@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* =============================================
+   REB — Rohlax Wellness
+   ============================================= */
+
+:root {
+  --cream:       #faf9f7;
+  --cream-dark:  #f0ede8;
+  --cream-mid:   #e5e0d8;
+  --sage:        #7c9a8e;
+  --sage-light:  #96b3a6;
+  --sage-dark:   #5a7a6e;
+  --sage-wash:   rgba(124, 154, 142, 0.08);
+  --bark:        #2a2520;
+  --bark-light:  #5a4d3e;
+  --bark-faded:  #8a7d6e;
+  --blush:       #d4a89a;
+  --blush-light: #e4c4b8;
+  --terra:       #b5634b;
+  --terra-light: #c97a64;
+  --pure-white:  #ffffff;
+  --warm-black:  #1a1510;
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-cream-dark: var(--cream-dark);
+  --color-cream-mid: var(--cream-mid);
+  --color-sage: var(--sage);
+  --color-sage-light: var(--sage-light);
+  --color-sage-dark: var(--sage-dark);
+  --color-bark: var(--bark);
+  --color-bark-light: var(--bark-light);
+  --color-bark-faded: var(--bark-faded);
+  --color-blush: var(--blush);
+  --color-blush-light: var(--blush-light);
+  --color-terra: var(--terra);
+  --color-terra-light: var(--terra-light);
+  --color-pure-white: var(--pure-white);
+  --color-warm-black: var(--warm-black);
+}
+
+/* Base */
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  background: var(--cream);
+  color: var(--bark);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--sage);
+  color: var(--cream);
+}
+
+/* ===== TYPOGRAPHY ===== */
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+.font-body {
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* ===== LAYOUT ===== */
+.container-main {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .container-main {
+    padding-left: 4rem;
+    padding-right: 4rem;
+  }
+}
+
+.container-wide {
+  max-width: 1440px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .container-wide {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--sage);
+  color: var(--pure-white);
+  padding: 1rem 2.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+.btn-primary:hover {
+  background: var(--sage-dark);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  color: var(--pure-white);
+  padding: 1rem 2.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1.5px solid rgba(255,255,255,0.8);
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-ghost:hover {
+  background: var(--pure-white);
+  color: var(--bark);
+  border-color: var(--pure-white);
+}
+
+/* ===== REVEAL ANIMATIONS ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--cream-mid); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bark-faded); }
+
+/* ===== TOAST ===== */
+@keyframes toast-in {
+  0% { opacity: 0; transform: translateY(8px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast {
+  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ===== SCROLL INDICATOR ===== */
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+  50% { transform: translateX(-50%) translateY(6px); opacity: 0.6; }
+}
