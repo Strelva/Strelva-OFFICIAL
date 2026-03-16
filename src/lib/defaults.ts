@@ -27,50 +27,14 @@ export const defaultServices: ServicesContent = {
     "Every assisted stretch session is thoughtfully tailored to each individual. You don't have to be an athlete or have a chronic condition to benefit.",
   services: [
     {
-      id: "intro-stretch",
-      name: "Intro Assisted Stretch",
+      id: "assisted-stretch",
+      name: "Assisted Stretch Session",
       description:
-        "New to assisted stretching? This introductory session focuses on full-body stretching to identify your areas of tension and build a personalized plan for ongoing sessions.",
-      duration: "50 min",
-      price: "65",
+        "A personalized 1-on-1 assisted stretching session tailored to your body. Chelsea will assess your range of motion, target your areas of tension, and guide you through hands-on stretching to restore mobility and promote relaxation.",
+      duration: "",
+      price: "",
       featured: true,
-      who_its_for: "First-time clients looking to experience assisted stretching",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-    },
-    {
-      id: "full-body",
-      name: "Full Body Stretch",
-      description:
-        "A comprehensive head-to-toe stretching session targeting all major muscle groups. Great for athletes, desk workers, and anyone looking to improve flexibility and range of motion.",
-      duration: "50 min",
-      price: "85",
-      featured: false,
-      who_its_for: "Anyone wanting full-body relief and improved range of motion",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-    },
-    {
-      id: "targeted",
-      name: "Targeted Stretch",
-      description:
-        "Focused stretching for specific problem areas — neck, shoulders, back, hips, or legs. Ideal when you know exactly where you need relief.",
-      duration: "30 min",
-      price: "55",
-      featured: false,
-      who_its_for: "Clients with specific areas of tightness or pain",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-    },
-    {
-      id: "couples",
-      name: "Couples Stretch",
-      description:
-        "Share the experience with a partner, friend, or family member. Two practitioners work simultaneously so you can stretch together.",
-      duration: "50 min",
-      price: "150",
-      featured: false,
-      who_its_for: "Pairs looking for a shared wellness experience",
+      who_its_for: "Everyone — athletes, desk workers, new parents, and anyone who wants to move and feel better",
       vagaro_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
@@ -106,30 +70,30 @@ export const defaultTestimonials: TestimonialsContent = {
     {
       id: "t1",
       quote:
-        "I've been going to Chelsea for months and the difference in my mobility is incredible. I can actually touch my toes now!",
-      author: "Jessica M.",
-      location: "Williamsville, NY",
+        "Chelsea truly works wonders. I left my first full-body stretch session feeling amazing — my body hasn't felt this good in years.",
+      author: "Vagaro Client",
+      location: "",
     },
     {
       id: "t2",
       quote:
-        "As a runner, stretching is everything. Chelsea's sessions have completely changed my recovery game.",
-      author: "Marcus R.",
-      location: "Amherst, NY",
+        "Chelsea was extremely professional, thorough, and focused on my key pain points. She explained everything extremely well without pushing anything.",
+      author: "Vagaro Client",
+      location: "",
     },
     {
       id: "t3",
       quote:
-        "I sit at a desk 8 hours a day and my shoulders were always locked up. After just a few sessions, the tension is gone.",
-      author: "Sarah K.",
-      location: "Buffalo, NY",
+        "Through many years in sports, Chelsea provided the most proficient and effective upper-body stretch I've ever had, by far.",
+      author: "Vagaro Client",
+      location: "",
     },
     {
       id: "t4",
       quote:
-        "Chelsea really knows what she's doing. She found knots I didn't even know I had. Highly recommend to anyone.",
-      author: "David P.",
-      location: "Clarence, NY",
+        "Had my first stretch postpartum and Chelsea really targeted the tense areas to work toward better mobility. Highly recommend!",
+      author: "Vagaro Client",
+      location: "",
     },
   ],
 };

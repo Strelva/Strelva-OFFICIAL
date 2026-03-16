@@ -49,17 +49,25 @@ export function Services({ services }: { services: ServicesContent }) {
                 <p className="text-base leading-relaxed mb-6 opacity-90">
                   {featured.description}
                 </p>
-                <div className="flex items-center gap-6 mb-6">
-                  <div>
-                    <span className="font-display text-2xl md:text-3xl tracking-tight">
-                      ${featured.price}
-                    </span>
+                {(featured.price || featured.duration) && (
+                  <div className="flex items-center gap-6 mb-6">
+                    {featured.price && (
+                      <div>
+                        <span className="font-display text-2xl md:text-3xl tracking-tight">
+                          ${featured.price}
+                        </span>
+                      </div>
+                    )}
+                    {featured.price && featured.duration && (
+                      <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.3)" }} />
+                    )}
+                    {featured.duration && (
+                      <div>
+                        <span className="text-sm opacity-80">{featured.duration}</span>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.3)" }} />
-                  <div>
-                    <span className="text-sm opacity-80">{featured.duration}</span>
-                  </div>
-                </div>
+                )}
                 {featured.who_its_for && (
                   <p className="text-sm opacity-70 mb-6">
                     <span className="font-medium">Best for:</span> {featured.who_its_for}
@@ -140,11 +148,13 @@ export function Services({ services }: { services: ServicesContent }) {
                     <h3 className="font-display text-xl tracking-tight">
                       {service.name}
                     </h3>
-                    <div className="flex-shrink-0 text-right">
-                      <span className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }}>
-                        ${service.price}
-                      </span>
-                    </div>
+                    {service.price && (
+                      <div className="flex-shrink-0 text-right">
+                        <span className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }}>
+                          ${service.price}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <p
                     className="text-sm leading-relaxed mb-4"
