@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = streamText({
-    model: google("gemini-2.0-flash"),
+    model: google("gemini-2.5-flash"),
     system: `You are the website assistant for Rohlax Wellness, a stretching and wellness studio in Williamsville, NY run by Chelsea.
 
 You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data with your changes applied — do not send partial updates.
@@ -142,5 +142,5 @@ Never remove content unless explicitly asked. For array items (services, events,
     stopWhen: stepCountIs(5),
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toTextStreamResponse();
 }
