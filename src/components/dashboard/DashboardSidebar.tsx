@@ -79,14 +79,14 @@ export function DashboardSidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-150 ${
+                className={`group flex items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-150 ${
                   active
                     ? "bg-[#1c1c1c] text-white border-l-2 border-violet-600 rounded-r-lg"
                     : "text-zinc-400 hover:text-white hover:bg-[#141414] rounded-lg"
                 }`}
               >
-                <item.icon className={`w-4 h-4 ${active ? "text-violet-400" : ""}`} />
-                {item.label}
+                <item.icon className={`w-4 h-4 transition-colors duration-150 ${active ? "text-violet-400" : "text-zinc-500 group-hover:text-violet-400"}`} />
+                <span className={`transition-transform duration-150 ${active ? "" : "group-hover:translate-x-0.5"}`}>{item.label}</span>
               </Link>
             );
           })}

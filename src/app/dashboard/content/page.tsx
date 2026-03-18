@@ -81,10 +81,11 @@ export default async function ContentPage() {
           <Link
             key={section.id}
             href="/dashboard/chat"
-            className="group bg-[#141414] border border-[#262626] rounded-lg p-4 hover:border-[#333] transition-colors duration-150"
+            className="group relative overflow-hidden bg-[#141414] border border-[#262626] rounded-lg p-4 hover:border-[#333] hover:border-l-2 hover:border-l-violet-600 transition-all duration-150"
           >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-md bg-violet-600/10 flex items-center justify-center shrink-0">
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+            <div className="relative flex items-start gap-3">
+              <div className="w-8 h-8 rounded-md bg-violet-600/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-150">
                 <section.icon className="w-4 h-4 text-violet-400" />
               </div>
               <div className="min-w-0 flex-1">

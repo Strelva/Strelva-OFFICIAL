@@ -69,25 +69,25 @@ export default function DashboardOverview() {
 
       {/* Hero metrics — visitors + clicks (the important numbers) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5">
+        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               PEOPLE WHO FOUND YOU
             </span>
             <span className="text-xs font-mono text-emerald-400">+12%</span>
           </div>
-          <p className="text-3xl font-semibold font-mono tabular-nums text-white">
+          <p className="text-3xl font-semibold font-mono tabular-nums text-white transition-all duration-700">
             127
           </p>
         </div>
-        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5">
+        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               BOOKING CLICKS
             </span>
             <span className="text-xs font-mono text-emerald-400">+8%</span>
           </div>
-          <p className="text-3xl font-semibold font-mono tabular-nums text-white">
+          <p className="text-3xl font-semibold font-mono tabular-nums text-white transition-all duration-700">
             23
           </p>
         </div>
@@ -130,7 +130,8 @@ export default function DashboardOverview() {
             {ACTIVITY.map((item, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 py-3 border-b border-[#1c1c1c] last:border-0"
+                className="flex items-center gap-3 py-3 border-b border-[#1c1c1c] last:border-0 animate-fade-in-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -162,7 +163,7 @@ export default function DashboardOverview() {
                   <action.icon className="w-4 h-4 text-zinc-500 group-hover:text-violet-400 transition-colors duration-150" />
                   {action.label}
                 </span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-zinc-700 group-hover:text-zinc-400 transition-colors duration-150" />
+                <ArrowUpRight className="w-3.5 h-3.5 text-zinc-700 group-hover:text-zinc-400 group-hover:rotate-45 transition-all duration-150" />
               </Link>
             ))}
           </div>

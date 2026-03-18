@@ -13,9 +13,15 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a]">
-      <DashboardSidebar />
-      <main className="flex-1 md:ml-0 mt-14 md:mt-0">{children}</main>
+    <div className="flex flex-col min-h-screen bg-[#0a0a0a]">
+      <div className="reb-accent-line w-full shrink-0" />
+      <div className="flex flex-1">
+        <DashboardSidebar />
+        <main className="flex-1 md:ml-0 mt-14 md:mt-0 relative">
+          <div className="reb-grid-bg absolute inset-0 opacity-30 pointer-events-none" />
+          <div className="relative">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

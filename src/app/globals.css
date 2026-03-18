@@ -180,3 +180,81 @@ body {
   0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
   50% { transform: translateX(-50%) translateY(6px); opacity: 0.6; }
 }
+
+/* ===== DASHBOARD CRAFT ===== */
+
+/* Staggered fade-in for activity items */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Gentle pulse for bot icon in empty state */
+@keyframes pulse-gentle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+.animate-pulse-gentle {
+  animation: pulse-gentle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Typing indicator — single violet dot */
+@keyframes typing-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.animate-typing-dot {
+  animation: typing-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* REB accent line — visual signature */
+.reb-accent-line {
+  height: 2px;
+  background: linear-gradient(90deg, #7c3aed 0%, #6d28d9 50%, transparent 100%);
+}
+
+/* Subtle grid dot pattern */
+.reb-grid-bg {
+  background-image: radial-gradient(circle, #1c1c1c 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Markdown in chat messages */
+.chat-markdown p { margin-bottom: 0.5rem; }
+.chat-markdown p:last-child { margin-bottom: 0; }
+.chat-markdown strong { font-weight: 600; }
+.chat-markdown ul, .chat-markdown ol { padding-left: 1rem; margin-bottom: 0.5rem; }
+.chat-markdown ul { list-style-type: disc; }
+.chat-markdown ol { list-style-type: decimal; }
+.chat-markdown li { margin-bottom: 0.25rem; }
+.chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  margin-top: 0.5rem;
+}
+.chat-markdown h1:first-child, .chat-markdown h2:first-child, .chat-markdown h3:first-child {
+  margin-top: 0;
+}
+.chat-markdown code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: #1c1c1c;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+.chat-markdown pre {
+  background: #1c1c1c;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+}
+.chat-markdown pre code {
+  background: transparent;
+  padding: 0;
+}

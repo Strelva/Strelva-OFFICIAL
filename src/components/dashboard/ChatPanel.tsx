@@ -11,6 +11,7 @@ import {
   User,
   Loader2,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
@@ -23,6 +24,15 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  timestamp: number;
+}
+
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 export function ChatPanel() {
@@ -49,6 +59,7 @@ export function ChatPanel() {
       id: Date.now().toString(),
       role: "user",
       content: text,
+      timestamp: Date.now(),
     };
 
     const allMessages = [...messages, userMsg];
@@ -77,6 +88,7 @@ export function ChatPanel() {
             id: Date.now().toString(),
             role: "assistant",
             content: `Sorry, something went wrong: ${err.error || res.statusText}`,
+            timestamp: Date.now(),
           },
         ]);
         setIsLoading(false);
@@ -90,9 +102,10 @@ export function ChatPanel() {
       }
 
       const assistantId = (Date.now() + 1).toString();
+      const assistantTs = Date.now();
       setMessages((prev) => [
         ...prev,
-        { id: assistantId, role: "assistant", content: "" },
+        { id: assistantId, role: "assistant", content: "", timestamp: assistantTs },
       ]);
 
       const decoder = new TextDecoder();
@@ -118,6 +131,7 @@ export function ChatPanel() {
           id: Date.now().toString(),
           role: "assistant",
           content: "Sorry, I couldn't connect. Please try again.",
+          timestamp: Date.now(),
         },
       ]);
     } finally {
@@ -157,7 +171,7 @@ export function ChatPanel() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-12 h-12 rounded-lg bg-violet-600/10 flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-lg bg-violet-600/10 flex items-center justify-center mb-4 animate-pulse-gentle">
               <Bot className="w-6 h-6 text-violet-400" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">
@@ -205,22 +219,32 @@ export function ChatPanel() {
                   <Bot className="w-3.5 h-3.5 text-white" />
                 )}
               </div>
-              <div
-                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  message.role === "user"
-                    ? "bg-violet-600 text-white"
-                    : "bg-[#141414] text-zinc-200 border border-[#262626]"
-                }`}
-              >
-                <p className="whitespace-pre-wrap">
-                  {message.content || (
-                    <span className="flex gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-zinc-600 animate-bounce [animation-delay:0ms]" />
-                      <span className="w-2 h-2 rounded-full bg-zinc-600 animate-bounce [animation-delay:150ms]" />
-                      <span className="w-2 h-2 rounded-full bg-zinc-600 animate-bounce [animation-delay:300ms]" />
+              <div className={message.role === "user" ? "text-right" : "text-left"}>
+                <div
+                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-violet-600 text-white"
+                      : "bg-[#141414] text-zinc-200 border border-[#262626]"
+                  }`}
+                >
+                  {message.content ? (
+                    message.role === "assistant" ? (
+                      <div className="chat-markdown">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )
+                  ) : (
+                    <span className="flex items-center gap-2 py-0.5">
+                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-typing-dot" />
+                      <span className="text-xs text-zinc-500">Thinking</span>
                     </span>
                   )}
-                </p>
+                </div>
+                <span className="font-mono text-[10px] text-zinc-600 mt-1 block px-1">
+                  {timeAgo(message.timestamp)}
+                </span>
               </div>
             </div>
           </div>
@@ -260,7 +284,11 @@ export function ChatPanel() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="w-9 h-9 rounded-md bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-600 flex items-center justify-center transition-colors duration-150 shrink-0"
+            className={`w-9 h-9 rounded-md flex items-center justify-center transition-all duration-150 shrink-0 ${
+              isLoading
+                ? "bg-violet-600 shadow-[0_0_12px_rgba(124,58,237,0.3)]"
+                : "bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-600"
+            }`}
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 text-white animate-spin" />
