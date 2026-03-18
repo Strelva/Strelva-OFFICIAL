@@ -1,0 +1,442 @@
+# REB Startup — Full Build Todos
+# Productized AI web agency with client business OS dashboard
+# You build sites. Clients get a Framer-quality dashboard + AI agent.
+# The dashboard IS their business OS for web presence.
+#
+# Priority: P0 (this week), P1 (next 2 weeks), P2 (month 2), P3 (month 3+)
+
+items:
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 1: AI Agent Core (P0 — this week)
+# ═══════════════════════════════════════════════════════════
+
+  - id: agent-api
+    title: "Build /api/agent/route.ts with read_section + update_section tools"
+    priority: P0
+    feature: ai-agent
+    status: done
+    done_at: 2026-03-17
+    context: "Vercel AI SDK v6 streamText + tools. Two tools wrapping existing /api/content/[section]. System prompt personalized per tenant. stopWhen: stepCountIs(5). Same JWT auth as admin."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: zod-schemas
+    title: "Add Zod schemas to lib/schemas.ts mirroring types.ts"
+    priority: P0
+    feature: ai-agent
+    status: done
+    done_at: 2026-03-17
+    context: "One Zod schema per content section. Used in update_section for validation before writes."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: chat-persistence
+    title: "Add saveChatMessages/loadChatMessages to lib/storage.ts"
+    priority: P0
+    feature: ai-agent
+    status: todo
+    context: "UIMessage[] in Redis keyed by clientId. onFinish callback to persist. 100-message sliding window."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: slack-notifications
+    title: "Add Slack webhook notification on content updates"
+    priority: P0
+    feature: ai-agent
+    status: done
+    done_at: 2026-03-17
+    context: "POST to SLACK_WEBHOOK_URL after successful write. No library — just fetch."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 1B: Client Business OS Dashboard (P0)
+# Framer-quality. This IS the product experience.
+# ═══════════════════════════════════════════════════════════
+
+  - id: client-dashboard-layout
+    title: "Build client dashboard layout — Framer-quality business OS"
+    priority: P0
+    feature: client-dashboard
+    status: done
+    done_at: 2026-03-17
+    context: "Route: /dashboard. Sidebar: AI Chat, Overview, My Site, Content, Reports, Settings. Dark mode, premium, mobile-first."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: client-overview
+    title: "Dashboard overview — 'How is my site doing?' in outcome language"
+    priority: P0
+    feature: client-dashboard
+    status: done
+    done_at: 2026-03-17
+    context: "Cards: 'People who found you', 'Booking clicks', 'Site health', 'AI activity'. Activity feed. Quick actions. No jargon."
+    source: "/product customer-research"
+    created: 2026-03-17
+
+  - id: client-chat-panel
+    title: "AI Chat panel — primary interaction surface"
+    priority: P0
+    feature: client-dashboard
+    status: done
+    done_at: 2026-03-17
+    context: "useChat + streaming + tool status + image drop + suggested prompts. The chat IS the CMS."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: chelsea-test
+    title: "Test with Chelsea — 15 min watching her use dashboard + chat"
+    priority: P0
+    feature: validation
+    status: todo
+    context: "First real user test. Watch her face. Note confusion/delight. Do NOT skip."
+    source: "/product coach"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 1C: Deployment Architecture (P0 — this week)
+# Two deployments: REB platform + client sites
+# ═══════════════════════════════════════════════════════════
+
+  - id: domain-strategy
+    title: "Decide and acquire domains: reb.studio + client subdomains"
+    priority: P0
+    feature: deployment
+    status: todo
+    context: |
+      Architecture:
+        reb.studio                    → REB agency landing page + Laney admin
+        chelsea.reb.studio            → Chelsea's public site + dashboard
+        [client].reb.studio           → future clients
+        OR: clients get custom domains (rohlaxwellness.com) mapped via Vercel
+
+      Options for domain:
+        reb.studio (~$40/yr) — clean, tech, memorable
+        reb.app — if available
+        getreb.com — if .studio taken
+
+      Check availability, buy through Vercel or Namecheap.
+      Add wildcard DNS (*.reb.studio) for subdomain routing.
+    source: "/strategy deployment"
+    created: 2026-03-17
+
+  - id: vercel-multi-project
+    title: "Set up Vercel project for multi-tenant subdomain routing"
+    priority: P0
+    feature: deployment
+    status: todo
+    context: |
+      Current: single Vercel project "rohlax-wellness" at rohlax-wellness.vercel.app
+      Target: same codebase serves all clients via subdomain routing
+
+      Steps:
+        1. Add reb.studio domain to Vercel project
+        2. Add wildcard *.reb.studio DNS
+        3. Update middleware to extract tenant from subdomain
+        4. Root domain (reb.studio) serves the REB agency landing page
+        5. chelsea.reb.studio serves Chelsea's site + dashboard
+        6. Environment: NEXT_PUBLIC_ROOT_DOMAIN=reb.studio
+
+      Reference: Vercel Platforms starter kit pattern.
+      The middleware already exists (tenant-middleware todo) — this is the infra setup.
+    source: "/strategy deployment"
+    created: 2026-03-17
+    depends_on: [domain-strategy]
+
+  - id: reb-landing-page
+    title: "Build REB agency landing page at root domain"
+    priority: P1
+    feature: deployment
+    status: todo
+    context: |
+      Route: reb.studio (root, no subdomain)
+      This is NOT a client site — it's the REB sales page.
+
+      Sections:
+        - Hero: "Your site works while you sleep"
+        - What you get: custom site + AI business OS
+        - How it works: 1. We build it, 2. You talk to AI, 3. Site improves
+        - Portfolio: Chelsea's site as first showcase
+        - Pricing: $3K build + $199/mo
+        - Testimonial: Chelsea (after she validates)
+        - CTA: "Get started" → contact form or Calendly link
+
+      Design: same Vercel-inspired design system but marketing-oriented.
+      Lives in the same codebase: src/app/(marketing)/ route group.
+      Middleware routes root domain to marketing pages, subdomains to client sites.
+    source: "/strategy deployment"
+    created: 2026-03-17
+    depends_on: [vercel-multi-project]
+
+  - id: deploy-chelsea-subdomain
+    title: "Deploy Chelsea's site to chelsea.reb.studio"
+    priority: P1
+    feature: deployment
+    status: todo
+    context: |
+      Move Chelsea from rohlax-wellness.vercel.app to chelsea.reb.studio.
+
+      Steps:
+        1. Middleware routes chelsea.reb.studio to tenant: chelsea
+        2. Chelsea's content loads from chelsea:content:* Redis keys
+        3. Dashboard at chelsea.reb.studio/dashboard
+        4. Public site at chelsea.reb.studio/
+        5. Optional: also map rohlaxwellness.com as custom domain later
+
+      Test: all pages work, AI agent works, content updates work.
+      This is the first real multi-tenant deployment.
+    source: "/strategy deployment"
+    created: 2026-03-17
+    depends_on: [vercel-multi-project, tenant-middleware, tenant-storage]
+
+  - id: env-per-tenant
+    title: "Per-tenant environment config (Redis, AI key, Slack webhook)"
+    priority: P1
+    feature: deployment
+    status: todo
+    context: |
+      Shared env vars across all tenants:
+        GOOGLE_GENERATIVE_AI_API_KEY (one key, all tenants)
+        REDIS_URL (one Redis, namespaced per tenant)
+        JWT_SECRET (shared, tenant scoped in JWT payload)
+
+      Per-tenant config (stored in Redis, not env):
+        Business name, system prompt, colors, domain, Vagaro URL
+        Slack webhook (per tenant or shared channel with tenant prefix)
+
+      Laney's admin credentials: super-admin JWT that works across all tenants.
+    source: "/strategy deployment"
+    created: 2026-03-17
+    depends_on: [tenant-config]
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 2: Multi-Tenant + Scale (P1 — next 2 weeks)
+# ═══════════════════════════════════════════════════════════
+
+  - id: tenant-middleware
+    title: "Subdomain-based tenant routing middleware"
+    priority: P1
+    feature: multi-tenant
+    status: todo
+    context: |
+      chelsea.reb.studio → tenant: chelsea. Vercel Platforms pattern.
+      Root domain (reb.studio, no subdomain) → marketing pages.
+      Rewrite: /sites/{tenant}{path} internally.
+      Set tenant in headers/cookies for downstream components.
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: tenant-storage
+    title: "Scope Redis storage to tenant namespace"
+    priority: P1
+    feature: multi-tenant
+    status: todo
+    context: "{tenantId}:content:{section}. Migrate Chelsea's data."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: tenant-config
+    title: "Per-tenant configuration system"
+    priority: P1
+    feature: multi-tenant
+    status: todo
+    context: "Redis: {tenantId}:config. businessName, domain, industry, colors, systemPrompt."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: tenant-auth
+    title: "Per-tenant JWT auth + Laney super-admin"
+    priority: P1
+    feature: multi-tenant
+    status: todo
+    context: "JWT includes tenantId. Per-tenant credentials. Super-admin across all."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: site-templates
+    title: "Industry-specific site templates (wellness, trades, restaurant, professional)"
+    priority: P1
+    feature: multi-tenant
+    status: todo
+    context: "3-5 templates. Default sections + industry copy. Reduces build time to hours."
+    source: "/research ai-managed-sites"
+    created: 2026-03-17
+
+  - id: image-upload-tool
+    title: "Add upload_image tool to AI agent"
+    priority: P1
+    feature: ai-agent
+    status: todo
+    context: "Client drops photo → upload_image tool → existing /api/upload → URL returned."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: array-guard
+    title: "Array-destructive operation guard (>50% removal = confirm)"
+    priority: P1
+    feature: ai-agent
+    status: done
+    done_at: 2026-03-17
+    context: "Prevent accidental mass deletion from ambiguous instructions."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: client-site-preview
+    title: "Live site preview in dashboard (iframe)"
+    priority: P1
+    feature: client-dashboard
+    status: done
+    done_at: 2026-03-17
+    context: "/dashboard/site — iframe of live site. Real-time changes visible."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: client-content-overview
+    title: "Content overview — visual map of site sections"
+    priority: P1
+    feature: client-dashboard
+    status: done
+    done_at: 2026-03-17
+    context: "Cards per section. Click edit → opens chat with pre-filled prompt."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: second-client
+    title: "Onboard second client from Chelsea's provider directory"
+    priority: P1
+    feature: validation
+    status: todo
+    context: "Build site. Give dashboard + AI. Validate multi-tenant end-to-end."
+    source: "/product"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 3: Business Operations (P2 — month 2)
+# ═══════════════════════════════════════════════════════════
+
+  - id: stripe-billing
+    title: "Stripe subscription billing ($3K build + $199/mo)"
+    priority: P2
+    feature: billing
+    status: todo
+    context: "Checkout + Subscription. Webhooks. Auto-disable on failure."
+    source: "/research agency-economics"
+    created: 2026-03-17
+
+  - id: weekly-reports
+    title: "AI-generated weekly site report per client (email)"
+    priority: P2
+    feature: retention
+    status: todo
+    context: "Monday report: visitors, clicks, what AI did. THE retention mechanism."
+    source: "/research agency-economics"
+    created: 2026-03-17
+
+  - id: analytics-integration
+    title: "Basic analytics per tenant (PostHog or Vercel Analytics)"
+    priority: P2
+    feature: analytics
+    status: todo
+    context: "Views, visitors, booking clicks, form submissions. Feed into dashboard + reports + chat."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: laney-command-center
+    title: "Laney's admin dashboard — all clients at a glance"
+    priority: P2
+    feature: operations
+    status: todo
+    context: "All tenants, MRR, recent changes, approve/reject queue."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: escalation-system
+    title: "AI escalation taxonomy (auto-approve / review / block)"
+    priority: P2
+    feature: ai-agent
+    status: todo
+    context: "Auto: hours/phone/address. Review: new pages, pricing. Block: code/layout. Slack approve/reject."
+    source: "/research ai-managed-sites"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
+# PHASE 4: Growth (P3 — month 3+)
+# ═══════════════════════════════════════════════════════════
+
+  - id: portfolio-site
+    title: "REB agency landing page (reb.studio)"
+    priority: P3
+    feature: distribution
+    status: done
+    done_at: 2026-03-17
+    context: "Replaced by reb-landing-page in Phase 1C. Same scope, earlier priority."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: referral-program
+    title: "Client referral program ($50/mo credit)"
+    priority: P3
+    feature: distribution
+    status: todo
+    context: "Provider directory IS the pipeline. Chelsea refers → credit."
+    source: "/research agency-economics"
+    created: 2026-03-17
+
+  - id: seo-automation
+    title: "Auto-SEO for all tenant sites (JSON-LD, sitemap, meta, GSC)"
+    priority: P3
+    feature: seo
+    status: todo
+    context: "Auto-generate on content update. Submit to Google Search Console."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: proactive-content
+    title: "AI proactive content suggestions + blog writing"
+    priority: P3
+    feature: ai-agent
+    status: todo
+    context: "AI suggests updates based on staleness + seasonality. Monthly content calendar."
+    source: "/product"
+    created: 2026-03-17
+
+  - id: custom-domains
+    title: "Custom domain support per tenant (Vercel API)"
+    priority: P3
+    feature: multi-tenant
+    status: todo
+    context: "Own domain. DNS verification. Auto-SSL."
+    source: "/research tech-architecture"
+    created: 2026-03-17
+
+  - id: onboarding-flow
+    title: "Streamlined new client onboarding flow"
+    priority: P3
+    feature: operations
+    status: todo
+    context: "Intake form → template build → 'Meet your AI' email → first chat → billing starts."
+    source: "/research agency-economics"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
+# LEGACY BACKLOG (from prior research)
+# ═══════════════════════════════════════════════════════════
+
+  - id: audit-vagaro-mysite
+    title: "Audit Vagaro MySite — document SEO/design limitations"
+    priority: P2
+    feature: vagaro-integration
+    status: backlog
+    context: "Sign up for trial, document what it can't do vs REB."
+    source: "manual"
+    created: 2026-03-17
+
+  - id: vagaro-api-access
+    title: "Investigate Vagaro API access for third-party developers"
+    priority: P2
+    feature: vagaro-integration
+    status: backlog
+    context: "Can data pipeline be built legally?"
+    source: "manual"
+    created: 2026-03-17
