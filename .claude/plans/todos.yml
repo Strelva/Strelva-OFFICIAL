@@ -420,6 +420,203 @@ items:
     created: 2026-03-17
 
 # ═══════════════════════════════════════════════════════════
+# EVAL-DRIVEN GAPS (from deep eval 2026-03-17)
+# Organized by feature, priority by eval score (worst first)
+# ═══════════════════════════════════════════════════════════
+
+# --- SEO (score: 42 — worst feature, P0 fix) ---
+
+  - id: dynamic-seo-schema
+    title: "Generate JSON-LD from CMS data, not hardcoded values"
+    priority: P0
+    feature: seo
+    status: todo
+    context: "Layout.tsx has hardcoded LocalBusiness schema. Should read from storage (contact + settings) and generate dynamically. Business name, address, phone, hours, services all come from CMS."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: sitemap-xml
+    title: "Auto-generate sitemap.xml"
+    priority: P1
+    feature: seo
+    status: todo
+    context: "No sitemap exists. Next.js 15 supports app/sitemap.ts for dynamic generation. Include all public pages."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: robots-txt
+    title: "Add robots.txt allowing crawlers, blocking /admin and /dashboard"
+    priority: P1
+    feature: seo
+    status: todo
+    context: "No robots.txt. Add app/robots.ts. Allow all crawlers. Disallow /admin/*, /dashboard/*, /api/*."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: dynamic-meta-tags
+    title: "Generate meta title/description from CMS settings data"
+    priority: P1
+    feature: seo
+    status: todo
+    context: "Meta tags should read siteName, siteDescription from settings. Currently partially hardcoded."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: opengraph-image
+    title: "Add Open Graph image for social sharing"
+    priority: P2
+    feature: seo
+    status: todo
+    context: "No og:image set. Generate or upload a branded social card for link previews."
+    source: "/eval"
+    created: 2026-03-17
+
+# --- AI Agent (score: 58 — key gaps) ---
+
+  - id: wire-chat-persistence
+    title: "Wire saveChatMessages/loadChatMessages into ChatPanel"
+    priority: P0
+    feature: ai-agent
+    status: todo
+    context: "Functions exist in storage.ts but ChatPanel uses local state. Need: save after each exchange, load on page open. Requires API routes for chat history since ChatPanel is a client component."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: chat-error-handling
+    title: "Handle AI agent API errors gracefully in chat UI"
+    priority: P1
+    feature: ai-agent
+    status: todo
+    context: "If Gemini API fails (rate limit, network), chat silently fails. Need: error message in chat bubble, retry button. Also handle auth expiry mid-conversation."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: dynamic-system-prompt
+    title: "Generate AI system prompt from tenant config, not hardcoded"
+    priority: P1
+    feature: ai-agent
+    status: todo
+    context: "System prompt hardcodes 'Rohlax Wellness' and 'Chelsea'. Should read from tenant config: business name, owner name, industry, custom instructions. Required for multi-tenant."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: agent-update-confirmation
+    title: "Show visual confirmation when AI updates site content"
+    priority: P1
+    feature: ai-agent
+    status: todo
+    context: "When update_section succeeds, chat shows text but no visual indicator that the SITE changed. Add: a toast/banner 'Site updated — view changes' with link to /dashboard/site."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: slack-webhook-prod
+    title: "Set SLACK_WEBHOOK_URL in Vercel production env"
+    priority: P0
+    feature: ai-agent
+    status: todo
+    context: "Slack notification code exists but env var not set in production. Create a Slack webhook and add to Vercel env."
+    source: "/eval"
+    created: 2026-03-17
+
+# --- Client Dashboard (score: 60 — mock data debt) ---
+
+  - id: real-overview-metrics
+    title: "Replace mock metrics with real data (or honest empty state)"
+    priority: P0
+    feature: client-dashboard
+    status: todo
+    context: "Overview shows hardcoded 127 visitors, 23 clicks, +12%, +8%. This is dishonest. Either: (1) wire real analytics via PostHog/Vercel, or (2) show honest empty state: 'Analytics coming soon — we'll track visitors once your site is live.' Mock data that looks real is worse than no data."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: real-activity-feed
+    title: "Replace hardcoded activity feed with real AI agent action log"
+    priority: P1
+    feature: client-dashboard
+    status: todo
+    context: "Activity feed shows fake items. Should read from an activity log that the AI agent writes to on every update_section call. Store in Redis: {tenant}:activity as a list of {text, time, type}."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: mobile-dashboard-audit
+    title: "Test and fix dashboard at 390px mobile width"
+    priority: P1
+    feature: client-dashboard
+    status: todo
+    context: "Sidebar has mobile hamburger but untested. Metric cards, activity feed, content grid may break on small screens. Chelsea will use this on her phone."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: dashboard-loading-states
+    title: "Add loading skeletons for server-fetched dashboard pages"
+    priority: P2
+    feature: client-dashboard
+    status: todo
+    context: "Content and settings pages fetch from Redis. On slow connections they'll flash. Add loading.tsx with skeleton UI matching the design system."
+    source: "/eval"
+    created: 2026-03-17
+
+# --- Public Site (score: 68 — strongest, minor gaps) ---
+
+  - id: public-empty-states
+    title: "Add empty states for events/providers when none exist"
+    priority: P2
+    feature: public-site
+    status: todo
+    context: "If Chelsea deletes all events via AI chat, what does the events section show? Currently: empty space. Should show: 'No upcoming events. Check back soon.' Same for providers."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: public-favicon
+    title: "Add favicon and apple-touch-icon"
+    priority: P2
+    feature: public-site
+    status: todo
+    context: "Browser tab shows generic Next.js icon. Console shows 404 for favicon.ico. Add branded favicon."
+    source: "/eval"
+    created: 2026-03-17
+
+# --- Vagaro Integration (score: 62 — stale data risk) ---
+
+  - id: vagaro-data-freshness
+    title: "Add 'last synced' indicator and manual refresh for Vagaro data"
+    priority: P2
+    feature: vagaro-integration
+    status: todo
+    context: "Services were scraped once via Playwright. If Chelsea updates prices on Vagaro, site is stale. Options: (1) manual re-scrape button in admin, (2) 'last synced: Mar 15' indicator, (3) AI agent tool to re-scrape."
+    source: "/eval"
+    created: 2026-03-17
+
+# --- Config/Infrastructure ---
+
+  - id: update-rhino-yml
+    title: "Update rhino.yml with ai-agent and client-dashboard features"
+    priority: P0
+    feature: operations
+    status: todo
+    context: "rhino.yml still describes only the original 6 features. Missing: ai-agent (weight:5), client-dashboard (weight:5), deployment (weight:4). Feature list is stale."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: beliefs-yml
+    title: "Create beliefs.yml with core assertions for eval"
+    priority: P1
+    feature: operations
+    status: todo
+    context: "No mechanical assertions exist. Need: site builds, agent API responds, auth works, content CRUD works, dashboard loads. These become the regression safety net."
+    source: "/eval"
+    created: 2026-03-17
+
+  - id: env-documentation
+    title: "Document all required env vars in README or .env.example"
+    priority: P1
+    feature: operations
+    status: todo
+    context: "Required env vars: JWT_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD, GOOGLE_GENERATIVE_AI_API_KEY, REDIS_URL (optional), BLOB_READ_WRITE_TOKEN (optional), SLACK_WEBHOOK_URL (optional). No documentation exists."
+    source: "/eval"
+    created: 2026-03-17
+
+# ═══════════════════════════════════════════════════════════
 # LEGACY BACKLOG (from prior research)
 # ═══════════════════════════════════════════════════════════
 

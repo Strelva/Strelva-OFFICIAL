@@ -1,0 +1,168 @@
+{
+  "public-site": {
+    "score": 71,
+    "delivery_score": 75,
+    "craft_score": 68,
+    "viability_score": 65,
+    "gaps": [
+      "defaults.ts missing real prices (belief failure: has-real-prices)",
+      "defaults.ts missing real contact phone 716-559-2282 (belief failure: has-contact-info)",
+      "JSON-LD schema hardcodes contact data instead of pulling from CMS \u2014 schema won't update if Chelsea changes phone/email",
+      "No loading skeletons for async content (mitigated by SSR but visible on client navigation)"
+    ],
+    "strengths": [
+      "All 10 sections present with real data \u2014 Hero, TrustStrip, Services, Booking, Story, Testimonials, Events, Providers, Contact, Footer",
+      "GSAP parallax with prefers-reduced-motion check (Hero.tsx:20)",
+      "Events empty state with Instagram CTA (Events.tsx:41-58) \u2014 not a dead end",
+      "Proper Next.js Image with sizes throughout, skip-to-content link (page.tsx:28)"
+    ],
+    "evidence": "Complete 10-section marketing site with real Vagaro services, reviews, and providers. Well-structured components with thoughtful animation, accessibility, and mobile support. Belief failures indicate defaults file has stale data.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "admin-cms": {
+    "score": 66,
+    "delivery_score": 72,
+    "craft_score": 62,
+    "viability_score": 58,
+    "gaps": [
+      "No MIME type validation in upload API \u2014 HTML accept attribute is client-side only (ImageUploader.tsx:86)",
+      "Credential comparison is not constant-time \u2014 timing attack surface (auth.ts:24-31)",
+      "No double-submit protection on SaveButton",
+      "Array editors lack required field validation \u2014 can save empty service names"
+    ],
+    "strengths": [
+      "All 8 section editors with sidebar navigation (AdminSidebar.tsx:6-16)",
+      "ImageCropper with aspect ratio, rule-of-thirds grid, corner resize handles (ImageCropper.tsx)",
+      "Unsaved changes warning via beforeunload (SectionEditor.tsx:24-30)",
+      "Past-event visual warning in events editor (events/page.tsx:62-65)",
+      "Storage abstraction: Redis prod, file dev, Vercel Blob uploads (storage.ts)"
+    ],
+    "evidence": "Functional 8-section CMS with image cropping, array editors, JWT auth, and thoughtful admin UX. Missing server-side input validation and some security hardening.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "seo": {
+    "score": 68,
+    "delivery_score": 74,
+    "craft_score": 55,
+    "viability_score": 72,
+    "gaps": [
+      "JSON-LD schema hardcodes address/phone/email instead of using getContent() \u2014 won't reflect CMS edits (layout.tsx:50-90)",
+      "No error handling in generateMetadata if getContent('settings') fails",
+      "Schema image uses Unsplash stock URL instead of actual Rohlax photo (layout.tsx:84)"
+    ],
+    "strengths": [
+      "HealthAndBeautyBusiness schema type is correct (layout.tsx:52)",
+      "Keywords include target phrases: 'assisted stretching', 'Williamsville NY', 'Chelsea Rohl' (layout.tsx:26)",
+      "Dynamic meta title/description from CMS via getContent('settings') (layout.tsx:21-24)",
+      "Full GeoCoordinates, openingHoursSpecification, sameAs, founder (layout.tsx:66-90)"
+    ],
+    "evidence": "Solid LocalBusiness schema with correct type, real geo data, and dynamic meta. Main gap is hardcoded contact data in schema that won't sync with CMS. Real differentiation vs LinkTree/Vagaro.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "events": {
+    "score": 71,
+    "delivery_score": 76,
+    "craft_score": 70,
+    "viability_score": 62,
+    "gaps": [
+      "No loading state in admin editor \u2014 shows 'Loading...' text instead of skeleton (events/page.tsx:34)",
+      "Date formatting doesn't show year \u2014 could confuse for events far in future"
+    ],
+    "strengths": [
+      "Auto-filters past events with proper date comparison (Events.tsx:15-19)",
+      "Sorted by date chronologically (Events.tsx:62)",
+      "Empty state with Instagram CTA (Events.tsx:41-58)",
+      "Admin editor with past-event visual warning (events/page.tsx:62-65)",
+      "HOST_LABELS record for type safety (Events.tsx:22-26)"
+    ],
+    "evidence": "Well-implemented events feature with smart filtering, sorting, and admin warnings. Clean empty state handling.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "provider-directory": {
+    "score": 69,
+    "delivery_score": 74,
+    "craft_score": 68,
+    "viability_score": 60,
+    "gaps": [
+      "Provider photos (photo_url) defined in type but never rendered in public component (Providers.tsx)",
+      "No loading state in admin editor (providers/page.tsx)",
+      "No field validation \u2014 can save providers with empty names"
+    ],
+    "strengths": [
+      "5 categories with fixed display order (Providers.tsx:14-20)",
+      "Chelsea's personal 'why I recommend' with attribution (Providers.tsx:73-79)",
+      "Returns null when no providers \u2014 no broken section (Providers.tsx:34)",
+      "Admin form uses domain-specific labels: 'Why I Recommend', category dropdown (providers/page.tsx)"
+    ],
+    "evidence": "Solid provider directory with category grouping and personal recommendations. Provider photos unused despite being in the type definition.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "vagaro-integration": {
+    "score": 69,
+    "delivery_score": 72,
+    "craft_score": 66,
+    "viability_score": 68,
+    "gaps": [
+      "No tracking/analytics on Vagaro booking clicks \u2014 can't measure conversion signal",
+      "5.0 rating is hardcoded (Booking.tsx:38) \u2014 no mechanism to update from Vagaro",
+      "'Sessions from $60' is hardcoded (Booking.tsx:56) \u2014 won't reflect price changes"
+    ],
+    "strengths": [
+      "Per-service Vagaro booking links (Services.tsx:77, 170)",
+      "Gift certificate CTA (Booking.tsx:86-98)",
+      "Payment methods and cancellation policy shown (Booking.tsx:81)",
+      "External link icon clarifies user leaves site (Booking.tsx:75-77)",
+      "'Coming Soon' state for services without Vagaro links (Services.tsx:179-185)"
+    ],
+    "evidence": "Effective booking funnel via Vagaro links with trust signals. Integration is link-level (correct given Vagaro's iframe blocking). Hardcoded rating and pricing will go stale.",
+    "delta": "new",
+    "cached_at": "2026-03-17T12:00:00Z"
+  },
+  "ai-agent": {
+    "score": 58,
+    "delivery_score": 65,
+    "craft_score": 52,
+    "viability_score": 55,
+    "gaps": [
+      "No chat persistence (unwired)",
+      "Hardcoded system prompt",
+      "No error UI",
+      "Slack webhook not in prod"
+    ],
+    "strengths": [
+      "Tool calling works e2e",
+      "Zod validation",
+      "Array guard",
+      "Markdown rendering"
+    ],
+    "evidence": "Agent reads/writes live CMS. Core works. Infra gaps remain.",
+    "delta": "new",
+    "cached_at": "2026-03-17T23:00:00Z"
+  },
+  "client-dashboard": {
+    "score": 60,
+    "delivery_score": 62,
+    "craft_score": 60,
+    "viability_score": 55,
+    "gaps": [
+      "Mock metrics (127, 23)",
+      "Fake activity feed",
+      "Mobile untested",
+      "No loading states"
+    ],
+    "strengths": [
+      "Vercel design system on 5 pages",
+      "Real CMS data on content+settings",
+      "Micro-interactions",
+      "Grid dots+accent line"
+    ],
+    "evidence": "Premium look but mock data undermines trust.",
+    "delta": "new",
+    "cached_at": "2026-03-17T23:00:00Z"
+  }
+}
