@@ -1,5 +1,5 @@
 import { streamText, tool, stepCountIs } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = streamText({
-    model: anthropic("claude-sonnet-4-5-20250514"),
+    model: google("gemini-2.0-flash"),
     system: `You are the website assistant for Rohlax Wellness, a stretching and wellness studio in Williamsville, NY run by Chelsea.
 
 You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data with your changes applied — do not send partial updates.
