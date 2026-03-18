@@ -13,7 +13,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-[#0a0a0a]">
       <DashboardSidebar />
       <main className="flex-1 md:ml-0 mt-14 md:mt-0">{children}</main>
     </div>

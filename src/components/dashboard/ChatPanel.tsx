@@ -137,9 +137,9 @@ export function ChatPanel() {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full bg-[#0a0a0a]">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#262626]">
         <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center">
           <Bot className="w-4 h-4 text-white" />
         </div>
@@ -157,8 +157,8 @@ export function ChatPanel() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-violet-600/10 flex items-center justify-center mb-4">
-              <Bot className="w-8 h-8 text-violet-400" />
+            <div className="w-12 h-12 rounded-lg bg-violet-600/10 flex items-center justify-center mb-4">
+              <Bot className="w-6 h-6 text-violet-400" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">
               Hey Chelsea! What can I help with?
@@ -172,10 +172,10 @@ export function ChatPanel() {
                 <button
                   key={prompt.label}
                   onClick={() => handleQuickPrompt(prompt.label)}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors text-left"
+                  className="flex items-center gap-2 px-4 py-3 rounded-md bg-[#141414] border border-[#262626] text-sm text-zinc-300 hover:bg-[#1c1c1c] hover:text-white hover:border-[#333] transition-colors duration-150 text-left"
                 >
                   <prompt.icon className="w-4 h-4 text-violet-400 shrink-0" />
-                  {prompt.label}
+                  <span className="font-mono text-xs">{prompt.label}</span>
                 </button>
               ))}
             </div>
@@ -209,7 +209,7 @@ export function ChatPanel() {
                 className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                   message.role === "user"
                     ? "bg-violet-600 text-white"
-                    : "bg-zinc-900 text-zinc-200 border border-zinc-800"
+                    : "bg-[#141414] text-zinc-200 border border-[#262626]"
                 }`}
               >
                 <p className="whitespace-pre-wrap">
@@ -234,7 +234,7 @@ export function ChatPanel() {
             <button
               key={prompt.label}
               onClick={() => handleQuickPrompt(prompt.label)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#141414] border border-[#262626] text-xs font-mono text-zinc-400 hover:bg-[#1c1c1c] hover:text-zinc-200 transition-colors duration-150 whitespace-nowrap shrink-0"
             >
               <prompt.icon className="w-3 h-3" />
               {prompt.label}
@@ -244,10 +244,10 @@ export function ChatPanel() {
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-zinc-800">
+      <div className="p-4 border-t border-[#262626]">
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 focus-within:border-violet-600/50 transition-colors"
+          className="flex items-center gap-2 bg-[#141414] border border-[#262626] rounded-lg px-4 py-2 focus-within:border-violet-600/50 transition-colors duration-150"
         >
           <input
             ref={inputRef}
@@ -260,7 +260,7 @@ export function ChatPanel() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="w-9 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-600 flex items-center justify-center transition-colors shrink-0"
+            className="w-9 h-9 rounded-md bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-600 flex items-center justify-center transition-colors duration-150 shrink-0"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 text-white animate-spin" />

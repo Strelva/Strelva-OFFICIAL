@@ -33,11 +33,11 @@ export function DashboardSidebar() {
   return (
     <>
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 bg-zinc-950 border-b border-zinc-800">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 bg-[#0a0a0a] border-b border-[#262626]">
         <span className="text-sm font-semibold text-white">Rohlax Wellness</span>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-md text-zinc-400 hover:text-white transition-colors duration-150"
         >
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -53,14 +53,21 @@ export function DashboardSidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col transition-transform duration-200 ${
+        className={`fixed top-0 left-0 z-40 h-full w-64 bg-[#0a0a0a] border-r border-[#262626] flex flex-col transition-transform duration-200 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 md:static md:z-auto`}
       >
         {/* Logo area */}
-        <div className="px-6 py-6 border-b border-zinc-800">
-          <h1 className="text-base font-semibold text-white">Rohlax Wellness</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Business Dashboard</p>
+        <div className="px-6 py-6 border-b border-[#262626]">
+          <h1 className="text-base font-semibold text-white tracking-tight">
+            Rohlax Wellness
+          </h1>
+          <div className="flex items-center gap-1.5 mt-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-500">
+              LIVE
+            </span>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -72,13 +79,13 @@ export function DashboardSidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-150 ${
                   active
-                    ? "bg-violet-600/10 text-violet-400"
-                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                    ? "bg-[#1c1c1c] text-white border-l-2 border-violet-600 rounded-r-lg"
+                    : "text-zinc-400 hover:text-white hover:bg-[#141414] rounded-lg"
                 }`}
               >
-                <item.icon className={`w-4.5 h-4.5 ${active ? "text-violet-400" : ""}`} />
+                <item.icon className={`w-4 h-4 ${active ? "text-violet-400" : ""}`} />
                 {item.label}
               </Link>
             );
@@ -86,8 +93,10 @@ export function DashboardSidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-zinc-800">
-          <p className="text-xs text-zinc-600">Powered by REB</p>
+        <div className="px-6 py-4 border-t border-[#262626]">
+          <p className="font-mono text-[10px] tracking-widest uppercase text-zinc-600">
+            POWERED BY REB
+          </p>
         </div>
       </aside>
     </>
