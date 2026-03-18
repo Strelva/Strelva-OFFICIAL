@@ -42,6 +42,33 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const prevLoadingRef = useRef(false);
+
+  // Load persisted messages on mount
+  useEffect(() => {
+    fetch("/api/chat", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((saved: ChatMessage[]) => {
+        if (Array.isArray(saved) && saved.length > 0) {
+          setMessages(saved);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Persist messages after AI response completes
+  useEffect(() => {
+    if (prevLoadingRef.current && !isLoading && messages.length > 0) {
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(messages),
+      }).catch(() => {});
+    }
+    prevLoadingRef.current = isLoading;
+  }, [isLoading, messages]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

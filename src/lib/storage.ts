@@ -124,3 +124,30 @@ export async function loadChatMessages(clientId: string): Promise<unknown[]> {
   const store = await readDevChat();
   return (store[clientId] as unknown[]) ?? [];
 }
+
+// Activity logging
+
+export async function logActivity(entry: { text: string; time: string; type: string }): Promise<void> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.lPush("reb:activity", JSON.stringify(entry));
+      await redis.lTrim("reb:activity", 0, 49);
+    });
+  }
+  const store = await readDevContent();
+  const activity = (store.__activity as unknown[] ?? []);
+  activity.unshift(entry);
+  store.__activity = activity.slice(0, 50);
+  await writeDevContent(store);
+}
+
+export async function getActivity(): Promise<Array<{ text: string; time: string; type: string }>> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.lRange("reb:activity", 0, 19);
+      return raw.map(r => JSON.parse(r));
+    });
+  }
+  const store = await readDevContent();
+  return (store.__activity as Array<{ text: string; time: string; type: string }>) ?? [];
+}

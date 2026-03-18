@@ -69,6 +69,32 @@ features:
     weight: 5
     maturity: working
 
+  ai-agent:
+    delivers: "AI chat agent that reads and modifies all 8 website sections via natural language. Gemini 2.5 Flash with tool calling, Zod validation, array-destructive guard, markdown responses."
+    for: "Chelsea — updating her site content by chatting instead of navigating CMS forms"
+    code: ["src/app/api/agent/", "src/lib/schemas.ts", "src/components/dashboard/ChatPanel.tsx"]
+    status: active
+    weight: 5
+    maturity: working
+    depends_on: [admin-cms]
+
+  client-dashboard:
+    delivers: "Vercel-inspired business OS dashboard with overview, AI chat, site preview, content map, and settings. Design system with monospace data, status dots, micro-interactions."
+    for: "Chelsea — her daily view of how her site is performing and a way to manage it"
+    code: ["src/app/dashboard/", "src/components/dashboard/"]
+    status: active
+    weight: 5
+    maturity: working
+    depends_on: [ai-agent]
+
+  deployment:
+    delivers: "Multi-tenant deployment architecture with subdomain routing (chelsea.reb.studio), shared codebase, tenant-scoped Redis storage"
+    for: "Laney — serving multiple clients from one deployment"
+    code: ["src/middleware.ts"]
+    status: planned
+    weight: 4
+    maturity: planned
+
 scoring:
   cache_ttl: 300
   health_gate_threshold: 20

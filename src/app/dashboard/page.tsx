@@ -1,12 +1,11 @@
 import {
-  Users,
-  MousePointerClick,
   MessageCircle,
   Globe,
   Clock,
   ArrowUpRight,
 } from "lucide-react";
 import Link from "next/link";
+import { getActivity } from "@/lib/storage";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -15,28 +14,13 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-const ACTIVITY = [
-  {
-    text: "Updated Sunday hours to Closed",
-    time: "2h ago",
-    type: "update" as const,
-  },
-  {
-    text: "Added new testimonial from Sarah M.",
-    time: "1d ago",
-    type: "update" as const,
-  },
-  {
-    text: "AI optimized meta descriptions",
-    time: "2d ago",
-    type: "ai" as const,
-  },
-  {
-    text: "Published blog post: Spring Stretching Tips",
-    time: "3d ago",
-    type: "ai" as const,
-  },
-];
+function timeAgo(isoDate: string): string {
+  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 const QUICK_ACTIONS = [
   { label: "Chat with AI", href: "/dashboard/chat", icon: MessageCircle },
@@ -44,17 +28,15 @@ const QUICK_ACTIONS = [
   { label: "Update hours", href: "/dashboard/chat", icon: Clock },
 ];
 
-export default function DashboardOverview() {
+export default async function DashboardOverview() {
+  const activity = await getActivity();
+
   return (
     <div className="p-6 md:p-8 max-w-5xl">
       {/* Site status bar */}
       <div className="flex items-center gap-1.5 mb-6">
         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
         <span className="text-xs font-mono text-zinc-400">Live</span>
-        <span className="text-xs text-zinc-600 mx-1">&middot;</span>
-        <span className="text-xs font-mono text-zinc-500">
-          Updated 2h ago
-        </span>
       </div>
 
       {/* Greeting */}
@@ -67,17 +49,19 @@ export default function DashboardOverview() {
         </p>
       </div>
 
-      {/* Hero metrics — visitors + clicks (the important numbers) */}
+      {/* Hero metrics — honest empty state until analytics are wired */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               PEOPLE WHO FOUND YOU
             </span>
-            <span className="text-xs font-mono text-emerald-400">+12%</span>
           </div>
           <p className="text-3xl font-semibold font-mono tabular-nums text-white transition-all duration-700">
-            127
+            &mdash;
+          </p>
+          <p className="text-xs font-mono text-zinc-600 mt-1">
+            Connect analytics to track
           </p>
         </div>
         <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
@@ -85,10 +69,12 @@ export default function DashboardOverview() {
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               BOOKING CLICKS
             </span>
-            <span className="text-xs font-mono text-emerald-400">+8%</span>
           </div>
           <p className="text-3xl font-semibold font-mono tabular-nums text-white transition-all duration-700">
-            23
+            &mdash;
+          </p>
+          <p className="text-xs font-mono text-zinc-600 mt-1">
+            Connect analytics to track
           </p>
         </div>
       </div>
@@ -114,7 +100,7 @@ export default function DashboardOverview() {
             </span>
           </div>
           <span className="text-sm font-mono tabular-nums text-zinc-200">
-            3 updates this week
+            {activity.length > 0 ? `${activity.length} updates logged` : "No updates yet"}
           </span>
         </div>
       </div>
@@ -126,25 +112,31 @@ export default function DashboardOverview() {
           <h2 className="text-xs uppercase tracking-wider text-zinc-500 mb-4">
             RECENT ACTIVITY
           </h2>
-          <div className="space-y-0">
-            {ACTIVITY.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 py-3 border-b border-[#1c1c1c] last:border-0 animate-fade-in-up"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
+          {activity.length === 0 ? (
+            <p className="text-sm text-zinc-500 py-4">
+              No activity yet — updates will appear here when you use the AI chat.
+            </p>
+          ) : (
+            <div className="space-y-0">
+              {activity.slice(0, 10).map((item, i) => (
                 <div
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    item.type === "ai" ? "bg-violet-500" : "bg-emerald-500"
-                  }`}
-                />
-                <p className="text-sm text-zinc-200 flex-1">{item.text}</p>
-                <span className="text-xs font-mono text-zinc-500 shrink-0">
-                  {item.time}
-                </span>
-              </div>
-            ))}
-          </div>
+                  key={i}
+                  className="flex items-center gap-3 py-3 border-b border-[#1c1c1c] last:border-0 animate-fade-in-up"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      item.type === "ai" ? "bg-violet-500" : "bg-emerald-500"
+                    }`}
+                  />
+                  <p className="text-sm text-zinc-200 flex-1">{item.text}</p>
+                  <span className="text-xs font-mono text-zinc-500 shrink-0">
+                    {timeAgo(item.time)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick actions */}

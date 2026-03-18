@@ -46,21 +46,52 @@ export const viewport: Viewport = {
   themeColor: "#faf9f7",
 };
 
-function LocalBusinessSchema() {
+async function LocalBusinessSchema() {
+  const contact = await getContent("contact");
+  const settings = await getContent("settings");
+
+  // Parse hours string into structured specs (e.g. "Tue 12-6, Wed 10-4, ...")
+  const dayMap: Record<string, string> = {
+    mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday",
+    fri: "Friday", sat: "Saturday", sun: "Sunday",
+  };
+  const hoursSpecs: Array<Record<string, string>> = [];
+  if (contact.hours) {
+    const parts = contact.hours.split(/[,;\n]+/).map((s: string) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const match = part.match(/^(\w{3})\w*\s+(\d{1,2}(?::\d{2})?)\s*[-–]\s*(\d{1,2}(?::\d{2})?)/i);
+      if (match) {
+        const dayKey = match[1].toLowerCase();
+        const day = dayMap[dayKey];
+        if (day) {
+          const opens = match[2].includes(":") ? match[2] : `${match[2]}:00`;
+          const closes = match[3].includes(":") ? match[3] : `${match[3]}:00`;
+          hoursSpecs.push({ "@type": "OpeningHoursSpecification", dayOfWeek: day, opens, closes });
+        }
+      }
+    }
+  }
+
+  // Parse address string into components (fallback to full string as streetAddress)
+  const addressParts = contact.address ? contact.address.split(",").map((s: string) => s.trim()) : [];
+  const streetAddress = addressParts[0] || "";
+  const addressLocality = addressParts[1] || "";
+  const stateZip = (addressParts[2] || "").match(/([A-Z]{2})\s*(\d{5})/);
+
   const schema = {
     "@context": "https://schema.org",
     "@type": "HealthAndBeautyBusiness",
-    name: "Rohlax Wellness",
-    description: "Professional assisted stretching in Williamsville, NY. Personalized 1-on-1 sessions to relieve tension, improve mobility, and support your well-being.",
+    name: settings.siteName,
+    description: settings.siteDescription,
     url: "https://rohlaxwellness.com",
-    telephone: "+17165592282",
-    email: "rohlaxwellness@gmail.com",
+    telephone: contact.phone,
+    email: contact.email,
     address: {
       "@type": "PostalAddress",
-      streetAddress: "7158 Transit Road",
-      addressLocality: "Williamsville",
-      addressRegion: "NY",
-      postalCode: "14221",
+      streetAddress,
+      addressLocality,
+      addressRegion: stateZip?.[1] || "NY",
+      postalCode: stateZip?.[2] || "",
       addressCountry: "US",
     },
     geo: {
@@ -68,18 +99,12 @@ function LocalBusinessSchema() {
       latitude: 42.97,
       longitude: -78.70,
     },
-    openingHoursSpecification: [
-      { "@type": "OpeningHoursSpecification", dayOfWeek: "Tuesday", opens: "12:00", closes: "18:00" },
-      { "@type": "OpeningHoursSpecification", dayOfWeek: "Wednesday", opens: "10:00", closes: "16:00" },
-      { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "12:00", closes: "18:00" },
-      { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "10:00", closes: "16:00" },
-    ],
+    ...(hoursSpecs.length > 0 ? { openingHoursSpecification: hoursSpecs } : {}),
     sameAs: [
-      "https://instagram.com/rohlaxwellness",
-      "https://facebook.com/rohlaxwellness",
-      "https://www.vagaro.com/rohlaxwellness",
-      "https://linktr.ee/rohlaxwellness",
-    ],
+      contact.instagramUrl,
+      contact.facebookUrl,
+      settings.vagaroUrl,
+    ].filter(Boolean),
     priceRange: "$$",
     image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&h=630&fit=crop",
     founder: {

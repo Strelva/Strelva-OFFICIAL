@@ -131,6 +131,16 @@ Never remove content unless explicitly asked. For array items (services, events,
             }).catch(() => {});
           }
 
+          // Log activity
+          try {
+            const { logActivity } = await import("@/lib/storage");
+            await logActivity({
+              text: `Updated ${section}`,
+              time: new Date().toISOString(),
+              type: "update",
+            });
+          } catch {}
+
           return {
             success: true,
             section,
