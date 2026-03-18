@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard")) {
     const authed = await isAuthenticated(request);
     if (!authed) {
       return NextResponse.redirect(new URL("/admin/login", request.url));
@@ -36,7 +36,8 @@ export async function middleware(request: NextRequest) {
 
   if (
     pathname.startsWith("/api/content") ||
-    pathname.startsWith("/api/upload")
+    pathname.startsWith("/api/upload") ||
+    pathname.startsWith("/api/agent")
   ) {
     const authed = await isAuthenticated(request);
     if (!authed) {
@@ -49,5 +50,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/content/:path*", "/api/upload/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*", "/api/content/:path*", "/api/upload/:path*", "/api/agent/:path*"],
 };

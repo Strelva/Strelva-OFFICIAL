@@ -43,3 +43,10 @@ next-env.d.ts
 dev-content.json
 /public/uploads/
 .claude/sessions/
+.claude/rules/
+.claude/commands/
+.claude/settings.json
+.claude/knowledge/
+.claude/cache/
+.claude/plans/
+.claude/scores/

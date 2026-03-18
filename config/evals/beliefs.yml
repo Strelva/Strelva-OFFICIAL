@@ -1,0 +1,220 @@
+# beliefs.yml — What must be true about REB (Rohlax Wellness)
+
+beliefs:
+
+  # ── Core — does the project build and run? ──
+
+  - id: has-value-hypothesis
+    belief: "Project has a defined value hypothesis"
+    type: file_check
+    path: "config/rhino.yml"
+    contains: "hypothesis:"
+    severity: block
+
+  - id: build-succeeds
+    belief: "Next.js production build completes without errors"
+    type: command_check
+    command: pnpm build 2>&1 | grep -q "Generating static pages"
+    severity: block
+
+  - id: dynamic-rendering
+    belief: "Homepage uses dynamic rendering (not static)"
+    type: file_check
+    path: "src/app/(public)/page.tsx"
+    contains: "force-dynamic"
+    severity: block
+
+  # ── Public Site — does the marketing site deliver value? ──
+
+  - id: has-hero
+    belief: "Hero component exists with headline and CTA"
+    type: file_check
+    path: "src/components/public/Hero.tsx"
+    contains: "hero.ctaText"
+    feature: public-site
+    severity: warn
+
+  - id: has-services
+    belief: "Services component renders real Vagaro services"
+    type: file_check
+    path: "src/components/public/Services.tsx"
+    contains: "vagaro_link"
+    feature: public-site
+    severity: warn
+
+  - id: has-real-service-data
+    belief: "Defaults include real services from Vagaro (not placeholders)"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "Flexibility Foundation"
+    feature: public-site
+    severity: warn
+
+  - id: has-real-prices
+    belief: "Services have real pricing from Vagaro"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: '"85"'
+    feature: public-site
+    severity: warn
+
+  - id: has-booking-section
+    belief: "Booking section links to Vagaro (not broken iframe)"
+    type: file_check
+    path: "src/components/public/Booking.tsx"
+    contains: "vagaro.com/rohlaxwellness"
+    feature: vagaro-integration
+    severity: block
+
+  - id: has-gift-cert-link
+    belief: "Gift certificate links to Vagaro gift certificates"
+    type: file_check
+    path: "src/components/public/Booking.tsx"
+    contains: "gift-certificates"
+    feature: vagaro-integration
+    severity: warn
+
+  - id: has-events-component
+    belief: "Events component filters past events"
+    type: file_check
+    path: "src/components/public/Events.tsx"
+    contains: "isUpcoming"
+    feature: events
+    severity: warn
+
+  - id: has-real-events
+    belief: "Defaults include real events from LinkTree"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "Beauty Boost Buffalo"
+    feature: events
+    severity: warn
+
+  - id: has-provider-directory
+    belief: "Provider directory renders categorized providers"
+    type: file_check
+    path: "src/components/public/Providers.tsx"
+    contains: "CATEGORY_ORDER"
+    feature: provider-directory
+    severity: warn
+
+  - id: has-real-providers
+    belief: "Defaults include real providers from LinkTree"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "RecoverLab"
+    feature: provider-directory
+    severity: warn
+
+  - id: has-real-testimonials
+    belief: "Testimonials use real Vagaro review quotes"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "Chelsea truly works wonders"
+    feature: public-site
+    severity: warn
+
+  - id: has-contact-info
+    belief: "Contact section has real phone, email, address, hours"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "716-559-2282"
+    feature: public-site
+    severity: warn
+
+  # ── Admin CMS — can Chelsea update content? ──
+
+  - id: has-admin-login
+    belief: "Admin login page exists"
+    type: file_check
+    path: "src/app/admin/login/page.tsx"
+    contains: "handleSubmit"
+    feature: admin-cms
+    severity: block
+
+  - id: has-admin-sidebar
+    belief: "Admin sidebar has all 8 section editors"
+    type: file_check
+    path: "src/components/admin/AdminSidebar.tsx"
+    contains: "Events"
+    feature: admin-cms
+    severity: warn
+
+  - id: has-events-editor
+    belief: "Events editor has date picker and past-event warning"
+    type: file_check
+    path: "src/app/admin/(dashboard)/events/page.tsx"
+    contains: "isPastEvent"
+    feature: events
+    severity: warn
+
+  - id: has-providers-editor
+    belief: "Providers editor has category dropdown"
+    type: file_check
+    path: "src/app/admin/(dashboard)/providers/page.tsx"
+    contains: "category"
+    feature: provider-directory
+    severity: warn
+
+  - id: has-image-upload
+    belief: "Image upload with crop works"
+    type: file_check
+    path: "src/components/admin/ImageUploader.tsx"
+    contains: "ImageCropper"
+    feature: admin-cms
+    severity: warn
+
+  # ── SEO — will Google find this? ──
+
+  - id: has-json-ld
+    belief: "JSON-LD LocalBusiness schema in layout"
+    type: file_check
+    path: "src/app/layout.tsx"
+    contains: "HealthAndBeautyBusiness"
+    feature: seo
+    severity: warn
+
+  - id: has-meta-description
+    belief: "Meta description targets local search terms"
+    type: file_check
+    path: "src/lib/defaults.ts"
+    contains: "assisted stretching"
+    feature: seo
+    severity: warn
+
+  - id: has-opening-hours-schema
+    belief: "JSON-LD includes real business hours"
+    type: file_check
+    path: "src/app/layout.tsx"
+    contains: "OpeningHoursSpecification"
+    feature: seo
+    severity: warn
+
+  # ── Infrastructure ──
+
+  - id: has-auth
+    belief: "JWT auth protects admin routes"
+    type: file_check
+    path: "src/middleware.ts"
+    contains: "rohlax-admin-token"
+    severity: warn
+
+  - id: has-storage-abstraction
+    belief: "Storage layer supports Redis (prod) and JSON (dev)"
+    type: file_check
+    path: "src/lib/storage.ts"
+    contains: "rohlax:content"
+    severity: warn
+
+  - id: has-content-validation
+    belief: "API validates required fields per section"
+    type: file_check
+    path: "src/app/api/content/[section]/route.ts"
+    contains: "REQUIRED_FIELDS"
+    severity: warn
+
+  - id: no-console-log-in-components
+    belief: "No console.log in component files"
+    type: command_check
+    command: "! grep -r 'console.log' src/components/ --include='*.tsx' -l 2>/dev/null | head -1 | grep -q ."
+    severity: warn

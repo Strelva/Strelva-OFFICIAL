@@ -80,3 +80,47 @@ export async function uploadFile(
 
   return { url: `/uploads/${filename}` };
 }
+
+// Chat persistence
+
+const DEV_CHAT_PATH = path.join(process.cwd(), "dev-chat.json");
+
+async function readDevChat(): Promise<Record<string, unknown[]>> {
+  try {
+    const raw = await fs.readFile(DEV_CHAT_PATH, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function writeDevChat(data: Record<string, unknown[]>): Promise<void> {
+  await fs.writeFile(DEV_CHAT_PATH, JSON.stringify(data, null, 2));
+}
+
+export async function saveChatMessages(clientId: string, messages: unknown[]): Promise<void> {
+  const trimmed = messages.slice(-100);
+
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.set(`reb:chat:${clientId}`, JSON.stringify(trimmed));
+    });
+  }
+
+  const store = await readDevChat();
+  store[clientId] = trimmed;
+  await writeDevChat(store);
+}
+
+export async function loadChatMessages(clientId: string): Promise<unknown[]> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`reb:chat:${clientId}`);
+      if (raw) return JSON.parse(raw) as unknown[];
+      return [];
+    });
+  }
+
+  const store = await readDevChat();
+  return (store[clientId] as unknown[]) ?? [];
+}

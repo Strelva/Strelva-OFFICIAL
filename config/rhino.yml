@@ -1,0 +1,80 @@
+project:
+  stage: mvp
+  mode: build
+
+value:
+  hypothesis: "Chelsea acquires more new clients from a professional site with SEO and service transparency than from a LinkTree + Vagaro combo that gates content and has zero search presence"
+  user: "A potential client in Williamsville/Buffalo searching for assisted stretching, or an existing follower on Instagram who wants to see services, prices, and events without navigating LinkTree links"
+  signals:
+    - name: organic_traffic
+      description: "Visitors arriving via Google search (not direct/social)"
+      target: "Any non-brand organic traffic within 60 days of domain connection"
+      measurable: false
+    - name: cms_usage
+      description: "Chelsea logs into /admin and makes an edit without being prompted"
+      target: "At least 1 edit in the first 14 days"
+      measurable: false
+    - name: vagaro_clicks
+      description: "Visitors who click Book on Vagaro from the site"
+      target: "Trackable via Vagaro referral source"
+      measurable: false
+
+features:
+  public-site:
+    delivers: "Professional single-page marketing site with 10 sections: hero, trust strip, services (7 real Vagaro services with prices), booking CTA, story/bio, testimonials (real Vagaro reviews), events (auto-hides past), provider directory (8 providers, 5 categories), contact (phone, email, hours, map), footer"
+    for: "Potential clients discovering Rohlax through search or referral"
+    code: ["src/components/public/", "src/app/(public)/"]
+    status: active
+    weight: 5
+    maturity: working
+
+  admin-cms:
+    delivers: "JWT-authenticated admin dashboard where Chelsea edits all 8 content sections (hero, services, story, testimonials, events, providers, contact, settings) with image upload, array editors, and instant publish"
+    for: "Chelsea — updating events, providers, services, and content without touching code"
+    code: ["src/components/admin/", "src/app/admin/"]
+    status: active
+    weight: 4
+    maturity: working
+
+  seo:
+    delivers: "JSON-LD LocalBusiness schema, meta tags targeting 'assisted stretching williamsville ny', Open Graph, proper heading hierarchy, dynamic meta from CMS"
+    for: "Google — indexing and ranking for local search terms"
+    code: ["src/app/layout.tsx"]
+    status: active
+    weight: 4
+    maturity: building
+    depends_on: [public-site]
+
+  events:
+    delivers: "Dynamic events list that auto-filters past events, sorted by date, with host type labels and external links. CMS editor with date picker and past-event warnings"
+    for: "Chelsea's community — people looking for upcoming wellness events in Buffalo"
+    code: ["src/components/public/Events.tsx", "src/app/admin/(dashboard)/events/page.tsx"]
+    status: active
+    weight: 3
+    maturity: working
+
+  provider-directory:
+    delivers: "Categorized directory of 8 trusted wellness providers across 5 categories (massage, chiro, yoga, fitness, specialty) with personal recommendations and booking links"
+    for: "Chelsea's clients who need care beyond stretching — and the providers who get referral traffic"
+    code: ["src/components/public/Providers.tsx", "src/app/admin/(dashboard)/providers/page.tsx"]
+    status: active
+    weight: 3
+    maturity: working
+
+  vagaro-integration:
+    delivers: "Booking CTA linking to Vagaro with 5-star rating display, pricing summary, gift certificate link. All 7 services link to vagaro.com/rohlaxwellness"
+    for: "Potential clients ready to book"
+    code: ["src/components/public/Booking.tsx", "src/components/public/Services.tsx"]
+    status: active
+    weight: 5
+    maturity: working
+
+scoring:
+  cache_ttl: 300
+  health_gate_threshold: 20
+  health_warn_threshold: 40
+  onboarding_cap: 50
+
+evals:
+  generative: true
+  beliefs_fallback: true
