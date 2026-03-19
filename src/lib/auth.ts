@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "rohlax-admin-token";
+const COOKIE_NAME = "reb-admin-token";
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;
@@ -67,4 +67,11 @@ export async function clearAuthCookie(): Promise<void> {
 export async function getAuthToken(): Promise<string | undefined> {
   const cookieStore = await cookies();
   return cookieStore.get(COOKIE_NAME)?.value;
+}
+
+/** Verify the current request is authenticated. Use in API routes. */
+export async function verifyAuth(): Promise<boolean> {
+  const token = await getAuthToken();
+  if (!token) return false;
+  return verifyToken(token);
 }

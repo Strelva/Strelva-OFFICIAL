@@ -1,25 +1,58 @@
 import { streamText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { verifyAuth } from "@/lib/auth";
+import { getContent, getClickCounts } from "@/lib/storage";
 
-function getSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET is not set");
-  return new TextEncoder().encode(secret);
-}
+async function buildSystemPrompt(): Promise<string> {
+  const [settings, services, contact, events] = await Promise.all([
+    getContent("settings"),
+    getContent("services"),
+    getContent("contact"),
+    getContent("events"),
+  ]);
 
-async function verifyAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("rohlax-admin-token")?.value;
-  if (!token) return false;
-  try {
-    await jwtVerify(token, getSecret());
-    return true;
-  } catch {
-    return false;
-  }
+  const bookingClicks = await getClickCounts("booking-click");
+
+  const serviceList = services.services
+    .map((s) => `- ${s.name} (${s.duration}, $${s.price})`)
+    .join("\n");
+
+  const futureEvents = events.events
+    .filter((e) => new Date(e.date) >= new Date())
+    .map((e) => `- ${e.title} (${e.date})`)
+    .join("\n");
+
+  const ownerName = settings.ownerName || "the owner";
+  const ownerTitle = settings.ownerTitle || "";
+
+  return `You are the website assistant for ${settings.siteName}.
+
+ABOUT THE BUSINESS:
+- Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
+- Phone: ${contact.phone}
+- Email: ${contact.email}
+- Address: ${contact.address}
+- Hours: ${contact.hours}
+- Booking: ${settings.vagaroUrl}
+
+CURRENT SERVICES (${services.services.length} listed):
+${serviceList}
+
+${futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed."}
+
+SITE PERFORMANCE:
+- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)
+
+You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
+
+Available sections: hero, services, story, testimonials, events, providers, contact, settings.
+
+Be conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
+
+Never remove content unless explicitly asked. For array items (services, events, testimonials, providers), preserve all existing items unless told to remove specific ones.
+
+When ${ownerName} asks "how's my site?" or similar, give a plain-English summary: how many services are listed, how many booking clicks, upcoming events, and suggest what to update next.`;
 }
 
 export async function POST(req: Request) {
@@ -32,18 +65,11 @@ export async function POST(req: Request) {
   }
 
   const { messages } = await req.json();
+  const systemPrompt = await buildSystemPrompt();
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
-    system: `You are the website assistant for Rohlax Wellness, a stretching and wellness studio in Williamsville, NY run by Chelsea.
-
-You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data with your changes applied — do not send partial updates.
-
-Available sections: hero, services, story, testimonials, events, providers, contact, settings.
-
-Be conversational and helpful. Confirm changes after making them. If a request is ambiguous, ask for clarification.
-
-Never remove content unless explicitly asked. For array items (services, events, testimonials, providers), preserve all existing items unless told to remove specific ones.`,
+    system: systemPrompt,
     messages,
     tools: {
       read_section: tool({
@@ -126,20 +152,23 @@ Never remove content unless explicitly asked. For array items (services, events,
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                text: `Chelsea updated *${section}* via AI chat`,
+                text: `Site updated *${section}* via AI chat`,
               }),
-            }).catch(() => {});
+            }).catch((err) => console.error("Slack notification failed:", err));
           }
 
-          // Log activity
+          // Log activity + record freshness timestamp
           try {
-            const { logActivity } = await import("@/lib/storage");
+            const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
             await logActivity({
-              text: `Updated ${section}`,
+              text: `AI updated ${section}`,
               time: new Date().toISOString(),
-              type: "update",
+              type: "ai",
             });
-          } catch {}
+            await recordSectionUpdate(section);
+          } catch (err) {
+            console.error("Failed to log activity:", err);
+          }
 
           return {
             success: true,

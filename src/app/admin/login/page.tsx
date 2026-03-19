@@ -27,7 +27,7 @@ export default function AdminLogin() {
         return;
       }
 
-      router.push("/admin");
+      router.push("/dashboard");
     } catch {
       setError("Something went wrong");
     } finally {
@@ -43,7 +43,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-sm px-6">
         <div className="text-center mb-8">
           <h2 className="font-display text-2xl tracking-tight" style={{ color: "var(--bark)" }}>
-            Rohlax Wellness
+            Welcome back
           </h2>
         </div>
         <div className="rounded-xl p-8" style={{ background: "var(--pure-white)", border: "1px solid var(--cream-dark)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>

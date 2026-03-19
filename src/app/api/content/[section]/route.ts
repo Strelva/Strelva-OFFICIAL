@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentSection } from "@/lib/types";
-import { getContent, setContent } from "@/lib/storage";
+import { getContent, setContent, recordSectionUpdate } from "@/lib/storage";
 
 const VALID_SECTIONS: ContentSection[] = [
   "hero",
@@ -115,6 +115,7 @@ export async function PUT(
   }
 
   await setContent(section, body);
+  await recordSectionUpdate(section);
   revalidatePath("/");
 
   return NextResponse.json({ success: true });

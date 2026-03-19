@@ -10,8 +10,12 @@ import {
   Bot,
   User,
   Loader2,
+  CheckCircle2,
+  Globe,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import Link from "next/link";
+import { timeAgo } from "@/lib/utils";
 
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
@@ -27,18 +31,11 @@ interface ChatMessage {
   timestamp: number;
 }
 
-function timeAgo(ts: number): string {
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-export function ChatPanel() {
+export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [updateToast, setUpdateToast] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +74,19 @@ export function ChatPanel() {
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // Detect when AI response mentions an update was made
+  const detectSiteUpdate = useCallback((text: string) => {
+    const updatePatterns = [
+      /updated.*successfully/i,
+      /changes.*applied/i,
+      /section.*updated/i,
+      /i'?ve updated/i,
+      /done!.*updated/i,
+      /made the change/i,
+    ];
+    return updatePatterns.some((p) => p.test(text));
   }, []);
 
   const sendChat = useCallback(async (text: string) => {
@@ -151,6 +161,12 @@ export function ChatPanel() {
           )
         );
       }
+
+      // Show toast if the AI updated the site
+      if (detectSiteUpdate(fullText)) {
+        setUpdateToast(true);
+        setTimeout(() => setUpdateToast(false), 5000);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -164,7 +180,7 @@ export function ChatPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, detectSiteUpdate]);
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -194,6 +210,25 @@ export function ChatPanel() {
         </div>
       </div>
 
+      {/* Update toast */}
+      {updateToast && (
+        <div className="mx-4 mt-3 animate-fade-in-up">
+          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600/10 border border-emerald-600/20 rounded-lg">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-sm text-emerald-300 flex-1">
+              Your site has been updated
+            </span>
+            <Link
+              href="/dashboard/site"
+              className="flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <Globe className="w-3 h-3" />
+              View changes
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {isEmpty && (
@@ -202,7 +237,7 @@ export function ChatPanel() {
               <Bot className="w-6 h-6 text-violet-400" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">
-              Hey Chelsea! What can I help with?
+              Hey {ownerName}! What can I help with?
             </h3>
             <p className="text-sm text-zinc-400 max-w-sm mb-8">
               I can update your website content, add events, change hours, write

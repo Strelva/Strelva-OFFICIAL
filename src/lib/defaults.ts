@@ -132,7 +132,6 @@ export const defaultStory: StoryContent = {
   quoteAttribution: "Chelsea Rohl, Founder",
   imageUrl:
     "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=1200&h=1600&fit=crop",
-  secondaryImageUrl: "",
 };
 
 export const defaultTestimonials: TestimonialsContent = {
@@ -333,6 +332,8 @@ export const defaultSettings: SiteSettings = {
   siteTagline: "Assisted Stretching in Williamsville, NY",
   siteDescription:
     "Professional assisted stretching in Williamsville, NY. Personalized 1-on-1 sessions to relieve tension, improve mobility, and support your well-being. Book with Chelsea Rohl today.",
+  ownerName: "Chelsea",
+  ownerTitle: "Physical Therapist & Stretch Therapist",
   footerTagline: "Move Better. Feel Better. Live Better.",
   copyrightText: "Rohlax Wellness",
   vagaroUrl: "https://www.vagaro.com/rohlaxwellness",

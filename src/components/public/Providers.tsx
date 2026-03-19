@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useReveal } from "@/hooks/useReveal";
+import { TrackedLink } from "./TrackedLink";
 import type { ProvidersContent, ProviderItem } from "@/lib/types";
 
 const CATEGORY_LABELS: Record<ProviderItem["category"], string> = {
@@ -63,6 +65,19 @@ export function Providers({ providers }: { providers: ProvidersContent }) {
                       className="p-6"
                       style={{ background: "var(--pure-white)", border: "1px solid var(--cream-mid)" }}
                     >
+                      <div className="flex items-start gap-4">
+                        {provider.photo_url && (
+                          <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
+                            <Image
+                              src={provider.photo_url}
+                              alt={provider.name}
+                              width={48}
+                              height={48}
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
                       <h4 className="font-display text-lg tracking-tight mb-1">
                         {provider.name}
                       </h4>
@@ -79,15 +94,16 @@ export function Providers({ providers }: { providers: ProvidersContent }) {
                       )}
                       <div className="flex items-center gap-3">
                         {provider.booking_link && (
-                          <a
+                          <TrackedLink
                             href={provider.booking_link}
+                            event="provider-referral-click"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                             style={{ color: "var(--sage)" }}
                           >
                             Book &rarr;
-                          </a>
+                          </TrackedLink>
                         )}
                         {provider.phone && (
                           <a
@@ -98,6 +114,8 @@ export function Providers({ providers }: { providers: ProvidersContent }) {
                             Call
                           </a>
                         )}
+                      </div>
+                        </div>
                       </div>
                     </div>
                   ))}

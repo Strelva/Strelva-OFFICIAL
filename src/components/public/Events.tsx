@@ -1,14 +1,18 @@
 "use client";
 
 import { useReveal } from "@/hooks/useReveal";
+import { TrackedLink } from "./TrackedLink";
 import type { EventsContent, EventItem } from "@/lib/types";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
+  const now = new Date();
+  const showYear = date.getFullYear() !== now.getFullYear();
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
+    ...(showYear ? { year: "numeric" } : {}),
   });
 }
 
@@ -98,15 +102,16 @@ export function Events({ events }: { events: EventsContent }) {
                     {/* CTA */}
                     <div className="md:text-right">
                       {event.external_link ? (
-                        <a
+                        <TrackedLink
                           href={event.external_link}
+                          event="event-click"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                           style={{ color: "var(--sage)" }}
                         >
                           Details &rarr;
-                        </a>
+                        </TrackedLink>
                       ) : (
                         <span className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--bark-faded)" }}>
                           More info soon

@@ -54,6 +54,7 @@ export default function ServicesEditor() {
           label="Services"
           items={data.services}
           onChange={(services) => setData({ ...data, services })}
+          requiredField="name"
           createItem={(): ServiceItem => ({
             id: `service-${Date.now()}`,
             name: "",
@@ -69,12 +70,13 @@ export default function ServicesEditor() {
             <div className="grid gap-4 pr-16">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Name</label>
+                  <label className="block text-xs text-gray-500 mb-1">Name <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     value={item.name}
                     onChange={(e) => update({ ...item, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none text-sm ${item.name.trim() === "" ? "border-red-300 bg-red-50/50" : "border-gray-200"}`}
+                    placeholder="Service name"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">

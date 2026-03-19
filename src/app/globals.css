@@ -223,6 +223,15 @@ body {
   background-size: 24px 24px;
 }
 
+/* Vercel-style card glow on hover */
+.reb-card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15), 0 2px 8px rgba(124, 58, 237, 0.08);
+}
+
+/* Hide scrollbar for quick prompts */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Markdown in chat messages */
 .chat-markdown p { margin-bottom: 0.5rem; }
 .chat-markdown p:last-child { margin-bottom: 0; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useReveal } from "@/hooks/useReveal";
+import { TrackedLink } from "./TrackedLink";
 import type { ServicesContent } from "@/lib/types";
 
 export function Services({ services }: { services: ServicesContent }) {
@@ -74,8 +75,9 @@ export function Services({ services }: { services: ServicesContent }) {
                   </p>
                 )}
                 {featured.vagaro_link ? (
-                  <a
+                  <TrackedLink
                     href={featured.vagaro_link}
+                    event="booking-click"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex text-xs font-bold tracking-widest uppercase px-6 py-3 transition-all duration-300 self-start"
@@ -88,7 +90,7 @@ export function Services({ services }: { services: ServicesContent }) {
                     }}
                   >
                     Book This Session
-                  </a>
+                  </TrackedLink>
                 ) : (
                   <a
                     href="#booking"
@@ -167,15 +169,16 @@ export function Services({ services }: { services: ServicesContent }) {
                       {service.duration}
                     </span>
                     {service.vagaro_link ? (
-                      <a
+                      <TrackedLink
                         href={service.vagaro_link}
+                        event="booking-click"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                         style={{ color: "var(--sage)" }}
                       >
                         Book Now &rarr;
-                      </a>
+                      </TrackedLink>
                     ) : service.comingSoon ? (
                       <span
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase"

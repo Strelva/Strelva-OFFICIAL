@@ -31,7 +31,19 @@ export default function EventsEditor() {
     }
   };
 
-  if (!data) return <div className="text-gray-400">Loading...</div>;
+  if (!data) return (
+    <div className="animate-pulse space-y-6">
+      <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <div className="h-4 w-20 bg-gray-200 rounded mb-3" />
+        <div className="h-10 bg-gray-100 rounded-lg" />
+      </div>
+      <div className="bg-white p-6 rounded-xl border border-gray-200 space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-32 bg-gray-50 rounded-lg border border-gray-100" />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <SectionEditor title="Events" description="Upcoming events, workshops, and community happenings" siteAnchor="events" onSave={save}>
@@ -47,6 +59,7 @@ export default function EventsEditor() {
           label="Events"
           items={data.events}
           onChange={(events) => setData({ ...data, events })}
+          requiredField="title"
           createItem={(): EventItem => ({
             id: `event-${Date.now()}`,
             title: "",
@@ -65,8 +78,8 @@ export default function EventsEditor() {
                 </div>
               )}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Title</label>
-                <input type="text" value={item.title} onChange={(e) => update({ ...item, title: e.target.value })} placeholder="Event name" className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
+                <label className="block text-xs text-gray-500 mb-1">Title <span className="text-red-400">*</span></label>
+                <input type="text" value={item.title} onChange={(e) => update({ ...item, title: e.target.value })} placeholder="Event name" className={`w-full px-3 py-2 border rounded-lg outline-none text-sm ${item.title.trim() === "" ? "border-red-300 bg-red-50/50" : "border-gray-200"}`} />
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>

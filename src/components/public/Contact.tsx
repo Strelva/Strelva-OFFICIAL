@@ -140,7 +140,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 <div className="aspect-[4/3] w-full">
                   <iframe
                     src={contact.googleMapsUrl}
-                    title="Rohlax Wellness Location"
+                    title="Business location map"
                     className="w-full h-full border-0"
                     allowFullScreen
                     loading="lazy"

@@ -9,7 +9,7 @@ function getSecret() {
 }
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
-  const token = request.cookies.get("rohlax-admin-token")?.value;
+  const token = request.cookies.get("reb-admin-token")?.value;
   if (!token) return false;
   try {
     await jwtVerify(token, getSecret());

@@ -1,15 +1,19 @@
 "use client";
 
 import { useReveal } from "@/hooks/useReveal";
+import { TrackedLink } from "./TrackedLink";
 
 interface BookingProps {
   vagaroUrl: string;
+  minPrice?: string;
+  reviewCount?: number;
 }
 
-export function Booking({ vagaroUrl }: BookingProps) {
+export function Booking({ vagaroUrl, minPrice, reviewCount }: BookingProps) {
   const sectionRef = useReveal();
   const bookingUrl = vagaroUrl || "https://www.vagaro.com/rohlaxwellness";
   const giftUrl = "https://www.vagaro.com/rohlaxwellness/gift-certificates";
+  const priceDisplay = minPrice ? `$${minPrice}` : "$60";
 
   return (
     <section
@@ -35,7 +39,7 @@ export function Booking({ vagaroUrl }: BookingProps) {
           >
             <div className="flex items-center justify-center gap-3 mb-6">
               <span className="text-[0.625rem] font-bold tracking-widest uppercase" style={{ color: "var(--sage)" }}>
-                5.0 Rating
+                5.0 Rating{reviewCount ? ` · ${reviewCount} reviews` : ""}
               </span>
               <div className="flex gap-0.5">
                 {[1,2,3,4,5].map((i) => (
@@ -53,11 +57,12 @@ export function Booking({ vagaroUrl }: BookingProps) {
               New clients start with a <strong>Flexibility Foundation</strong> session.
             </p>
             <p className="text-sm mb-8" style={{ color: "var(--bark-faded)" }}>
-              Sessions from $60 · 24-hour cancellation policy
+              Sessions from {priceDisplay} · 24-hour cancellation policy
             </p>
 
-            <a
+            <TrackedLink
               href={bookingUrl}
+              event="booking-click"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 px-10 py-4 text-sm font-bold tracking-widest uppercase transition-all duration-300"
@@ -75,7 +80,7 @@ export function Booking({ vagaroUrl }: BookingProps) {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-            </a>
+            </TrackedLink>
 
             <p className="text-xs mt-6" style={{ color: "var(--bark-faded)" }}>
               Secure booking through Vagaro · Visa, Mastercard, Amex, Discover, Cash
@@ -86,15 +91,16 @@ export function Booking({ vagaroUrl }: BookingProps) {
           <div className="mt-10 pt-8" style={{ borderTop: "1px solid var(--cream-mid)" }}>
             <p className="text-sm" style={{ color: "var(--bark-faded)" }}>
               Looking for a gift?{" "}
-              <a
+              <TrackedLink
                 href={giftUrl}
+                event="gift-certificate-click"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium transition-opacity hover:opacity-60"
                 style={{ color: "var(--sage)" }}
               >
                 Purchase a gift certificate &rarr;
-              </a>
+              </TrackedLink>
             </p>
           </div>
         </div>

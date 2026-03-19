@@ -18,8 +18,10 @@ const inter = Inter({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getContent("settings");
-  const contact = await getContent("contact");
+  const [settings, hero] = await Promise.all([
+    getContent("settings"),
+    getContent("hero"),
+  ]);
   return {
     title: `${settings.siteName} | ${settings.siteTagline}`,
     description: settings.siteDescription,
@@ -29,6 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: settings.siteDescription,
       type: "website",
       locale: "en_US",
+      images: hero.backgroundImageUrl ? [{ url: hero.backgroundImageUrl, width: 1200, height: 630 }] : [],
     },
     other: {
       "geo.region": "US-NY",
@@ -47,26 +50,48 @@ export const viewport: Viewport = {
 };
 
 async function LocalBusinessSchema() {
-  const contact = await getContent("contact");
-  const settings = await getContent("settings");
+  const [contact, settings, hero] = await Promise.all([
+    getContent("contact"),
+    getContent("settings"),
+    getContent("hero"),
+  ]);
 
-  // Parse hours string into structured specs (e.g. "Tue 12-6, Wed 10-4, ...")
+  // Parse hours string into structured specs
+  // Supports: "Tuesday: 12:00 PM – 6:00 PM", "Tue 12-6", "Mon 9am-5pm"
   const dayMap: Record<string, string> = {
     mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday",
     fri: "Friday", sat: "Saturday", sun: "Sunday",
   };
+
+  function parseTime(t: string): string {
+    t = t.trim().toLowerCase();
+    const match12 = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+    if (match12) {
+      let h = parseInt(match12[1]);
+      const m = match12[2] || "00";
+      if (match12[3].toLowerCase() === "pm" && h < 12) h += 12;
+      if (match12[3].toLowerCase() === "am" && h === 12) h = 0;
+      return `${h.toString().padStart(2, "0")}:${m}`;
+    }
+    if (t.includes(":")) return t;
+    return `${t.padStart(2, "0")}:00`;
+  }
+
   const hoursSpecs: Array<Record<string, string>> = [];
   if (contact.hours) {
     const parts = contact.hours.split(/[,;\n]+/).map((s: string) => s.trim()).filter(Boolean);
     for (const part of parts) {
-      const match = part.match(/^(\w{3})\w*\s+(\d{1,2}(?::\d{2})?)\s*[-–]\s*(\d{1,2}(?::\d{2})?)/i);
+      const match = part.match(/^(\w{3})\w*[:\s]+(\d{1,2}(?::\d{2})?\s*(?:AM|PM)?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM)?)/i);
       if (match) {
         const dayKey = match[1].toLowerCase();
         const day = dayMap[dayKey];
         if (day) {
-          const opens = match[2].includes(":") ? match[2] : `${match[2]}:00`;
-          const closes = match[3].includes(":") ? match[3] : `${match[3]}:00`;
-          hoursSpecs.push({ "@type": "OpeningHoursSpecification", dayOfWeek: day, opens, closes });
+          hoursSpecs.push({
+            "@type": "OpeningHoursSpecification",
+            dayOfWeek: day,
+            opens: parseTime(match[2]),
+            closes: parseTime(match[3]),
+          });
         }
       }
     }
@@ -94,11 +119,16 @@ async function LocalBusinessSchema() {
       postalCode: stateZip?.[2] || "",
       addressCountry: "US",
     },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: 42.97,
-      longitude: -78.70,
-    },
+    geo: (() => {
+      // Parse coordinates from Google Maps embed URL if available
+      const mapUrl = contact.googleMapsUrl || "";
+      const coordMatch = mapUrl.match(/!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)/);
+      return {
+        "@type": "GeoCoordinates",
+        latitude: coordMatch ? parseFloat(coordMatch[2]) : 42.97,
+        longitude: coordMatch ? parseFloat(coordMatch[1]) : -78.70,
+      };
+    })(),
     ...(hoursSpecs.length > 0 ? { openingHoursSpecification: hoursSpecs } : {}),
     sameAs: [
       contact.instagramUrl,
@@ -106,12 +136,14 @@ async function LocalBusinessSchema() {
       settings.vagaroUrl,
     ].filter(Boolean),
     priceRange: "$$",
-    image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&h=630&fit=crop",
-    founder: {
-      "@type": "Person",
-      name: "Chelsea Rohl",
-      jobTitle: "Physical Therapist & Stretch Therapist",
-    },
+    image: hero.backgroundImageUrl || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&h=630&fit=crop",
+    ...(settings.ownerName ? {
+      founder: {
+        "@type": "Person",
+        name: settings.ownerName,
+        ...(settings.ownerTitle ? { jobTitle: settings.ownerTitle } : {}),
+      },
+    } : {}),
   };
 
   return (

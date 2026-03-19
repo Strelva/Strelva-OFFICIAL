@@ -36,7 +36,6 @@ export interface StoryContent {
   quote: string;
   quoteAttribution: string;
   imageUrl: string;
-  secondaryImageUrl: string;
 }
 
 export interface TestimonialItem {
@@ -103,6 +102,8 @@ export interface SiteSettings {
   siteName: string;
   siteTagline: string;
   siteDescription: string;
+  ownerName: string;
+  ownerTitle: string;
   footerTagline: string;
   copyrightText: string;
   vagaroUrl: string;

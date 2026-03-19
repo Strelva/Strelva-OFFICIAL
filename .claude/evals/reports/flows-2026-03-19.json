@@ -1,0 +1,64 @@
+{
+  "date": "2026-03-19",
+  "url": "http://localhost:3847",
+  "pages_tested": ["/", "/dashboard", "/dashboard/content", "/dashboard/settings"],
+  "issues": [
+    {
+      "severity": "major",
+      "page": "/",
+      "description": "Footer renders twice — once inside <main> (div wrapper) and once as <footer> (contentinfo). Duplicate nav links, contact info, copyright visible on page.",
+      "file": "src/app/(public)/page.tsx",
+      "fix": "Footer component renders <footer> inside <main>. The component is correct — the issue is likely a layout.tsx also rendering Footer, or an SSR/hydration duplication."
+    },
+    {
+      "severity": "major",
+      "page": "/",
+      "description": "Hydration mismatch error in console: 'A tree hydrated but some attributes of the server rendered HTML didn't match'. Causes React to re-render client-side.",
+      "file": "src/app/layout.tsx or page.tsx",
+      "fix": "Check for Date-dependent rendering (getGreeting, timeAgo) or dynamic geo coord parsing that differs between server and client."
+    },
+    {
+      "severity": "minor",
+      "page": "/",
+      "description": "favicon.ico returns 404. Browser tab shows generic icon.",
+      "file": "public/favicon.ico",
+      "fix": "Add a branded favicon and apple-touch-icon to public/"
+    },
+    {
+      "severity": "minor",
+      "page": "/",
+      "description": "48 interactive elements with height < 44px on desktop. Nav links at 16px height. Most are desktop-appropriate but nav touch targets are small.",
+      "file": "src/components/public/Header.tsx (nav links)",
+      "fix": "Add padding to nav links for larger click targets (py-2 minimum)"
+    },
+    {
+      "severity": "minor",
+      "page": "/",
+      "description": "1 image without alt text (hero background). Decorative images should have alt='' and aria-hidden.",
+      "file": "src/components/public/Hero.tsx:67",
+      "fix": "Already has alt='' — this is correct for decorative. The check may be flagging the Next.js Image optimization wrapper."
+    },
+    {
+      "severity": "polish",
+      "page": "/dashboard",
+      "description": "Login redirects to /admin (old CMS) not /dashboard. After logging in at /admin, user must manually navigate to /dashboard.",
+      "file": "src/app/api/auth/login route or middleware",
+      "fix": "After login, redirect to /dashboard instead of /admin for client users"
+    },
+    {
+      "severity": "polish",
+      "page": "/dashboard",
+      "description": "Page view count increments on every dev server reload. Will inflate in development. No bot/crawler filtering.",
+      "file": "src/components/public/PageViewTracker.tsx",
+      "fix": "Consider filtering by user-agent or adding a flag to skip tracking in development"
+    }
+  ],
+  "summary": {
+    "blockers": 0,
+    "majors": 2,
+    "minors": 3,
+    "polish": 2,
+    "total": 7
+  },
+  "verdict": "Core flows work end-to-end. No blockers. Two majors: duplicate footer and hydration mismatch. Both fixable in minutes. Dashboard flows are clean — all pages load, nav works, mobile responsive, real data displayed."
+}

@@ -24,7 +24,20 @@ export default function ProvidersEditor() {
     }
   };
 
-  if (!data) return <div className="text-gray-400">Loading...</div>;
+  if (!data) return (
+    <div className="animate-pulse space-y-6">
+      <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <div className="h-4 w-24 bg-gray-200 rounded mb-3" />
+        <div className="h-10 bg-gray-100 rounded-lg mb-3" />
+        <div className="h-16 bg-gray-100 rounded-lg" />
+      </div>
+      <div className="bg-white p-6 rounded-xl border border-gray-200 space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-40 bg-gray-50 rounded-lg border border-gray-100" />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <SectionEditor title="Providers" description="Recommended wellness providers in Chelsea's network" siteAnchor="providers" onSave={save}>
@@ -44,6 +57,7 @@ export default function ProvidersEditor() {
           label="Providers"
           items={data.providers}
           onChange={(providers) => setData({ ...data, providers })}
+          requiredField="name"
           createItem={(): ProviderItem => ({
             id: `provider-${Date.now()}`,
             name: "",
@@ -58,8 +72,8 @@ export default function ProvidersEditor() {
             <div className="grid gap-4 pr-16">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Name</label>
-                  <input type="text" value={item.name} onChange={(e) => update({ ...item, name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
+                  <label className="block text-xs text-gray-500 mb-1">Name <span className="text-red-400">*</span></label>
+                  <input type="text" value={item.name} onChange={(e) => update({ ...item, name: e.target.value })} placeholder="Provider name" className={`w-full px-3 py-2 border rounded-lg outline-none text-sm ${item.name.trim() === "" ? "border-red-300 bg-red-50/50" : "border-gray-200"}`} />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Category</label>

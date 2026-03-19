@@ -8,6 +8,9 @@ const hasRedis = !!process.env.REDIS_URL;
 const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 const DEV_CONTENT_PATH = path.join(process.cwd(), "dev-content.json");
 
+/** Default tenant — used until multi-tenant routing is wired */
+export const DEFAULT_TENANT = "rohlax";
+
 async function withRedis<T>(fn: (redis: ReturnType<typeof createClient>) => Promise<T>): Promise<T> {
   const client = createClient({ url: process.env.REDIS_URL });
   await client.connect();
@@ -31,12 +34,15 @@ async function writeDevContent(data: Record<string, unknown>): Promise<void> {
   await fs.writeFile(DEV_CONTENT_PATH, JSON.stringify(data, null, 2));
 }
 
+// --- Content ---
+
 export async function getContent<K extends ContentSection>(
-  section: K
+  section: K,
+  tenant: string = DEFAULT_TENANT
 ): Promise<ContentMap[K]> {
   if (hasRedis) {
     return withRedis(async (redis) => {
-      const raw = await redis.get(`rohlax:content:${section}`);
+      const raw = await redis.get(`${tenant}:content:${section}`);
       if (raw) return JSON.parse(raw) as ContentMap[K];
       return defaults[section];
     });
@@ -48,11 +54,12 @@ export async function getContent<K extends ContentSection>(
 
 export async function setContent<K extends ContentSection>(
   section: K,
-  data: ContentMap[K]
+  data: ContentMap[K],
+  tenant: string = DEFAULT_TENANT
 ): Promise<void> {
   if (hasRedis) {
     return withRedis(async (redis) => {
-      await redis.set(`rohlax:content:${section}`, JSON.stringify(data));
+      await redis.set(`${tenant}:content:${section}`, JSON.stringify(data));
     });
   }
 
@@ -60,6 +67,8 @@ export async function setContent<K extends ContentSection>(
   store[section] = data;
   await writeDevContent(store);
 }
+
+// --- File upload ---
 
 export async function uploadFile(
   file: File
@@ -81,7 +90,7 @@ export async function uploadFile(
   return { url: `/uploads/${filename}` };
 }
 
-// Chat persistence
+// --- Chat persistence ---
 
 const DEV_CHAT_PATH = path.join(process.cwd(), "dev-chat.json");
 
@@ -98,40 +107,50 @@ async function writeDevChat(data: Record<string, unknown[]>): Promise<void> {
   await fs.writeFile(DEV_CHAT_PATH, JSON.stringify(data, null, 2));
 }
 
-export async function saveChatMessages(clientId: string, messages: unknown[]): Promise<void> {
+export async function saveChatMessages(
+  clientId: string,
+  messages: unknown[],
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
   const trimmed = messages.slice(-100);
 
   if (hasRedis) {
     return withRedis(async (redis) => {
-      await redis.set(`reb:chat:${clientId}`, JSON.stringify(trimmed));
+      await redis.set(`${tenant}:chat:${clientId}`, JSON.stringify(trimmed));
     });
   }
 
   const store = await readDevChat();
-  store[clientId] = trimmed;
+  store[`${tenant}:${clientId}`] = trimmed;
   await writeDevChat(store);
 }
 
-export async function loadChatMessages(clientId: string): Promise<unknown[]> {
+export async function loadChatMessages(
+  clientId: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<unknown[]> {
   if (hasRedis) {
     return withRedis(async (redis) => {
-      const raw = await redis.get(`reb:chat:${clientId}`);
+      const raw = await redis.get(`${tenant}:chat:${clientId}`);
       if (raw) return JSON.parse(raw) as unknown[];
       return [];
     });
   }
 
   const store = await readDevChat();
-  return (store[clientId] as unknown[]) ?? [];
+  return (store[`${tenant}:${clientId}`] as unknown[]) ?? [];
 }
 
-// Activity logging
+// --- Activity logging ---
 
-export async function logActivity(entry: { text: string; time: string; type: string }): Promise<void> {
+export async function logActivity(
+  entry: { text: string; time: string; type: string },
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
   if (hasRedis) {
     return withRedis(async (redis) => {
-      await redis.lPush("reb:activity", JSON.stringify(entry));
-      await redis.lTrim("reb:activity", 0, 49);
+      await redis.lPush(`${tenant}:activity`, JSON.stringify(entry));
+      await redis.lTrim(`${tenant}:activity`, 0, 49);
     });
   }
   const store = await readDevContent();
@@ -141,13 +160,102 @@ export async function logActivity(entry: { text: string; time: string; type: str
   await writeDevContent(store);
 }
 
-export async function getActivity(): Promise<Array<{ text: string; time: string; type: string }>> {
+export async function getActivity(
+  tenant: string = DEFAULT_TENANT
+): Promise<Array<{ text: string; time: string; type: string }>> {
   if (hasRedis) {
     return withRedis(async (redis) => {
-      const raw = await redis.lRange("reb:activity", 0, 19);
+      const raw = await redis.lRange(`${tenant}:activity`, 0, 19);
       return raw.map(r => JSON.parse(r));
     });
   }
   const store = await readDevContent();
   return (store.__activity as Array<{ text: string; time: string; type: string }>) ?? [];
+}
+
+// --- Click tracking ---
+
+export async function trackClick(
+  event: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.hIncrBy(`${tenant}:clicks`, `${event}:${today}`, 1);
+      await redis.hIncrBy(`${tenant}:clicks`, `${event}:total`, 1);
+    });
+  }
+  const store = await readDevContent();
+  const clicks = (store.__clicks as Record<string, number>) ?? {};
+  clicks[`${event}:${today}`] = (clicks[`${event}:${today}`] || 0) + 1;
+  clicks[`${event}:total`] = (clicks[`${event}:total`] || 0) + 1;
+  store.__clicks = clicks;
+  await writeDevContent(store);
+}
+
+export async function getClickCounts(
+  event: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<{ total: number; today: number; thisWeek: number }> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const total = parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:total`) || "0");
+      const todayCount = parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:${today}`) || "0");
+      let weekCount = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        weekCount += parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:${key}`) || "0");
+      }
+      return { total, today: todayCount, thisWeek: weekCount };
+    });
+  }
+
+  const store = await readDevContent();
+  const clicks = (store.__clicks as Record<string, number>) ?? {};
+  const total = clicks[`${event}:total`] || 0;
+  const todayCount = clicks[`${event}:${today}`] || 0;
+  let weekCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    weekCount += clicks[`${event}:${key}`] || 0;
+  }
+  return { total, today: todayCount, thisWeek: weekCount };
+}
+
+// --- Content freshness ---
+
+export async function recordSectionUpdate(
+  section: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  const now = new Date().toISOString();
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.hSet(`${tenant}:section-timestamps`, section, now);
+    });
+  }
+  const store = await readDevContent();
+  const timestamps = (store.__sectionTimestamps as Record<string, string>) ?? {};
+  timestamps[section] = now;
+  store.__sectionTimestamps = timestamps;
+  await writeDevContent(store);
+}
+
+export async function getSectionTimestamps(
+  tenant: string = DEFAULT_TENANT
+): Promise<Record<string, string>> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      return await redis.hGetAll(`${tenant}:section-timestamps`) as Record<string, string>;
+    });
+  }
+  const store = await readDevContent();
+  return (store.__sectionTimestamps as Record<string, string>) ?? {};
 }

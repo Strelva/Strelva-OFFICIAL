@@ -8,6 +8,8 @@ interface ArrayEditorProps<T> {
   renderItem: (item: T, index: number, update: (item: T) => void) => React.ReactNode;
   createItem: () => T;
   label: string;
+  /** Field name that must be non-empty on each item (e.g. "name" or "title") */
+  requiredField?: keyof T & string;
 }
 
 export function ArrayEditor<T>({
@@ -16,6 +18,7 @@ export function ArrayEditor<T>({
   renderItem,
   createItem,
   label,
+  requiredField,
 }: ArrayEditorProps<T>) {
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
@@ -116,6 +119,11 @@ export function ArrayEditor<T>({
                 </button>
               )}
             </div>
+            {requiredField && typeof (item as Record<string, unknown>)[requiredField] === "string" && ((item as Record<string, unknown>)[requiredField] as string).trim() === "" && (
+              <div className="mb-2 px-3 py-1.5 rounded text-xs font-medium" style={{ background: "rgba(181,99,75,0.1)", color: "var(--terra)" }}>
+                {String(requiredField).charAt(0).toUpperCase() + String(requiredField).slice(1)} is required
+              </div>
+            )}
             {renderItem(item, index, (updated) => updateItem(index, updated))}
           </div>
         ))}

@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ siteName = "Your Business" }: { siteName?: string }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -34,7 +34,7 @@ export function DashboardSidebar() {
     <>
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 bg-[#0a0a0a] border-b border-[#262626]">
-        <span className="text-sm font-semibold text-white">Rohlax Wellness</span>
+        <span className="text-sm font-semibold text-white">{siteName}</span>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="w-10 h-10 flex items-center justify-center rounded-md text-zinc-400 hover:text-white transition-colors duration-150"
@@ -60,7 +60,7 @@ export function DashboardSidebar() {
         {/* Logo area */}
         <div className="px-6 py-6 border-b border-[#262626]">
           <h1 className="text-base font-semibold text-white tracking-tight">
-            Rohlax Wellness
+            {siteName}
           </h1>
           <div className="flex items-center gap-1.5 mt-1">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />

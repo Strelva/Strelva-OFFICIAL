@@ -84,7 +84,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="text-xs font-medium tracking-wider uppercase transition-colors duration-300"
+                  className="text-xs font-medium tracking-wider uppercase transition-colors duration-300 px-3 py-2.5"
                   style={{ color: isActive(link.href) ? linkActiveColor : linkColor }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = linkHover; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = isActive(link.href) ? linkActiveColor : linkColor; }}
@@ -163,7 +163,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 key={link.href}
                 href={link.href}
                 onClick={handleNavClick}
-                className="font-display text-3xl tracking-tight transition-opacity hover:opacity-60"
+                className="font-display text-3xl tracking-tight transition-opacity hover:opacity-60 px-6 py-3"
                 style={{ color: "var(--bark)" }}
               >
                 {link.label}

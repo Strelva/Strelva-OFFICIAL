@@ -7,6 +7,7 @@ import { Testimonials } from "@/components/public/Testimonials";
 import { Events } from "@/components/public/Events";
 import { Providers } from "@/components/public/Providers";
 import { Contact } from "@/components/public/Contact";
+import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,15 @@ export default async function Home() {
       getContent("settings"),
     ]);
 
+  const prices = services.services.map((s) => parseInt(s.price || "0")).filter((p) => p > 0);
+  const minServicePrice = prices.length > 0 ? String(Math.min(...prices)) : undefined;
+
   return (
     <>
       <a href="#services" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:text-sm" style={{ background: "var(--sage)", color: "var(--cream)" }}>
         Skip to services
       </a>
+      <PageViewTracker />
       <main>
         <Hero hero={hero} />
 
@@ -52,7 +57,7 @@ export default async function Home() {
         </div>
 
         <Services services={services} />
-        <Booking vagaroUrl={settings.vagaroUrl} />
+        <Booking vagaroUrl={settings.vagaroUrl} minPrice={minServicePrice} reviewCount={testimonials.testimonials.length} />
         <Story story={story} />
         <Testimonials testimonials={testimonials} />
         <Events events={events} />

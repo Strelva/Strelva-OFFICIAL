@@ -1,25 +1,6 @@
 import { NextResponse } from "next/server";
-import { jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { verifyAuth } from "@/lib/auth";
 import { loadChatMessages, saveChatMessages } from "@/lib/storage";
-
-function getSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET is not set");
-  return new TextEncoder().encode(secret);
-}
-
-async function verifyAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("rohlax-admin-token")?.value;
-  if (!token) return false;
-  try {
-    await jwtVerify(token, getSecret());
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function GET() {
   const authed = await verifyAuth();

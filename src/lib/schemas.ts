@@ -39,7 +39,6 @@ export const storySchema = z.object({
   quote: z.string(),
   quoteAttribution: z.string(),
   imageUrl: z.string(),
-  secondaryImageUrl: z.string(),
 });
 
 export const testimonialItemSchema = z.object({
@@ -106,6 +105,8 @@ export const siteSettingsSchema = z.object({
   siteName: z.string().min(1),
   siteTagline: z.string(),
   siteDescription: z.string(),
+  ownerName: z.string().optional().default(""),
+  ownerTitle: z.string().optional().default(""),
   footerTagline: z.string(),
   copyrightText: z.string(),
   vagaroUrl: z.string(),

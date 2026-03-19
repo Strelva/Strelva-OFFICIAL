@@ -192,7 +192,7 @@ items:
 
   - id: env-per-tenant
     title: "Per-tenant environment config (Redis, AI key, Slack webhook)"
-    priority: P1
+    priority: P3-deferred
     feature: deployment
     status: todo
     context: |
@@ -216,7 +216,7 @@ items:
 
   - id: tenant-middleware
     title: "Subdomain-based tenant routing middleware"
-    priority: P1
+    priority: P3-deferred
     feature: multi-tenant
     status: todo
     context: |
@@ -229,7 +229,7 @@ items:
 
   - id: tenant-storage
     title: "Scope Redis storage to tenant namespace"
-    priority: P1
+    priority: P3-deferred
     feature: multi-tenant
     status: todo
     context: "{tenantId}:content:{section}. Migrate Chelsea's data."
@@ -238,7 +238,7 @@ items:
 
   - id: tenant-config
     title: "Per-tenant configuration system"
-    priority: P1
+    priority: P3-deferred
     feature: multi-tenant
     status: todo
     context: "Redis: {tenantId}:config. businessName, domain, industry, colors, systemPrompt."
@@ -247,7 +247,7 @@ items:
 
   - id: tenant-auth
     title: "Per-tenant JWT auth + Laney super-admin"
-    priority: P1
+    priority: P3-deferred
     feature: multi-tenant
     status: todo
     context: "JWT includes tenantId. Per-tenant credentials. Super-admin across all."
@@ -256,7 +256,7 @@ items:
 
   - id: site-templates
     title: "Industry-specific site templates (wellness, trades, restaurant, professional)"
-    priority: P1
+    priority: P3-deferred
     feature: multi-tenant
     status: todo
     context: "3-5 templates. Default sections + industry copy. Reduces build time to hours."
@@ -304,7 +304,7 @@ items:
 
   - id: second-client
     title: "Onboard second client from Chelsea's provider directory"
-    priority: P1
+    priority: P3-deferred
     feature: validation
     status: todo
     context: "Build site. Give dashboard + AI. Validate multi-tenant end-to-end."
@@ -326,7 +326,7 @@ items:
 
   - id: weekly-reports
     title: "AI-generated weekly site report per client (email)"
-    priority: P2
+    priority: P3-deferred
     feature: retention
     status: todo
     context: "Monday report: visitors, clicks, what AI did. THE retention mechanism."
