@@ -9,13 +9,14 @@ export default function HeroEditor() {
   const [data, setData] = useState<HeroContent | null>(null);
 
   useEffect(() => {
-    fetch("/api/content/hero").then((r) => r.json()).then(setData);
+    fetch("/api/content/hero", { credentials: "same-origin" }).then((r) => r.json()).then(setData);
   }, []);
 
   const save = async () => {
     const res = await fetch("/api/content/hero", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(data),
     });
     if (!res.ok) {

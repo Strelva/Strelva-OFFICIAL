@@ -76,17 +76,34 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
     inputRef.current?.focus();
   }, []);
 
-  // Detect when AI response mentions an update was made
-  const detectSiteUpdate = useCallback((text: string) => {
-    const updatePatterns = [
-      /updated.*successfully/i,
-      /changes.*applied/i,
-      /section.*updated/i,
-      /i'?ve updated/i,
-      /done!.*updated/i,
-      /made the change/i,
-    ];
-    return updatePatterns.some((p) => p.test(text));
+  // Verify site update by checking the activity feed for new entries
+  const lastActivityRef = useRef<string | null>(null);
+
+  // Capture the latest activity timestamp on mount
+  useEffect(() => {
+    fetch("/api/activity", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((items: Array<{ time: string }>) => {
+        if (items.length > 0) lastActivityRef.current = items[0].time;
+      })
+      .catch(() => {});
+  }, []);
+
+  const checkForSiteUpdate = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/activity", { credentials: "same-origin" });
+      if (!res.ok) return false;
+      const items: Array<{ time: string; type: string }> = await res.json();
+      if (items.length === 0) return false;
+      const latest = items[0];
+      if (latest.type === "ai" && latest.time !== lastActivityRef.current) {
+        lastActivityRef.current = latest.time;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }, []);
 
   const sendChat = useCallback(async (text: string) => {
@@ -162,8 +179,9 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
         );
       }
 
-      // Show toast if the AI updated the site
-      if (detectSiteUpdate(fullText)) {
+      // Verify if the AI actually updated the site via activity feed
+      const didUpdate = await checkForSiteUpdate();
+      if (didUpdate) {
         setUpdateToast(true);
         setTimeout(() => setUpdateToast(false), 5000);
       }
@@ -180,7 +198,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isLoading, detectSiteUpdate]);
+  }, [messages, isLoading, checkForSiteUpdate]);
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();

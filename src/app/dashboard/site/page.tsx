@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ExternalLink, Monitor, Tablet, Smartphone } from "lucide-react";
 
 const DEVICES = [
@@ -92,8 +93,14 @@ export default function SitePage() {
           POWERED BY REB
         </span>
         <div className="flex items-center gap-4">
+          <Link href="/dashboard/content" className="font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
+            Edit content
+          </Link>
+          <Link href="/dashboard/chat" className="font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
+            Ask AI to update
+          </Link>
           <span className="font-mono text-[10px] text-zinc-500">
-            {activeDevice.width === "100%" ? "Full width" : activeDevice.width} · Single-page site
+            {activeDevice.width === "100%" ? "Full width" : activeDevice.width}
           </span>
         </div>
       </div>

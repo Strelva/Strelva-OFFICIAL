@@ -12,7 +12,8 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Dashboard error:", error);
+    // Error boundary caught — error is displayed in the UI
+    void error;
   }, [error]);
 
   return (

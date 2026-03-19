@@ -105,6 +105,7 @@ export const siteSettingsSchema = z.object({
   siteName: z.string().min(1),
   siteTagline: z.string(),
   siteDescription: z.string(),
+  siteKeywords: z.string().optional().default(""),
   ownerName: z.string().optional().default(""),
   ownerTitle: z.string().optional().default(""),
   footerTagline: z.string(),

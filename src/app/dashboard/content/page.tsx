@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
+import { defaults } from "@/lib/defaults";
 import { timeAgo } from "@/lib/utils";
 
 const SECTION_META = [
@@ -30,17 +31,21 @@ function truncate(s: string, len: number): string {
   return s.slice(0, len).trimEnd() + "...";
 }
 
+async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch { return fallback; }
+}
+
 export default async function ContentPage() {
   const [hero, services, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
-      getContent("hero"),
-      getContent("services"),
-      getContent("testimonials"),
-      getContent("events"),
-      getContent("providers"),
-      getContent("contact"),
-      getContent("settings"),
-      getSectionTimestamps(),
+      safeFetch(() => getContent("hero"), defaults.hero),
+      safeFetch(() => getContent("services"), defaults.services),
+      safeFetch(() => getContent("testimonials"), defaults.testimonials),
+      safeFetch(() => getContent("events"), defaults.events),
+      safeFetch(() => getContent("providers"), defaults.providers),
+      safeFetch(() => getContent("contact"), defaults.contact),
+      safeFetch(() => getContent("settings"), defaults.settings),
+      safeFetch(() => getSectionTimestamps(), {}),
     ]);
 
   const sectionData: Record<string, { preview: string; status: "live" | "empty" | "configured"; count?: string; chatPrompt: string }> = {

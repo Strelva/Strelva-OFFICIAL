@@ -17,7 +17,6 @@ export function validateCredentials(
   const validPassword = process.env.ADMIN_PASSWORD;
 
   if (!validUsername || !validPassword) {
-    console.error("ADMIN_USERNAME or ADMIN_PASSWORD env vars not set");
     return false;
   }
 

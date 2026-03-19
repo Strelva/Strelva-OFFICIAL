@@ -31,13 +31,17 @@ type SettingsData = Record<string, string>;
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/content/settings")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load");
+        return res.json();
+      })
       .then((data) => setSettings(data))
-      .catch(() => setSettings(null));
+      .catch(() => setLoadError(true));
   }, []);
 
   const handleCopy = async (key: string, value: string) => {
@@ -47,6 +51,22 @@ export default function SettingsPage() {
       setTimeout(() => setCopiedField(null), 2000);
     } catch {}
   };
+
+  if (loadError) {
+    return (
+      <div className="p-6 md:p-8 max-w-3xl">
+        <div className="bg-red-600/5 border border-red-600/20 rounded-lg p-6 text-center">
+          <p className="text-sm text-red-400 mb-3">Couldn&apos;t load settings</p>
+          <button
+            onClick={() => { setLoadError(false); setSettings(null); window.location.reload(); }}
+            className="px-4 py-2 rounded-md bg-[#141414] border border-[#262626] text-xs text-zinc-300 hover:bg-[#1c1c1c] transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!settings) {
     return (

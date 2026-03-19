@@ -1,120 +1,93 @@
-{
-  "public-site": {
-    "score": 78,
-    "delivery_score": 80,
-    "craft_score": 74,
-    "gaps": [],
-    "strengths": [
-      "10 sections via layout (Footer in layout.tsx, not duplicated)",
-      "Favicon: SVG icon at src/app/icon.svg",
-      "Nav touch targets: px-3 py-2.5 on desktop, px-6 py-3 on mobile",
-      "Dynamic min price + review count in Booking",
-      "All outbound clicks tracked via TrackedLink + sendBeacon",
-      "GSAP parallax with prefers-reduced-motion, skip-to-content",
-      "PageViewTracker skips development environment"
-    ],
-    "delta": "+1",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "admin-cms": {
-    "score": 74,
-    "delivery_score": 76,
-    "craft_score": 70,
-    "gaps": [],
-    "strengths": [
-      "8 section editors, ImageCropper, unsaved changes warning",
-      "Inline red-border validation on required fields with asterisk indicators",
-      "Loading skeletons for events/providers editors",
-      "Server-side MIME + field validation, client-side ArrayEditor warnings"
-    ],
-    "delta": "stable",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "seo": {
-    "score": 77,
-    "delivery_score": 80,
-    "craft_score": 72,
-    "gaps": [],
-    "strengths": [
-      "Dynamic JSON-LD: business name, contact, hours, social, hero image, founder name/title",
-      "Geo coordinates parsed dynamically from Google Maps embed URL",
-      "Robust hours parsing: 12:00 PM, Tue 12-6, 9am-5pm all handled",
-      "OG image from hero background, robots.ts, sitemap.ts",
-      "Favicon resolves (icon.svg)"
-    ],
-    "delta": "+1",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "events": {
-    "score": 74,
-    "delivery_score": 78,
-    "craft_score": 72,
-    "gaps": [],
-    "strengths": [
-      "Auto-filters past events, year shown for future-year dates",
-      "Event link clicks tracked, empty state with Instagram CTA",
-      "Admin: loading skeleton, required title validation with red border"
-    ],
-    "delta": "stable",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "provider-directory": {
-    "score": 74,
-    "delivery_score": 78,
-    "craft_score": 70,
-    "gaps": [],
-    "strengths": [
-      "5 categories, personal recommendations, photos when available",
-      "Referral click tracking, admin loading skeleton + required name validation"
-    ],
-    "delta": "stable",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "vagaro-integration": {
-    "score": 76,
-    "delivery_score": 78,
-    "craft_score": 72,
-    "gaps": [],
-    "strengths": [
-      "Dynamic min price from services, review count from testimonials",
-      "TrackedLink on all booking + gift certificate links",
-      "Click counts: daily, total, weekly rollup"
-    ],
-    "delta": "stable",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "ai-agent": {
-    "score": 74,
-    "delivery_score": 76,
-    "craft_score": 72,
-    "gaps": [
-      "clientId: 'default' hardcoded (multi-tenant Phase 2)"
-    ],
-    "strengths": [
-      "Dynamic system prompt: services, hours, contact, events, booking clicks, ownerName",
-      "Zero hardcoded tenant data — generic reb-admin-token cookie",
-      "Shared verifyAuth(), Slack error logging, activity timestamps",
-      "Update toast in chat UI when AI modifies site"
-    ],
-    "delta": "stable",
-    "cached_at": "2026-03-19T23:00:00Z"
-  },
-  "client-dashboard": {
-    "score": 78,
-    "delivery_score": 80,
-    "craft_score": 74,
-    "gaps": [],
-    "strengths": [
-      "Vercel-style content page: row list with status dots, counts, previews, hover-reveal Edit",
-      "Vercel-style settings: label+description+value, hover-reveal edit/copy, empty badges",
-      "Error boundary with retry + navigation (error.tsx)",
-      "Login redirects to /dashboard (not /admin)",
-      "3 hero metrics: page views, booking clicks, completeness",
-      "Smart suggestions, at-a-glance grid, activity feed",
-      "Loading skeletons on all server-fetched pages",
-      "Device preview toggle, dynamic ownerName greeting"
-    ],
-    "delta": "+1",
-    "cached_at": "2026-03-19T23:00:00Z"
-  }
-}
+{"public-site":{"verdict":"PARTIAL","gaps":[
+  "Trust strip is completely hardcoded (page.tsx:35-42) instead of data-driven — brittle if messaging changes",
+  "Header navigation is hardcoded array (Header.tsx:9-14) instead of dynamically reflecting actual page sections — conflicts with principle of single source of truth",
+  "Price extraction assumes numeric values (page.tsx:30) — would crash silently if any service has 'call for quote' or non-numeric price",
+  "No explicit error handling for failed content fetches (page.tsx:24-28) — relies on parent layout component to catch, creates unclear failure modes",
+  "No explicit loading states for async content — relies entirely on SSR to mask latency",
+  "if SSR fails, page renders blank",
+  "Mobile menu stays open when user scrolls (Header.tsx manages menuOpen state but doesn't sync to scroll events) — minor UX friction"
+],"evidence":"Feature is feature-complete: all 10 sections render and function end-to-end (hero→services→booking→story→testimonials→events→providers→contact→footer). Data integration is solid; sections properly display whatever content is provided (services show prices, events filter past dates, testimonials display quotes, providers group by 5 categories). However, trust strip is hardcoded copy that should be configurable, and error handling for failed fetches is minimal. Code is professionally written with proper accessibility, responsive patterns, and correct use of Next.js/TypeScript, but some architectural decisions (hardcoded navigation, trust messaging) would be friction points if this were handed off or needed to scale.","score":65,"delivery_score":65,"craft_score":65,"delta":"same","delta_vs":65,"cached_at":"2026-03-19T16:54:18Z"},"admin-cms":{"verdict":"PARTIAL","gaps":[
+  "Login redirect bug: admin/login/page.tsx:32 redirects to '/dashboard' but actual admin is at '/admin/(dashboard)/*' — Chelsea hits 404 after login, feature is completely broken",
+  "No auth enforcement shown: admin pages are 'use client' with no middleware or page-level auth check — how do unauthenticated users get blocked?",
+  "JWT not transmitted: fetch calls to /api/content/* in every page (hero:18-25, services:14-21, etc.) have no Authorization header — unclear how backend authenticates",
+  "Required field validation is visual-only: ArrayEditor shows red warning (line 71-73) but form saves anyway — providers/page.tsx requiredField='name' allows empty names to save",
+  "No rollback on save failure: if API PUT fails, local state stays dirty but component doesn't indicate sync failure — user left with inconsistent state (hero/page.tsx:18-25)",
+  "Inconsistent error handling: .json().catch(() => ({})) pattern means garbage responses become 'Server error' with no details (settings/page.tsx:16-20, contact:17-21)",
+  "Google Maps URL accepts anything: contact/page.tsx:64 has no validation that googleMapsUrl is actually valid embed code",
+  "Character counter lacks teeth: settings/page.tsx:56 shows length but maxLength={200} allows exceeding the stated 160 char limit for meta description"
+],"evidence":"The content editing part is feature-complete and functional — Chelsea could edit all 8 sections if she could log in. But authentication is critically broken: login redirects to a non-existent route, API calls lack JWT, and no middleware shown to protect pages. The code works but reads like scaffolded-in-a-hurry: extensive inline style manipulation (ImageUploader:56-62, AdminSidebar throughout), identical save logic copy-pasted across 8 pages, basic error handling. This is 'shipped to meet deadline' not 'proud of it.'","score":57,"delivery_score":55,"craft_score":62,"delta":"same","delta_vs":57,"cached_at":"2026-03-19T16:54:18Z"},"seo":{"verdict":"PARTIAL","gaps":[
+  "Heading hierarchy not implemented anywhere — claim includes 'proper heading hierarchy' but code has zero h1/h2/h3 markup. Would need to be verified in page components, but not in this feature.",
+  "Keywords hardcoded instead of dynamic — lines 35-39 have hardcoded keyword array ['assisted stretching', 'Buffalo NY', etc] while description on line 37 is dynamic from CMS. Keywords should be `settings.siteKeywords` or similar, not baked.",
+  "Site URL hardcoded to single client — line 108 has literal `'https://rohlaxwellness.com'` instead of `process.env.NEXT_PUBLIC_SITE_URL` or `settings.siteUrl`. Won't work for multi-tenant (Phase 2 per CLAUDE.md).",
+  "Fallback geo coordinates hardcoded for one location — line 142 defaults to `42.97, -78.70` (Williamsville, NY). For multi-tenant, this will silently give wrong location for other clients.",
+  "Address parsing is fragile — line 118-120 splits by comma and assumes exactly 3 parts ['street', 'city', 'state zip']. Fails silently if format is '123 Main, Williamsville, NY 14221, USA' (4 parts) or missing commas.",
+  "Hours parsing has no error handling — line 91 regex is complex",
+  "if `contact.hours` has unexpected format, regex won't match and entry silently disappears. No logging or validation.",
+  "Google Maps URL parsing silently degrades — line 138 tries to extract coordinates from URL with regex",
+  "if format changed or URL absent, falls back to hardcoded location without logging failure.",
+  "No JSON-LD schema validation — schema is constructed and stringified but never validated against schema.org. No verification that output is valid for Google's Structured Data Testing Tool (mentioned in claim).",
+  "Potential invalid schema field — line 149-152 includes `founder` field, but LocalBusiness schema.org type doesn't have `founder`. Should verify against schema.org spec.",
+  "No SEO preview for user — claim targets 'Google' but ignores Chelsea (actual user). No dashboard component for her to preview schema, meta tags, OG preview before publishing. She can't validate what Google will see."
+],"evidence":"Feature renders working JSON-LD schema and meta tags for single client (Rohlax), but is architecturally broken for multi-tenant use (hardcoded URLs, coordinates, keywords) and missing a claimed feature (heading hierarchy). Code is readable but has fragile parsing with no error handling or validation—it works until the input doesn't match assumptions, then fails silently.","score":56,"delivery_score":58,"craft_score":56,"delta":"same","delta_vs":56,"cached_at":"2026-03-19T16:54:18Z"},"events":{"verdict":"PARTIAL","gaps":[
+  "HOST_LABELS undefined fallback (Events.tsx:80) — renders literal 'undefined' text if hosted_by value is unmapped, breaking the host type label display",
+  "No date field validation in editor (events/page.tsx:104) — date input can be left empty and saved",
+  "empty dates silently filter out (isUpcoming returns false for Invalid Date) with zero warning to the editor unlike past events",
+  "No save error feedback (events/page.tsx:26-29) — throws exception on API failure instead of showing user UI feedback",
+  "component hangs with no indication of what went wrong",
+  "suppressHydrationWarning on date output (Events.tsx:69) — hides a real client/server mismatch (timezone or parsing difference)",
+  "band-aid instead of fix",
+  "signals unresolved issue in date logic",
+  "Required title validation is UX-only (events/page.tsx) — red border appears but no logical check",
+  "can save event with empty title since ArrayEditor only shows validation hint, not enforcement",
+  "Time field is free-form text (events/page.tsx:108) — no format validation or normalization",
+  "users will enter '6pm', '6:00 PM', '18:00' inconsistently with no standardization",
+  "No URL validation on external_link (events/page.tsx:134) — accepts any string including 'not a url' without validation",
+  "users could save broken links",
+  "No positive feedback in editor (events/page.tsx) — shows 'past event' warning but no 'this event WILL appear on site' confirmation for valid future events",
+  "asymmetric feedback",
+  "No error boundary or null checks (Events.tsx:33) — if events.events is undefined, component crashes",
+  "assumes data shape without validation",
+  "Analytics destination unclear (Events.tsx:84) — TrackedLink wired with event='event-click' but no indication where this data goes or if it's visible in Chelsea's dashboard for 'proof of value'"
+],"evidence":"Feature works end-to-end for valid data (upcoming events filter, sort, display, link) but has silent failures on edge cases: unmapped host types render as 'undefined', empty/invalid dates disappear without warning, and zero validation prevents Chelsea from catching mistakes before save. Admin editor lacks error handling and positive feedback, making it feel fragile. Code structure is sound (semantic functions, good layout) but lacks defensive programming (error boundaries, validation, loading states). suppressHydrationWarning suggests unresolved timezone or parsing issues rather than fixed. This would work for a launch but would break with real customer usage.","score":60,"delivery_score":64,"craft_score":57,"delta":"same","delta_vs":60,"cached_at":"2026-03-19T16:54:18Z"},"provider-directory":{"verdict":"PARTIAL","gaps":[
+  "No seed data visible (claim: '8 trusted wellness providers') — need to verify 8 ProviderItem records exist in Redis/database. Are they initialized anywhere? src/app/admin/(dashboard)/providers/page.tsx fetches from /api/content/providers but no seed file provided.",
+  "Analytics attribution incomplete: TrackedLink fires 'provider-referral-click' event but no code shown for dashboard/reporting that connects referral clicks → bookings. Feature claims 'visible proof of value within first week' (\"47 people found you. 3 clicked Book.\") — where is the aggregation logic? src/components/public/Providers.tsx:78 fires the event but downstream is missing.",
+  "Admin form allows editing why_i_recommend (src/app/admin/(dashboard)/providers/page.tsx:80-83), but feature spec requires 'verified-authentic (not user-editable, only settable by Laney)'. Client should not be able to change recommendations.",
+  "No validation that booking_link or phone exist. User could save a provider with neither (src/app/admin/(dashboard)/providers/page.tsx:82 marks only 'name' as required). Results in unusable provider records on public site.",
+  "'Book' and 'Call' buttons are text-[0.5625rem] = 9px (src/components/public/Providers.tsx:89, 96). Unreadable and untappable on mobile (touch targets need 44px+). Serious UX bug on primary CTA.",
+  "No URL validation for booking_link or photo_url in admin form (src/app/admin/(dashboard)/providers/page.tsx). User could paste invalid URLs without feedback.",
+  "No image preview in admin form. User pastes a URL and never sees if image loads/looks right until public site.",
+  "No success/loading feedback after admin save (src/app/admin/(dashboard)/providers/page.tsx:19). Does save succeed? User doesn't know. On slow network, could cause duplicate submits.",
+  "TrackedLink implementation not provided (imported src/components/public/Providers.tsx:3). Can't verify if event actually fires, payload structure, or if data reaches analytics backend.",
+  "Empty provider list returns null (src/components/public/Providers.tsx:32) — dead end. New user scrolls to Providers section and sees nothing. No empty state, no guidance, no CTA."
+],"evidence":"Feature has the UI shell but is critically incomplete. Public display works and admin editing is functional, but the core value hypothesis (provider referral attribution → visible ROI in first week) requires working analytics wiring that isn't shown. Admin form allows client to edit recommendations when spec requires Laney-only control. Most damaging: 'Book' button is 9px text—completely unusable on mobile. Data validation is absent (no guarantee booking_link exists, no URL validation). Without visible seed data, it's unclear if 8 providers actually exist. Reads as a first pass: structure is competent but doesn't deliver on the promise.","score":51,"delivery_score":45,"craft_score":62,"delta":"same","delta_vs":51,"cached_at":"2026-03-19T16:54:18Z"},"vagaro-integration":{"verdict":"PARTIAL","gaps":[
+  "Booking.tsx line 46: 'Flexibility Foundation' service name is hardcoded. If Booking is reusable for all 7 services, this should be a prop — currently breaks UX when used as fallback for non-FF services (e.g., massage or coaching).",
+  "Services.tsx lines 204–211: 'What to expect' list is hardcoded but featured service is data-driven (line 22). If featured varies across clients/sessions, this contradicts the actual service selected.",
+  "Services.tsx line 22: featured could be undefined if services.services is empty — no guard. Line 25 filters using featured?.id but later code assumes featured exists, risking null-ref errors.",
+  "Booking.tsx line 13: vagaroUrl is used without validation — silent fallback to hardcoded Rohlax URL masks upstream errors. No guard if URL is invalid or malformed.",
+  "Unverified claim: 'All 7 services link to vagaro.com/rohlaxwellness' — code SUPPORTS parameterized vagaro_link per service, but provides no proof all 7 are configured in content data. Services.tsx lines 168, 246 conditionally use service.vagaro_link, suggesting each could differ. Content data not shown to validate claim."
+],"evidence":"Feature works as one-off implementation for current client but does not generalize. Hardcoded content (Flexibility Foundation, What to Expect steps) and missing defensive checks indicate template-coded rather than production-built. Booking component fails as fallback for 6 non-FF services. Code supports the feature claim but does not prove it — 'all 7 services' linked is unverified from content layer.","score":57,"delivery_score":55,"craft_score":62,"delta":"same","delta_vs":57,"cached_at":"2026-03-19T16:54:18Z"},"ai-agent":{"verdict":"PARTIAL","gaps":[
+  "System prompt context is incomplete: buildSystemPrompt (route.ts:11-32) fetches only 4 of 8 sections (settings, services, contact, events). Agent can read hero/story/testimonials/providers via tools but has zero context about current state. For 'update my bio' or 'add a testimonial', agent is blind. This violates check_80 'understands business context' for all sections.",
+  "Missing /api/chat endpoint for message persistence: ChatPanel (ChatPanel.tsx:49-54, 64-72) calls GET/POST /api/chat to load and save chat history, but this endpoint is not provided in the codebase. Feature is incomplete — Chelsea loses conversation history on page reload.",
+  "Tool execution failures are unhandled: getContent and setContent calls in tool execute blocks (route.ts:85, 119) have no try-catch. If Redis is down or storage fails, error propagates as 500, user sees generic 'Request failed' with no guidance. Array guard provides good UX for deletion, but storage/read failures leave user blind.",
+  "Update detection is fragile: ChatPanel (line 303-309) detects site updates via regex patterns on AI response ('updated.*successfully', 'i've updated'). Depends on model response wording",
+  "if Gemini says 'Modified your services section', regex won't match and toast won't fire.",
+  "No context about current system prompt coverage: system prompt claims 'Available sections: hero, services, story, testimonials, events, providers, contact, settings' (route.ts:45) but only 4 are contextualized. Agent reads all 8 but operates blind for half of them."
+],"evidence":"Feature works end-to-end for 4 of 8 sections (services, events, contact, settings) — Chelsea can chat to update hours/add events/manage services and see it work. But missing system prompt context for half the sections, no persistence endpoint, and weak error handling leave it incomplete. Code is intentional (not sloppy), validation is pre-storage, array guard is smart. Feels like an MVP that ships but needs hardening before second client.","score":63,"delivery_score":62,"craft_score":65,"delta":"same","delta_vs":63,"cached_at":"2026-03-19T16:54:18Z"},"client-dashboard":{"verdict":"PARTIAL","gaps":[
+  "Hardcoded site URL 'rohlaxwellness.com' in site/page.tsx:129 breaks multi-tenant setup",
+  "should be dynamic from settings",
+  "animate-toast CSS class used in settings/page.tsx:204 is not defined anywhere, toast will render without animation",
+  "Generic error messages in ChatPanel.tsx:260 don't distinguish between agent failure, rate limit, network error, or malformed response",
+  "Message persistence in ChatPanel.tsx:60-66 re-POSTs all messages on every save instead of incremental upsert",
+  "wasteful and could timeout",
+  "Settings form has no input validation (empty name allowed, URL format not checked) despite being displayed in metrics",
+  "Activity feed verification in ChatPanel.tsx:278-295 is fragile — compares timestamps but could race if user refreshes mid-response or API is slow",
+  "Error retry button in settings/page.tsx:70 doesn't show loading state, user can't tell if click registered",
+  "Quick prompts hardcoded in ChatPanel.tsx:14 with no fallback if agent can't handle one"
+],"evidence":"Dashboard is functionally complete and polished — all promised surfaces (overview, chat, site preview, content map, settings) are wired and work. UX details are thoughtful (data-driven greeting, completeness score, status indicators). Code is clean with proper TypeScript and component organization. However, delivery depends entirely on backend APIs working correctly (not shown here), and concrete gaps prevent higher scores: hardcoded demo URL breaks multi-tenant, undefined CSS animation, generic error messages, inefficient persistence, missing validation. This is production-ready for a single client but would need fixes before scaling to multiple clients.","score":65,"delivery_score":65,"craft_score":65,"delta":"same","delta_vs":65,"cached_at":"2026-03-19T16:54:18Z"},"deployment":{"verdict":"PARTIAL","gaps":[
+  "middleware.ts has no subdomain extraction — no code parsing request.headers.host or nextUrl.hostname to extract tenant ID (e.g., 'chelsea' from 'chelsea.reb.studio'). Feature claim requires this.",
+  "middleware.ts lines 22-46 — Routes are protected by JWT auth alone. Same token works for all tenants. No tenant context attached to request, so API routes cannot scope data by client. Multi-tenant isolation is impossible without this.",
+  "Missing entirely — No tenant validation. Even if subdomain were extracted, middleware doesn't check that it maps to a known tenant or reject invalid subdomains.",
+  "Missing entirely — No Redis scoping code visible. Claim requires tenant-scoped keys (e.g., client:${tenantId}:*). Cannot verify this exists without seeing API routes or Redis layer.",
+  "Missing entirely — No tenant configuration. No TENANTS env var, no mapping of subdomains to client IDs, no known-tenant lookup.",
+  "middleware.ts is generic JWT auth, not multi-tenant routing. The claimed feature (subdomain routing + tenant isolation) is completely unbuilt. This is a prerequisite guard, not the feature itself."
+],"evidence":"This is authentication middleware masquerading as multi-tenant deployment. The actual feature — subdomain extraction, tenant ID routing, tenant-scoped data access — is completely unbuilt. The middleware compiles and protects routes, but Laney cannot serve multiple clients yet because there is no mechanism to distinguish which client made a request. The code that exists is competent auth, but it solves a prerequisite problem, not the stated feature.","score":38,"delivery_score":30,"craft_score":50,"delta":"same","delta_vs":38,"cached_at":"2026-03-19T16:54:18Z"}}

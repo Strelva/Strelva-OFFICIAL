@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import Image from "next/image";
 
 interface ImageCropperProps {
   src: string;
@@ -153,8 +154,7 @@ export function ImageCropper({ src, onCrop, onCancel, aspect }: ImageCropperProp
           <button onClick={onCancel} className="text-xs px-3 py-1 rounded-md" style={{ color: "var(--bark-faded)" }}>Cancel</button>
         </div>
         <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-gray-100 p-4 select-none" style={{ minHeight: 200 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="Crop preview" onLoad={onImgLoad} className="max-w-full max-h-[60vh] block" draggable={false} />
+          <Image src={src} alt="Crop preview" onLoad={onImgLoad} className="max-w-full max-h-[60vh] block" draggable={false} width={800} height={600} unoptimized style={{ width: "auto", height: "auto", maxWidth: "100%", maxHeight: "60vh" }} />
           {imgSize.w > 0 && (
             <>
               <div className="absolute pointer-events-none" style={{ left: containerRef.current?.querySelector("img")?.offsetLeft ?? 0, top: containerRef.current?.querySelector("img")?.offsetTop ?? 0, width: imgSize.w, height: imgSize.h }}>

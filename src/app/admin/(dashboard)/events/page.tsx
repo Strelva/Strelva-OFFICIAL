@@ -16,13 +16,14 @@ export default function EventsEditor() {
   const [data, setData] = useState<EventsContent | null>(null);
 
   useEffect(() => {
-    fetch("/api/content/events").then((r) => r.json()).then(setData);
+    fetch("/api/content/events", { credentials: "same-origin" }).then((r) => r.json()).then(setData);
   }, []);
 
   const save = async () => {
     const res = await fetch("/api/content/events", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(data),
     });
     if (!res.ok) {

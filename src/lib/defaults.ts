@@ -332,6 +332,7 @@ export const defaultSettings: SiteSettings = {
   siteTagline: "Assisted Stretching in Williamsville, NY",
   siteDescription:
     "Professional assisted stretching in Williamsville, NY. Personalized 1-on-1 sessions to relieve tension, improve mobility, and support your well-being. Book with Chelsea Rohl today.",
+  siteKeywords: "assisted stretching, Buffalo NY, Williamsville NY, stretch therapy, mobility, wellness, Chelsea Rohl, Rohlax",
   ownerName: "Chelsea",
   ownerTitle: "Physical Therapist & Stretch Therapist",
   footerTagline: "Move Better. Feel Better. Live Better.",

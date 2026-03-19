@@ -57,7 +57,7 @@ export function Footer({ settings, contact }: FooterProps) {
       {/* Bottom bar */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="container-main py-5 flex flex-wrap justify-between items-center gap-4 text-[0.625rem] tracking-wider uppercase opacity-40">
-          <p>&copy; {new Date().getFullYear()} {settings.copyrightText}</p>
+          <p suppressHydrationWarning>&copy; {new Date().getFullYear()} {settings.copyrightText}</p>
           <p>{settings.footerTagline}</p>
         </div>
       </div>

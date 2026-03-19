@@ -102,6 +102,7 @@ export interface SiteSettings {
   siteName: string;
   siteTagline: string;
   siteDescription: string;
+  siteKeywords: string;
   ownerName: string;
   ownerTitle: string;
   footerTagline: string;

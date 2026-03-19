@@ -13,13 +13,17 @@ export default async function DashboardLayout({
     redirect("/admin/login");
   }
 
-  const settings = await getContent("settings");
+  let siteName = "Your Business";
+  try {
+    const settings = await getContent("settings");
+    siteName = settings.siteName || siteName;
+  } catch {}
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a]">
       <div className="reb-accent-line w-full shrink-0" />
       <div className="flex flex-1">
-        <DashboardSidebar siteName={settings.siteName} />
+        <DashboardSidebar siteName={siteName} />
         <main className="flex-1 md:ml-0 mt-14 md:mt-0 relative">
           <div className="reb-grid-bg absolute inset-0 opacity-30 pointer-events-none" />
           <div className="relative">{children}</div>

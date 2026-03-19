@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentSection } from "@/lib/types";
-import { getContent, setContent, recordSectionUpdate } from "@/lib/storage";
+import { getContent, setContent, recordSectionUpdate, logActivity } from "@/lib/storage";
 
 const VALID_SECTIONS: ContentSection[] = [
   "hero",
@@ -93,8 +93,12 @@ export async function GET(
     return NextResponse.json({ error: "Invalid section" }, { status: 400 });
   }
 
-  const data = await getContent(section);
-  return NextResponse.json(data);
+  try {
+    const data = await getContent(section);
+    return NextResponse.json(data);
+  } catch {
+    return NextResponse.json({ error: "Failed to load content" }, { status: 500 });
+  }
 }
 
 export async function PUT(
@@ -107,16 +111,25 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid section" }, { status: 400 });
   }
 
-  const body = await request.json();
+  try {
+    const body = await request.json();
 
-  const validationError = validateBody(section, body);
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 422 });
+    const validationError = validateBody(section, body);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 422 });
+    }
+
+    await setContent(section, body);
+    await recordSectionUpdate(section);
+    await logActivity({
+      text: `Updated ${section} via admin`,
+      time: new Date().toISOString(),
+      type: "admin",
+    });
+    revalidatePath("/");
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to save content" }, { status: 500 });
   }
-
-  await setContent(section, body);
-  await recordSectionUpdate(section);
-  revalidatePath("/");
-
-  return NextResponse.json({ success: true });
 }

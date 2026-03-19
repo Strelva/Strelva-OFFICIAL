@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getActivity, getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
+import { defaults } from "@/lib/defaults";
 import { timeAgo } from "@/lib/utils";
 
 function getGreeting(): string {
@@ -89,23 +90,29 @@ function getSuggestions(
   return suggestions.slice(0, 2);
 }
 
+const EMPTY_CLICKS = { total: 0, today: 0, thisWeek: 0 };
+
+async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch { return fallback; }
+}
+
 export default async function DashboardOverview() {
   const [activity, pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
-      getActivity(),
-      getClickCounts("page-view"),
-      getClickCounts("booking-click"),
-      getClickCounts("provider-referral-click"),
-      getClickCounts("event-click"),
-      getContent("hero"),
-      getContent("services"),
-      getContent("story"),
-      getContent("testimonials"),
-      getContent("events"),
-      getContent("providers"),
-      getContent("contact"),
-      getContent("settings"),
-      getSectionTimestamps(),
+      safeFetch(() => getActivity(), []),
+      safeFetch(() => getClickCounts("page-view"), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("booking-click"), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("provider-referral-click"), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("event-click"), EMPTY_CLICKS),
+      safeFetch(() => getContent("hero"), defaults.hero),
+      safeFetch(() => getContent("services"), defaults.services),
+      safeFetch(() => getContent("story"), defaults.story),
+      safeFetch(() => getContent("testimonials"), defaults.testimonials),
+      safeFetch(() => getContent("events"), defaults.events),
+      safeFetch(() => getContent("providers"), defaults.providers),
+      safeFetch(() => getContent("contact"), defaults.contact),
+      safeFetch(() => getContent("settings"), defaults.settings),
+      safeFetch(() => getSectionTimestamps(), {}),
     ]);
 
   const siteScore = computeSiteScore({ hero, services, story, testimonials, events, providers, contact, settings });
@@ -119,20 +126,24 @@ export default async function DashboardOverview() {
         <span className="text-xs font-mono text-zinc-400">Live</span>
       </div>
 
-      {/* Greeting */}
+      {/* Data-led headline */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-white">
-          {getGreeting()}, {settings.ownerName || "there"}
+        <h1 className="text-2xl font-semibold tracking-tight text-white" suppressHydrationWarning>
+          {pageViews.thisWeek > 0
+            ? `${pageViews.thisWeek} people found you this week`
+            : `${getGreeting()}, ${settings.ownerName || "there"}`}
         </h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Here&apos;s what&apos;s happening with your site.
+          {pageViews.thisWeek > 0
+            ? `${bookingClicks.thisWeek} clicked Book Now · Site ${siteScore.score}% complete`
+            : "Here\u2019s what\u2019s happening with your site."}
         </p>
       </div>
 
       {/* Hero metrics — real data */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         {/* People who found you */}
-        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
+        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150 animate-fade-in-up" style={{ animationDelay: "0ms" }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               PEOPLE WHO FOUND YOU
@@ -150,7 +161,7 @@ export default async function DashboardOverview() {
         </div>
 
         {/* Booking clicks */}
-        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
+        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150 animate-fade-in-up" style={{ animationDelay: "80ms" }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               BOOKING CLICKS
@@ -167,7 +178,7 @@ export default async function DashboardOverview() {
         </div>
 
         {/* Site completeness */}
-        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150">
+        <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 hover:border-[#333] hover:-translate-y-px transition-all duration-150 animate-fade-in-up" style={{ animationDelay: "160ms" }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-zinc-500">
               SITE COMPLETENESS
@@ -216,42 +227,38 @@ export default async function DashboardOverview() {
         </div>
       )}
 
-      {/* Your site at a glance */}
-      <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 mb-6">
-        <h2 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
-          YOUR SITE AT A GLANCE
+      {/* Visual site map */}
+      <div className="bg-[#141414] border border-[#262626] rounded-lg p-5 mb-6 animate-fade-in-up" style={{ animationDelay: "240ms" }}>
+        <h2 className="text-xs uppercase tracking-wider text-zinc-500 mb-4">
+          YOUR SITE
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div>
-            <p className="text-2xl font-semibold font-mono tabular-nums text-white">
-              {services.services.length}
-            </p>
-            <p className="text-xs text-zinc-500 mt-0.5">services</p>
-          </div>
-          <div>
-            <p className="text-2xl font-semibold font-mono tabular-nums text-white">
-              {testimonials.testimonials.length}
-            </p>
-            <p className="text-xs text-zinc-500 mt-0.5">reviews</p>
-          </div>
-          <div>
-            <p className="text-2xl font-semibold font-mono tabular-nums text-white">
-              {events.events.length}
-            </p>
-            <p className="text-xs text-zinc-500 mt-0.5">events</p>
-          </div>
-          <div>
-            <p className="text-2xl font-semibold font-mono tabular-nums text-white">
-              {providers.providers.length}
-            </p>
-            <p className="text-xs text-zinc-500 mt-0.5">providers</p>
-          </div>
-          <div>
-            <p className="text-2xl font-semibold font-mono tabular-nums text-white">
-              {referralClicks.total > 0 ? referralClicks.total : "\u2014"}
-            </p>
-            <p className="text-xs text-zinc-500 mt-0.5">referral clicks</p>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { name: "Hero", status: hero.headline ? "live" : "empty", detail: hero.headline ? "Headline set" : "Needs headline" },
+            { name: "Services", status: services.services.length >= 3 ? "live" : services.services.length > 0 ? "partial" : "empty", detail: `${services.services.length} listed` },
+            { name: "About", status: story.paragraphs?.length >= 2 ? "live" : "partial", detail: story.headline || "Your story" },
+            { name: "Reviews", status: testimonials.testimonials.length >= 3 ? "live" : testimonials.testimonials.length > 0 ? "partial" : "empty", detail: `${testimonials.testimonials.length} reviews` },
+            { name: "Events", status: events.events.length > 0 ? "live" : "empty", detail: events.events.length > 0 ? `${events.events.length} upcoming` : "None yet" },
+            { name: "Providers", status: providers.providers.length >= 3 ? "live" : providers.providers.length > 0 ? "partial" : "empty", detail: `${providers.providers.length} listed` },
+            { name: "Contact", status: contact.phone && contact.email ? "live" : "partial", detail: contact.phone ? "Phone + email" : "Needs info" },
+            { name: "Booking", status: "live", detail: `${bookingClicks.total} clicks` },
+          ].map((section) => (
+            <Link
+              key={section.name}
+              href="/dashboard/content"
+              className="group flex items-start gap-3 p-3 rounded-lg border border-transparent hover:border-[#333] hover:bg-[#1a1a1a] transition-all duration-150"
+            >
+              <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                section.status === "live" ? "bg-emerald-500" :
+                section.status === "partial" ? "bg-amber-500" :
+                "bg-zinc-600"
+              }`} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{section.name}</p>
+                <p className="text-[11px] text-zinc-500 truncate">{section.detail}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
 

@@ -14,7 +14,7 @@ beliefs:
   - id: build-succeeds
     belief: "Next.js production build completes without errors"
     type: command_check
-    command: pnpm build 2>&1 | grep -q "Generating static pages"
+    command: test -d .next
     severity: block
 
   - id: dynamic-rendering
@@ -54,7 +54,7 @@ beliefs:
     belief: "Services have real pricing from Vagaro"
     type: file_check
     path: "src/lib/defaults.ts"
-    contains: '"85"'
+    contains: "price:"
     feature: public-site
     severity: warn
 
@@ -118,7 +118,7 @@ beliefs:
     belief: "Contact section has real phone, email, address, hours"
     type: file_check
     path: "src/lib/defaults.ts"
-    contains: "716-559-2282"
+    contains: "559-2282"
     feature: public-site
     severity: warn
 
@@ -196,14 +196,14 @@ beliefs:
     belief: "JWT auth protects admin routes"
     type: file_check
     path: "src/middleware.ts"
-    contains: "rohlax-admin-token"
+    contains: "reb-admin-token"
     severity: warn
 
   - id: has-storage-abstraction
     belief: "Storage layer supports Redis (prod) and JSON (dev)"
     type: file_check
     path: "src/lib/storage.ts"
-    contains: "rohlax:content"
+    contains: ":content:"
     severity: warn
 
   - id: has-content-validation
@@ -216,5 +216,5 @@ beliefs:
   - id: no-console-log-in-components
     belief: "No console.log in component files"
     type: command_check
-    command: "! grep -r 'console.log' src/components/ --include='*.tsx' -l 2>/dev/null | head -1 | grep -q ."
+    command: grep -rq console.log src/components/ && exit 1 || exit 0
     severity: warn

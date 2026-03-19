@@ -8,8 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const messages = await loadChatMessages("default");
-  return NextResponse.json(messages);
+  try {
+    const messages = await loadChatMessages("default");
+    return NextResponse.json(messages);
+  } catch {
+    return NextResponse.json([], { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -18,7 +22,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const messages = await req.json();
-  await saveChatMessages("default", messages);
-  return NextResponse.json({ success: true });
+  try {
+    const messages = await req.json();
+    await saveChatMessages("default", messages);
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to save messages" }, { status: 500 });
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { SectionEditor } from "@/components/admin/SectionEditor";
 import type { ContactContent } from "@/lib/types";
 
@@ -8,13 +9,14 @@ export default function ContactEditor() {
   const [data, setData] = useState<ContactContent | null>(null);
 
   useEffect(() => {
-    fetch("/api/content/contact").then((r) => r.json()).then(setData);
+    fetch("/api/content/contact", { credentials: "same-origin" }).then((r) => r.json()).then(setData);
   }, []);
 
   const save = async () => {
     const res = await fetch("/api/content/contact", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(data),
     });
     if (!res.ok) {

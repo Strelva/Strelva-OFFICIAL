@@ -25,7 +25,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `${settings.siteName} | ${settings.siteTagline}`,
     description: settings.siteDescription,
-    keywords: ["assisted stretching", "Buffalo NY", "Williamsville NY", "stretch therapy", "mobility", "wellness", "Chelsea Rohl", "Rohlax"],
+    keywords: settings.siteKeywords
+      ? settings.siteKeywords.split(",").map((k: string) => k.trim())
+      : ["assisted stretching", "Buffalo NY", "Williamsville NY", "stretch therapy", "mobility", "wellness"],
     openGraph: {
       title: `${settings.siteName} | ${settings.siteTagline}`,
       description: settings.siteDescription,
@@ -108,7 +110,7 @@ async function LocalBusinessSchema() {
     "@type": "HealthAndBeautyBusiness",
     name: settings.siteName,
     description: settings.siteDescription,
-    url: "https://rohlaxwellness.com",
+    url: process.env.NEXT_PUBLIC_SITE_URL || "https://rohlaxwellness.com",
     telephone: contact.phone,
     email: contact.email,
     address: {

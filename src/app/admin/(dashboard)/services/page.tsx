@@ -9,13 +9,14 @@ export default function ServicesEditor() {
   const [data, setData] = useState<ServicesContent | null>(null);
 
   useEffect(() => {
-    fetch("/api/content/services").then((r) => r.json()).then(setData);
+    fetch("/api/content/services", { credentials: "same-origin" }).then((r) => r.json()).then(setData);
   }, []);
 
   const save = async () => {
     const res = await fetch("/api/content/services", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(data),
     });
     if (!res.ok) {

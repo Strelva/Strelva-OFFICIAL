@@ -72,7 +72,7 @@ export function Events({ events }: { events: EventsContent }) {
                   >
                     {/* Date */}
                     <div>
-                      <p className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }}>
+                      <p className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }} suppressHydrationWarning>
                         {formatDate(event.date)}
                       </p>
                       {event.time && (
@@ -95,7 +95,7 @@ export function Events({ events }: { events: EventsContent }) {
                       <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "var(--bark-faded)" }}>
                         {event.location && <span>{event.location}</span>}
                         <span style={{ color: "var(--cream-mid)" }}>·</span>
-                        <span>{HOST_LABELS[event.hosted_by]}</span>
+                        <span>{HOST_LABELS[event.hosted_by] ?? "Event"}</span>
                       </div>
                     </div>
 

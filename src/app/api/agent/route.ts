@@ -5,14 +5,13 @@ import { verifyAuth } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 
 async function buildSystemPrompt(): Promise<string> {
-  const [settings, services, contact, events] = await Promise.all([
+  const [settings, services, contact, events, bookingClicks] = await Promise.all([
     getContent("settings"),
     getContent("services"),
     getContent("contact"),
     getContent("events"),
+    getClickCounts("booking-click"),
   ]);
-
-  const bookingClicks = await getClickCounts("booking-click");
 
   const serviceList = services.services
     .map((s) => `- ${s.name} (${s.duration}, $${s.price})`)
@@ -141,8 +140,10 @@ export async function POST(req: Request) {
             }
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await setContent(section, parsed.data as any);
+          await setContent(
+            section,
+            parsed.data as Parameters<typeof setContent>[1]
+          );
 
           const { revalidatePath } = await import("next/cache");
           revalidatePath("/");
@@ -154,7 +155,7 @@ export async function POST(req: Request) {
               body: JSON.stringify({
                 text: `Site updated *${section}* via AI chat`,
               }),
-            }).catch((err) => console.error("Slack notification failed:", err));
+            }).catch(() => { /* Slack notification is best-effort */ });
           }
 
           // Log activity + record freshness timestamp
@@ -166,8 +167,8 @@ export async function POST(req: Request) {
               type: "ai",
             });
             await recordSectionUpdate(section);
-          } catch (err) {
-            console.error("Failed to log activity:", err);
+          } catch {
+            // Activity logging is best-effort
           }
 
           return {
