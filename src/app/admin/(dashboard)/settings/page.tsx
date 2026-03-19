@@ -28,7 +28,7 @@ export default function SettingsEditor() {
   if (!data) return <div className="text-gray-400">Loading...</div>;
 
   return (
-    <SectionEditor title="Site Settings" description="Global config — site name, SEO, Vagaro" onSave={save}>
+    <SectionEditor title="Site Settings" description="Global config — site name, SEO, booking" onSave={save}>
       <div className="grid gap-6 bg-white p-6 rounded-xl border border-gray-200">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Site Name</label>
@@ -50,11 +50,11 @@ export default function SettingsEditor() {
           <input type="text" value={data.siteKeywords || ""} onChange={(e) => setData({ ...data, siteKeywords: e.target.value })} placeholder="assisted stretching, Buffalo NY, wellness" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none text-sm" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Vagaro Embed URL</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Booking URL</label>
           <p className="text-xs mb-1.5" style={{ color: "var(--bark-faded)" }}>
-            Paste your Vagaro booking widget URL. This embeds the booking calendar on your site.
+            External booking link (optional — built-in booking is used by default).
           </p>
-          <input type="text" value={data.vagaroUrl} onChange={(e) => setData({ ...data, vagaroUrl: e.target.value })} placeholder="https://www.vagaro.com/..." className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none text-sm" />
+          <input type="text" value={data.bookingUrl} onChange={(e) => setData({ ...data, bookingUrl: e.target.value })} placeholder="https://..." className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none text-sm" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Footer Tagline</label>

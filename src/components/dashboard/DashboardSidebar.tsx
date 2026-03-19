@@ -8,6 +8,7 @@ import {
   Globe,
   FileStack,
   Settings,
+  CalendarDays,
   Menu,
   X,
 } from "lucide-react";
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "AI Chat", href: "/dashboard/chat", icon: MessageCircle },
   { label: "My Site", href: "/dashboard/site", icon: Globe },
+  { label: "Bookings", href: "/dashboard/bookings", icon: CalendarDays },
   { label: "Content", href: "/dashboard/content", icon: FileStack },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

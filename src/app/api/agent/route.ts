@@ -3,18 +3,19 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { verifyAuth } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 
-async function buildSystemPrompt(): Promise<string> {
+async function buildSystemPrompt(tenant: string): Promise<string> {
   const [settings, services, contact, events, bookingClicks] = await Promise.all([
-    getContent("settings"),
-    getContent("services"),
-    getContent("contact"),
-    getContent("events"),
-    getClickCounts("booking-click"),
+    getContent("settings", tenant),
+    getContent("services", tenant),
+    getContent("contact", tenant),
+    getContent("events", tenant),
+    getClickCounts("booking-click", tenant),
   ]);
 
   const serviceList = services.services
-    .map((s) => `- ${s.name} (${s.duration}, $${s.price})`)
+    .map((s) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
     .join("\n");
 
   const futureEvents = events.events
@@ -33,7 +34,7 @@ ABOUT THE BUSINESS:
 - Email: ${contact.email}
 - Address: ${contact.address}
 - Hours: ${contact.hours}
-- Booking: ${settings.vagaroUrl}
+- Booking: ${settings.bookingUrl}
 
 CURRENT SERVICES (${services.services.length} listed):
 ${serviceList}
@@ -43,15 +44,17 @@ ${futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events liste
 SITE PERFORMANCE:
 - Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)
 
-You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
+You can read and update any section of the website, manage bookings, and check availability. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
 
 Available sections: hero, services, story, testimonials, events, providers, contact, settings.
+
+BOOKING: You can check availability, book appointments, and list upcoming bookings. When someone asks to book, use check_availability first, then book_appointment.
 
 Be conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
 
 Never remove content unless explicitly asked. For array items (services, events, testimonials, providers), preserve all existing items unless told to remove specific ones.
 
-When ${ownerName} asks "how's my site?" or similar, give a plain-English summary: how many services are listed, how many booking clicks, upcoming events, and suggest what to update next.`;
+When ${ownerName} asks "how's my site?" or similar, give a plain-English summary: how many services are listed, how many booking clicks, upcoming events, upcoming bookings, and suggest what to update next.`;
 }
 
 export async function POST(req: Request) {
@@ -63,8 +66,9 @@ export async function POST(req: Request) {
     });
   }
 
+  const tenant = await getTenantFromHeaders();
   const { messages } = await req.json();
-  const systemPrompt = await buildSystemPrompt();
+  const systemPrompt = await buildSystemPrompt(tenant);
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
         }),
         execute: async ({ section }) => {
           const { getContent } = await import("@/lib/storage");
-          return await getContent(section);
+          return await getContent(section, tenant);
         },
       }),
       update_section: tool({
@@ -118,7 +122,7 @@ export async function POST(req: Request) {
           }
 
           const { getContent, setContent } = await import("@/lib/storage");
-          const current = (await getContent(section)) as unknown as Record<
+          const current = (await getContent(section, tenant)) as unknown as Record<
             string,
             unknown
           >;
@@ -142,7 +146,8 @@ export async function POST(req: Request) {
 
           await setContent(
             section,
-            parsed.data as Parameters<typeof setContent>[1]
+            parsed.data as Parameters<typeof setContent>[1],
+            tenant
           );
 
           const { revalidatePath } = await import("next/cache");
@@ -155,21 +160,18 @@ export async function POST(req: Request) {
               body: JSON.stringify({
                 text: `Site updated *${section}* via AI chat`,
               }),
-            }).catch(() => { /* Slack notification is best-effort */ });
+            }).catch(() => {});
           }
 
-          // Log activity + record freshness timestamp
           try {
             const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
             await logActivity({
               text: `AI updated ${section}`,
               time: new Date().toISOString(),
               type: "ai",
-            });
-            await recordSectionUpdate(section);
-          } catch {
-            // Activity logging is best-effort
-          }
+            }, tenant);
+            await recordSectionUpdate(section, tenant);
+          } catch {}
 
           return {
             success: true,
@@ -178,8 +180,118 @@ export async function POST(req: Request) {
           };
         },
       }),
+      check_availability: tool({
+        description: "Check available booking slots for a specific date and service",
+        inputSchema: z.object({
+          date: z.string().describe("Date in YYYY-MM-DD format"),
+          serviceId: z.string().describe("Service ID to check availability for"),
+        }),
+        execute: async ({ date, serviceId }) => {
+          const { getAvailableSlots, getContent } = await import("@/lib/storage");
+          const slots = await getAvailableSlots(date, serviceId, tenant);
+          const services = await getContent("services", tenant);
+          const service = services.services.find((s) => s.id === serviceId);
+          return {
+            date,
+            service: service?.name || serviceId,
+            availableSlots: slots,
+            count: slots.length,
+          };
+        },
+      }),
+      book_appointment: tool({
+        description: "Book an appointment for a client",
+        inputSchema: z.object({
+          serviceId: z.string(),
+          serviceName: z.string(),
+          date: z.string().describe("Date in YYYY-MM-DD format"),
+          startTime: z.string().describe("Start time in HH:MM format"),
+          clientName: z.string(),
+          clientEmail: z.string(),
+          clientPhone: z.string().optional(),
+          notes: z.string().optional(),
+        }),
+        execute: async ({ serviceId, serviceName, date, startTime, clientName, clientEmail, clientPhone, notes }) => {
+          const { getAvailableSlots, createBooking, getContent, logActivity } = await import("@/lib/storage");
+
+          // Verify slot
+          const available = await getAvailableSlots(date, serviceId, tenant);
+          if (!available.includes(startTime)) {
+            return { success: false, error: "This time slot is no longer available." };
+          }
+
+          // Calculate end time
+          const services = await getContent("services", tenant);
+          const service = services.services.find((s) => s.id === serviceId);
+          const duration = service ? parseInt(service.duration) || 60 : 60;
+          const [h, m] = startTime.split(":").map(Number);
+          const endMin = h * 60 + m + duration;
+          const endTime = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+
+          const booking = await createBooking({
+            serviceId,
+            serviceName,
+            date,
+            startTime,
+            endTime,
+            clientName,
+            clientEmail,
+            clientPhone: clientPhone || "",
+            notes,
+          }, tenant);
+
+          await logActivity({
+            text: `Booked ${serviceName} for ${clientName} on ${date} at ${startTime}`,
+            time: new Date().toISOString(),
+            type: "booking",
+          }, tenant);
+
+          return { success: true, booking };
+        },
+      }),
+      list_bookings: tool({
+        description: "List upcoming bookings",
+        inputSchema: z.object({
+          from: z.string().optional().describe("Start date (YYYY-MM-DD), defaults to today"),
+          to: z.string().optional().describe("End date (YYYY-MM-DD), defaults to 30 days from now"),
+        }),
+        execute: async ({ from, to }) => {
+          const { getBookings } = await import("@/lib/storage");
+          const today = new Date().toISOString().slice(0, 10);
+          const thirtyDays = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+          const bookings = await getBookings(tenant, {
+            from: from || today,
+            to: to || thirtyDays,
+          });
+          const active = bookings.filter((b) => b.status !== "cancelled");
+          return {
+            total: active.length,
+            bookings: active.map((b) => ({
+              id: b.id,
+              service: b.serviceName,
+              date: b.date,
+              time: `${b.startTime}-${b.endTime}`,
+              client: b.clientName,
+              status: b.status,
+            })),
+          };
+        },
+      }),
+      update_booking_config: tool({
+        description: "Update booking availability configuration (schedule, lead time, etc.)",
+        inputSchema: z.object({
+          config: z.record(z.string(), z.unknown()).describe("Partial booking config to merge"),
+        }),
+        execute: async ({ config }) => {
+          const { getBookingConfig, setBookingConfig } = await import("@/lib/storage");
+          const current = await getBookingConfig(tenant);
+          const updated = { ...current, ...config };
+          await setBookingConfig(updated, tenant);
+          return { success: true, config: updated };
+        },
+      }),
     },
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(8),
   });
 
   return result.toTextStreamResponse();

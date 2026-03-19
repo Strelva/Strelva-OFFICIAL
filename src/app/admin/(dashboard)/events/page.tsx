@@ -68,7 +68,7 @@ export default function EventsEditor() {
             time: "",
             location: "",
             description: "",
-            hosted_by: "chelsea",
+            hosted_by: "owner",
             external_link: "",
           })}
           renderItem={(item, _index, update) => (
@@ -94,7 +94,7 @@ export default function EventsEditor() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Hosted By</label>
                   <select value={item.hosted_by} onChange={(e) => update({ ...item, hosted_by: e.target.value as EventItem["hosted_by"] })} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm">
-                    <option value="chelsea">Chelsea</option>
+                    <option value="owner">Owner</option>
                     <option value="partner">Partner</option>
                     <option value="community">Community</option>
                   </select>

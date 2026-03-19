@@ -24,7 +24,7 @@ function isUpcoming(dateStr: string): boolean {
 }
 
 const HOST_LABELS: Record<EventItem["hosted_by"], string> = {
-  chelsea: "Hosted by Chelsea",
+  owner: "Our Event",
   partner: "Partner Event",
   community: "Community Event",
 };

@@ -22,7 +22,7 @@ const SETTING_FIELDS: readonly {
   { key: "ownerName", label: "Owner Name", description: "Shown in greetings and AI interactions", chatPrompt: "Change my owner name to" },
   { key: "siteTagline", label: "Tagline", description: "Appears in search results and header", chatPrompt: "Change my tagline to" },
   { key: "siteDescription", label: "Description", description: "SEO description for Google", chatPrompt: "Update my site description" },
-  { key: "vagaroUrl", label: "Booking URL", description: "Where clients book sessions", copyable: true, isUrl: true, chatPrompt: "Change my booking URL to" },
+  { key: "bookingUrl", label: "Booking URL", description: "Where clients book sessions", copyable: true, isUrl: true, chatPrompt: "Change my booking URL to" },
   { key: "footerTagline", label: "Footer Tagline", description: "Shown at the bottom of your site", chatPrompt: "Change my footer tagline to" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer", chatPrompt: "Change my copyright text to" },
 ];

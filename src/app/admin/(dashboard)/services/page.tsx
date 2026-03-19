@@ -28,7 +28,7 @@ export default function ServicesEditor() {
   if (!data) return <div className="text-gray-400">Loading...</div>;
 
   return (
-    <SectionEditor title="Services" description="Session types, pricing, and Vagaro booking links" siteAnchor="services" onSave={save}>
+    <SectionEditor title="Services" description="Session types, pricing, and booking links" siteAnchor="services" onSave={save}>
       <div className="grid gap-6 bg-white p-6 rounded-xl border border-gray-200">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Headline</label>
@@ -64,7 +64,7 @@ export default function ServicesEditor() {
             price: "",
             featured: false,
             who_its_for: "",
-            vagaro_link: "",
+            booking_link: "",
             comingSoon: false,
           })}
           renderItem={(item, _index, update) => (
@@ -123,16 +123,16 @@ export default function ServicesEditor() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Vagaro Booking Link</label>
+                <label className="block text-xs text-gray-500 mb-1">Booking Link</label>
                 <input
                   type="text"
-                  value={item.vagaro_link}
-                  onChange={(e) => update({ ...item, vagaro_link: e.target.value })}
-                  placeholder="https://www.vagaro.com/..."
+                  value={item.booking_link}
+                  onChange={(e) => update({ ...item, booking_link: e.target.value })}
+                  placeholder="Booking link (or leave empty for built-in booking)"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none text-sm"
                 />
                 <p className="text-[0.625rem] mt-0.5" style={{ color: "var(--bark-faded)" }}>
-                  Direct link to book this specific service on Vagaro
+                  Direct link to an external booking page, or leave empty for built-in booking
                 </p>
               </div>
               <div className="flex items-center gap-4">

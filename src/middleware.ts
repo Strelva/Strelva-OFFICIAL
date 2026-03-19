@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
+const DEFAULT_TENANT = "rohlax";
+
 function getSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not set");
@@ -19,11 +21,36 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
   }
 }
 
+function extractTenant(request: NextRequest): string {
+  // Dev fallback: ?tenant=carolee
+  const paramTenant = request.nextUrl.searchParams.get("tenant");
+  if (paramTenant) return paramTenant;
+
+  // Subdomain extraction: carolee.reb.studio → carolee
+  const host = request.headers.get("host") || "";
+  const parts = host.split(".");
+  // If 3+ parts (sub.domain.tld) and first part isn't "www"
+  if (parts.length >= 3 && parts[0] !== "www") {
+    return parts[0];
+  }
+
+  return DEFAULT_TENANT;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const tenant = extractTenant(request);
+
+  // Clone headers and inject tenant
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-tenant", tenant);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   if (pathname === "/admin/login") {
-    return NextResponse.next();
+    return response;
   }
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard")) {
@@ -31,7 +58,7 @@ export async function middleware(request: NextRequest) {
     if (!authed) {
       return NextResponse.redirect(new URL("/admin/login", request.url));
     }
-    return NextResponse.next();
+    return response;
   }
 
   if (
@@ -43,12 +70,12 @@ export async function middleware(request: NextRequest) {
     if (!authed) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.next();
+    return response;
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*", "/api/content/:path*", "/api/upload/:path*", "/api/agent/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|uploads/).*)"],
 };

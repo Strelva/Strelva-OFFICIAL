@@ -6,7 +6,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "@/lib/lenis";
 import type { HeroContent } from "@/lib/types";
 
-export function Hero({ hero }: { hero: HeroContent }) {
+export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: string }) {
   const sectionRef = useRef<HTMLElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -126,7 +126,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
                 {hero.ctaText}
               </a>
               <a href="#story" className="btn-ghost">
-                About Chelsea
+                About {ownerName || "Us"}
               </a>
             </div>
           </div>

@@ -35,7 +35,7 @@ export const defaultServices: ServicesContent = {
       price: "85",
       featured: true,
       who_its_for: "New clients or those who haven't visited in over a year",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -47,7 +47,7 @@ export const defaultServices: ServicesContent = {
       price: "85",
       featured: false,
       who_its_for: "New pregnant clients seeking safe, supported stretching",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -59,7 +59,7 @@ export const defaultServices: ServicesContent = {
       price: "60",
       featured: false,
       who_its_for: "Returning clients wanting comprehensive full-body stretching",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -71,7 +71,7 @@ export const defaultServices: ServicesContent = {
       price: "60",
       featured: false,
       who_its_for: "Desk workers and anyone with back stiffness or tension",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -83,7 +83,7 @@ export const defaultServices: ServicesContent = {
       price: "60",
       featured: false,
       who_its_for: "Those carrying tension in shoulders, neck, or arms",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -95,7 +95,7 @@ export const defaultServices: ServicesContent = {
       price: "60",
       featured: false,
       who_its_for: "Runners, athletes, and anyone with hip or leg tightness",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
     {
@@ -107,7 +107,7 @@ export const defaultServices: ServicesContent = {
       price: "60",
       featured: false,
       who_its_for: "Expecting mothers at any stage of pregnancy",
-      vagaro_link: "https://www.vagaro.com/rohlaxwellness",
+      booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
     },
   ],
@@ -180,7 +180,7 @@ export const defaultEvents: EventsContent = {
       time: "7:00 PM",
       location: "Vibe Yoga Lab",
       description: "A private restorative yoga session hosted by Rohlax Wellness at Vibe Yoga Lab. Limited spots available.",
-      hosted_by: "chelsea",
+      hosted_by: "owner",
       external_link: "https://www.eventbrite.com",
     },
     {
@@ -337,7 +337,7 @@ export const defaultSettings: SiteSettings = {
   ownerTitle: "Physical Therapist & Stretch Therapist",
   footerTagline: "Move Better. Feel Better. Live Better.",
   copyrightText: "Rohlax Wellness",
-  vagaroUrl: "https://www.vagaro.com/rohlaxwellness",
+  bookingUrl: "https://www.vagaro.com/rohlaxwellness",
 };
 
 export const defaults: ContentMap = {

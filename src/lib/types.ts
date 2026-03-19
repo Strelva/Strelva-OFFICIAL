@@ -15,7 +15,7 @@ export interface ServiceItem {
   price: string;
   featured: boolean;
   who_its_for: string;
-  vagaro_link: string;
+  booking_link: string;
   comingSoon: boolean;
 }
 
@@ -58,7 +58,7 @@ export interface EventItem {
   time: string;
   location: string;
   description: string;
-  hosted_by: "chelsea" | "partner" | "community";
+  hosted_by: "owner" | "partner" | "community";
   external_link: string;
 }
 
@@ -107,7 +107,7 @@ export interface SiteSettings {
   ownerTitle: string;
   footerTagline: string;
   copyrightText: string;
-  vagaroUrl: string;
+  bookingUrl: string;
 }
 
 export type ContentSection =
@@ -130,3 +130,58 @@ export type ContentMap = {
   contact: ContactContent;
   settings: SiteSettings;
 };
+
+// --- Booking Types ---
+
+export interface BookingConfig {
+  timezone: string;
+  weeklySchedule: WeeklySlot[];
+  slotDuration: number;
+  bufferTime: number;
+  bookingLeadTime: number;
+  maxAdvanceBooking: number;
+  requirePayment: boolean;
+}
+
+export interface WeeklySlot {
+  day: number;
+  start: string;
+  end: string;
+  enabled: boolean;
+}
+
+export interface DateOverride {
+  date: string;
+  available: boolean;
+  start?: string;
+  end?: string;
+  reason?: string;
+}
+
+export interface Booking {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  notes?: string;
+  status: "confirmed" | "cancelled" | "completed";
+  createdAt: string;
+  cancelledAt?: string;
+}
+
+// --- Tenant Types ---
+
+export interface TenantConfig {
+  id: string;
+  subdomain: string;
+  siteName: string;
+  ownerName: string;
+  industry: string;
+  active: boolean;
+  createdAt: string;
+}

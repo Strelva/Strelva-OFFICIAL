@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentSection } from "@/lib/types";
 import { getContent, setContent, recordSectionUpdate, logActivity } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 
 const VALID_SECTIONS: ContentSection[] = [
   "hero",
@@ -94,7 +95,8 @@ export async function GET(
   }
 
   try {
-    const data = await getContent(section);
+    const tenant = await getTenantFromHeaders();
+    const data = await getContent(section, tenant);
     return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: "Failed to load content" }, { status: 500 });
@@ -119,13 +121,14 @@ export async function PUT(
       return NextResponse.json({ error: validationError }, { status: 422 });
     }
 
-    await setContent(section, body);
-    await recordSectionUpdate(section);
+    const tenant = await getTenantFromHeaders();
+    await setContent(section, body, tenant);
+    await recordSectionUpdate(section, tenant);
     await logActivity({
       text: `Updated ${section} via admin`,
       time: new Date().toISOString(),
       type: "admin",
-    });
+    }, tenant);
     revalidatePath("/");
 
     return NextResponse.json({ success: true });

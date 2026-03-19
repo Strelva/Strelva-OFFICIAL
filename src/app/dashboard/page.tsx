@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getActivity, getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 import { defaults } from "@/lib/defaults";
 import { timeAgo } from "@/lib/utils";
 
@@ -97,22 +98,23 @@ async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export default async function DashboardOverview() {
+  const tenant = await getTenantFromHeaders();
   const [activity, pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
-      safeFetch(() => getActivity(), []),
-      safeFetch(() => getClickCounts("page-view"), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("booking-click"), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("provider-referral-click"), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("event-click"), EMPTY_CLICKS),
-      safeFetch(() => getContent("hero"), defaults.hero),
-      safeFetch(() => getContent("services"), defaults.services),
-      safeFetch(() => getContent("story"), defaults.story),
-      safeFetch(() => getContent("testimonials"), defaults.testimonials),
-      safeFetch(() => getContent("events"), defaults.events),
-      safeFetch(() => getContent("providers"), defaults.providers),
-      safeFetch(() => getContent("contact"), defaults.contact),
-      safeFetch(() => getContent("settings"), defaults.settings),
-      safeFetch(() => getSectionTimestamps(), {}),
+      safeFetch(() => getActivity(tenant), []),
+      safeFetch(() => getClickCounts("page-view", tenant), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("booking-click", tenant), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("provider-referral-click", tenant), EMPTY_CLICKS),
+      safeFetch(() => getClickCounts("event-click", tenant), EMPTY_CLICKS),
+      safeFetch(() => getContent("hero", tenant), defaults.hero),
+      safeFetch(() => getContent("services", tenant), defaults.services),
+      safeFetch(() => getContent("story", tenant), defaults.story),
+      safeFetch(() => getContent("testimonials", tenant), defaults.testimonials),
+      safeFetch(() => getContent("events", tenant), defaults.events),
+      safeFetch(() => getContent("providers", tenant), defaults.providers),
+      safeFetch(() => getContent("contact", tenant), defaults.contact),
+      safeFetch(() => getContent("settings", tenant), defaults.settings),
+      safeFetch(() => getSectionTimestamps(tenant), {}),
     ]);
 
   const siteScore = computeSiteScore({ hero, services, story, testimonials, events, providers, contact, settings });

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 import { getContent } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-display",
@@ -18,9 +19,10 @@ const inter = Inter({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await getTenantFromHeaders();
   const [settings, hero] = await Promise.all([
-    getContent("settings"),
-    getContent("hero"),
+    getContent("settings", tenant),
+    getContent("hero", tenant),
   ]);
   return {
     title: `${settings.siteName} | ${settings.siteTagline}`,
@@ -52,10 +54,11 @@ export const viewport: Viewport = {
 };
 
 async function LocalBusinessSchema() {
+  const tenant = await getTenantFromHeaders();
   const [contact, settings, hero] = await Promise.all([
-    getContent("contact"),
-    getContent("settings"),
-    getContent("hero"),
+    getContent("contact", tenant),
+    getContent("settings", tenant),
+    getContent("hero", tenant),
   ]);
 
   // Parse hours string into structured specs
@@ -135,7 +138,7 @@ async function LocalBusinessSchema() {
     sameAs: [
       contact.instagramUrl,
       contact.facebookUrl,
-      settings.vagaroUrl,
+      settings.bookingUrl,
     ].filter(Boolean),
     priceRange: "$$",
     image: hero.backgroundImageUrl || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&h=630&fit=crop",

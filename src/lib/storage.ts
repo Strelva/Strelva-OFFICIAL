@@ -1,8 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { createClient } from "redis";
-import type { ContentSection, ContentMap } from "./types";
+import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking } from "./types";
 import { defaults } from "./defaults";
+import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "./booking";
 
 const hasRedis = !!process.env.REDIS_URL;
 const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
@@ -227,6 +228,166 @@ export async function getClickCounts(
     weekCount += clicks[`${event}:${key}`] || 0;
   }
   return { total, today: todayCount, thisWeek: weekCount };
+}
+
+// --- Booking ---
+
+export async function getBookingConfig(
+  tenant: string = DEFAULT_TENANT
+): Promise<BookingConfig> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`${tenant}:booking-config`);
+      if (raw) return JSON.parse(raw) as BookingConfig;
+      return DEFAULT_BOOKING_CONFIG;
+    });
+  }
+  const store = await readDevContent();
+  return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
+}
+
+export async function setBookingConfig(
+  config: BookingConfig,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.set(`${tenant}:booking-config`, JSON.stringify(config));
+    });
+  }
+  const store = await readDevContent();
+  store[`__bookingConfig_${tenant}`] = config;
+  await writeDevContent(store);
+}
+
+export async function getDateOverrides(
+  tenant: string = DEFAULT_TENANT
+): Promise<DateOverride[]> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`${tenant}:date-overrides`);
+      if (raw) return JSON.parse(raw) as DateOverride[];
+      return [];
+    });
+  }
+  const store = await readDevContent();
+  return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
+}
+
+export async function setDateOverrides(
+  overrides: DateOverride[],
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      await redis.set(`${tenant}:date-overrides`, JSON.stringify(overrides));
+    });
+  }
+  const store = await readDevContent();
+  store[`__dateOverrides_${tenant}`] = overrides;
+  await writeDevContent(store);
+}
+
+export async function getBookings(
+  tenant: string = DEFAULT_TENANT,
+  dateRange?: { from: string; to: string }
+): Promise<Booking[]> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`${tenant}:bookings`);
+      if (!raw) return [];
+      let bookings = JSON.parse(raw) as Booking[];
+      if (dateRange) {
+        bookings = bookings.filter(
+          (b) => b.date >= dateRange.from && b.date <= dateRange.to
+        );
+      }
+      return bookings;
+    });
+  }
+  const store = await readDevContent();
+  let bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
+  if (dateRange) {
+    bookings = bookings.filter(
+      (b) => b.date >= dateRange.from && b.date <= dateRange.to
+    );
+  }
+  return bookings;
+}
+
+export async function createBooking(
+  booking: Omit<Booking, "id" | "createdAt" | "status">,
+  tenant: string = DEFAULT_TENANT
+): Promise<Booking> {
+  const newBooking: Booking = {
+    ...booking,
+    id: generateBookingId(),
+    status: "confirmed",
+    createdAt: new Date().toISOString(),
+  };
+
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`${tenant}:bookings`);
+      const bookings = raw ? (JSON.parse(raw) as Booking[]) : [];
+      bookings.push(newBooking);
+      await redis.set(`${tenant}:bookings`, JSON.stringify(bookings));
+      return newBooking;
+    });
+  }
+
+  const store = await readDevContent();
+  const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
+  bookings.push(newBooking);
+  store[`__bookings_${tenant}`] = bookings;
+  await writeDevContent(store);
+  return newBooking;
+}
+
+export async function updateBooking(
+  id: string,
+  updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>,
+  tenant: string = DEFAULT_TENANT
+): Promise<Booking | null> {
+  if (hasRedis) {
+    return withRedis(async (redis) => {
+      const raw = await redis.get(`${tenant}:bookings`);
+      if (!raw) return null;
+      const bookings = JSON.parse(raw) as Booking[];
+      const idx = bookings.findIndex((b) => b.id === id);
+      if (idx === -1) return null;
+      bookings[idx] = { ...bookings[idx], ...updates };
+      await redis.set(`${tenant}:bookings`, JSON.stringify(bookings));
+      return bookings[idx];
+    });
+  }
+
+  const store = await readDevContent();
+  const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
+  const idx = bookings.findIndex((b) => b.id === id);
+  if (idx === -1) return null;
+  bookings[idx] = { ...bookings[idx], ...updates };
+  store[`__bookings_${tenant}`] = bookings;
+  await writeDevContent(store);
+  return bookings[idx];
+}
+
+export async function getAvailableSlots(
+  date: string,
+  serviceId: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<string[]> {
+  const [config, bookings, overrides, services] = await Promise.all([
+    getBookingConfig(tenant),
+    getBookings(tenant, { from: date, to: date }),
+    getDateOverrides(tenant),
+    getContent("services", tenant),
+  ]);
+
+  const service = services.services.find((s) => s.id === serviceId);
+  const duration = service ? parseInt(service.duration) || config.slotDuration : config.slotDuration;
+
+  return generateSlots(config, date, duration, bookings, overrides);
 }
 
 // --- Content freshness ---

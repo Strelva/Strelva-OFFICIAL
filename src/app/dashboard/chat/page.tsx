@@ -2,9 +2,11 @@ import Link from "next/link";
 import { Globe, FileText } from "lucide-react";
 import { ChatPanel } from "@/components/dashboard/ChatPanel";
 import { getContent } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 
 export default async function ChatPage() {
-  const settings = await getContent("settings");
+  const tenant = await getTenantFromHeaders();
+  const settings = await getContent("settings", tenant);
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] md:h-screen">

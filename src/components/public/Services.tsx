@@ -74,9 +74,9 @@ export function Services({ services }: { services: ServicesContent }) {
                     <span className="font-medium">Best for:</span> {featured.who_its_for}
                   </p>
                 )}
-                {featured.vagaro_link ? (
+                {featured.booking_link ? (
                   <TrackedLink
-                    href={featured.vagaro_link}
+                    href={featured.booking_link}
                     event="booking-click"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -168,9 +168,9 @@ export function Services({ services }: { services: ServicesContent }) {
                     <span className="text-xs" style={{ color: "var(--bark-faded)" }}>
                       {service.duration}
                     </span>
-                    {service.vagaro_link ? (
+                    {service.booking_link ? (
                       <TrackedLink
-                        href={service.vagaro_link}
+                        href={service.booking_link}
                         event="booking-click"
                         target="_blank"
                         rel="noopener noreferrer"

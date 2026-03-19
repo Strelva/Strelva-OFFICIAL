@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
-import { loadChatMessages, saveChatMessages } from "@/lib/storage";
+import { getBookingConfig, setBookingConfig } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { verifyAuth } from "@/lib/auth";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -11,25 +11,25 @@ export async function GET() {
 
   try {
     const tenant = await getTenantFromHeaders();
-    const messages = await loadChatMessages("default", tenant);
-    return NextResponse.json(messages);
+    const config = await getBookingConfig(tenant);
+    return NextResponse.json(config);
   } catch {
-    return NextResponse.json([], { status: 500 });
+    return NextResponse.json({ error: "Failed to get config" }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function PUT(request: Request) {
   const authed = await verifyAuth();
   if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    const body = await request.json();
     const tenant = await getTenantFromHeaders();
-    const messages = await req.json();
-    await saveChatMessages("default", messages, tenant);
+    await setBookingConfig(body, tenant);
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Failed to save messages" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update config" }, { status: 500 });
   }
 }

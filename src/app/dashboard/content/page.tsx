@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 import { defaults } from "@/lib/defaults";
 import { timeAgo } from "@/lib/utils";
 
@@ -36,16 +37,17 @@ async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export default async function ContentPage() {
+  const tenant = await getTenantFromHeaders();
   const [hero, services, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
-      safeFetch(() => getContent("hero"), defaults.hero),
-      safeFetch(() => getContent("services"), defaults.services),
-      safeFetch(() => getContent("testimonials"), defaults.testimonials),
-      safeFetch(() => getContent("events"), defaults.events),
-      safeFetch(() => getContent("providers"), defaults.providers),
-      safeFetch(() => getContent("contact"), defaults.contact),
-      safeFetch(() => getContent("settings"), defaults.settings),
-      safeFetch(() => getSectionTimestamps(), {}),
+      safeFetch(() => getContent("hero", tenant), defaults.hero),
+      safeFetch(() => getContent("services", tenant), defaults.services),
+      safeFetch(() => getContent("testimonials", tenant), defaults.testimonials),
+      safeFetch(() => getContent("events", tenant), defaults.events),
+      safeFetch(() => getContent("providers", tenant), defaults.providers),
+      safeFetch(() => getContent("contact", tenant), defaults.contact),
+      safeFetch(() => getContent("settings", tenant), defaults.settings),
+      safeFetch(() => getSectionTimestamps(tenant), {}),
     ]);
 
   const sectionData: Record<string, { preview: string; status: "live" | "empty" | "configured"; count?: string; chatPrompt: string }> = {

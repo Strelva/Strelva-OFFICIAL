@@ -25,7 +25,7 @@ export default function SitePage() {
             YOUR SITE
           </span>
           <span className="font-mono text-xs text-zinc-400">
-            rohlaxwellness.com
+            your site
           </span>
         </div>
         <a

@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { updateBooking, logActivity } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { verifyAuth } from "@/lib/auth";
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authed = await verifyAuth();
+  if (!authed) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const body = await request.json();
+    const { status, notes } = body;
+
+    if (status && !["confirmed", "cancelled", "completed"].includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    const tenant = await getTenantFromHeaders();
+    const updates: Record<string, unknown> = {};
+    if (status) updates.status = status;
+    if (notes !== undefined) updates.notes = notes;
+    if (status === "cancelled") updates.cancelledAt = new Date().toISOString();
+
+    const booking = await updateBooking(id, updates, tenant);
+    if (!booking) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    await logActivity(
+      {
+        text: `Booking ${status || "updated"}: ${booking.serviceName} on ${booking.date} for ${booking.clientName}`,
+        time: new Date().toISOString(),
+        type: "booking",
+      },
+      tenant
+    );
+
+    return NextResponse.json({ success: true, booking });
+  } catch {
+    return NextResponse.json({ error: "Failed to update booking" }, { status: 500 });
+  }
+}

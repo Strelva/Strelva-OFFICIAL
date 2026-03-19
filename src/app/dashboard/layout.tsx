@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthToken, verifyToken } from "@/lib/auth";
 import { getContent } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 
 export default async function DashboardLayout({
@@ -13,9 +14,10 @@ export default async function DashboardLayout({
     redirect("/admin/login");
   }
 
+  const tenant = await getTenantFromHeaders();
   let siteName = "Your Business";
   try {
-    const settings = await getContent("settings");
+    const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
   } catch {}
 

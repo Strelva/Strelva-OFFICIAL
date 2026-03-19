@@ -18,7 +18,7 @@ export const serviceItemSchema = z.object({
   price: z.string(),
   featured: z.boolean(),
   who_its_for: z.string(),
-  vagaro_link: z.string(),
+  booking_link: z.string(),
   comingSoon: z.boolean(),
 });
 
@@ -61,7 +61,7 @@ export const eventItemSchema = z.object({
   time: z.string(),
   location: z.string(),
   description: z.string(),
-  hosted_by: z.enum(["chelsea", "partner", "community"]),
+  hosted_by: z.enum(["owner", "partner", "community"]),
   external_link: z.string(),
 });
 
@@ -110,7 +110,7 @@ export const siteSettingsSchema = z.object({
   ownerTitle: z.string().optional().default(""),
   footerTagline: z.string(),
   copyrightText: z.string(),
-  vagaroUrl: z.string(),
+  bookingUrl: z.string(),
 });
 
 export const sectionSchemas: Record<ContentSection, z.ZodType> = {
