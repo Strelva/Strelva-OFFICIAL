@@ -8,7 +8,7 @@
 
 import { setContent } from "../src/lib/storage";
 import type { ContentMap } from "../src/lib/types";
-import { defaults as rohlaxDefaults } from "../src/lib/defaults";
+import { defaults as rohlaxDefaults, defaultFaq, defaultShop } from "../src/lib/defaults";
 
 const caroleeDefaults: ContentMap = {
   hero: {
@@ -126,6 +126,32 @@ const caroleeDefaults: ContentMap = {
     footerTagline: "We are our own healers.",
     copyrightText: "Carolee Fraass",
     bookingUrl: "",
+  },
+  faq: {
+    ...defaultFaq,
+    faqs: [
+      {
+        id: "faq-1",
+        question: "What is Reiki?",
+        answer: "Reiki is a gentle, hands-on energy healing technique that promotes relaxation, reduces stress, and supports the body's natural ability to heal. During a session, I channel universal life energy to help clear blockages and restore balance.",
+      },
+      {
+        id: "faq-2",
+        question: "Do I need to believe in energy work for it to help?",
+        answer: "Not at all. You don't need any specific belief system. Many people come simply seeking relaxation or stress relief and find the experience deeply calming. Your body does the work — I just help facilitate the space.",
+      },
+      {
+        id: "faq-3",
+        question: "What should I expect during a session?",
+        answer: "You'll lie fully clothed on a comfortable table. I'll gently place my hands on or near various points on your body. Most people feel warmth, tingling, or deep relaxation. Many fall asleep — that's perfectly normal and welcome.",
+      },
+    ],
+  },
+  shop: {
+    ...defaultShop,
+    headline: "Bella Grace & More",
+    description: "Natural products I create and tools I recommend to support your healing journey.",
+    items: [],
   },
 };
 

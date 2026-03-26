@@ -7,6 +7,8 @@ import type {
   ProvidersContent,
   ContactContent,
   SiteSettings,
+  FaqContent,
+  ShopContent,
   ContentMap,
 } from "./types";
 
@@ -340,6 +342,69 @@ export const defaultSettings: SiteSettings = {
   bookingUrl: "https://www.vagaro.com/rohlaxwellness",
 };
 
+export const defaultFaq: FaqContent = {
+  sectionLabel: "FAQ",
+  headline: "Frequently Asked Questions",
+  description: "Common questions about assisted stretching and what to expect at your session.",
+  faqs: [
+    {
+      id: "faq-1",
+      question: "What should I wear to my stretching session?",
+      answer: "Wear comfortable, stretchy clothing — think yoga pants, leggings, or athletic shorts and a t-shirt. Avoid jeans, belts, or anything restrictive. You'll be moving through various positions, so comfort is key.",
+    },
+    {
+      id: "faq-2",
+      question: "Do I need to be flexible to benefit from assisted stretching?",
+      answer: "Not at all! Assisted stretching is for everyone — athletes, desk workers, new parents, and anyone who wants to feel better in their body. Every session is tailored to your current range of motion and goals.",
+    },
+    {
+      id: "faq-3",
+      question: "How is assisted stretching different from massage?",
+      answer: "Massage focuses on soft tissue manipulation to relieve muscle tension. Assisted stretching actively moves your joints and muscles through their range of motion to improve flexibility, mobility, and body awareness. They complement each other beautifully.",
+    },
+    {
+      id: "faq-4",
+      question: "How often should I get stretched?",
+      answer: "For best results, we recommend starting with weekly sessions. As your flexibility improves, many clients transition to every other week for maintenance. We'll build a plan that fits your goals and schedule.",
+    },
+  ],
+};
+
+export const defaultShop: ShopContent = {
+  sectionLabel: "Shop",
+  headline: "Chelsea's Picks",
+  description: "Products I personally use and recommend to support your wellness between sessions.",
+  items: [
+    {
+      id: "shop-1",
+      name: "TheraBand Stretch Strap",
+      description: "My go-to recommendation for at-home stretching. Multiple loops let you gradually deepen your stretch safely.",
+      category: "recommended",
+      price: "15",
+      external_link: "",
+      image_url: "",
+    },
+    {
+      id: "shop-2",
+      name: "Rohlax Wellness Tee",
+      description: "Soft, comfortable, and perfect for your stretch sessions. Rep the brand that keeps you moving.",
+      category: "merch",
+      price: "30",
+      external_link: "",
+      image_url: "",
+    },
+    {
+      id: "shop-3",
+      name: "Massage Gun — Deep Tissue",
+      description: "The same massage gun I use at the end of every session. Great for at-home recovery between appointments.",
+      category: "tools",
+      price: "80",
+      external_link: "",
+      image_url: "",
+    },
+  ],
+};
+
 export const defaults: ContentMap = {
   hero: defaultHero,
   services: defaultServices,
@@ -349,4 +414,6 @@ export const defaults: ContentMap = {
   providers: defaultProviders,
   contact: defaultContact,
   settings: defaultSettings,
+  faq: defaultFaq,
+  shop: defaultShop,
 };

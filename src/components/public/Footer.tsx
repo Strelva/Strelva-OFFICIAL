@@ -1,5 +1,4 @@
-"use client";
-
+import Link from "next/link";
 import type { SiteSettings, ContactContent } from "@/lib/types";
 
 interface FooterProps {
@@ -28,11 +27,14 @@ export function Footer({ settings, contact }: FooterProps) {
               Navigate
             </p>
             <ul className="space-y-3 text-sm opacity-60">
-              <li><a href="#services" className="hover:opacity-100 transition-opacity">Services</a></li>
-              <li><a href="#story" className="hover:opacity-100 transition-opacity">About Chelsea</a></li>
-              <li><a href="#events" className="hover:opacity-100 transition-opacity">Events</a></li>
-              <li><a href="#providers" className="hover:opacity-100 transition-opacity">Providers</a></li>
-              <li><a href="#booking" className="hover:opacity-100 transition-opacity">Book Now</a></li>
+              <li><Link href="/services" className="hover:opacity-100 transition-opacity">Services</Link></li>
+              <li><Link href="/about" className="hover:opacity-100 transition-opacity">About</Link></li>
+              <li><Link href="/events" className="hover:opacity-100 transition-opacity">Events</Link></li>
+              <li><Link href="/providers" className="hover:opacity-100 transition-opacity">Providers</Link></li>
+              <li><Link href="/faq" className="hover:opacity-100 transition-opacity">FAQ</Link></li>
+              <li><Link href="/shop" className="hover:opacity-100 transition-opacity">Shop</Link></li>
+              <li><Link href="/contact" className="hover:opacity-100 transition-opacity">Contact</Link></li>
+              <li><Link href="/services#booking" className="hover:opacity-100 transition-opacity">Book Now</Link></li>
             </ul>
           </div>
 

@@ -13,6 +13,8 @@ const VALID_SECTIONS: ContentSection[] = [
   "providers",
   "contact",
   "settings",
+  "faq",
+  "shop",
 ];
 
 function isValidSection(section: string): section is ContentSection {
@@ -28,6 +30,8 @@ const REQUIRED_FIELDS: Record<ContentSection, string[]> = {
   providers: [],
   contact: ["email"],
   settings: ["siteName"],
+  faq: [],
+  shop: [],
 };
 
 function validateBody(section: ContentSection, body: Record<string, unknown>): string | null {

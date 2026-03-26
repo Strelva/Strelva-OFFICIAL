@@ -86,6 +86,36 @@ export interface ProvidersContent {
   providers: ProviderItem[];
 }
 
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface FaqContent {
+  sectionLabel: string;
+  headline: string;
+  description: string;
+  faqs: FaqItem[];
+}
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  description: string;
+  category: "recommended" | "merch" | "tools";
+  price: string;
+  external_link: string;
+  image_url: string;
+}
+
+export interface ShopContent {
+  sectionLabel: string;
+  headline: string;
+  description: string;
+  items: ShopItem[];
+}
+
 export interface ContactContent {
   email: string;
   phone: string;
@@ -118,7 +148,9 @@ export type ContentSection =
   | "events"
   | "providers"
   | "contact"
-  | "settings";
+  | "settings"
+  | "faq"
+  | "shop";
 
 export type ContentMap = {
   hero: HeroContent;
@@ -129,6 +161,8 @@ export type ContentMap = {
   providers: ProvidersContent;
   contact: ContactContent;
   settings: SiteSettings;
+  faq: FaqContent;
+  shop: ShopContent;
 };
 
 // --- Booking Types ---

@@ -6,11 +6,13 @@ import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
-  const [settings, services, contact, events, bookingClicks] = await Promise.all([
+  const [settings, services, contact, events, faq, shop, bookingClicks] = await Promise.all([
     getContent("settings", tenant),
     getContent("services", tenant),
     getContent("contact", tenant),
     getContent("events", tenant),
+    getContent("faq", tenant),
+    getContent("shop", tenant),
     getClickCounts("booking-click", tenant),
   ]);
 
@@ -46,7 +48,10 @@ SITE PERFORMANCE:
 
 You can read and update any section of the website, manage bookings, and check availability. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
 
-Available sections: hero, services, story, testimonials, events, providers, contact, settings.
+FAQ: ${faq.faqs.length} questions listed.
+SHOP: ${shop.items.length} products listed.
+
+Available sections: hero, services, story, testimonials, events, providers, contact, settings, faq, shop.
 
 BOOKING: You can check availability, book appointments, and list upcoming bookings. When someone asks to book, use check_availability first, then book_appointment.
 
@@ -87,6 +92,8 @@ export async function POST(req: Request) {
             "providers",
             "contact",
             "settings",
+            "faq",
+            "shop",
           ]),
         }),
         execute: async ({ section }) => {
@@ -107,6 +114,8 @@ export async function POST(req: Request) {
             "providers",
             "contact",
             "settings",
+            "faq",
+            "shop",
           ]),
           data: z.record(z.string(), z.unknown()),
         }),

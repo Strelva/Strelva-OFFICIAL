@@ -1,72 +1,65 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import type { SiteSettings } from "@/lib/types";
 
 const navLinks = [
-  { label: "Services", href: "#services" },
-  { label: "About", href: "#story" },
-  { label: "Events", href: "#events" },
-  { label: "Providers", href: "#providers" },
-  { label: "Contact", href: "#contact" },
+  { label: "Services", href: "/services" },
+  { label: "About", href: "/about" },
+  { label: "Events", href: "/events" },
+  { label: "Providers", href: "/providers" },
+  { label: "FAQ", href: "/faq" },
+  { label: "Shop", href: "/shop" },
 ];
-
-const sectionIds = ["services", "booking", "story", "testimonials", "events", "providers", "contact"];
 
 export function Header({ settings }: { settings: SiteSettings }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("");
-
-  const updateActiveSection = useCallback(() => {
-    const scrollY = window.scrollY + 200;
-    let current = "";
-    for (const id of sectionIds) {
-      const el = document.getElementById(id);
-      if (el && el.offsetTop <= scrollY) {
-        current = id;
-      }
-    }
-    setActiveSection(current);
-  }, []);
+  const pathname = usePathname();
+  const isHome = pathname === "/";
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 80);
-      updateActiveSection();
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [updateActiveSection]);
+  }, []);
 
-  const handleNavClick = () => setMenuOpen(false);
+  // Close menu on route change
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
-  const linkColor = scrolled ? "var(--bark-faded)" : "rgba(255,255,255,0.95)";
-  const linkActiveColor = scrolled ? "var(--bark)" : "#fff";
-  const linkHover = scrolled ? "var(--bark)" : "#fff";
-  const wordmarkColor = scrolled ? "var(--bark)" : "#fff";
+  // On inner pages, always use scrolled (light bg) style
+  const useTransparent = isHome && !scrolled;
 
-  const isActive = (href: string) => {
-    const id = href.replace("#", "");
-    return activeSection === id;
-  };
+  const linkColor = useTransparent ? "rgba(255,255,255,0.95)" : "var(--bark-faded)";
+  const linkActiveColor = useTransparent ? "#fff" : "var(--bark)";
+  const linkHover = useTransparent ? "#fff" : "var(--bark)";
+  const wordmarkColor = useTransparent ? "#fff" : "var(--bark)";
+
+  const isActive = (href: string) => pathname === href;
 
   return (
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${
-          scrolled ? "py-3 backdrop-blur-xl" : "py-6"
+          useTransparent ? "py-6" : "py-3 backdrop-blur-xl"
         }`}
         style={{
-          background: scrolled
-            ? "rgba(250, 249, 247, 0.92)"
-            : "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 70%, transparent 100%)",
-          borderBottom: scrolled ? "1px solid rgba(0,0,0,0.04)" : "1px solid transparent",
+          background: useTransparent
+            ? "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 70%, transparent 100%)"
+            : "rgba(250, 249, 247, 0.92)",
+          borderBottom: useTransparent ? "1px solid transparent" : "1px solid rgba(0,0,0,0.04)",
         }}
       >
         <div className="container-main">
           <div className="flex items-center justify-between">
-            <a
+            <Link
               href="/"
               className="group transition-opacity duration-300 hover:opacity-70"
             >
@@ -76,12 +69,12 @@ export function Header({ settings }: { settings: SiteSettings }) {
               >
                 {settings.siteName}
               </span>
-            </a>
+            </Link>
 
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   className="text-xs font-medium tracking-wider uppercase transition-colors duration-300 px-3 py-2.5"
@@ -90,42 +83,41 @@ export function Header({ settings }: { settings: SiteSettings }) {
                   onMouseLeave={(e) => { e.currentTarget.style.color = isActive(link.href) ? linkActiveColor : linkColor; }}
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
-              <a
-                href="#booking"
+              <Link
+                href="/services#booking"
                 className="text-xs font-semibold tracking-wider uppercase px-5 py-2.5 transition-all duration-300"
                 style={{
-                  background: scrolled ? "var(--sage)" : "rgba(255,255,255,0.25)",
-                  color: scrolled ? "var(--pure-white)" : "#fff",
-                  border: scrolled ? "1px solid transparent" : "1px solid rgba(255,255,255,0.9)",
-                  backdropFilter: scrolled ? "none" : "blur(8px)",
+                  background: useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)",
+                  color: useTransparent ? "#fff" : "var(--pure-white)",
+                  border: useTransparent ? "1px solid rgba(255,255,255,0.9)" : "1px solid transparent",
+                  backdropFilter: useTransparent ? "blur(8px)" : "none",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = scrolled ? "var(--sage-dark)" : "rgba(255,255,255,0.4)";
+                  e.currentTarget.style.background = useTransparent ? "rgba(255,255,255,0.4)" : "var(--sage-dark)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = scrolled ? "var(--sage)" : "rgba(255,255,255,0.25)";
+                  e.currentTarget.style.background = useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)";
                 }}
               >
                 Book Now
-              </a>
+              </Link>
             </nav>
 
             {/* Mobile: CTA + hamburger */}
             <div className="flex md:hidden items-center gap-4">
-              <a
-                href="#booking"
+              <Link
+                href="/services#booking"
                 className="text-[0.625rem] font-semibold tracking-wider uppercase px-4 py-2 transition-all duration-300"
                 style={{
-                  background: scrolled ? "var(--sage)" : "rgba(255,255,255,0.2)",
+                  background: useTransparent ? "rgba(255,255,255,0.2)" : "var(--sage)",
                   color: "var(--pure-white)",
-                  border: scrolled ? "1px solid transparent" : "1px solid rgba(255,255,255,0.7)",
+                  border: useTransparent ? "1px solid rgba(255,255,255,0.7)" : "1px solid transparent",
                 }}
-                onClick={handleNavClick}
               >
                 Book Now
-              </a>
+              </Link>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className="flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
@@ -134,14 +126,14 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 <span
                   className="block w-5 h-[1.5px] transition-all duration-300"
                   style={{
-                    background: scrolled ? "var(--bark)" : "var(--cream)",
+                    background: useTransparent ? "var(--cream)" : "var(--bark)",
                     transform: menuOpen ? "rotate(45deg) translateY(3.25px)" : "none",
                   }}
                 />
                 <span
                   className="block w-5 h-[1.5px] transition-all duration-300"
                   style={{
-                    background: scrolled ? "var(--bark)" : "var(--cream)",
+                    background: useTransparent ? "var(--cream)" : "var(--bark)",
                     transform: menuOpen ? "rotate(-45deg) translateY(-3.25px)" : "none",
                   }}
                 />
@@ -159,24 +151,24 @@ export function Header({ settings }: { settings: SiteSettings }) {
         >
           <nav className="flex flex-col items-center justify-center h-full gap-8">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
-                onClick={handleNavClick}
                 className="font-display text-3xl tracking-tight transition-opacity hover:opacity-60 px-6 py-3"
-                style={{ color: "var(--bark)" }}
+                style={{
+                  color: isActive(link.href) ? "var(--sage)" : "var(--bark)",
+                }}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
-            <a
-              href="#booking"
-              onClick={handleNavClick}
+            <Link
+              href="/services#booking"
               className="mt-4 px-8 py-3.5 text-xs font-bold tracking-widest uppercase transition-all"
               style={{ background: "var(--sage)", color: "var(--pure-white)" }}
             >
               Book Now
-            </a>
+            </Link>
           </nav>
         </div>
       )}

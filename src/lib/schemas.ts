@@ -89,6 +89,36 @@ export const providersSchema = z.object({
   providers: z.array(providerItemSchema),
 });
 
+export const faqItemSchema = z.object({
+  id: z.string().min(1),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+});
+
+export const faqSchema = z.object({
+  sectionLabel: z.string(),
+  headline: z.string(),
+  description: z.string(),
+  faqs: z.array(faqItemSchema),
+});
+
+export const shopItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  category: z.enum(["recommended", "merch", "tools"]),
+  price: z.string(),
+  external_link: z.string(),
+  image_url: z.string(),
+});
+
+export const shopSchema = z.object({
+  sectionLabel: z.string(),
+  headline: z.string(),
+  description: z.string(),
+  items: z.array(shopItemSchema),
+});
+
 export const contactSchema = z.object({
   email: z.string().email(),
   phone: z.string(),
@@ -122,4 +152,6 @@ export const sectionSchemas: Record<ContentSection, z.ZodType> = {
   providers: providersSchema,
   contact: contactSchema,
   settings: siteSettingsSchema,
+  faq: faqSchema,
+  shop: shopSchema,
 };
