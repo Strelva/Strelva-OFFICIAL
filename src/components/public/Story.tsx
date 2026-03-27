@@ -9,15 +9,7 @@ export function Story({ story }: { story: StoryContent }) {
         <div className="container-main">
           <div>
             <p className="font-display text-[clamp(2rem,5vw,4rem)] leading-[1.1] tracking-tight max-w-4xl">
-              {story.statement.split(/(move freely)/).map((part, i) =>
-                part === "move freely" ? (
-                  <em key={i} className="not-italic" style={{ color: "var(--sage)" }}>
-                    {part}
-                  </em>
-                ) : (
-                  <span key={i}>{part}</span>
-                )
-              )}
+              {story.statement}
             </p>
           </div>
         </div>

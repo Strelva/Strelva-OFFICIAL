@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useReveal } from "@/hooks/useReveal";
 import { TrackedLink } from "./TrackedLink";
 import type { EventsContent, EventItem } from "@/lib/types";
@@ -67,9 +68,22 @@ export function Events({ events }: { events: EventsContent }) {
                 .map((event) => (
                   <div
                     key={event.id}
-                    className="grid md:grid-cols-[140px_1fr_auto] gap-4 md:gap-8 p-6 md:p-8 items-center"
+                    className={`grid ${event.image_url ? "md:grid-cols-[160px_140px_1fr_auto]" : "md:grid-cols-[140px_1fr_auto]"} gap-4 md:gap-8 p-6 md:p-8 items-center overflow-hidden`}
                     style={{ background: "var(--cream-dark)" }}
                   >
+                    {/* Event photo */}
+                    {event.image_url && (
+                      <div className="relative aspect-[4/3] md:aspect-square rounded-lg overflow-hidden">
+                        <Image
+                          src={event.image_url}
+                          alt={event.title}
+                          fill
+                          className="object-cover"
+                          sizes="160px"
+                        />
+                      </div>
+                    )}
+
                     {/* Date */}
                     <div>
                       <p className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }} suppressHydrationWarning>
@@ -95,7 +109,7 @@ export function Events({ events }: { events: EventsContent }) {
                       <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "var(--bark-faded)" }}>
                         {event.location && <span>{event.location}</span>}
                         <span style={{ color: "var(--cream-mid)" }}>·</span>
-                        <span>{HOST_LABELS[event.hosted_by] ?? "Event"}</span>
+                        <span>{HOST_LABELS[event.hosted_by] || "Event"}</span>
                       </div>
                     </div>
 

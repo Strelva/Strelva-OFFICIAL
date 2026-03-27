@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useReveal } from "@/hooks/useReveal";
 import { TrackedLink } from "./TrackedLink";
 import type { ServicesContent } from "@/lib/types";
@@ -93,7 +94,7 @@ export function Services({ services }: { services: ServicesContent }) {
                   </TrackedLink>
                 ) : (
                   <a
-                    href="#booking"
+                    href="/services#booking"
                     className="inline-flex text-xs font-bold tracking-widest uppercase px-6 py-3 transition-all duration-300 self-start"
                     style={{ background: "var(--pure-white)", color: "var(--sage)" }}
                     onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -107,31 +108,43 @@ export function Services({ services }: { services: ServicesContent }) {
                   </a>
                 )}
               </div>
-              <div
-                className="md:col-span-2 p-8 md:p-12 flex flex-col justify-center"
-                style={{ background: "var(--cream-dark)" }}
-              >
-                <h4 className="text-xs font-bold tracking-widest uppercase mb-6" style={{ color: "var(--bark-faded)" }}>
-                  What to expect
-                </h4>
-                <ul className="space-y-4">
-                  {[
-                    "Brief consultation about your goals and areas of tension",
-                    "Full-body assessment of your range of motion",
-                    "Guided stretching with hands-on assistance",
-                    "Personalized plan for ongoing sessions",
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[0.625rem] font-bold mt-0.5" style={{ background: "var(--sage)", color: "var(--pure-white)" }}>
-                        {i + 1}
-                      </span>
-                      <span className="text-sm leading-relaxed" style={{ color: "var(--bark-light)" }}>
-                        {item}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {featured.image_url ? (
+                <div className="md:col-span-2 relative min-h-[280px]">
+                  <Image
+                    src={featured.image_url}
+                    alt={featured.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 40vw"
+                  />
+                </div>
+              ) : (
+                <div
+                  className="md:col-span-2 p-8 md:p-12 flex flex-col justify-center"
+                  style={{ background: "var(--cream-dark)" }}
+                >
+                  <h4 className="text-xs font-bold tracking-widest uppercase mb-6" style={{ color: "var(--bark-faded)" }}>
+                    What to expect
+                  </h4>
+                  <ul className="space-y-4">
+                    {[
+                      "Brief consultation about your goals and areas of tension",
+                      "Full-body assessment of your range of motion",
+                      "Guided stretching with hands-on assistance",
+                      "Personalized plan for ongoing sessions",
+                    ].map((item, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[0.625rem] font-bold mt-0.5" style={{ background: "var(--sage)", color: "var(--pure-white)" }}>
+                          {i + 1}
+                        </span>
+                        <span className="text-sm leading-relaxed" style={{ color: "var(--bark-light)" }}>
+                          {item}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -143,9 +156,21 @@ export function Services({ services }: { services: ServicesContent }) {
               {others.map((service, i) => (
                 <div
                   key={service.id}
-                  className={`p-8 reveal-delay-${Math.min(i + 1, 3)}`}
+                  className={`reveal-delay-${Math.min(i + 1, 3)} overflow-hidden`}
                   style={{ background: "var(--cream-dark)" }}
                 >
+                  {service.image_url && (
+                    <div className="relative aspect-[3/2]">
+                      <Image
+                        src={service.image_url}
+                        alt={service.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                    </div>
+                  )}
+                  <div className="p-8">
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <h3 className="font-display text-xl tracking-tight">
                       {service.name}
@@ -188,7 +213,7 @@ export function Services({ services }: { services: ServicesContent }) {
                       </span>
                     ) : (
                       <a
-                        href="#booking"
+                        href="/services#booking"
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                         style={{ color: "var(--sage)" }}
                       >
@@ -201,6 +226,7 @@ export function Services({ services }: { services: ServicesContent }) {
                       <span className="font-medium">Best for:</span> {service.who_its_for}
                     </p>
                   )}
+                  </div>
                 </div>
               ))}
             </div>

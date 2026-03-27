@@ -20,6 +20,7 @@ export const serviceItemSchema = z.object({
   who_its_for: z.string(),
   booking_link: z.string(),
   comingSoon: z.boolean(),
+  image_url: z.string().optional().default(""),
 });
 
 export const servicesSchema = z.object({
@@ -63,6 +64,7 @@ export const eventItemSchema = z.object({
   description: z.string(),
   hosted_by: z.enum(["owner", "partner", "community"]),
   external_link: z.string(),
+  image_url: z.string().optional().default(""),
 });
 
 export const eventsSchema = z.object({

@@ -39,6 +39,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "New clients or those who haven't visited in over a year",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "prenatal-foundation",
@@ -51,6 +52,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "New pregnant clients seeking safe, supported stretching",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "stretch-360",
@@ -63,6 +65,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "Returning clients wanting comprehensive full-body stretching",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "spinal-sequence",
@@ -75,6 +78,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "Desk workers and anyone with back stiffness or tension",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "upper-body",
@@ -87,6 +91,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "Those carrying tension in shoulders, neck, or arms",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "lower-body",
@@ -99,6 +104,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "Runners, athletes, and anyone with hip or leg tightness",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
     {
       id: "prenatal-stretch",
@@ -111,6 +117,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "Expecting mothers at any stage of pregnancy",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
+      image_url: "",
     },
   ],
 };
@@ -184,6 +191,7 @@ export const defaultEvents: EventsContent = {
       description: "A private restorative yoga session hosted by Rohlax Wellness at Vibe Yoga Lab. Limited spots available.",
       hosted_by: "owner",
       external_link: "https://www.eventbrite.com",
+      image_url: "",
     },
     {
       id: "e2",
@@ -194,6 +202,7 @@ export const defaultEvents: EventsContent = {
       description: "A movement series designed for mothers at every stage. Stretch, strengthen, and restore with expert guidance.",
       hosted_by: "partner",
       external_link: "https://vitalrootschiropracticwny.janeapp.com",
+      image_url: "",
     },
     {
       id: "e3",
@@ -204,6 +213,7 @@ export const defaultEvents: EventsContent = {
       description: "Release what no longer serves you in this guided yoga and stretching event focused on growth and renewal.",
       hosted_by: "community",
       external_link: "https://hopeandhealingwellnessservices.com/letgotogrow",
+      image_url: "",
     },
     {
       id: "e4",
@@ -214,6 +224,7 @@ export const defaultEvents: EventsContent = {
       description: "A fun pilates event supporting a great cause. Get moving, have fun, and give back to the community.",
       hosted_by: "community",
       external_link: "https://www.eventbrite.com",
+      image_url: "",
     },
     {
       id: "e5",
@@ -224,6 +235,7 @@ export const defaultEvents: EventsContent = {
       description: "Supporting women-owned businesses in WNY. Rohlax Wellness will be there — come say hi and learn about assisted stretching.",
       hosted_by: "community",
       external_link: "https://www.thebeautyboost.net/buffalo",
+      image_url: "",
     },
   ],
 };

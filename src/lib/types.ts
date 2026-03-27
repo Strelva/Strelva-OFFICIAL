@@ -17,6 +17,7 @@ export interface ServiceItem {
   who_its_for: string;
   booking_link: string;
   comingSoon: boolean;
+  image_url: string;
 }
 
 export interface ServicesContent {
@@ -60,6 +61,7 @@ export interface EventItem {
   description: string;
   hosted_by: "owner" | "partner" | "community";
   external_link: string;
+  image_url: string;
 }
 
 export interface EventsContent {

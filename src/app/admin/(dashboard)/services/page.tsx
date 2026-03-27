@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { SectionEditor } from "@/components/admin/SectionEditor";
 import { ArrayEditor } from "@/components/admin/ArrayEditor";
+import { ImageUploader } from "@/components/admin/ImageUploader";
 import type { ServicesContent, ServiceItem } from "@/lib/types";
 
 export default function ServicesEditor() {
@@ -66,6 +67,7 @@ export default function ServicesEditor() {
             who_its_for: "",
             booking_link: "",
             comingSoon: false,
+            image_url: "",
           })}
           renderItem={(item, _index, update) => (
             <div className="grid gap-4 pr-16">
@@ -135,6 +137,12 @@ export default function ServicesEditor() {
                   Direct link to an external booking page, or leave empty for built-in booking
                 </p>
               </div>
+              <ImageUploader
+                currentUrl={item.image_url || ""}
+                onUpload={(url) => update({ ...item, image_url: url })}
+                label="Photo"
+                hint="Show clients what this session looks like"
+              />
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <input

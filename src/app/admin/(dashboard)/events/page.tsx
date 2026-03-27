@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { SectionEditor } from "@/components/admin/SectionEditor";
 import { ArrayEditor } from "@/components/admin/ArrayEditor";
+import { ImageUploader } from "@/components/admin/ImageUploader";
 import type { EventsContent, EventItem } from "@/lib/types";
 
 function isPastEvent(dateStr: string): boolean {
@@ -70,6 +71,7 @@ export default function EventsEditor() {
             description: "",
             hosted_by: "owner",
             external_link: "",
+            image_url: "",
           })}
           renderItem={(item, _index, update) => (
             <div className="grid gap-4 pr-16">
@@ -108,6 +110,12 @@ export default function EventsEditor() {
                 <label className="block text-xs text-gray-500 mb-1">Description</label>
                 <textarea value={item.description} onChange={(e) => update({ ...item, description: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
               </div>
+              <ImageUploader
+                currentUrl={item.image_url || ""}
+                onUpload={(url) => update({ ...item, image_url: url })}
+                label="Event Photo"
+                hint="Flyer, venue photo, or past event image"
+              />
               <div>
                 <label className="block text-xs text-gray-500 mb-1">External Link</label>
                 <input type="text" value={item.external_link} onChange={(e) => update({ ...item, external_link: e.target.value })} placeholder="https://..." className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />

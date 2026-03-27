@@ -62,7 +62,7 @@ export default function StoryEditor() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Big Statement</label>
           <p className="text-xs mb-1.5" style={{ color: "var(--bark-faded)" }}>
-            The phrase &quot;move freely&quot; will be highlighted in green.
+            This appears as a large statement on the About page.
           </p>
           <textarea
             value={data.statement}

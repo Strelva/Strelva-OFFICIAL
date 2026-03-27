@@ -38,6 +38,7 @@ const caroleeDefaults: ContentMap = {
         who_its_for: "Anyone seeking stress relief, emotional balance, or energetic clearing",
         booking_link: "",
         comingSoon: false,
+        image_url: "",
       },
       {
         id: "mentorship",
@@ -50,6 +51,7 @@ const caroleeDefaults: ContentMap = {
         who_its_for: "Those seeking guidance through life transitions or spiritual growth",
         booking_link: "",
         comingSoon: false,
+        image_url: "",
       },
       {
         id: "combined-session",
@@ -62,6 +64,7 @@ const caroleeDefaults: ContentMap = {
         who_its_for: "Those ready for deep healing work combining mind, body, and spirit",
         booking_link: "",
         comingSoon: false,
+        image_url: "",
       },
     ],
   },

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "@/lib/lenis";
 import type { HeroContent } from "@/lib/types";
@@ -113,7 +114,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
             </p>
             <div data-hero-animate className="flex flex-wrap items-center gap-4">
               <a
-                href={hero.ctaLink}
+                href={hero.ctaLink || "/services#booking"}
                 className="btn-primary"
                 style={{ background: "var(--sage)", color: "var(--pure-white)" }}
                 onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -125,9 +126,9 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
               >
                 {hero.ctaText}
               </a>
-              <a href="#story" className="btn-ghost">
+              <Link href="/about" className="btn-ghost">
                 About {ownerName || "Us"}
-              </a>
+              </Link>
             </div>
           </div>
         </div>
