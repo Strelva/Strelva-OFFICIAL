@@ -12,6 +12,7 @@ const navLinks = [
   { label: "Providers", href: "/providers" },
   { label: "FAQ", href: "/faq" },
   { label: "Shop", href: "/shop" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export function Header({ settings }: { settings: SiteSettings }) {

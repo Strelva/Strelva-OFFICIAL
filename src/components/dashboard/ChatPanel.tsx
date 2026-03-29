@@ -16,6 +16,19 @@ import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
 import { useDashboardOptional } from "./DashboardContext";
 
+const SECTION_LABELS: Record<string, string> = {
+  hero: "Hero",
+  services: "Services",
+  story: "About",
+  testimonials: "Reviews",
+  events: "Events",
+  providers: "Providers",
+  contact: "Contact",
+  settings: "Settings",
+  faq: "FAQ",
+  shop: "Shop",
+};
+
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
   { label: "Add an event", icon: CalendarPlus },
@@ -35,6 +48,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [updateToast, setUpdateToast] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -142,6 +156,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
             role: m.role,
             content: m.content,
           })),
+          activeSection: dashCtx?.activeSection || null,
         }),
       });
 
@@ -175,20 +190,57 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
 
       const decoder = new TextDecoder();
       let fullText = "";
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        fullText += chunk;
+        buffer += chunk;
+
+        // Parse tool-call status markers
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("__TOOL__")) {
+            setToolStatus(line.slice(8));
+            continue;
+          }
+          fullText += line + "\n";
+        }
+        // Add remaining buffer content that isn't a tool marker
+        if (buffer && !buffer.startsWith("__TOOL__")) {
+          fullText += buffer;
+          buffer = "";
+        }
+
+        if (fullText) {
+          setToolStatus(null);
+        }
 
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: fullText } : m
+            m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m
           )
         );
       }
+
+      // Process any remaining buffer
+      if (buffer) {
+        if (buffer.startsWith("__TOOL__")) {
+          setToolStatus(null);
+        } else {
+          fullText += buffer;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m
+            )
+          );
+        }
+      }
+      setToolStatus(null);
 
       // Verify if the AI actually updated the site via activity feed
       const didUpdate = await checkForSiteUpdate();
@@ -239,6 +291,18 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
           </p>
         </div>
       </div>
+
+      {/* Active section context pill */}
+      {dashCtx?.activeSection && (
+        <div className="px-4 py-1.5 border-b border-[#e8e8e8] bg-[#fafafa]">
+          <span className="text-[10px] text-[#999]">
+            Editing:{" "}
+            <span className="font-medium text-[#7c9a8e]">
+              {SECTION_LABELS[dashCtx.activeSection] || dashCtx.activeSection}
+            </span>
+          </span>
+        </div>
+      )}
 
       {/* Update toast */}
       {updateToast && (
@@ -320,8 +384,19 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     )
                   ) : (
-                    <span className="flex items-center gap-1 py-0.5">
-                      <span className="text-[12px] text-[#999]">...</span>
+                    <span className="flex items-center gap-1.5 py-1">
+                      {toolStatus ? (
+                        <>
+                          <Loader2 className="w-3 h-3 text-[#7c9a8e] animate-spin" strokeWidth={1.5} />
+                          <span className="text-[11px] text-[#7c9a8e]">{toolStatus}</span>
+                        </>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" style={{ animationDelay: "0.2s" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" style={{ animationDelay: "0.4s" }} />
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>

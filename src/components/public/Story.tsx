@@ -8,7 +8,7 @@ export function Story({ story }: { story: StoryContent }) {
       <div className="py-8 md:py-10" style={{ borderBottom: "1px solid var(--cream-dark)" }}>
         <div className="container-main">
           <div>
-            <p className="font-display text-[clamp(2rem,5vw,4rem)] leading-[1.1] tracking-tight max-w-4xl">
+            <p className="font-display text-[clamp(2rem,5vw,4rem)] leading-[1.1] tracking-tight max-w-4xl" data-reb-field="statement">
               {story.statement}
             </p>
           </div>
@@ -24,7 +24,7 @@ export function Story({ story }: { story: StoryContent }) {
               <div>
                 <div className="relative aspect-[4/3] md:aspect-[3/2]">
                   <Image
-                    src={story.imageUrl}
+                    src={story.imageUrl || "/images/chelsea/portrait.jpg"}
                     alt="Chelsea Rohl, founder of Rohlax Wellness"
                     fill
                     className="object-cover"

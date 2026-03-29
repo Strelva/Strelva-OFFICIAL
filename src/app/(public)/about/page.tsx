@@ -1,7 +1,6 @@
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { Story } from "@/components/public/Story";
-import { PageCTA } from "@/components/public/PageCTA";
+import { SectionRenderer } from "@/components/public/SectionRenderer";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
@@ -15,25 +14,19 @@ export async function generateMetadata() {
   };
 }
 
-export default async function AboutPage() {
+export default async function AboutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
+  const params = await searchParams;
   const tenant = await getTenantFromHeaders();
-  const story = await getContent("story", tenant);
 
   return (
     <>
       <PageViewTracker />
       <main>
-        {/* Page header */}
-        <div className="pt-32 pb-10 md:pt-36 md:pb-14" style={{ background: "var(--cream)" }}>
-          <div className="container-main">
-            <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight">
-              {story.headline.split("\n")[0]}
-            </h1>
-          </div>
-        </div>
-
-        <Story story={story} />
-        <PageCTA />
+        <SectionRenderer pageSlug="about" tenant={tenant} editMode={params.edit === "true"} />
       </main>
     </>
   );

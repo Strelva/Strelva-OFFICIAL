@@ -15,18 +15,17 @@ import type {
 export const defaultHero: HeroContent = {
   headline: "Move Better.\nFeel Better.\nLive Better.",
   subheadline: "Assisted Stretching in Williamsville, NY",
-  tagline: "Personalized assisted stretching sessions that promote relaxation, restore mobility, and support your overall well-being.",
+  tagline: "Release. Restore. ROHLAX. — Personalized assisted stretching sessions in-studio and mobile, tailored to your body.",
   ctaText: "Book a Session",
-  ctaLink: "#booking",
-  backgroundImageUrl:
-    "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=2400&h=1600&fit=crop&q=90",
+  ctaLink: "https://www.vagaro.com/rohlaxwellness",
+  backgroundImageUrl: "/images/chelsea/studio-wide.webp",
 };
 
 export const defaultServices: ServicesContent = {
   sectionLabel: "Services",
   headline: "What We Offer",
   description:
-    "Every assisted stretch session is thoughtfully tailored to each individual. You don't have to be an athlete or have a chronic condition to benefit.",
+    "Every assisted stretch session is thoughtfully tailored to each individual — in-studio or mobile, wherever you're most comfortable. You don't have to be an athlete or have a chronic condition to benefit.",
   services: [
     {
       id: "flexibility-foundation",
@@ -125,7 +124,7 @@ export const defaultServices: ServicesContent = {
 export const defaultStory: StoryContent = {
   sectionLabel: "About Chelsea",
   headline: "Your body\ndeserves better.",
-  accentText: "Buffalo native, physical therapist, wellness advocate",
+  accentText: "Buffalo native, physical therapist, wellness advocate — in-studio & mobile sessions",
   statement:
     "I started Rohlax because I believe everyone deserves to move freely and feel good in their body.",
   paragraphs: [
@@ -139,8 +138,7 @@ export const defaultStory: StoryContent = {
   ],
   quote: "Your presence is your power.",
   quoteAttribution: "Chelsea Rohl, Founder",
-  imageUrl:
-    "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=1200&h=1600&fit=crop",
+  imageUrl: "/images/chelsea/portrait.jpg",
 };
 
 export const defaultTestimonials: TestimonialsContent = {
@@ -182,50 +180,6 @@ export const defaultEvents: EventsContent = {
   sectionLabel: "Events",
   headline: "Upcoming Events",
   events: [
-    {
-      id: "e1",
-      title: "Private Rohlax Restorative Yoga",
-      date: "2026-03-15",
-      time: "7:00 PM",
-      location: "Vibe Yoga Lab",
-      description: "A private restorative yoga session hosted by Rohlax Wellness at Vibe Yoga Lab. Limited spots available.",
-      hosted_by: "owner",
-      external_link: "https://www.eventbrite.com",
-      image_url: "",
-    },
-    {
-      id: "e2",
-      title: "Move Through Motherhood Series",
-      date: "2026-03-20",
-      time: "",
-      location: "Vital Roots Chiropractic WNY",
-      description: "A movement series designed for mothers at every stage. Stretch, strengthen, and restore with expert guidance.",
-      hosted_by: "partner",
-      external_link: "https://vitalrootschiropracticwny.janeapp.com",
-      image_url: "",
-    },
-    {
-      id: "e3",
-      title: "Let Go to Grow — Yoga Event",
-      date: "2026-03-28",
-      time: "",
-      location: "Hope and Healing Wellness Services",
-      description: "Release what no longer serves you in this guided yoga and stretching event focused on growth and renewal.",
-      hosted_by: "community",
-      external_link: "https://hopeandhealingwellnessservices.com/letgotogrow",
-      image_url: "",
-    },
-    {
-      id: "e4",
-      title: "Saving Butts Pilates",
-      date: "2026-03-28",
-      time: "",
-      location: "",
-      description: "A fun pilates event supporting a great cause. Get moving, have fun, and give back to the community.",
-      hosted_by: "community",
-      external_link: "https://www.eventbrite.com",
-      image_url: "",
-    },
     {
       id: "e5",
       title: "Beauty Boost Buffalo",
@@ -352,6 +306,8 @@ export const defaultSettings: SiteSettings = {
   footerTagline: "Move Better. Feel Better. Live Better.",
   copyrightText: "Rohlax Wellness",
   bookingUrl: "https://www.vagaro.com/rohlaxwellness",
+  instagramHandle: "rohlaxwellness",
+  vagaro_embed_id: "rohlaxwellness",
 };
 
 export const defaultFaq: FaqContent = {
@@ -393,7 +349,7 @@ export const defaultShop: ShopContent = {
       description: "My go-to recommendation for at-home stretching. Multiple loops let you gradually deepen your stretch safely.",
       category: "recommended",
       price: "15",
-      external_link: "",
+      external_link: "https://www.amazon.com/dp/B000KGOMBC",
       image_url: "",
     },
     {
@@ -411,7 +367,7 @@ export const defaultShop: ShopContent = {
       description: "The same massage gun I use at the end of every session. Great for at-home recovery between appointments.",
       category: "tools",
       price: "80",
-      external_link: "",
+      external_link: "https://www.amazon.com/dp/B09MVYCTP4",
       image_url: "",
     },
   ],

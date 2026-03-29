@@ -306,3 +306,50 @@ body {
   animation: card-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
 }
+
+/* =============================================
+   Edit Mode — Visual Builder Overlays
+   ============================================= */
+
+[data-reb-edit="true"] [data-reb-section] {
+  position: relative;
+  cursor: pointer;
+  transition: outline 0.15s ease, outline-offset 0.15s ease;
+}
+
+[data-reb-edit="true"] [data-reb-section]:hover {
+  outline: 2px solid var(--sage);
+  outline-offset: -2px;
+}
+
+[data-reb-edit="true"] [data-reb-section].reb-highlighted {
+  outline: 2px solid var(--sage);
+  outline-offset: -2px;
+}
+
+/* Inline editable field styling */
+[data-reb-edit="true"] [data-reb-field] {
+  cursor: text !important;
+  transition: outline 0.15s ease;
+  border-radius: 2px;
+}
+
+[data-reb-edit="true"] [data-reb-field]:hover {
+  outline: 1px dashed var(--sage-light);
+  outline-offset: 2px;
+}
+
+/* Section label floating tooltip */
+.reb-section-label {
+  background: var(--sage);
+  color: var(--pure-white);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+  white-space: nowrap;
+}

@@ -1,6 +1,8 @@
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import { Header } from "@/components/public/Header";
 import { Footer } from "@/components/public/Footer";
+import { IframeScrollListener } from "@/components/public/IframeScrollListener";
+import { EditModeOverlay } from "@/components/public/EditModeOverlay";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
@@ -17,6 +19,8 @@ export default async function PublicLayout({
 
   return (
     <SmoothScrollProvider>
+      <IframeScrollListener />
+      <EditModeOverlay />
       <Header settings={settings} />
       {children}
       <Footer settings={settings} contact={contact} />

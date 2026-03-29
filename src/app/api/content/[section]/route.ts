@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentSection } from "@/lib/types";
-import { getContent, setContent, recordSectionUpdate, logActivity } from "@/lib/storage";
+import {
+  getContent,
+  setContent,
+  recordSectionUpdate,
+  logActivity,
+  getDraftContent,
+  setDraftContent,
+  clearDraft,
+} from "@/lib/storage";
+import { diffFields } from "@/lib/utils";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 const VALID_SECTIONS: ContentSection[] = [
@@ -89,7 +98,7 @@ function validateBody(section: ContentSection, body: Record<string, unknown>): s
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ section: string }> }
 ) {
   const { section } = await params;
@@ -100,6 +109,14 @@ export async function GET(
 
   try {
     const tenant = await getTenantFromHeaders();
+    const url = new URL(request.url);
+    const isDraft = url.searchParams.get("draft") === "true";
+
+    if (isDraft) {
+      const draft = await getDraftContent(section, tenant);
+      if (draft) return NextResponse.json(draft);
+    }
+
     const data = await getContent(section, tenant);
     return NextResponse.json(data);
   } catch {
@@ -126,17 +143,62 @@ export async function PUT(
     }
 
     const tenant = await getTenantFromHeaders();
+    const url = new URL(request.url);
+    const isDraft = url.searchParams.get("draft") === "true";
+
+    if (isDraft) {
+      await setDraftContent(section, body, tenant);
+      return NextResponse.json({ success: true, draft: true });
+    }
+
+    // Capture diffs before saving
+    const current = await getContent(section, tenant) as unknown as Record<string, unknown>;
+    const changes = diffFields(current, body);
+
     await setContent(section, body, tenant);
     await recordSectionUpdate(section, tenant);
     await logActivity({
       text: `Updated ${section} via admin`,
       time: new Date().toISOString(),
       type: "admin",
+      section,
+      actor: "user",
+      changes,
     }, tenant);
+
+    // Clear any existing draft for this section on live publish
+    await clearDraft(section, tenant).catch(() => {});
+
     revalidatePath("/");
 
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to save content" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ section: string }> }
+) {
+  const { section } = await params;
+
+  if (!isValidSection(section)) {
+    return NextResponse.json({ error: "Invalid section" }, { status: 400 });
+  }
+
+  try {
+    const tenant = await getTenantFromHeaders();
+    const url = new URL(request.url);
+    const isDraft = url.searchParams.get("draft") === "true";
+
+    if (isDraft) {
+      await clearDraft(section, tenant);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "DELETE only supported for drafts" }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }

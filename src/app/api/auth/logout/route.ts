@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { clearAuthCookie } from "@/lib/auth";
 
+// Auth is now handled by Clerk
 export async function POST() {
-  await clearAuthCookie();
-  return NextResponse.json({ success: true });
+  return NextResponse.json(
+    { error: "Auth moved to Clerk. Use Clerk's sign-out." },
+    { status: 410 }
+  );
 }

@@ -72,8 +72,12 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const { messages } = await req.json();
-  const systemPrompt = await buildSystemPrompt(tenant);
+  const { messages, activeSection } = await req.json();
+  let systemPrompt = await buildSystemPrompt(tenant);
+
+  if (activeSection) {
+    systemPrompt += `\n\nCONTEXT: The user is currently viewing the "${activeSection}" section in their dashboard editor. When they say "this", "it", "add one", "update this", etc., they are referring to ${activeSection}. Proactively reference this section in your responses.`;
+  }
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
@@ -174,10 +178,15 @@ export async function POST(req: Request) {
 
           try {
             const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
+            const { diffFields } = await import("@/lib/utils");
+            const changes = diffFields(current, data as Record<string, unknown>);
             await logActivity({
               text: `AI updated ${section}`,
               time: new Date().toISOString(),
               type: "ai",
+              section,
+              actor: "ai",
+              changes,
             }, tenant);
             await recordSectionUpdate(section, tenant);
           } catch {}
@@ -303,5 +312,41 @@ export async function POST(req: Request) {
     stopWhen: stepCountIs(8),
   });
 
-  return result.toTextStreamResponse();
+  // Stream text + tool-call status events as SSE-like lines
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const part of result.fullStream) {
+          if (part.type === "tool-call") {
+            const toolName = part.toolName;
+            const input = ("args" in part ? part.args : "input" in part ? part.input : undefined) as Record<string, unknown> | undefined;
+            const section = input?.section as string | undefined;
+            const label =
+              toolName === "read_section" ? `Reading your ${section || "content"}...` :
+              toolName === "update_section" ? `Updating your ${section || "content"}...` :
+              toolName === "check_availability" ? "Checking availability..." :
+              toolName === "book_appointment" ? "Booking appointment..." :
+              toolName === "list_bookings" ? "Checking your bookings..." :
+              toolName === "update_booking_config" ? "Updating booking settings..." :
+              "Working on it...";
+            controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
+          } else if (part.type === "text-delta") {
+            controller.enqueue(encoder.encode("text" in part ? part.text : ""));
+          }
+        }
+      } catch {
+        // Stream closed by client
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+    },
+  });
 }

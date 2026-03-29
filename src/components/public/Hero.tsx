@@ -61,10 +61,10 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative min-h-screen flex items-end pb-20 md:pb-28 overflow-hidden">
+    <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-end pb-20 md:pb-28 overflow-hidden">
       <div ref={imageRef} className="absolute inset-0" style={{ willChange: "transform" }}>
         <Image
-          src={hero.backgroundImageUrl}
+          src={hero.backgroundImageUrl || "/images/chelsea/studio-wide.webp"}
           alt=""
           fill
           className="object-cover"
@@ -87,6 +87,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
             {hero.subheadline && (
               <p
                 data-hero-animate
+                data-reb-field="subheadline"
                 className="text-sm md:text-base font-medium tracking-wider uppercase mb-4"
                 style={{ color: "rgba(250,249,247,0.85)" }}
               >
@@ -107,6 +108,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
             </h1>
             <p
               data-hero-animate
+              data-reb-field="tagline"
               className="text-base md:text-lg max-w-md mb-8 leading-relaxed"
               style={{ color: "rgba(250,249,247,0.7)" }}
             >
@@ -123,6 +125,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
                 onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
                   e.currentTarget.style.background = "var(--sage)";
                 }}
+                data-reb-field="ctaText"
               >
                 {hero.ctaText}
               </a>

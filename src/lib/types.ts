@@ -140,7 +140,10 @@ export interface SiteSettings {
   footerTagline: string;
   copyrightText: string;
   bookingUrl: string;
+  instagramHandle: string;
+  vagaro_embed_id: string;
 }
+
 
 export type ContentSection =
   | "hero"
@@ -166,6 +169,21 @@ export type ContentMap = {
   faq: FaqContent;
   shop: ShopContent;
 };
+
+// --- Page Config Types ---
+
+export interface PageSectionConfig {
+  type: string;
+  visible: boolean;
+  order: number;
+  props?: Record<string, unknown>;
+}
+
+export interface PageConfig {
+  sections: PageSectionConfig[];
+}
+
+export type SitePageConfig = Record<string, PageConfig>;
 
 // --- Booking Types ---
 

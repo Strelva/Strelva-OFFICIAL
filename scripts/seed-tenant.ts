@@ -129,6 +129,8 @@ const caroleeDefaults: ContentMap = {
     footerTagline: "We are our own healers.",
     copyrightText: "Carolee Fraass",
     bookingUrl: "",
+    instagramHandle: "",
+    vagaro_embed_id: "",
   },
   faq: {
     ...defaultFaq,

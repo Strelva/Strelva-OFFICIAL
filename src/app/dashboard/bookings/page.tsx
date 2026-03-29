@@ -84,8 +84,8 @@ export default function BookingsPage() {
     return (
       <div className="p-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-[#1c1c1c] rounded" />
-          <div className="h-64 bg-[#1c1c1c] rounded" />
+          <div className="h-8 w-48 bg-[#f0f0f0] rounded" />
+          <div className="h-64 bg-[#f0f0f0] rounded" />
         </div>
       </div>
     );
@@ -95,36 +95,36 @@ export default function BookingsPage() {
     <div className="p-6 md:p-8 max-w-5xl">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">Bookings</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage your appointment schedule</p>
+        <h1 className="text-2xl font-semibold text-[#1a1a1a] tracking-tight">Bookings</h1>
+        <p className="text-sm text-[#999] mt-1">Manage your appointment schedule</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="p-4 rounded-lg bg-[#141414] border border-[#262626]">
-          <p className="text-2xl font-semibold text-white">{todayBookings.length}</p>
-          <p className="text-xs text-zinc-500 mt-1">Today</p>
+        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
+          <p className="text-2xl font-semibold text-[#1a1a1a]">{todayBookings.length}</p>
+          <p className="text-xs text-[#999] mt-1">Today</p>
         </div>
-        <div className="p-4 rounded-lg bg-[#141414] border border-[#262626]">
-          <p className="text-2xl font-semibold text-white">{weekBookings.length}</p>
-          <p className="text-xs text-zinc-500 mt-1">This week</p>
+        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
+          <p className="text-2xl font-semibold text-[#1a1a1a]">{weekBookings.length}</p>
+          <p className="text-xs text-[#999] mt-1">This week</p>
         </div>
-        <div className="p-4 rounded-lg bg-[#141414] border border-[#262626]">
-          <p className="text-2xl font-semibold text-white">
+        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
+          <p className="text-2xl font-semibold text-[#1a1a1a]">
             {bookings.filter((b) => b.status === "confirmed" && b.date >= today).length}
           </p>
-          <p className="text-xs text-zinc-500 mt-1">Upcoming</p>
+          <p className="text-xs text-[#999] mt-1">Upcoming</p>
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 mb-6 bg-[#141414] border border-[#262626] rounded-md p-0.5 w-fit">
+      <div className="flex gap-1 mb-6 bg-[#f5f5f5] border border-[#e8e8e8] rounded-md p-0.5 w-fit">
         {(["upcoming", "past", "all"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
-              filter === f ? "bg-[#262626] text-white" : "text-zinc-500 hover:text-zinc-300"
+              filter === f ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#999] hover:text-[#666]"
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -134,48 +134,48 @@ export default function BookingsPage() {
 
       {/* Bookings list */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-zinc-500">
+        <div className="text-center py-16 text-[#999]">
           <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No {filter} bookings</p>
-          <p className="text-xs mt-1 text-zinc-600">Bookings will appear here when clients book through your site.</p>
+          <p className="text-xs mt-1 text-[#ccc]">Bookings will appear here when clients book through your site.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((b) => (
             <div
               key={b.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-[#141414] border border-[#262626] hover:border-[#333] transition-colors"
+              className="flex items-center justify-between p-4 rounded-lg bg-white border border-[#e8e8e8] hover:border-[#d0d0d0] transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-[#1c1c1c]">
-                  <span className="text-xs font-bold text-white leading-none">
+                <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-[#f5f5f5]">
+                  <span className="text-xs font-bold text-[#1a1a1a] leading-none">
                     {new Date(b.date + "T12:00:00").getDate()}
                   </span>
-                  <span className="text-[10px] text-zinc-500 uppercase">
+                  <span className="text-[10px] text-[#999] uppercase">
                     {new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{b.serviceName}</p>
+                  <p className="text-sm font-medium text-[#1a1a1a]">{b.serviceName}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-xs text-zinc-400">
+                    <span className="flex items-center gap-1 text-xs text-[#999]">
                       <Clock className="w-3 h-3" />
                       {formatTime(b.startTime)} – {formatTime(b.endTime)}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-zinc-400">
+                    <span className="flex items-center gap-1 text-xs text-[#999]">
                       <User className="w-3 h-3" />
                       {b.clientName}
                     </span>
                   </div>
-                  {b.notes && <p className="text-xs text-zinc-600 mt-1">{b.notes}</p>}
+                  {b.notes && <p className="text-xs text-[#ccc] mt-1">{b.notes}</p>}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] font-medium tracking-wider uppercase px-2 py-1 rounded ${
-                  b.status === "confirmed" ? "bg-emerald-500/10 text-emerald-400" :
-                  b.status === "completed" ? "bg-blue-500/10 text-blue-400" :
-                  "bg-red-500/10 text-red-400"
+                  b.status === "confirmed" ? "bg-emerald-500/10 text-emerald-600" :
+                  b.status === "completed" ? "bg-blue-500/10 text-blue-600" :
+                  "bg-red-500/10 text-red-600"
                 }`}>
                   {b.status}
                 </span>
@@ -183,17 +183,17 @@ export default function BookingsPage() {
                   <div className="flex gap-1 ml-2">
                     <button
                       onClick={() => updateStatus(b.id, "completed")}
-                      className="p-1.5 rounded hover:bg-[#262626] transition-colors"
+                      className="p-1.5 rounded hover:bg-[#f5f5f5] transition-colors"
                       title="Mark completed"
                     >
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
                     </button>
                     <button
                       onClick={() => updateStatus(b.id, "cancelled")}
-                      className="p-1.5 rounded hover:bg-[#262626] transition-colors"
+                      className="p-1.5 rounded hover:bg-[#f5f5f5] transition-colors"
                       title="Cancel"
                     >
-                      <XCircle className="w-4 h-4 text-red-400" />
+                      <XCircle className="w-4 h-4 text-red-500" />
                     </button>
                   </div>
                 )}

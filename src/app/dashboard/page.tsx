@@ -1,8 +1,8 @@
-import { getActivity, getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
+import { getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { defaults } from "@/lib/defaults";
-import { timeAgo } from "@/lib/utils";
 import { DashboardWorkspace } from "@/components/dashboard/DashboardWorkspace";
+import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
 import type { SectionData } from "@/components/dashboard/ContentBrowser";
 
 function truncate(s: string, len: number): string {
@@ -82,9 +82,8 @@ function getSuggestions(
 export default async function DashboardPage() {
   const tenant = await getTenantFromHeaders();
 
-  const [activity, pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
+  const [pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
-      safeFetch(() => getActivity(tenant), []),
       safeFetch(() => getClickCounts("page-view", tenant), EMPTY_CLICKS),
       safeFetch(() => getClickCounts("booking-click", tenant), EMPTY_CLICKS),
       safeFetch(() => getClickCounts("provider-referral-click", tenant), EMPTY_CLICKS),
@@ -285,23 +284,9 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Recent activity */}
+      {/* Activity timeline (client component with filtering) */}
       <div className="bg-white border border-[#e8e8e8] rounded-lg p-4">
-        <h2 className="text-[10px] font-medium uppercase tracking-wider text-[#999] mb-3">RECENT ACTIVITY</h2>
-        {activity.length === 0 ? (
-          <p className="text-[12px] text-[#999] py-3">
-            No activity yet — updates appear when you use the AI chat.
-          </p>
-        ) : (
-          <div>
-            {activity.slice(0, 10).map((item: { type: string; text: string; time: string }, i: number) => (
-              <div key={i} className="flex items-center gap-3 py-2 border-b border-[#f5f5f5] last:border-0">
-                <p className="text-[12px] text-[#1a1a1a] flex-1">{item.text}</p>
-                <span className="text-[10px] font-mono text-[#ccc] shrink-0">{timeAgo(item.time)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ActivityTimeline />
       </div>
     </div>
   );

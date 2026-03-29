@@ -1,7 +1,6 @@
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { Contact } from "@/components/public/Contact";
-import { PageCTA } from "@/components/public/PageCTA";
+import { SectionRenderer } from "@/components/public/SectionRenderer";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
@@ -15,23 +14,19 @@ export async function generateMetadata() {
   };
 }
 
-export default async function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
+  const params = await searchParams;
   const tenant = await getTenantFromHeaders();
-  const contact = await getContent("contact", tenant);
 
   return (
     <>
       <PageViewTracker />
       <main>
-        <div className="pt-32 pb-10 md:pt-36 md:pb-14" style={{ background: "var(--cream)" }}>
-          <div className="container-main">
-            <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight">
-              Get in touch
-            </h1>
-          </div>
-        </div>
-        <Contact contact={contact} />
-        <PageCTA />
+        <SectionRenderer pageSlug="contact" tenant={tenant} editMode={params.edit === "true"} />
       </main>
     </>
   );

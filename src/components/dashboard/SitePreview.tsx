@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Monitor, Tablet, Smartphone, ExternalLink } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -10,13 +10,37 @@ const DEVICES = [
   { id: "mobile", label: "Mobile", icon: Smartphone, width: "390px" },
 ] as const;
 
+const PAGE_PATHS: Record<string, string> = {
+  home: "/",
+  services: "/services",
+  about: "/about",
+  contact: "/contact",
+  events: "/events",
+  faq: "/faq",
+  providers: "/providers",
+  shop: "/shop",
+};
+
 type DeviceId = (typeof DEVICES)[number]["id"];
 
 export function SitePreview() {
   const [device, setDevice] = useState<DeviceId>("desktop");
-  const { refreshKey, scrollToSection, setScrollToSection } = useDashboard();
+  const {
+    refreshKey,
+    scrollToSection,
+    setScrollToSection,
+    setActiveSection,
+    activeSection,
+    editMode,
+    triggerRefresh,
+  } = useDashboard();
   const activeDevice = DEVICES.find((d) => d.id === device)!;
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Build iframe URL
+  const pagePath = PAGE_PATHS["home"] || "/";
+  const editParam = editMode === "draft" ? "" : "?edit=true";
+  const iframeSrc = `${pagePath}${editParam}`;
 
   // Handle scroll-to-section requests from ContentBrowser
   useEffect(() => {
@@ -27,11 +51,57 @@ export function SitePreview() {
           "*"
         );
       } catch {
-        iframeRef.current.src = `/#${scrollToSection}`;
+        iframeRef.current.src = `${pagePath}#${scrollToSection}`;
       }
       setScrollToSection(null);
     }
-  }, [scrollToSection, setScrollToSection]);
+  }, [scrollToSection, setScrollToSection, pagePath]);
+
+  // Send highlight to iframe when activeSection changes
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        { type: "reb-highlight-section", section: activeSection },
+        "*"
+      );
+    }
+  }, [activeSection]);
+
+  // Handle inline edit saves from iframe
+  const handleInlineEdit = useCallback(async (section: string, field: string, value: string) => {
+    try {
+      const res = await fetch(`/api/content/${section}`, { credentials: "same-origin" });
+      if (!res.ok) return;
+      const data = await res.json();
+      data[field] = value;
+      const saveRes = await fetch(`/api/content/${section}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(data),
+      });
+      if (saveRes.ok) {
+        triggerRefresh();
+      }
+    } catch {}
+  }, [triggerRefresh]);
+
+  // Listen for messages from iframe
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      const { data } = event;
+      if (!data?.type?.startsWith("reb-")) return;
+
+      if (data.type === "reb-section-clicked") {
+        setActiveSection(data.section);
+      }
+      if (data.type === "reb-inline-edit") {
+        handleInlineEdit(data.section, data.field, data.value);
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [setActiveSection, handleInlineEdit]);
 
   return (
     <div className="flex flex-col h-full">
@@ -84,7 +154,7 @@ export function SitePreview() {
           <iframe
             ref={iframeRef}
             key={refreshKey}
-            src="/"
+            src={iframeSrc}
             className="w-full h-full border-0"
             title="Live site preview"
           />

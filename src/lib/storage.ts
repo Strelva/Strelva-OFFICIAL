@@ -1,26 +1,17 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { createClient } from "redis";
 import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking } from "./types";
 import { defaults } from "./defaults";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "./booking";
+import { getSanityClient, getSanityReadClient, sanityImageUrl } from "./sanity";
 
-const hasRedis = !!process.env.REDIS_URL;
-const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_CONTENT_PATH = path.join(process.cwd(), "dev-content.json");
 
 /** Default tenant — used until multi-tenant routing is wired */
 export const DEFAULT_TENANT = "rohlax";
 
-async function withRedis<T>(fn: (redis: ReturnType<typeof createClient>) => Promise<T>): Promise<T> {
-  const client = createClient({ url: process.env.REDIS_URL });
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.quit();
-  }
-}
+// --- Dev file fallback (no Sanity configured) ---
 
 async function readDevContent(): Promise<Record<string, unknown>> {
   try {
@@ -35,18 +26,99 @@ async function writeDevContent(data: Record<string, unknown>): Promise<void> {
   await fs.writeFile(DEV_CONTENT_PATH, JSON.stringify(data, null, 2));
 }
 
+// --- Sanity document type mapping ---
+
+const SECTION_TO_TYPE: Record<ContentSection, string> = {
+  hero: "hero",
+  services: "services",
+  story: "story",
+  testimonials: "testimonials",
+  events: "events",
+  providers: "providers",
+  contact: "contact",
+  settings: "siteSettings",
+  faq: "faq",
+  shop: "shop",
+};
+
+/**
+ * Transform Sanity image fields back to URL strings for the existing frontend.
+ * This keeps the rest of the codebase unchanged — components still receive
+ * `backgroundImageUrl: string`, `image_url: string`, etc.
+ */
+function transformSanityImages<K extends ContentSection>(
+  section: K,
+  doc: Record<string, unknown>
+): ContentMap[K] {
+  // Remove Sanity internal fields
+  const { _id, _rev, _type, _createdAt, _updatedAt, tenant, ...data } = doc;
+
+  if (section === "hero" && data.backgroundImage) {
+    data.backgroundImageUrl = sanityImageUrl(data.backgroundImage);
+    delete data.backgroundImage;
+  }
+
+  if (section === "story" && data.portraitImage) {
+    data.imageUrl = sanityImageUrl(data.portraitImage);
+    delete data.portraitImage;
+  }
+
+  // Array items with image fields
+  const arrayFields: Record<string, { sanityField: string; urlField: string }> = {
+    services: { sanityField: "image", urlField: "image_url" },
+    events: { sanityField: "image", urlField: "image_url" },
+    providers: { sanityField: "photo", urlField: "photo_url" },
+    shop: { sanityField: "image", urlField: "image_url" },
+  };
+
+  const mapping = arrayFields[section];
+  if (mapping) {
+    const arrayKey = section === "shop" ? "items" : section;
+    const items = data[arrayKey] as Array<Record<string, unknown>> | undefined;
+    if (items) {
+      data[arrayKey] = items.map((item) => {
+        const { _key, [mapping.sanityField]: img, ...rest } = item;
+        return {
+          ...rest,
+          id: rest.id || _key || "",
+          [mapping.urlField]: img ? sanityImageUrl(img) : "",
+        };
+      });
+    }
+  }
+
+  // Testimonials, FAQ — array items with _key → id
+  if (section === "testimonials" && Array.isArray(data.testimonials)) {
+    data.testimonials = (data.testimonials as Array<Record<string, unknown>>).map(
+      ({ _key, ...rest }) => ({ ...rest, id: rest.id || _key || "" })
+    );
+  }
+  if (section === "faq" && Array.isArray(data.faqs)) {
+    data.faqs = (data.faqs as Array<Record<string, unknown>>).map(
+      ({ _key, ...rest }) => ({ ...rest, id: rest.id || _key || "" })
+    );
+  }
+  if (section === "story" && Array.isArray(data.stats)) {
+    data.stats = (data.stats as Array<Record<string, unknown>>).map(
+      ({ _key, ...rest }) => rest
+    );
+  }
+
+  return data as unknown as ContentMap[K];
+}
+
 // --- Content ---
 
 export async function getContent<K extends ContentSection>(
   section: K,
   tenant: string = DEFAULT_TENANT
 ): Promise<ContentMap[K]> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:content:${section}`);
-      if (raw) return JSON.parse(raw) as ContentMap[K];
-      return defaults[section];
-    });
+  if (hasSanity) {
+    const type = SECTION_TO_TYPE[section];
+    const query = `*[_type == $type && tenant == $tenant][0]`;
+    const doc = await getSanityReadClient().fetch(query, { type, tenant });
+    if (doc) return transformSanityImages(section, doc);
+    return defaults[section];
   }
 
   const store = await readDevContent();
@@ -58,10 +130,24 @@ export async function setContent<K extends ContentSection>(
   data: ContentMap[K],
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.set(`${tenant}:content:${section}`, JSON.stringify(data));
-    });
+  if (hasSanity) {
+    const type = SECTION_TO_TYPE[section];
+    const query = `*[_type == $type && tenant == $tenant][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { type, tenant });
+
+    const doc = {
+      _type: type,
+      tenant,
+      ...(data as unknown as Record<string, unknown>),
+    };
+
+    if (existingId) {
+      await getSanityClient().patch(existingId).set(doc).commit();
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await getSanityClient().create(doc as any);
+    }
+    return;
   }
 
   const store = await readDevContent();
@@ -71,9 +157,18 @@ export async function setContent<K extends ContentSection>(
 
 // --- File upload ---
 
-export async function uploadFile(
-  file: File
-): Promise<{ url: string }> {
+export async function uploadFile(file: File): Promise<{ url: string }> {
+  if (hasSanity) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const asset = await getSanityClient().assets.upload("image", buffer, {
+      filename: file.name,
+      contentType: file.type,
+    });
+    return { url: sanityImageUrl(asset) };
+  }
+
+  // Vercel Blob fallback
+  const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (hasBlob) {
     const { put } = await import("@vercel/blob");
     const blob = await put(file.name, file, { access: "public" });
@@ -115,10 +210,21 @@ export async function saveChatMessages(
 ): Promise<void> {
   const trimmed = messages.slice(-100);
 
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.set(`${tenant}:chat:${clientId}`, JSON.stringify(trimmed));
-    });
+  if (hasSanity) {
+    const query = `*[_type == "chatSession" && tenant == $tenant && clientId == $clientId][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { tenant, clientId });
+
+    if (existingId) {
+      await getSanityClient().patch(existingId).set({ messages: trimmed }).commit();
+    } else {
+      await getSanityClient().create({
+        _type: "chatSession",
+        tenant,
+        clientId,
+        messages: trimmed,
+      });
+    }
+    return;
   }
 
   const store = await readDevChat();
@@ -130,12 +236,10 @@ export async function loadChatMessages(
   clientId: string,
   tenant: string = DEFAULT_TENANT
 ): Promise<unknown[]> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:chat:${clientId}`);
-      if (raw) return JSON.parse(raw) as unknown[];
-      return [];
-    });
+  if (hasSanity) {
+    const query = `*[_type == "chatSession" && tenant == $tenant && clientId == $clientId][0].messages`;
+    const messages = await getSanityClient().fetch(query, { tenant, clientId });
+    return messages || [];
   }
 
   const store = await readDevChat();
@@ -144,49 +248,229 @@ export async function loadChatMessages(
 
 // --- Activity logging ---
 
+export interface ActivityEntry {
+  text: string;
+  time: string;
+  type: string;
+  section?: string;
+  actor?: "user" | "ai";
+  changes?: { field: string; before: string; after: string }[];
+}
+
 export async function logActivity(
-  entry: { text: string; time: string; type: string },
+  entry: ActivityEntry,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.lPush(`${tenant}:activity`, JSON.stringify(entry));
-      await redis.lTrim(`${tenant}:activity`, 0, 49);
+  if (hasSanity) {
+    await getSanityClient().create({
+      _type: "activityLog",
+      tenant,
+      text: entry.text,
+      activityType: entry.type,
+      time: entry.time,
+      section: entry.section,
+      actor: entry.actor,
+      changes: entry.changes,
     });
+    return;
   }
+
   const store = await readDevContent();
-  const activity = (store.__activity as unknown[] ?? []);
+  const activity = (store.__activity as unknown[]) ?? [];
   activity.unshift(entry);
-  store.__activity = activity.slice(0, 50);
+  store.__activity = activity.slice(0, 200);
   await writeDevContent(store);
 }
 
 export async function getActivity(
-  tenant: string = DEFAULT_TENANT
-): Promise<Array<{ text: string; time: string; type: string }>> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.lRange(`${tenant}:activity`, 0, 19);
-      return raw.map(r => JSON.parse(r));
-    });
+  tenant: string = DEFAULT_TENANT,
+  filters?: { section?: string; actor?: string }
+): Promise<ActivityEntry[]> {
+  if (hasSanity) {
+    let query = `*[_type == "activityLog" && tenant == $tenant`;
+    const params: Record<string, string> = { tenant };
+    if (filters?.section) {
+      query += ` && section == $section`;
+      params.section = filters.section;
+    }
+    if (filters?.actor) {
+      query += ` && actor == $actor`;
+      params.actor = filters.actor;
+    }
+    query += `] | order(time desc)[0...50]{ text, "type": activityType, time, section, actor, changes }`;
+    return getSanityClient().fetch(query, params);
   }
+
   const store = await readDevContent();
-  return (store.__activity as Array<{ text: string; time: string; type: string }>) ?? [];
+  let activity = (store.__activity as ActivityEntry[]) ?? [];
+  if (filters?.section) {
+    activity = activity.filter((a) => a.section === filters.section);
+  }
+  if (filters?.actor) {
+    activity = activity.filter((a) => a.actor === filters.actor);
+  }
+  return activity.slice(0, 50);
 }
 
-// --- Click tracking ---
+// --- Draft content ---
+
+export async function getDraftContent<K extends ContentSection>(
+  section: K,
+  tenant: string = DEFAULT_TENANT
+): Promise<ContentMap[K] | null> {
+  if (hasSanity) {
+    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0].data`;
+    const data = await getSanityClient().fetch(query, { tenant, section });
+    return data || null;
+  }
+
+  const store = await readDevContent();
+  const key = `__draft:${section}`;
+  return (store[key] as ContentMap[K]) ?? null;
+}
+
+export async function setDraftContent<K extends ContentSection>(
+  section: K,
+  data: ContentMap[K],
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasSanity) {
+    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { tenant, section });
+    const doc = { _type: "draftContent" as const, tenant, section, data };
+    if (existingId) {
+      await getSanityClient().patch(existingId).set(doc).commit();
+    } else {
+      await getSanityClient().create(doc);
+    }
+    return;
+  }
+
+  const store = await readDevContent();
+  store[`__draft:${section}`] = data;
+  await writeDevContent(store);
+}
+
+export async function clearDraft(
+  section: ContentSection,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasSanity) {
+    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { tenant, section });
+    if (existingId) {
+      await getSanityClient().delete(existingId);
+    }
+    return;
+  }
+
+  const store = await readDevContent();
+  delete store[`__draft:${section}`];
+  await writeDevContent(store);
+}
+
+export async function listDrafts(
+  tenant: string = DEFAULT_TENANT
+): Promise<Record<string, boolean>> {
+  if (hasSanity) {
+    const query = `*[_type == "draftContent" && tenant == $tenant].section`;
+    const sections: string[] = await getSanityClient().fetch(query, { tenant });
+    const result: Record<string, boolean> = {};
+    for (const s of sections) result[s] = true;
+    return result;
+  }
+
+  const store = await readDevContent();
+  const result: Record<string, boolean> = {};
+  for (const key of Object.keys(store)) {
+    if (key.startsWith("__draft:")) {
+      result[key.replace("__draft:", "")] = true;
+    }
+  }
+  return result;
+}
+
+// --- Page Config ---
+
+import type { SitePageConfig } from "./types";
+import { DEFAULT_PAGE_CONFIG } from "./pageConfigDefaults";
+
+export async function getPageConfig(
+  tenant: string = DEFAULT_TENANT
+): Promise<SitePageConfig> {
+  if (hasSanity) {
+    const doc = await getSanityReadClient().fetch(
+      `*[_type == "pageConfig" && tenant == $tenant][0]`,
+      { tenant }
+    );
+    if (doc) {
+      const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...config } = doc;
+      return config.pages as SitePageConfig;
+    }
+    return DEFAULT_PAGE_CONFIG;
+  }
+
+  const store = await readDevContent();
+  return (store.__pageConfig as SitePageConfig) ?? DEFAULT_PAGE_CONFIG;
+}
+
+export async function setPageConfig(
+  config: SitePageConfig,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasSanity) {
+    const query = `*[_type == "pageConfig" && tenant == $tenant][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { tenant });
+    const doc = { _type: "pageConfig" as const, tenant, pages: config };
+    if (existingId) {
+      await getSanityClient().patch(existingId).set(doc).commit();
+    } else {
+      await getSanityClient().create(doc);
+    }
+    return;
+  }
+
+  const store = await readDevContent();
+  store.__pageConfig = config;
+  await writeDevContent(store);
+}
+
+// --- Click tracking (stays simple — use Sanity counter documents) ---
 
 export async function trackClick(
   event: string,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.hIncrBy(`${tenant}:clicks`, `${event}:${today}`, 1);
-      await redis.hIncrBy(`${tenant}:clicks`, `${event}:total`, 1);
-    });
+
+  if (hasSanity) {
+    // Use a single tracking document per tenant, increment counters
+    const docId = `clicks-${tenant}`;
+    try {
+      await getSanityClient()
+        .patch(docId)
+        .setIfMissing({ _type: "activityLog", tenant, text: "click-tracking", activityType: "system", time: new Date().toISOString(), clicks: {} })
+        .inc({ [`clicks.${event}_${today}`]: 1, [`clicks.${event}_total`]: 1 })
+        .commit({ autoGenerateArrayKeys: true });
+    } catch {
+      // Document doesn't exist yet
+      await getSanityClient().createIfNotExists({
+        _id: docId,
+        _type: "activityLog",
+        tenant,
+        text: "click-tracking",
+        activityType: "system",
+        time: new Date().toISOString(),
+      });
+      await getSanityClient()
+        .patch(docId)
+        .setIfMissing({ clicks: {} })
+        .inc({ [`clicks.${event}_${today}`]: 1, [`clicks.${event}_total`]: 1 })
+        .commit({ autoGenerateArrayKeys: true });
+    }
+    return;
   }
+
   const store = await readDevContent();
   const clicks = (store.__clicks as Record<string, number>) ?? {};
   clicks[`${event}:${today}`] = (clicks[`${event}:${today}`] || 0) + 1;
@@ -201,19 +485,21 @@ export async function getClickCounts(
 ): Promise<{ total: number; today: number; thisWeek: number }> {
   const today = new Date().toISOString().slice(0, 10);
 
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const total = parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:total`) || "0");
-      const todayCount = parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:${today}`) || "0");
-      let weekCount = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
-        weekCount += parseInt(await redis.hGet(`${tenant}:clicks`, `${event}:${key}`) || "0");
-      }
-      return { total, today: todayCount, thisWeek: weekCount };
-    });
+  if (hasSanity) {
+    const docId = `clicks-${tenant}`;
+    const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
+    const clicks = (doc || {}) as Record<string, number>;
+
+    const total = clicks[`${event}_total`] || 0;
+    const todayCount = clicks[`${event}_${today}`] || 0;
+    let weekCount = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      weekCount += clicks[`${event}_${key}`] || 0;
+    }
+    return { total, today: todayCount, thisWeek: weekCount };
   }
 
   const store = await readDevContent();
@@ -235,13 +521,24 @@ export async function getClickCounts(
 export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<BookingConfig> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:booking-config`);
-      if (raw) return JSON.parse(raw) as BookingConfig;
-      return DEFAULT_BOOKING_CONFIG;
-    });
+  if (hasSanity) {
+    const doc = await getSanityClient().fetch(
+      `*[_type == "bookingConfig" && tenant == $tenant][0]`,
+      { tenant }
+    );
+    if (doc) {
+      const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...config } = doc;
+      // Clean _key from weeklySchedule items
+      if (config.weeklySchedule) {
+        config.weeklySchedule = config.weeklySchedule.map(
+          ({ _key, ...rest }: { _key?: string } & Record<string, unknown>) => rest
+        );
+      }
+      return config as BookingConfig;
+    }
+    return DEFAULT_BOOKING_CONFIG;
   }
+
   const store = await readDevContent();
   return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
 }
@@ -250,11 +547,20 @@ export async function setBookingConfig(
   config: BookingConfig,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.set(`${tenant}:booking-config`, JSON.stringify(config));
-    });
+  if (hasSanity) {
+    const existingId = await getSanityClient().fetch(
+      `*[_type == "bookingConfig" && tenant == $tenant][0]._id`,
+      { tenant }
+    );
+    const doc = { _type: "bookingConfig" as const, tenant, ...config };
+    if (existingId) {
+      await getSanityClient().patch(existingId).set(doc).commit();
+    } else {
+      await getSanityClient().create(doc);
+    }
+    return;
   }
+
   const store = await readDevContent();
   store[`__bookingConfig_${tenant}`] = config;
   await writeDevContent(store);
@@ -263,13 +569,15 @@ export async function setBookingConfig(
 export async function getDateOverrides(
   tenant: string = DEFAULT_TENANT
 ): Promise<DateOverride[]> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:date-overrides`);
-      if (raw) return JSON.parse(raw) as DateOverride[];
-      return [];
-    });
+  if (hasSanity) {
+    // Store date overrides as part of booking config
+    const doc = await getSanityClient().fetch(
+      `*[_type == "bookingConfig" && tenant == $tenant][0].dateOverrides`,
+      { tenant }
+    );
+    return doc || [];
   }
+
   const store = await readDevContent();
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
 }
@@ -278,11 +586,17 @@ export async function setDateOverrides(
   overrides: DateOverride[],
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.set(`${tenant}:date-overrides`, JSON.stringify(overrides));
-    });
+  if (hasSanity) {
+    const existingId = await getSanityClient().fetch(
+      `*[_type == "bookingConfig" && tenant == $tenant][0]._id`,
+      { tenant }
+    );
+    if (existingId) {
+      await getSanityClient().patch(existingId).set({ dateOverrides: overrides }).commit();
+    }
+    return;
   }
+
   const store = await readDevContent();
   store[`__dateOverrides_${tenant}`] = overrides;
   await writeDevContent(store);
@@ -292,19 +606,20 @@ export async function getBookings(
   tenant: string = DEFAULT_TENANT,
   dateRange?: { from: string; to: string }
 ): Promise<Booking[]> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:bookings`);
-      if (!raw) return [];
-      let bookings = JSON.parse(raw) as Booking[];
-      if (dateRange) {
-        bookings = bookings.filter(
-          (b) => b.date >= dateRange.from && b.date <= dateRange.to
-        );
-      }
-      return bookings;
-    });
+  if (hasSanity) {
+    let query = `*[_type == "booking" && tenant == $tenant`;
+    const params: Record<string, string> = { tenant };
+
+    if (dateRange) {
+      query += ` && date >= $from && date <= $to`;
+      params.from = dateRange.from;
+      params.to = dateRange.to;
+    }
+    query += `] | order(date asc){ "id": bookingId, serviceId, serviceName, date, startTime, endTime, clientName, clientEmail, clientPhone, notes, status, "createdAt": _createdAt, cancelledAt }`;
+
+    return getSanityClient().fetch(query, params);
   }
+
   const store = await readDevContent();
   let bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
   if (dateRange) {
@@ -319,22 +634,31 @@ export async function createBooking(
   booking: Omit<Booking, "id" | "createdAt" | "status">,
   tenant: string = DEFAULT_TENANT
 ): Promise<Booking> {
+  const bookingId = generateBookingId();
+
+  if (hasSanity) {
+    const doc = await getSanityClient().create({
+      _type: "booking",
+      tenant,
+      bookingId,
+      ...booking,
+      status: "confirmed",
+    });
+
+    return {
+      ...booking,
+      id: bookingId,
+      status: "confirmed",
+      createdAt: doc._createdAt!,
+    };
+  }
+
   const newBooking: Booking = {
     ...booking,
-    id: generateBookingId(),
+    id: bookingId,
     status: "confirmed",
     createdAt: new Date().toISOString(),
   };
-
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:bookings`);
-      const bookings = raw ? (JSON.parse(raw) as Booking[]) : [];
-      bookings.push(newBooking);
-      await redis.set(`${tenant}:bookings`, JSON.stringify(bookings));
-      return newBooking;
-    });
-  }
 
   const store = await readDevContent();
   const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
@@ -349,17 +673,28 @@ export async function updateBooking(
   updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>,
   tenant: string = DEFAULT_TENANT
 ): Promise<Booking | null> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      const raw = await redis.get(`${tenant}:bookings`);
-      if (!raw) return null;
-      const bookings = JSON.parse(raw) as Booking[];
-      const idx = bookings.findIndex((b) => b.id === id);
-      if (idx === -1) return null;
-      bookings[idx] = { ...bookings[idx], ...updates };
-      await redis.set(`${tenant}:bookings`, JSON.stringify(bookings));
-      return bookings[idx];
-    });
+  if (hasSanity) {
+    const query = `*[_type == "booking" && tenant == $tenant && bookingId == $id][0]`;
+    const doc = await getSanityClient().fetch(query, { tenant, id });
+    if (!doc) return null;
+
+    await getSanityClient().patch(doc._id).set(updates).commit();
+    return {
+      id,
+      serviceId: doc.serviceId,
+      serviceName: doc.serviceName,
+      date: doc.date,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      clientName: doc.clientName,
+      clientEmail: doc.clientEmail,
+      clientPhone: doc.clientPhone,
+      notes: doc.notes,
+      status: doc.status,
+      createdAt: doc._createdAt,
+      cancelledAt: doc.cancelledAt,
+      ...updates,
+    };
   }
 
   const store = await readDevContent();
@@ -396,12 +731,10 @@ export async function recordSectionUpdate(
   section: string,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
+  // With Sanity, _updatedAt is automatic — no manual tracking needed
+  if (hasSanity) return;
+
   const now = new Date().toISOString();
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      await redis.hSet(`${tenant}:section-timestamps`, section, now);
-    });
-  }
   const store = await readDevContent();
   const timestamps = (store.__sectionTimestamps as Record<string, string>) ?? {};
   timestamps[section] = now;
@@ -412,11 +745,21 @@ export async function recordSectionUpdate(
 export async function getSectionTimestamps(
   tenant: string = DEFAULT_TENANT
 ): Promise<Record<string, string>> {
-  if (hasRedis) {
-    return withRedis(async (redis) => {
-      return await redis.hGetAll(`${tenant}:section-timestamps`) as Record<string, string>;
-    });
+  if (hasSanity) {
+    // Query _updatedAt from all content documents for this tenant
+    const sections = Object.entries(SECTION_TO_TYPE);
+    const timestamps: Record<string, string> = {};
+
+    for (const [section, type] of sections) {
+      const doc = await getSanityClient().fetch(
+        `*[_type == $type && tenant == $tenant][0]._updatedAt`,
+        { type, tenant }
+      );
+      if (doc) timestamps[section] = doc;
+    }
+    return timestamps;
   }
+
   const store = await readDevContent();
   return (store.__sectionTimestamps as Record<string, string>) ?? {};
 }

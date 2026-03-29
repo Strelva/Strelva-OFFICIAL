@@ -22,7 +22,7 @@ export function Services({ services }: { services: ServicesContent }) {
         {/* Header */}
         <div ref={headerRef} className="reveal mb-10 md:mb-14">
           <div className="grid md:grid-cols-2 gap-6 md:gap-20 items-end">
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]" data-reb-field="headline">
               {services.headline}
             </h2>
             <p

@@ -16,10 +16,10 @@ export function PageCTA({
   return (
     <section className="py-16 md:py-24" style={{ background: "var(--sage)" }}>
       <div className="container-main text-center">
-        <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-6" style={{ color: "var(--pure-white)" }}>
+        <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-6" style={{ color: "var(--pure-white)" }} data-reb-field="heading">
           {heading}
         </h2>
-        <p className="text-base md:text-lg leading-relaxed max-w-md mx-auto mb-8" style={{ color: "rgba(255,255,255,0.8)" }}>
+        <p className="text-base md:text-lg leading-relaxed max-w-md mx-auto mb-8" style={{ color: "rgba(255,255,255,0.8)" }} data-reb-field="description">
           {description}
         </p>
         <Link
