@@ -11,11 +11,10 @@ import {
   User,
   Loader2,
   CheckCircle2,
-  Globe,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import Link from "next/link";
 import { timeAgo } from "@/lib/utils";
+import { useDashboardOptional } from "./DashboardContext";
 
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
@@ -40,6 +39,18 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const prevLoadingRef = useRef(false);
+
+  // Context integration — pre-fill from content cards + refresh iframe
+  const dashCtx = useDashboardOptional();
+
+  // Watch for chatPrompt changes from content card clicks
+  useEffect(() => {
+    if (dashCtx?.chatPrompt) {
+      setInput(dashCtx.chatPrompt);
+      dashCtx.setChatPrompt("");
+      inputRef.current?.focus();
+    }
+  }, [dashCtx?.chatPrompt, dashCtx]);
 
   // Load persisted messages on mount
   useEffect(() => {
@@ -183,6 +194,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       const didUpdate = await checkForSiteUpdate();
       if (didUpdate) {
         setUpdateToast(true);
+        dashCtx?.triggerRefresh();
         setTimeout(() => setUpdateToast(false), 5000);
       }
     } catch {
@@ -212,64 +224,56 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a]">
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#262626]">
-        <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center">
-          <Bot className="w-4 h-4 text-white" />
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-[#e8e8e8] shrink-0">
+        <div className="w-7 h-7 rounded-full bg-[#7c9a8e] flex items-center justify-center">
+          <Bot className="w-[14px] h-[14px] text-white" strokeWidth={1.5} />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-white">
-            Chat with your AI assistant
+          <h2 className="text-[12px] font-medium text-[#1a1a1a]">
+            AI Assistant
           </h2>
-          <p className="text-xs text-zinc-500">
-            Ask me to update your site, add events, change hours, anything.
+          <p className="text-[11px] text-[#999]">
+            Update your site via chat
           </p>
         </div>
       </div>
 
       {/* Update toast */}
       {updateToast && (
-        <div className="mx-4 mt-3 animate-fade-in-up">
-          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600/10 border border-emerald-600/20 rounded-lg">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-sm text-emerald-300 flex-1">
-              Your site has been updated
+        <div className="mx-3 mt-2 animate-fade-in-up">
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <CheckCircle2 className="w-[14px] h-[14px] text-emerald-500 shrink-0" strokeWidth={1.5} />
+            <span className="text-[12px] text-emerald-700">
+              Site updated — check the preview
             </span>
-            <Link
-              href="/dashboard/site"
-              className="flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              <Globe className="w-3 h-3" />
-              View changes
-            </Link>
           </div>
         </div>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
         {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-12 h-12 rounded-lg bg-violet-600/10 flex items-center justify-center mb-4 animate-pulse-gentle">
-              <Bot className="w-6 h-6 text-violet-400" />
+            <div className="w-10 h-10 rounded-lg bg-[#7c9a8e]/[0.06] flex items-center justify-center mb-3">
+              <Bot className="w-5 h-5 text-[#7c9a8e]" strokeWidth={1.5} />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">
-              Hey {ownerName}! What can I help with?
+            <h3 className="text-[13px] font-medium text-[#1a1a1a] mb-1">
+              Hey {ownerName}!
             </h3>
-            <p className="text-sm text-zinc-400 max-w-sm mb-8">
-              I can update your website content, add events, change hours, write
-              copy, and more. Just tell me what you need.
+            <p className="text-[12px] text-[#999] max-w-[240px] mb-6">
+              I can update your site, add events, change hours, and more.
             </p>
-            <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
+            <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
               {QUICK_PROMPTS.map((prompt) => (
                 <button
                   key={prompt.label}
                   onClick={() => handleQuickPrompt(prompt.label)}
-                  className="flex items-center gap-2 px-4 py-3 rounded-md bg-[#141414] border border-[#262626] text-sm text-zinc-300 hover:bg-[#1c1c1c] hover:text-white hover:border-[#333] transition-colors duration-150 text-left"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-[#e8e8e8] text-[11px] text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150 text-left"
                 >
-                  <prompt.icon className="w-4 h-4 text-violet-400 shrink-0" />
-                  <span className="font-mono text-xs">{prompt.label}</span>
+                  <prompt.icon className="w-[14px] h-[14px] text-[#999] shrink-0" strokeWidth={1.5} />
+                  <span>{prompt.label}</span>
                 </button>
               ))}
             </div>
@@ -284,27 +288,27 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
             }`}
           >
             <div
-              className={`flex items-start gap-3 max-w-[85%] ${
+              className={`flex items-start gap-2 max-w-[85%] ${
                 message.role === "user" ? "flex-row-reverse" : "flex-row"
               }`}
             >
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                  message.role === "user" ? "bg-zinc-700" : "bg-violet-600"
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                  message.role === "user" ? "bg-[#f5f5f5]" : "bg-[#7c9a8e]"
                 }`}
               >
                 {message.role === "user" ? (
-                  <User className="w-3.5 h-3.5 text-zinc-300" />
+                  <User className="w-3 h-3 text-[#999]" strokeWidth={1.5} />
                 ) : (
-                  <Bot className="w-3.5 h-3.5 text-white" />
+                  <Bot className="w-3 h-3 text-white" strokeWidth={1.5} />
                 )}
               </div>
               <div className={message.role === "user" ? "text-right" : "text-left"}>
                 <div
-                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                  className={`px-3 py-2 rounded-2xl text-[12px] leading-relaxed ${
                     message.role === "user"
-                      ? "bg-violet-600 text-white"
-                      : "bg-[#141414] text-zinc-200 border border-[#262626]"
+                      ? "bg-[#7c9a8e] text-white"
+                      : "bg-[#f5f5f5] text-[#1a1a1a] border border-[#e8e8e8]"
                   }`}
                 >
                   {message.content ? (
@@ -316,13 +320,12 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     )
                   ) : (
-                    <span className="flex items-center gap-2 py-0.5">
-                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-typing-dot" />
-                      <span className="text-xs text-zinc-500">Thinking</span>
+                    <span className="flex items-center gap-1 py-0.5">
+                      <span className="text-[12px] text-[#999]">...</span>
                     </span>
                   )}
                 </div>
-                <span className="font-mono text-[10px] text-zinc-600 mt-1 block px-1">
+                <span className="font-mono text-[10px] text-[#ccc] mt-0.5 block px-1">
                   {timeAgo(message.timestamp)}
                 </span>
               </div>
@@ -333,14 +336,14 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
 
       {/* Quick prompts when there are messages */}
       {!isEmpty && !isLoading && (
-        <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
           {QUICK_PROMPTS.map((prompt) => (
             <button
               key={prompt.label}
               onClick={() => handleQuickPrompt(prompt.label)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#141414] border border-[#262626] text-xs font-mono text-zinc-400 hover:bg-[#1c1c1c] hover:text-zinc-200 transition-colors duration-150 whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#e8e8e8] text-[11px] text-[#999] hover:bg-[#f5f5f5] hover:text-[#7c9a8e] transition-colors duration-150 whitespace-nowrap shrink-0"
             >
-              <prompt.icon className="w-3 h-3" />
+              <prompt.icon className="w-3 h-3" strokeWidth={1.5} />
               {prompt.label}
             </button>
           ))}
@@ -348,32 +351,32 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-[#262626]">
+      <div className="p-3 border-t border-[#e8e8e8]">
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 bg-[#141414] border border-[#262626] rounded-lg px-4 py-2 focus-within:border-violet-600/50 transition-colors duration-150"
+          className="flex items-center gap-2 bg-white border border-[#e8e8e8] rounded-lg px-3 py-1.5 focus-within:border-[#7c9a8e] focus-within:shadow-[0_0_0_1px_rgba(124,154,142,0.15)] transition-all duration-150"
         >
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Tell me what to update..."
-            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none min-h-[44px]"
+            className="flex-1 bg-transparent text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none h-[44px]"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-all duration-150 shrink-0 ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 shrink-0 ${
               isLoading
-                ? "bg-violet-600 shadow-[0_0_12px_rgba(124,58,237,0.3)]"
-                : "bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-600"
+                ? "bg-[#7c9a8e]"
+                : "bg-[#7c9a8e] hover:bg-[#5a7a6e] disabled:bg-[#e8e8e8]"
             }`}
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 text-white animate-spin" />
+              <Loader2 className="w-[14px] h-[14px] text-white animate-spin" strokeWidth={1.5} />
             ) : (
-              <Send className="w-4 h-4 text-white" />
+              <Send className="w-[14px] h-[14px] text-white" strokeWidth={1.5} />
             )}
           </button>
         </form>

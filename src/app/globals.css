@@ -189,7 +189,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in-up {
-  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fade-in-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 
@@ -214,18 +214,18 @@ body {
 /* REB accent line — visual signature */
 .reb-accent-line {
   height: 2px;
-  background: linear-gradient(90deg, #7c3aed 0%, #6d28d9 50%, transparent 100%);
+  background: linear-gradient(90deg, var(--sage) 0%, var(--sage-dark) 50%, transparent 100%);
 }
 
 /* Subtle grid dot pattern */
 .reb-grid-bg {
-  background-image: radial-gradient(circle, #1c1c1c 1px, transparent 1px);
+  background-image: radial-gradient(circle, var(--cream-mid) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
 /* Vercel-style card glow on hover */
 .reb-card-glow:hover {
-  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15), 0 2px 8px rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 0 1px rgba(124, 154, 142, 0.15), 0 2px 8px rgba(124, 154, 142, 0.08);
 }
 
 /* Hide scrollbar for quick prompts */
@@ -252,12 +252,14 @@ body {
 .chat-markdown code {
   font-family: ui-monospace, monospace;
   font-size: 0.8125rem;
-  background: #1c1c1c;
+  background: var(--cream-dark);
+  color: var(--bark);
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
 }
 .chat-markdown pre {
-  background: #1c1c1c;
+  background: var(--cream-dark);
+  color: var(--bark);
   padding: 0.75rem;
   border-radius: 0.375rem;
   margin-bottom: 0.5rem;
@@ -266,4 +268,41 @@ body {
 .chat-markdown pre code {
   background: transparent;
   padding: 0;
+}
+
+/* ===== DASHBOARD PANEL ANIMATIONS ===== */
+
+/* Panel slide animations */
+@keyframes panel-slide-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes panel-slide-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-panel-left {
+  animation: panel-slide-left 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-panel-right {
+  animation: panel-slide-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Overlay entrance */
+@keyframes overlay-enter {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-overlay-enter {
+  animation: overlay-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Card stagger — use with animation-delay inline styles */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-card-enter {
+  animation: card-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
 }
