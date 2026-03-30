@@ -27,14 +27,9 @@ export function Footer({ settings, contact }: FooterProps) {
               Navigate
             </p>
             <ul className="space-y-3 text-sm opacity-60">
-              <li><Link href="/services" className="hover:opacity-100 transition-opacity">Services</Link></li>
               <li><Link href="/about" className="hover:opacity-100 transition-opacity">About</Link></li>
-              <li><Link href="/events" className="hover:opacity-100 transition-opacity">Events</Link></li>
-              <li><Link href="/providers" className="hover:opacity-100 transition-opacity">Providers</Link></li>
-              <li><Link href="/faq" className="hover:opacity-100 transition-opacity">FAQ</Link></li>
-              <li><Link href="/shop" className="hover:opacity-100 transition-opacity">Shop</Link></li>
               <li><Link href="/contact" className="hover:opacity-100 transition-opacity">Contact</Link></li>
-              <li><Link href="/services#booking" className="hover:opacity-100 transition-opacity">Book Now</Link></li>
+              <li><a href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">Book Now</a></li>
             </ul>
           </div>
 
@@ -44,7 +39,9 @@ export function Footer({ settings, contact }: FooterProps) {
               Connect
             </p>
             <ul className="space-y-3 text-sm opacity-60">
-              <li><a href={`mailto:${contact.email}`} className="hover:opacity-100 transition-opacity">{contact.email}</a></li>
+              {contact.email && (
+                <li><a href={`mailto:${contact.email}`} className="hover:opacity-100 transition-opacity">{contact.email}</a></li>
+              )}
               {contact.phone && (
                 <li><a href={`tel:${contact.phone}`} className="hover:opacity-100 transition-opacity">{contact.phone}</a></li>
               )}

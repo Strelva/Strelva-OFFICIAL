@@ -1,22 +1,47 @@
 "use client";
 
-import { useReveal } from "@/hooks/useReveal";
+import { useRef, useEffect } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "@/lib/lenis";
 import type { ContactContent } from "@/lib/types";
 
 export function Contact({ contact }: { contact: ContactContent }) {
-  const sectionRef = useReveal();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const ctx = gsap.context(() => {
+      const animateEls = el.querySelectorAll("[data-contact-animate]");
+      if (animateEls.length) {
+        gsap.from(animateEls, {
+          opacity: 0,
+          y: 20,
+          stagger: 0.1,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: { trigger: animateEls[0], start: "top 80%", once: true },
+        });
+      }
+    }, el);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
     <section
       id="contact"
+      ref={sectionRef}
       className="py-14 md:py-20"
       style={{ background: "var(--cream)" }}
     >
       <div className="container-main">
-        <div ref={sectionRef} className="reveal">
+        <div>
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
             {/* Left */}
-            <div>
+            <div data-contact-animate>
               <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-4">
                 Get in touch.
               </h2>
@@ -24,29 +49,31 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 className="text-base leading-relaxed max-w-sm mb-10"
                 style={{ color: "var(--bark-light)" }}
               >
-                Questions about assisted stretching? Want to learn more before booking? I&apos;d love to hear from you.
+                Have questions? Want to learn more before booking? We&apos;d love to hear from you.
               </p>
 
               {/* Email */}
-              <a
-                href={`mailto:${contact.email}`}
-                className="group flex items-center gap-4 mb-4"
-              >
-                <div
-                  className="flex h-10 w-10 items-center justify-center transition-colors"
-                  style={{ background: "var(--cream-dark)" }}
+              {contact.email && (
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="group flex items-center gap-4 mb-4"
                 >
-                  <svg className="h-4 w-4" style={{ color: "var(--bark-faded)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <span
-                  className="text-sm font-medium group-hover:opacity-60 transition-opacity"
-                  style={{ color: "var(--bark)" }}
-                >
-                  {contact.email}
-                </span>
-              </a>
+                  <div
+                    className="flex h-10 w-10 items-center justify-center transition-colors"
+                    style={{ background: "var(--cream-dark)" }}
+                  >
+                    <svg className="h-4 w-4" style={{ color: "var(--bark-faded)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span
+                    className="text-sm font-medium group-hover:opacity-60 transition-opacity"
+                    style={{ color: "var(--bark)" }}
+                  >
+                    {contact.email}
+                  </span>
+                </a>
+              )}
 
               {/* Phone */}
               {contact.phone && (
@@ -109,13 +136,13 @@ export function Contact({ contact }: { contact: ContactContent }) {
             </div>
 
             {/* Right — Location */}
-            <div className="flex flex-col gap-6">
+            <div data-contact-animate className="flex flex-col gap-6">
               <div
                 className="p-10 md:p-14"
                 style={{ background: "var(--cream-dark)" }}
               >
                 <h3 className="font-display text-3xl md:text-4xl tracking-tight mb-4">
-                  {contact.locationTitle.split("\n").map((line, i) => (
+                  {(contact.locationTitle || "Visit Us").split("\n").map((line, i) => (
                     <span key={i}>
                       {i > 0 && <br />}
                       {line}

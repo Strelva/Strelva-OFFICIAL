@@ -47,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
       "geo.placename": "Williamsville",
     },
     alternates: {
-      canonical: "/",
+      canonical: process.env.NEXT_PUBLIC_SITE_URL || "https://rohlaxwellness.com",
     },
   };
 }

@@ -20,14 +20,15 @@ import { PageHeader } from "./PageHeader";
 import { InstagramFeed } from "./InstagramFeed";
 import { VagaroEmbed } from "./VagaroEmbed";
 import { NewsletterSignup } from "./NewsletterSignup";
+import { SectionErrorBoundary } from "./SectionErrorBoundary";
 
 // Which content keys each section type needs
 const SECTION_CONTENT_KEYS: Record<string, ContentSection[]> = {
   hero: ["hero", "settings"],
   services: ["services"],
-  story: ["story"],
+  story: ["story", "settings"],
   testimonials: ["testimonials"],
-  events: ["events"],
+  events: ["events", "settings"],
   providers: ["providers", "settings"],
   contact: ["contact"],
   faq: ["faq"],
@@ -92,11 +93,14 @@ function buildSectionProps(
     case "services":
       return { services: content.services };
     case "story":
-      return { story: content.story };
+      return {
+        story: content.story,
+        ownerName: (content.settings as Record<string, unknown>)?.ownerName,
+      };
     case "testimonials":
       return { testimonials: content.testimonials };
     case "events":
-      return { events: content.events };
+      return { events: content.events, settings: content.settings };
     case "providers":
       return {
         providers: content.providers,
@@ -132,7 +136,7 @@ function buildSectionProps(
     case "instagram-feed": {
       const settings = content.settings as Record<string, unknown>;
       return {
-        handle: (settings?.instagramHandle as string) || "rohlaxwellness",
+        handle: (settings?.instagramHandle as string) || "",
         posts: (customProps?.posts as string[]) || undefined,
       };
     }
@@ -198,11 +202,22 @@ export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRen
     pageConfig = DEFAULT_PAGE_CONFIG;
   }
 
-  const page = pageConfig[pageSlug] || DEFAULT_PAGE_CONFIG[pageSlug];
-  if (!page) return null;
+  const storedPage = pageConfig[pageSlug];
+  const defaultPage = DEFAULT_PAGE_CONFIG[pageSlug];
+  if (!storedPage && !defaultPage) return null;
+
+  // Merge: use stored config but add any new default sections not present
+  let pageSections = (storedPage || defaultPage)!.sections;
+  if (storedPage && defaultPage) {
+    const storedTypes = new Set(storedPage.sections.map((s) => s.type));
+    const newDefaults = defaultPage.sections.filter((s) => !storedTypes.has(s.type));
+    if (newDefaults.length > 0) {
+      pageSections = [...storedPage.sections, ...newDefaults];
+    }
+  }
 
   // Get visible sections sorted by order
-  const visibleSections = page.sections
+  const visibleSections = pageSections
     .filter((s) => s.visible)
     .sort((a, b) => a.order - b.order);
 
@@ -243,7 +258,9 @@ export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRen
             data-reb-editable={editableSection || undefined}
             data-reb-label={SECTION_LABELS[sectionConfig.type]}
           >
-            <Component {...props} />
+            <SectionErrorBoundary>
+              <Component {...props} />
+            </SectionErrorBoundary>
           </div>
         );
       })}

@@ -182,11 +182,47 @@ export function ActivityTimeline() {
 
       {/* Timeline */}
       {loading ? (
-        <div className="text-[11px] text-[#ccc] py-4 text-center">Loading...</div>
-      ) : entries.length === 0 ? (
-        <div className="text-[11px] text-[#ccc] py-4 text-center">
-          {hasActiveFilters ? "No matching activity" : "No activity yet"}
+        <div className="py-4 space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-3 animate-pulse">
+              <div className="w-5 h-5 rounded-full bg-[#f0f0f0] shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-2.5 bg-[#f0f0f0] rounded w-3/4" />
+                <div className="h-2 bg-[#f5f5f5] rounded w-1/2" />
+              </div>
+            </div>
+          ))}
         </div>
+      ) : entries.length === 0 ? (
+        hasActiveFilters ? (
+          <div className="py-6 text-center">
+            <p className="text-[11px] text-[#bbb]">No matching activity</p>
+          </div>
+        ) : (
+          <div className="py-4">
+            <div className="space-y-3">
+              {[
+                { step: 1, label: "Share your site link", detail: "Send it to friends, add it to Instagram bio", done: false },
+                { step: 2, label: "Get your first visitor", detail: "We'll track every person who finds you", done: false },
+                { step: 3, label: "See your first booking click", detail: "Know exactly when someone clicks Book Now", done: false },
+              ].map((item) => (
+                <div key={item.step} className="flex items-start gap-3 px-1">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-semibold ${
+                    item.done
+                      ? "bg-[#7c9a8e] text-white"
+                      : "bg-[#f5f5f5] text-[#999]"
+                  }`}>
+                    {item.done ? "\u2713" : item.step}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[11px] font-medium text-[#1a1a1a]">{item.label}</p>
+                    <p className="text-[10px] text-[#bbb] mt-0.5">{item.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).map(([day, items]) => (

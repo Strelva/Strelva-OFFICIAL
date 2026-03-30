@@ -59,6 +59,35 @@ body {
   color: var(--cream);
 }
 
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cream-mid);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bark-faded);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cream-mid) transparent;
+}
+
+/* Focus-visible — sage ring, not browser default */
+:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ===== TYPOGRAPHY ===== */
 .font-display {
   font-family: var(--font-display), Georgia, serif;
@@ -193,6 +222,16 @@ body {
   opacity: 0;
 }
 
+/* Overview panel entrance — slightly more dramatic with scale */
+@keyframes overview-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-overview-enter {
+  animation: overview-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
 /* Gentle pulse for bot icon in empty state */
 @keyframes pulse-gentle {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -307,6 +346,22 @@ body {
   opacity: 0;
 }
 
+/* ===== PAGE TRANSITIONS ===== */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-enter {
+  animation: page-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-enter {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* =============================================
    Edit Mode — Visual Builder Overlays
    ============================================= */
@@ -352,4 +407,19 @@ body {
   font-family: system-ui, sans-serif;
   line-height: 1;
   white-space: nowrap;
+}
+
+/* ===== CTA HOVER MICRO-INTERACTION ===== */
+a[href*="booking"], a[href*="services#booking"],
+.cta-primary {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+a[href*="booking"]:hover, a[href*="services#booking"]:hover,
+.cta-primary:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 20px rgba(124, 154, 142, 0.15);
+}
+a[href*="booking"]:active, a[href*="services#booking"]:active,
+.cta-primary:active {
+  transform: scale(0.98);
 }

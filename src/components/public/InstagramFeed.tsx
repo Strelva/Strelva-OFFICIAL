@@ -20,6 +20,9 @@ interface InstagramFeedProps {
  * The AI agent can do this via chat: "update my Instagram posts on the homepage"
  */
 export function InstagramFeed({ handle, posts }: InstagramFeedProps) {
+  // No handle configured — skip entire section
+  if (!handle) return null;
+
   // No posts configured — show a CTA to the Instagram profile
   if (!posts || posts.length === 0) {
     return (

@@ -66,7 +66,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
       <div ref={imageRef} className="absolute inset-0" style={{ willChange: "transform" }}>
         <Image
           src={hero.backgroundImageUrl || "/images/chelsea/studio-wide.webp"}
-          alt=""
+          alt="Rohlax Wellness studio"
           fill
           className="object-cover"
           sizes="100vw"
@@ -100,7 +100,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
               className="font-display text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight leading-[0.92] mb-6"
               style={{ color: "var(--cream)" }}
             >
-              {hero.headline.split("\n").map((line, i) => (
+              {(hero.headline || "").split("\n").map((line, i) => (
                 <span key={i}>
                   {i > 0 && <br />}
                   {line}

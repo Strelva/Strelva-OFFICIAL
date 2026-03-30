@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, ChevronDown as MoveDown, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { ChevronDown, ChevronRight, ChevronUp, ChevronDown as MoveDown, Trash2, Upload, X } from "lucide-react";
+import Image from "next/image";
 import type { ArrayFieldDef, ArraySectionConfig } from "./arrayFieldConfigs";
 
 interface ArrayItemCardProps {
@@ -20,6 +21,61 @@ interface ArrayItemCardProps {
 const INPUT_CLASS =
   "w-full bg-[#fafafa] border border-[#e8e8e8] rounded-md px-3 py-2 text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150";
 
+function ImageField({ value, onChange }: { value: unknown; onChange: (val: unknown) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const url = value as string;
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (res.ok) {
+        const { url } = await res.json();
+        onChange(url);
+      }
+    } catch {} finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      {url ? (
+        <div className="relative inline-block">
+          <Image src={url} alt="" width={80} height={80} className="w-20 h-20 object-cover rounded-lg border border-[#e8e8e8]" />
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#b5634b] text-white flex items-center justify-center hover:bg-[#943a24] transition-colors"
+          >
+            <X className="w-3 h-3" strokeWidth={2} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[#e8e8e8] text-[11px] text-[#999] hover:border-[#7c9a8e] hover:text-[#7c9a8e] transition-colors"
+        >
+          <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
+          {uploading ? "Uploading..." : "Upload photo"}
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+      />
+    </div>
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -29,6 +85,10 @@ function FieldInput({
   value: unknown;
   onChange: (val: unknown) => void;
 }) {
+  if (field.type === "image") {
+    return <ImageField value={value} onChange={onChange} />;
+  }
+
   if (field.type === "toggle") {
     return (
       <button

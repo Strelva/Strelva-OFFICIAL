@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useReveal } from "@/hooks/useReveal";
+import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
 import type { ShopContent, ShopItem } from "@/lib/types";
 
@@ -12,18 +14,52 @@ const CATEGORY_LABELS: Record<ShopItem["category"], string> = {
 };
 
 export function Shop({ shop }: { shop: ShopContent }) {
-  const sectionRef = useReveal();
+  const sectionRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<ShopItem["category"] | "all">("all");
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const ctx = gsap.context(() => {
+      const heading = el.querySelector("[data-shop-heading]");
+      if (heading) {
+        gsap.from(heading, {
+          opacity: 0,
+          y: 20,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: { trigger: heading, start: "top 80%", once: true },
+        });
+      }
+
+      const cards = el.querySelectorAll("[data-shop-card]");
+      if (cards.length) {
+        gsap.from(cards, {
+          opacity: 0,
+          y: 20,
+          stagger: 0.08,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: { trigger: cards[0], start: "top 80%", once: true },
+        });
+      }
+    }, el);
+
+    return () => ctx.revert();
+  }, []);
 
   const categories = Array.from(new Set(shop.items.map((i) => i.category)));
   const filtered = filter === "all" ? shop.items : shop.items.filter((i) => i.category === filter);
 
   return (
-    <section id="shop" className="py-14 md:py-20" style={{ background: "var(--cream)" }}>
+    <section id="shop" ref={sectionRef} className="py-14 md:py-20" style={{ background: "var(--cream)" }}>
       <div className="container-main">
-        <div ref={sectionRef} className="reveal">
+        <div>
           {shop.description && (
             <p
+              data-shop-heading
               className="text-base leading-relaxed max-w-2xl mb-10"
               style={{ color: "var(--bark-light)" }}
             >
@@ -75,16 +111,19 @@ export function Shop({ shop }: { shop: ShopContent }) {
               {filtered.map((item) => (
                 <div
                   key={item.id}
+                  data-shop-card
                   className="flex flex-col"
                   style={{ background: "var(--cream-dark)" }}
                 >
                   {/* Image placeholder */}
                   {item.image_url ? (
-                    <div className="aspect-square overflow-hidden">
-                      <img
+                    <div className="aspect-square overflow-hidden relative">
+                      <Image
                         src={item.image_url}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                       />
                     </div>
                   ) : (

@@ -1,9 +1,11 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import Image from "next/image";
-import { useReveal } from "@/hooks/useReveal";
+import gsap from "gsap";
+import { ScrollTrigger } from "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
-import type { EventsContent, EventItem } from "@/lib/types";
+import type { EventsContent, EventItem, SiteSettings } from "@/lib/types";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T00:00:00");
@@ -30,15 +32,48 @@ const HOST_LABELS: Record<EventItem["hosted_by"], string> = {
   community: "Community Event",
 };
 
-export function Events({ events }: { events: EventsContent }) {
-  const sectionRef = useReveal();
+export function Events({ events, settings }: { events: EventsContent; settings?: SiteSettings }) {
+  const sectionRef = useRef<HTMLElement>(null);
   const upcomingEvents = events.events.filter((e) => isUpcoming(e.date));
 
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const ctx = gsap.context(() => {
+      const heading = el.querySelector("[data-events-heading]");
+      if (heading) {
+        gsap.from(heading, {
+          opacity: 0,
+          y: 20,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: { trigger: heading, start: "top 80%", once: true },
+        });
+      }
+
+      const cards = el.querySelectorAll("[data-event-card]");
+      if (cards.length) {
+        gsap.from(cards, {
+          opacity: 0,
+          y: 20,
+          stagger: 0.08,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: { trigger: cards[0], start: "top 80%", once: true },
+        });
+      }
+    }, el);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section id="events" className="py-14 md:py-20" style={{ background: "var(--cream)" }}>
+    <section id="events" ref={sectionRef} className="py-14 md:py-20" style={{ background: "var(--cream)" }}>
       <div className="container-main">
-        <div ref={sectionRef} className="reveal">
-          <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-4">
+        <div>
+          <h2 data-events-heading className="font-display text-4xl md:text-5xl tracking-tight mb-4">
             {events.headline}
           </h2>
 
@@ -50,13 +85,13 @@ export function Events({ events }: { events: EventsContent }) {
               <p className="text-sm" style={{ color: "var(--bark-faded)" }}>
                 Follow{" "}
                 <a
-                  href="https://instagram.com/rohlaxwellness"
+                  href={`https://instagram.com/${settings?.instagramHandle || "rohlaxwellness"}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium transition-opacity hover:opacity-60"
                   style={{ color: "var(--sage)" }}
                 >
-                  @rohlaxwellness
+                  @{settings?.instagramHandle || "rohlaxwellness"}
                 </a>{" "}
                 for updates on upcoming events and workshops.
               </p>
@@ -68,6 +103,7 @@ export function Events({ events }: { events: EventsContent }) {
                 .map((event) => (
                   <div
                     key={event.id}
+                    data-event-card
                     className={`grid ${event.image_url ? "md:grid-cols-[160px_140px_1fr_auto]" : "md:grid-cols-[140px_1fr_auto]"} gap-4 md:gap-8 p-6 md:p-8 items-center overflow-hidden`}
                     style={{ background: "var(--cream-dark)" }}
                   >

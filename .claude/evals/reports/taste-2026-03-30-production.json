@@ -1,0 +1,58 @@
+{
+  "url": "rohlax-wellness.vercel.app (production)",
+  "timestamp": "2026-03-30T19:36:00Z",
+  "overall": 58,
+  "previous_overall": 57,
+  "delta": 1,
+  "note": "First eval against production deployment. Scores largely match localhost eval from earlier today — validates that deployed site matches dev.",
+  "dimensions": {
+    "hierarchy": { "score": 60, "previous": 58, "delta": 2, "evidence": "Homepage: H1 88px serif dominates, sage CTA clear primary, subtitle well-receded. Services: 'Most Popular' badge + featured card layout creates clear priority. About: image + stats create strong visual path. Contact: redundant 'Get in touch' H1 + H2.", "prescription": "Contact page: differentiate H1 from H2 — H1 should be the emotional hook, H2 the functional label" },
+    "breathing_room": { "score": 62, "previous": 60, "delta": 2, "evidence": "Homepage: generous 80-112px section padding, hero has room to breathe. Services: featured card has good internal padding, secondary cards well-spaced. About: photo-to-text spacing balanced. Footer: 3-column with adequate margins.", "prescription": "Services secondary cards could use slightly more vertical gap between them" },
+    "contrast": { "score": 55, "previous": 52, "delta": 3, "evidence": "Homepage: sage CTA on cream works, bark text on cream high contrast, trust strip legible. Services: price/duration tags clear. About: stat numbers (10+, 1:1) pop with serif weight. Weakness: nav items all same weight, no active-state differentiation on desktop.", "prescription": "Add font-weight or underline to active nav item on desktop — currently no visual indication which page you're on" },
+    "polish": { "score": 48, "previous": 45, "delta": 3, "evidence": "Homepage: GSAP parallax hero, staggered fade-in-up, custom ::selection, prefers-reduced-motion. About page image NOW WORKING (was broken grey rectangle). Services booking widget with stars. API/track endpoint throwing 500 on every page load. Clerk loaded in dev mode on production.", "prescription": "Fix /api/track 500 error — visible in console on every page. Switch Clerk to production keys." },
+    "emotional_tone": { "score": 52, "previous": 48, "delta": 4, "evidence": "Homepage: 'Move Better. Feel Better. Live Better.' has great rhythm. Real testimonial. Instagram CTA feels personal. About: Chelsea's story is authentic — burnout, pivot, purpose. 'Your presence is your power' quote anchors it. Contact: hours + embedded map feel complete and trustworthy.", "prescription": "Homepage Instagram section feels thin — just a link. Show 2-3 actual Instagram photos to build emotional connection" },
+    "information_density": { "score": 56, "previous": 53, "delta": 3, "evidence": "Homepage: appropriate — hero sparse, trust strip dense but scannable. Services: excellent density — featured card with full details, secondary cards with price/duration/audience. Contact: good balance of info + map. FAQ page content not evaluated but nav-reachable.", "prescription": "Homepage could benefit from a 'Why stretching?' educational snippet between trust strip and CTA" },
+    "wayfinding": { "score": 58, "previous": 55, "delta": 3, "evidence": "Every page ends with 'Ready to feel better?' CTA — no dead ends. 8-item nav reaches all pages. Footer duplicates full nav + contact. Services active state visible. Skip-to-content link present. Weakness: no breadcrumbs, active nav state subtle.", "prescription": "Bold or underline current page in nav — currently relies only on text-transform which is subtle" },
+    "distinctiveness": { "score": 38, "previous": 35, "delta": 3, "evidence": "Public site: Instrument Serif + cream/sage/bark palette is ownable. Real hero photo of studio (not stock). Trust strip with real credentials. About page photo is Chelsea herself. But: inner pages (Services, Contact, FAQ) feel like well-executed template — grid cards, standard layout patterns.", "prescription": "Services page needs one Chelsea-specific visual element — a photo of her working with a client, or the studio space. Currently all text, no imagery." },
+    "scroll_experience": { "score": 50, "previous": 48, "delta": 2, "evidence": "Homepage: 5 sections (hero, trust strip, testimonial, Instagram, CTA) — variety exists but total scroll is short. GSAP ScrollTrigger active. Services page has best depth — featured card, service grid, booking widget, testimonials. About has nice photo-to-text reveal.", "prescription": "Homepage needs 1-2 more content blocks — a brief 'How it works' or 'Who it's for' section between trust strip and testimonial" },
+    "layout_coherence": { "score": 63, "previous": 62, "delta": 1, "evidence": "Consistent max-width container across all pages. Header/footer shared. Section padding follows 80/96/112px scale. Services uses 2-column featured + card grid. About uses 2-column photo + text. Contact uses 2-column info + map. All stack cleanly on mobile 390px.", "prescription": "Minor: Services secondary cards use slightly different internal padding than featured card — normalize the padding scale" },
+    "information_architecture": { "score": 65, "previous": 63, "delta": 2, "evidence": "8 nav items all reachable, all return 200. Logical grouping: Services, About, Events, Providers, FAQ, Shop, Contact, Book Now. Book Now links to /services#booking (not a separate page — smart). Per-page titles set correctly. No orphan routes found. No dead links detected in production.", "prescription": "Consider grouping Events + Providers under an 'Explore' dropdown — 8 top-level items is at Hick's law threshold" }
+  },
+  "gates": { "layout_coherence": 63, "information_architecture": 65, "capped": false },
+  "slop": { "verdict": "crafted", "signals": 0, "evidence": ["Custom cream/sage/bark/blush/terra palette", "Instrument Serif + Inter pairing", "Real Chelsea photo in hero and about", "Real studio photo", "GSAP animations with a11y check", "Custom ::selection styling", "Real Vagaro reviews", "Google Maps embed with real address"], "cap_applied": null },
+  "gestalt": {
+    "see": "Full-bleed studio photo with warm cream overlay, large serif 'Move Better' headline dominates left half, sage 'Book a Session' CTA. Immediate clarity: this is a wellness business in a real space.",
+    "feel": "Warm, personal, trustworthy. Feels like a real person's business, not a template. The serif + cream palette signals 'premium wellness' without being cold or corporate.",
+    "wrong": "/api/track 500 error in console on every page. Nav has 8 items with no visual active state on desktop. Homepage scroll is short — only 5 sections before footer."
+  },
+  "caps_applied": ["early stage cap 80", "partially calibrated: uncalibrated dimensions noted"],
+  "first_eval_penalty": false,
+  "confidence": "medium — first production eval, partially calibrated (2/3), previous localhost evals provide baseline",
+  "flows_findings": {
+    "errors": [
+      { "severity": "major", "finding": "/api/track returns 500 on every page load — analytics tracking broken in production" },
+      { "severity": "minor", "finding": "Clerk loaded with development keys on production deployment (console warning)" }
+    ],
+    "accessibility": {
+      "landmarks": "PASS — main, nav, header, footer all present",
+      "heading_hierarchy": "PASS — H1 88px > H2 48px > H3, no inversions",
+      "images_alt": "FAIL — hero image missing alt text (studio-wide.webp)",
+      "click_targets": "WARNING — 21/27 interactive elements under 44px height (nav links at 36px, footer links smaller)",
+      "form_labels": "PASS — no forms on homepage"
+    },
+    "mobile": {
+      "hamburger_menu": "PRESENT — collapses to burger + Book Now CTA",
+      "hero_responsive": "CTAs stack vertically, text scales down, image fills viewport",
+      "no_horizontal_scroll": "PASS"
+    }
+  },
+  "product_intelligence": {
+    "feature_context": { "delivers": "credible web presence for local wellness business", "for": "Chelsea Rohl (solo practitioner) and her potential clients", "stage": "live production" },
+    "opportunities": [
+      { "signal": "strong", "type": "conversion", "finding": "Book a Session CTA appears 3x (hero, nav, every page footer) — good repetition" },
+      { "signal": "strong", "type": "trust", "finding": "Real testimonials, real photo, real address with map — trust signals are genuine" },
+      { "signal": "moderate", "type": "gap", "finding": "No imagery on Services page — all text descriptions of physical services. A photo of a stretch session would dramatically increase conversion." },
+      { "signal": "moderate", "type": "gap", "finding": "Instagram section is just a link — no preview content. Missed opportunity to show social proof visually." }
+    ]
+  }
+}

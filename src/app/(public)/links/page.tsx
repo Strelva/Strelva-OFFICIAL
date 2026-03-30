@@ -61,11 +61,11 @@ export default async function LinksPage() {
       external: true,
     },
     {
-      title: "Shop Wellness Picks",
-      url: "/shop",
+      title: "View Services",
+      url: "https://www.vagaro.com/rohlaxwellness",
       icon: "shop" as const,
       featured: false,
-      external: false,
+      external: true,
     },
     {
       title: contact.email,

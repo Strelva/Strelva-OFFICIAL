@@ -126,7 +126,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
             {reviewCount && reviewCount > 0 && (
               <div className="flex items-center justify-center gap-3 mb-6">
                 <span className="text-[0.625rem] font-bold tracking-widest uppercase" style={{ color: "var(--sage)" }}>
-                  5.0 Rating · {reviewCount} reviews
+                  Highly Rated · {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
                 </span>
                 <div className="flex gap-0.5">
                   {[1,2,3,4,5].map((i) => (

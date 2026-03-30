@@ -342,35 +342,7 @@ export const defaultShop: ShopContent = {
   sectionLabel: "Shop",
   headline: "Chelsea's Picks",
   description: "Products I personally use and recommend to support your wellness between sessions.",
-  items: [
-    {
-      id: "shop-1",
-      name: "TheraBand Stretch Strap",
-      description: "My go-to recommendation for at-home stretching. Multiple loops let you gradually deepen your stretch safely.",
-      category: "recommended",
-      price: "15",
-      external_link: "https://www.amazon.com/dp/B000KGOMBC",
-      image_url: "",
-    },
-    {
-      id: "shop-2",
-      name: "Rohlax Wellness Tee",
-      description: "Soft, comfortable, and perfect for your stretch sessions. Rep the brand that keeps you moving.",
-      category: "merch",
-      price: "30",
-      external_link: "",
-      image_url: "",
-    },
-    {
-      id: "shop-3",
-      name: "Massage Gun — Deep Tissue",
-      description: "The same massage gun I use at the end of every session. Great for at-home recovery between appointments.",
-      category: "tools",
-      price: "80",
-      external_link: "https://www.amazon.com/dp/B09MVYCTP4",
-      image_url: "",
-    },
-  ],
+  items: [],
 };
 
 export const defaults: ContentMap = {

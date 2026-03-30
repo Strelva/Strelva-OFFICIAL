@@ -21,6 +21,7 @@ interface BookingItem {
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
   const today = new Date().toISOString().slice(0, 10);
@@ -36,7 +37,9 @@ export default function BookingsPage() {
         const data = await res.json();
         setBookings(data);
       }
-    } catch {} finally {
+    } catch {
+      setError("Failed to load bookings");
+    } finally {
       setLoading(false);
     }
   }
@@ -53,7 +56,10 @@ export default function BookingsPage() {
           prev.map((b) => (b.id === id ? { ...b, status } : b))
         );
       }
-    } catch {}
+    } catch {
+      setError("Failed to update booking status");
+      setTimeout(() => setError(null), 3000);
+    }
   }
 
   const filtered = bookings.filter((b) => {
@@ -98,6 +104,13 @@ export default function BookingsPage() {
         <h1 className="text-2xl font-semibold text-[#1a1a1a] tracking-tight">Bookings</h1>
         <p className="text-sm text-[#999] mt-1">Manage your appointment schedule</p>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-red-600/5 border border-red-200 text-sm text-red-600">
+          {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">

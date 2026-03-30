@@ -1,13 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { useReveal } from "@/hooks/useReveal";
+import { useState, useRef, useEffect } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "@/lib/lenis";
 
 export function NewsletterSignup() {
-  const sectionRef = useReveal();
+  const sectionRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const content = contentRef.current;
+    if (!section || !content) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const ctx = gsap.context(() => {
+      const elements = content.querySelectorAll("[data-newsletter-animate]");
+      gsap.from(elements, {
+        opacity: 0,
+        y: 20,
+        duration: 0.7,
+        ease: "power3.out",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: section,
+          start: "top 85%",
+          once: true,
+        },
+      });
+    }, section);
+
+    return () => ctx.revert();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +61,7 @@ export function NewsletterSignup() {
 
       setStatus("success");
       setEmail("");
+      setTimeout(() => setStatus("idle"), 8000);
     } catch {
       setStatus("error");
       setErrorMsg("Something went wrong. Please try again.");
@@ -41,19 +70,22 @@ export function NewsletterSignup() {
 
   return (
     <section
+      ref={sectionRef}
       id="newsletter"
       className="py-14 md:py-20"
       style={{ background: "var(--cream-dark)" }}
     >
       <div className="container-main">
-        <div ref={sectionRef} className="reveal max-w-xl mx-auto text-center">
+        <div ref={contentRef} className="max-w-xl mx-auto text-center">
           <h2
+            data-newsletter-animate
             className="font-display text-3xl md:text-4xl tracking-tight mb-3"
             style={{ color: "var(--bark)" }}
           >
             Stay in the loop.
           </h2>
           <p
+            data-newsletter-animate
             className="text-sm leading-relaxed mb-8"
             style={{ color: "var(--bark-light)" }}
           >
@@ -68,7 +100,7 @@ export function NewsletterSignup() {
               You&apos;re in! We&apos;ll keep you updated.
             </p>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+            <form data-newsletter-animate onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
               <input
                 type="email"
                 required

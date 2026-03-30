@@ -13,7 +13,7 @@ interface BottomToolbarProps {
 }
 
 export function BottomToolbar({ siteName }: BottomToolbarProps) {
-  const { setOverlayView, editMode, setEditMode } = useDashboard();
+  const { overlayView, setOverlayView, editMode, setEditMode } = useDashboard();
 
   return (
     <div className="hidden md:flex items-center justify-between px-4 h-9 border-t border-[#e8e8e8] bg-white shrink-0">
@@ -57,7 +57,9 @@ export function BottomToolbar({ siteName }: BottomToolbarProps) {
       <div className="flex items-center gap-0.5">
         <button
           onClick={() => setOverlayView("overview")}
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono text-[#999] hover:text-[#1a1a1a] transition-colors duration-150"
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono transition-colors duration-150 ${
+            overlayView === "overview" ? "text-[#7c9a8e] font-medium" : "text-[#999] hover:text-[#1a1a1a]"
+          }`}
         >
           <LayoutDashboard className="w-3 h-3" strokeWidth={1.5} />
           Overview
@@ -65,7 +67,9 @@ export function BottomToolbar({ siteName }: BottomToolbarProps) {
         <span className="text-[10px] text-[#e8e8e8]">&middot;</span>
         <button
           onClick={() => setOverlayView("bookings")}
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono text-[#999] hover:text-[#1a1a1a] transition-colors duration-150"
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono transition-colors duration-150 ${
+            overlayView === "bookings" ? "text-[#7c9a8e] font-medium" : "text-[#999] hover:text-[#1a1a1a]"
+          }`}
         >
           <CalendarDays className="w-3 h-3" strokeWidth={1.5} />
           Bookings
@@ -73,7 +77,9 @@ export function BottomToolbar({ siteName }: BottomToolbarProps) {
         <span className="text-[10px] text-[#e8e8e8]">&middot;</span>
         <button
           onClick={() => setOverlayView("settings")}
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono text-[#999] hover:text-[#1a1a1a] transition-colors duration-150"
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono transition-colors duration-150 ${
+            overlayView === "settings" ? "text-[#7c9a8e] font-medium" : "text-[#999] hover:text-[#1a1a1a]"
+          }`}
         >
           <Settings className="w-3 h-3" strokeWidth={1.5} />
           Settings

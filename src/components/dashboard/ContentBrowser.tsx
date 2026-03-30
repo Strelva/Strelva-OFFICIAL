@@ -27,6 +27,7 @@ import {
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
 import type { PageSectionConfig, SitePageConfig } from "@/lib/types";
+import { DEFAULT_PAGE_CONFIG } from "@/lib/pageConfigDefaults";
 
 const SECTION_ICONS: Record<string, LucideIcon> = {
   hero: Sparkles,
@@ -70,12 +71,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 const PAGE_OPTIONS = [
   { id: "home", label: "Home" },
-  { id: "services", label: "Services" },
   { id: "about", label: "About" },
-  { id: "events", label: "Events" },
-  { id: "providers", label: "Providers" },
-  { id: "faq", label: "FAQ" },
-  { id: "shop", label: "Shop" },
   { id: "contact", label: "Contact" },
 ];
 
@@ -114,13 +110,30 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   const [activePage, setActivePage] = useState("home");
   const [pageConfig, setPageConfig] = useState<SitePageConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   useEffect(() => {
     fetch("/api/page-config", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (data) setPageConfig(data); })
-      .catch(() => {});
+      .then((data) => {
+        if (!data) { setPageConfig(DEFAULT_PAGE_CONFIG); return; }
+        // Merge stored config with defaults — add new default sections not yet in stored config
+        const merged = { ...DEFAULT_PAGE_CONFIG };
+        for (const page of Object.keys(merged) as Array<keyof typeof merged>) {
+          const stored = data[page];
+          const defaults = DEFAULT_PAGE_CONFIG[page];
+          if (stored && defaults) {
+            const storedTypes = new Set(stored.sections.map((s: PageSectionConfig) => s.type));
+            const newDefaults = defaults.sections.filter((s) => !storedTypes.has(s.type));
+            merged[page] = { sections: [...stored.sections, ...newDefaults] };
+          } else if (stored) {
+            merged[page] = stored;
+          }
+        }
+        setPageConfig(merged);
+      })
+      .catch(() => { setPageConfig(DEFAULT_PAGE_CONFIG); });
   }, []);
 
   useEffect(() => {
@@ -139,7 +152,10 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         body: JSON.stringify(config),
       });
       triggerRefresh();
-    } catch {}
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    }
     setSaving(false);
   }, [triggerRefresh]);
 
@@ -251,6 +267,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
           <div className="flex items-center gap-1">
             {saving && (
               <span className="text-[9px] font-mono text-[#7c9a8e] animate-pulse">saving</span>
+            )}
+            {saveError && (
+              <span className="text-[9px] font-mono text-[#b5634b]">save failed</span>
             )}
             <button
               onClick={toggleLeft}

@@ -6,23 +6,31 @@ import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
-  const [settings, services, contact, events, faq, shop, bookingClicks] = await Promise.all([
+  const [settings, services, contact, events, faq, shop, hero, story, testimonials, providers, bookingClicks] = await Promise.all([
     getContent("settings", tenant),
     getContent("services", tenant),
     getContent("contact", tenant),
     getContent("events", tenant),
     getContent("faq", tenant),
     getContent("shop", tenant),
+    getContent("hero", tenant),
+    getContent("story", tenant),
+    getContent("testimonials", tenant),
+    getContent("providers", tenant),
     getClickCounts("booking-click", tenant),
   ]);
 
   const serviceList = services.services
-    .map((s) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
+    .map((s: { name: string; duration: string; price: string; id: string }) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
     .join("\n");
 
   const futureEvents = events.events
-    .filter((e) => new Date(e.date) >= new Date())
-    .map((e) => `- ${e.title} (${e.date})`)
+    .filter((e: { date: string }) => new Date(e.date) >= new Date())
+    .map((e: { title: string; date: string }) => `- ${e.title} (${e.date})`)
+    .join("\n");
+
+  const providerList = providers.providers
+    .map((p: { name: string; service: string; category: string }) => `- ${p.name} — ${p.service} (${p.category})`)
     .join("\n");
 
   const ownerName = settings.ownerName || "the owner";
@@ -38,18 +46,33 @@ ABOUT THE BUSINESS:
 - Hours: ${contact.hours}
 - Booking: ${settings.bookingUrl}
 
+HERO SECTION:
+- Headline: ${hero.headline || "(not set)"}
+- Subheadline: ${hero.subheadline || "(not set)"}
+- CTA: ${hero.ctaText || "(not set)"}
+
+ABOUT/STORY:
+- Headline: ${story.headline || "(not set)"}
+- Statement: ${story.statement || "(not set)"}
+- ${story.paragraphs?.length || 0} paragraphs, ${story.stats?.length || 0} stats
+
 CURRENT SERVICES (${services.services.length} listed):
 ${serviceList}
 
 ${futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed."}
 
+TESTIMONIALS: ${testimonials.testimonials?.length || 0} reviews listed.
+
+PROVIDERS (${providers.providers?.length || 0} listed):
+${providerList || "None yet."}
+
+FAQ: ${faq.faqs.length} questions listed.
+SHOP: ${shop.items.length} products listed.
+
 SITE PERFORMANCE:
 - Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)
 
 You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
-
-FAQ: ${faq.faqs.length} questions listed.
-SHOP: ${shop.items.length} products listed.
 
 Available sections: hero, services, story, testimonials, events, providers, contact, settings, faq, shop.
 
@@ -103,8 +126,12 @@ export async function POST(req: Request) {
           ]),
         }),
         execute: async ({ section }) => {
-          const { getContent } = await import("@/lib/storage");
-          return await getContent(section, tenant);
+          try {
+            const { getContent } = await import("@/lib/storage");
+            return await getContent(section, tenant);
+          } catch (err) {
+            return { error: `Failed to read ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
         },
       }),
       update_section: tool({
@@ -126,6 +153,7 @@ export async function POST(req: Request) {
           data: z.record(z.string(), z.unknown()),
         }),
         execute: async ({ section, data }) => {
+          try {
           const { sectionSchemas } = await import("@/lib/schemas");
           const schema = sectionSchemas[section];
           const parsed = schema.safeParse(data);
@@ -198,6 +226,9 @@ export async function POST(req: Request) {
             section,
             message: `Updated ${section} successfully`,
           };
+          } catch (err) {
+            return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
         },
       }),
       upload_image: tool({

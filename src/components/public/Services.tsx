@@ -94,7 +94,7 @@ export function Services({ services }: { services: ServicesContent }) {
                   </TrackedLink>
                 ) : (
                   <a
-                    href="/services#booking"
+                    href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
                     className="inline-flex text-xs font-bold tracking-widest uppercase px-6 py-3 transition-all duration-300 self-start"
                     style={{ background: "var(--pure-white)", color: "var(--sage)" }}
                     onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -127,12 +127,12 @@ export function Services({ services }: { services: ServicesContent }) {
                     What to expect
                   </h4>
                   <ul className="space-y-4">
-                    {[
-                      "Brief consultation about your goals and areas of tension",
-                      "Full-body assessment of your range of motion",
-                      "Guided stretching with hands-on assistance",
+                    {((featured as unknown as Record<string, unknown>).whatToExpect as string[] || [
+                      "Brief consultation about your goals",
+                      "Assessment of your needs",
+                      "Guided session with hands-on support",
                       "Personalized plan for ongoing sessions",
-                    ].map((item, i) => (
+                    ]).map((item, i) => (
                       <li key={i} className="flex items-start gap-3">
                         <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[0.625rem] font-bold mt-0.5" style={{ background: "var(--sage)", color: "var(--pure-white)" }}>
                           {i + 1}
@@ -213,7 +213,7 @@ export function Services({ services }: { services: ServicesContent }) {
                       </span>
                     ) : (
                       <a
-                        href="/services#booking"
+                        href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                         style={{ color: "var(--sage)" }}
                       >

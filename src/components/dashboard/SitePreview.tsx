@@ -37,8 +37,13 @@ export function SitePreview() {
   const activeDevice = DEVICES.find((d) => d.id === device)!;
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Build iframe URL
-  const pagePath = PAGE_PATHS["home"] || "/";
+  // Build iframe URL — navigate to the page containing the active section
+  const SECTION_TO_PAGE: Record<string, string> = {
+    hero: "home", services: "services", story: "about", testimonials: "home",
+    events: "events", providers: "providers", contact: "contact", faq: "faq", shop: "shop",
+  };
+  const currentPage = activeSection ? (SECTION_TO_PAGE[activeSection] || "home") : "home";
+  const pagePath = PAGE_PATHS[currentPage] || "/";
   const editParam = editMode === "draft" ? "?edit=true" : "";
   const iframeSrc = `${pagePath}${editParam}`;
 
@@ -48,7 +53,7 @@ export function SitePreview() {
       try {
         iframeRef.current.contentWindow.postMessage(
           { type: "reb-scroll-to", section: scrollToSection },
-          "*"
+          window.location.origin
         );
       } catch {
         iframeRef.current.src = `${pagePath}#${scrollToSection}`;
@@ -90,6 +95,7 @@ export function SitePreview() {
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const { data } = event;
+      if (event.origin !== window.location.origin) return;
       if (!data?.type?.startsWith("reb-")) return;
 
       if (data.type === "reb-section-clicked") {

@@ -59,7 +59,14 @@ export default function SettingsPage() {
         <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-sm text-red-600 mb-3">Couldn&apos;t load settings</p>
           <button
-            onClick={() => { setLoadError(false); setSettings(null); window.location.reload(); }}
+            onClick={() => {
+              setLoadError(false);
+              setSettings(null);
+              fetch("/api/content/settings")
+                .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+                .then((data) => setSettings(data))
+                .catch(() => setLoadError(true));
+            }}
             className="px-4 py-2 rounded-md bg-white border border-[#e8e8e8] text-xs text-[#666] hover:bg-[#f5f5f5] transition-colors"
           >
             Try again

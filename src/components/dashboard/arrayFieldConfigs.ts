@@ -1,7 +1,7 @@
 export interface ArrayFieldDef {
   key: string;
   label: string;
-  type: "text" | "textarea" | "url" | "tel" | "select" | "toggle" | "date";
+  type: "text" | "textarea" | "url" | "tel" | "select" | "toggle" | "date" | "image";
   placeholder?: string;
   options?: { value: string; label: string }[];
   required?: boolean;
@@ -132,6 +132,7 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
       { key: "why_i_recommend", label: "Why I Recommend", type: "textarea", placeholder: "I love working with..." },
       { key: "booking_link", label: "Booking Link", type: "url", placeholder: "https://..." },
       { key: "phone", label: "Phone", type: "tel", placeholder: "(716) 555-0000" },
+      { key: "photo_url", label: "Photo", type: "image" },
     ],
     defaultItem: () => ({
       id: uid(),

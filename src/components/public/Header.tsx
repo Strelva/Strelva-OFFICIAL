@@ -6,12 +6,7 @@ import Link from "next/link";
 import type { SiteSettings } from "@/lib/types";
 
 const navLinks = [
-  { label: "Services", href: "/services" },
   { label: "About", href: "/about" },
-  { label: "Events", href: "/events" },
-  { label: "Providers", href: "/providers" },
-  { label: "FAQ", href: "/faq" },
-  { label: "Shop", href: "/shop" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -78,7 +73,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-xs font-medium tracking-wider uppercase transition-colors duration-300 px-3 py-2.5"
+                  className="text-xs font-medium tracking-wider uppercase transition-colors duration-300 px-3 py-3"
                   style={{ color: isActive(link.href) ? linkActiveColor : linkColor }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = linkHover; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = isActive(link.href) ? linkActiveColor : linkColor; }}
@@ -87,7 +82,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 </Link>
               ))}
               <Link
-                href="/services#booking"
+                href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
                 className="text-xs font-semibold tracking-wider uppercase px-5 py-2.5 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)",
@@ -109,7 +104,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
             {/* Mobile: CTA + hamburger */}
             <div className="flex md:hidden items-center gap-4">
               <Link
-                href="/services#booking"
+                href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
                 className="text-[0.625rem] font-semibold tracking-wider uppercase px-4 py-2 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.2)" : "var(--sage)",
@@ -123,6 +118,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 onClick={() => setMenuOpen(!menuOpen)}
                 className="flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
                 aria-label="Menu"
+                aria-expanded={menuOpen}
               >
                 <span
                   className="block w-5 h-[1.5px] transition-all duration-300"
@@ -164,7 +160,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
               </Link>
             ))}
             <Link
-              href="/services#booking"
+              href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
               className="mt-4 px-8 py-3.5 text-xs font-bold tracking-widest uppercase transition-all"
               style={{ background: "var(--sage)", color: "var(--pure-white)" }}
             >

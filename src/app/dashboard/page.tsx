@@ -1,3 +1,7 @@
+import {
+  Sparkles, ListChecks, User, MessageSquareQuote,
+  Calendar, Users, Mail, Settings as SettingsIcon,
+} from "lucide-react";
 import { getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { defaults } from "@/lib/defaults";
@@ -22,6 +26,17 @@ function getGreeting(): string {
 }
 
 const EMPTY_CLICKS = { total: 0, today: 0, thisWeek: 0 };
+
+const SECTION_ICONS: Record<string, React.ElementType> = {
+  hero: Sparkles,
+  services: ListChecks,
+  story: User,
+  testimonials: MessageSquareQuote,
+  events: Calendar,
+  providers: Users,
+  contact: Mail,
+  settings: SettingsIcon,
+};
 
 // Compute site completeness score
 function computeSiteScore(sections: {
@@ -215,8 +230,9 @@ export default async function DashboardPage() {
   // Overview content rendered as server component, passed to workspace for overlay
   const overviewContent = (
     <div className="p-5 max-w-xl">
+      <div data-ov="accent" className="h-[2px] bg-gradient-to-r from-[#7c9a8e] via-[#96b3a6] to-transparent mb-5 rounded-full" />
       {/* Headline */}
-      <div className="mb-5">
+      <div data-ov="headline" className="mb-5">
         <h1 className="text-[20px] font-medium tracking-tight text-[#1a1a1a]" suppressHydrationWarning>
           {pageViews.thisWeek > 0
             ? `${pageViews.thisWeek} people found you this week`
@@ -225,36 +241,36 @@ export default async function DashboardPage() {
         <p className="text-[12px] text-[#999] mt-1">
           {pageViews.thisWeek > 0
             ? `${bookingClicks.thisWeek} clicked Book Now`
-            : "Here\u2019s what\u2019s happening with your site."}
+            : "Your site is ready \u2014 here\u2019s how it\u2019s doing."}
         </p>
       </div>
 
       {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <div className="bg-white border border-[#e8e8e8] rounded-lg p-4">
+        <div data-ov="metric" className="bg-white border border-[#e8e8e8] rounded-lg p-4 reb-card-glow cursor-pointer">
           <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">PEOPLE WHO FOUND YOU</span>
-          <p className="text-[24px] font-medium font-mono tabular-nums text-[#1a1a1a] mt-2">
+          <p className="text-[28px] font-semibold font-mono tabular-nums text-[#1a1a1a] mt-2">
             {pageViews.total > 0 ? pageViews.total : "\u2014"}
           </p>
-          <p className="text-[10px] font-mono text-[#999] mt-0.5">
-            {pageViews.total > 0 ? `${pageViews.thisWeek} this week` : "Tracked when live"}
+          <p className="text-[10px] font-mono text-[#bbb] mt-0.5">
+            {pageViews.total > 0 ? `${pageViews.thisWeek} this week` : "Share your link to start tracking"}
           </p>
         </div>
-        <div className="bg-white border border-[#e8e8e8] rounded-lg p-4">
+        <div data-ov="metric" className="bg-white border border-[#e8e8e8] rounded-lg p-4 reb-card-glow cursor-pointer">
           <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">BOOKING CLICKS</span>
-          <p className="text-[24px] font-medium font-mono tabular-nums text-[#1a1a1a] mt-2">
+          <p className="text-[28px] font-semibold font-mono tabular-nums text-[#1a1a1a] mt-2">
             {bookingClicks.total > 0 ? bookingClicks.total : "\u2014"}
           </p>
-          <p className="text-[10px] font-mono text-[#999] mt-0.5">
-            {bookingClicks.total > 0 ? `${bookingClicks.thisWeek} this week` : "Every click tracked"}
+          <p className="text-[10px] font-mono text-[#bbb] mt-0.5">
+            {bookingClicks.total > 0 ? `${bookingClicks.thisWeek} this week` : "Clicks tracked automatically"}
           </p>
         </div>
-        <div className="bg-white border border-[#e8e8e8] rounded-lg p-4">
+        <div data-ov="metric" className="bg-white border border-[#e8e8e8] rounded-lg p-4 reb-card-glow cursor-pointer">
           <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">SITE COMPLETENESS</span>
-          <p className="text-[24px] font-medium font-mono tabular-nums text-[#1a1a1a] mt-2">
+          <p className="text-[28px] font-semibold font-mono tabular-nums text-[#1a1a1a] mt-2">
             {siteScore.score}%
           </p>
-          <p className="text-[10px] font-mono text-[#999] mt-0.5">
+          <p className="text-[10px] font-mono text-[#bbb] mt-0.5">
             {siteScore.items.filter(i => i.done).length} of {siteScore.items.length} sections
           </p>
           <div className="mt-2 h-[3px] bg-[#f5f5f5] rounded-full overflow-hidden">
@@ -271,7 +287,7 @@ export default async function DashboardPage() {
 
       {/* Suggestions */}
       {suggestions.length > 0 && (
-        <div className="bg-[#7c9a8e]/[0.04] border border-[#7c9a8e]/[0.12] rounded-lg px-4 py-3 mb-5">
+        <div data-ov="suggestions" className="bg-[#7c9a8e]/[0.06] border border-[#7c9a8e]/[0.12] rounded-lg px-4 py-3 mb-5">
           <h2 className="text-[10px] font-medium uppercase tracking-wider text-[#7c9a8e] mb-2">SUGGESTIONS</h2>
           <div className="space-y-1.5">
             {suggestions.map((s, i) => (
@@ -284,8 +300,35 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {/* Site sections visual map */}
+      <div data-ov="sitemap" className="bg-white border border-[#e8e8e8] rounded-lg p-4 mb-5 reb-card-glow cursor-pointer">
+        <h3 className="text-[10px] font-medium uppercase tracking-wider text-[#999] mb-3">YOUR SITE</h3>
+        <div className="grid grid-cols-4 gap-2">
+          {Object.entries(sectionData).map(([key, data]) => (
+            <div
+              key={key}
+              data-ov="icon"
+              className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg bg-[#faf9f7] border border-transparent hover:border-[#7c9a8e]/20 transition-colors"
+            >
+              {(() => {
+                const Icon = SECTION_ICONS[key];
+                const isActive = data.status === "live" || data.status === "configured";
+                return Icon ? (
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[#7c9a8e]" : "text-[#ccc]"}`} strokeWidth={1.5} />
+                ) : (
+                  <div className={`w-2 h-2 rounded-full ${isActive ? "bg-[#7c9a8e]" : "bg-[#e8e8e8]"}`} />
+                );
+              })()}
+              <span className="text-[9px] font-medium text-[#999] text-center leading-tight capitalize">
+                {key === "settings" ? "Settings" : key}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Activity timeline (client component with filtering) */}
-      <div className="bg-white border border-[#e8e8e8] rounded-lg p-4">
+      <div data-ov="activity" className="bg-white border border-[#e8e8e8] rounded-lg p-4 reb-card-glow">
         <ActivityTimeline />
       </div>
     </div>
