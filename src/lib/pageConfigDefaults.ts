@@ -12,7 +12,8 @@ export const DEFAULT_PAGE_CONFIG: SitePageConfig = {
       { type: "trust-strip", visible: true, order: 1 },
       { type: "testimonial-quote", visible: true, order: 2 },
       { type: "instagram-feed", visible: true, order: 3 },
-      { type: "cta", visible: true, order: 4 },
+      { type: "newsletter", visible: true, order: 4 },
+      { type: "cta", visible: true, order: 5 },
     ],
   },
   services: {

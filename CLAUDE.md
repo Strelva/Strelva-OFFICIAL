@@ -66,7 +66,7 @@ Local business owners will pay $199/mo for a custom site + AI agent that handles
 - Drag-and-drop visual editor (you build the sites, AI handles content)
 - Client-facing code editor (never)
 - Self-serve site generation (you are the quality control)
-- Email marketing / newsletter (not yet)
+- Email marketing / newsletter — NOW IN SCOPE (Chelsea asked for it unprompted, hates Vagaro's email tool)
 - E-commerce / checkout (booking platforms handle this)
 - Social media management (out of scope)
 

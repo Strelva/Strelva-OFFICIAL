@@ -19,6 +19,7 @@ import { PageCTA } from "./PageCTA";
 import { PageHeader } from "./PageHeader";
 import { InstagramFeed } from "./InstagramFeed";
 import { VagaroEmbed } from "./VagaroEmbed";
+import { NewsletterSignup } from "./NewsletterSignup";
 
 // Which content keys each section type needs
 const SECTION_CONTENT_KEYS: Record<string, ContentSection[]> = {
@@ -38,6 +39,7 @@ const SECTION_CONTENT_KEYS: Record<string, ContentSection[]> = {
   "page-header": [],
   "instagram-feed": ["settings"],
   "vagaro-booking": ["settings"],
+  newsletter: [],
 };
 
 // Section labels for the edit-mode overlay
@@ -58,6 +60,7 @@ const SECTION_LABELS: Record<string, string> = {
   "page-header": "Page Header",
   "instagram-feed": "Instagram Feed",
   "vagaro-booking": "Vagaro Booking",
+  newsletter: "Newsletter Signup",
 };
 
 // Map section type → editable content section key (for dashboard click-to-edit)
@@ -140,6 +143,8 @@ function buildSectionProps(
         fallbackUrl: (settings?.bookingUrl as string) || undefined,
       };
     }
+    case "newsletter":
+      return {};
     case "page-header": {
       // Title from explicit props, or from a content section via contentKey
       let title = (customProps?.title as string) || undefined;
@@ -175,6 +180,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "page-header": PageHeader,
   "instagram-feed": InstagramFeed,
   "vagaro-booking": VagaroEmbed,
+  newsletter: NewsletterSignup,
 };
 
 interface SectionRendererProps {

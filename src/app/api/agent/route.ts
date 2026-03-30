@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { verifyAuth } from "@/lib/auth";
-import { getContent, getClickCounts } from "@/lib/storage";
+import { getContent, getClickCounts, getSubscribers } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
@@ -54,6 +54,8 @@ SHOP: ${shop.items.length} products listed.
 Available sections: hero, services, story, testimonials, events, providers, contact, settings, faq, shop.
 
 BOOKING: You can check availability, book appointments, and list upcoming bookings. When someone asks to book, use check_availability first, then book_appointment.
+
+NEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
 
 Be conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
 
@@ -341,6 +343,74 @@ export async function POST(req: Request) {
           return { success: true, config: updated };
         },
       }),
+      send_newsletter: tool({
+        description: "Compose and send an email newsletter to all subscribers",
+        inputSchema: z.object({
+          subject: z.string(),
+          body: z.string().describe("The email content in plain text or simple HTML"),
+        }),
+        execute: async ({ subject, body }) => {
+          try {
+            const { getSubscribers, getContent, logActivity } = await import("@/lib/storage");
+            const subscribers = await getSubscribers(tenant);
+            const active = subscribers.filter((s) => s.status === "active");
+
+            if (active.length === 0) {
+              return { success: false, error: "No active subscribers" };
+            }
+
+            const settings = await getContent("settings", tenant);
+            const fromName = settings.siteName || "Newsletter";
+
+            if (process.env.RESEND_API_KEY) {
+              const { Resend } = await import("resend");
+              const resend = new Resend(process.env.RESEND_API_KEY);
+              const emails = active.map((s) => s.email);
+              const batchSize = 100;
+              for (let i = 0; i < emails.length; i += batchSize) {
+                const batch = emails.slice(i, i + batchSize);
+                await resend.batch.send(
+                  batch.map((to) => ({
+                    from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.rohlaxwellness.com"}>`,
+                    to,
+                    subject,
+                    html: body,
+                    text: body.replace(/<[^>]*>/g, ""),
+                  }))
+                );
+              }
+            } else {
+              console.log(`[Newsletter dev] "${subject}" → ${active.length} subscribers`);
+            }
+
+            await logActivity({
+              text: `AI sent newsletter: "${subject}" to ${active.length} subscribers`,
+              time: new Date().toISOString(),
+              type: "newsletter",
+              actor: "ai",
+            }, tenant);
+
+            return { success: true, subscriberCount: active.length };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : "Failed to send" };
+          }
+        },
+      }),
+      list_subscribers: tool({
+        description: "List all newsletter subscribers and their count",
+        inputSchema: z.object({}),
+        execute: async () => {
+          const subscribers = await getSubscribers(tenant);
+          return {
+            count: subscribers.length,
+            subscribers: subscribers.map((s) => ({
+              email: s.email,
+              name: s.name,
+              subscribedAt: s.subscribedAt,
+            })),
+          };
+        },
+      }),
     },
     stopWhen: stepCountIs(8),
   });
@@ -363,6 +433,8 @@ export async function POST(req: Request) {
               toolName === "list_bookings" ? "Checking your bookings..." :
               toolName === "upload_image" ? "Uploading image..." :
               toolName === "update_booking_config" ? "Updating booking settings..." :
+              toolName === "send_newsletter" ? "Sending newsletter..." :
+              toolName === "list_subscribers" ? "Checking subscribers..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "text-delta") {

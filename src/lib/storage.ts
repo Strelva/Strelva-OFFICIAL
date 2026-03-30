@@ -725,6 +725,114 @@ export async function getAvailableSlots(
   return generateSlots(config, date, duration, bookings, overrides);
 }
 
+// --- Newsletter subscribers ---
+
+export interface NewsletterSubscriber {
+  email: string;
+  name?: string;
+  subscribedAt: string;
+  status: "active" | "unsubscribed";
+}
+
+const DEV_NEWSLETTER_PATH = path.join(process.cwd(), "dev-newsletter.json");
+
+async function readDevNewsletter(): Promise<Record<string, NewsletterSubscriber[]>> {
+  try {
+    const raw = await fs.readFile(DEV_NEWSLETTER_PATH, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function writeDevNewsletter(data: Record<string, NewsletterSubscriber[]>): Promise<void> {
+  await fs.writeFile(DEV_NEWSLETTER_PATH, JSON.stringify(data, null, 2));
+}
+
+export async function addSubscriber(
+  email: string,
+  name?: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<{ duplicate: boolean }> {
+  if (hasSanity) {
+    const existing = await getSanityClient().fetch(
+      `*[_type == "newsletterSubscriber" && tenant == $tenant && email == $email][0]._id`,
+      { tenant, email }
+    );
+    if (existing) {
+      // Re-activate if previously unsubscribed
+      await getSanityClient().patch(existing).set({ status: "active" }).commit();
+      return { duplicate: true };
+    }
+    await getSanityClient().create({
+      _type: "newsletterSubscriber",
+      tenant,
+      email,
+      name: name || undefined,
+      subscribedAt: new Date().toISOString(),
+      status: "active",
+    });
+    return { duplicate: false };
+  }
+
+  const store = await readDevNewsletter();
+  const subscribers = store[tenant] || [];
+  const existing = subscribers.find((s) => s.email === email);
+  if (existing) {
+    existing.status = "active";
+    store[tenant] = subscribers;
+    await writeDevNewsletter(store);
+    return { duplicate: true };
+  }
+  subscribers.push({
+    email,
+    name: name || undefined,
+    subscribedAt: new Date().toISOString(),
+    status: "active",
+  });
+  store[tenant] = subscribers;
+  await writeDevNewsletter(store);
+  return { duplicate: false };
+}
+
+export async function getSubscribers(
+  tenant: string = DEFAULT_TENANT
+): Promise<NewsletterSubscriber[]> {
+  if (hasSanity) {
+    return getSanityClient().fetch(
+      `*[_type == "newsletterSubscriber" && tenant == $tenant] | order(subscribedAt desc) { email, name, subscribedAt, status }`,
+      { tenant }
+    );
+  }
+
+  const store = await readDevNewsletter();
+  return (store[tenant] || []).filter((s) => s.status === "active");
+}
+
+export async function removeSubscriber(
+  email: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<boolean> {
+  if (hasSanity) {
+    const existing = await getSanityClient().fetch(
+      `*[_type == "newsletterSubscriber" && tenant == $tenant && email == $email][0]._id`,
+      { tenant, email }
+    );
+    if (!existing) return false;
+    await getSanityClient().patch(existing).set({ status: "unsubscribed" }).commit();
+    return true;
+  }
+
+  const store = await readDevNewsletter();
+  const subscribers = store[tenant] || [];
+  const sub = subscribers.find((s) => s.email === email);
+  if (!sub) return false;
+  sub.status = "unsubscribed";
+  store[tenant] = subscribers;
+  await writeDevNewsletter(store);
+  return true;
+}
+
 // --- Content freshness ---
 
 export async function recordSectionUpdate(
