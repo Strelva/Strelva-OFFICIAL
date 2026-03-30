@@ -6,7 +6,6 @@ const DEFAULT_TENANT = "rohlax";
 
 // Routes that require authentication
 const isProtectedRoute = createRouteMatcher([
-  "/admin(.*)",
   "/dashboard(.*)",
 ]);
 

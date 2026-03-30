@@ -15,7 +15,7 @@ export default function SignInPage() {
             formButtonPrimary: "bg-[var(--sage)] hover:bg-[var(--sage-dark)]",
           },
         }}
-        fallbackRedirectUrl="/admin"
+        fallbackRedirectUrl="/dashboard"
       />
     </div>
   );
