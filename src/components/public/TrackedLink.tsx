@@ -1,16 +1,8 @@
 "use client";
 
-interface TrackedLinkProps {
-  href: string;
+type TrackedLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   event: string;
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-  target?: string;
-  rel?: string;
-  onMouseEnter?: React.MouseEventHandler<HTMLAnchorElement>;
-  onMouseLeave?: React.MouseEventHandler<HTMLAnchorElement>;
-}
+};
 
 export function TrackedLink({
   href,

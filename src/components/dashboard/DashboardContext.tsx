@@ -76,10 +76,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("chat");
-  const [overlayView, setOverlayView] = useState<OverlayView>(null);
+  const [overlayView, setOverlayView] = useState<OverlayView>(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("reb-overview-shown")) {
+      return null;
+    }
+    return "overview";
+  });
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<EditMode>("live");
+  const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
 
   // Load collapse state from localStorage on mount
@@ -88,6 +93,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setLeftCollapsed(stored.left);
     setRightCollapsed(stored.right);
   }, []);
+
+  // Mark overview as shown for this browser session
+  useEffect(() => {
+    if (overlayView === "overview" && typeof window !== "undefined") {
+      sessionStorage.setItem("reb-overview-shown", "1");
+    }
+  }, [overlayView]);
 
   const persistCollapse = (left: boolean, right: boolean) => {
     try {

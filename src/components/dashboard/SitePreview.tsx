@@ -39,7 +39,7 @@ export function SitePreview() {
 
   // Build iframe URL
   const pagePath = PAGE_PATHS["home"] || "/";
-  const editParam = editMode === "draft" ? "" : "?edit=true";
+  const editParam = editMode === "draft" ? "?edit=true" : "";
   const iframeSrc = `${pagePath}${editParam}`;
 
   // Handle scroll-to-section requests from ContentBrowser

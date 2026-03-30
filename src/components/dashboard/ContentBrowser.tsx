@@ -225,9 +225,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               }`}
               title={SECTION_LABELS[section.type] || section.type}
             >
-              <Icon className="w-[14px] h-[14px]" strokeWidth={1.5} />
+              <Icon className="w-4 h-4" strokeWidth={1.5} />
               {data && (
-                <div className={`absolute bottom-1 right-1 w-[5px] h-[5px] rounded-full ${
+                <div className={`absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full ${
                   data.status === "live" ? "bg-emerald-500"
                     : data.status === "configured" ? "bg-[#999]"
                     : "bg-[#ccc]"
@@ -294,8 +294,8 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               <div
                 key={`${section.type}-${section.order}`}
                 ref={isExpanded ? expandedRef : undefined}
-                className={`animate-card-enter rounded-lg mx-1 mb-0.5 overflow-hidden ${isHidden ? "opacity-40" : ""}`}
-                style={{ animationDelay: `${i * 30}ms` }}
+                className={`rounded-lg mx-1 mb-0.5 overflow-hidden ${isHidden ? "opacity-40" : ""}`}
+                style={{ animation: "fade-in-up 200ms ease-out both", animationDelay: `${i * 40}ms` }}
               >
                 {/* Row */}
                 <div className={`flex items-center h-10 transition-colors duration-150 ${

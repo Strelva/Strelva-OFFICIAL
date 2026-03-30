@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "@/lib/lenis";
+import { TrackedLink } from "./TrackedLink";
 import type { HeroContent } from "@/lib/types";
 
 export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: string }) {
@@ -115,7 +116,8 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
               {hero.tagline}
             </p>
             <div data-hero-animate className="flex flex-wrap items-center gap-4">
-              <a
+              <TrackedLink
+                event="booking-click"
                 href={hero.ctaLink || "/services#booking"}
                 className="btn-primary"
                 style={{ background: "var(--sage)", color: "var(--pure-white)" }}
@@ -128,7 +130,7 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
                 data-reb-field="ctaText"
               >
                 {hero.ctaText}
-              </a>
+              </TrackedLink>
               <Link href="/about" className="btn-ghost">
                 About {ownerName || "Us"}
               </Link>

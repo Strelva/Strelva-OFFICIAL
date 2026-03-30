@@ -5,12 +5,13 @@ import {
   Send,
   Clock,
   CalendarPlus,
-  FileText,
+  Mail,
   BarChart3,
   Bot,
   User,
   Loader2,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
@@ -32,7 +33,7 @@ const SECTION_LABELS: Record<string, string> = {
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
   { label: "Add an event", icon: CalendarPlus },
-  { label: "Write a blog post", icon: FileText },
+  { label: "Send a newsletter", icon: Mail },
   { label: "How's my site?", icon: BarChart3 },
 ];
 
@@ -66,12 +67,18 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
     }
   }, [dashCtx?.chatPrompt, dashCtx]);
 
-  // Load persisted messages on mount
+  // Load persisted messages on mount (skip if older than 24h)
   useEffect(() => {
     fetch("/api/chat", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : []))
       .then((saved: ChatMessage[]) => {
         if (Array.isArray(saved) && saved.length > 0) {
+          const lastMsg = saved[saved.length - 1];
+          const ageMs = Date.now() - (lastMsg.timestamp || 0);
+          if (ageMs > 24 * 60 * 60 * 1000) {
+            // Stale chat — don't load old messages
+            return;
+          }
           setMessages(saved);
         }
       })
@@ -273,6 +280,16 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
     sendChat(prompt);
   };
 
+  const handleClearChat = useCallback(() => {
+    setMessages([]);
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify([]),
+    }).catch(() => {});
+  }, []);
+
   const isEmpty = messages.length === 0;
 
   return (
@@ -282,7 +299,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
         <div className="w-7 h-7 rounded-full bg-[#7c9a8e] flex items-center justify-center">
           <Bot className="w-[14px] h-[14px] text-white" strokeWidth={1.5} />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-[12px] font-medium text-[#1a1a1a]">
             AI Assistant
           </h2>
@@ -290,6 +307,15 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
             Update your site via chat
           </p>
         </div>
+        {!isEmpty && (
+          <button
+            onClick={handleClearChat}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[#ccc] hover:text-[#999] hover:bg-[#f5f5f5] transition-colors duration-150"
+            title="Clear chat"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Active section context pill */}

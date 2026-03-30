@@ -78,6 +78,19 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
   ],
 };
 
+const SECTION_LABELS: Record<string, string> = {
+  hero: "Hero",
+  services: "Services",
+  story: "About",
+  testimonials: "Reviews",
+  events: "Events",
+  providers: "Providers",
+  contact: "Contact",
+  settings: "Settings",
+  faq: "FAQ",
+  shop: "Shop",
+};
+
 // Array sections use the inline editor from ARRAY_CONFIGS
 
 export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
@@ -235,6 +248,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
   return (
     <div className="flex flex-col h-full bg-white">
+      {/* Section header */}
+      <div className="px-4 py-2.5 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0">
+        <span className="text-[10px] uppercase tracking-wider text-[#999]">Editing</span>
+        <h3 className="text-[13px] font-medium text-[#1a1a1a] mt-0.5">
+          {SECTION_LABELS[activeSection] || activeSection}
+        </h3>
+      </div>
+
       {/* Save bar */}
       {hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0 animate-fade-in-up">

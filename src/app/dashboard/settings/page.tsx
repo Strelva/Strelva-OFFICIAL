@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   MessageCircle,
   Copy,
@@ -9,6 +8,7 @@ import {
   ExternalLink,
   Pencil,
 } from "lucide-react";
+import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
 const SETTING_FIELDS: readonly {
   key: string;
@@ -30,6 +30,7 @@ const SETTING_FIELDS: readonly {
 type SettingsData = Record<string, string>;
 
 export default function SettingsPage() {
+  const dashboard = useDashboardOptional();
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -161,13 +162,18 @@ export default function SettingsPage() {
                     )}
                   </button>
                 )}
-                <Link
-                  href="/dashboard/chat"
+                <button
+                  onClick={() => {
+                    if (dashboard) {
+                      dashboard.setChatPrompt(field.chatPrompt);
+                      dashboard.setOverlayView(null);
+                    }
+                  }}
                   className="w-8 h-8 rounded-md flex items-center justify-center text-[#999] hover:text-[#7c9a8e] hover:bg-[#7c9a8e]/[0.06] transition-all duration-150"
                   title={`Edit ${field.label}`}
                 >
                   <Pencil className="w-3.5 h-3.5" />
-                </Link>
+                </button>
               </div>
             </div>
           );
@@ -189,13 +195,17 @@ export default function SettingsPage() {
           <p className="text-sm text-[#1a1a1a]">Need to change something?</p>
           <p className="text-xs text-[#999] mt-0.5">Tell the AI what to update in plain English.</p>
         </div>
-        <Link
-          href="/dashboard/chat"
+        <button
+          onClick={() => {
+            if (dashboard) {
+              dashboard.setOverlayView(null);
+            }
+          }}
           className="flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-[#7c9a8e] hover:bg-[#5a7a6e] text-xs font-medium text-white transition-colors duration-150"
         >
           <MessageCircle className="w-3.5 h-3.5" />
           Open Chat
-        </Link>
+        </button>
       </div>
     </div>
   );
