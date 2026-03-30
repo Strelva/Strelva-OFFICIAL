@@ -1,10 +1,55 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, Loader2, Check, RotateCcw, AlertCircle } from "lucide-react";
+import { Save, Loader2, Check, RotateCcw, AlertCircle, MessageCircle } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
+
+// Composite sections that don't have their own content API —
+// they pull from other sections on the public site.
+const COMPOSITE_SECTION_INFO: Record<string, { label: string; sources: string; chatPrompt: string }> = {
+  "trust-strip": {
+    label: "Trust Strip",
+    sources: "Settings & Contact",
+    chatPrompt: "Update my trust strip stats",
+  },
+  "testimonial-quote": {
+    label: "Quote",
+    sources: "Reviews",
+    chatPrompt: "Update my featured quote",
+  },
+  cta: {
+    label: "Call to Action",
+    sources: "page layout",
+    chatPrompt: "Update my call to action section",
+  },
+  "instagram-feed": {
+    label: "Instagram Feed",
+    sources: "Settings",
+    chatPrompt: "Update my Instagram handle",
+  },
+  "page-header": {
+    label: "Page Header",
+    sources: "page layout",
+    chatPrompt: "Update my page header",
+  },
+  newsletter: {
+    label: "Newsletter Signup",
+    sources: "built-in",
+    chatPrompt: "Update my newsletter section",
+  },
+  "booking-widget": {
+    label: "Booking Widget",
+    sources: "Services & Settings",
+    chatPrompt: "Update my booking section",
+  },
+  "vagaro-booking": {
+    label: "Vagaro Booking",
+    sources: "Settings",
+    chatPrompt: "Update my Vagaro booking embed",
+  },
+};
 
 interface PropertiesEditorProps {
   activeSection: string | null;
@@ -102,9 +147,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  // Fetch section data when activeSection changes
+  const isComposite = activeSection ? activeSection in COMPOSITE_SECTION_INFO : false;
+
+  // Fetch section data when activeSection changes (skip composites)
   useEffect(() => {
-    if (!activeSection) {
+    if (!activeSection || activeSection in COMPOSITE_SECTION_INFO) {
       setData(null);
       setOriginal(null);
       return;
@@ -231,6 +278,26 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-4 h-4 text-[#999] animate-spin" />
+      </div>
+    );
+  }
+
+  // Composite sections — not directly editable, point to chat
+  if (activeSection && isComposite) {
+    const info = COMPOSITE_SECTION_INFO[activeSection];
+    return (
+      <div className="flex flex-col h-full bg-white">
+        <div className="px-4 py-2.5 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-[#999]">Viewing</span>
+          <h3 className="text-[13px] font-medium text-[#1a1a1a] mt-0.5">{info.label}</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1 px-6 text-center">
+          <div className="w-10 h-10 rounded-lg bg-[#7c9a8e]/[0.08] flex items-center justify-center mb-3">
+            <MessageCircle className="w-[18px] h-[18px] text-[#7c9a8e]" strokeWidth={1.5} />
+          </div>
+          <p className="text-[12px] text-[#666] mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
+          <p className="text-[11px] text-[#999] mb-4">Use AI Chat to make changes</p>
+        </div>
       </div>
     );
   }
