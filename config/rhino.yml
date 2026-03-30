@@ -21,7 +21,7 @@ value:
 
 features:
   public-site:
-    delivers: "Professional single-page marketing site with 10 sections: hero, trust strip, services (7 real Vagaro services with prices), booking CTA, story/bio, testimonials (real Vagaro reviews), events (auto-hides past), provider directory (8 providers, 5 categories), contact (phone, email, hours, map), footer"
+    delivers: "Professional multi-page marketing site with dedicated pages: home (hero + teasers), services (7 real Vagaro services with prices + booking), about (story/bio), events (auto-hides past), providers (8 providers, 5 categories), contact (phone, email, hours, map). Each page has unique SEO metadata."
     for: "Potential clients discovering Rohlax through search or referral"
     code: ["src/components/public/", "src/app/(public)/"]
     status: active

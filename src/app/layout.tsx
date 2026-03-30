@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -165,16 +166,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <LocalBusinessSchema />
-      </head>
-      <body
-        className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
-        style={{ background: "var(--cream)", color: "var(--bark)" }}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <head>
+          <LocalBusinessSchema />
+        </head>
+        <body
+          className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
+          style={{ background: "var(--cream)", color: "var(--bark)" }}
+        >
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

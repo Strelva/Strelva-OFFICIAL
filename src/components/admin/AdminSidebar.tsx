@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useClerk, useUser } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin" },
@@ -19,7 +20,8 @@ const NAV_ITEMS = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const { signOut } = useClerk();
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -34,15 +36,16 @@ export function AdminSidebar() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/admin/login");
+  const handleLogout = () => {
+    signOut({ redirectUrl: "/" });
   };
+
+  const displayName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "Admin";
 
   const sidebarContent = (
     <>
       <div className="p-6" style={{ borderBottom: "1px solid var(--cream-dark)" }}>
-        <h2 className="font-display text-lg" style={{ color: "var(--bark)" }}>Rohlax Admin</h2>
+        <h2 className="font-display text-lg" style={{ color: "var(--bark)" }}>{displayName}</h2>
         <p className="text-xs mt-1" style={{ color: "var(--bark-faded)" }}>Content Management</p>
       </div>
 
@@ -136,7 +139,7 @@ export function AdminSidebar() {
             )}
           </svg>
         </button>
-        <span className="font-display text-sm" style={{ color: "var(--bark)" }}>Rohlax Admin</span>
+        <span className="font-display text-sm" style={{ color: "var(--bark)" }}>{displayName}</span>
         <div className="w-8" />
       </div>
 

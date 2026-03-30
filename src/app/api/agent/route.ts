@@ -295,6 +295,39 @@ export async function POST(req: Request) {
           };
         },
       }),
+      upload_image: tool({
+        description: "Upload an image to the website. Use when the client shares a photo or wants to add an image to their site.",
+        inputSchema: z.object({
+          imageData: z.string().describe("Base64-encoded image data URL (e.g. data:image/jpeg;base64,...)"),
+          filename: z.string().optional().describe("Desired filename for the image"),
+        }),
+        execute: async ({ imageData, filename }) => {
+          try {
+            // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
+            const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!match) {
+              return { success: false, error: "Invalid image data. Expected a base64-encoded data URL (data:image/type;base64,...)." };
+            }
+            const mimeType = match[1];
+            const base64Data = match[2];
+            const buffer = Buffer.from(base64Data, "base64");
+
+            const ext = mimeType.split("/")[1] || "png";
+            const finalFilename = filename || `upload-${Date.now()}.${ext}`;
+
+            // Create a File-like object for uploadFile
+            const blob = new Blob([buffer], { type: mimeType });
+            const file = new File([blob], finalFilename, { type: mimeType });
+
+            const { uploadFile } = await import("@/lib/storage");
+            const { url } = await uploadFile(file);
+
+            return { success: true, url, filename: finalFilename };
+          } catch (err) {
+            return { success: false, error: `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
       update_booking_config: tool({
         description: "Update booking availability configuration (schedule, lead time, etc.)",
         inputSchema: z.object({
@@ -328,6 +361,7 @@ export async function POST(req: Request) {
               toolName === "check_availability" ? "Checking availability..." :
               toolName === "book_appointment" ? "Booking appointment..." :
               toolName === "list_bookings" ? "Checking your bookings..." :
+              toolName === "upload_image" ? "Uploading image..." :
               toolName === "update_booking_config" ? "Updating booking settings..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));

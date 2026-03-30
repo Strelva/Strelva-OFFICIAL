@@ -35,8 +35,9 @@ items:
     title: "Add saveChatMessages/loadChatMessages to lib/storage.ts"
     priority: P0
     feature: ai-agent
-    status: todo
-    context: "UIMessage[] in Redis keyed by clientId. onFinish callback to persist. 100-message sliding window."
+    status: done
+    done_at: 2026-03-29
+    context: "Wired into ChatPanel — loads on mount via GET /api/chat, saves after AI response via POST /api/chat. 100-message sliding window."
     source: "/research tech-architecture"
     created: 2026-03-17
 
@@ -148,7 +149,8 @@ items:
     title: "Build REB agency landing page at root domain"
     priority: P1
     feature: deployment
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: |
       Route: reb.studio (root, no subdomain)
       This is NOT a client site — it's the REB sales page.
@@ -267,7 +269,8 @@ items:
     title: "Add upload_image tool to AI agent"
     priority: P1
     feature: ai-agent
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Client drops photo → upload_image tool → existing /api/upload → URL returned."
     source: "/research tech-architecture"
     created: 2026-03-17
@@ -430,7 +433,8 @@ items:
     title: "Generate JSON-LD from CMS data, not hardcoded values"
     priority: P0
     feature: seo
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Layout.tsx has hardcoded LocalBusiness schema. Should read from storage (contact + settings) and generate dynamically. Business name, address, phone, hours, services all come from CMS."
     source: "/eval"
     created: 2026-03-17
@@ -439,7 +443,8 @@ items:
     title: "Auto-generate sitemap.xml"
     priority: P1
     feature: seo
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "No sitemap exists. Next.js 15 supports app/sitemap.ts for dynamic generation. Include all public pages."
     source: "/eval"
     created: 2026-03-17
@@ -448,7 +453,8 @@ items:
     title: "Add robots.txt allowing crawlers, blocking /admin and /dashboard"
     priority: P1
     feature: seo
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "No robots.txt. Add app/robots.ts. Allow all crawlers. Disallow /admin/*, /dashboard/*, /api/*."
     source: "/eval"
     created: 2026-03-17
@@ -457,7 +463,8 @@ items:
     title: "Generate meta title/description from CMS settings data"
     priority: P1
     feature: seo
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Meta tags should read siteName, siteDescription from settings. Currently partially hardcoded."
     source: "/eval"
     created: 2026-03-17
@@ -477,7 +484,8 @@ items:
     title: "Wire saveChatMessages/loadChatMessages into ChatPanel"
     priority: P0
     feature: ai-agent
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Functions exist in storage.ts but ChatPanel uses local state. Need: save after each exchange, load on page open. Requires API routes for chat history since ChatPanel is a client component."
     source: "/eval"
     created: 2026-03-17
@@ -486,7 +494,8 @@ items:
     title: "Handle AI agent API errors gracefully in chat UI"
     priority: P1
     feature: ai-agent
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "If Gemini API fails (rate limit, network), chat silently fails. Need: error message in chat bubble, retry button. Also handle auth expiry mid-conversation."
     source: "/eval"
     created: 2026-03-17
@@ -495,7 +504,8 @@ items:
     title: "Generate AI system prompt from tenant config, not hardcoded"
     priority: P1
     feature: ai-agent
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "System prompt hardcodes 'Rohlax Wellness' and 'Chelsea'. Should read from tenant config: business name, owner name, industry, custom instructions. Required for multi-tenant."
     source: "/eval"
     created: 2026-03-17
@@ -504,7 +514,8 @@ items:
     title: "Show visual confirmation when AI updates site content"
     priority: P1
     feature: ai-agent
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "When update_section succeeds, chat shows text but no visual indicator that the SITE changed. Add: a toast/banner 'Site updated — view changes' with link to /dashboard/site."
     source: "/eval"
     created: 2026-03-17
@@ -524,7 +535,8 @@ items:
     title: "Replace mock metrics with real data (or honest empty state)"
     priority: P0
     feature: client-dashboard
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Overview shows hardcoded 127 visitors, 23 clicks, +12%, +8%. This is dishonest. Either: (1) wire real analytics via PostHog/Vercel, or (2) show honest empty state: 'Analytics coming soon — we'll track visitors once your site is live.' Mock data that looks real is worse than no data."
     source: "/eval"
     created: 2026-03-17
@@ -533,7 +545,8 @@ items:
     title: "Replace hardcoded activity feed with real AI agent action log"
     priority: P1
     feature: client-dashboard
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Activity feed shows fake items. Should read from an activity log that the AI agent writes to on every update_section call. Store in Redis: {tenant}:activity as a list of {text, time, type}."
     source: "/eval"
     created: 2026-03-17
@@ -551,7 +564,8 @@ items:
     title: "Add loading skeletons for server-fetched dashboard pages"
     priority: P2
     feature: client-dashboard
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Content and settings pages fetch from Redis. On slow connections they'll flash. Add loading.tsx with skeleton UI matching the design system."
     source: "/eval"
     created: 2026-03-17
@@ -562,7 +576,8 @@ items:
     title: "Add empty states for events/providers when none exist"
     priority: P2
     feature: public-site
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "If Chelsea deletes all events via AI chat, what does the events section show? Currently: empty space. Should show: 'No upcoming events. Check back soon.' Same for providers."
     source: "/eval"
     created: 2026-03-17
@@ -593,7 +608,8 @@ items:
     title: "Update rhino.yml with ai-agent and client-dashboard features"
     priority: P0
     feature: operations
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "rhino.yml still describes only the original 6 features. Missing: ai-agent (weight:5), client-dashboard (weight:5), deployment (weight:4). Feature list is stale."
     source: "/eval"
     created: 2026-03-17
@@ -611,7 +627,8 @@ items:
     title: "Document all required env vars in README or .env.example"
     priority: P1
     feature: operations
-    status: todo
+    status: done
+    done_at: 2026-03-29
     context: "Required env vars: JWT_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD, GOOGLE_GENERATIVE_AI_API_KEY, REDIS_URL (optional), BLOB_READ_WRITE_TOKEN (optional), SLACK_WEBHOOK_URL (optional). No documentation exists."
     source: "/eval"
     created: 2026-03-17

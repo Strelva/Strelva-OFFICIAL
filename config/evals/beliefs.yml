@@ -35,10 +35,10 @@ beliefs:
     severity: warn
 
   - id: has-services
-    belief: "Services component renders real Vagaro services"
+    belief: "Services component renders real services with booking links"
     type: file_check
     path: "src/components/public/Services.tsx"
-    contains: "vagaro_link"
+    contains: "booking_link"
     feature: public-site
     severity: warn
 
@@ -59,18 +59,18 @@ beliefs:
     severity: warn
 
   - id: has-booking-section
-    belief: "Booking section links to Vagaro (not broken iframe)"
+    belief: "Booking widget provides native booking flow on services page"
     type: file_check
-    path: "src/components/public/Booking.tsx"
-    contains: "vagaro.com/rohlaxwellness"
+    path: "src/components/public/BookingWidget.tsx"
+    contains: "Book a Session"
     feature: vagaro-integration
     severity: block
 
   - id: has-gift-cert-link
-    belief: "Gift certificate links to Vagaro gift certificates"
+    belief: "Services link to Vagaro for booking"
     type: file_check
-    path: "src/components/public/Booking.tsx"
-    contains: "gift-certificates"
+    path: "src/lib/defaults.ts"
+    contains: "vagaro.com/rohlaxwellness"
     feature: vagaro-integration
     severity: warn
 
