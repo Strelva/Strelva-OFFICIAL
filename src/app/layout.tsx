@@ -32,8 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
       ? settings.siteKeywords.split(",").map((k: string) => k.trim())
       : ["assisted stretching", "Buffalo NY", "Williamsville NY", "stretch therapy", "mobility", "wellness"],
     icons: {
-      icon: "/icon.svg",
-      apple: "/apple-icon.svg",
+      icon: "/icon.jpg",
+      apple: "/apple-icon.jpg",
     },
     openGraph: {
       title: `${settings.siteName} | ${settings.siteTagline}`,
