@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { verifyAuth } from "@/lib/auth";
-import { getContent, getClickCounts, getSubscribers } from "@/lib/storage";
+import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
@@ -46,14 +46,14 @@ ${futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events liste
 SITE PERFORMANCE:
 - Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)
 
-You can read and update any section of the website, manage bookings, and check availability. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
+You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
 
 FAQ: ${faq.faqs.length} questions listed.
 SHOP: ${shop.items.length} products listed.
 
 Available sections: hero, services, story, testimonials, events, providers, contact, settings, faq, shop.
 
-BOOKING: You can check availability, book appointments, and list upcoming bookings. When someone asks to book, use check_availability first, then book_appointment.
+BOOKING: All booking is handled through Vagaro at ${settings.bookingUrl}. When someone asks about booking, direct them to Vagaro. You cannot book appointments directly — always link to Vagaro.
 
 NEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
 
@@ -200,103 +200,6 @@ export async function POST(req: Request) {
           };
         },
       }),
-      check_availability: tool({
-        description: "Check available booking slots for a specific date and service",
-        inputSchema: z.object({
-          date: z.string().describe("Date in YYYY-MM-DD format"),
-          serviceId: z.string().describe("Service ID to check availability for"),
-        }),
-        execute: async ({ date, serviceId }) => {
-          const { getAvailableSlots, getContent } = await import("@/lib/storage");
-          const slots = await getAvailableSlots(date, serviceId, tenant);
-          const services = await getContent("services", tenant);
-          const service = services.services.find((s) => s.id === serviceId);
-          return {
-            date,
-            service: service?.name || serviceId,
-            availableSlots: slots,
-            count: slots.length,
-          };
-        },
-      }),
-      book_appointment: tool({
-        description: "Book an appointment for a client",
-        inputSchema: z.object({
-          serviceId: z.string(),
-          serviceName: z.string(),
-          date: z.string().describe("Date in YYYY-MM-DD format"),
-          startTime: z.string().describe("Start time in HH:MM format"),
-          clientName: z.string(),
-          clientEmail: z.string(),
-          clientPhone: z.string().optional(),
-          notes: z.string().optional(),
-        }),
-        execute: async ({ serviceId, serviceName, date, startTime, clientName, clientEmail, clientPhone, notes }) => {
-          const { getAvailableSlots, createBooking, getContent, logActivity } = await import("@/lib/storage");
-
-          // Verify slot
-          const available = await getAvailableSlots(date, serviceId, tenant);
-          if (!available.includes(startTime)) {
-            return { success: false, error: "This time slot is no longer available." };
-          }
-
-          // Calculate end time
-          const services = await getContent("services", tenant);
-          const service = services.services.find((s) => s.id === serviceId);
-          const duration = service ? parseInt(service.duration) || 60 : 60;
-          const [h, m] = startTime.split(":").map(Number);
-          const endMin = h * 60 + m + duration;
-          const endTime = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
-
-          const booking = await createBooking({
-            serviceId,
-            serviceName,
-            date,
-            startTime,
-            endTime,
-            clientName,
-            clientEmail,
-            clientPhone: clientPhone || "",
-            notes,
-          }, tenant);
-
-          await logActivity({
-            text: `Booked ${serviceName} for ${clientName} on ${date} at ${startTime}`,
-            time: new Date().toISOString(),
-            type: "booking",
-          }, tenant);
-
-          return { success: true, booking };
-        },
-      }),
-      list_bookings: tool({
-        description: "List upcoming bookings",
-        inputSchema: z.object({
-          from: z.string().optional().describe("Start date (YYYY-MM-DD), defaults to today"),
-          to: z.string().optional().describe("End date (YYYY-MM-DD), defaults to 30 days from now"),
-        }),
-        execute: async ({ from, to }) => {
-          const { getBookings } = await import("@/lib/storage");
-          const today = new Date().toISOString().slice(0, 10);
-          const thirtyDays = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-          const bookings = await getBookings(tenant, {
-            from: from || today,
-            to: to || thirtyDays,
-          });
-          const active = bookings.filter((b) => b.status !== "cancelled");
-          return {
-            total: active.length,
-            bookings: active.map((b) => ({
-              id: b.id,
-              service: b.serviceName,
-              date: b.date,
-              time: `${b.startTime}-${b.endTime}`,
-              client: b.clientName,
-              status: b.status,
-            })),
-          };
-        },
-      }),
       upload_image: tool({
         description: "Upload an image to the website. Use when the client shares a photo or wants to add an image to their site.",
         inputSchema: z.object({
@@ -328,19 +231,6 @@ export async function POST(req: Request) {
           } catch (err) {
             return { success: false, error: `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
-        },
-      }),
-      update_booking_config: tool({
-        description: "Update booking availability configuration (schedule, lead time, etc.)",
-        inputSchema: z.object({
-          config: z.record(z.string(), z.unknown()).describe("Partial booking config to merge"),
-        }),
-        execute: async ({ config }) => {
-          const { getBookingConfig, setBookingConfig } = await import("@/lib/storage");
-          const current = await getBookingConfig(tenant);
-          const updated = { ...current, ...config };
-          await setBookingConfig(updated, tenant);
-          return { success: true, config: updated };
         },
       }),
       send_newsletter: tool({
@@ -400,10 +290,11 @@ export async function POST(req: Request) {
         description: "List all newsletter subscribers and their count",
         inputSchema: z.object({}),
         execute: async () => {
+          const { getSubscribers } = await import("@/lib/storage");
           const subscribers = await getSubscribers(tenant);
           return {
             count: subscribers.length,
-            subscribers: subscribers.map((s) => ({
+            subscribers: subscribers.map((s: { email: string; name?: string; subscribedAt: string }) => ({
               email: s.email,
               name: s.name,
               subscribedAt: s.subscribedAt,
@@ -428,11 +319,7 @@ export async function POST(req: Request) {
             const label =
               toolName === "read_section" ? `Reading your ${section || "content"}...` :
               toolName === "update_section" ? `Updating your ${section || "content"}...` :
-              toolName === "check_availability" ? "Checking availability..." :
-              toolName === "book_appointment" ? "Booking appointment..." :
-              toolName === "list_bookings" ? "Checking your bookings..." :
               toolName === "upload_image" ? "Uploading image..." :
-              toolName === "update_booking_config" ? "Updating booking settings..." :
               toolName === "send_newsletter" ? "Sending newsletter..." :
               toolName === "list_subscribers" ? "Checking subscribers..." :
               "Working on it...";
