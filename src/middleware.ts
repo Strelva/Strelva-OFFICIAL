@@ -10,15 +10,20 @@ const isProtectedRoute = createRouteMatcher([
   "/admin(.*)",
 ]);
 
+// APIs that require auth for ALL methods (GET, POST, PUT, DELETE)
 const isProtectedApi = createRouteMatcher([
-  "/api/content(.*)",
   "/api/upload(.*)",
   "/api/agent(.*)",
   "/api/booking/config(.*)",
   "/api/booking/list(.*)",
   "/api/activity(.*)",
-  "/api/page-config(.*)",
   "/api/admin(.*)",
+]);
+
+// APIs where GET is public (content is visible on the site) but writes are protected in-route
+const isWriteProtectedApi = createRouteMatcher([
+  "/api/content(.*)",
+  "/api/page-config(.*)",
 ]);
 
 // Custom domain → tenant mapping (from centralized tenant config)
@@ -79,8 +84,17 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  // Check protected API routes
+  // Check protected API routes (all methods blocked without auth)
   if (isProtectedApi(request)) {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  // Write-protected APIs: GET is public (content is on the site anyway),
+  // but PUT/DELETE/POST require auth (enforced in the route handlers)
+  if (isWriteProtectedApi(request) && request.method !== "GET") {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

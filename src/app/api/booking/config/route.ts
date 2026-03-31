@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBookingConfig, setBookingConfig } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -11,6 +11,9 @@ export async function GET() {
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const config = await getBookingConfig(tenant);
     return NextResponse.json(config);
   } catch {
@@ -25,8 +28,11 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const body = await request.json();
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
+    const body = await request.json();
     await setBookingConfig(body, tenant);
     return NextResponse.json({ success: true });
   } catch {
