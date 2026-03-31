@@ -205,21 +205,37 @@ export async function POST(req: Request) {
             }
           }
 
-          await setContent(
-            section as ContentSection,
-            parsed.data as Parameters<typeof setContent>[1],
-            tenant
-          );
+          const autoPublish = process.env.AI_AUTO_PUBLISH !== "false";
 
-          const { revalidatePath } = await import("next/cache");
-          revalidatePath("/");
+          if (autoPublish) {
+            // Publish immediately
+            await setContent(
+              section as ContentSection,
+              parsed.data as Parameters<typeof setContent>[1],
+              tenant
+            );
+
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/");
+          } else {
+            // Save as draft for admin review
+            const { setDraftContent } = await import("@/lib/storage");
+            await setDraftContent(
+              section as ContentSection,
+              parsed.data as Parameters<typeof setContent>[1],
+              tenant
+            );
+          }
 
           if (process.env.SLACK_WEBHOOK_URL) {
+            const action = autoPublish ? "updated" : "drafted changes to";
             fetch(process.env.SLACK_WEBHOOK_URL, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                text: `Site updated *${section}* via AI chat`,
+                text: autoPublish
+                  ? `Site updated *${section}* via AI chat`
+                  : `AI drafted changes to *${section}* for ${tenant} — review at /admin/drafts`,
               }),
             }).catch(() => {});
           }
@@ -229,20 +245,22 @@ export async function POST(req: Request) {
             const { diffFields } = await import("@/lib/utils");
             const changes = diffFields(current, data as Record<string, unknown>);
             await logActivity({
-              text: `AI updated ${section}`,
+              text: autoPublish ? `AI updated ${section}` : `AI drafted changes to ${section} (pending review)`,
               time: new Date().toISOString(),
               type: "ai",
               section,
               actor: "ai",
               changes,
             }, tenant);
-            await recordSectionUpdate(section, tenant);
+            if (autoPublish) await recordSectionUpdate(section, tenant);
           } catch {}
 
           return {
             success: true,
             section,
-            message: `Updated ${section} successfully`,
+            message: autoPublish
+              ? `Updated ${section} successfully`
+              : `I've drafted the changes to ${section}. Laney will review and publish them shortly.`,
           };
           } catch (err) {
             return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };

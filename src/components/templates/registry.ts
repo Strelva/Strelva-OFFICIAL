@@ -51,12 +51,10 @@ export function getTemplateRegistry(): Record<TemplateId, TemplateDefinition> {
   return _registry;
 }
 
-const TENANT_TEMPLATES: Record<string, TemplateId> = {
-  rohlax: "wellness",
-  gldf: "food-brand",
-};
-
 export function getTemplateForTenant(tenant: string): TemplateDefinition {
-  const templateId = TENANT_TEMPLATES[tenant] ?? "wellness";
+  // Lazy import to avoid circular dependency (tenants.ts is pure data)
+  const { getTenantConfig } = require("@/lib/tenants");
+  const config = getTenantConfig(tenant);
+  const templateId: TemplateId = config?.template ?? "wellness";
   return getTemplateRegistry()[templateId];
 }

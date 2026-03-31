@@ -273,4 +273,7 @@ export interface TenantConfig {
   createdAt: string;
   template: TemplateId;
   features?: TenantFeature[];
+  customDomains?: string[];
+  stripeCustomerId?: string;
+  subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
 }

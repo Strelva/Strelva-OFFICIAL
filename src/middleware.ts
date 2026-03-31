@@ -7,6 +7,7 @@ const DEFAULT_TENANT = "rohlax";
 // Routes that require authentication
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
+  "/admin(.*)",
 ]);
 
 const isProtectedApi = createRouteMatcher([
@@ -16,13 +17,13 @@ const isProtectedApi = createRouteMatcher([
   "/api/booking/config(.*)",
   "/api/booking/list(.*)",
   "/api/activity(.*)",
+  "/api/page-config(.*)",
+  "/api/admin(.*)",
 ]);
 
-// Custom domain → tenant mapping
-const CUSTOM_DOMAINS: Record<string, string> = {
-  "greatlakesdriedfruit.com": "gldf",
-  "www.greatlakesdriedfruit.com": "gldf",
-};
+// Custom domain → tenant mapping (from centralized tenant config)
+import { getCustomDomainMap } from "@/lib/tenants";
+const CUSTOM_DOMAINS = getCustomDomainMap();
 
 function extractTenant(request: NextRequest): string {
   // Dev fallback: ?tenant=gldf

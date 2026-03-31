@@ -167,13 +167,21 @@ const TENANT_DEFAULTS: Record<string, ContentMap> = {
 };
 
 async function seed(tenantId: string) {
-  const data = TENANT_DEFAULTS[tenantId];
-  if (!data) {
-    console.error(`Unknown tenant: ${tenantId}. Available: ${Object.keys(TENANT_DEFAULTS).join(", ")}`);
+  // Check if tenant is registered in the central config
+  const { getTenantConfig, TENANTS } = await import("../src/lib/tenants");
+  const tenantConfig = getTenantConfig(tenantId);
+
+  if (!tenantConfig) {
+    console.error(`Tenant "${tenantId}" not found in src/lib/tenants.ts.`);
+    console.error(`Registered tenants: ${TENANTS.map((t: { id: string }) => t.id).join(", ")}`);
+    console.error(`\nAdd the tenant to TENANTS in src/lib/tenants.ts first.`);
     process.exit(1);
   }
 
-  console.log(`Seeding content for tenant: ${tenantId}`);
+  // Use tenant-specific defaults if available, otherwise fall back to template defaults
+  const data = TENANT_DEFAULTS[tenantId] ?? rohlaxDefaults;
+
+  console.log(`Seeding content for tenant: ${tenantId} (template: ${tenantConfig.template})`);
 
   const sections = Object.keys(data) as (keyof ContentMap)[];
   for (const section of sections) {
@@ -181,13 +189,21 @@ async function seed(tenantId: string) {
     console.log(`  ✓ ${section}`);
   }
 
-  console.log(`Done! ${sections.length} sections seeded for "${tenantId}".`);
+  console.log(`\nDone! ${sections.length} sections seeded for "${tenantId}".`);
+  console.log(`\nOnboarding checklist:`);
+  console.log(`  □ Set Clerk publicMetadata: { tenants: ["${tenantId}"] } on client's user`);
+  console.log(`  □ Add Vercel domain: ${tenantConfig.subdomain}.reb.studio`);
+  if (tenantConfig.customDomains?.length) {
+    console.log(`  □ Configure custom domains: ${tenantConfig.customDomains.join(", ")}`);
+  }
+  console.log(`  □ Create Stripe subscription via /admin`);
 }
 
 const tenantId = process.argv[2];
 if (!tenantId) {
+  const { TENANTS } = require("../src/lib/tenants");
   console.error("Usage: npx tsx scripts/seed-tenant.ts <tenant-id>");
-  console.error("Available tenants: " + Object.keys(TENANT_DEFAULTS).join(", "));
+  console.error("Registered tenants: " + TENANTS.map((t: { id: string }) => t.id).join(", "));
   process.exit(1);
 }
 

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { trackClick } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { isRateLimited, rateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    if (isRateLimited(rateLimitKey(req, "track"), 30)) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const { event } = await req.json();
     if (typeof event !== "string" || event.length > 50) {
       return NextResponse.json({ error: "Invalid event" }, { status: 400 });

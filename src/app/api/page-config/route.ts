@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getPageConfig, setPageConfig } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -15,7 +16,13 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const authed = await verifyAuth();
+    if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const body = await request.json();
     await setPageConfig(body, tenant);
     revalidatePath("/");

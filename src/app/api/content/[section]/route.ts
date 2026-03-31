@@ -13,6 +13,7 @@ import {
 import { diffFields } from "@/lib/utils";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
+import { requireTenantAccess } from "@/lib/auth";
 
 function isValidSection(section: string, tenant: string): section is ContentSection {
   const template = getTemplateForTenant(tenant);
@@ -117,7 +118,8 @@ export async function GET(
 
     const data = await getContent(section, tenant);
     return NextResponse.json(data);
-  } catch {
+  } catch (err) {
+    console.error("[content GET]", section, err);
     return NextResponse.json({ error: "Failed to load content" }, { status: 500 });
   }
 }
@@ -130,6 +132,8 @@ export async function PUT(
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
 
     if (!isValidSection(section, tenant)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
@@ -171,7 +175,8 @@ export async function PUT(
     revalidatePath("/");
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("[content PUT]", section, err);
     return NextResponse.json({ error: "Failed to save content" }, { status: 500 });
   }
 }
@@ -184,6 +189,8 @@ export async function DELETE(
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
 
     if (!isValidSection(section, tenant)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
@@ -198,7 +205,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ error: "DELETE only supported for drafts" }, { status: 400 });
-  } catch {
+  } catch (err) {
+    console.error("[content DELETE]", section, err);
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }

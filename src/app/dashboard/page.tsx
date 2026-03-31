@@ -1,9 +1,11 @@
+import { redirect } from "next/navigation";
 import {
   Sparkles, ListChecks, User, MessageSquareQuote,
   Calendar, Users, Mail, Settings as SettingsIcon,
 } from "lucide-react";
 import { getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { DashboardWorkspace } from "@/components/dashboard/DashboardWorkspace";
 import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
@@ -96,6 +98,10 @@ function getSuggestions(
 
 export default async function DashboardPage() {
   const tenant = await getTenantFromHeaders();
+
+  // Verify current user has access to this tenant
+  const allowed = await hasTenantAccess(tenant);
+  if (!allowed) redirect("/");
 
   const [pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([

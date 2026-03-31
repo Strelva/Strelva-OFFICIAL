@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { uploadFile } from "@/lib/storage";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { getTenantFromHeaders } from "@/lib/tenant";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export async function POST(request: Request) {
+  const authed = await verifyAuth();
+  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
 
