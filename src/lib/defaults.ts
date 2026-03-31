@@ -9,6 +9,7 @@ import type {
   SiteSettings,
   FaqContent,
   ShopContent,
+  ProductsContent,
   ContentMap,
 } from "./types";
 
@@ -345,6 +346,29 @@ export const defaultShop: ShopContent = {
   items: [],
 };
 
+export const defaultProducts: ProductsContent = {
+  sectionLabel: "Our Products",
+  headline: "Simple Ingredients,\nReal Flavor",
+  description:
+    "Thin-sliced, slow-dried apple chips with real ingredients you can pronounce. Light, crispy, and naturally sweet.",
+  products: [
+    {
+      id: "apple-snaps",
+      name: "Apple Snaps",
+      description:
+        "Thin-sliced, slow-dried apple chips with a hint of warmth from cinnamon and pure maple syrup.",
+      ingredients: "Dried Apples, Cinnamon, Maple",
+      imageUrl: "/images/kraft-bag.png",
+      badge: "BESTSELLER",
+      featured: true,
+      price: "5.99",
+      stripePaymentLink: "",
+      comingSoon: false,
+    },
+  ],
+  bottomNote: "More flavors coming soon",
+};
+
 export const defaults: ContentMap = {
   hero: defaultHero,
   services: defaultServices,
@@ -356,4 +380,5 @@ export const defaults: ContentMap = {
   settings: defaultSettings,
   faq: defaultFaq,
   shop: defaultShop,
+  products: defaultProducts,
 };

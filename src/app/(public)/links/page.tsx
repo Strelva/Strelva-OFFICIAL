@@ -74,13 +74,15 @@ export default async function LinksPage() {
       featured: false,
       external: true,
     },
-    {
-      title: contact.phone,
-      url: `tel:${contact.phone.replace(/[^+\d]/g, "")}`,
-      icon: "phone" as const,
-      featured: false,
-      external: true,
-    },
+    ...(contact.phone
+      ? [{
+          title: contact.phone,
+          url: `tel:${contact.phone.replace(/[^+\d]/g, "")}`,
+          icon: "phone" as const,
+          featured: false,
+          external: true,
+        }]
+      : []),
   ];
 
   const ICONS: Record<string, React.ReactNode> = {

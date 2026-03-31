@@ -133,6 +133,27 @@ export const contactSchema = z.object({
   googleMapsUrl: z.string(),
 });
 
+export const productItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  ingredients: z.string(),
+  imageUrl: z.string(),
+  badge: z.string(),
+  featured: z.boolean(),
+  price: z.string(),
+  stripePaymentLink: z.string(),
+  comingSoon: z.boolean(),
+});
+
+export const productsSchema = z.object({
+  sectionLabel: z.string(),
+  headline: z.string().min(1),
+  description: z.string(),
+  products: z.array(productItemSchema),
+  bottomNote: z.string(),
+});
+
 export const siteSettingsSchema = z.object({
   siteName: z.string().min(1),
   siteTagline: z.string(),
@@ -156,4 +177,5 @@ export const sectionSchemas: Record<ContentSection, z.ZodType> = {
   settings: siteSettingsSchema,
   faq: faqSchema,
   shop: shopSchema,
+  products: productsSchema,
 };

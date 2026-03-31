@@ -12,39 +12,24 @@ import {
 } from "@/lib/storage";
 import { diffFields } from "@/lib/utils";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTemplateForTenant } from "@/components/templates/registry";
 
-const VALID_SECTIONS: ContentSection[] = [
-  "hero",
-  "services",
-  "story",
-  "testimonials",
-  "events",
-  "providers",
-  "contact",
-  "settings",
-  "faq",
-  "shop",
-];
-
-function isValidSection(section: string): section is ContentSection {
-  return VALID_SECTIONS.includes(section as ContentSection);
+function isValidSection(section: string, tenant: string): section is ContentSection {
+  const template = getTemplateForTenant(tenant);
+  return template.contentSections.includes(section as ContentSection);
 }
 
-const REQUIRED_FIELDS: Record<ContentSection, string[]> = {
+const REQUIRED_FIELDS: Partial<Record<ContentSection, string[]>> = {
   hero: ["headline", "tagline", "ctaText"],
   services: ["headline"],
   story: ["headline", "statement"],
-  testimonials: [],
-  events: [],
-  providers: [],
   contact: ["email"],
   settings: ["siteName"],
-  faq: [],
-  shop: [],
+  products: ["headline"],
 };
 
 function validateBody(section: ContentSection, body: Record<string, unknown>): string | null {
-  const required = REQUIRED_FIELDS[section];
+  const required = REQUIRED_FIELDS[section] ?? [];
   for (const field of required) {
     const value = body[field];
     if (typeof value !== "string" || value.trim() === "") {
@@ -94,6 +79,18 @@ function validateBody(section: ContentSection, body: Record<string, unknown>): s
     }
   }
 
+  if (section === "products" && Array.isArray(body.products)) {
+    for (let i = 0; i < body.products.length; i++) {
+      const p = body.products[i] as Record<string, unknown>;
+      if (typeof p.name !== "string" || p.name.trim() === "") {
+        return `Product ${i + 1} is missing a name`;
+      }
+      if (typeof p.price !== "string" || p.price.trim() === "") {
+        return `Product ${i + 1} is missing a price`;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -103,12 +100,13 @@ export async function GET(
 ) {
   const { section } = await params;
 
-  if (!isValidSection(section)) {
-    return NextResponse.json({ error: "Invalid section" }, { status: 400 });
-  }
-
   try {
     const tenant = await getTenantFromHeaders();
+
+    if (!isValidSection(section, tenant)) {
+      return NextResponse.json({ error: "Invalid section" }, { status: 400 });
+    }
+
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
 
@@ -130,11 +128,13 @@ export async function PUT(
 ) {
   const { section } = await params;
 
-  if (!isValidSection(section)) {
-    return NextResponse.json({ error: "Invalid section" }, { status: 400 });
-  }
-
   try {
+    const tenant = await getTenantFromHeaders();
+
+    if (!isValidSection(section, tenant)) {
+      return NextResponse.json({ error: "Invalid section" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     const validationError = validateBody(section, body);
@@ -142,7 +142,6 @@ export async function PUT(
       return NextResponse.json({ error: validationError }, { status: 422 });
     }
 
-    const tenant = await getTenantFromHeaders();
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
 
@@ -183,12 +182,13 @@ export async function DELETE(
 ) {
   const { section } = await params;
 
-  if (!isValidSection(section)) {
-    return NextResponse.json({ error: "Invalid section" }, { status: 400 });
-  }
-
   try {
     const tenant = await getTenantFromHeaders();
+
+    if (!isValidSection(section, tenant)) {
+      return NextResponse.json({ error: "Invalid section" }, { status: 400 });
+    }
+
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
 

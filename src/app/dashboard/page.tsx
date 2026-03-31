@@ -46,7 +46,7 @@ function computeSiteScore(sections: {
   testimonials: { testimonials: unknown[] };
   events: { events: unknown[] };
   providers: { providers: unknown[] };
-  contact: { phone: string; email: string; address: string; hours: string };
+  contact: { phone?: string; email: string; address?: string; hours?: string };
   settings: { siteName: string; siteDescription: string };
 }): { score: number; items: { label: string; done: boolean }[] } {
   const items = [

@@ -5,6 +5,7 @@ export interface HeroContent {
   ctaText: string;
   ctaLink: string;
   backgroundImageUrl: string;
+  logoUrl?: string;
 }
 
 export interface ServiceItem {
@@ -37,6 +38,7 @@ export interface StoryContent {
   quote: string;
   quoteAttribution: string;
   imageUrl: string;
+  secondaryImageUrl?: string;
 }
 
 export interface TestimonialItem {
@@ -120,30 +122,53 @@ export interface ShopContent {
 
 export interface ContactContent {
   email: string;
-  phone: string;
-  address: string;
-  hours: string;
+  phone?: string;
+  address?: string;
+  hours?: string;
   locationTitle: string;
   locationDescription: string;
   instagramUrl: string;
   facebookUrl: string;
-  googleMapsUrl: string;
+  googleMapsUrl?: string;
 }
 
 export interface SiteSettings {
   siteName: string;
   siteTagline: string;
   siteDescription: string;
-  siteKeywords: string;
-  ownerName: string;
-  ownerTitle: string;
+  siteKeywords?: string;
+  ownerName?: string;
+  ownerTitle?: string;
   footerTagline: string;
   copyrightText: string;
-  bookingUrl: string;
-  instagramHandle: string;
-  vagaro_embed_id: string;
+  bookingUrl?: string;
+  instagramHandle?: string;
+  vagaro_embed_id?: string;
+  logoUrl?: string;
+  marqueeText?: string;
 }
 
+
+export interface ProductItem {
+  id: string;
+  name: string;
+  description: string;
+  ingredients: string;
+  imageUrl: string;
+  badge: string;
+  featured: boolean;
+  price: string;
+  stripePaymentLink: string;
+  comingSoon: boolean;
+}
+
+export interface ProductsContent {
+  sectionLabel: string;
+  headline: string;
+  description: string;
+  products: ProductItem[];
+  bottomNote: string;
+}
 
 export type ContentSection =
   | "hero"
@@ -155,7 +180,8 @@ export type ContentSection =
   | "contact"
   | "settings"
   | "faq"
-  | "shop";
+  | "shop"
+  | "products";
 
 export type ContentMap = {
   hero: HeroContent;
@@ -168,6 +194,7 @@ export type ContentMap = {
   settings: SiteSettings;
   faq: FaqContent;
   shop: ShopContent;
+  products: ProductsContent;
 };
 
 // --- Page Config Types ---
@@ -228,6 +255,12 @@ export interface Booking {
   cancelledAt?: string;
 }
 
+// --- Template Types ---
+
+export type TemplateId = "wellness" | "food-brand";
+
+export type TenantFeature = "commerce" | "booking" | "newsletter";
+
 // --- Tenant Types ---
 
 export interface TenantConfig {
@@ -238,4 +271,6 @@ export interface TenantConfig {
   industry: string;
   active: boolean;
   createdAt: string;
+  template: TemplateId;
+  features?: TenantFeature[];
 }

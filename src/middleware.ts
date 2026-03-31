@@ -18,13 +18,23 @@ const isProtectedApi = createRouteMatcher([
   "/api/activity(.*)",
 ]);
 
+// Custom domain → tenant mapping
+const CUSTOM_DOMAINS: Record<string, string> = {
+  "greatlakesdriedfruit.com": "gldf",
+  "www.greatlakesdriedfruit.com": "gldf",
+};
+
 function extractTenant(request: NextRequest): string {
-  // Dev fallback: ?tenant=carolee
+  // Dev fallback: ?tenant=gldf
   const paramTenant = request.nextUrl.searchParams.get("tenant");
   if (paramTenant) return paramTenant;
 
+  const host = (request.headers.get("host") || "").split(":")[0];
+
+  // Custom domain check
+  if (CUSTOM_DOMAINS[host]) return CUSTOM_DOMAINS[host];
+
   // Subdomain extraction: rohlax.reb.studio → rohlax
-  const host = request.headers.get("host") || "";
   const parts = host.split(".");
   if (parts.length >= 3 && parts[0] !== "www") {
     return parts[0];

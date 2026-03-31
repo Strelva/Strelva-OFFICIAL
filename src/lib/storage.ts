@@ -13,17 +13,22 @@ export const DEFAULT_TENANT = "rohlax";
 
 // --- Dev file fallback (no Sanity configured) ---
 
-async function readDevContent(): Promise<Record<string, unknown>> {
+function devContentPath(tenant: string): string {
+  if (tenant === DEFAULT_TENANT) return DEV_CONTENT_PATH;
+  return path.join(process.cwd(), `dev-content-${tenant}.json`);
+}
+
+async function readDevContent(tenant: string = DEFAULT_TENANT): Promise<Record<string, unknown>> {
   try {
-    const raw = await fs.readFile(DEV_CONTENT_PATH, "utf-8");
+    const raw = await fs.readFile(devContentPath(tenant), "utf-8");
     return JSON.parse(raw);
   } catch {
     return {};
   }
 }
 
-async function writeDevContent(data: Record<string, unknown>): Promise<void> {
-  await fs.writeFile(DEV_CONTENT_PATH, JSON.stringify(data, null, 2));
+async function writeDevContent(data: Record<string, unknown>, tenant: string = DEFAULT_TENANT): Promise<void> {
+  await fs.writeFile(devContentPath(tenant), JSON.stringify(data, null, 2));
 }
 
 // --- Sanity document type mapping ---
@@ -39,6 +44,7 @@ const SECTION_TO_TYPE: Record<ContentSection, string> = {
   settings: "siteSettings",
   faq: "faq",
   shop: "shop",
+  products: "products",
 };
 
 /**
@@ -69,11 +75,12 @@ function transformSanityImages<K extends ContentSection>(
     events: { sanityField: "image", urlField: "image_url" },
     providers: { sanityField: "photo", urlField: "photo_url" },
     shop: { sanityField: "image", urlField: "image_url" },
+    products: { sanityField: "image", urlField: "imageUrl" },
   };
 
   const mapping = arrayFields[section];
   if (mapping) {
-    const arrayKey = section === "shop" ? "items" : section;
+    const arrayKey = section === "shop" ? "items" : section === "products" ? "products" : section;
     const items = data[arrayKey] as Array<Record<string, unknown>> | undefined;
     if (items) {
       data[arrayKey] = items.map((item) => {
@@ -118,10 +125,10 @@ export async function getContent<K extends ContentSection>(
     const query = `*[_type == $type && tenant == $tenant][0]`;
     const doc = await getSanityReadClient().fetch(query, { type, tenant });
     if (doc) return transformSanityImages(section, doc);
-    return defaults[section];
+    // Fall through to dev file if Sanity has no data for this tenant
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   return (store[section] as ContentMap[K]) ?? defaults[section];
 }
 
@@ -150,9 +157,9 @@ export async function setContent<K extends ContentSection>(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   store[section] = data;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 // --- File upload ---
@@ -275,11 +282,11 @@ export async function logActivity(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const activity = (store.__activity as unknown[]) ?? [];
   activity.unshift(entry);
   store.__activity = activity.slice(0, 200);
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function getActivity(
@@ -301,7 +308,7 @@ export async function getActivity(
     return getSanityClient().fetch(query, params);
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   let activity = (store.__activity as ActivityEntry[]) ?? [];
   if (filters?.section) {
     activity = activity.filter((a) => a.section === filters.section);
@@ -324,7 +331,7 @@ export async function getDraftContent<K extends ContentSection>(
     return data || null;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const key = `__draft:${section}`;
   return (store[key] as ContentMap[K]) ?? null;
 }
@@ -346,9 +353,9 @@ export async function setDraftContent<K extends ContentSection>(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   store[`__draft:${section}`] = data;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function clearDraft(
@@ -364,9 +371,9 @@ export async function clearDraft(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   delete store[`__draft:${section}`];
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function listDrafts(
@@ -380,7 +387,7 @@ export async function listDrafts(
     return result;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const result: Record<string, boolean> = {};
   for (const key of Object.keys(store)) {
     if (key.startsWith("__draft:")) {
@@ -410,7 +417,7 @@ export async function getPageConfig(
     return DEFAULT_PAGE_CONFIG;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   return (store.__pageConfig as SitePageConfig) ?? DEFAULT_PAGE_CONFIG;
 }
 
@@ -430,9 +437,9 @@ export async function setPageConfig(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   store.__pageConfig = config;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 // --- Click tracking (stays simple — use Sanity counter documents) ---
@@ -471,12 +478,12 @@ export async function trackClick(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const clicks = (store.__clicks as Record<string, number>) ?? {};
   clicks[`${event}:${today}`] = (clicks[`${event}:${today}`] || 0) + 1;
   clicks[`${event}:total`] = (clicks[`${event}:total`] || 0) + 1;
   store.__clicks = clicks;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function getClickCounts(
@@ -502,7 +509,7 @@ export async function getClickCounts(
     return { total, today: todayCount, thisWeek: weekCount };
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const clicks = (store.__clicks as Record<string, number>) ?? {};
   const total = clicks[`${event}:total`] || 0;
   const todayCount = clicks[`${event}:${today}`] || 0;
@@ -539,7 +546,7 @@ export async function getBookingConfig(
     return DEFAULT_BOOKING_CONFIG;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
 }
 
@@ -561,9 +568,9 @@ export async function setBookingConfig(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   store[`__bookingConfig_${tenant}`] = config;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function getDateOverrides(
@@ -578,7 +585,7 @@ export async function getDateOverrides(
     return doc || [];
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
 }
 
@@ -597,9 +604,9 @@ export async function setDateOverrides(
     return;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   store[`__dateOverrides_${tenant}`] = overrides;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function getBookings(
@@ -620,7 +627,7 @@ export async function getBookings(
     return getSanityClient().fetch(query, params);
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   let bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
   if (dateRange) {
     bookings = bookings.filter(
@@ -660,11 +667,11 @@ export async function createBooking(
     createdAt: new Date().toISOString(),
   };
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
   bookings.push(newBooking);
   store[`__bookings_${tenant}`] = bookings;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
   return newBooking;
 }
 
@@ -697,13 +704,13 @@ export async function updateBooking(
     };
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
   const idx = bookings.findIndex((b) => b.id === id);
   if (idx === -1) return null;
   bookings[idx] = { ...bookings[idx], ...updates };
   store[`__bookings_${tenant}`] = bookings;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
   return bookings[idx];
 }
 
@@ -843,11 +850,11 @@ export async function recordSectionUpdate(
   if (hasSanity) return;
 
   const now = new Date().toISOString();
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   const timestamps = (store.__sectionTimestamps as Record<string, string>) ?? {};
   timestamps[section] = now;
   store.__sectionTimestamps = timestamps;
-  await writeDevContent(store);
+  await writeDevContent(store, tenant);
 }
 
 export async function getSectionTimestamps(
@@ -868,6 +875,6 @@ export async function getSectionTimestamps(
     return timestamps;
   }
 
-  const store = await readDevContent();
+  const store = await readDevContent(tenant);
   return (store.__sectionTimestamps as Record<string, string>) ?? {};
 }

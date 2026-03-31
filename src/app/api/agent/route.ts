@@ -4,87 +4,121 @@ import { z } from "zod";
 import { verifyAuth } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTemplateForTenant } from "@/components/templates/registry";
+import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
-  const [settings, services, contact, events, faq, shop, hero, story, testimonials, providers, bookingClicks] = await Promise.all([
-    getContent("settings", tenant),
-    getContent("services", tenant),
-    getContent("contact", tenant),
-    getContent("events", tenant),
-    getContent("faq", tenant),
-    getContent("shop", tenant),
-    getContent("hero", tenant),
-    getContent("story", tenant),
-    getContent("testimonials", tenant),
-    getContent("providers", tenant),
-    getClickCounts("booking-click", tenant),
-  ]);
+  const template = getTemplateForTenant(tenant);
+  const sections = template.contentSections;
 
-  const serviceList = services.services
-    .map((s: { name: string; duration: string; price: string; id: string }) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
-    .join("\n");
+  // Fetch all content sections + booking clicks in parallel
+  const contentEntries = await Promise.all(
+    sections.map(async (s) => [s, await getContent(s, tenant)] as unknown as [ContentSection, Record<string, unknown>])
+  );
+  const content: Record<string, Record<string, unknown>> = Object.fromEntries(contentEntries);
+  const bookingClicks = await getClickCounts("booking-click", tenant);
 
-  const futureEvents = events.events
-    .filter((e: { date: string }) => new Date(e.date) >= new Date())
-    .map((e: { title: string; date: string }) => `- ${e.title} (${e.date})`)
-    .join("\n");
+  const settings = content.settings || {};
+  const contact = content.contact || {};
+  const hero = content.hero || {};
+  const story = content.story || {};
 
-  const providerList = providers.providers
-    .map((p: { name: string; service: string; category: string }) => `- ${p.name} — ${p.service} (${p.category})`)
-    .join("\n");
+  const ownerName = (settings.ownerName as string) || "the owner";
+  const ownerTitle = (settings.ownerTitle as string) || "";
 
-  const ownerName = settings.ownerName || "the owner";
-  const ownerTitle = settings.ownerTitle || "";
+  // Build dynamic section summaries
+  const sectionSummaries: string[] = [];
 
-  return `You are the website assistant for ${settings.siteName}.
-
-ABOUT THE BUSINESS:
+  sectionSummaries.push(`ABOUT THE BUSINESS:
 - Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
-- Phone: ${contact.phone}
-- Email: ${contact.email}
-- Address: ${contact.address}
-- Hours: ${contact.hours}
-- Booking: ${settings.bookingUrl}
+- Phone: ${contact.phone || "(not set)"}
+- Email: ${contact.email || "(not set)"}
+- Address: ${contact.address || "(not set)"}
+- Hours: ${contact.hours || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${settings.bookingUrl}` : ""}`);
 
-HERO SECTION:
+  if (sections.includes("hero")) {
+    sectionSummaries.push(`HERO SECTION:
 - Headline: ${hero.headline || "(not set)"}
 - Subheadline: ${hero.subheadline || "(not set)"}
-- CTA: ${hero.ctaText || "(not set)"}
+- CTA: ${hero.ctaText || "(not set)"}`);
+  }
 
-ABOUT/STORY:
+  if (sections.includes("story")) {
+    sectionSummaries.push(`ABOUT/STORY:
 - Headline: ${story.headline || "(not set)"}
 - Statement: ${story.statement || "(not set)"}
-- ${story.paragraphs?.length || 0} paragraphs, ${story.stats?.length || 0} stats
+- ${(story.paragraphs as string[])?.length || 0} paragraphs, ${(story.stats as unknown[])?.length || 0} stats`);
+  }
 
-CURRENT SERVICES (${services.services.length} listed):
-${serviceList}
+  if (sections.includes("services") && content.services) {
+    const svc = content.services;
+    const serviceList = ((svc.services as Array<{ name: string; duration: string; price: string; id: string }>) || [])
+      .map((s) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
+      .join("\n");
+    sectionSummaries.push(`CURRENT SERVICES (${((svc.services as unknown[]) || []).length} listed):\n${serviceList}`);
+  }
 
-${futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed."}
+  if (sections.includes("products") && content.products) {
+    const prod = content.products;
+    const productList = ((prod.products as Array<{ name: string; price: string; id: string }>) || [])
+      .map((p) => `- ${p.name} ($${p.price}) [id: ${p.id}]`)
+      .join("\n");
+    sectionSummaries.push(`PRODUCTS (${((prod.products as unknown[]) || []).length} listed):\n${productList}`);
+  }
 
-TESTIMONIALS: ${testimonials.testimonials?.length || 0} reviews listed.
+  if (sections.includes("events") && content.events) {
+    const evt = content.events;
+    const futureEvents = ((evt.events as Array<{ title: string; date: string }>) || [])
+      .filter((e) => new Date(e.date) >= new Date())
+      .map((e) => `- ${e.title} (${e.date})`)
+      .join("\n");
+    sectionSummaries.push(futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed.");
+  }
 
-PROVIDERS (${providers.providers?.length || 0} listed):
-${providerList || "None yet."}
+  if (sections.includes("testimonials") && content.testimonials) {
+    sectionSummaries.push(`TESTIMONIALS: ${(content.testimonials.testimonials as unknown[])?.length || 0} reviews listed.`);
+  }
 
-FAQ: ${faq.faqs.length} questions listed.
-SHOP: ${shop.items.length} products listed.
+  if (sections.includes("providers") && content.providers) {
+    const providerList = ((content.providers.providers as Array<{ name: string; service: string; category: string }>) || [])
+      .map((p) => `- ${p.name} — ${p.service} (${p.category})`)
+      .join("\n");
+    sectionSummaries.push(`PROVIDERS (${(content.providers.providers as unknown[])?.length || 0} listed):\n${providerList || "None yet."}`);
+  }
 
-SITE PERFORMANCE:
-- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)
+  if (sections.includes("faq") && content.faq) {
+    sectionSummaries.push(`FAQ: ${(content.faq.faqs as unknown[])?.length || 0} questions listed.`);
+  }
+
+  if (sections.includes("shop") && content.shop) {
+    sectionSummaries.push(`SHOP: ${(content.shop.items as unknown[])?.length || 0} products listed.`);
+  }
+
+  sectionSummaries.push(`SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`);
+
+  const sectionNames = sections.join(", ");
+
+  let prompt = `You are the website assistant for ${(settings.siteName as string) || "this business"}.
+
+${sectionSummaries.join("\n\n")}
 
 You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
 
-Available sections: hero, services, story, testimonials, events, providers, contact, settings, faq, shop.
+Available sections: ${sectionNames}.`;
 
-BOOKING: All booking is handled through Vagaro at ${settings.bookingUrl}. When someone asks about booking, direct them to Vagaro. You cannot book appointments directly — always link to Vagaro.
+  if (settings.bookingUrl) {
+    prompt += `\n\nBOOKING: All booking is handled through Vagaro at ${settings.bookingUrl}. When someone asks about booking, direct them to Vagaro. You cannot book appointments directly — always link to Vagaro.`;
+  }
 
-NEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
+  prompt += `\n\nNEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
 
 Be conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
 
-Never remove content unless explicitly asked. For array items (services, events, testimonials, providers), preserve all existing items unless told to remove specific ones.
+Never remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
 
-When ${ownerName} asks "how's my site?" or similar, give a plain-English summary: how many services are listed, how many booking clicks, upcoming events, upcoming bookings, and suggest what to update next.`;
+When ${ownerName} asks "how's my site?" or similar, give a plain-English summary of what's on the site, how many booking clicks, and suggest what to update next.`;
+
+  return prompt;
 }
 
 export async function POST(req: Request) {
@@ -98,11 +132,17 @@ export async function POST(req: Request) {
 
   const tenant = await getTenantFromHeaders();
   const { messages, activeSection } = await req.json();
+  const template = getTemplateForTenant(tenant);
   let systemPrompt = await buildSystemPrompt(tenant);
 
   if (activeSection) {
     systemPrompt += `\n\nCONTEXT: The user is currently viewing the "${activeSection}" section in their dashboard editor. When they say "this", "it", "add one", "update this", etc., they are referring to ${activeSection}. Proactively reference this section in your responses.`;
   }
+
+  // Build dynamic section enum from template
+  const sectionEnum = z.enum(
+    template.contentSections as [string, ...string[]]
+  );
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
@@ -112,23 +152,12 @@ export async function POST(req: Request) {
       read_section: tool({
         description: "Read current content for a website section",
         inputSchema: z.object({
-          section: z.enum([
-            "hero",
-            "services",
-            "story",
-            "testimonials",
-            "events",
-            "providers",
-            "contact",
-            "settings",
-            "faq",
-            "shop",
-          ]),
+          section: sectionEnum,
         }),
         execute: async ({ section }) => {
           try {
             const { getContent } = await import("@/lib/storage");
-            return await getContent(section, tenant);
+            return await getContent(section as ContentSection, tenant);
           } catch (err) {
             return { error: `Failed to read ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
@@ -138,24 +167,13 @@ export async function POST(req: Request) {
         description:
           "Update content for a website section. Always read the section first, then send the COMPLETE updated data.",
         inputSchema: z.object({
-          section: z.enum([
-            "hero",
-            "services",
-            "story",
-            "testimonials",
-            "events",
-            "providers",
-            "contact",
-            "settings",
-            "faq",
-            "shop",
-          ]),
+          section: sectionEnum,
           data: z.record(z.string(), z.unknown()),
         }),
         execute: async ({ section, data }) => {
           try {
           const { sectionSchemas } = await import("@/lib/schemas");
-          const schema = sectionSchemas[section];
+          const schema = sectionSchemas[section as ContentSection];
           const parsed = schema.safeParse(data);
           if (!parsed.success) {
             return {
@@ -165,7 +183,7 @@ export async function POST(req: Request) {
           }
 
           const { getContent, setContent } = await import("@/lib/storage");
-          const current = (await getContent(section, tenant)) as unknown as Record<
+          const current = (await getContent(section as ContentSection, tenant)) as unknown as Record<
             string,
             unknown
           >;
@@ -188,7 +206,7 @@ export async function POST(req: Request) {
           }
 
           await setContent(
-            section,
+            section as ContentSection,
             parsed.data as Parameters<typeof setContent>[1],
             tenant
           );

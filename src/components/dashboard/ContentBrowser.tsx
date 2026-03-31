@@ -22,6 +22,12 @@ import {
   GripVertical,
   Instagram,
   CalendarCheck,
+  ShoppingBag,
+  BarChart3,
+  Mail,
+  Type,
+  Bell,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
@@ -47,6 +53,13 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   "booking-widget": Calendar,
   "instagram-feed": Instagram,
   "vagaro-booking": CalendarCheck,
+  // Food-brand / GLDF sections
+  products: ShoppingBag,
+  comparison: BarChart3,
+  notify: Bell,
+  "email-popup": Mail,
+  "typographic-break": Type,
+  newsletter: Megaphone,
 };
 
 const SECTION_LABELS: Record<string, string> = {
@@ -67,6 +80,13 @@ const SECTION_LABELS: Record<string, string> = {
   "booking-widget": "Booking Widget",
   "instagram-feed": "Instagram Feed",
   "vagaro-booking": "Vagaro Booking",
+  // Food-brand / GLDF sections
+  products: "Products",
+  comparison: "Comparison",
+  notify: "Email Signup",
+  "email-popup": "Email Popup",
+  "typographic-break": "Divider",
+  newsletter: "Newsletter",
 };
 
 const PAGE_OPTIONS = [
@@ -79,6 +99,8 @@ const ALL_SECTION_TYPES = [
   "hero", "services", "story", "testimonials", "events", "providers",
   "contact", "faq", "shop", "trust-strip", "testimonial-quote",
   "cta", "page-header", "booking-widget", "instagram-feed", "vagaro-booking",
+  // Food-brand / GLDF sections
+  "products", "comparison", "notify", "email-popup", "typographic-break", "newsletter",
 ];
 
 export interface SectionData {
