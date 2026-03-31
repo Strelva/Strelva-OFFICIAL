@@ -1,0 +1,101 @@
+{
+  "hero": {
+    "headline": "Great Lakes\nDried Fruit",
+    "subheadline": "Orchard-dried. Ingredient-honest.",
+    "tagline": "Small-batch apple snacks crafted by hand in Western New York.",
+    "ctaText": "See Our Products",
+    "ctaLink": "#products",
+    "backgroundImageUrl": "https://images.unsplash.com/photo-1609966245858-c4311db1bce1?w=2400&h=1600&fit=crop&q=90",
+    "logoUrl": "/images/logo.webp"
+  },
+  "products": {
+    "sectionLabel": "Products",
+    "headline": "What We Make",
+    "description": "Thin-sliced, slow-dried apple chips with real ingredients you can pronounce. Light, crispy, and naturally sweet.",
+    "products": [
+      {
+        "id": "apple-snaps",
+        "name": "Apple Snaps",
+        "description": "Thin-sliced, slow-dried apple chips with a hint of warmth from cinnamon and pure maple syrup.",
+        "ingredients": "Dried Apples, Cinnamon, Maple",
+        "imageUrl": "/images/kraft-bag.png",
+        "badge": "BESTSELLER",
+        "featured": true,
+        "price": "5.99",
+        "stripePaymentLink": "",
+        "comingSoon": false
+      }
+    ],
+    "bottomNote": "More flavors coming soon"
+  },
+  "story": {
+    "sectionLabel": "Our Story",
+    "headline": "Small batch.\nBig flavor.",
+    "accentText": "From the shores of Lake Erie",
+    "statement": "We started with one idea: make snacks you can actually feel good about.",
+    "paragraphs": [
+      "No mystery ingredients. No corporate shortcuts. Just real fruit, dried with care in Western New York.",
+      "We source from orchards that have been growing incredible apples for generations — and we keep things simple on purpose."
+    ],
+    "stats": [
+      {
+        "value": "100%",
+        "label": "Real Ingredients"
+      },
+      {
+        "value": "3",
+        "label": "Ingredients Per Bag"
+      }
+    ],
+    "quote": "Good things take time.",
+    "quoteAttribution": "Every batch, made by hand",
+    "imageUrl": "https://images.unsplash.com/photo-1474564862106-1f23d10b9d72?w=1200&h=1600&fit=crop",
+    "secondaryImageUrl": "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=2400&h=1600&fit=crop"
+  },
+  "testimonials": {
+    "sectionLabel": "Testimonials",
+    "headline": "What People Are Saying",
+    "testimonials": [
+      {
+        "id": "t1",
+        "quote": "These are the best dried apple snacks I've ever had. You can taste the difference real ingredients make.",
+        "author": "Sarah M.",
+        "location": "Buffalo, NY"
+      },
+      {
+        "id": "t2",
+        "quote": "My kids ask for these every day after school. So glad I found a snack I feel good about giving them.",
+        "author": "Mike R.",
+        "location": "Rochester, NY"
+      },
+      {
+        "id": "t3",
+        "quote": "The cinnamon maple flavor is incredible. I keep a bag in my desk at work — they never last long.",
+        "author": "Jennifer L.",
+        "location": "Erie, PA"
+      },
+      {
+        "id": "t4",
+        "quote": "Finally, a snack company that actually cares about what goes into their products. Three ingredients. That's it.",
+        "author": "David K.",
+        "location": "Cleveland, OH"
+      }
+    ]
+  },
+  "contact": {
+    "email": "hello@greatlakesdriedfruit.com",
+    "locationTitle": "Western\nNew York",
+    "locationDescription": "Small-batch apple snacks, crafted with care since 2025.",
+    "instagramUrl": "#",
+    "facebookUrl": "#"
+  },
+  "settings": {
+    "siteName": "Great Lakes Dried Fruit",
+    "siteTagline": "Orchard-Dried Apple Snacks",
+    "siteDescription": "Small-batch dried fruit snacks made with real ingredients in Western New York.",
+    "logoUrl": "/images/logo.webp",
+    "footerTagline": "Orchard-dried. Ingredient-honest.",
+    "copyrightText": "Great Lakes Dried Fruit",
+    "marqueeText": "DRIED APPLES • CINNAMON • MAPLE •"
+  }
+}
