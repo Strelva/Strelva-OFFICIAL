@@ -13,6 +13,7 @@ export interface ArraySectionConfig {
   nameKey: string;
   detailKey: string;
   label: string;
+  addLabel: string;
   fields: ArrayFieldDef[];
   defaultItem: () => Record<string, unknown>;
 }
@@ -27,7 +28,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "services",
     nameKey: "name",
     detailKey: "price",
-    label: "Services",
+    label: "Your services",
+    addLabel: "Add service",
     fields: [
       { key: "name", label: "Name", type: "text", placeholder: "Service name", required: true },
       { key: "description", label: "Description", type: "textarea", placeholder: "What this service includes..." },
@@ -57,7 +59,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "testimonials",
     nameKey: "author",
     detailKey: "quote",
-    label: "Reviews",
+    label: "Client reviews",
+    addLabel: "Add review",
     fields: [
       { key: "author", label: "Author", type: "text", placeholder: "Client name", required: true },
       { key: "quote", label: "Quote", type: "textarea", placeholder: "What they said...", required: true },
@@ -76,7 +79,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "events",
     nameKey: "title",
     detailKey: "date",
-    label: "Events",
+    label: "Events & classes",
+    addLabel: "Add event",
     fields: [
       { key: "title", label: "Title", type: "text", placeholder: "Event name", required: true },
       { key: "date", label: "Date", type: "date", required: true },
@@ -113,7 +117,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "providers",
     nameKey: "name",
     detailKey: "service",
-    label: "Providers",
+    label: "Recommended providers",
+    addLabel: "Add provider",
     fields: [
       { key: "name", label: "Name", type: "text", placeholder: "Provider name", required: true },
       {
@@ -151,7 +156,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "faqs",
     nameKey: "question",
     detailKey: "answer",
-    label: "FAQ",
+    label: "Questions & answers",
+    addLabel: "Add question",
     fields: [
       { key: "question", label: "Question", type: "text", placeholder: "What do clients ask?", required: true },
       { key: "answer", label: "Answer", type: "textarea", placeholder: "Your answer..." },
@@ -168,7 +174,8 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     arrayKey: "items",
     nameKey: "name",
     detailKey: "price",
-    label: "Shop",
+    label: "Products",
+    addLabel: "Add product",
     fields: [
       { key: "name", label: "Name", type: "text", placeholder: "Product name", required: true },
       { key: "description", label: "Description", type: "textarea", placeholder: "What is it..." },

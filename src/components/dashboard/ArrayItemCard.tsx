@@ -200,9 +200,9 @@ export function ArrayItemCard({
             {config.fields.map((field) => (
               <div key={field.key}>
                 <label className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
+                  <span className="text-[11px] font-medium text-[#666]">
                     {field.label}
-                    {field.required && <span className="text-[#b5634b] ml-0.5">*</span>}
+                    {field.required && <span className="text-[#d4a89a] ml-0.5">*</span>}
                   </span>
                 </label>
                 <FieldInput

@@ -67,59 +67,59 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
   hero: [
     { key: "headline", label: "Headline", type: "textarea", placeholder: "Main heading..." },
     { key: "subheadline", label: "Subheadline", type: "text", placeholder: "Supporting text..." },
-    { key: "tagline", label: "Tagline", type: "textarea", placeholder: "Brand tagline..." },
-    { key: "ctaText", label: "CTA Text", type: "text", placeholder: "Book a Session" },
-    { key: "ctaLink", label: "CTA Link", type: "url", placeholder: "https://..." },
+    { key: "tagline", label: "Tagline", type: "textarea", placeholder: "Describe what you do..." },
+    { key: "ctaText", label: "Button text", type: "text", placeholder: "Book a Session" },
+    { key: "ctaLink", label: "Button link", type: "url", placeholder: "https://..." },
   ],
   story: [
-    { key: "headline", label: "Headline", type: "text", placeholder: "About section title..." },
-    { key: "accentText", label: "Accent Text", type: "text", placeholder: "Short accent..." },
-    { key: "statement", label: "Statement", type: "textarea", placeholder: "Mission statement..." },
-    { key: "quote", label: "Quote", type: "textarea", placeholder: "Pull quote..." },
-    { key: "quoteAttribution", label: "Quote Attribution", type: "text", placeholder: "— Name" },
+    { key: "headline", label: "Title", type: "text", placeholder: "About section title..." },
+    { key: "accentText", label: "Subtitle", type: "text", placeholder: "Short accent..." },
+    { key: "statement", label: "Your mission", type: "textarea", placeholder: "What drives your work..." },
+    { key: "quote", label: "Featured quote", type: "textarea", placeholder: "A quote that represents you..." },
+    { key: "quoteAttribution", label: "Quote by", type: "text", placeholder: "— Name" },
   ],
   contact: [
-    { key: "phone", label: "Phone", type: "tel", placeholder: "(716) 555-0000" },
+    { key: "phone", label: "Phone number", type: "tel", placeholder: "(716) 555-0000" },
     { key: "email", label: "Email", type: "email", placeholder: "hello@example.com" },
     { key: "address", label: "Address", type: "text", placeholder: "123 Main St, City, ST" },
-    { key: "hours", label: "Hours", type: "textarea", placeholder: "Mon-Fri: 9am-5pm" },
+    { key: "hours", label: "Business hours", type: "textarea", placeholder: "Mon-Fri: 9am-5pm" },
     { key: "instagramUrl", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
     { key: "facebookUrl", label: "Facebook", type: "url", placeholder: "https://facebook.com/..." },
-    { key: "googleMapsUrl", label: "Google Maps", type: "url", placeholder: "https://maps.google.com/..." },
+    { key: "googleMapsUrl", label: "Google Maps link", type: "url", placeholder: "https://maps.google.com/..." },
   ],
   settings: [
-    { key: "siteName", label: "Site Name", type: "text", placeholder: "Business name" },
-    { key: "ownerName", label: "Owner Name", type: "text", placeholder: "Your name" },
+    { key: "siteName", label: "Business name", type: "text", placeholder: "Your business name" },
+    { key: "ownerName", label: "Your name", type: "text", placeholder: "First name" },
     { key: "siteTagline", label: "Tagline", type: "text", placeholder: "Short tagline" },
-    { key: "siteDescription", label: "SEO Description", type: "textarea", placeholder: "Description for Google..." },
-    { key: "bookingUrl", label: "Booking URL", type: "url", placeholder: "https://..." },
-    { key: "footerTagline", label: "Footer Tagline", type: "text", placeholder: "Footer text" },
+    { key: "siteDescription", label: "Google description", type: "textarea", placeholder: "How you appear in search results..." },
+    { key: "bookingUrl", label: "Booking link", type: "url", placeholder: "https://..." },
+    { key: "footerTagline", label: "Footer tagline", type: "text", placeholder: "Footer text" },
     { key: "copyrightText", label: "Copyright", type: "text", placeholder: "2026 Business Name" },
-    { key: "instagramHandle", label: "Instagram Handle", type: "text", placeholder: "rohlaxwellness" },
-    { key: "vagaro_embed_id", label: "Vagaro Business ID", type: "text", placeholder: "rohlaxwellness" },
+    { key: "instagramHandle", label: "Instagram handle", type: "text", placeholder: "rohlaxwellness" },
+    { key: "vagaro_embed_id", label: "Vagaro business ID", type: "text", placeholder: "rohlaxwellness" },
   ],
   // Array sections with top-level fields (rendered above the array editor)
   services: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "What We Offer" },
-    { key: "description", label: "Description", type: "textarea", placeholder: "Section description..." },
+    { key: "headline", label: "Title", type: "text", placeholder: "What We Offer" },
+    { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   faq: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "Common Questions" },
-    { key: "description", label: "Description", type: "textarea", placeholder: "Section description..." },
+    { key: "headline", label: "Title", type: "text", placeholder: "Common Questions" },
+    { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   shop: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "Shop" },
-    { key: "description", label: "Description", type: "textarea", placeholder: "Section description..." },
+    { key: "headline", label: "Title", type: "text", placeholder: "Shop" },
+    { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   providers: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "Wellness Network" },
-    { key: "description", label: "Description", type: "textarea", placeholder: "Section description..." },
+    { key: "headline", label: "Title", type: "text", placeholder: "Wellness Network" },
+    { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   testimonials: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "What Clients Say" },
+    { key: "headline", label: "Title", type: "text", placeholder: "What Clients Say" },
   ],
   events: [
-    { key: "headline", label: "Section Headline", type: "text", placeholder: "Upcoming Events" },
+    { key: "headline", label: "Title", type: "text", placeholder: "Upcoming Events" },
   ],
 };
 
@@ -316,9 +316,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Section header */}
-      <div className="px-4 py-2.5 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0">
-        <span className="text-[10px] uppercase tracking-wider text-[#999]">Editing</span>
-        <h3 className="text-[13px] font-medium text-[#1a1a1a] mt-0.5">
+      <div className="px-4 py-3 border-b border-[#e8e8e8] bg-white shrink-0">
+        <h3 className="text-[14px] font-semibold text-[#1a1a1a]">
           {SECTION_LABELS[activeSection] || activeSection}
         </h3>
       </div>
@@ -397,7 +396,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         {/* Simple fields */}
         {fields && fields.map((field) => (
           <div key={field.key} className="px-4 py-3 border-b border-[#f5f5f5]">
-            <label className="block text-[10px] font-medium uppercase tracking-wider text-[#999] mb-1.5">
+            <label className="block text-[11px] font-medium text-[#666] mb-1.5">
               {field.label}
             </label>
             {field.type === "textarea" ? (

@@ -78,11 +78,11 @@ export function ArrayItemEditor({ section, data, onDataChange }: ArrayItemEditor
   return (
     <div className="px-4 py-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
+        <span className="text-[11px] font-medium text-[#666]">
           {config.label}
         </span>
-        <span className="text-[10px] font-mono text-[#ccc]">
-          {items.length} {items.length === 1 ? "item" : "items"}
+        <span className="text-[10px] text-[#bbb]">
+          {items.length}
         </span>
       </div>
 
@@ -110,7 +110,7 @@ export function ArrayItemEditor({ section, data, onDataChange }: ArrayItemEditor
         className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-dashed border-[#e8e8e8] text-[11px] text-[#7c9a8e] font-medium hover:bg-[#7c9a8e]/[0.04] hover:border-[#7c9a8e]/40 transition-all duration-150"
       >
         <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-        Add {config.label.replace(/s$/, "").toLowerCase()}
+        {config.addLabel}
       </button>
 
       <div ref={bottomRef} />
