@@ -57,7 +57,20 @@ function isAgencyDomain(request: NextRequest): boolean {
   return AGENCY_DOMAINS.includes(host);
 }
 
+// Detect admin.* custom domains → rewrite to /dashboard
+function isAdminSubdomain(request: NextRequest): boolean {
+  const host = (request.headers.get("host") || "").split(":")[0];
+  return host.startsWith("admin.");
+}
+
 export default clerkMiddleware(async (auth, request) => {
+  // admin.greatlakesdriedfruit.com → rewrite to /dashboard (tenant extracted from custom domain map)
+  if (isAdminSubdomain(request) && !request.nextUrl.pathname.startsWith("/dashboard") && !request.nextUrl.pathname.startsWith("/api") && !request.nextUrl.pathname.startsWith("/sign-in") && !request.nextUrl.pathname.startsWith("/sign-up")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard" + (request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname);
+    return NextResponse.rewrite(url);
+  }
+
   // Rewrite root of agency domain to the marketing page
   if (
     isAgencyDomain(request) &&

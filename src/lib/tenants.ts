@@ -26,7 +26,7 @@ export const TENANTS: TenantConfig[] = [
     createdAt: "2026-03-30",
     template: "food-brand",
     features: ["commerce", "newsletter"],
-    customDomains: ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
+    customDomains: ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com", "admin.greatlakesdriedfruit.com"],
     subscriptionStatus: "none",
   },
 ];
