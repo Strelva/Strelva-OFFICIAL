@@ -20,6 +20,17 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   settings: SettingsIcon,
 };
 
+const SECTION_LABELS: Record<string, string> = {
+  hero: "Banner",
+  services: "Services",
+  story: "Story",
+  testimonials: "Reviews",
+  events: "Events",
+  providers: "Providers",
+  contact: "Contact",
+  settings: "Settings",
+};
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -198,8 +209,8 @@ export function HubPage({
                   <div className={`w-2 h-2 rounded-full ${isActive ? "bg-[#7c9a8e]" : "bg-[#e8e8e8]"}`} />
                 );
               })()}
-              <span className="text-[9px] font-medium text-[#999] text-center leading-tight capitalize">
-                {key === "settings" ? "Settings" : key}
+              <span className="text-[9px] font-medium text-[#999] text-center leading-tight">
+                {SECTION_LABELS[key] || key}
               </span>
             </div>
           ))}

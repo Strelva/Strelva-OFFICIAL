@@ -63,15 +63,15 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
 };
 
 const SECTION_LABELS: Record<string, string> = {
-  hero: "Hero",
-  services: "Services",
-  story: "About",
-  testimonials: "Reviews",
-  events: "Events",
-  providers: "Providers",
-  contact: "Contact",
-  settings: "Settings",
-  faq: "FAQ",
+  hero: "Homepage Banner",
+  services: "Your Services",
+  story: "Your Story",
+  testimonials: "Client Reviews",
+  events: "Events & Classes",
+  providers: "Recommended Providers",
+  contact: "Contact Info",
+  settings: "Site Settings",
+  faq: "Common Questions",
   shop: "Shop",
   "trust-strip": "Trust Strip",
   "testimonial-quote": "Quote",
@@ -88,6 +88,13 @@ const SECTION_LABELS: Record<string, string> = {
   "typographic-break": "Divider",
   newsletter: "Newsletter",
 };
+
+// Composite/layout sections that clients shouldn't see in the editor
+const COMPOSITE_SECTIONS = new Set([
+  "trust-strip", "testimonial-quote", "cta", "page-header",
+  "booking-widget", "instagram-feed", "vagaro-booking", "newsletter",
+  "typographic-break", "email-popup",
+]);
 
 const PAGE_OPTIONS = [
   { id: "home", label: "Home" },
@@ -183,6 +190,8 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
   const pageSections = pageConfig?.[activePage]?.sections || [];
   const sortedSections = [...pageSections].sort((a, b) => a.order - b.order);
+  // Filter out composite/layout sections that clients don't directly edit
+  const visibleSections = sortedSections.filter((s) => !COMPOSITE_SECTIONS.has(s.type));
 
   function handleMoveUp(index: number) {
     if (!pageConfig || index === 0) return;
@@ -234,7 +243,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   }
 
   const usedTypes = new Set(sortedSections.map((s) => s.type));
-  const availableTypes = ALL_SECTION_TYPES.filter((t) => !usedTypes.has(t));
+  const availableTypes = ALL_SECTION_TYPES.filter((t) => !usedTypes.has(t) && !COMPOSITE_SECTIONS.has(t));
 
   // Collapsed state
   if (leftCollapsed) {
@@ -248,7 +257,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
           <PanelLeftOpen className="w-4 h-4" strokeWidth={1.5} />
         </button>
         <div className="w-5 h-px bg-[#e8e8e8] my-1" />
-        {sortedSections.filter((s) => s.visible).map((section) => {
+        {visibleSections.filter((s) => s.visible).map((section) => {
           const Icon = SECTION_ICONS[section.type] || Layers;
           const data = sectionData[section.type];
           const isActive = activeSection === section.type;
@@ -323,7 +332,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
       {/* Section rows */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-1 py-2">
-          {sortedSections.map((section, i) => {
+          {visibleSections.map((section, i) => {
             const Icon = SECTION_ICONS[section.type] || Layers;
             const label = SECTION_LABELS[section.type] || section.type;
             const data = sectionData[section.type];
@@ -357,7 +366,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                       </button>
                       <button
                         onClick={() => handleMoveDown(i)}
-                        disabled={i === sortedSections.length - 1}
+                        disabled={i === visibleSections.length - 1}
                         className="text-[#999] hover:text-[#1a1a1a] disabled:opacity-0 transition-colors"
                         title="Move down"
                       >

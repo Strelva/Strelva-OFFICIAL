@@ -124,15 +124,15 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
 };
 
 const SECTION_LABELS: Record<string, string> = {
-  hero: "Hero",
-  services: "Services",
-  story: "About",
-  testimonials: "Reviews",
-  events: "Events",
-  providers: "Providers",
-  contact: "Contact",
-  settings: "Settings",
-  faq: "FAQ",
+  hero: "Homepage Banner",
+  services: "Your Services",
+  story: "Your Story",
+  testimonials: "Client Reviews",
+  events: "Events & Classes",
+  providers: "Recommended Providers",
+  contact: "Contact Info",
+  settings: "Site Settings",
+  faq: "Common Questions",
   shop: "Shop",
 };
 
