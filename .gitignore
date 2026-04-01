@@ -50,3 +50,11 @@ dev-content.json
 .claude/cache/
 .claude/plans/
 .claude/scores/
+.claude/evals/
+
+# screenshots & eval artifacts
+*.png
+*.jpeg
+*.jpg
+blueprint-*.md
+.playwright-mcp/
