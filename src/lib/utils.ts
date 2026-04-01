@@ -1,3 +1,29 @@
+export function truncate(s: string, len: number): string {
+  if (s.length <= len) return s;
+  return s.slice(0, len).trimEnd() + "...";
+}
+
+export async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+export function getFreshness(
+  sectionId: string,
+  timestamps: Record<string, string>,
+): "fresh" | "aging" | "stale" | "unknown" {
+  const ts = timestamps[sectionId];
+  if (!ts) return "unknown";
+  const age = Date.now() - new Date(ts).getTime();
+  const days = age / (86400 * 1000);
+  if (days < 7) return "fresh";
+  if (days < 14) return "aging";
+  return "stale";
+}
+
 export function timeAgo(input: string | number): string {
   const ts = typeof input === "string" ? new Date(input).getTime() : input;
   const diff = Math.floor((Date.now() - ts) / 1000);
