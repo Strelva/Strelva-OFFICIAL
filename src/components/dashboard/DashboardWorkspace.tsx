@@ -6,26 +6,18 @@ import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
-import { BottomToolbar } from "./BottomToolbar";
-import { MobileTabBar } from "./MobileTabBar";
 import { MiniPreview } from "./MiniPreview";
-import BookingsPage from "@/app/dashboard/bookings/page";
-import SettingsPage from "@/app/dashboard/settings/page";
 
 interface DashboardWorkspaceProps {
-  siteName: string;
   ownerName: string;
   sectionData: Record<string, SectionData>;
   timestamps: Record<string, string>;
-  overviewContent: React.ReactNode;
 }
 
 export function DashboardWorkspace({
-  siteName,
   ownerName,
   sectionData,
   timestamps,
-  overviewContent,
 }: DashboardWorkspaceProps) {
   const {
     activePanel,
@@ -34,8 +26,6 @@ export function DashboardWorkspace({
     setRightTab,
     leftCollapsed,
     rightCollapsed,
-    overlayView,
-    setOverlayView,
   } = useDashboard();
 
   const rightPanelContent = (
@@ -90,22 +80,9 @@ export function DashboardWorkspace({
           <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
         </aside>
 
-        {/* Center: Site Preview or Overlay Content */}
+        {/* Center: Site Preview */}
         <main className="flex-1 flex flex-col min-w-0">
-          {overlayView === "overview" || overlayView === "bookings" || overlayView === "settings" ? (
-            <div className="flex-1 flex items-start justify-center overflow-y-auto bg-[#faf9f7]">
-              <div
-                key={overlayView}
-                className={`w-full max-w-xl py-8 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
-              >
-                {overlayView === "overview" && overviewContent}
-                {overlayView === "bookings" && <BookingsPage />}
-                {overlayView === "settings" && <SettingsPage />}
-              </div>
-            </div>
-          ) : (
-            <SitePreview />
-          )}
+          <SitePreview />
         </main>
 
         {/* Right: Properties + Chat */}
@@ -125,20 +102,7 @@ export function DashboardWorkspace({
       {/* Tablet (md to lg): vertical split — preview top, editor bottom */}
       <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0">
         <div className="h-[45%] border-b border-[#e8e8e8] shrink-0">
-          {overlayView === "overview" || overlayView === "bookings" || overlayView === "settings" ? (
-            <div className="h-full overflow-y-auto bg-[#faf9f7]">
-              <div
-                key={overlayView}
-                className={`w-full max-w-xl mx-auto py-6 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
-              >
-                {overlayView === "overview" && overviewContent}
-                {overlayView === "bookings" && <BookingsPage />}
-                {overlayView === "settings" && <SettingsPage />}
-              </div>
-            </div>
-          ) : (
-            <SitePreview />
-          )}
+          <SitePreview />
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {rightPanelContent}
@@ -148,42 +112,20 @@ export function DashboardWorkspace({
       {/* Mobile: single panel with mini-preview */}
       <div className="flex md:hidden flex-1 min-h-0">
         <div className="flex-1 flex flex-col overflow-hidden">
-          {overlayView ? (
-            <div className="flex-1 overflow-y-auto bg-[#faf9f7]">
-              <div
-                key={overlayView}
-                className={`w-full max-w-xl mx-auto py-6 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
-              >
-                {overlayView === "overview" && overviewContent}
-                {overlayView === "bookings" && <BookingsPage />}
-                {overlayView === "settings" && <SettingsPage />}
-              </div>
-            </div>
-          ) : (
+          {activePanel === "content" && (
+            <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
+          )}
+          {activePanel === "preview" && <SitePreview />}
+          {activePanel === "chat" && (
             <>
-              {activePanel === "content" && (
-                <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
-              )}
-              {activePanel === "preview" && <SitePreview />}
-              {activePanel === "chat" && (
-                <>
-                  <MiniPreview />
-                  <div className="flex-1 min-h-0">
-                    <ChatPanel ownerName={ownerName} />
-                  </div>
-                </>
-              )}
+              <MiniPreview />
+              <div className="flex-1 min-h-0">
+                <ChatPanel ownerName={ownerName} />
+              </div>
             </>
           )}
         </div>
       </div>
-
-      {/* Bottom toolbar (desktop) */}
-      <BottomToolbar siteName={siteName} />
-
-      {/* Mobile tab bar */}
-      <MobileTabBar />
-
     </div>
   );
 }

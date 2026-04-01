@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 
 type Panel = "content" | "preview" | "chat";
 type RightTab = "properties" | "chat";
-type OverlayView = "overview" | "bookings" | "settings" | null;
 type EditMode = "live" | "draft";
 
 interface DashboardContextValue {
@@ -29,10 +28,6 @@ interface DashboardContextValue {
   rightCollapsed: boolean;
   toggleLeft: () => void;
   toggleRight: () => void;
-
-  // Overlay sheets
-  overlayView: OverlayView;
-  setOverlayView: (view: OverlayView) => void;
 
   // Iframe refresh + scroll-to-section
   refreshKey: number;
@@ -80,12 +75,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("chat");
-  const [overlayView, setOverlayView] = useState<OverlayView>(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem("reb-overview-shown")) {
-      return null;
-    }
-    return "overview";
-  });
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
@@ -98,13 +87,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setLeftCollapsed(stored.left);
     setRightCollapsed(stored.right);
   }, []);
-
-  // Mark overview as shown for this browser session
-  useEffect(() => {
-    if (overlayView === "overview" && typeof window !== "undefined") {
-      sessionStorage.setItem("reb-overview-shown", "1");
-    }
-  }, [overlayView]);
 
   const persistCollapse = (left: boolean, right: boolean) => {
     try {
@@ -159,8 +141,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         rightCollapsed,
         toggleLeft,
         toggleRight,
-        overlayView,
-        setOverlayView,
         refreshKey,
         triggerRefresh,
         scrollToSection,

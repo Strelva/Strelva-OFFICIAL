@@ -5,7 +5,6 @@ import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
-import { DashboardWorkspace } from "@/components/dashboard/DashboardWorkspace";
 import { HubPage } from "@/components/dashboard/HubPage";
 
 const EMPTY_CLICKS = { total: 0, today: 0, thisWeek: 0 };
@@ -73,12 +72,10 @@ export default async function DashboardPage() {
   const allowed = await hasTenantAccess(tenant);
   if (!allowed) redirect("/");
 
-  const [pageViews, bookingClicks, referralClicks, eventClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
+  const [pageViews, bookingClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
     await Promise.all([
       safeFetch(() => getClickCounts("page-view", tenant), EMPTY_CLICKS),
       safeFetch(() => getClickCounts("booking-click", tenant), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("provider-referral-click", tenant), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("event-click", tenant), EMPTY_CLICKS),
       safeFetch(() => getContent("hero", tenant), defaults.hero),
       safeFetch(() => getContent("services", tenant), defaults.services),
       safeFetch(() => getContent("story", tenant), defaults.story),
@@ -98,7 +95,7 @@ export default async function DashboardPage() {
   const siteScore = computeSiteScore({ hero, services, story, testimonials, events, providers, contact, settings });
   const suggestions = getSuggestions(siteScore, timestamps, bookingClicks);
 
-  const overviewContent = (
+  return (
     <HubPage
       ownerName={settings.ownerName || "there"}
       pageViews={pageViews}
@@ -106,16 +103,6 @@ export default async function DashboardPage() {
       siteScore={siteScore}
       suggestions={suggestions}
       sectionData={sectionData}
-    />
-  );
-
-  return (
-    <DashboardWorkspace
-      siteName={settings.siteName || "Your Business"}
-      ownerName={settings.ownerName || "there"}
-      sectionData={sectionData}
-      timestamps={timestamps}
-      overviewContent={overviewContent}
     />
   );
 }
