@@ -6,8 +6,7 @@ import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
-import { BottomToolbar } from "./BottomToolbar";
-import { MobileTabBar } from "./MobileTabBar";
+
 import { MiniPreview } from "./MiniPreview";
 
 interface ContentWorkspaceProps {
@@ -131,11 +130,6 @@ export function ContentWorkspace({
         </div>
       </div>
 
-      {/* Bottom toolbar (desktop) */}
-      <BottomToolbar siteName={siteName} />
-
-      {/* Mobile tab bar */}
-      <MobileTabBar />
     </div>
   );
 }

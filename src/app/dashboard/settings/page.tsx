@@ -32,7 +32,7 @@ type SettingsData = Record<string, string>;
 
 export default function SettingsPage() {
   const dashboard = useDashboardOptional();
-  const router = useRouter();
+
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);

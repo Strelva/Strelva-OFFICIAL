@@ -18,32 +18,25 @@ interface DashboardNavProps {
 }
 
 const NAV_ITEMS = [
-  { label: "Home", href: "/dashboard", overlay: "overview" as const, icon: LayoutDashboard },
-  { label: "Content", href: "/dashboard", overlay: null, icon: FileStack },
-  { label: "Bookings", href: "/dashboard/bookings", overlay: "bookings" as const, icon: CalendarDays },
-  { label: "Settings", href: "/dashboard/settings", overlay: "settings" as const, icon: Settings },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Content", href: "/dashboard/content", icon: FileStack },
+  { label: "Bookings", href: "/dashboard/bookings", icon: CalendarDays },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export function DashboardNav({ siteName }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { editMode, setEditMode, setOverlayView, overlayView, setActivePanel } = useDashboard();
+  const { editMode, setEditMode, setChatDrawerOpen, setActivePanel } = useDashboard();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const handleNavClick = (item: (typeof NAV_ITEMS)[number]) => {
-    // Set overlay for backwards compat with DashboardWorkspace
-    if (item.overlay) {
-      setOverlayView(item.overlay);
-    } else {
-      setOverlayView(null);
-    }
     router.push(item.href);
   };
 
   const isActive = (item: (typeof NAV_ITEMS)[number]) => {
-    if (item.overlay && overlayView === item.overlay) return true;
-    if (!item.overlay && pathname === item.href && !overlayView) return true;
-    return false;
+    if (item.href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(item.href);
   };
 
   return (
@@ -201,7 +194,7 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
 
           {/* Chat */}
           <button
-            onClick={() => setActivePanel("chat")}
+            onClick={() => setChatDrawerOpen(true)}
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 text-[#999]`}
           >
             <MessageCircle className="w-5 h-5" strokeWidth={1.5} />
