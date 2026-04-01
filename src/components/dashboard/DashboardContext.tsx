@@ -40,6 +40,10 @@ interface DashboardContextValue {
   scrollToSection: string | null;
   setScrollToSection: (section: string | null) => void;
 
+  // Chat drawer
+  chatDrawerOpen: boolean;
+  setChatDrawerOpen: (open: boolean) => void;
+
   // Draft mode
   editMode: EditMode;
   setEditMode: (mode: EditMode) => void;
@@ -84,6 +88,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   });
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
 
@@ -136,6 +141,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setChatPromptState(prompt);
     setRightTab("chat"); // Switch to chat tab when using chat prompt
     setActivePanel("chat"); // Switch to chat on mobile
+    setChatDrawerOpen(true); // Also open the floating drawer
   }, []);
 
   return (
@@ -159,6 +165,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         triggerRefresh,
         scrollToSection,
         setScrollToSection,
+        chatDrawerOpen,
+        setChatDrawerOpen,
         editMode,
         setEditMode,
         hasDraft,
