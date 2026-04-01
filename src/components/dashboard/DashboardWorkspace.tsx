@@ -144,7 +144,7 @@ export function DashboardWorkspace({
   );
 
   return (
-    <div className="flex flex-col h-screen bg-[#faf9f7]">
+    <div className="flex flex-col flex-1 min-h-0 bg-[#faf9f7]">
       {/* Desktop (lg+): 3-panel layout */}
       <div className="hidden lg:flex flex-1 min-h-0">
         {/* Left: Content Browser */}
