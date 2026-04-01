@@ -173,7 +173,6 @@ export default function SettingsPage() {
                   onClick={() => {
                     if (dashboard) {
                       dashboard.setChatPrompt(field.chatPrompt);
-                      dashboard.setOverlayView(null);
                     }
                   }}
                   className="w-8 h-8 rounded-md flex items-center justify-center text-[#999] hover:text-[#7c9a8e] hover:bg-[#7c9a8e]/[0.06] transition-all duration-150"
@@ -205,7 +204,7 @@ export default function SettingsPage() {
         <button
           onClick={() => {
             if (dashboard) {
-              dashboard.setOverlayView(null);
+              dashboard.setChatPrompt("Update my site settings");
             }
           }}
           className="flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-[#7c9a8e] hover:bg-[#5a7a6e] text-xs font-medium text-white transition-colors duration-150"
