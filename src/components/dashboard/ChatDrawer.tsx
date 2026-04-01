@@ -40,7 +40,7 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
       {!chatDrawerOpen && (
         <button
           onClick={() => setChatDrawerOpen(true)}
-          className="fixed z-40 w-12 h-12 rounded-full bg-[#7c9a8e] text-white shadow-lg hover:bg-[#5a7a6e] transition-all duration-200 flex items-center justify-center bottom-20 right-4 md:bottom-6 md:right-6"
+          className="fixed z-40 w-10 h-10 rounded-full bg-[#7c9a8e] text-white shadow-md hover:bg-[#5a7a6e] hover:scale-105 transition-all duration-200 flex items-center justify-center bottom-20 right-4 md:bottom-5 md:right-5"
           title="Open AI Chat"
         >
           <MessageCircle className="w-5 h-5" strokeWidth={1.5} />

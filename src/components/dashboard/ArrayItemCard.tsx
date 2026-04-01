@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, ChevronDown as MoveDown, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Upload, X, GripVertical } from "lucide-react";
 import Image from "next/image";
 import type { ArrayFieldDef, ArraySectionConfig } from "./arrayFieldConfigs";
 
@@ -19,7 +19,7 @@ interface ArrayItemCardProps {
 }
 
 const INPUT_CLASS =
-  "w-full bg-[#fafafa] border border-[#e8e8e8] rounded-md px-3 py-2 text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150";
+  "w-full bg-white border border-[#e8e8e8] rounded-md px-3 py-1.5 text-[13px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150";
 
 function ImageField({ value, onChange }: { value: unknown; onChange: (val: unknown) => void }) {
   const [uploading, setUploading] = useState(false);
@@ -45,13 +45,13 @@ function ImageField({ value, onChange }: { value: unknown; onChange: (val: unkno
     <div>
       {url ? (
         <div className="relative inline-block">
-          <Image src={url} alt="" width={80} height={80} className="w-20 h-20 object-cover rounded-lg border border-[#e8e8e8]" />
+          <Image src={url} alt="" width={80} height={80} className="w-16 h-16 object-cover rounded-lg border border-[#e8e8e8]" />
           <button
             type="button"
             onClick={() => onChange("")}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#b5634b] text-white flex items-center justify-center hover:bg-[#943a24] transition-colors"
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#b5634b] text-white flex items-center justify-center hover:bg-[#943a24] transition-colors"
           >
-            <X className="w-3 h-3" strokeWidth={2} />
+            <X className="w-2.5 h-2.5" strokeWidth={2} />
           </button>
         </div>
       ) : (
@@ -59,10 +59,10 @@ function ImageField({ value, onChange }: { value: unknown; onChange: (val: unkno
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[#e8e8e8] text-[11px] text-[#999] hover:border-[#7c9a8e] hover:text-[#7c9a8e] transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-[#e8e8e8] text-[11px] text-[#999] hover:border-[#7c9a8e] hover:text-[#7c9a8e] transition-colors"
         >
-          <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
-          {uploading ? "Uploading..." : "Upload photo"}
+          <Upload className="w-3 h-3" strokeWidth={1.5} />
+          {uploading ? "Uploading..." : "Upload"}
         </button>
       )}
       <input
@@ -96,13 +96,13 @@ function FieldInput({
         role="switch"
         aria-checked={!!value}
         onClick={() => onChange(!value)}
-        className={`relative w-9 h-5 rounded-full transition-colors duration-150 ${
-          value ? "bg-[#7c9a8e]" : "bg-[#e8e8e8]"
+        className={`relative w-8 h-[18px] rounded-full transition-colors duration-150 ${
+          value ? "bg-[#7c9a8e]" : "bg-[#e0e0e0]"
         }`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-150 ${
-            value ? "translate-x-4" : "translate-x-0"
+          className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+            value ? "translate-x-[14px]" : "translate-x-0"
           }`}
         />
       </button>
@@ -131,8 +131,8 @@ function FieldInput({
         value={(value as string) || ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}
-        rows={3}
-        className={INPUT_CLASS + " resize-none"}
+        rows={2}
+        className={INPUT_CLASS + " resize-none leading-relaxed"}
       />
     );
   }
@@ -170,78 +170,82 @@ export function ArrayItemCard({
   const detail = (item[config.detailKey] as string) || "";
 
   return (
-    <div className="border border-[#e8e8e8] rounded-lg overflow-hidden bg-white">
-      {/* Collapsed row */}
+    <div className={`rounded-lg overflow-hidden transition-all duration-150 ${
+      isExpanded
+        ? "bg-[#fafafa] ring-1 ring-[#e8e8e8]"
+        : "bg-white hover:bg-[#fafafa] border border-[#f0f0f0]"
+    }`}>
+      {/* Header row */}
       <button
         type="button"
         onClick={onToggleExpand}
-        className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-[#fafafa] transition-colors duration-150 text-left"
+        className="group w-full flex items-center gap-2 px-3 py-2 text-left"
       >
-        <span className="text-[10px] font-mono text-[#ccc] w-4 shrink-0 text-center">
-          {index + 1}
-        </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-[#1a1a1a] truncate font-medium">{name}</p>
-          {detail && (
-            <p className="text-[10px] text-[#999] truncate">{truncate(detail, 50)}</p>
+          <p className="text-[12px] text-[#1a1a1a] truncate font-medium leading-tight">{name}</p>
+          {detail && !isExpanded && (
+            <p className="text-[10px] text-[#aaa] truncate mt-0.5 leading-tight">{truncate(detail, 60)}</p>
           )}
         </div>
-        {isExpanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-[#999] shrink-0" strokeWidth={1.5} />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-[#999] shrink-0" strokeWidth={1.5} />
-        )}
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-[#ccc] shrink-0 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
+          strokeWidth={1.5}
+        />
       </button>
 
-      {/* Expanded fields */}
+      {/* Expanded editor */}
       {isExpanded && (
-        <div className="border-t border-[#e8e8e8] animate-fade-in-up">
-          <div className="p-3 space-y-3">
+        <div className="px-3 pb-3">
+          <div className="space-y-2.5">
             {config.fields.map((field) => (
               <div key={field.key}>
-                <label className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-medium text-[#666]">
-                    {field.label}
-                    {field.required && <span className="text-[#d4a89a] ml-0.5">*</span>}
-                  </span>
-                </label>
-                <FieldInput
-                  field={field}
-                  value={item[field.key]}
-                  onChange={(val) => onChange(field.key, val)}
-                />
+                {field.type === "toggle" ? (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-[11px] text-[#666]">{field.label}</span>
+                    <FieldInput field={field} value={item[field.key]} onChange={(val) => onChange(field.key, val)} />
+                  </div>
+                ) : (
+                  <>
+                    <label className="block text-[10px] text-[#999] mb-0.5">
+                      {field.label}
+                    </label>
+                    <FieldInput
+                      field={field}
+                      value={item[field.key]}
+                      onChange={(val) => onChange(field.key, val)}
+                    />
+                  </>
+                )}
               </div>
             ))}
           </div>
 
-          {/* Card actions */}
-          <div className="flex items-center justify-between px-3 py-2 border-t border-[#f5f5f5] bg-[#fafafa]">
-            {/* Reorder */}
-            <div className="flex items-center gap-0.5">
+          {/* Actions row — compact, inline */}
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e8e8e8]/60">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
                 disabled={index === 0}
-                className="p-1 rounded text-[#999] hover:text-[#1a1a1a] hover:bg-[#e8e8e8] disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[#999] transition-colors duration-150"
+                className="p-1 rounded text-[#ccc] hover:text-[#666] disabled:opacity-0 transition-all duration-150"
                 title="Move up"
               >
-                <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <ChevronUp className="w-3 h-3" strokeWidth={2} />
               </button>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
                 disabled={index === total - 1}
-                className="p-1 rounded text-[#999] hover:text-[#1a1a1a] hover:bg-[#e8e8e8] disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[#999] transition-colors duration-150"
+                className="p-1 rounded text-[#ccc] hover:text-[#666] disabled:opacity-0 transition-all duration-150"
                 title="Move down"
               >
-                <MoveDown className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <ChevronDown className="w-3 h-3" strokeWidth={2} />
               </button>
             </div>
 
-            {/* Delete */}
             {confirmDelete ? (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[#b5634b]">Delete?</span>
+                <span className="text-[10px] text-[#b5634b]">Remove?</span>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -254,17 +258,17 @@ export function ArrayItemCard({
                   onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
                   className="text-[10px] text-[#999] hover:text-[#1a1a1a] transition-colors"
                 >
-                  Cancel
+                  No
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
-                className="p-1 rounded text-[#999] hover:text-[#b5634b] hover:bg-red-500/[0.06] transition-colors duration-150"
-                title="Delete item"
+                className="p-1 rounded text-[#ccc] hover:text-[#b5634b] transition-colors duration-150"
+                title="Remove"
               >
-                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Trash2 className="w-3 h-3" strokeWidth={1.5} />
               </button>
             )}
           </div>

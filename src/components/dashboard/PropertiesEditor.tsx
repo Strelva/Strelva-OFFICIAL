@@ -392,11 +392,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       )}
 
       {/* Fields */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-20">
         {/* Simple fields */}
         {fields && fields.map((field) => (
-          <div key={field.key} className="px-4 py-3 border-b border-[#f5f5f5]">
-            <label className="block text-[11px] font-medium text-[#666] mb-1.5">
+          <div key={field.key} className="px-4 py-2">
+            <label className="block text-[10px] text-[#999] mb-0.5">
               {field.label}
             </label>
             {field.type === "textarea" ? (
@@ -404,8 +404,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 value={(data[field.key] as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
-                rows={3}
-                className="w-full bg-[#fafafa] border border-[#e8e8e8] rounded-md px-3 py-2 text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150 resize-none"
+                rows={2}
+                className="w-full bg-white border border-[#e8e8e8] rounded-md px-3 py-1.5 text-[13px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150 resize-none leading-relaxed"
               />
             ) : (
               <input
@@ -413,7 +413,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 value={(data[field.key] as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
-                className="w-full bg-[#fafafa] border border-[#e8e8e8] rounded-md px-3 py-2 text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150"
+                className="w-full bg-white border border-[#e8e8e8] rounded-md px-3 py-1.5 text-[13px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150"
               />
             )}
           </div>
