@@ -1,8 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
-import gsap from "gsap";
 import { useDashboard } from "./DashboardContext";
 import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
@@ -39,70 +37,6 @@ export function DashboardWorkspace({
     overlayView,
     setOverlayView,
   } = useDashboard();
-
-  const overviewRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (overlayView !== "overview") return;
-    const el = overviewRef.current;
-    if (!el) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-      // Accent line draws in
-      const accent = el.querySelector('[data-ov="accent"]');
-      if (accent) {
-        gsap.set(accent, { scaleX: 0, transformOrigin: "left" });
-        tl.to(accent, { scaleX: 1, duration: 0.6 }, 0);
-      }
-
-      // Headline fades up
-      const headline = el.querySelector('[data-ov="headline"]');
-      if (headline) {
-        gsap.set(headline, { opacity: 0, y: 16 });
-        tl.to(headline, { opacity: 1, y: 0, duration: 0.5 }, 0.1);
-      }
-
-      // Metric cards stagger in with scale
-      const metrics = el.querySelectorAll('[data-ov="metric"]');
-      if (metrics.length) {
-        gsap.set(metrics, { opacity: 0, y: 16, scale: 0.97 });
-        tl.to(metrics, { opacity: 1, y: 0, scale: 1, duration: 0.4, stagger: 0.08 }, 0.25);
-      }
-
-      // Suggestions card
-      const suggestions = el.querySelector('[data-ov="suggestions"]');
-      if (suggestions) {
-        gsap.set(suggestions, { opacity: 0, y: 12 });
-        tl.to(suggestions, { opacity: 1, y: 0, duration: 0.4 }, 0.5);
-      }
-
-      // Site map card
-      const sitemap = el.querySelector('[data-ov="sitemap"]');
-      if (sitemap) {
-        gsap.set(sitemap, { opacity: 0, y: 12 });
-        tl.to(sitemap, { opacity: 1, y: 0, duration: 0.4 }, 0.6);
-      }
-
-      // Site map icons pop in
-      const icons = el.querySelectorAll('[data-ov="icon"]');
-      if (icons.length) {
-        gsap.set(icons, { opacity: 0, scale: 0.8 });
-        tl.to(icons, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.04 }, 0.7);
-      }
-
-      // Activity card
-      const activity = el.querySelector('[data-ov="activity"]');
-      if (activity) {
-        gsap.set(activity, { opacity: 0, y: 12 });
-        tl.to(activity, { opacity: 1, y: 0, duration: 0.4 }, 0.85);
-      }
-    }, el);
-
-    return () => ctx.revert();
-  }, [overlayView]);
 
   const rightPanelContent = (
     <>
@@ -162,7 +96,6 @@ export function DashboardWorkspace({
             <div className="flex-1 flex items-start justify-center overflow-y-auto bg-[#faf9f7]">
               <div
                 key={overlayView}
-                ref={overlayView === "overview" ? overviewRef : undefined}
                 className={`w-full max-w-xl py-8 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
               >
                 {overlayView === "overview" && overviewContent}
@@ -196,7 +129,6 @@ export function DashboardWorkspace({
             <div className="h-full overflow-y-auto bg-[#faf9f7]">
               <div
                 key={overlayView}
-                ref={overlayView === "overview" ? overviewRef : undefined}
                 className={`w-full max-w-xl mx-auto py-6 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
               >
                 {overlayView === "overview" && overviewContent}
@@ -220,7 +152,6 @@ export function DashboardWorkspace({
             <div className="flex-1 overflow-y-auto bg-[#faf9f7]">
               <div
                 key={overlayView}
-                ref={overlayView === "overview" ? overviewRef : undefined}
                 className={`w-full max-w-xl mx-auto py-6 ${overlayView !== "overview" ? "animate-overview-enter" : ""}`}
               >
                 {overlayView === "overview" && overviewContent}
