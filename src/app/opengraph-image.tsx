@@ -1,11 +1,46 @@
 import { ImageResponse } from "next/og";
+import { headers } from "next/headers";
 
 export const runtime = "edge";
-export const alt = "Rohlax Wellness — Wellness Services in Buffalo, NY";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+const TENANT_OG: Record<
+  string,
+  { name: string; tagline: string; initials: string; bg: string; accent: string; fg: string }
+> = {
+  rohlax: {
+    name: "Rohlax Wellness",
+    tagline: "Wellness Services in Buffalo, NY",
+    initials: "RW",
+    bg: "#3d3229",
+    accent: "#7c9a8e",
+    fg: "#faf9f7",
+  },
+  gldf: {
+    name: "Great Lakes Dried Fruit",
+    tagline: "Orchard-Dried Apple Snacks",
+    initials: "GL",
+    bg: "#2c2418",
+    accent: "#5a260c",
+    fg: "#faf8f5",
+  },
+};
+
+const DEFAULT_OG = {
+  name: "REB",
+  tagline: "Your site works while you sleep",
+  initials: "R",
+  bg: "#3d3229",
+  accent: "#7c9a8e",
+  fg: "#faf9f7",
+};
+
 export default async function Image() {
+  const h = await headers();
+  const tenant = h.get("x-tenant") || "rohlax";
+  const og = TENANT_OG[tenant] || DEFAULT_OG;
+
   return new ImageResponse(
     (
       <div
@@ -16,12 +51,12 @@ export default async function Image() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#3d3229",
+          backgroundColor: og.bg,
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Subtle decorative border */}
+        {/* Decorative border */}
         <div
           style={{
             position: "absolute",
@@ -29,13 +64,13 @@ export default async function Image() {
             left: 24,
             right: 24,
             bottom: 24,
-            border: "1px solid rgba(250, 249, 247, 0.12)",
+            border: `1px solid rgba(250, 249, 247, 0.12)`,
             borderRadius: 16,
             display: "flex",
           }}
         />
 
-        {/* RW monogram */}
+        {/* Monogram badge */}
         <div
           style={{
             display: "flex",
@@ -44,7 +79,7 @@ export default async function Image() {
             width: 72,
             height: 72,
             borderRadius: 14,
-            backgroundColor: "#7c9a8e",
+            backgroundColor: og.accent,
             marginBottom: 32,
           }}
         >
@@ -52,11 +87,11 @@ export default async function Image() {
             style={{
               fontFamily: "Georgia, serif",
               fontSize: 36,
-              color: "#faf9f7",
+              color: og.fg,
               letterSpacing: -1,
             }}
           >
-            RW
+            {og.initials}
           </span>
         </div>
 
@@ -66,12 +101,12 @@ export default async function Image() {
             fontFamily: "Georgia, serif",
             fontSize: 56,
             fontWeight: 400,
-            color: "#faf9f7",
+            color: og.fg,
             margin: 0,
             letterSpacing: -1,
           }}
         >
-          Rohlax Wellness
+          {og.name}
         </h1>
 
         {/* Tagline */}
@@ -79,18 +114,16 @@ export default async function Image() {
           style={{
             fontFamily: "sans-serif",
             fontSize: 24,
-            color: "rgba(250, 249, 247, 0.6)",
+            color: `rgba(250, 249, 247, 0.6)`,
             margin: 0,
             marginTop: 16,
             letterSpacing: 0.5,
           }}
         >
-          Wellness Services in Buffalo, NY
+          {og.tagline}
         </p>
       </div>
     ),
-    {
-      ...size,
-    }
+    { ...size }
   );
 }
