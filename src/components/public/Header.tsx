@@ -82,7 +82,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 </Link>
               ))}
               <Link
-                href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
+                href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
                 className="text-xs font-semibold tracking-wider uppercase px-5 py-2.5 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)",
@@ -104,7 +104,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
             {/* Mobile: CTA + hamburger */}
             <div className="flex md:hidden items-center gap-4">
               <Link
-                href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
+                href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
                 className="text-[0.625rem] font-semibold tracking-wider uppercase px-4 py-2 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.2)" : "var(--sage)",
@@ -160,7 +160,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
               </Link>
             ))}
             <Link
-              href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
+              href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
               className="mt-4 px-8 py-3.5 text-xs font-bold tracking-widest uppercase transition-all"
               style={{ background: "var(--sage)", color: "var(--pure-white)" }}
             >

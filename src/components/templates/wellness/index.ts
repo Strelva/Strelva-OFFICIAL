@@ -50,7 +50,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType<any>> = {
 
 const SECTION_CONTENT_KEYS: Record<string, ContentSection[]> = {
   hero: ["hero", "settings"],
-  services: ["services"],
+  services: ["services", "settings"],
   story: ["story", "settings"],
   testimonials: ["testimonials"],
   events: ["events", "settings"],
@@ -61,7 +61,7 @@ const SECTION_CONTENT_KEYS: Record<string, ContentSection[]> = {
   "booking-widget": ["services", "testimonials", "settings"],
   "trust-strip": ["settings", "contact"],
   "testimonial-quote": ["testimonials"],
-  cta: [],
+  cta: ["settings"],
   "page-header": [],
   "instagram-feed": ["settings"],
   "vagaro-booking": ["settings"],
@@ -114,7 +114,10 @@ function buildSectionProps(
         ownerName: (content.settings as Record<string, unknown>)?.ownerName,
       };
     case "services":
-      return { services: content.services };
+      return {
+        services: content.services,
+        bookingUrl: (content.settings as Record<string, unknown>)?.bookingUrl,
+      };
     case "story":
       return {
         story: content.story,
@@ -155,7 +158,10 @@ function buildSectionProps(
     case "testimonial-quote":
       return { testimonials: content.testimonials };
     case "cta":
-      return customProps || {};
+      return {
+        ...(customProps || {}),
+        ctaHref: (customProps?.ctaHref as string) || (content.settings as Record<string, unknown>)?.bookingUrl,
+      };
     case "instagram-feed": {
       const settings = content.settings as Record<string, unknown>;
       return {

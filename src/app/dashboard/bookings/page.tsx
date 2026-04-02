@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, Clock, User, CheckCircle, XCircle } from "lucide-react";
+import { Tabs } from "@/components/ui/Tabs";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonLine } from "@/components/ui/Skeleton";
+import { IconButton } from "@/components/ui/Button";
 
 interface BookingItem {
   id: string;
@@ -88,11 +94,9 @@ export default function BookingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-[#f0f0f0] rounded" />
-          <div className="h-64 bg-[#f0f0f0] rounded" />
-        </div>
+      <div className="p-8 space-y-4">
+        <SkeletonLine width="w-48" height="h-8" />
+        <SkeletonLine width="w-full" height="h-64" />
       </div>
     );
   }
@@ -101,8 +105,8 @@ export default function BookingsPage() {
     <div className="p-6 md:p-8 max-w-5xl">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-[#1a1a1a] tracking-tight">Bookings</h1>
-        <p className="text-sm text-[#999] mt-1">Manage your appointment schedule</p>
+        <h1 className="text-2xl font-semibold text-warm-black tracking-tight">Bookings</h1>
+        <p className="text-sm text-gray-muted mt-1">Manage your appointment schedule</p>
       </div>
 
       {/* Error banner */}
@@ -113,105 +117,106 @@ export default function BookingsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
-          <p className="text-2xl font-semibold text-[#1a1a1a]">{todayBookings.length}</p>
-          <p className="text-xs text-[#999] mt-1">Today</p>
-        </div>
-        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
-          <p className="text-2xl font-semibold text-[#1a1a1a]">{weekBookings.length}</p>
-          <p className="text-xs text-[#999] mt-1">This week</p>
-        </div>
-        <div className="p-4 rounded-lg bg-white border border-[#e8e8e8]">
-          <p className="text-2xl font-semibold text-[#1a1a1a]">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <Card>
+          <p className="text-2xl font-semibold text-warm-black">{todayBookings.length}</p>
+          <p className="text-xs text-gray-muted mt-1">Today</p>
+        </Card>
+        <Card>
+          <p className="text-2xl font-semibold text-warm-black">{weekBookings.length}</p>
+          <p className="text-xs text-gray-muted mt-1">This week</p>
+        </Card>
+        <Card>
+          <p className="text-2xl font-semibold text-warm-black">
             {bookings.filter((b) => b.status === "confirmed" && b.date >= today).length}
           </p>
-          <p className="text-xs text-[#999] mt-1">Upcoming</p>
-        </div>
+          <p className="text-xs text-gray-muted mt-1">Upcoming</p>
+        </Card>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 mb-6 bg-[#f5f5f5] border border-[#e8e8e8] rounded-md p-0.5 w-fit">
-        {(["upcoming", "past", "all"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
-              filter === f ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#999] hover:text-[#666]"
-            }`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+      <div className="mb-6">
+        <Tabs
+          variant="segment"
+          items={[
+            { value: "upcoming", label: "Upcoming" },
+            { value: "past", label: "Past" },
+            { value: "all", label: "All" },
+          ]}
+          value={filter}
+          onChange={(v) => setFilter(v as "upcoming" | "past" | "all")}
+        />
       </div>
 
       {/* Bookings list */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-[#999]">
-          <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No {filter} bookings</p>
-          <p className="text-xs mt-1 text-[#ccc]">Bookings will appear here when clients book through your site.</p>
-        </div>
+        <EmptyState
+          icon={<Calendar className="w-5 h-5 text-gray-muted" strokeWidth={1.5} />}
+          title={`No ${filter} bookings`}
+          description="Bookings will appear here when clients book through your site."
+          className="py-16"
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map((b) => (
-            <div
+            <Card
               key={b.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-white border border-[#e8e8e8] hover:border-[#d0d0d0] transition-colors"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-center gap-4">
-                <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-[#f5f5f5]">
-                  <span className="text-xs font-bold text-[#1a1a1a] leading-none">
+                <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-gray-bg">
+                  <span className="text-xs font-bold text-warm-black leading-none">
                     {new Date(b.date + "T12:00:00").getDate()}
                   </span>
-                  <span className="text-[10px] text-[#999] uppercase">
+                  <span className="text-[11px] text-gray-muted uppercase">
                     {new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#1a1a1a]">{b.serviceName}</p>
+                  <p className="text-sm font-medium text-warm-black">{b.serviceName}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-xs text-[#999]">
+                    <span className="flex items-center gap-1 text-xs text-gray-muted">
                       <Clock className="w-3 h-3" />
                       {formatTime(b.startTime)} – {formatTime(b.endTime)}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-[#999]">
+                    <span className="flex items-center gap-1 text-xs text-gray-muted">
                       <User className="w-3 h-3" />
                       {b.clientName}
                     </span>
                   </div>
-                  {b.notes && <p className="text-xs text-[#ccc] mt-1">{b.notes}</p>}
+                  {b.notes && <p className="text-xs text-gray-subtle mt-1">{b.notes}</p>}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-medium tracking-wider uppercase px-2 py-1 rounded ${
-                  b.status === "confirmed" ? "bg-emerald-500/10 text-emerald-600" :
-                  b.status === "completed" ? "bg-blue-500/10 text-blue-600" :
-                  "bg-red-500/10 text-red-600"
-                }`}>
+                <Badge variant={
+                  b.status === "confirmed" ? "emerald" :
+                  b.status === "completed" ? "sage" :
+                  "red"
+                }>
                   {b.status}
-                </span>
+                </Badge>
                 {b.status === "confirmed" && (
                   <div className="flex gap-1 ml-2">
-                    <button
+                    <IconButton
+                      label="Mark completed"
+                      size="sm"
                       onClick={() => updateStatus(b.id, "completed")}
-                      className="p-1.5 rounded hover:bg-[#f5f5f5] transition-colors"
-                      title="Mark completed"
                     >
                       <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
+                      label="Cancel"
+                      size="sm"
+                      variant="danger"
                       onClick={() => updateStatus(b.id, "cancelled")}
-                      className="p-1.5 rounded hover:bg-[#f5f5f5] transition-colors"
-                      title="Cancel"
                     >
                       <XCircle className="w-4 h-4 text-red-500" />
-                    </button>
+                    </IconButton>
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

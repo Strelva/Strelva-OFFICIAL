@@ -8,7 +8,6 @@ import {
   Mail,
   BarChart3,
   Bot,
-  User,
   Loader2,
   CheckCircle2,
   Trash2,
@@ -16,19 +15,10 @@ import {
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
 import { useDashboardOptional } from "./DashboardContext";
-
-const SECTION_LABELS: Record<string, string> = {
-  hero: "Hero",
-  services: "Services",
-  story: "About",
-  testimonials: "Reviews",
-  events: "Events",
-  providers: "Providers",
-  contact: "Contact",
-  settings: "Settings",
-  faq: "FAQ",
-  shop: "Shop",
-};
+import { SECTION_LABELS } from "@/components/ui/section-labels";
+import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const QUICK_PROMPTS = [
   { label: "Update my hours", icon: Clock },
@@ -295,22 +285,20 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-[#e8e8e8] shrink-0">
-        <div className="w-7 h-7 rounded-full bg-[#7c9a8e] flex items-center justify-center">
-          <Bot className="w-[14px] h-[14px] text-white" strokeWidth={1.5} />
-        </div>
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-gray-border shrink-0">
+        <Avatar type="bot" size="md" />
         <div className="flex-1">
-          <h2 className="text-[12px] font-medium text-[#1a1a1a]">
+          <h2 className="text-[12px] font-medium text-warm-black">
             AI Assistant
           </h2>
-          <p className="text-[11px] text-[#999]">
+          <p className="text-[11px] text-gray-muted">
             Update your site via chat
           </p>
         </div>
         {!isEmpty && (
           <button
             onClick={handleClearChat}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#ccc] hover:text-[#999] hover:bg-[#f5f5f5] transition-colors duration-150"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-gray-subtle hover:text-gray-muted hover:bg-gray-bg transition-colors duration-150"
             title="Clear chat"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -320,10 +308,10 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
 
       {/* Active section context pill */}
       {dashCtx?.activeSection && (
-        <div className="px-4 py-1.5 border-b border-[#e8e8e8] bg-[#fafafa]">
-          <span className="text-[10px] text-[#999]">
+        <div className="px-4 py-1.5 border-b border-gray-border bg-gray-bg-alt">
+          <span className="text-[11px] text-gray-muted">
             Editing:{" "}
-            <span className="font-medium text-[#7c9a8e]">
+            <span className="font-medium text-sage">
               {SECTION_LABELS[dashCtx.activeSection] || dashCtx.activeSection}
             </span>
           </span>
@@ -345,29 +333,28 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-10 h-10 rounded-lg bg-[#7c9a8e]/[0.06] flex items-center justify-center mb-3">
-              <Bot className="w-5 h-5 text-[#7c9a8e]" strokeWidth={1.5} />
-            </div>
-            <h3 className="text-[13px] font-medium text-[#1a1a1a] mb-1">
-              Hey {ownerName}!
-            </h3>
-            <p className="text-[12px] text-[#999] max-w-[240px] mb-6">
-              I can update your site, add events, change hours, and more.
-            </p>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
-              {QUICK_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt.label}
-                  onClick={() => handleQuickPrompt(prompt.label)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-[#e8e8e8] text-[11px] text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150 text-left"
-                >
-                  <prompt.icon className="w-[14px] h-[14px] text-[#999] shrink-0" strokeWidth={1.5} />
-                  <span>{prompt.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <EmptyState
+            icon={<Bot className="w-5 h-5 text-sage" strokeWidth={1.5} />}
+            title={`Hey ${ownerName}!`}
+            description="I can update your site, add events, change hours, and more."
+            className="h-full"
+            action={
+              <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <Button
+                    key={prompt.label}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleQuickPrompt(prompt.label)}
+                    icon={<prompt.icon className="w-[14px] h-[14px] text-gray-muted shrink-0" strokeWidth={1.5} />}
+                    className="justify-start bg-white border border-gray-border text-warm-black hover:bg-gray-bg"
+                  >
+                    {prompt.label}
+                  </Button>
+                ))}
+              </div>
+            }
+          />
         )}
 
         {messages.map((message) => (
@@ -382,23 +369,17 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                 message.role === "user" ? "flex-row-reverse" : "flex-row"
               }`}
             >
-              <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                  message.role === "user" ? "bg-[#f5f5f5]" : "bg-[#7c9a8e]"
-                }`}
-              >
-                {message.role === "user" ? (
-                  <User className="w-3 h-3 text-[#999]" strokeWidth={1.5} />
-                ) : (
-                  <Bot className="w-3 h-3 text-white" strokeWidth={1.5} />
-                )}
-              </div>
+              <Avatar
+                type={message.role === "user" ? "user" : "bot"}
+                size="sm"
+                className="mt-0.5"
+              />
               <div className={message.role === "user" ? "text-right" : "text-left"}>
                 <div
                   className={`px-3 py-2 rounded-2xl text-[12px] leading-relaxed ${
                     message.role === "user"
-                      ? "bg-[#7c9a8e] text-white"
-                      : "bg-[#f5f5f5] text-[#1a1a1a] border border-[#e8e8e8]"
+                      ? "bg-sage text-white"
+                      : "bg-gray-bg text-warm-black border border-gray-border"
                   }`}
                 >
                   {message.content ? (
@@ -413,20 +394,20 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                     <span className="flex items-center gap-1.5 py-1">
                       {toolStatus ? (
                         <>
-                          <Loader2 className="w-3 h-3 text-[#7c9a8e] animate-spin" strokeWidth={1.5} />
-                          <span className="text-[11px] text-[#7c9a8e]">{toolStatus}</span>
+                          <Loader2 className="w-3 h-3 text-sage animate-spin" strokeWidth={1.5} />
+                          <span className="text-[11px] text-sage">{toolStatus}</span>
                         </>
                       ) : (
                         <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" style={{ animationDelay: "0.2s" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7c9a8e] animate-typing-dot" style={{ animationDelay: "0.4s" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-sage animate-typing-dot" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-sage animate-typing-dot" style={{ animationDelay: "0.2s" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-sage animate-typing-dot" style={{ animationDelay: "0.4s" }} />
                         </span>
                       )}
                     </span>
                   )}
                 </div>
-                <span className="font-mono text-[10px] text-[#ccc] mt-0.5 block px-1">
+                <span className="font-mono text-[11px] text-gray-subtle mt-0.5 block px-1">
                   {timeAgo(message.timestamp)}
                 </span>
               </div>
@@ -439,30 +420,32 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       {!isEmpty && !isLoading && (
         <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
           {QUICK_PROMPTS.map((prompt) => (
-            <button
+            <Button
               key={prompt.label}
+              variant="ghost"
+              size="sm"
               onClick={() => handleQuickPrompt(prompt.label)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#e8e8e8] text-[11px] text-[#999] hover:bg-[#f5f5f5] hover:text-[#7c9a8e] transition-colors duration-150 whitespace-nowrap shrink-0"
+              icon={<prompt.icon className="w-3 h-3" strokeWidth={1.5} />}
+              className="bg-white border border-gray-border text-gray-muted hover:text-sage whitespace-nowrap shrink-0"
             >
-              <prompt.icon className="w-3 h-3" strokeWidth={1.5} />
               {prompt.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
       {/* Input */}
-      <div className="p-3 border-t border-[#e8e8e8]">
+      <div className="p-3 border-t border-gray-border">
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 bg-white border border-[#e8e8e8] rounded-lg px-3 py-1.5 focus-within:border-[#7c9a8e] focus-within:shadow-[0_0_0_1px_rgba(124,154,142,0.15)] transition-all duration-150"
+          className="flex items-center gap-2 bg-white border border-gray-border rounded-lg px-3 py-1.5 focus-within:border-sage focus-within:shadow-[0_0_0_1px_rgba(124,154,142,0.15)] transition-all duration-150"
         >
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Tell me what to update..."
-            className="flex-1 bg-transparent text-[12px] text-[#1a1a1a] placeholder-[#ccc] outline-none h-[44px]"
+            className="flex-1 bg-transparent text-[12px] text-warm-black placeholder-gray-subtle outline-none h-[44px]"
             disabled={isLoading}
           />
           <button
@@ -470,8 +453,8 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
             disabled={isLoading || !input.trim()}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 shrink-0 ${
               isLoading
-                ? "bg-[#7c9a8e]"
-                : "bg-[#7c9a8e] hover:bg-[#5a7a6e] disabled:bg-[#e8e8e8]"
+                ? "bg-sage"
+                : "bg-sage hover:bg-sage-dark disabled:bg-gray-border"
             }`}
           >
             {isLoading ? (

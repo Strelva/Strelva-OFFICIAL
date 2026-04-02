@@ -2,14 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import {
-  Sparkles,
   Layers,
-  BookOpen,
-  Star,
-  Calendar,
-  Users,
-  Phone,
-  Settings,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -20,94 +13,19 @@ import {
   EyeOff,
   Plus,
   GripVertical,
-  Instagram,
-  CalendarCheck,
-  ShoppingBag,
-  BarChart3,
-  Mail,
-  Type,
-  Bell,
-  Megaphone,
-  type LucideIcon,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
 import type { PageSectionConfig, SitePageConfig } from "@/lib/types";
 import { DEFAULT_PAGE_CONFIG } from "@/lib/pageConfigDefaults";
-
-const SECTION_ICONS: Record<string, LucideIcon> = {
-  hero: Sparkles,
-  services: Layers,
-  story: BookOpen,
-  testimonials: Star,
-  events: Calendar,
-  providers: Users,
-  contact: Phone,
-  settings: Settings,
-  faq: BookOpen,
-  shop: Layers,
-  "trust-strip": Sparkles,
-  "testimonial-quote": Star,
-  cta: Sparkles,
-  "page-header": BookOpen,
-  "booking-widget": Calendar,
-  "instagram-feed": Instagram,
-  "vagaro-booking": CalendarCheck,
-  // Food-brand / GLDF sections
-  products: ShoppingBag,
-  comparison: BarChart3,
-  notify: Bell,
-  "email-popup": Mail,
-  "typographic-break": Type,
-  newsletter: Megaphone,
-};
-
-const SECTION_LABELS: Record<string, string> = {
-  hero: "Homepage Banner",
-  services: "Your Services",
-  story: "Your Story",
-  testimonials: "Client Reviews",
-  events: "Events & Classes",
-  providers: "Recommended Providers",
-  contact: "Contact Info",
-  settings: "Site Settings",
-  faq: "Common Questions",
-  shop: "Shop",
-  "trust-strip": "Trust Strip",
-  "testimonial-quote": "Quote",
-  cta: "Call to Action",
-  "page-header": "Page Header",
-  "booking-widget": "Booking Widget",
-  "instagram-feed": "Instagram Feed",
-  "vagaro-booking": "Vagaro Booking",
-  // Food-brand / GLDF sections
-  products: "Products",
-  comparison: "Comparison",
-  notify: "Email Signup",
-  "email-popup": "Email Popup",
-  "typographic-break": "Divider",
-  newsletter: "Newsletter",
-};
-
-// Composite/layout sections that clients shouldn't see in the editor
-const COMPOSITE_SECTIONS = new Set([
-  "trust-strip", "testimonial-quote", "cta", "page-header",
-  "booking-widget", "instagram-feed", "vagaro-booking", "newsletter",
-  "typographic-break", "email-popup",
-]);
+import { SECTION_LABELS, SECTION_ICONS, COMPOSITE_SECTIONS, ALL_SECTION_TYPES } from "@/components/ui/section-labels";
+import { Tabs } from "@/components/ui/Tabs";
+import { Button } from "@/components/ui/Button";
 
 const PAGE_OPTIONS = [
   { id: "home", label: "Home" },
   { id: "about", label: "About" },
   { id: "contact", label: "Contact" },
-];
-
-const ALL_SECTION_TYPES = [
-  "hero", "services", "story", "testimonials", "events", "providers",
-  "contact", "faq", "shop", "trust-strip", "testimonial-quote",
-  "cta", "page-header", "booking-widget", "instagram-feed", "vagaro-booking",
-  // Food-brand / GLDF sections
-  "products", "comparison", "notify", "email-popup", "typographic-break", "newsletter",
 ];
 
 export interface SectionData {
@@ -251,12 +169,12 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
       <div className="flex flex-col items-center py-3 gap-1 bg-white">
         <button
           onClick={toggleLeft}
-          className="w-8 h-8 rounded-md flex items-center justify-center text-[#999] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+          className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
           title="Expand content panel"
         >
           <PanelLeftOpen className="w-4 h-4" strokeWidth={1.5} />
         </button>
-        <div className="w-5 h-px bg-[#e8e8e8] my-1" />
+        <div className="w-5 h-px bg-gray-border my-1" />
         {visibleSections.filter((s) => s.visible).map((section) => {
           const Icon = SECTION_ICONS[section.type] || Layers;
           const data = sectionData[section.type];
@@ -267,8 +185,8 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               onClick={() => { toggleLeft(); setActiveSection(section.type); }}
               className={`relative w-8 h-8 rounded-md flex items-center justify-center transition-colors duration-150 ${
                 isActive
-                  ? "text-[#7c9a8e] bg-[#7c9a8e]/[0.06]"
-                  : "text-[#999] hover:text-[#1a1a1a] hover:bg-[#f5f5f5]"
+                  ? "text-sage bg-sage/[0.06]"
+                  : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
               }`}
               title={SECTION_LABELS[section.type] || section.type}
             >
@@ -276,8 +194,8 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               {data && (
                 <div className={`absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full ${
                   data.status === "live" ? "bg-emerald-500"
-                    : data.status === "configured" ? "bg-[#999]"
-                    : "bg-[#ccc]"
+                    : data.status === "configured" ? "bg-gray-muted"
+                    : "bg-gray-subtle"
                 }`} />
               )}
             </button>
@@ -290,21 +208,21 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header — page selector as pill tabs */}
-      <div className="border-b border-[#e8e8e8] shrink-0">
+      <div className="border-b border-gray-border shrink-0">
         <div className="flex items-center justify-between px-3 h-10">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-gray-muted">
             Pages
           </span>
           <div className="flex items-center gap-1">
             {saving && (
-              <span className="text-[9px] font-mono text-[#7c9a8e] animate-pulse">saving</span>
+              <span className="text-[11px] font-mono text-sage animate-pulse">saving</span>
             )}
             {saveError && (
-              <span className="text-[9px] font-mono text-[#b5634b]">save failed</span>
+              <span className="text-[11px] font-mono text-terra">save failed</span>
             )}
             <button
               onClick={toggleLeft}
-              className="hidden md:flex w-6 h-6 rounded-md items-center justify-center text-[#999] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+              className="hidden md:flex w-6 h-6 rounded-md items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
               title="Collapse panel"
             >
               <PanelLeftClose className="w-[14px] h-[14px]" strokeWidth={1.5} />
@@ -312,20 +230,13 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
           </div>
         </div>
         {/* Page pills */}
-        <div className="flex flex-wrap gap-1 px-3 pb-2.5">
-          {PAGE_OPTIONS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setActivePage(p.id)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all duration-150 ${
-                activePage === p.id
-                  ? "bg-[#7c9a8e] text-white"
-                  : "bg-[#f5f5f5] text-[#999] hover:text-[#1a1a1a] hover:bg-[#e8e8e8]"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="px-3 pb-2.5">
+          <Tabs
+            variant="pill"
+            items={PAGE_OPTIONS.map((p) => ({ value: p.id, label: p.label }))}
+            value={activePage}
+            onChange={setActivePage}
+          />
         </div>
       </div>
 
@@ -350,8 +261,8 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                 {/* Row */}
                 <div className={`flex items-center h-10 transition-colors duration-150 ${
                   isExpanded
-                    ? "bg-[#7c9a8e]/[0.06]"
-                    : "hover:bg-[#f5f5f5]"
+                    ? "bg-sage/[0.06]"
+                    : "hover:bg-gray-bg"
                 }`}>
                   {/* Grip + reorder */}
                   <div className="flex items-center w-7 shrink-0 justify-center group/grip">
@@ -359,7 +270,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                       <button
                         onClick={() => handleMoveUp(i)}
                         disabled={i === 0}
-                        className="text-[#999] hover:text-[#1a1a1a] disabled:opacity-0 transition-colors"
+                        className="text-gray-muted hover:text-warm-black disabled:opacity-0 transition-colors"
                         title="Move up"
                       >
                         <ChevronUp className="w-3 h-3" strokeWidth={2} />
@@ -367,13 +278,13 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                       <button
                         onClick={() => handleMoveDown(i)}
                         disabled={i === visibleSections.length - 1}
-                        className="text-[#999] hover:text-[#1a1a1a] disabled:opacity-0 transition-colors"
+                        className="text-gray-muted hover:text-warm-black disabled:opacity-0 transition-colors"
                         title="Move down"
                       >
                         <ChevronDown className="w-3 h-3" strokeWidth={2} />
                       </button>
                     </div>
-                    <GripVertical className="w-3 h-3 text-[#ccc] group-hover/grip:hidden" strokeWidth={1.5} />
+                    <GripVertical className="w-3 h-3 text-gray-subtle group-hover/grip:hidden" strokeWidth={1.5} />
                   </div>
 
                   {/* Main row button */}
@@ -383,18 +294,18 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                   >
                     <Icon
                       className={`w-[14px] h-[14px] mr-2.5 shrink-0 transition-colors duration-150 ${
-                        isExpanded ? "text-[#7c9a8e]" : "text-[#999]"
+                        isExpanded ? "text-sage" : "text-gray-muted"
                       }`}
                       strokeWidth={1.5}
                     />
                     <span className={`text-[12px] font-medium flex-1 min-w-0 truncate ${
-                      isHidden ? "line-through text-[#999]" : "text-[#1a1a1a]"
+                      isHidden ? "line-through text-gray-muted" : "text-warm-black"
                     }`}>
                       {label}
                     </span>
 
                     {data?.count && (
-                      <span className="font-mono text-[10px] text-[#ccc] mr-1">{data.count}</span>
+                      <span className="font-mono text-[11px] text-gray-subtle mr-1">{data.count}</span>
                     )}
 
                     {data?.freshness === "stale" && (
@@ -402,16 +313,16 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                     )}
 
                     {isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-[#999] shrink-0" strokeWidth={1.5} />
+                      <ChevronDown className="w-3 h-3 text-gray-muted shrink-0" strokeWidth={1.5} />
                     ) : (
-                      <ChevronRight className="w-3 h-3 text-[#ccc] shrink-0" strokeWidth={1.5} />
+                      <ChevronRight className="w-3 h-3 text-gray-subtle shrink-0" strokeWidth={1.5} />
                     )}
                   </button>
 
                   {/* Visibility toggle */}
                   <button
                     onClick={() => handleToggleVisibility(i)}
-                    className="w-7 h-7 flex items-center justify-center text-[#ccc] hover:text-[#999] transition-colors shrink-0 rounded-md hover:bg-[#f5f5f5]"
+                    className="w-7 h-7 flex items-center justify-center text-gray-subtle hover:text-gray-muted transition-colors shrink-0 rounded-md hover:bg-gray-bg"
                     title={isHidden ? "Show section" : "Hide section"}
                   >
                     {isHidden ? (
@@ -424,63 +335,69 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
                 {/* Expanded content */}
                 {isExpanded && data && (
-                  <div className="bg-[#fafafa] border-t border-[#e8e8e8]/50 animate-fade-in-up">
+                  <div className="bg-gray-bg-alt border-t border-gray-border/50 animate-fade-in-up">
                     {data.items && data.items.length > 0 ? (
                       <div className="py-1">
                         {data.items.slice(0, 5).map((item, j) => (
                           <div key={j} className="flex items-center justify-between h-7 px-4 pl-[42px]">
-                            <span className="text-[11px] text-[#666] truncate flex-1">{item.label}</span>
+                            <span className="text-[11px] text-gray-fg truncate flex-1">{item.label}</span>
                             {item.detail && (
-                              <span className="text-[10px] font-mono text-[#ccc] ml-2 shrink-0">{item.detail}</span>
+                              <span className="text-[11px] font-mono text-gray-subtle ml-2 shrink-0">{item.detail}</span>
                             )}
                           </div>
                         ))}
                         {data.items.length > 5 && (
                           <div className="h-7 flex items-center px-4 pl-[42px]">
-                            <span className="text-[10px] font-mono text-[#ccc]">+{data.items.length - 5} more</span>
+                            <span className="text-[11px] font-mono text-gray-subtle">+{data.items.length - 5} more</span>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="h-8 flex items-center px-4 pl-[42px]">
-                        <span className="text-[11px] text-[#999] italic">
+                        <span className="text-[11px] text-gray-muted italic">
                           {data.status === "empty" ? "No content yet" : data.preview}
                         </span>
                       </div>
                     )}
 
                     {/* Actions row */}
-                    <div className="flex items-center justify-between h-9 px-3 pl-[42px] border-t border-[#e8e8e8]/50 bg-white/50">
+                    <div className="flex items-center justify-between h-9 px-3 pl-[42px] border-t border-gray-border/50 bg-white/50">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-[5px] h-[5px] rounded-full ${
                           data.freshness === "fresh" ? "bg-emerald-500" :
                           data.freshness === "aging" ? "bg-amber-400" :
                           data.freshness === "stale" ? "bg-red-400" :
-                          "bg-[#ccc]"
+                          "bg-gray-subtle"
                         }`} />
-                        <span className="text-[10px] font-mono text-[#ccc]">
+                        <span className="text-[11px] font-mono text-gray-subtle">
                           {ts ? timeAgo(ts) : "never"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => { e.stopPropagation(); setChatPrompt(data.chatPrompt); }}
-                          className="px-2 py-1 rounded text-[10px] font-medium text-[#7c9a8e] hover:bg-[#7c9a8e]/[0.06] transition-colors duration-150"
+                          className="text-[11px] text-sage hover:bg-sage/[0.06]"
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => { e.stopPropagation(); setScrollToSection(section.type); }}
-                          className="px-2 py-1 rounded text-[10px] font-medium text-[#7c9a8e] hover:bg-[#7c9a8e]/[0.06] transition-colors duration-150"
+                          className="text-[11px] text-sage hover:bg-sage/[0.06]"
                         >
                           View
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => { e.stopPropagation(); handleRemoveSection(i); }}
-                          className="px-2 py-1 rounded text-[10px] font-medium text-[#999] hover:text-[#b5634b] hover:bg-red-500/[0.04] transition-colors duration-150"
+                          className="text-[11px] text-gray-muted hover:text-terra hover:bg-red-500/[0.04]"
                         >
                           Remove
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -493,19 +410,19 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         {/* Add Section */}
         <div className="px-3 pb-3">
           {showAddMenu ? (
-            <div className="border border-[#e8e8e8] rounded-lg bg-white overflow-hidden animate-fade-in-up shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-[#e8e8e8] bg-[#fafafa]">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">Add Section</span>
+            <div className="border border-gray-border rounded-lg bg-white overflow-hidden animate-fade-in-up shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-border bg-gray-bg-alt">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-muted">Add Section</span>
                 <button
                   onClick={() => setShowAddMenu(false)}
-                  className="text-[10px] text-[#999] hover:text-[#1a1a1a] transition-colors"
+                  className="text-[11px] text-gray-muted hover:text-warm-black transition-colors"
                 >
                   Cancel
                 </button>
               </div>
               <div className="max-h-52 overflow-y-auto py-1">
                 {availableTypes.length === 0 ? (
-                  <div className="px-3 py-4 text-[11px] text-[#999] text-center">
+                  <div className="px-3 py-4 text-[11px] text-gray-muted text-center">
                     All sections added to this page
                   </div>
                 ) : (
@@ -515,11 +432,11 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                       <button
                         key={type}
                         onClick={() => handleAddSection(type)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#f5f5f5] transition-colors text-left rounded-md mx-1"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-bg transition-colors text-left rounded-md mx-1"
                         style={{ width: "calc(100% - 8px)" }}
                       >
-                        <Icon className="w-[14px] h-[14px] text-[#999]" strokeWidth={1.5} />
-                        <span className="text-[12px] text-[#1a1a1a]">{SECTION_LABELS[type] || type}</span>
+                        <Icon className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                        <span className="text-[12px] text-warm-black">{SECTION_LABELS[type] || type}</span>
                       </button>
                     );
                   })
@@ -527,14 +444,23 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               </div>
             </div>
           ) : (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowAddMenu(true)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-dashed border-[#e8e8e8] text-[11px] text-[#7c9a8e] font-medium hover:bg-[#7c9a8e]/[0.04] hover:border-[#7c9a8e]/40 transition-all duration-150"
+              icon={<Plus className="w-3.5 h-3.5" strokeWidth={1.5} />}
+              className="w-full justify-center border border-sage/30 md:border-dashed text-sage hover:bg-sage/[0.04] hover:border-sage/40"
             >
-              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
               Add section
-            </button>
+            </Button>
           )}
+        </div>
+
+        {/* Mobile guidance */}
+        <div className="flex-1 flex items-end justify-center pb-6 md:hidden">
+          <p className="text-[11px] text-gray-subtle text-center px-8">
+            Tap a section to preview it, or use the chat to make changes
+          </p>
         </div>
       </div>
     </div>

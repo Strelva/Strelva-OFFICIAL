@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Monitor, Tablet, Smartphone, ExternalLink } from "lucide-react";
+import { Monitor, Tablet, Smartphone, ExternalLink, Loader2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
 const DEVICES = [
@@ -25,6 +25,7 @@ type DeviceId = (typeof DEVICES)[number]["id"];
 
 export function SitePreview() {
   const [device, setDevice] = useState<DeviceId>("desktop");
+  const [iframeLoading, setIframeLoading] = useState(true);
   const {
     refreshKey,
     scrollToSection,
@@ -46,6 +47,11 @@ export function SitePreview() {
   const pagePath = PAGE_PATHS[currentPage] || "/";
   const editParam = editMode === "draft" ? "?edit=true" : "";
   const iframeSrc = `${pagePath}${editParam}`;
+
+  // Reset loading state when refreshKey changes
+  useEffect(() => {
+    setIframeLoading(true);
+  }, [refreshKey]);
 
   // Handle scroll-to-section requests from ContentBrowser
   useEffect(() => {
@@ -112,24 +118,25 @@ export function SitePreview() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 h-9 border-b border-[#e8e8e8] shrink-0 bg-white">
+      <div className="flex items-center justify-between px-4 h-9 border-b border-gray-border shrink-0 bg-white">
         <div className="flex items-center gap-2">
           <div className="w-[6px] h-[6px] rounded-full bg-emerald-500" />
         </div>
 
         <div className="flex items-center gap-2">
           {/* Device switcher */}
-          <div className="flex items-center gap-0.5 bg-[#f5f5f5] rounded-full p-0.5">
+          <div className="flex items-center gap-0.5 bg-gray-bg rounded-full p-0.5">
             {DEVICES.map((d) => (
               <button
                 key={d.id}
                 onClick={() => setDevice(d.id)}
-                className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] transition-all duration-150 ${
+                className={`flex items-center justify-center w-8 h-8 rounded-full text-[11px] transition-all duration-150 ${
                   device === d.id
-                    ? "bg-white text-[#1a1a1a] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    : "text-[#999] hover:text-[#666]"
+                    ? "bg-white text-warm-black shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                    : "text-gray-muted hover:text-gray-fg"
                 }`}
                 title={d.label}
+                aria-label={`${d.label} view`}
               >
                 <d.icon className="w-[14px] h-[14px]" strokeWidth={1.5} />
               </button>
@@ -140,7 +147,7 @@ export function SitePreview() {
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-6 h-6 rounded-md text-[#999] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
             title="Open in new tab"
           >
             <ExternalLink className="w-[14px] h-[14px]" strokeWidth={1.5} />
@@ -149,9 +156,9 @@ export function SitePreview() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 flex justify-center p-3 overflow-hidden bg-[#f0f0f0]">
+      <div className="flex-1 flex justify-center p-3 overflow-hidden bg-gray-bg-hover">
         <div
-          className="h-full rounded-lg overflow-hidden transition-all duration-300 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+          className="relative h-full rounded-lg overflow-hidden transition-all duration-300 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
           style={{
             width: activeDevice.width,
             maxWidth: "100%",
@@ -163,7 +170,16 @@ export function SitePreview() {
             src={iframeSrc}
             className="w-full h-full border-0"
             title="Live site preview"
+            onLoad={() => setIframeLoading(false)}
           />
+          {iframeLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
+                <span className="text-[11px] text-gray-muted">Loading preview...</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { useReveal } from "@/hooks/useReveal";
 import { TrackedLink } from "./TrackedLink";
 import type { ServicesContent } from "@/lib/types";
 
-export function Services({ services }: { services: ServicesContent }) {
+export function Services({ services, bookingUrl }: { services: ServicesContent; bookingUrl?: string }) {
   const headerRef = useReveal();
   const gridRef = useReveal();
 
@@ -94,7 +94,7 @@ export function Services({ services }: { services: ServicesContent }) {
                   </TrackedLink>
                 ) : (
                   <a
-                    href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
+                    href={bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
                     className="inline-flex text-xs font-bold tracking-widest uppercase px-6 py-3 transition-all duration-300 self-start"
                     style={{ background: "var(--pure-white)", color: "var(--sage)" }}
                     onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -213,7 +213,7 @@ export function Services({ services }: { services: ServicesContent }) {
                       </span>
                     ) : (
                       <a
-                        href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer"
+                        href={bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                         style={{ color: "var(--sage)" }}
                       >

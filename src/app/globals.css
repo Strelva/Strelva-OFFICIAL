@@ -21,6 +21,16 @@
   --terra-light: #c97a64;
   --pure-white:  #ffffff;
   --warm-black:  #1a1510;
+
+  /* Semantic grays — dashboard surfaces */
+  --gray-border:   #e8e8e8;
+  --gray-bg:       #f5f5f5;
+  --gray-bg-hover: #f0f0f0;
+  --gray-bg-alt:   #fafafa;
+  --gray-muted:    #999999;
+  --gray-subtle:   #cccccc;
+  --gray-faint:    #bbbbbb;
+  --gray-fg:       #666666;
 }
 
 @theme inline {
@@ -39,6 +49,16 @@
   --color-terra-light: var(--terra-light);
   --color-pure-white: var(--pure-white);
   --color-warm-black: var(--warm-black);
+
+  /* Semantic grays */
+  --color-gray-border: var(--gray-border);
+  --color-gray-bg: var(--gray-bg);
+  --color-gray-bg-hover: var(--gray-bg-hover);
+  --color-gray-bg-alt: var(--gray-bg-alt);
+  --color-gray-muted: var(--gray-muted);
+  --color-gray-subtle: var(--gray-subtle);
+  --color-gray-faint: var(--gray-faint);
+  --color-gray-fg: var(--gray-fg);
 }
 
 /* Base */
@@ -346,9 +366,28 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-page-enter {
+  .animate-page-enter,
+  .animate-fade-in-up,
+  .animate-toast,
+  .animate-panel-left,
+  .animate-panel-right,
+  .animate-overlay-enter,
+  .animate-card-enter {
     animation: none;
     opacity: 1;
+    transform: none;
+  }
+  .animate-pulse-gentle {
+    animation: none;
+  }
+  .animate-typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 

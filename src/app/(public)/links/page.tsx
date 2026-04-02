@@ -62,7 +62,7 @@ export default async function LinksPage() {
     },
     {
       title: "View Services",
-      url: "https://www.vagaro.com/rohlaxwellness",
+      url: bookingUrl,
       icon: "shop" as const,
       featured: false,
       external: true,

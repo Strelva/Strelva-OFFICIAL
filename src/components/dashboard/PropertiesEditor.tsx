@@ -5,6 +5,11 @@ import { Save, Loader2, Check, RotateCcw, AlertCircle, MessageCircle } from "luc
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
+import { TextInput, TextArea } from "@/components/ui/TextInput";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonLine } from "@/components/ui/Skeleton";
 
 // Composite sections that don't have their own content API —
 // they pull from other sections on the public site.
@@ -121,19 +126,6 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
   events: [
     { key: "headline", label: "Title", type: "text", placeholder: "Upcoming Events" },
   ],
-};
-
-const SECTION_LABELS: Record<string, string> = {
-  hero: "Homepage Banner",
-  services: "Your Services",
-  story: "Your Story",
-  testimonials: "Client Reviews",
-  events: "Events & Classes",
-  providers: "Recommended Providers",
-  contact: "Contact Info",
-  settings: "Site Settings",
-  faq: "Common Questions",
-  shop: "Shop",
 };
 
 // Array sections use the inline editor from ARRAY_CONFIGS
@@ -260,24 +252,28 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   // No section selected
   if (!activeSection) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-        <div className="w-10 h-10 rounded-lg bg-[#f5f5f5] flex items-center justify-center mb-3">
+      <EmptyState
+        icon={
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
           </svg>
-        </div>
-        <p className="text-[12px] text-[#999]">Select a section to edit</p>
-        <p className="text-[11px] text-[#ccc] mt-1">Click any section in the left panel</p>
-      </div>
+        }
+        title="Select a section to edit"
+        description="Click any section in the left panel"
+        className="h-full"
+      />
     );
   }
 
   // Loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-4 h-4 text-[#999] animate-spin" />
+      <div className="p-4 space-y-4">
+        <SkeletonLine width="w-1/3" height="h-4" />
+        <SkeletonLine width="w-full" height="h-8" />
+        <SkeletonLine width="w-full" height="h-8" />
+        <SkeletonLine width="w-2/3" height="h-8" />
       </div>
     );
   }
@@ -287,16 +283,16 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     const info = COMPOSITE_SECTION_INFO[activeSection];
     return (
       <div className="flex flex-col h-full bg-white">
-        <div className="px-4 py-2.5 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0">
-          <span className="text-[10px] uppercase tracking-wider text-[#999]">Viewing</span>
-          <h3 className="text-[13px] font-medium text-[#1a1a1a] mt-0.5">{info.label}</h3>
+        <div className="px-4 py-2.5 border-b border-gray-border bg-gray-bg-alt shrink-0">
+          <span className="text-[11px] uppercase tracking-wider text-gray-muted">Viewing</span>
+          <h3 className="text-[13px] font-medium text-warm-black mt-0.5">{info.label}</h3>
         </div>
         <div className="flex flex-col items-center justify-center flex-1 px-6 text-center">
-          <div className="w-10 h-10 rounded-lg bg-[#7c9a8e]/[0.08] flex items-center justify-center mb-3">
-            <MessageCircle className="w-[18px] h-[18px] text-[#7c9a8e]" strokeWidth={1.5} />
+          <div className="w-10 h-10 rounded-lg bg-sage/[0.08] flex items-center justify-center mb-3">
+            <MessageCircle className="w-[18px] h-[18px] text-sage" strokeWidth={1.5} />
           </div>
-          <p className="text-[12px] text-[#666] mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
-          <p className="text-[11px] text-[#999] mb-4">Use AI Chat to make changes</p>
+          <p className="text-[12px] text-gray-fg mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
+          <p className="text-[11px] text-gray-muted mb-4">Use AI Chat to make changes</p>
         </div>
       </div>
     );
@@ -305,7 +301,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   if (!data) {
     return (
       <div className="flex items-center justify-center h-full px-6 text-center">
-        <p className="text-[12px] text-[#999]">Could not load section data</p>
+        <p className="text-[12px] text-gray-muted">Could not load section data</p>
       </div>
     );
   }
@@ -316,60 +312,56 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Section header */}
-      <div className="px-4 py-3 border-b border-[#e8e8e8] bg-white shrink-0">
-        <h3 className="text-[14px] font-semibold text-[#1a1a1a]">
+      <div className="px-4 py-3 border-b border-gray-border bg-white shrink-0">
+        <h3 className="text-[14px] font-semibold text-warm-black">
           {SECTION_LABELS[activeSection] || activeSection}
         </h3>
       </div>
 
       {/* Save bar */}
       {hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#e8e8e8] bg-[#fafafa] shrink-0 animate-fade-in-up">
-          <span className="text-[11px] text-[#999]">Unsaved changes</span>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0 animate-fade-in-up">
+          <span className="text-[11px] text-gray-muted">Unsaved changes</span>
           <div className="flex items-center gap-1.5">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RotateCcw className="w-3 h-3" strokeWidth={1.5} />}
               onClick={handleReset}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-[#999] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
             >
-              <RotateCcw className="w-3 h-3" strokeWidth={1.5} />
               Reset
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saving}
+              icon={!saving ? <Save className="w-3 h-3" strokeWidth={1.5} /> : undefined}
               onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1 px-3 py-1 rounded-md text-[11px] font-medium text-white bg-[#7c9a8e] hover:bg-[#5a7a6e] disabled:opacity-50 transition-colors duration-150"
             >
-              {saving ? (
-                <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />
-              ) : (
-                <Save className="w-3 h-3" strokeWidth={1.5} />
-              )}
               {editMode === "draft" ? "Save Draft" : "Save"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Publish bar — shown in draft mode when a draft exists */}
       {editMode === "draft" && activeSection && hasDraft[activeSection] && !hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#e8e8e8] bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
           <span className="text-[11px] text-amber-700">Draft saved — not yet live</span>
-          <button
+          <Button
+            variant="primary"
+            size="sm"
+            loading={saving}
             onClick={handlePublish}
-            disabled={saving}
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-[11px] font-medium text-white bg-[#7c9a8e] hover:bg-[#5a7a6e] disabled:opacity-50 transition-colors duration-150"
           >
-            {saving ? (
-              <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />
-            ) : null}
             Publish
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Saved confirmation */}
       {saved && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-[#e8e8e8] bg-emerald-500/[0.04] shrink-0">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
           <Check className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
           <span className="text-[11px] text-emerald-700">Saved — preview updated</span>
         </div>
@@ -377,14 +369,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
       {/* Save error */}
       {saveError && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#e8e8e8] bg-red-500/[0.04] shrink-0 animate-fade-in-up">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-red-500/[0.04] shrink-0 animate-fade-in-up">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3 h-3 text-red-500" strokeWidth={1.5} />
             <span className="text-[11px] text-red-600">Couldn&apos;t save — try again</span>
           </div>
           <button
             onClick={handleSave}
-            className="text-[10px] font-medium text-red-600 hover:text-red-700 transition-colors"
+            className="text-[11px] font-medium text-red-600 hover:text-red-700 transition-colors"
           >
             Retry
           </button>
@@ -396,24 +388,21 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         {/* Simple fields */}
         {fields && fields.map((field) => (
           <div key={field.key} className="px-4 py-2">
-            <label className="block text-[10px] text-[#999] mb-0.5">
-              {field.label}
-            </label>
             {field.type === "textarea" ? (
-              <textarea
+              <TextArea
+                label={field.label}
                 value={(data[field.key] as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
                 rows={2}
-                className="w-full bg-white border border-[#e8e8e8] rounded-md px-3 py-1.5 text-[13px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150 resize-none leading-relaxed"
               />
             ) : (
-              <input
+              <TextInput
+                label={field.label}
                 type={field.type}
                 value={(data[field.key] as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
-                className="w-full bg-white border border-[#e8e8e8] rounded-md px-3 py-1.5 text-[13px] text-[#1a1a1a] placeholder-[#ccc] outline-none focus:border-[#7c9a8e] focus:ring-1 focus:ring-[#7c9a8e]/20 transition-all duration-150"
               />
             )}
           </div>

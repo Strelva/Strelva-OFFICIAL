@@ -69,7 +69,7 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
 }
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const [activePanel, setActivePanel] = useState<Panel>("chat");
+  const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -78,7 +78,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
-  const [editMode, setEditMode] = useState<EditMode>("draft");
+  const [editMode, setEditMode] = useState<EditMode>("live");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
 
   // Load collapse state from localStorage on mount

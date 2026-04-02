@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -10,25 +10,37 @@ import {
   ExternalLink,
   MessageCircle,
   MoreHorizontal,
+  ImageIcon,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
 interface DashboardNavProps {
   siteName: string;
+  bookingUrl?: string;
 }
 
 const NAV_ITEMS = [
   { label: "Home", href: "/dashboard", icon: LayoutDashboard },
   { label: "Content", href: "/dashboard/content", icon: FileStack },
-  { label: "Bookings", href: "/dashboard/bookings", icon: CalendarDays },
+  { label: "Photos", href: "/dashboard/photos", icon: ImageIcon },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function DashboardNav({ siteName }: DashboardNavProps) {
+export function DashboardNav({ siteName, bookingUrl }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { editMode, setEditMode, setChatDrawerOpen, setActivePanel } = useDashboard();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // Close More menu on Escape
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [moreOpen]);
 
   const handleNavClick = (item: (typeof NAV_ITEMS)[number]) => {
     router.push(item.href);
@@ -42,7 +54,7 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
   return (
     <>
       {/* Desktop nav (lg+) */}
-      <nav className="hidden lg:flex items-center h-12 border-b border-[#e8e8e8] bg-white shrink-0 px-4">
+      <nav className="hidden lg:flex items-center h-12 border-b border-gray-border bg-white shrink-0 px-4">
         {/* Left: site name + status dot + toggle */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -51,18 +63,18 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
                 editMode === "draft" ? "bg-amber-400" : "bg-emerald-500"
               }`}
             />
-            <span className="font-mono text-[10px] text-[#999]">{siteName}</span>
+            <span className="font-mono text-[11px] text-gray-muted">{siteName}</span>
           </div>
 
           <button
             type="button"
             onClick={() => setEditMode(editMode === "live" ? "draft" : "live")}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#f5f5f5] hover:bg-[#e8e8e8] transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-bg hover:bg-gray-border transition-colors"
             title={editMode === "live" ? "Switch to draft mode" : "Switch to live mode"}
           >
             <span
-              className={`text-[9px] font-medium uppercase tracking-wider transition-colors ${
-                editMode === "live" ? "text-emerald-600" : "text-[#ccc]"
+              className={`text-[11px] font-medium uppercase tracking-wider transition-colors ${
+                editMode === "live" ? "text-emerald-600" : "text-gray-subtle"
               }`}
             >
               Live
@@ -79,8 +91,8 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
               />
             </div>
             <span
-              className={`text-[9px] font-medium uppercase tracking-wider transition-colors ${
-                editMode === "draft" ? "text-amber-600" : "text-[#ccc]"
+              className={`text-[11px] font-medium uppercase tracking-wider transition-colors ${
+                editMode === "draft" ? "text-amber-600" : "text-gray-subtle"
               }`}
             >
               Draft
@@ -96,10 +108,11 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
               <button
                 key={item.label}
                 onClick={() => handleNavClick(item)}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 px-3 h-12 text-[11px] font-medium transition-colors duration-150 border-b-2 ${
                   active
-                    ? "text-[#7c9a8e] border-b-[#7c9a8e]"
-                    : "text-[#999] border-b-transparent hover:text-[#1a1a1a]"
+                    ? "text-sage border-b-sage"
+                    : "text-gray-muted border-b-transparent hover:text-warm-black"
                 }`}
               >
                 <item.icon className="w-4 h-4" strokeWidth={1.5} />
@@ -109,16 +122,29 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
           })}
         </div>
 
-        {/* Right: Open Site */}
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium text-[#999] hover:text-[#1a1a1a] transition-colors duration-150"
-        >
-          <ExternalLink className="w-4 h-4" strokeWidth={1.5} />
-          Open Site
-        </a>
+        {/* Right: external links */}
+        <div className="flex items-center gap-1">
+          <a
+            href={bookingUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Manage bookings on Vagaro"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+          >
+            <CalendarDays className="w-4 h-4" strokeWidth={1.5} />
+            Bookings
+          </a>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open site in new tab"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+          >
+            <ExternalLink className="w-4 h-4" strokeWidth={1.5} />
+            Open Site
+          </a>
+        </div>
       </nav>
 
       {/* Mobile nav (<lg): bottom tab bar */}
@@ -126,36 +152,37 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
         {/* More popover */}
         {moreOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
-            <div className="absolute bottom-full right-2 mb-2 z-50 bg-white border border-[#e8e8e8] rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
-              <button
-                onClick={() => {
-                  handleNavClick(NAV_ITEMS[2]); // Bookings
-                  setMoreOpen(false);
-                }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+            <div className="fixed inset-0 bottom-14 z-40" onClick={() => setMoreOpen(false)} />
+            <div className="absolute bottom-full right-2 mb-2 z-50 bg-white border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up">
+              <a
+                href={bookingUrl || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                onClick={() => setMoreOpen(false)}
               >
-                <CalendarDays className="w-[14px] h-[14px] text-[#999]" strokeWidth={1.5} />
+                <CalendarDays className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Bookings
-              </button>
+                <ExternalLink className="w-3 h-3 text-gray-subtle ml-auto" strokeWidth={1.5} />
+              </a>
               <button
                 onClick={() => {
                   handleNavClick(NAV_ITEMS[3]); // Settings
                   setMoreOpen(false);
                 }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
               >
-                <Settings className="w-[14px] h-[14px] text-[#999]" strokeWidth={1.5} />
+                <Settings className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Settings
               </button>
               <a
                 href="/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors duration-150"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
                 onClick={() => setMoreOpen(false)}
               >
-                <ExternalLink className="w-[14px] h-[14px] text-[#999]" strokeWidth={1.5} />
+                <ExternalLink className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Open Site
               </a>
             </div>
@@ -163,53 +190,62 @@ export function DashboardNav({ siteName }: DashboardNavProps) {
         )}
 
         {/* Tab bar */}
-        <div className="flex items-center border-t border-[#e8e8e8] bg-white h-14">
+        <div className="flex items-center border-t border-gray-border bg-white h-14">
           {/* Home */}
           <button
             onClick={() => handleNavClick(NAV_ITEMS[0])}
+            aria-current={isActive(NAV_ITEMS[0]) ? "page" : undefined}
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              isActive(NAV_ITEMS[0]) ? "text-[#7c9a8e]" : "text-[#999]"
+              isActive(NAV_ITEMS[0]) ? "text-sage" : "text-gray-muted"
             }`}
           >
             {isActive(NAV_ITEMS[0]) && (
-              <div className="absolute top-0 w-8 h-[2px] bg-[#7c9a8e] rounded-b" />
+              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
             )}
             <LayoutDashboard className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[10px] font-medium">Home</span>
+            <span className="text-[11px] font-medium">Home</span>
           </button>
 
           {/* Content */}
           <button
             onClick={() => handleNavClick(NAV_ITEMS[1])}
+            aria-current={isActive(NAV_ITEMS[1]) ? "page" : undefined}
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              isActive(NAV_ITEMS[1]) ? "text-[#7c9a8e]" : "text-[#999]"
+              isActive(NAV_ITEMS[1]) ? "text-sage" : "text-gray-muted"
             }`}
           >
             {isActive(NAV_ITEMS[1]) && (
-              <div className="absolute top-0 w-8 h-[2px] bg-[#7c9a8e] rounded-b" />
+              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
             )}
             <FileStack className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[10px] font-medium">Content</span>
+            <span className="text-[11px] font-medium">Content</span>
           </button>
 
-          {/* Chat */}
+          {/* Photos */}
           <button
-            onClick={() => setChatDrawerOpen(true)}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 text-[#999]`}
+            onClick={() => handleNavClick(NAV_ITEMS[2])}
+            aria-current={isActive(NAV_ITEMS[2]) ? "page" : undefined}
+            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
+              isActive(NAV_ITEMS[2]) ? "text-sage" : "text-gray-muted"
+            }`}
           >
-            <MessageCircle className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[10px] font-medium">Chat</span>
+            {isActive(NAV_ITEMS[2]) && (
+              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
+            )}
+            <ImageIcon className="w-5 h-5" strokeWidth={1.5} />
+            <span className="text-[11px] font-medium">Photos</span>
           </button>
 
           {/* More */}
           <button
             onClick={() => setMoreOpen(!moreOpen)}
+            aria-label="More options"
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              moreOpen ? "text-[#7c9a8e]" : "text-[#999]"
+              moreOpen ? "text-sage" : "text-gray-muted"
             }`}
           >
             <MoreHorizontal className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[10px] font-medium">More</span>
+            <span className="text-[11px] font-medium">More</span>
           </button>
         </div>
       </nav>

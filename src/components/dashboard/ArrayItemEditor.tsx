@@ -79,8 +79,8 @@ export function ArrayItemEditor({ section, data, onDataChange }: ArrayItemEditor
     <div className="px-4 pt-2 pb-4">
       {/* Divider with count */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="h-px flex-1 bg-[#e8e8e8]" />
-        <span className="text-[10px] text-[#bbb] shrink-0">
+        <div className="h-px flex-1 bg-gray-border" />
+        <span className="text-[11px] text-gray-faint shrink-0">
           {items.length} {items.length === 1 ? "item" : "items"}
         </span>
       </div>
@@ -106,7 +106,7 @@ export function ArrayItemEditor({ section, data, onDataChange }: ArrayItemEditor
       <button
         type="button"
         onClick={handleAdd}
-        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[11px] text-[#7c9a8e] font-medium hover:bg-[#7c9a8e]/[0.06] transition-colors duration-150"
+        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[11px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
       >
         <Plus className="w-3 h-3" strokeWidth={2} />
         {config.addLabel}

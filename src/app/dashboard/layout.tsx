@@ -19,15 +19,17 @@ export default async function DashboardLayout({
   const tenant = await getTenantFromHeaders();
   let siteName = "Your Business";
   let ownerName = "there";
+  let bookingUrl = "";
   try {
     const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
     ownerName = settings.ownerName || ownerName;
+    bookingUrl = settings.bookingUrl || "";
   } catch {}
 
   return (
     <DashboardProvider>
-      <DashboardShell siteName={siteName}>
+      <DashboardShell siteName={siteName} bookingUrl={bookingUrl}>
         {children}
       </DashboardShell>
       <ChatDrawer ownerName={ownerName} />

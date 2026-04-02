@@ -39,7 +39,7 @@ export const defaultServices: ServicesContent = {
       who_its_for: "New clients or those who haven't visited in over a year",
       booking_link: "https://www.vagaro.com/rohlaxwellness",
       comingSoon: false,
-      image_url: "",
+      image_url: "/images/chelsea/studio-table.webp",
     },
     {
       id: "prenatal-foundation",

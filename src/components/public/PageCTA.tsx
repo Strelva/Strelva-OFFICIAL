@@ -11,7 +11,7 @@ export function PageCTA({
   heading = "Ready to feel better?",
   description = "Book your first session and experience the difference.",
   ctaText = "Book a Session",
-  ctaHref = "https://www.vagaro.com/rohlaxwellness",
+  ctaHref = "#",
 }: PageCTAProps) {
   return (
     <section className="py-16 md:py-24" style={{ background: "var(--sage)" }}>

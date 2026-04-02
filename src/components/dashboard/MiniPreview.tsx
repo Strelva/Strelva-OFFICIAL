@@ -23,7 +23,7 @@ export function MiniPreview() {
       type="button"
       onClick={() => setActivePanel("preview")}
       className={`relative w-full h-[80px] overflow-hidden border-b transition-colors duration-300 ${
-        flash ? "border-emerald-400 border-2" : "border-[#e8e8e8] border-b"
+        flash ? "border-emerald-400 border-2" : "border-gray-border border-b"
       }`}
       title="Tap to expand preview"
     >
@@ -44,7 +44,7 @@ export function MiniPreview() {
       </div>
       {/* Overlay label */}
       <div className="absolute bottom-1 right-2 bg-white/80 backdrop-blur-sm rounded px-1.5 py-0.5">
-        <span className="text-[9px] text-[#999] font-mono">PREVIEW</span>
+        <span className="text-[11px] text-gray-muted font-mono">PREVIEW</span>
       </div>
     </button>
   );

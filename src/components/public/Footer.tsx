@@ -29,7 +29,7 @@ export function Footer({ settings, contact }: FooterProps) {
             <ul className="space-y-3 text-sm opacity-60">
               <li><Link href="/about" className="hover:opacity-100 transition-opacity">About</Link></li>
               <li><Link href="/contact" className="hover:opacity-100 transition-opacity">Contact</Link></li>
-              <li><a href="https://www.vagaro.com/rohlaxwellness" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">Book Now</a></li>
+              <li><a href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">Book Now</a></li>
             </ul>
           </div>
 
