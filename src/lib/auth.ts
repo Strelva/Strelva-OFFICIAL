@@ -1,5 +1,6 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getTenantConfig } from "./tenants";
 
 /** Verify the current request is authenticated. Use in API routes. */
 export async function verifyAuth(): Promise<boolean> {
@@ -20,8 +21,27 @@ export async function isSuperAdmin(): Promise<boolean> {
   return !!email && adminEmails.includes(email);
 }
 
+/** Auto-assign a user to a tenant if they have no tenants yet.
+ *  This makes sign-up frictionless: sign up on rohlax.reb.studio → get rohlax access. */
+async function autoAssignTenant(userId: string, tenant: string, existingTenants: string[]): Promise<boolean> {
+  // Only auto-assign if tenant is valid and user has no tenants yet
+  if (existingTenants.length > 0) return false;
+  if (!getTenantConfig(tenant)) return false;
+
+  try {
+    const client = await clerkClient();
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: { tenants: [tenant] },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Check if current user has access to a specific tenant.
- *  Uses Clerk publicMetadata.tenants (string[]) set per user in the Clerk dashboard. */
+ *  Uses Clerk publicMetadata.tenants (string[]) set per user.
+ *  Auto-assigns first-time users to the tenant they signed up on. */
 export async function hasTenantAccess(tenant: string): Promise<boolean> {
   if (await isSuperAdmin()) return true;
 
@@ -29,7 +49,11 @@ export async function hasTenantAccess(tenant: string): Promise<boolean> {
   if (!user) return false;
 
   const tenants = (user.publicMetadata?.tenants as string[] | undefined) || [];
-  return tenants.includes(tenant);
+  if (tenants.includes(tenant)) return true;
+
+  // Auto-assign first-time users to their tenant
+  const assigned = await autoAssignTenant(user.id, tenant, tenants);
+  return assigned;
 }
 
 /** Guard for API routes — returns a 403 Response if the user lacks tenant access.
