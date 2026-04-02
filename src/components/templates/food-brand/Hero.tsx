@@ -58,17 +58,30 @@ export function Hero({ hero }: { hero: HeroContent }) {
     <section
       ref={sectionRef}
       className="relative min-h-screen flex items-center overflow-hidden"
-      style={{ background: "var(--cream)" }}
     >
-      <div className="container-main w-full">
+      {/* Full-bleed background image */}
+      {hero.backgroundImageUrl && (
+        <Image
+          src={hero.backgroundImageUrl}
+          alt=""
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
+        />
+      )}
+      {/* Dark overlay for text legibility */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      <div className="container-main w-full relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center py-24 md:py-32">
           {/* Left — Text */}
-          <div ref={contentRef} className="max-w-xl text-center lg:text-left mx-auto lg:mx-0 order-2 lg:order-1">
+          <div ref={contentRef} className="max-w-xl text-center lg:text-left mx-auto lg:mx-0">
             {hero.subheadline && (
               <p
                 data-hero-animate
                 className="text-sm md:text-base font-medium tracking-wider uppercase mb-4"
-                style={{ color: "var(--sage)" }}
+                style={{ color: "var(--wheat-light)" }}
               >
                 {hero.subheadline}
               </p>
@@ -76,7 +89,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
             <h1
               data-hero-animate
               className="font-display text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight leading-[0.92] mb-6"
-              style={{ color: "var(--bark)" }}
+              style={{ color: "var(--cream)" }}
             >
               {hero.headline.split("\n").map((line, i) => (
                 <span key={i}>
@@ -88,7 +101,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
             <p
               data-hero-animate
               className="text-base md:text-lg max-w-md mx-auto lg:mx-0 mb-8 leading-relaxed"
-              style={{ color: "var(--bark-faded)" }}
+              style={{ color: "rgba(250, 248, 245, 0.8)" }}
             >
               {hero.tagline}
             </p>
@@ -96,12 +109,12 @@ export function Hero({ hero }: { hero: HeroContent }) {
               <a
                 href="#products"
                 className="btn-primary"
-                style={{ background: "var(--sage)", color: "var(--cream)" }}
+                style={{ background: "var(--cream)", color: "var(--sage)" }}
                 onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  e.currentTarget.style.background = "var(--sage-dark)";
+                  e.currentTarget.style.background = "var(--wheat-light)";
                 }}
                 onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  e.currentTarget.style.background = "var(--sage)";
+                  e.currentTarget.style.background = "var(--cream)";
                 }}
               >
                 {hero.ctaText}
@@ -109,71 +122,27 @@ export function Hero({ hero }: { hero: HeroContent }) {
               <a
                 href="#story"
                 className="btn-ghost"
-                style={{ borderColor: "var(--bark)", color: "var(--bark)" }}
+                style={{ borderColor: "rgba(250,248,245,0.5)", color: "var(--cream)" }}
               >
                 Our Story
               </a>
             </div>
-
-            {/* Launch teaser */}
-            <div data-hero-animate className="mt-12 flex items-center justify-center lg:justify-start gap-2.5">
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: "var(--sage)", animation: "pulse 2s ease-in-out infinite" }}
-              />
-              <span
-                className="text-[0.6875rem] tracking-widest uppercase"
-                style={{ color: "var(--bark-faded)" }}
-              >
-                Launching Spring 2026
-              </span>
-            </div>
           </div>
 
-          {/* Right — Product with paint slab */}
-          <div ref={productRef} className="relative flex items-center justify-center lg:justify-end order-1 lg:order-2">
-            {/* Paint slab background accent */}
-            <div
-              className="absolute"
-              style={{
-                width: "85%",
-                height: "80%",
-                top: "10%",
-                left: "10%",
-                background: "#ffffff",
-                borderRadius: "4px 40px 4px 40px",
-                transform: "rotate(-3deg)",
-                opacity: 0.12,
-              }}
-            />
-            {/* Second paint slab — offset for depth */}
-            <div
-              className="absolute"
-              style={{
-                width: "75%",
-                height: "70%",
-                top: "18%",
-                left: "16%",
-                background: "#ffffff",
-                borderRadius: "40px 4px 40px 4px",
-                transform: "rotate(2deg)",
-                opacity: 0.15,
-              }}
-            />
-
-            {/* Product image */}
+          {/* Right — Product bag floating over the lake */}
+          <div ref={productRef} className="relative flex items-center justify-center lg:justify-end">
             <div
               data-product-img
               className="relative z-10"
-              style={{ width: "min(420px, 60vw)" }}
+              style={{ width: "min(380px, 55vw)" }}
             >
               <Image
                 src="/images/transparentbag.png"
                 alt="Great Lakes Dried Fruit — Apple Chips"
                 width={1200}
                 height={1703}
-                className="w-full h-auto drop-shadow-2xl"
-                sizes="(max-width: 1024px) 80vw, 420px"
+                className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
+                sizes="(max-width: 1024px) 80vw, 380px"
                 priority
               />
             </div>
@@ -187,8 +156,8 @@ export function Hero({ hero }: { hero: HeroContent }) {
         style={{ animation: "bounce-subtle 2s ease-in-out infinite" }}
       >
         <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
-          <rect x="1" y="1" width="18" height="26" rx="9" stroke="var(--bark-faded)" strokeWidth="1.5" opacity="0.3" />
-          <circle cx="10" cy="8" r="2" fill="var(--bark-faded)" opacity="0.5">
+          <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(250,248,245,0.4)" strokeWidth="1.5" />
+          <circle cx="10" cy="8" r="2" fill="rgba(250,248,245,0.6)">
             <animate attributeName="cy" values="8;18;8" dur="2s" repeatCount="indefinite" />
           </circle>
         </svg>
