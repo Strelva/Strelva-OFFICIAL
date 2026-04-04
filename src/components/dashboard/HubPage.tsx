@@ -3,6 +3,7 @@
 import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import { ActivityTimeline } from "./ActivityTimeline";
+import { WelcomeBanner } from "./WelcomeBanner";
 import { SECTION_LABELS, SECTION_ICONS } from "@/components/ui/section-labels";
 import type { SectionData } from "./ContentBrowser";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +17,7 @@ function getGreeting(): string {
 
 interface HubPageProps {
   ownerName: string;
+  siteName: string;
   pageViews: { total: number; today: number; thisWeek: number };
   bookingClicks: { total: number; today: number; thisWeek: number };
   siteScore: { score: number; items: { label: string; done: boolean }[] };
@@ -25,6 +27,7 @@ interface HubPageProps {
 
 export function HubPage({
   ownerName,
+  siteName,
   pageViews,
   bookingClicks,
   siteScore,
@@ -89,6 +92,7 @@ export function HubPage({
 
   return (
     <div ref={containerRef} className="p-5 max-w-xl">
+      <WelcomeBanner siteName={siteName} />
       {/* Headline */}
       <div data-ov="headline" className="mb-5">
         <h1 className="text-[20px] font-medium tracking-tight text-warm-black" suppressHydrationWarning>

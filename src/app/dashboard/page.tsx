@@ -98,6 +98,7 @@ export default async function DashboardPage() {
   return (
     <HubPage
       ownerName={settings.ownerName || "there"}
+      siteName={settings.siteName || "Your site"}
       pageViews={pageViews}
       bookingClicks={bookingClicks}
       siteScore={siteScore}
