@@ -15,8 +15,8 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { requireTenantAccess } from "@/lib/auth";
 
-function isValidSection(section: string, tenant: string): section is ContentSection {
-  const template = getTemplateForTenant(tenant);
+async function isValidSection(section: string, tenant: string): Promise<boolean> {
+  const template = await getTemplateForTenant(tenant);
   return template.contentSections.includes(section as ContentSection);
 }
 
@@ -104,19 +104,20 @@ export async function GET(
   try {
     const tenant = await getTenantFromHeaders();
 
-    if (!isValidSection(section, tenant)) {
+    if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
+    const s = section as ContentSection;
 
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
 
     if (isDraft) {
-      const draft = await getDraftContent(section, tenant);
+      const draft = await getDraftContent(s, tenant);
       if (draft) return NextResponse.json(draft);
     }
 
-    const data = await getContent(section, tenant);
+    const data = await getContent(s, tenant);
     return NextResponse.json(data);
   } catch (err) {
     console.error("[content GET]", section, err);
@@ -135,13 +136,14 @@ export async function PUT(
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    if (!isValidSection(section, tenant)) {
+    if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
+    const s = section as ContentSection;
 
     const body = await request.json();
 
-    const validationError = validateBody(section, body);
+    const validationError = validateBody(s, body);
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 422 });
     }
@@ -150,27 +152,25 @@ export async function PUT(
     const isDraft = url.searchParams.get("draft") === "true";
 
     if (isDraft) {
-      await setDraftContent(section, body, tenant);
+      await setDraftContent(s, body, tenant);
       return NextResponse.json({ success: true, draft: true });
     }
 
-    // Capture diffs before saving
-    const current = await getContent(section, tenant) as unknown as Record<string, unknown>;
+    const current = await getContent(s, tenant) as unknown as Record<string, unknown>;
     const changes = diffFields(current, body);
 
-    await setContent(section, body, tenant);
-    await recordSectionUpdate(section, tenant);
+    await setContent(s, body, tenant);
+    await recordSectionUpdate(s, tenant);
     await logActivity({
-      text: `Updated ${section} via admin`,
+      text: `Updated ${s} via admin`,
       time: new Date().toISOString(),
       type: "admin",
-      section,
+      section: s,
       actor: "user",
       changes,
     }, tenant);
 
-    // Clear any existing draft for this section on live publish
-    await clearDraft(section, tenant).catch(() => {});
+    await clearDraft(s, tenant).catch(() => {});
 
     revalidatePath("/");
 
@@ -192,15 +192,16 @@ export async function DELETE(
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    if (!isValidSection(section, tenant)) {
+    if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
+    const s = section as ContentSection;
 
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
 
     if (isDraft) {
-      await clearDraft(section, tenant);
+      await clearDraft(s, tenant);
       return NextResponse.json({ success: true });
     }
 

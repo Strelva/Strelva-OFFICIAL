@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { isSuperAdmin } from "@/lib/auth";
-import { TENANTS } from "@/lib/tenants";
+import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import {
   listDrafts,
   getDraftContent,
@@ -15,6 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const TENANTS = await getAllTenants();
   const allDrafts: { tenant: string; section: string; data: unknown }[] = [];
 
   await Promise.all(
@@ -63,7 +64,8 @@ export async function POST(request: Request) {
   }
 
   // Verify tenant exists
-  if (!TENANTS.find((t) => t.id === tenant)) {
+  const tenants = await getAllTenants();
+  if (!tenants.find((t) => t.id === tenant)) {
     return NextResponse.json({ error: "Unknown tenant" }, { status: 404 });
   }
 

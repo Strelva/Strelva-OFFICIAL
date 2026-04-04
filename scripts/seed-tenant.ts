@@ -168,12 +168,13 @@ const TENANT_DEFAULTS: Record<string, ContentMap> = {
 
 async function seed(tenantId: string) {
   // Check if tenant is registered in the central config
-  const { getTenantConfig, TENANTS } = await import("../src/lib/tenants");
-  const tenantConfig = getTenantConfig(tenantId);
+  const { getTenantConfig, getAllTenants } = await import("../src/lib/tenants");
+  const tenantConfig = await getTenantConfig(tenantId);
 
   if (!tenantConfig) {
+    const allTenants = await getAllTenants();
     console.error(`Tenant "${tenantId}" not found in src/lib/tenants.ts.`);
-    console.error(`Registered tenants: ${TENANTS.map((t: { id: string }) => t.id).join(", ")}`);
+    console.error(`Registered tenants: ${allTenants.map((t: { id: string }) => t.id).join(", ")}`);
     console.error(`\nAdd the tenant to TENANTS in src/lib/tenants.ts first.`);
     process.exit(1);
   }
@@ -201,13 +202,16 @@ async function seed(tenantId: string) {
 
 const tenantId = process.argv[2];
 if (!tenantId) {
-  const { TENANTS } = require("../src/lib/tenants");
-  console.error("Usage: npx tsx scripts/seed-tenant.ts <tenant-id>");
-  console.error("Registered tenants: " + TENANTS.map((t: { id: string }) => t.id).join(", "));
-  process.exit(1);
+  import("../src/lib/tenants").then(({ getAllTenants }) =>
+    getAllTenants().then((tenants) => {
+      console.error("Usage: npx tsx scripts/seed-tenant.ts <tenant-id>");
+      console.error("Registered tenants: " + tenants.map((t: { id: string }) => t.id).join(", "));
+      process.exit(1);
+    })
+  );
+} else {
+  seed(tenantId).catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
 }
-
-seed(tenantId).catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
