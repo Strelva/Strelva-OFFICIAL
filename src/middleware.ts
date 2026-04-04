@@ -49,7 +49,12 @@ function extractTenant(request: NextRequest): string {
 }
 
 // Domains where the marketing landing page should show at /
-const MARKETING_DOMAINS = ["reb.studio", "www.reb.studio", "localhost"];
+const MARKETING_DOMAINS = [
+  "reb.studio",
+  "www.reb.studio",
+  "localhost",
+  "reb-platform.vercel.app",
+];
 
 function isMarketingDomain(request: NextRequest): boolean {
   const host = (request.headers.get("host") || "").split(":")[0];
