@@ -156,7 +156,7 @@ export default async function TenantPublicLayout({
   children: React.ReactNode;
 }) {
   const tenant = await getTenantFromHeaders();
-  const template = getTemplateForTenant(tenant);
+  const template = await getTemplateForTenant(tenant);
 
   const [settings, contact] = await Promise.all([
     getContent("settings", tenant),

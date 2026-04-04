@@ -1,0 +1,31 @@
+[
+  {
+    "id": "rohlax",
+    "subdomain": "rohlax",
+    "siteName": "Rohlax Wellness",
+    "ownerName": "Chelsea",
+    "industry": "wellness",
+    "active": true,
+    "createdAt": "2026-01-15",
+    "template": "wellness",
+    "features": ["booking", "newsletter"],
+    "customDomains": [],
+    "subscriptionStatus": "none",
+    "bookingProvider": "Vagaro",
+    "bookingUrl": "https://www.vagaro.com/rohlaxwellness",
+    "resendDomain": "updates.rohlaxwellness.com"
+  },
+  {
+    "id": "gldf",
+    "subdomain": "gldf",
+    "siteName": "Great Lakes Dried Fruit",
+    "ownerName": "Great Lakes Dried Fruit",
+    "industry": "food-brand",
+    "active": true,
+    "createdAt": "2026-03-30",
+    "template": "food-brand",
+    "features": ["commerce", "newsletter"],
+    "customDomains": ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
+    "subscriptionStatus": "none"
+  }
+]

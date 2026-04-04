@@ -3,8 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ChatDrawer } from "@/components/dashboard/ChatDrawer";
+import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getContent } from "@/lib/storage";
+import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 
 export default async function DashboardLayout({
   children,
@@ -27,8 +29,11 @@ export default async function DashboardLayout({
     bookingUrl = settings.bookingUrl || "";
   } catch {}
 
+  const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
+
   return (
     <DashboardProvider>
+      <BillingBanner subscriptionStatus={subscriptionStatus} />
       <DashboardShell siteName={siteName} bookingUrl={bookingUrl}>
         {children}
       </DashboardShell>

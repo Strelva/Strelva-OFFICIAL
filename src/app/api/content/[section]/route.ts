@@ -14,6 +14,7 @@ import { diffFields } from "@/lib/utils";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { requireTenantAccess } from "@/lib/auth";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateForTenant(tenant);
@@ -135,6 +136,8 @@ export async function PUT(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
 
     if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
@@ -191,6 +194,8 @@ export async function DELETE(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
 
     if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });

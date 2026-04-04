@@ -1,20 +1,24 @@
-# REB — Productized AI Web Agency
+# REB — AI Website Management Platform
 
 ## What This Is
-You build custom sites. Clients get a Framer-quality business OS dashboard + AI agent that handles everything. The dashboard IS their business — they never touch a CMS, never email you for small changes. They talk to their AI, it updates the site, you get notified.
+An AI agent that runs a business's online presence autonomously. Businesses talk to it via chat — it builds, updates, and manages their website. It reaches out proactively with weekly reports and suggestions. Dashboard shows proof of value.
+
+**Pivoted from agency model to platform on 2026-04-03.** See `.claude/plans/todos.yml` for the full build plan and phase completion status.
 
 ## One-Liner
-"Your site works while you sleep."
+"Your business runs itself. Just text back yes."
 
 ## The Model
-- **Build fee**: $3,000 one-time (custom Next.js site)
-- **Monthly**: $199/mo (AI agent + dashboard + hosting + updates)
-- **Gross margin**: 92-95% ($12 COGS per client)
-- **Solo ceiling**: 40-60 clients with AI handling 80%
-- **First pipeline**: Chelsea's 8 provider directory contacts
+- **Build**: Human-in-the-loop (AI generates 80%, human polishes 20%). $1,500-3,000 one-time.
+- **Starter**: $49/mo — website + analytics capabilities
+- **Growth**: $149/mo — + email + blog + reviews
+- **Scale**: $399/mo — + everything + API + white-label
+- **Agency channel**: $49/mo wholesale, agencies charge $199+
+- **Gross margin**: 90-94%
+- **Solo ceiling**: 50-60 clients before needing help on build side
 
 ## Value Hypothesis
-Local business owners will pay $199/mo for a custom site + AI agent that handles all content updates via chat — IF the dashboard shows visible proof of value (visitors, bookings) within the first week and the AI agent responds to requests instantly instead of the 24-48hr agency turnaround.
+Business owners will pay $49-149/mo for an AI that autonomously manages their website and proves its value weekly — IF the AI is proactive (reaches out with reports/suggestions, not just reactive), the onboarding delivers a live site in under 5 minutes, and the dashboard shows "47 people found you this week" within the first week.
 
 ## ICP: Chelsea (and her network)
 - Wellness practitioners, trades, local service businesses
@@ -71,11 +75,16 @@ Local business owners will pay $199/mo for a custom site + AI agent that handles
 - Social media management (out of scope)
 
 ## Build Order
-See `.claude/plans/todos.yml` for complete todo list.
-Phase 1 (this week): AI agent + client dashboard + Chelsea test
-Phase 2 (2 weeks): Multi-tenant + second client
-Phase 3 (month 2): Billing + analytics + operations
-Phase 4 (month 3+): Growth + distribution
+See `.claude/plans/todos.yml` for complete phase plan with status tracking.
+- Phase 1: Generalize from wellness-specific → DONE
+- Phase 2: Database-backed tenant registry → DONE
+- Phase 3: Subscription enforcement → DONE
+- Phase 4: Self-serve onboarding flow → DONE
+- Phase 5: 3 new templates (restaurant, trades, professional) → TODO (next)
+- Phase 6: Proactive AI (weekly report, staleness, push) → TODO
+- Phase 7: Capability module system → TODO
+- Phase 8: Deploy + Chelsea live test → TODO
+- Phase 9: Marketing site + second client → TODO
 
 ## Validation Signals
 1. Does Chelsea use the chat agent without being prompted?

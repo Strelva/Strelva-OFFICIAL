@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const tenantConfig = getTenantConfig(tenantId);
+  const tenantConfig = await getTenantConfig(tenantId);
   if (!tenantConfig) {
     return NextResponse.json({ error: `Unknown tenant: ${tenantId}` }, { status: 400 });
   }

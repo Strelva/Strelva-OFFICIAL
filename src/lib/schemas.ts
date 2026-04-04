@@ -62,7 +62,7 @@ export const eventItemSchema = z.object({
   time: z.string(),
   location: z.string(),
   description: z.string(),
-  hosted_by: z.enum(["owner", "partner", "community"]),
+  hosted_by: z.string(),
   external_link: z.string(),
   image_url: z.string().optional().default(""),
 });
@@ -76,7 +76,7 @@ export const eventsSchema = z.object({
 export const providerItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  category: z.enum(["massage", "chiropractic", "yoga", "fitness", "specialty"]),
+  category: z.string(),
   service: z.string(),
   why_i_recommend: z.string(),
   booking_link: z.string(),
@@ -108,7 +108,7 @@ export const shopItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string(),
-  category: z.enum(["recommended", "merch", "tools"]),
+  category: z.string(),
   price: z.string(),
   external_link: z.string(),
   image_url: z.string(),

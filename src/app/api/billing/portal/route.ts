@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const config = getTenantConfig(tenant);
+  const config = await getTenantConfig(tenant);
 
   if (!config?.stripeCustomerId) {
     return NextResponse.json(

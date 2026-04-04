@@ -37,9 +37,9 @@ export interface TemplateDefinition {
 }
 
 // Templates are registered here — imported lazily to avoid circular deps
-let _registry: Record<TemplateId, TemplateDefinition> | null = null;
+let _registry: Record<string, TemplateDefinition> | null = null;
 
-export function getTemplateRegistry(): Record<TemplateId, TemplateDefinition> {
+export function getTemplateRegistry(): Record<string, TemplateDefinition> {
   if (!_registry) {
     const { wellnessTemplate } = require("./wellness");
     const { foodBrandTemplate } = require("./food-brand");
@@ -51,10 +51,15 @@ export function getTemplateRegistry(): Record<TemplateId, TemplateDefinition> {
   return _registry;
 }
 
-export function getTemplateForTenant(tenant: string): TemplateDefinition {
-  // Lazy import to avoid circular dependency (tenants.ts is pure data)
-  const { getTenantConfig } = require("@/lib/tenants");
-  const config = getTenantConfig(tenant);
-  const templateId: TemplateId = config?.template ?? "wellness";
-  return getTemplateRegistry()[templateId];
+export function registerTemplate(template: TemplateDefinition) {
+  const registry = getTemplateRegistry();
+  registry[template.id] = template;
+}
+
+export async function getTemplateForTenant(tenant: string): Promise<TemplateDefinition> {
+  const { getTenantConfig } = await import("@/lib/tenants");
+  const config = await getTenantConfig(tenant);
+  const templateId = config?.template ?? "wellness";
+  const registry = getTemplateRegistry();
+  return registry[templateId] ?? registry["wellness"];
 }

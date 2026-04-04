@@ -1,656 +1,154 @@
-# REB Startup — Full Build Todos
-# Productized AI web agency with client business OS dashboard
-# You build sites. Clients get a Framer-quality dashboard + AI agent.
-# The dashboard IS their business OS for web presence.
+# REB Platform — Build Plan
+# AI website management platform with modular capabilities
+# Pivoted from agency model 2026-04-03
 #
-# Priority: P0 (this week), P1 (next 2 weeks), P2 (month 2), P3 (month 3+)
+# Timeline: 8 weeks to graduation (May 2026)
+# Status key: done, in-progress, todo
 
-items:
+phases:
 
-# ═══════════════════════════════════════════════════════════
-# PHASE 1: AI Agent Core (P0 — this week)
-# ═══════════════════════════════════════════════════════════
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 1: Generalize from wellness-specific (Week 1)
+  # ═══════════════════════════════════════════════════════════
 
-  - id: agent-api
-    title: "Build /api/agent/route.ts with read_section + update_section tools"
-    priority: P0
-    feature: ai-agent
+  - id: generalize
+    title: "Generalize from wellness-specific to universal"
     status: done
-    done_at: 2026-03-17
-    context: "Vercel AI SDK v6 streamText + tools. Two tools wrapping existing /api/content/[section]. System prompt personalized per tenant. stopWhen: stepCountIs(5). Same JWT auth as admin."
-    source: "/research tech-architecture"
-    created: 2026-03-17
+    done_at: 2026-04-03
+    changes:
+      - "schemas.ts: replaced hardcoded provider/shop/event category enums with z.string()"
+      - "types.ts: ProviderItem.category, ShopItem.category, EventItem.hosted_by → string"
+      - "types.ts: TemplateId extended with restaurant, trades, professional + string escape hatch"
+      - "types.ts: TenantConfig gained ownerEmail, bookingProvider, bookingUrl, resendDomain fields"
+      - "agent/route.ts: booking prompt uses tenantConfig.bookingProvider instead of hardcoded Vagaro"
+      - "agent/route.ts: newsletter from-domain uses tenantConfig.resendDomain, fallback updates.reb.studio"
+      - "registry.ts: template registry uses Record<string, TemplateDefinition>, added registerTemplate()"
 
-  - id: zod-schemas
-    title: "Add Zod schemas to lib/schemas.ts mirroring types.ts"
-    priority: P0
-    feature: ai-agent
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 2: Database-backed tenant registry (Week 1-2)
+  # ═══════════════════════════════════════════════════════════
+
+  - id: db-tenants
+    title: "Database-backed tenant registry"
     status: done
-    done_at: 2026-03-17
-    context: "One Zod schema per content section. Used in update_section for validation before writes."
-    source: "/research tech-architecture"
-    created: 2026-03-17
+    done_at: 2026-04-03
+    changes:
+      - "tenants.ts: replaced static TENANTS array with async file-backed functions"
+      - "tenants.ts: getTenantConfig() now async, reads from dev-tenants.json with 60s cache"
+      - "tenants.ts: added createTenant(), updateTenant(), getAllTenants()"
+      - "dev-tenants.json: seeded with rohlax + gldf tenant configs"
+      - "api/admin/tenants/route.ts: GET (list all) + POST (create) endpoints, super-admin only"
+      - "All callers updated to await async getTenantConfig/getCustomDomainMap/getTemplateForTenant"
 
-  - id: chat-persistence
-    title: "Add saveChatMessages/loadChatMessages to lib/storage.ts"
-    priority: P0
-    feature: ai-agent
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 3: Subscription enforcement (Week 2)
+  # ═══════════════════════════════════════════════════════════
+
+  - id: billing-enforce
+    title: "Subscription enforcement"
     status: done
-    done_at: 2026-03-29
-    context: "Wired into ChatPanel — loads on mount via GET /api/chat, saves after AI response via POST /api/chat. 100-message sliding window."
-    source: "/research tech-architecture"
-    created: 2026-03-17
+    done_at: 2026-04-03
+    changes:
+      - "lib/subscription.ts: requireActiveSubscription() guard — cancelled=402, others=allow"
+      - "lib/subscription.ts: getEffectiveSubscriptionStatus() — runtime override > static config"
+      - "lib/storage.ts: getSubscriptionOverride/setSubscriptionOverride for webhook-driven status"
+      - "api/agent/route.ts: subscription guard on POST (AI chat blocked if cancelled)"
+      - "api/content/[section]/route.ts: subscription guard on PUT and DELETE"
+      - "api/billing/webhook/route.ts: now writes status on invoice.paid/failed/subscription.deleted"
+      - "components/dashboard/BillingBanner.tsx: dismissible banner for cancelled/past_due"
+      - "dashboard/layout.tsx: renders BillingBanner with live subscription status"
 
-  - id: slack-notifications
-    title: "Add Slack webhook notification on content updates"
-    priority: P0
-    feature: ai-agent
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 4: Self-serve onboarding flow (Week 2-3)
+  # ═══════════════════════════════════════════════════════════
+
+  - id: onboarding
+    title: "Self-serve onboarding — describe your business → site is live"
     status: done
-    done_at: 2026-03-17
-    context: "POST to SLACK_WEBHOOK_URL after successful write. No library — just fetch."
-    source: "/research tech-architecture"
-    created: 2026-03-17
+    done_at: 2026-04-03
+    changes:
+      - "api/onboard/generate/route.ts: POST endpoint — takes business info, generates content via Gemini structured output"
+      - "api/onboard/complete/route.ts: POST endpoint — creates tenant, seeds content, creates Stripe checkout"
+      - "app/onboard/page.tsx: multi-step flow (info → generating → preview → checkout) with subdomain picker"
+      - "components/dashboard/WelcomeBanner.tsx: dismissible welcome banner on ?welcome=true"
+      - "HubPage.tsx: added siteName prop + WelcomeBanner integration"
+      - "Industry-to-template mapping auto-selects wellness/restaurant/trades/professional"
 
-# ═══════════════════════════════════════════════════════════
-# PHASE 1B: Client Business OS Dashboard (P0)
-# Framer-quality. This IS the product experience.
-# ═══════════════════════════════════════════════════════════
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 5: Add 3 new templates (Week 3-4)
+  # ═══════════════════════════════════════════════════════════
 
-  - id: client-dashboard-layout
-    title: "Build client dashboard layout — Framer-quality business OS"
-    priority: P0
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-17
-    context: "Route: /dashboard. Sidebar: AI Chat, Overview, My Site, Content, Reports, Settings. Dark mode, premium, mobile-first."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: client-overview
-    title: "Dashboard overview — 'How is my site doing?' in outcome language"
-    priority: P0
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-17
-    context: "Cards: 'People who found you', 'Booking clicks', 'Site health', 'AI activity'. Activity feed. Quick actions. No jargon."
-    source: "/product customer-research"
-    created: 2026-03-17
-
-  - id: client-chat-panel
-    title: "AI Chat panel — primary interaction surface"
-    priority: P0
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-17
-    context: "useChat + streaming + tool status + image drop + suggested prompts. The chat IS the CMS."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: chelsea-test
-    title: "Test with Chelsea — 15 min watching her use dashboard + chat"
-    priority: P0
-    feature: validation
+  - id: templates
+    title: "Add restaurant, trades, professional templates"
     status: todo
-    context: "First real user test. Watch her face. Note confusion/delight. Do NOT skip."
-    source: "/product coach"
-    created: 2026-03-17
+    details: |
+      For each: create src/components/templates/{name}/index.ts with TemplateDefinition.
+      Reuse shared public components (Hero, Contact, Testimonials, FAQ) where possible.
+      - restaurant: menu sections, hours, location, reservation link, events/specials
+      - trades: services+pricing, service area, before/after gallery, license badges, free estimate CTA
+      - professional: team bios, practice areas, case results, blog, consultation CTA
+      Register each in registry.ts. Add default content in defaults.ts + pageConfigDefaults.ts.
 
-# ═══════════════════════════════════════════════════════════
-# PHASE 1C: Deployment Architecture (P0 — this week)
-# Two deployments: REB platform + client sites
-# ═══════════════════════════════════════════════════════════
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 6: Proactive AI — weekly report + staleness (Week 4-5)
+  # ═══════════════════════════════════════════════════════════
 
-  - id: domain-strategy
-    title: "Decide and acquire domains: reb.studio + client subdomains"
-    priority: P0
-    feature: deployment
+  - id: proactive-ai
+    title: "Proactive AI — weekly report + staleness detection + push notifications"
     status: todo
-    context: |
-      Architecture:
-        reb.studio                    → REB agency landing page + Laney admin
-        chelsea.reb.studio            → Chelsea's public site + dashboard
-        [client].reb.studio           → future clients
-        OR: clients get custom domains (rohlaxwellness.com) mapped via Vercel
+    details: |
+      1. Weekly report email (Vercel Cron, Monday 9am):
+         - Per tenant: pull analytics, activity log, generate plain-English summary via LLM
+         - Send via Resend: "Here's what happened on your site this week"
+      2. Staleness detection (daily cron):
+         - Flag sections >30 days stale, store as pending suggestion
+      3. Web Push notifications:
+         - Service worker + VAPID keys
+         - Push on: weekly report, staleness alert, AI suggestion
+      4. Suggestion system in dashboard HubPage — one-tap "Yes, do it"
 
-      Options for domain:
-        reb.studio (~$40/yr) — clean, tech, memorable
-        reb.app — if available
-        getreb.com — if .studio taken
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 7: Capability module system (Week 5-6)
+  # ═══════════════════════════════════════════════════════════
 
-      Check availability, buy through Vercel or Namecheap.
-      Add wildcard DNS (*.reb.studio) for subdomain routing.
-    source: "/strategy deployment"
-    created: 2026-03-17
-
-  - id: vercel-multi-project
-    title: "Set up Vercel project for multi-tenant subdomain routing"
-    priority: P0
-    feature: deployment
+  - id: capabilities
+    title: "Capability module system — tools organized into named bundles"
     status: todo
-    context: |
-      Current: single Vercel project "rohlax-wellness" at rohlax-wellness.vercel.app
-      Target: same codebase serves all clients via subdomain routing
+    details: |
+      1. lib/capabilities.ts — define bundles:
+         website: [read_section, update_section, upload_image]
+         analytics: [get_metrics, get_activity]
+         email: [send_newsletter, list_subscribers]
+         social/reviews/blog: v2 stubs
+      2. Tier → capability mapping (Starter/Growth/Scale)
+      3. Agent tool filtering based on tenant's tier
+      4. System prompt only describes activated capabilities
+      5. Dashboard upgrade prompts for locked features
 
-      Steps:
-        1. Add reb.studio domain to Vercel project
-        2. Add wildcard *.reb.studio DNS
-        3. Update middleware to extract tenant from subdomain
-        4. Root domain (reb.studio) serves the REB agency landing page
-        5. chelsea.reb.studio serves Chelsea's site + dashboard
-        6. Environment: NEXT_PUBLIC_ROOT_DOMAIN=reb.studio
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 8: Deploy + Chelsea live test (Week 6)
+  # ═══════════════════════════════════════════════════════════
 
-      Reference: Vercel Platforms starter kit pattern.
-      The middleware already exists (tenant-middleware todo) — this is the infra setup.
-    source: "/strategy deployment"
-    created: 2026-03-17
-    depends_on: [domain-strategy]
-
-  - id: reb-landing-page
-    title: "Build REB agency landing page at root domain"
-    priority: P1
-    feature: deployment
-    status: done
-    done_at: 2026-03-29
-    context: |
-      Route: reb.studio (root, no subdomain)
-      This is NOT a client site — it's the REB sales page.
-
-      Sections:
-        - Hero: "Your site works while you sleep"
-        - What you get: custom site + AI business OS
-        - How it works: 1. We build it, 2. You talk to AI, 3. Site improves
-        - Portfolio: Chelsea's site as first showcase
-        - Pricing: $3K build + $199/mo
-        - Testimonial: Chelsea (after she validates)
-        - CTA: "Get started" → contact form or Calendly link
-
-      Design: same Vercel-inspired design system but marketing-oriented.
-      Lives in the same codebase: src/app/(marketing)/ route group.
-      Middleware routes root domain to marketing pages, subdomains to client sites.
-    source: "/strategy deployment"
-    created: 2026-03-17
-    depends_on: [vercel-multi-project]
-
-  - id: deploy-chelsea-subdomain
-    title: "Deploy Chelsea's site to chelsea.reb.studio"
-    priority: P1
-    feature: deployment
+  - id: deploy
+    title: "Deploy to production + Chelsea live test"
     status: todo
-    context: |
-      Move Chelsea from rohlax-wellness.vercel.app to chelsea.reb.studio.
+    details: |
+      1. Buy domain, add to Vercel, wildcard DNS
+      2. Deploy: root → marketing, subdomains → client sites
+      3. Migrate Chelsea to production storage
+      4. 15-min user test watching Chelsea use chat
+      5. Production env vars: Stripe, Clerk, Resend, Slack webhook
 
-      Steps:
-        1. Middleware routes chelsea.reb.studio to tenant: chelsea
-        2. Chelsea's content loads from chelsea:content:* Redis keys
-        3. Dashboard at chelsea.reb.studio/dashboard
-        4. Public site at chelsea.reb.studio/
-        5. Optional: also map rohlaxwellness.com as custom domain later
+  # ═══════════════════════════════════════════════════════════
+  # PHASE 9: Marketing site + second client (Week 7-8)
+  # ═══════════════════════════════════════════════════════════
 
-      Test: all pages work, AI agent works, content updates work.
-      This is the first real multi-tenant deployment.
-    source: "/strategy deployment"
-    created: 2026-03-17
-    depends_on: [vercel-multi-project, tenant-middleware, tenant-storage]
-
-  - id: env-per-tenant
-    title: "Per-tenant environment config (Redis, AI key, Slack webhook)"
-    priority: P3-deferred
-    feature: deployment
+  - id: marketing
+    title: "Marketing site reposition + second client"
     status: todo
-    context: |
-      Shared env vars across all tenants:
-        GOOGLE_GENERATIVE_AI_API_KEY (one key, all tenants)
-        REDIS_URL (one Redis, namespaced per tenant)
-        JWT_SECRET (shared, tenant scoped in JWT payload)
-
-      Per-tenant config (stored in Redis, not env):
-        Business name, system prompt, colors, domain, Vagaro URL
-        Slack webhook (per tenant or shared channel with tenant prefix)
-
-      Laney's admin credentials: super-admin JWT that works across all tenants.
-    source: "/strategy deployment"
-    created: 2026-03-17
-    depends_on: [tenant-config]
-
-# ═══════════════════════════════════════════════════════════
-# PHASE 2: Multi-Tenant + Scale (P1 — next 2 weeks)
-# ═══════════════════════════════════════════════════════════
-
-  - id: tenant-middleware
-    title: "Subdomain-based tenant routing middleware"
-    priority: P3-deferred
-    feature: multi-tenant
-    status: todo
-    context: |
-      chelsea.reb.studio → tenant: chelsea. Vercel Platforms pattern.
-      Root domain (reb.studio, no subdomain) → marketing pages.
-      Rewrite: /sites/{tenant}{path} internally.
-      Set tenant in headers/cookies for downstream components.
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: tenant-storage
-    title: "Scope Redis storage to tenant namespace"
-    priority: P3-deferred
-    feature: multi-tenant
-    status: todo
-    context: "{tenantId}:content:{section}. Migrate Chelsea's data."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: tenant-config
-    title: "Per-tenant configuration system"
-    priority: P3-deferred
-    feature: multi-tenant
-    status: todo
-    context: "Redis: {tenantId}:config. businessName, domain, industry, colors, systemPrompt."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: tenant-auth
-    title: "Per-tenant JWT auth + Laney super-admin"
-    priority: P3-deferred
-    feature: multi-tenant
-    status: todo
-    context: "JWT includes tenantId. Per-tenant credentials. Super-admin across all."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: site-templates
-    title: "Industry-specific site templates (wellness, trades, restaurant, professional)"
-    priority: P3-deferred
-    feature: multi-tenant
-    status: todo
-    context: "3-5 templates. Default sections + industry copy. Reduces build time to hours."
-    source: "/research ai-managed-sites"
-    created: 2026-03-17
-
-  - id: image-upload-tool
-    title: "Add upload_image tool to AI agent"
-    priority: P1
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-29
-    context: "Client drops photo → upload_image tool → existing /api/upload → URL returned."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: array-guard
-    title: "Array-destructive operation guard (>50% removal = confirm)"
-    priority: P1
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-17
-    context: "Prevent accidental mass deletion from ambiguous instructions."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: client-site-preview
-    title: "Live site preview in dashboard (iframe)"
-    priority: P1
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-17
-    context: "/dashboard/site — iframe of live site. Real-time changes visible."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: client-content-overview
-    title: "Content overview — visual map of site sections"
-    priority: P1
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-17
-    context: "Cards per section. Click edit → opens chat with pre-filled prompt."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: second-client
-    title: "Onboard second client from Chelsea's provider directory"
-    priority: P3-deferred
-    feature: validation
-    status: todo
-    context: "Build site. Give dashboard + AI. Validate multi-tenant end-to-end."
-    source: "/product"
-    created: 2026-03-17
-
-# ═══════════════════════════════════════════════════════════
-# PHASE 3: Business Operations (P2 — month 2)
-# ═══════════════════════════════════════════════════════════
-
-  - id: stripe-billing
-    title: "Stripe subscription billing ($3K build + $199/mo)"
-    priority: P2
-    feature: billing
-    status: todo
-    context: "Checkout + Subscription. Webhooks. Auto-disable on failure."
-    source: "/research agency-economics"
-    created: 2026-03-17
-
-  - id: weekly-reports
-    title: "AI-generated weekly site report per client (email)"
-    priority: P3-deferred
-    feature: retention
-    status: todo
-    context: "Monday report: visitors, clicks, what AI did. THE retention mechanism."
-    source: "/research agency-economics"
-    created: 2026-03-17
-
-  - id: analytics-integration
-    title: "Basic analytics per tenant (PostHog or Vercel Analytics)"
-    priority: P2
-    feature: analytics
-    status: todo
-    context: "Views, visitors, booking clicks, form submissions. Feed into dashboard + reports + chat."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: laney-command-center
-    title: "Laney's admin dashboard — all clients at a glance"
-    priority: P2
-    feature: operations
-    status: todo
-    context: "All tenants, MRR, recent changes, approve/reject queue."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: escalation-system
-    title: "AI escalation taxonomy (auto-approve / review / block)"
-    priority: P2
-    feature: ai-agent
-    status: todo
-    context: "Auto: hours/phone/address. Review: new pages, pricing. Block: code/layout. Slack approve/reject."
-    source: "/research ai-managed-sites"
-    created: 2026-03-17
-
-# ═══════════════════════════════════════════════════════════
-# PHASE 4: Growth (P3 — month 3+)
-# ═══════════════════════════════════════════════════════════
-
-  - id: portfolio-site
-    title: "REB agency landing page (reb.studio)"
-    priority: P3
-    feature: distribution
-    status: done
-    done_at: 2026-03-17
-    context: "Replaced by reb-landing-page in Phase 1C. Same scope, earlier priority."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: referral-program
-    title: "Client referral program ($50/mo credit)"
-    priority: P3
-    feature: distribution
-    status: todo
-    context: "Provider directory IS the pipeline. Chelsea refers → credit."
-    source: "/research agency-economics"
-    created: 2026-03-17
-
-  - id: seo-automation
-    title: "Auto-SEO for all tenant sites (JSON-LD, sitemap, meta, GSC)"
-    priority: P3
-    feature: seo
-    status: todo
-    context: "Auto-generate on content update. Submit to Google Search Console."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: proactive-content
-    title: "AI proactive content suggestions + blog writing"
-    priority: P3
-    feature: ai-agent
-    status: todo
-    context: "AI suggests updates based on staleness + seasonality. Monthly content calendar."
-    source: "/product"
-    created: 2026-03-17
-
-  - id: custom-domains
-    title: "Custom domain support per tenant (Vercel API)"
-    priority: P3
-    feature: multi-tenant
-    status: todo
-    context: "Own domain. DNS verification. Auto-SSL."
-    source: "/research tech-architecture"
-    created: 2026-03-17
-
-  - id: onboarding-flow
-    title: "Streamlined new client onboarding flow"
-    priority: P3
-    feature: operations
-    status: todo
-    context: "Intake form → template build → 'Meet your AI' email → first chat → billing starts."
-    source: "/research agency-economics"
-    created: 2026-03-17
-
-# ═══════════════════════════════════════════════════════════
-# EVAL-DRIVEN GAPS (from deep eval 2026-03-17)
-# Organized by feature, priority by eval score (worst first)
-# ═══════════════════════════════════════════════════════════
-
-# --- SEO (score: 42 — worst feature, P0 fix) ---
-
-  - id: dynamic-seo-schema
-    title: "Generate JSON-LD from CMS data, not hardcoded values"
-    priority: P0
-    feature: seo
-    status: done
-    done_at: 2026-03-29
-    context: "Layout.tsx has hardcoded LocalBusiness schema. Should read from storage (contact + settings) and generate dynamically. Business name, address, phone, hours, services all come from CMS."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: sitemap-xml
-    title: "Auto-generate sitemap.xml"
-    priority: P1
-    feature: seo
-    status: done
-    done_at: 2026-03-29
-    context: "No sitemap exists. Next.js 15 supports app/sitemap.ts for dynamic generation. Include all public pages."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: robots-txt
-    title: "Add robots.txt allowing crawlers, blocking /admin and /dashboard"
-    priority: P1
-    feature: seo
-    status: done
-    done_at: 2026-03-29
-    context: "No robots.txt. Add app/robots.ts. Allow all crawlers. Disallow /admin/*, /dashboard/*, /api/*."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: dynamic-meta-tags
-    title: "Generate meta title/description from CMS settings data"
-    priority: P1
-    feature: seo
-    status: done
-    done_at: 2026-03-29
-    context: "Meta tags should read siteName, siteDescription from settings. Currently partially hardcoded."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: opengraph-image
-    title: "Add Open Graph image for social sharing"
-    priority: P2
-    feature: seo
-    status: todo
-    context: "No og:image set. Generate or upload a branded social card for link previews."
-    source: "/eval"
-    created: 2026-03-17
-
-# --- AI Agent (score: 58 — key gaps) ---
-
-  - id: wire-chat-persistence
-    title: "Wire saveChatMessages/loadChatMessages into ChatPanel"
-    priority: P0
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-29
-    context: "Functions exist in storage.ts but ChatPanel uses local state. Need: save after each exchange, load on page open. Requires API routes for chat history since ChatPanel is a client component."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: chat-error-handling
-    title: "Handle AI agent API errors gracefully in chat UI"
-    priority: P1
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-29
-    context: "If Gemini API fails (rate limit, network), chat silently fails. Need: error message in chat bubble, retry button. Also handle auth expiry mid-conversation."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: dynamic-system-prompt
-    title: "Generate AI system prompt from tenant config, not hardcoded"
-    priority: P1
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-29
-    context: "System prompt hardcodes 'Rohlax Wellness' and 'Chelsea'. Should read from tenant config: business name, owner name, industry, custom instructions. Required for multi-tenant."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: agent-update-confirmation
-    title: "Show visual confirmation when AI updates site content"
-    priority: P1
-    feature: ai-agent
-    status: done
-    done_at: 2026-03-29
-    context: "When update_section succeeds, chat shows text but no visual indicator that the SITE changed. Add: a toast/banner 'Site updated — view changes' with link to /dashboard/site."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: slack-webhook-prod
-    title: "Set SLACK_WEBHOOK_URL in Vercel production env"
-    priority: P0
-    feature: ai-agent
-    status: todo
-    context: "Slack notification code exists but env var not set in production. Create a Slack webhook and add to Vercel env."
-    source: "/eval"
-    created: 2026-03-17
-
-# --- Client Dashboard (score: 60 — mock data debt) ---
-
-  - id: real-overview-metrics
-    title: "Replace mock metrics with real data (or honest empty state)"
-    priority: P0
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-29
-    context: "Overview shows hardcoded 127 visitors, 23 clicks, +12%, +8%. This is dishonest. Either: (1) wire real analytics via PostHog/Vercel, or (2) show honest empty state: 'Analytics coming soon — we'll track visitors once your site is live.' Mock data that looks real is worse than no data."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: real-activity-feed
-    title: "Replace hardcoded activity feed with real AI agent action log"
-    priority: P1
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-29
-    context: "Activity feed shows fake items. Should read from an activity log that the AI agent writes to on every update_section call. Store in Redis: {tenant}:activity as a list of {text, time, type}."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: mobile-dashboard-audit
-    title: "Test and fix dashboard at 390px mobile width"
-    priority: P1
-    feature: client-dashboard
-    status: todo
-    context: "Sidebar has mobile hamburger but untested. Metric cards, activity feed, content grid may break on small screens. Chelsea will use this on her phone."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: dashboard-loading-states
-    title: "Add loading skeletons for server-fetched dashboard pages"
-    priority: P2
-    feature: client-dashboard
-    status: done
-    done_at: 2026-03-29
-    context: "Content and settings pages fetch from Redis. On slow connections they'll flash. Add loading.tsx with skeleton UI matching the design system."
-    source: "/eval"
-    created: 2026-03-17
-
-# --- Public Site (score: 68 — strongest, minor gaps) ---
-
-  - id: public-empty-states
-    title: "Add empty states for events/providers when none exist"
-    priority: P2
-    feature: public-site
-    status: done
-    done_at: 2026-03-29
-    context: "If Chelsea deletes all events via AI chat, what does the events section show? Currently: empty space. Should show: 'No upcoming events. Check back soon.' Same for providers."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: public-favicon
-    title: "Add favicon and apple-touch-icon"
-    priority: P2
-    feature: public-site
-    status: todo
-    context: "Browser tab shows generic Next.js icon. Console shows 404 for favicon.ico. Add branded favicon."
-    source: "/eval"
-    created: 2026-03-17
-
-# --- Vagaro Integration (score: 62 — stale data risk) ---
-
-  - id: vagaro-data-freshness
-    title: "Add 'last synced' indicator and manual refresh for Vagaro data"
-    priority: P2
-    feature: vagaro-integration
-    status: todo
-    context: "Services were scraped once via Playwright. If Chelsea updates prices on Vagaro, site is stale. Options: (1) manual re-scrape button in admin, (2) 'last synced: Mar 15' indicator, (3) AI agent tool to re-scrape."
-    source: "/eval"
-    created: 2026-03-17
-
-# --- Config/Infrastructure ---
-
-  - id: update-rhino-yml
-    title: "Update rhino.yml with ai-agent and client-dashboard features"
-    priority: P0
-    feature: operations
-    status: done
-    done_at: 2026-03-29
-    context: "rhino.yml still describes only the original 6 features. Missing: ai-agent (weight:5), client-dashboard (weight:5), deployment (weight:4). Feature list is stale."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: beliefs-yml
-    title: "Create beliefs.yml with core assertions for eval"
-    priority: P1
-    feature: operations
-    status: todo
-    context: "No mechanical assertions exist. Need: site builds, agent API responds, auth works, content CRUD works, dashboard loads. These become the regression safety net."
-    source: "/eval"
-    created: 2026-03-17
-
-  - id: env-documentation
-    title: "Document all required env vars in README or .env.example"
-    priority: P1
-    feature: operations
-    status: done
-    done_at: 2026-03-29
-    context: "Required env vars: JWT_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD, GOOGLE_GENERATIVE_AI_API_KEY, REDIS_URL (optional), BLOB_READ_WRITE_TOKEN (optional), SLACK_WEBHOOK_URL (optional). No documentation exists."
-    source: "/eval"
-    created: 2026-03-17
-
-# ═══════════════════════════════════════════════════════════
-# LEGACY BACKLOG (from prior research)
-# ═══════════════════════════════════════════════════════════
-
-  - id: audit-vagaro-mysite
-    title: "Audit Vagaro MySite — document SEO/design limitations"
-    priority: P2
-    feature: vagaro-integration
-    status: backlog
-    context: "Sign up for trial, document what it can't do vs REB."
-    source: "manual"
-    created: 2026-03-17
-
-  - id: vagaro-api-access
-    title: "Investigate Vagaro API access for third-party developers"
-    priority: P2
-    feature: vagaro-integration
-    status: backlog
-    context: "Can data pipeline be built legally?"
-    source: "manual"
-    created: 2026-03-17
+    details: |
+      1. Update landing page: agency → platform positioning
+      2. Chelsea case study with real metrics
+      3. Onboard second client from Chelsea's network
+      4. SEO: target "AI website management", "HoneyBook alternative"
+      5. Product Hunt prep

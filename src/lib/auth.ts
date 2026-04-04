@@ -26,7 +26,7 @@ export async function isSuperAdmin(): Promise<boolean> {
 async function autoAssignTenant(userId: string, tenant: string, existingTenants: string[]): Promise<boolean> {
   // Only auto-assign if tenant is valid and user has no tenants yet
   if (existingTenants.length > 0) return false;
-  if (!getTenantConfig(tenant)) return false;
+  if (!(await getTenantConfig(tenant))) return false;
 
   try {
     const client = await clerkClient();

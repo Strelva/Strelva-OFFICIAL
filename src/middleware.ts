@@ -26,21 +26,18 @@ const isWriteProtectedApi = createRouteMatcher([
   "/api/page-config(.*)",
 ]);
 
-// Custom domain → tenant mapping (from centralized tenant config)
-import { getCustomDomainMap } from "@/lib/tenants";
-const CUSTOM_DOMAINS = getCustomDomainMap();
+const CUSTOM_DOMAINS: Record<string, string> = JSON.parse(
+  process.env.CUSTOM_DOMAIN_MAP || '{"greatlakesdriedfruit.com":"gldf","www.greatlakesdriedfruit.com":"gldf"}'
+);
 
 function extractTenant(request: NextRequest): string {
-  // Dev fallback: ?tenant=gldf
   const paramTenant = request.nextUrl.searchParams.get("tenant");
   if (paramTenant) return paramTenant;
 
   const host = (request.headers.get("host") || "").split(":")[0];
 
-  // Custom domain check
   if (CUSTOM_DOMAINS[host]) return CUSTOM_DOMAINS[host];
 
-  // Subdomain extraction: rohlax.reb.studio → rohlax
   const parts = host.split(".");
   if (parts.length >= 3 && parts[0] !== "www") {
     return parts[0];

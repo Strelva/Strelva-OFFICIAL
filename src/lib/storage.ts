@@ -878,3 +878,19 @@ export async function getSectionTimestamps(
   const store = await readDevContent(tenant);
   return (store.__sectionTimestamps as Record<string, string>) ?? {};
 }
+
+export async function getSubscriptionOverride(
+  tenant: string
+): Promise<string | null> {
+  const store = await readDevContent(tenant);
+  return (store.__subscriptionStatus as string) ?? null;
+}
+
+export async function setSubscriptionOverride(
+  tenant: string,
+  status: string
+): Promise<void> {
+  const store = await readDevContent(tenant);
+  store.__subscriptionStatus = status;
+  await writeDevContent(store, tenant);
+}

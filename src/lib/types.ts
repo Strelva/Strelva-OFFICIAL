@@ -61,7 +61,7 @@ export interface EventItem {
   time: string;
   location: string;
   description: string;
-  hosted_by: "owner" | "partner" | "community";
+  hosted_by: string;
   external_link: string;
   image_url: string;
 }
@@ -75,7 +75,7 @@ export interface EventsContent {
 export interface ProviderItem {
   id: string;
   name: string;
-  category: "massage" | "chiropractic" | "yoga" | "fitness" | "specialty";
+  category: string;
   service: string;
   why_i_recommend: string;
   booking_link: string;
@@ -107,7 +107,7 @@ export interface ShopItem {
   id: string;
   name: string;
   description: string;
-  category: "recommended" | "merch" | "tools";
+  category: string;
   price: string;
   external_link: string;
   image_url: string;
@@ -257,7 +257,7 @@ export interface Booking {
 
 // --- Template Types ---
 
-export type TemplateId = "wellness" | "food-brand";
+export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "professional" | (string & {});
 
 export type TenantFeature = "commerce" | "booking" | "newsletter";
 
@@ -268,6 +268,7 @@ export interface TenantConfig {
   subdomain: string;
   siteName: string;
   ownerName: string;
+  ownerEmail?: string;
   industry: string;
   active: boolean;
   createdAt: string;
@@ -276,4 +277,7 @@ export interface TenantConfig {
   customDomains?: string[];
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
+  bookingProvider?: string;
+  bookingUrl?: string;
+  resendDomain?: string;
 }

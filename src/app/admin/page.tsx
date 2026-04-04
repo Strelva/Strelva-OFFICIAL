@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TENANTS } from "@/lib/tenants";
+import { getAllTenants } from "@/lib/tenants";
 import { getActivity, listDrafts } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,8 @@ function formatTime(iso: string): string {
 }
 
 export default async function AdminPage() {
-  // Fetch activity + drafts in parallel for all tenants
+  const TENANTS = await getAllTenants();
+
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
       const [activity, drafts] = await Promise.all([

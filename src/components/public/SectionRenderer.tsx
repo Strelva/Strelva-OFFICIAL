@@ -10,7 +10,7 @@ interface SectionRendererProps {
 }
 
 export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRendererProps) {
-  const template = getTemplateForTenant(tenant);
+  const template = await getTemplateForTenant(tenant);
 
   // Load page config
   let pageConfig: SitePageConfig;

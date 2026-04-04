@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { setSubscriptionOverride } from "@/lib/storage";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -7,12 +8,6 @@ function getStripe() {
   });
 }
 
-/** Handles Stripe webhook events for REB subscription lifecycle.
- *
- *  Note: subscriptionStatus lives in src/lib/tenants.ts as static config.
- *  For a fully dynamic system, move tenant config to a database.
- *  At <20 clients, updating the config and redeploying is acceptable.
- *  This webhook logs events so Laney can act on them manually. */
 export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
@@ -39,39 +34,36 @@ export async function POST(req: Request) {
 
   switch (event.type) {
     case "invoice.paid":
-      console.log(`[billing] Invoice paid for tenant: ${tenantId}`);
-      // Subscription is healthy — no action needed at <20 clients
+      if (tenantId) await setSubscriptionOverride(tenantId, "active");
       break;
 
     case "invoice.payment_failed":
-      console.error(`[billing] Payment FAILED for tenant: ${tenantId}. Action required.`);
-      // Notify via Slack if configured
+      if (tenantId) await setSubscriptionOverride(tenantId, "past_due");
       if (process.env.SLACK_WEBHOOK_URL) {
         fetch(process.env.SLACK_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: `⚠️ Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
+            text: `Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
           }),
         }).catch(() => {});
       }
       break;
 
     case "customer.subscription.deleted":
-      console.log(`[billing] Subscription cancelled for tenant: ${tenantId}`);
+      if (tenantId) await setSubscriptionOverride(tenantId, "cancelled");
       if (process.env.SLACK_WEBHOOK_URL) {
         fetch(process.env.SLACK_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: `🚨 Subscription cancelled for tenant *${tenantId}*. Update tenants.ts and redeploy.`,
+            text: `Subscription cancelled for tenant *${tenantId}*.`,
           }),
         }).catch(() => {});
       }
       break;
 
     default:
-      // Unhandled event type — ignore
       break;
   }
 

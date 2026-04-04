@@ -5,10 +5,12 @@ import { verifyAuth } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTenantConfig } from "@/lib/tenants";
+import { requireActiveSubscription } from "@/lib/subscription";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string): Promise<string> {
-  const template = getTemplateForTenant(tenant);
+  const template = await getTemplateForTenant(tenant);
   const sections = template.contentSections;
 
   // Fetch all content sections + booking clicks in parallel
@@ -107,7 +109,9 @@ You can read and update any section of the website. Always read the current cont
 Available sections: ${sectionNames}.`;
 
   if (settings.bookingUrl) {
-    prompt += `\n\nBOOKING: All booking is handled through Vagaro at ${settings.bookingUrl}. When someone asks about booking, direct them to Vagaro. You cannot book appointments directly — always link to Vagaro.`;
+    const tenantConfig = await getTenantConfig(tenant);
+    const provider = tenantConfig?.bookingProvider || "their booking platform";
+    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
   }
 
   prompt += `\n\nNEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
@@ -131,8 +135,12 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+  const blocked = await requireActiveSubscription(tenant);
+  if (blocked) return blocked;
+
+  const tenantConfig = await getTenantConfig(tenant);
   const { messages, activeSection } = await req.json();
-  const template = getTemplateForTenant(tenant);
+  const template = await getTemplateForTenant(tenant);
   let systemPrompt = await buildSystemPrompt(tenant);
 
   if (activeSection) {
@@ -328,7 +336,7 @@ export async function POST(req: Request) {
                 const batch = emails.slice(i, i + batchSize);
                 await resend.batch.send(
                   batch.map((to) => ({
-                    from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.rohlaxwellness.com"}>`,
+                    from: `${fromName} <newsletter@${tenantConfig?.resendDomain || process.env.RESEND_DOMAIN || "updates.reb.studio"}>`,
                     to,
                     subject,
                     html: body,
