@@ -43,9 +43,11 @@ export function getTemplateRegistry(): Record<string, TemplateDefinition> {
   if (!_registry) {
     const { wellnessTemplate } = require("./wellness");
     const { foodBrandTemplate } = require("./food-brand");
+    const { restaurantTemplate } = require("./restaurant");
     _registry = {
       wellness: wellnessTemplate,
       "food-brand": foodBrandTemplate,
+      restaurant: restaurantTemplate,
     };
   }
   return _registry;
