@@ -45,11 +45,13 @@ export function getTemplateRegistry(): Record<string, TemplateDefinition> {
     const { foodBrandTemplate } = require("./food-brand");
     const { restaurantTemplate } = require("./restaurant");
     const { tradesTemplate } = require("./trades");
+    const { professionalTemplate } = require("./professional");
     _registry = {
       wellness: wellnessTemplate,
       "food-brand": foodBrandTemplate,
       restaurant: restaurantTemplate,
       trades: tradesTemplate,
+      professional: professionalTemplate,
     };
   }
   return _registry;
