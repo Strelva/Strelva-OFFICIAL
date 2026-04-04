@@ -24,8 +24,8 @@ export default async function LinksPage() {
     getContent("events", tenant),
   ]);
 
-  const bookingUrl = settings.bookingUrl || "https://www.vagaro.com/rohlaxwellness";
-  const instagramUrl = contact.instagramUrl || `https://instagram.com/${settings.instagramHandle || "rohlaxwellness"}`;
+  const bookingUrl = settings.bookingUrl || "";
+  const instagramUrl = contact.instagramUrl || (settings.instagramHandle ? `https://instagram.com/${settings.instagramHandle}` : "");
   const upcomingEvents = events.events.filter((e) => new Date(e.date) >= new Date());
 
   // Build links dynamically from content

@@ -7,9 +7,10 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { getActivatedCapabilities, capabilityPromptFragment } from "@/lib/capabilities";
 import type { ContentSection } from "@/lib/types";
 
-async function buildSystemPrompt(tenant: string): Promise<string> {
+async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
   const template = await getTemplateForTenant(tenant);
   const sections = template.contentSections;
 
@@ -114,9 +115,9 @@ Available sections: ${sectionNames}.`;
     prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
   }
 
-  prompt += `\n\nNEWSLETTER: You can send email newsletters to subscribers and check the subscriber list. When asked to send a newsletter, compose a subject and body, then use send_newsletter.
+  prompt += `\n\n${capFragment}`;
 
-Be conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
+  prompt += `\n\nBe conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
 
 Never remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
 
@@ -141,7 +142,9 @@ export async function POST(req: Request) {
   const tenantConfig = await getTenantConfig(tenant);
   const { messages, activeSection } = await req.json();
   const template = await getTemplateForTenant(tenant);
-  let systemPrompt = await buildSystemPrompt(tenant);
+  const { activeTools, tier } = await getActivatedCapabilities(tenant);
+  const capFragment = capabilityPromptFragment(tier);
+  let systemPrompt = await buildSystemPrompt(tenant, capFragment);
 
   if (activeSection) {
     systemPrompt += `\n\nCONTEXT: The user is currently viewing the "${activeSection}" section in their dashboard editor. When they say "this", "it", "add one", "update this", etc., they are referring to ${activeSection}. Proactively reference this section in your responses.`;
@@ -152,16 +155,14 @@ export async function POST(req: Request) {
     template.contentSections as [string, ...string[]]
   );
 
-  const result = streamText({
-    model: google("gemini-2.5-flash"),
-    system: systemPrompt,
-    messages,
-    tools: {
-      read_section: tool({
+  // Define all tools, then filter by tenant capabilities
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allTools: Record<string, { capability: string; def: any }> = {
+    read_section: {
+      capability: "read_section",
+      def: tool({
         description: "Read current content for a website section",
-        inputSchema: z.object({
-          section: sectionEnum,
-        }),
+        inputSchema: z.object({ section: sectionEnum }),
         execute: async ({ section }) => {
           try {
             const { getContent } = await import("@/lib/storage");
@@ -171,111 +172,93 @@ export async function POST(req: Request) {
           }
         },
       }),
-      update_section: tool({
-        description:
-          "Update content for a website section. Always read the section first, then send the COMPLETE updated data.",
+    },
+    update_section: {
+      capability: "update_section",
+      def: tool({
+        description: "Update content for a website section. Always read the section first, then send the COMPLETE updated data.",
         inputSchema: z.object({
           section: sectionEnum,
           data: z.record(z.string(), z.unknown()),
         }),
         execute: async ({ section, data }) => {
           try {
-          const { sectionSchemas } = await import("@/lib/schemas");
-          const schema = sectionSchemas[section as ContentSection];
-          const parsed = schema.safeParse(data);
-          if (!parsed.success) {
-            return {
-              success: false,
-              error: parsed.error.message,
-            };
-          }
+            const { sectionSchemas } = await import("@/lib/schemas");
+            const schema = sectionSchemas[section as ContentSection];
+            const parsed = schema.safeParse(data);
+            if (!parsed.success) {
+              return { success: false, error: parsed.error.message };
+            }
 
-          const { getContent, setContent } = await import("@/lib/storage");
-          const current = (await getContent(section as ContentSection, tenant)) as unknown as Record<
-            string,
-            unknown
-          >;
-          for (const key of Object.keys(current)) {
-            if (
-              Array.isArray(current[key]) &&
-              Array.isArray((data as Record<string, unknown>)[key])
-            ) {
-              const oldLen = (current[key] as unknown[]).length;
-              const newLen = (
-                (data as Record<string, unknown>)[key] as unknown[]
-              ).length;
-              if (oldLen > 0 && newLen < oldLen * 0.5) {
-                return {
-                  success: false,
-                  error: `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`,
-                };
+            const { getContent, setContent } = await import("@/lib/storage");
+            const current = (await getContent(section as ContentSection, tenant)) as unknown as Record<string, unknown>;
+            for (const key of Object.keys(current)) {
+              if (Array.isArray(current[key]) && Array.isArray((data as Record<string, unknown>)[key])) {
+                const oldLen = (current[key] as unknown[]).length;
+                const newLen = ((data as Record<string, unknown>)[key] as unknown[]).length;
+                if (oldLen > 0 && newLen < oldLen * 0.5) {
+                  return {
+                    success: false,
+                    error: `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`,
+                  };
+                }
               }
             }
-          }
 
-          const autoPublish = process.env.AI_AUTO_PUBLISH !== "false";
+            const autoPublish = process.env.AI_AUTO_PUBLISH !== "false";
 
-          if (autoPublish) {
-            // Publish immediately
-            await setContent(
-              section as ContentSection,
-              parsed.data as Parameters<typeof setContent>[1],
-              tenant
-            );
+            if (autoPublish) {
+              await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
+              const { revalidatePath } = await import("next/cache");
+              revalidatePath("/");
+            } else {
+              const { setDraftContent } = await import("@/lib/storage");
+              await setDraftContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
+            }
 
-            const { revalidatePath } = await import("next/cache");
-            revalidatePath("/");
-          } else {
-            // Save as draft for admin review
-            const { setDraftContent } = await import("@/lib/storage");
-            await setDraftContent(
-              section as ContentSection,
-              parsed.data as Parameters<typeof setContent>[1],
-              tenant
-            );
-          }
+            if (process.env.SLACK_WEBHOOK_URL) {
+              fetch(process.env.SLACK_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  text: autoPublish
+                    ? `Site updated *${section}* via AI chat`
+                    : `AI drafted changes to *${section}* for ${tenant} — review at /admin/drafts`,
+                }),
+              }).catch(() => {});
+            }
 
-          if (process.env.SLACK_WEBHOOK_URL) {
-            const action = autoPublish ? "updated" : "drafted changes to";
-            fetch(process.env.SLACK_WEBHOOK_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                text: autoPublish
-                  ? `Site updated *${section}* via AI chat`
-                  : `AI drafted changes to *${section}* for ${tenant} — review at /admin/drafts`,
-              }),
-            }).catch(() => {});
-          }
+            try {
+              const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
+              const { diffFields } = await import("@/lib/utils");
+              const changes = diffFields(current, data as Record<string, unknown>);
+              await logActivity({
+                text: autoPublish ? `AI updated ${section}` : `AI drafted changes to ${section} (pending review)`,
+                time: new Date().toISOString(),
+                type: "ai",
+                section,
+                actor: "ai",
+                changes,
+              }, tenant);
+              if (autoPublish) await recordSectionUpdate(section, tenant);
+            } catch {}
 
-          try {
-            const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
-            const { diffFields } = await import("@/lib/utils");
-            const changes = diffFields(current, data as Record<string, unknown>);
-            await logActivity({
-              text: autoPublish ? `AI updated ${section}` : `AI drafted changes to ${section} (pending review)`,
-              time: new Date().toISOString(),
-              type: "ai",
+            return {
+              success: true,
               section,
-              actor: "ai",
-              changes,
-            }, tenant);
-            if (autoPublish) await recordSectionUpdate(section, tenant);
-          } catch {}
-
-          return {
-            success: true,
-            section,
-            message: autoPublish
-              ? `Updated ${section} successfully`
-              : `I've drafted the changes to ${section}. Laney will review and publish them shortly.`,
-          };
+              message: autoPublish
+                ? `Updated ${section} successfully`
+                : `I've drafted the changes to ${section}. Laney will review and publish them shortly.`,
+            };
           } catch (err) {
             return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
         },
       }),
-      upload_image: tool({
+    },
+    upload_image: {
+      capability: "upload_image",
+      def: tool({
         description: "Upload an image to the website. Use when the client shares a photo or wants to add an image to their site.",
         inputSchema: z.object({
           imageData: z.string().describe("Base64-encoded image data URL (e.g. data:image/jpeg;base64,...)"),
@@ -283,32 +266,56 @@ export async function POST(req: Request) {
         }),
         execute: async ({ imageData, filename }) => {
           try {
-            // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
             const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
             if (!match) {
               return { success: false, error: "Invalid image data. Expected a base64-encoded data URL (data:image/type;base64,...)." };
             }
-            const mimeType = match[1];
-            const base64Data = match[2];
-            const buffer = Buffer.from(base64Data, "base64");
-
-            const ext = mimeType.split("/")[1] || "png";
+            const buffer = Buffer.from(match[2], "base64");
+            const ext = match[1].split("/")[1] || "png";
             const finalFilename = filename || `upload-${Date.now()}.${ext}`;
-
-            // Create a File-like object for uploadFile
-            const blob = new Blob([buffer], { type: mimeType });
-            const file = new File([blob], finalFilename, { type: mimeType });
-
+            const blob = new Blob([buffer], { type: match[1] });
+            const file = new File([blob], finalFilename, { type: match[1] });
             const { uploadFile } = await import("@/lib/storage");
             const { url } = await uploadFile(file);
-
             return { success: true, url, filename: finalFilename };
           } catch (err) {
             return { success: false, error: `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
         },
       }),
-      send_newsletter: tool({
+    },
+    get_metrics: {
+      capability: "get_metrics",
+      def: tool({
+        description: "Get site traffic metrics — page views, booking clicks, and trends",
+        inputSchema: z.object({}),
+        execute: async () => {
+          const { getClickCounts } = await import("@/lib/storage");
+          const [pageViews, bookingClicks] = await Promise.all([
+            getClickCounts("page-view", tenant),
+            getClickCounts("booking-click", tenant),
+          ]);
+          return { pageViews, bookingClicks };
+        },
+      }),
+    },
+    get_activity: {
+      capability: "get_activity",
+      def: tool({
+        description: "Get recent site activity — changes, updates, and events",
+        inputSchema: z.object({
+          section: z.string().optional().describe("Filter by section name"),
+        }),
+        execute: async ({ section }) => {
+          const { getActivity } = await import("@/lib/storage");
+          const activity = await getActivity(tenant, section ? { section } : undefined);
+          return { activity: activity.slice(0, 20) };
+        },
+      }),
+    },
+    send_newsletter: {
+      capability: "send_newsletter",
+      def: tool({
         description: "Compose and send an email newsletter to all subscribers",
         inputSchema: z.object({
           subject: z.string(),
@@ -319,10 +326,7 @@ export async function POST(req: Request) {
             const { getSubscribers, getContent, logActivity } = await import("@/lib/storage");
             const subscribers = await getSubscribers(tenant);
             const active = subscribers.filter((s) => s.status === "active");
-
-            if (active.length === 0) {
-              return { success: false, error: "No active subscribers" };
-            }
+            if (active.length === 0) return { success: false, error: "No active subscribers" };
 
             const settings = await getContent("settings", tenant);
             const fromName = settings.siteName || "Newsletter";
@@ -361,7 +365,10 @@ export async function POST(req: Request) {
           }
         },
       }),
-      list_subscribers: tool({
+    },
+    list_subscribers: {
+      capability: "list_subscribers",
+      def: tool({
         description: "List all newsletter subscribers and their count",
         inputSchema: z.object({}),
         execute: async () => {
@@ -378,6 +385,22 @@ export async function POST(req: Request) {
         },
       }),
     },
+  };
+
+  // Filter tools to only those the tenant's tier allows
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filteredTools: Record<string, any> = {};
+  for (const [name, { capability, def }] of Object.entries(allTools)) {
+    if (activeTools.has(capability)) {
+      filteredTools[name] = def;
+    }
+  }
+
+  const result = streamText({
+    model: google("gemini-2.5-flash"),
+    system: systemPrompt,
+    messages,
+    tools: filteredTools,
     stopWhen: stepCountIs(8),
   });
 
@@ -395,6 +418,8 @@ export async function POST(req: Request) {
               toolName === "read_section" ? `Reading your ${section || "content"}...` :
               toolName === "update_section" ? `Updating your ${section || "content"}...` :
               toolName === "upload_image" ? "Uploading image..." :
+              toolName === "get_metrics" ? "Checking your metrics..." :
+              toolName === "get_activity" ? "Looking at recent activity..." :
               toolName === "send_newsletter" ? "Sending newsletter..." :
               toolName === "list_subscribers" ? "Checking subscribers..." :
               "Working on it...";

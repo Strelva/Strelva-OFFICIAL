@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { setSubscriptionOverride } from "@/lib/storage";
+import { updateTenant } from "@/lib/tenants";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -34,11 +34,11 @@ export async function POST(req: Request) {
 
   switch (event.type) {
     case "invoice.paid":
-      if (tenantId) await setSubscriptionOverride(tenantId, "active");
+      if (tenantId) await updateTenant(tenantId, { subscriptionStatus: "active" });
       break;
 
     case "invoice.payment_failed":
-      if (tenantId) await setSubscriptionOverride(tenantId, "past_due");
+      if (tenantId) await updateTenant(tenantId, { subscriptionStatus: "past_due" });
       if (process.env.SLACK_WEBHOOK_URL) {
         fetch(process.env.SLACK_WEBHOOK_URL, {
           method: "POST",
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       break;
 
     case "customer.subscription.deleted":
-      if (tenantId) await setSubscriptionOverride(tenantId, "cancelled");
+      if (tenantId) await updateTenant(tenantId, { subscriptionStatus: "cancelled" });
       if (process.env.SLACK_WEBHOOK_URL) {
         fetch(process.env.SLACK_WEBHOOK_URL, {
           method: "POST",

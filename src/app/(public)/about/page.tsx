@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://rohlaxwellness.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://reb.studio";
   const description = `Learn about ${settings.ownerName || settings.siteName} and our approach to wellness.`;
   return {
     title: `About | ${settings.siteName}`,

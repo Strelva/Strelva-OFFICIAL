@@ -12,6 +12,8 @@ import { bookingConfig } from "./bookingConfig";
 import { booking } from "./booking";
 import { chatSession } from "./chatSession";
 import { activityLog } from "./activityLog";
+import { tenant } from "./tenant";
+import { suggestion } from "./suggestion";
 
 export const schemaTypes = [
   hero,
@@ -28,4 +30,6 @@ export const schemaTypes = [
   booking,
   chatSession,
   activityLog,
+  tenant,
+  suggestion,
 ];

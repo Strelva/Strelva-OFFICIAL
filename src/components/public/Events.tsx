@@ -83,17 +83,23 @@ export function Events({ events, settings }: { events: EventsContent; settings?:
                 No upcoming events
               </p>
               <p className="text-sm" style={{ color: "var(--bark-faded)" }}>
-                Follow{" "}
-                <a
-                  href={`https://instagram.com/${settings?.instagramHandle || "rohlaxwellness"}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium transition-opacity hover:opacity-60"
-                  style={{ color: "var(--sage)" }}
-                >
-                  @{settings?.instagramHandle || "rohlaxwellness"}
-                </a>{" "}
-                for updates on upcoming events and workshops.
+                {settings?.instagramHandle ? (
+                  <>
+                    Follow{" "}
+                    <a
+                      href={`https://instagram.com/${settings.instagramHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium transition-opacity hover:opacity-60"
+                      style={{ color: "var(--sage)" }}
+                    >
+                      @{settings.instagramHandle}
+                    </a>{" "}
+                    for updates on upcoming events and workshops.
+                  </>
+                ) : (
+                  "Check back soon for upcoming events and workshops."
+                )}
               </p>
             </div>
           ) : (

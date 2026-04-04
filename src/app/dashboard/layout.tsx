@@ -4,6 +4,7 @@ import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ChatDrawer } from "@/components/dashboard/ChatDrawer";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
+import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
@@ -33,11 +34,13 @@ export default async function DashboardLayout({
 
   return (
     <DashboardProvider>
-      <BillingBanner subscriptionStatus={subscriptionStatus} />
-      <DashboardShell siteName={siteName} bookingUrl={bookingUrl}>
-        {children}
-      </DashboardShell>
-      <ChatDrawer ownerName={ownerName} />
+      <CapabilityProvider>
+        <BillingBanner subscriptionStatus={subscriptionStatus} />
+        <DashboardShell siteName={siteName} bookingUrl={bookingUrl}>
+          {children}
+        </DashboardShell>
+        <ChatDrawer ownerName={ownerName} />
+      </CapabilityProvider>
     </DashboardProvider>
   );
 }

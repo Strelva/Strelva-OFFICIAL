@@ -18,6 +18,8 @@ const isProtectedApi = createRouteMatcher([
   "/api/booking/list(.*)",
   "/api/activity(.*)",
   "/api/admin(.*)",
+  "/api/suggestions(.*)",
+  "/api/capabilities(.*)",
 ]);
 
 // APIs where GET is public (content is visible on the site) but writes are protected in-route
@@ -27,7 +29,7 @@ const isWriteProtectedApi = createRouteMatcher([
 ]);
 
 const CUSTOM_DOMAINS: Record<string, string> = JSON.parse(
-  process.env.CUSTOM_DOMAIN_MAP || '{"greatlakesdriedfruit.com":"gldf","www.greatlakesdriedfruit.com":"gldf"}'
+  process.env.CUSTOM_DOMAIN_MAP || "{}"
 );
 
 function extractTenant(request: NextRequest): string {
@@ -46,18 +48,29 @@ function extractTenant(request: NextRequest): string {
   return DEFAULT_TENANT;
 }
 
-// Domains where the marketing/agency landing page should show at /
-const AGENCY_DOMAINS = ["reb.studio", "www.reb.studio"];
+// Domains where the marketing landing page should show at /
+const MARKETING_DOMAINS = ["reb.studio", "www.reb.studio", "localhost"];
 
-function isAgencyDomain(request: NextRequest): boolean {
-  const host = (request.headers.get("host") || "").split(":")[0]; // strip port
-  return AGENCY_DOMAINS.includes(host);
+function isMarketingDomain(request: NextRequest): boolean {
+  const host = (request.headers.get("host") || "").split(":")[0];
+  return MARKETING_DOMAINS.includes(host);
 }
 
+// Cron routes use CRON_SECRET header auth, not Clerk
+const isCronRoute = createRouteMatcher(["/api/cron(.*)"]);
+
 export default clerkMiddleware(async (auth, request) => {
-  // Rewrite root of agency domain to the marketing page
+  // Skip Clerk auth for cron routes (they verify CRON_SECRET internally)
+  if (isCronRoute(request)) {
+    const tenant = extractTenant(request);
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-tenant", tenant);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  // Rewrite root of marketing domain to the landing page
   if (
-    isAgencyDomain(request) &&
+    isMarketingDomain(request) &&
     request.nextUrl.pathname === "/"
   ) {
     const url = request.nextUrl.clone();

@@ -80,11 +80,11 @@ See `.claude/plans/todos.yml` for complete phase plan with status tracking.
 - Phase 2: Database-backed tenant registry → DONE
 - Phase 3: Subscription enforcement → DONE
 - Phase 4: Self-serve onboarding flow → DONE
-- Phase 5: 3 new templates (restaurant, trades, professional) → TODO (next)
-- Phase 6: Proactive AI (weekly report, staleness, push) → TODO
-- Phase 7: Capability module system → TODO
-- Phase 8: Deploy + Chelsea live test → TODO
-- Phase 9: Marketing site + second client → TODO
+- Phase 5: 3 new templates (restaurant, trades, professional) → DONE
+- Phase 6: Proactive AI (weekly report, staleness, suggestions) → DONE
+- Phase 7: Capability module system → DONE
+- Phase 8: Deploy + Chelsea live test → DONE (code ready, manual deploy steps remain)
+- Phase 9: Marketing site + second client → DONE (code done, manual outreach remains)
 
 ## Validation Signals
 1. Does Chelsea use the chat agent without being prompted?

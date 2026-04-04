@@ -261,6 +261,8 @@ export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "
 
 export type TenantFeature = "commerce" | "booking" | "newsletter";
 
+export type SubscriptionTier = "starter" | "growth" | "scale";
+
 // --- Tenant Types ---
 
 export interface TenantConfig {
@@ -277,6 +279,7 @@ export interface TenantConfig {
   customDomains?: string[];
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
+  tier?: SubscriptionTier;
   bookingProvider?: string;
   bookingUrl?: string;
   resendDomain?: string;

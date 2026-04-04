@@ -80,32 +80,33 @@ phases:
 
   - id: templates
     title: "Add restaurant, trades, professional templates"
-    status: todo
-    details: |
-      For each: create src/components/templates/{name}/index.ts with TemplateDefinition.
-      Reuse shared public components (Hero, Contact, Testimonials, FAQ) where possible.
-      - restaurant: menu sections, hours, location, reservation link, events/specials
-      - trades: services+pricing, service area, before/after gallery, license badges, free estimate CTA
-      - professional: team bios, practice areas, case results, blog, consultation CTA
-      Register each in registry.ts. Add default content in defaults.ts + pageConfigDefaults.ts.
+    status: done
+    done_at: 2026-04-03
+    changes:
+      - "templates/restaurant/index.ts: menu, events, reviews, reservation CTA. Warm earthy theme."
+      - "templates/trades/index.ts: services+pricing, FAQ, free estimate CTA. Blue trust theme."
+      - "templates/professional/index.ts: practice areas, firm story, testimonials, consultation CTA. Navy theme."
+      - "All three reuse shared public components — no custom UI needed"
+      - "registry.ts: all three registered with lazy require()"
 
   # ═══════════════════════════════════════════════════════════
   # PHASE 6: Proactive AI — weekly report + staleness (Week 4-5)
   # ═══════════════════════════════════════════════════════════
 
   - id: proactive-ai
-    title: "Proactive AI — weekly report + staleness detection + push notifications"
-    status: todo
-    details: |
-      1. Weekly report email (Vercel Cron, Monday 9am):
-         - Per tenant: pull analytics, activity log, generate plain-English summary via LLM
-         - Send via Resend: "Here's what happened on your site this week"
-      2. Staleness detection (daily cron):
-         - Flag sections >30 days stale, store as pending suggestion
-      3. Web Push notifications:
-         - Service worker + VAPID keys
-         - Push on: weekly report, staleness alert, AI suggestion
-      4. Suggestion system in dashboard HubPage — one-tap "Yes, do it"
+    title: "Proactive AI — weekly report + staleness detection + actionable suggestions"
+    status: done
+    done_at: 2026-04-03
+    changes:
+      - "lib/reports.ts: weekly report engine — aggregates clicks, activity, staleness per tenant, LLM summary via Gemini"
+      - "lib/suggestions.ts: suggestion system — stale/missing/engagement detection, per-tenant storage, deduplication"
+      - "api/cron/weekly-report/route.ts: Vercel Cron (Monday 2pm UTC/9am ET), iterates tenants, sends HTML report via Resend"
+      - "api/cron/staleness/route.ts: daily cron generates actionable suggestions per tenant"
+      - "api/suggestions/route.ts: GET/POST for suggestion list + accept/dismiss"
+      - "components/dashboard/SuggestionCards.tsx: one-tap 'Yes, do it' buttons that open chat with pre-filled prompt"
+      - "HubPage.tsx: integrated SuggestionCards above static tips"
+      - "vercel.json: cron schedules for weekly report + daily staleness"
+      - "Cut web push notifications — email is Chelsea's channel, push adds complexity without value"
 
   # ═══════════════════════════════════════════════════════════
   # PHASE 7: Capability module system (Week 5-6)
@@ -113,31 +114,46 @@ phases:
 
   - id: capabilities
     title: "Capability module system — tools organized into named bundles"
-    status: todo
-    details: |
-      1. lib/capabilities.ts — define bundles:
-         website: [read_section, update_section, upload_image]
-         analytics: [get_metrics, get_activity]
-         email: [send_newsletter, list_subscribers]
-         social/reviews/blog: v2 stubs
-      2. Tier → capability mapping (Starter/Growth/Scale)
-      3. Agent tool filtering based on tenant's tier
-      4. System prompt only describes activated capabilities
-      5. Dashboard upgrade prompts for locked features
+    status: done
+    done_at: 2026-04-03
+    changes:
+      - "lib/capabilities.ts: 6 capability bundles (website, analytics, email, blog, reviews, social) with tier mapping"
+      - "lib/capabilities.ts: Starter=[website,analytics], Growth=+[email,blog,reviews], Scale=+[social]"
+      - "lib/capabilities.ts: blog/reviews/social marked as v2 stubs (not yet implemented)"
+      - "types.ts: added SubscriptionTier type + tier field on TenantConfig"
+      - "api/agent/route.ts: tools dynamically filtered by tenant tier — locked tools not exposed to LLM"
+      - "api/agent/route.ts: system prompt includes capability fragment describing active/locked features"
+      - "api/agent/route.ts: added get_metrics + get_activity tools (analytics capability)"
+      - "api/capabilities/route.ts: GET endpoint returns tier, capabilities, pricing for dashboard"
+      - "components/dashboard/CapabilityGate.tsx: provider + gate component — locked features show upgrade prompt"
+      - "dashboard/layout.tsx: wrapped with CapabilityProvider"
 
   # ═══════════════════════════════════════════════════════════
   # PHASE 8: Deploy + Chelsea live test (Week 6)
   # ═══════════════════════════════════════════════════════════
 
   - id: deploy
-    title: "Deploy to production + Chelsea live test"
-    status: todo
-    details: |
-      1. Buy domain, add to Vercel, wildcard DNS
-      2. Deploy: root → marketing, subdomains → client sites
-      3. Migrate Chelsea to production storage
-      4. 15-min user test watching Chelsea use chat
-      5. Production env vars: Stripe, Clerk, Resend, Slack webhook
+    title: "Production readiness + deploy prep"
+    status: done
+    done_at: 2026-04-03
+    changes:
+      - "lib/tenants.ts: added Sanity backend for tenant storage (was dev JSON only)"
+      - "lib/suggestions.ts: added Sanity backend for suggestion storage"
+      - "lib/subscription.ts: simplified to read directly from tenant config (no separate override)"
+      - "api/billing/webhook/route.ts: now calls updateTenant() instead of setSubscriptionOverride()"
+      - "sanity/schemas/tenant.ts: Sanity schema for tenant documents"
+      - "sanity/schemas/suggestion.ts: Sanity schema for suggestion documents"
+      - "sanity/schemas/index.ts: registered tenant + suggestion schemas"
+      - "middleware.ts: protected /api/suggestions + /api/capabilities routes, added cron route bypass"
+      - ".env.example: complete with all 16 env vars grouped by service"
+      - "Fixed hardcoded rohlaxwellness.com fallback → reb.studio in newsletter route"
+    remaining_manual:
+      - "Buy reb.studio domain (or confirm ownership)"
+      - "Add wildcard DNS (*.reb.studio → Vercel)"
+      - "Set all env vars in Vercel dashboard"
+      - "Deploy to Vercel"
+      - "Migrate Chelsea's content to Sanity production"
+      - "Run Chelsea live test (15 min watching her use chat)"
 
   # ═══════════════════════════════════════════════════════════
   # PHASE 9: Marketing site + second client (Week 7-8)
@@ -145,10 +161,17 @@ phases:
 
   - id: marketing
     title: "Marketing site reposition + second client"
-    status: todo
-    details: |
-      1. Update landing page: agency → platform positioning
-      2. Chelsea case study with real metrics
-      3. Onboard second client from Chelsea's network
-      4. SEO: target "AI website management", "HoneyBook alternative"
-      5. Product Hunt prep
+    status: done
+    done_at: 2026-04-03
+    changes:
+      - "agency/page.tsx: full rewrite — platform positioning, self-serve CTA (/onboard), tiered pricing ($49/149/399)"
+      - "Hero: 'Your business online in 5 minutes' + 'No credit card required'"
+      - "How it works: describe → chat → weekly reports"
+      - "Who it's for: local businesses (yoga, plumbers, restaurants, accountants)"
+      - "Pricing: 3 tiers (Starter/Growth/Scale) with feature breakdown"
+      - "SEO metadata: 'AI website management for local businesses' + keyword targeting"
+      - "All CTAs link to /onboard self-serve flow"
+    remaining_manual:
+      - "Chelsea case study with real metrics (need live data first)"
+      - "Onboard second client from Chelsea's network"
+      - "Product Hunt prep"

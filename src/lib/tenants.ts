@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { TenantConfig } from "./types";
 
+const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
 
 let _cache: TenantConfig[] | null = null;
@@ -11,6 +12,17 @@ const CACHE_TTL = 60_000;
 async function loadTenants(): Promise<TenantConfig[]> {
   const now = Date.now();
   if (_cache && now - _cacheTime < CACHE_TTL) return _cache;
+
+  if (hasSanity) {
+    const { getSanityClient } = await import("./sanity");
+    const docs = await getSanityClient().fetch(
+      `*[_type == "tenant"] | order(createdAt desc)`
+    );
+    const tenants = (docs || []).map(sanityToTenant);
+    _cache = tenants;
+    _cacheTime = now;
+    return tenants;
+  }
 
   try {
     const raw = await fs.readFile(DEV_TENANTS_PATH, "utf-8");
@@ -25,6 +37,12 @@ async function loadTenants(): Promise<TenantConfig[]> {
 function invalidateCache() {
   _cache = null;
   _cacheTime = 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sanityToTenant(doc: any): TenantConfig {
+  const { _id, _rev, _type, _createdAt, _updatedAt, ...rest } = doc;
+  return rest as TenantConfig;
 }
 
 export async function getTenantConfig(
@@ -52,7 +70,6 @@ export async function getAllTenants(): Promise<TenantConfig[]> {
 export async function createTenant(
   config: Omit<TenantConfig, "id" | "createdAt" | "active" | "subscriptionStatus">
 ): Promise<TenantConfig> {
-  const tenants = await loadTenants();
   const tenant: TenantConfig = {
     ...config,
     id: config.subdomain,
@@ -61,6 +78,20 @@ export async function createTenant(
     subscriptionStatus: "none",
   };
 
+  if (hasSanity) {
+    const { getSanityClient } = await import("./sanity");
+    const existing = await getSanityClient().fetch(
+      `*[_type == "tenant" && id == $id][0]._id`,
+      { id: tenant.id }
+    );
+    if (existing) throw new Error(`Tenant "${tenant.id}" already exists`);
+
+    await getSanityClient().create({ _type: "tenant", ...tenant });
+    invalidateCache();
+    return tenant;
+  }
+
+  const tenants = await loadTenants();
   if (tenants.find((t) => t.id === tenant.id)) {
     throw new Error(`Tenant "${tenant.id}" already exists`);
   }
@@ -75,6 +106,23 @@ export async function updateTenant(
   id: string,
   updates: Partial<TenantConfig>
 ): Promise<TenantConfig | null> {
+  if (hasSanity) {
+    const { getSanityClient } = await import("./sanity");
+    const docId = await getSanityClient().fetch(
+      `*[_type == "tenant" && id == $id][0]._id`,
+      { id }
+    );
+    if (!docId) return null;
+
+    await getSanityClient().patch(docId).set(updates).commit();
+    invalidateCache();
+    const updated = await getSanityClient().fetch(
+      `*[_type == "tenant" && id == $id][0]`,
+      { id }
+    );
+    return updated ? sanityToTenant(updated) : null;
+  }
+
   const tenants = await loadTenants();
   const idx = tenants.findIndex((t) => t.id === id);
   if (idx === -1) return null;

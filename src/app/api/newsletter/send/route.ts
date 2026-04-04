@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         const batch = emails.slice(i, i + batchSize);
         await resend.batch.send(
           batch.map((to) => ({
-            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.rohlaxwellness.com"}>`,
+            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.reb.studio"}>`,
             to,
             subject,
             html: body,

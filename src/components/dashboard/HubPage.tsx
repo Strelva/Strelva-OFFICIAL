@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { WelcomeBanner } from "./WelcomeBanner";
+import { SuggestionCards } from "./SuggestionCards";
 import { SECTION_LABELS, SECTION_ICONS } from "@/components/ui/section-labels";
 import type { SectionData } from "./ContentBrowser";
 import { Card } from "@/components/ui/Card";
@@ -147,7 +148,10 @@ export function HubPage({
         </Card>
       </div>
 
-      {/* Suggestions */}
+      {/* AI-powered actionable suggestions */}
+      <SuggestionCards />
+
+      {/* Static fallback suggestions */}
       {suggestions.length === 1 && (
         <div data-ov="suggestions" className="flex items-center gap-2.5 text-[12px] text-warm-black bg-sage/[0.06] rounded-lg px-4 py-2.5 mb-5">
           <div className="w-1 h-1 rounded-full bg-sage shrink-0" />
@@ -155,8 +159,8 @@ export function HubPage({
         </div>
       )}
       {suggestions.length > 1 && (
-        <Card data-ov="suggestions" padding="none" className="bg-sage/[0.06] border-sage/[0.12] px-4 py-3 mb-5">
-          <h2 className="text-[11px] font-medium tracking-wider text-sage mb-2">Suggestions</h2>
+        <Card padding="none" className="bg-sage/[0.06] border-sage/[0.12] px-4 py-3 mb-5">
+          <h2 className="text-[11px] font-medium tracking-wider text-sage mb-2">Tips</h2>
           <div className="space-y-1.5">
             {suggestions.map((s, i) => (
               <div key={i} className="flex items-center gap-2.5 text-[12px] text-warm-black">
