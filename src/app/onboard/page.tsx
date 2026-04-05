@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
-type Step = "info" | "generating" | "preview" | "checkout";
+type ChatStep = "name" | "description" | "contact" | "generating" | "preview";
+
+interface Message {
+  from: "reb" | "user";
+  text: string;
+}
 
 interface BusinessInfo {
   businessName: string;
-  industry: string;
-  location: string;
   description: string;
-  phone: string;
+  location: string;
   email: string;
-  bookingUrl: string;
 }
 
 interface GeneratedResult {
@@ -20,69 +22,126 @@ interface GeneratedResult {
   subdomain: string;
 }
 
-const INDUSTRIES = [
-  "Wellness & Spa",
-  "Fitness & Yoga",
-  "Restaurant & Cafe",
-  "Trades & Home Services",
-  "Professional Services",
-  "Health & Medical",
-  "Beauty & Salon",
-  "Other",
-];
+function parseContactInfo(input: string): { location: string; email: string } {
+  const emailMatch = input.match(/[\w.+-]+@[\w.-]+\.\w+/);
+  const email = emailMatch ? emailMatch[0] : "";
+  const location = input.replace(emailMatch?.[0] ?? "", "").replace(/[—\-,]\s*$/, "").trim();
+  return { location, email };
+}
 
 export default function OnboardPage() {
-  const [step, setStep] = useState<Step>("info");
+  const [step, setStep] = useState<ChatStep>("name");
+  const [messages, setMessages] = useState<Message[]>([
+    { from: "reb", text: "What's your business called?" },
+  ]);
+  const [input, setInput] = useState("");
   const [info, setInfo] = useState<BusinessInfo>({
     businessName: "",
-    industry: "",
-    location: "",
     description: "",
-    phone: "",
+    location: "",
     email: "",
-    bookingUrl: "",
   });
   const [generated, setGenerated] = useState<GeneratedResult | null>(null);
   const [subdomain, setSubdomain] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function updateInfo(field: keyof BusinessInfo, value: string) {
-    setInfo((prev) => ({ ...prev, [field]: value }));
-    if (field === "businessName") {
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, step]);
+
+  useEffect(() => {
+    if (step !== "generating" && step !== "preview") {
+      inputRef.current?.focus();
+    }
+  }, [step]);
+
+  function addMessages(...msgs: Message[]) {
+    setMessages((prev) => [...prev, ...msgs]);
+  }
+
+  function handleSend() {
+    const value = input.trim();
+    if (!value) return;
+    setInput("");
+
+    if (step === "name") {
+      const name = value;
+      setInfo((prev) => ({ ...prev, businessName: name }));
       setSubdomain(
-        value
+        name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "")
       );
+      addMessages(
+        { from: "user", text: value },
+        { from: "reb", text: `Tell me about ${name}. What do you do?` }
+      );
+      setStep("description");
+    } else if (step === "description") {
+      setInfo((prev) => ({ ...prev, description: value }));
+      addMessages(
+        { from: "user", text: value },
+        {
+          from: "reb",
+          text: "Where are you located? And what's the best email for customers?",
+        }
+      );
+      setStep("contact");
+    } else if (step === "contact") {
+      const { location, email } = parseContactInfo(value);
+      const updatedInfo = {
+        ...info,
+        description: info.description || messages.find((m) => m.from === "user" && messages.indexOf(m) === 2)?.text || "",
+        location,
+        email,
+      };
+      setInfo(updatedInfo);
+      addMessages(
+        { from: "user", text: value },
+        { from: "reb", text: `Got it. Building ${info.businessName}'s website...` }
+      );
+      setStep("generating");
+      generate(updatedInfo);
     }
   }
 
-  async function handleGenerate() {
+  async function generate(data: BusinessInfo) {
     setError("");
-    setStep("generating");
     setLoading(true);
 
     try {
       const res = await fetch("/api/onboard/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(info),
+        body: JSON.stringify({
+          businessName: data.businessName,
+          description: data.description,
+          location: data.location,
+          email: data.email || undefined,
+        }),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(typeof data.error === "string" ? data.error : "Generation failed");
+        const d = await res.json();
+        throw new Error(typeof d.error === "string" ? d.error : "Generation failed");
       }
 
-      const data = await res.json();
-      setGenerated(data);
-      setSubdomain(data.subdomain);
+      const d = await res.json();
+      setGenerated(d);
+      setSubdomain(d.subdomain);
+      addMessages({
+        from: "reb",
+        text: `Here's what I built for ${data.businessName}.`,
+      });
       setStep("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-      setStep("info");
+      addMessages({ from: "reb", text: "Something went wrong. Let's try again. What's your business called?" });
+      setStep("name");
     } finally {
       setLoading(false);
     }
@@ -99,19 +158,18 @@ export default function OnboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: info.businessName,
-          ownerName: info.businessName, // they can update later
+          ownerName: info.businessName,
           ownerEmail: info.email,
-          industry: info.industry,
+          industry: info.description,
           subdomain,
           template: generated.template,
           content: generated.content,
-          bookingUrl: info.bookingUrl || undefined,
         }),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(typeof data.error === "string" ? data.error : "Setup failed");
+        const d = await res.json();
+        throw new Error(typeof d.error === "string" ? d.error : "Setup failed");
       }
 
       const data = await res.json();
@@ -128,188 +186,72 @@ export default function OnboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--cream)] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        {/* Progress */}
-        <div className="flex items-center gap-2 mb-8 justify-center">
-          {["info", "generating", "preview", "checkout"].map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                  step === s
-                    ? "bg-[var(--sage)]"
-                    : ["info", "generating", "preview", "checkout"].indexOf(step) > i
-                      ? "bg-[var(--sage-light)]"
-                      : "bg-[var(--cream-mid)]"
-                }`}
-              />
-              {i < 3 && <div className="w-8 h-px bg-[var(--cream-mid)]" />}
+    <div className="flex flex-col h-dvh" style={{ background: "#08080a" }}>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 pt-12 pb-4">
+        <div className="mx-auto max-w-xl space-y-4">
+          {messages.map((msg, i) => (
+            <div
+              key={i}
+              className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
+              style={{
+                animation: "chatFadeIn 0.25s ease-out both",
+                animationDelay: `${i * 0.05}s`,
+              }}
+            >
+              <div className={msg.from === "user" ? "max-w-[80%]" : "max-w-[85%]"}>
+                {msg.from === "reb" && (
+                  <span
+                    className="block text-xs font-medium mb-1 tracking-wide"
+                    style={{ color: "#d4a052" }}
+                  >
+                    REB
+                  </span>
+                )}
+                <div
+                  className="rounded-xl px-4 py-2.5 text-[15px] leading-relaxed"
+                  style={
+                    msg.from === "user"
+                      ? { background: "#1c1c20", color: "#e8e8ec" }
+                      : { color: "#8e8e96" }
+                  }
+                >
+                  {msg.text}
+                </div>
+              </div>
             </div>
           ))}
-        </div>
 
-        {/* Step: Business Info */}
-        {step === "info" && (
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-[var(--gray-border)]">
-            <h1 className="text-2xl font-semibold text-[var(--bark)] mb-2">
-              Tell us about your business
-            </h1>
-            <p className="text-[var(--bark-faded)] mb-8">
-              We'll build your website in under a minute.
-            </p>
-
-            {error && (
-              <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-6">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-5">
+          {/* Generating spinner */}
+          {step === "generating" && (
+            <div className="flex justify-start" style={{ animation: "chatFadeIn 0.25s ease-out both" }}>
               <div>
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                  Business name *
-                </label>
-                <input
-                  type="text"
-                  value={info.businessName}
-                  onChange={(e) => updateInfo("businessName", e.target.value)}
-                  placeholder="Sunrise Yoga Studio"
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                  Industry *
-                </label>
-                <select
-                  value={info.industry}
-                  onChange={(e) => updateInfo("industry", e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                >
-                  <option value="">Select your industry</option>
-                  {INDUSTRIES.map((ind) => (
-                    <option key={ind} value={ind}>
-                      {ind}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={info.location}
-                  onChange={(e) => updateInfo("location", e.target.value)}
-                  placeholder="Buffalo, NY"
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                  Describe your business *
-                </label>
-                <textarea
-                  value={info.description}
-                  onChange={(e) => updateInfo("description", e.target.value)}
-                  placeholder="We offer private and group yoga classes with a focus on beginners. Open since 2019, located downtown..."
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)] resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={info.email}
-                    onChange={(e) => updateInfo("email", e.target.value)}
-                    placeholder="hello@yourbiz.com"
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                  />
+                <span className="block text-xs font-medium mb-1 tracking-wide" style={{ color: "#d4a052" }}>
+                  REB
+                </span>
+                <div className="flex items-center gap-2 px-4 py-2.5" style={{ color: "#8e8e96" }}>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeDasharray="60"
+                      strokeDashoffset="20"
+                    />
+                  </svg>
+                  <span className="text-[15px]">Writing content, picking a layout...</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={info.phone}
-                    onChange={(e) => updateInfo("phone", e.target.value)}
-                    placeholder="(716) 555-0123"
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
-                  Booking URL
-                  <span className="text-[var(--gray-muted)] font-normal"> (optional)</span>
-                </label>
-                <input
-                  type="url"
-                  value={info.bookingUrl}
-                  onChange={(e) => updateInfo("bookingUrl", e.target.value)}
-                  placeholder="https://www.vagaro.com/yourbiz"
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--gray-border)] bg-white text-[var(--bark)] placeholder:text-[var(--gray-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)]"
-                />
               </div>
             </div>
+          )}
 
-            <button
-              onClick={handleGenerate}
-              disabled={!info.businessName || !info.industry || !info.description}
-              className="w-full mt-8 py-3 rounded-lg bg-[var(--sage)] text-white font-medium hover:bg-[var(--sage-dark)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Build my site
-            </button>
-          </div>
-        )}
-
-        {/* Step: Generating */}
-        {step === "generating" && (
-          <div className="bg-white rounded-2xl p-12 shadow-sm border border-[var(--gray-border)] text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--sage-wash)] mb-6">
-              <svg className="w-8 h-8 text-[var(--sage)] animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="60" strokeDashoffset="20" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-[var(--bark)] mb-2">
-              Building your website...
-            </h2>
-            <p className="text-[var(--bark-faded)]">
-              Our AI is writing your content, picking your layout, and setting everything up. Takes about 15 seconds.
-            </p>
-          </div>
-        )}
-
-        {/* Step: Preview */}
-        {step === "preview" && generated && (
-          <div className="bg-white rounded-2xl shadow-sm border border-[var(--gray-border)] overflow-hidden">
-            <div className="p-8">
-              <h2 className="text-xl font-semibold text-[var(--bark)] mb-1">
-                Here's your site
-              </h2>
-              <p className="text-[var(--bark-faded)] mb-6">
-                You can change everything later from your dashboard.
-              </p>
-
-              {error && (
-                <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-6">
-                  {error}
-                </div>
-              )}
-
-              {/* Content preview cards */}
-              <div className="space-y-4">
+          {/* Preview cards + launch */}
+          {step === "preview" && generated && (
+            <div className="space-y-4" style={{ animation: "chatFadeIn 0.3s ease-out both" }}>
+              <div className="space-y-3">
                 <PreviewCard
                   title="Homepage"
                   content={generated.content.hero as Record<string, unknown>}
@@ -336,49 +278,111 @@ export default function OnboardPage() {
                 />
               </div>
 
-              {/* Subdomain */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-[var(--bark)] mb-1.5">
+              {/* Subdomain picker */}
+              <div className="rounded-xl p-4" style={{ background: "#0f0f12", border: "1px solid #1c1c20" }}>
+                <label className="block text-xs font-medium mb-2" style={{ color: "#8e8e96" }}>
                   Your site URL
                 </label>
-                <div className="flex items-center gap-0">
+                <div className="flex items-center">
                   <input
                     type="text"
                     value={subdomain}
                     onChange={(e) =>
-                      setSubdomain(
-                        e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9-]/g, "")
-                      )
+                      setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
                     }
-                    className="px-4 py-2.5 rounded-l-lg border border-r-0 border-[var(--gray-border)] bg-white text-[var(--bark)] focus:outline-none focus:ring-2 focus:ring-[var(--sage)]/30 focus:border-[var(--sage)] w-48"
+                    className="flex-1 px-3 py-2 rounded-l-lg text-sm outline-none"
+                    style={{
+                      background: "#08080a",
+                      color: "#e8e8ec",
+                      border: "1px solid #26262b",
+                      borderRight: "none",
+                    }}
                   />
-                  <span className="px-4 py-2.5 rounded-r-lg border border-[var(--gray-border)] bg-[var(--gray-bg)] text-[var(--bark-faded)] text-sm">
+                  <span
+                    className="px-3 py-2 rounded-r-lg text-sm"
+                    style={{
+                      background: "#0f0f12",
+                      color: "#55555c",
+                      border: "1px solid #26262b",
+                    }}
+                  >
                     .reb.studio
                   </span>
                 </div>
               </div>
-            </div>
 
-            <div className="border-t border-[var(--gray-border)] p-6 bg-[var(--gray-bg-alt)] flex items-center justify-between">
-              <button
-                onClick={() => setStep("info")}
-                className="px-5 py-2.5 rounded-lg text-[var(--bark-faded)] hover:text-[var(--bark)] transition-colors"
-              >
-                Go back
-              </button>
+              {error && (
+                <div
+                  className="rounded-lg px-4 py-2.5 text-sm"
+                  style={{ background: "rgba(220, 38, 38, 0.1)", color: "#f87171" }}
+                >
+                  {error}
+                </div>
+              )}
+
               <button
                 onClick={handleComplete}
                 disabled={loading || !subdomain}
-                className="px-8 py-2.5 rounded-lg bg-[var(--sage)] text-white font-medium hover:bg-[var(--sage-dark)] disabled:opacity-40 transition-colors"
+                className="w-full py-3 rounded-xl text-sm font-medium transition-opacity disabled:opacity-40"
+                style={{ background: "#d4a052", color: "#08080a" }}
               >
-                {loading ? "Setting up..." : "Launch my site"}
+                {loading ? "Setting up..." : "Launch my site \u2192"}
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          <div ref={bottomRef} />
+        </div>
       </div>
+
+      {/* Input bar */}
+      {(step === "name" || step === "description" || step === "contact") && (
+        <div className="px-4 pb-6 pt-2" style={{ background: "#08080a" }}>
+          <div className="mx-auto max-w-xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  step === "name"
+                    ? "e.g. Sunrise Yoga Studio"
+                    : step === "description"
+                      ? "e.g. We offer private and group yoga classes..."
+                      : "e.g. Buffalo, NY — hello@mybiz.com"
+                }
+                className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors"
+                style={{
+                  background: "#0f0f12",
+                  color: "#e8e8ec",
+                  border: "1px solid #26262b",
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#d4a052")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#26262b")}
+              />
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes chatFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -397,25 +401,33 @@ function PreviewCard({
   listLabel?: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--gray-border)] p-5">
-      <h3 className="text-sm font-medium text-[var(--sage)] uppercase tracking-wider mb-3">
+    <div className="rounded-xl p-4" style={{ background: "#0f0f12", border: "1px solid #1c1c20" }}>
+      <h3
+        className="text-xs font-medium uppercase tracking-wider mb-2"
+        style={{ color: "#d4a052" }}
+      >
         {title}
       </h3>
       {fields.map((field) => {
         const val = content[field];
         if (!val || typeof val !== "string") return null;
         return (
-          <p key={field} className={field === fields[0] ? "text-lg font-semibold text-[var(--bark)] mb-1" : "text-[var(--bark-faded)] text-sm mb-1"}>
+          <p
+            key={field}
+            className={field === fields[0] ? "text-base font-semibold mb-1" : "text-sm mb-1"}
+            style={{ color: field === fields[0] ? "#e8e8ec" : "#8e8e96" }}
+          >
             {val}
           </p>
         );
       })}
       {listField && listLabel && Array.isArray(content[listField]) && (
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {(content[listField] as Record<string, unknown>[]).slice(0, 5).map((item, i) => (
             <span
               key={i}
-              className="text-xs px-2.5 py-1 rounded-full bg-[var(--sage-wash)] text-[var(--sage-dark)]"
+              className="text-xs px-2.5 py-1 rounded-full"
+              style={{ background: "rgba(212, 160, 82, 0.12)", color: "#d4a052" }}
             >
               {item[listLabel] as string}
             </span>

@@ -6,11 +6,11 @@ import type { TemplateId } from "@/lib/types";
 
 const businessInputSchema = z.object({
   businessName: z.string().min(1),
-  industry: z.string().min(1),
+  industry: z.string().optional(),
   location: z.string().optional(),
   description: z.string().min(10),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal("")),
   bookingUrl: z.string().url().optional(),
 });
 
@@ -145,12 +145,13 @@ export async function POST(req: Request) {
   }
 
   const { businessName, industry, location, description, phone, email, bookingUrl } = parsed.data;
-  const template = pickTemplate(industry);
+  const industryContext = industry || description;
+  const template = pickTemplate(industryContext);
 
   const prompt = `Generate website content for a business with these details:
 
 Business name: ${businessName}
-Industry: ${industry}
+Industry: ${industryContext}
 ${location ? `Location: ${location}` : ""}
 Description: ${description}
 ${phone ? `Phone: ${phone}` : ""}
