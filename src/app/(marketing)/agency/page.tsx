@@ -1,318 +1,247 @@
 import type { Metadata } from "next";
+import { MarketingAnimations } from "./animations";
 
 export const metadata: Metadata = {
-  title: "REB — AI website management for local businesses",
+  title: "REB — Your site works while you sleep",
   description:
-    "Describe your business. Get a live website in 5 minutes. Update it by chatting with AI. Weekly reports prove it's working.",
-  keywords: [
-    "AI website management",
-    "AI website builder",
-    "local business website",
-    "website for small business",
-    "AI website assistant",
-  ],
+    "Describe your business. Get a live website in 5 minutes. Update it by chatting with AI.",
 };
-
-/* ─── Icon components ─── */
-
-function ChatIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function ZapIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-/* ─── Data ─── */
-
-const steps = [
-  {
-    icon: <ZapIcon />,
-    title: "Describe your business",
-    description: "Tell us what you do, who you serve, and what matters. AI generates your site in under 5 minutes.",
-  },
-  {
-    icon: <ChatIcon />,
-    title: "Update it by talking",
-    description: '"Add my new Saturday yoga class." "Change my hours for the holiday." Your AI assistant handles it.',
-  },
-  {
-    icon: <ChartIcon />,
-    title: "Watch it work",
-    description: 'Weekly reports in plain English: "47 people found you this week. 3 clicked Book Now."',
-  },
-];
-
-const tiers = [
-  {
-    name: "Starter",
-    price: 49,
-    description: "Your website + AI assistant",
-    features: [
-      "AI-generated website",
-      "Chat to update anything",
-      "Business dashboard",
-      "Traffic analytics",
-      "Hosting included",
-    ],
-    cta: "Start free",
-    highlighted: false,
-  },
-  {
-    name: "Growth",
-    price: 149,
-    description: "Everything in Starter, plus reach",
-    features: [
-      "Everything in Starter",
-      "Email newsletters",
-      "Blog posts via AI",
-      "Review management",
-      "Weekly AI reports",
-      "Priority support",
-    ],
-    cta: "Start free",
-    highlighted: true,
-  },
-  {
-    name: "Scale",
-    price: 399,
-    description: "Full AI business OS",
-    features: [
-      "Everything in Growth",
-      "Social media posting",
-      "API access",
-      "White-label ready",
-      "Custom domain",
-      "Dedicated support",
-    ],
-    cta: "Contact us",
-    highlighted: false,
-  },
-];
 
 /* ─── Page ─── */
 
 export default function MarketingPage() {
   return (
     <>
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden" style={{ background: "var(--pure-white)" }}>
-        <div className="max-w-4xl mx-auto px-6 pt-24 pb-20 md:pt-36 md:pb-32 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "var(--sage)" }}>
-            AI website management
-          </p>
+      <MarketingAnimations />
+
+      {/* ── Hero — editorial, not SaaS ── */}
+      <section className="px-6" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto pt-24 md:pt-40 pb-20 md:pb-32">
+          {/* Oversized headline — the page IS the headline */}
           <h1
-            className="text-4xl md:text-6xl font-semibold tracking-tight leading-tight"
-            style={{ color: "var(--bark)", fontFamily: "var(--font-display), serif" }}
+            className="text-[clamp(2.5rem,8vw,5.5rem)] font-semibold leading-[0.95] tracking-[-0.04em]"
+            style={{ color: "var(--m-text)" }}
           >
-            Your business online
+            Your business
             <br />
-            in 5 minutes
+            online in{" "}
+            <span
+              className="italic"
+              style={{ color: "var(--m-accent)", fontFamily: "var(--font-display), Georgia, serif" }}
+            >
+              five minutes.
+            </span>
           </h1>
-          <p className="mt-6 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed" style={{ color: "var(--bark-light)" }}>
-            Describe what you do. AI builds your website. Update it by chatting.
-            Weekly reports prove it&rsquo;s working.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-              href="/onboard"
-              className="inline-flex items-center px-8 py-3.5 rounded-full text-base font-medium transition-all hover:scale-[1.02]"
-              style={{ background: "var(--sage)", color: "var(--pure-white)" }}
-            >
-              Get your site now
-            </a>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center px-8 py-3.5 rounded-full text-base font-medium transition-colors"
-              style={{ color: "var(--sage-dark)", border: "1.5px solid var(--sage-light)" }}
-            >
-              See how it works
-            </a>
-          </div>
-          <p className="mt-5 text-sm" style={{ color: "var(--bark-faded)" }}>
-            No credit card required. Live site in under 5 minutes.
-          </p>
-        </div>
-        <div
-          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-          style={{ background: "linear-gradient(to bottom, transparent, var(--cream))" }}
-        />
-      </section>
 
-      {/* ── How It Works ── */}
-      <section id="how-it-works" className="py-20 md:py-28 px-6" style={{ background: "var(--cream)" }}>
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-center" style={{ color: "var(--bark)" }}>
-            How it works
-          </h2>
-          <p className="mt-4 text-center text-lg max-w-xl mx-auto" style={{ color: "var(--bark-faded)" }}>
-            From &ldquo;I need a website&rdquo; to &ldquo;my site runs itself&rdquo; in three steps.
-          </p>
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            {steps.map((step, i) => (
-              <div key={i} className="text-center md:text-left">
-                <div
-                  className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5"
-                  style={{ background: "var(--sage-wash)", color: "var(--sage-dark)" }}
+          {/* Subhead — generous spacing, asymmetric placement */}
+          <div className="grid md:grid-cols-[7fr_5fr] gap-8 mt-12 md:mt-16">
+            <div>
+              <p className="text-[clamp(1rem,1.8vw,1.25rem)] leading-[1.6]" style={{ color: "var(--m-text-2)" }}>
+                REB builds and manages your website.
+                You text what you need. It happens. Weekly reports
+                prove it&rsquo;s working. You never log in to anything.
+              </p>
+              <div className="mt-8 flex items-center gap-4">
+                <a
+                  href="/onboard"
+                  className="text-[14px] font-medium px-6 py-3 transition-all hover:brightness-110 active:scale-[0.97]"
+                  style={{ background: "var(--m-accent)", color: "var(--m-bg)" }}
                 >
-                  {step.icon}
-                </div>
-                <div className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--sage)" }}>
-                  Step {i + 1}
-                </div>
-                <h3 className="text-xl font-semibold mb-2" style={{ color: "var(--bark)" }}>
-                  {step.title}
-                </h3>
-                <p className="text-base leading-relaxed" style={{ color: "var(--bark-faded)" }}>
-                  {step.description}
-                </p>
+                  Get your site &rarr;
+                </a>
+                <span className="text-[13px]" style={{ color: "var(--m-text-3)" }}>
+                  Free 14-day trial
+                </span>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Who It's For ── */}
-      <section className="py-20 md:py-28 px-6" style={{ background: "var(--pure-white)" }}>
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight" style={{ color: "var(--bark)" }}>
-            Built for businesses that don&rsquo;t have time for a website
-          </h2>
-          <p className="mt-6 text-lg leading-relaxed" style={{ color: "var(--bark-faded)" }}>
-            Yoga studios. Plumbers. Restaurants. Accountants. Salons. Contractors.
-            If you run a local business and your website is either bad, outdated,
-            or a LinkTree page — this is for you.
-          </p>
-          <p className="mt-4 text-lg leading-relaxed" style={{ color: "var(--bark-faded)" }}>
-            You don&rsquo;t need to learn a CMS. You don&rsquo;t need to hire a designer.
-            You text the AI what you need, and it happens.
-          </p>
+      {/* ── Divider rule ── */}
+      <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
+
+      {/* ── The product, as a pull quote ── */}
+      <section className="px-6 py-20 md:py-32" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto grid md:grid-cols-[5fr_7fr] gap-12 md:gap-20 items-start">
+          {/* Left — editorial label */}
+          <div className="reveal-section">
+            <div className="text-[11px] font-medium tracking-[0.2em] uppercase mb-4" style={{ color: "var(--m-accent)" }}>
+              How it works
+            </div>
+            <p className="text-[clamp(1.5rem,3vw,2.25rem)] font-medium leading-[1.2] tracking-[-0.02em]" style={{ color: "var(--m-text)" }}>
+              You text the AI.
+              <br />
+              It updates your site.
+              <br />
+              <span style={{ color: "var(--m-text-2)" }}>That&rsquo;s the whole product.</span>
+            </p>
+          </div>
+          {/* Right — the chat, inline like a magazine sidebar */}
+          <div className="reveal-section">
+            <div className="border-l-2 pl-6" style={{ borderColor: "var(--m-rule-light)" }}>
+              <div className="space-y-4">
+                {[
+                  { from: "you", text: "Add my Saturday yoga class, 9am, $25 drop-in" },
+                  { from: "reb", text: "Done — added to your services page and updated your schedule. Want me to email your regulars?" },
+                  { from: "you", text: "Yes" },
+                  { from: "reb", text: "Sent to 34 subscribers. 6 opened it already." },
+                ].map((msg, i) => (
+                  <div key={i}>
+                    <div className="text-[10px] font-medium tracking-[0.15em] uppercase mb-1" style={{ color: msg.from === "you" ? "var(--m-text-3)" : "var(--m-accent)" }}>
+                      {msg.from === "you" ? "You" : "REB"}
+                    </div>
+                    <p className="text-[15px] leading-[1.6]" style={{ color: "var(--m-text)" }}>
+                      {msg.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── Pricing ── */}
-      <section id="pricing" className="py-20 md:py-28 px-6" style={{ background: "var(--cream)" }}>
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-center" style={{ color: "var(--bark)" }}>
-            Simple, honest pricing
-          </h2>
-          <p className="mt-4 text-center text-lg max-w-xl mx-auto" style={{ color: "var(--bark-faded)" }}>
-            Start free. Upgrade when you need more.
-          </p>
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {tiers.map((tier) => (
-              <div
-                key={tier.name}
-                className="rounded-2xl p-7 border-2 flex flex-col"
-                style={{
-                  background: "var(--pure-white)",
-                  borderColor: tier.highlighted ? "var(--sage)" : "var(--cream-dark)",
-                }}
-              >
-                {tier.highlighted && (
-                  <div
-                    className="text-[10px] font-bold uppercase tracking-widest mb-3 px-3 py-1 rounded-full self-start"
-                    style={{ background: "var(--sage-wash)", color: "var(--sage-dark)" }}
-                  >
-                    Most popular
-                  </div>
-                )}
-                <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--sage)" }}>
-                  {tier.name}
+      {/* ── Rule ── */}
+      <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
+
+      {/* ── What you get — editorial list, not cards ── */}
+      <section className="px-6 py-20 md:py-32" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto">
+          <div className="reveal-section">
+            <div className="text-[11px] font-medium tracking-[0.2em] uppercase mb-10" style={{ color: "var(--m-accent)" }}>
+              What you get
+            </div>
+            <div className="space-y-0">
+              {[
+                { title: "A site that looks like you paid $10,000 for it", detail: "Professional design tailored to your business. Mobile-ready, fast, SEO-optimized." },
+                { title: "An AI that manages it while you sleep", detail: "Weekly reports. Proactive suggestions. Stale content caught before clients notice." },
+                { title: "Updates by texting, not logging in", detail: "Add services. Change hours. Write blog posts. Send newsletters. All by chat." },
+                { title: "Proof it's working, every week", detail: "\"47 people found you. 12 clicked Book Now.\" Numbers, not dashboards." },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="grid md:grid-cols-[5fr_7fr] gap-4 py-7 border-t"
+                  style={{ borderColor: "var(--m-rule)" }}
+                >
+                  <h3 className="text-[17px] font-medium" style={{ color: "var(--m-text)" }}>
+                    {item.title}
+                  </h3>
+                  <p className="text-[15px] leading-[1.6]" style={{ color: "var(--m-text-2)" }}>
+                    {item.detail}
+                  </p>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold" style={{ color: "var(--bark)" }}>
-                    ${tier.price}
-                  </span>
-                  <span className="text-base" style={{ color: "var(--bark-faded)" }}>/mo</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Rule ── */}
+      <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
+
+      {/* ── Pricing — two columns, no cards ── */}
+      <section id="pricing" className="px-6 py-20 md:py-32" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto">
+          <div className="reveal-section">
+            <div className="text-[11px] font-medium tracking-[0.2em] uppercase mb-10" style={{ color: "var(--m-accent)" }}>
+              Pricing
+            </div>
+            <div className="grid md:grid-cols-2 gap-16">
+              {/* Starter */}
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-[2.5rem] font-semibold tracking-tight tabular-nums" style={{ color: "var(--m-text)" }}>$49</span>
+                  <span className="text-[15px]" style={{ color: "var(--m-text-3)" }}>/month</span>
                 </div>
-                <p className="mt-2 text-sm" style={{ color: "var(--bark-faded)" }}>
-                  {tier.description}
+                <div className="text-[13px] font-medium uppercase tracking-[0.1em] mb-4" style={{ color: "var(--m-text-2)" }}>Starter</div>
+                <p className="text-[15px] leading-[1.6] mb-5" style={{ color: "var(--m-text-2)" }}>
+                  A professional site that updates itself.
                 </p>
-                <ul className="mt-5 space-y-2.5 flex-1">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2">
-                      <span className="mt-0.5 shrink-0" style={{ color: "var(--sage)" }}>
-                        <CheckIcon />
-                      </span>
-                      <span className="text-sm" style={{ color: "var(--bark-light)" }}>
-                        {feature}
-                      </span>
+                <ul className="space-y-2 mb-6">
+                  {["AI-generated website", "Chat to update anything", "Business dashboard", "Traffic analytics", "Hosting included"].map((f) => (
+                    <li key={f} className="text-[14px] flex items-center gap-2" style={{ color: "var(--m-text-2)" }}>
+                      <span style={{ color: "var(--m-accent)" }}>&middot;</span> {f}
                     </li>
                   ))}
                 </ul>
                 <a
-                  href={tier.name === "Scale" ? "mailto:laney@buffaloprojects.com" : "/onboard"}
-                  className="mt-6 inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-medium transition-all hover:scale-[1.02]"
-                  style={
-                    tier.highlighted
-                      ? { background: "var(--sage)", color: "var(--pure-white)" }
-                      : { background: "var(--cream)", color: "var(--sage-dark)" }
-                  }
+                  href="/onboard"
+                  className="text-[13px] font-medium px-5 py-2.5 border transition-colors hover:bg-white/5"
+                  style={{ borderColor: "var(--m-rule-light)", color: "var(--m-text)" }}
                 >
-                  {tier.cta}
+                  Start free trial
                 </a>
               </div>
-            ))}
+              {/* Growth */}
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-[2.5rem] font-semibold tracking-tight tabular-nums" style={{ color: "var(--m-text)" }}>$149</span>
+                  <span className="text-[15px]" style={{ color: "var(--m-text-3)" }}>/month</span>
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--m-text-2)" }}>Growth</span>
+                  <span className="text-[10px] font-medium tracking-[0.1em] uppercase px-2 py-0.5" style={{ background: "var(--m-accent-muted)", color: "var(--m-accent)" }}>
+                    Popular
+                  </span>
+                </div>
+                <p className="text-[15px] leading-[1.6] mb-5" style={{ color: "var(--m-text-2)" }}>
+                  Get found, stay in touch, grow your client list.
+                </p>
+                <ul className="space-y-2 mb-6">
+                  {["Everything in Starter", "Email newsletters", "Blog posts via AI", "Review management", "Weekly AI reports", "Priority support"].map((f) => (
+                    <li key={f} className="text-[14px] flex items-center gap-2" style={{ color: "var(--m-text-2)" }}>
+                      <span style={{ color: "var(--m-accent)" }}>&middot;</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href="/onboard"
+                  className="text-[13px] font-medium px-5 py-2.5 transition-all hover:brightness-110 active:scale-[0.97]"
+                  style={{ background: "var(--m-accent)", color: "var(--m-bg)" }}
+                >
+                  Start free trial
+                </a>
+              </div>
+            </div>
+            <p className="mt-10 text-[13px]" style={{ color: "var(--m-text-3)" }}>
+              14-day free trial on both plans. No credit card required.
+              <br />
+              Need multi-location or white-label?{" "}
+              <a href="mailto:laney@buffaloprojects.com" className="underline" style={{ color: "var(--m-text-2)" }}>Talk to Laney</a>
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="py-20 md:py-28 px-6" style={{ background: "var(--pure-white)" }}>
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight" style={{ color: "var(--bark)" }}>
-            Your site in 5 minutes. No catch.
-          </h2>
-          <p className="mt-4 text-lg leading-relaxed" style={{ color: "var(--bark-faded)" }}>
-            Describe your business, pick a look, and you&rsquo;re live.
-            No credit card. No meetings. No waiting.
+      {/* ── Rule ── */}
+      <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
+
+      {/* ── Close — one line, massive type ── */}
+      <section className="px-6 py-24 md:py-40" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto reveal-section">
+          <p
+            className="text-[clamp(2rem,5vw,3.5rem)] font-semibold leading-[1.1] tracking-[-0.03em]"
+            style={{ color: "var(--m-text)" }}
+          >
+            Your site in five minutes.
+            <br />
+            <span
+              className="italic"
+              style={{ color: "var(--m-accent)", fontFamily: "var(--font-display), Georgia, serif" }}
+            >
+              No catch.
+            </span>
           </p>
-          <div className="mt-10">
+          <div className="mt-8">
             <a
               href="/onboard"
-              className="inline-flex items-center px-10 py-4 rounded-full text-base font-medium transition-all hover:scale-[1.02]"
-              style={{ background: "var(--sage)", color: "var(--pure-white)" }}
+              className="text-[14px] font-medium px-6 py-3 transition-all hover:brightness-110 active:scale-[0.97]"
+              style={{ background: "var(--m-accent)", color: "var(--m-bg)" }}
             >
-              Get your site now
+              Get your site &rarr;
             </a>
           </div>
-          <p className="mt-8 text-sm" style={{ color: "var(--bark-faded)" }}>
-            Questions?{" "}
-            <a
-              href="mailto:laney@buffaloprojects.com"
-              className="underline underline-offset-2"
-              style={{ color: "var(--sage-dark)" }}
-            >
-              laney@buffaloprojects.com
-            </a>
-          </p>
         </div>
       </section>
     </>

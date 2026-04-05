@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "REB Studio — Your site works while you sleep",
+  title: "REB — Your site works while you sleep",
   description:
-    "Custom websites powered by AI. Your clients get a beautiful site + an AI assistant that handles everything. $3,000 build + $199/mo.",
+    "Describe your business. Get a live website in 5 minutes. Update it by chatting with AI.",
   openGraph: {
-    title: "REB Studio — Your site works while you sleep",
-    description:
-      "Custom websites powered by AI. Beautiful site + AI assistant that handles everything.",
+    title: "REB — Your site works while you sleep",
+    description: "AI builds and manages your website. You text what you need. It happens.",
     type: "website",
     locale: "en_US",
   },
@@ -19,56 +18,54 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      {/* Marketing nav */}
-      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-white/80 border-b border-cream-dark/40">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <a
-            href="/"
-            className="text-xl font-semibold tracking-tight"
-            style={{ color: "var(--bark)" }}
-          >
+    <div
+      className="marketing-root antialiased"
+      style={{
+        ["--m-bg" as string]: "#08080a",
+        ["--m-surface" as string]: "#0f0f12",
+        ["--m-rule" as string]: "#1c1c20",
+        ["--m-rule-light" as string]: "#26262b",
+        ["--m-text" as string]: "#e8e8ec",
+        ["--m-text-2" as string]: "#8e8e96",
+        ["--m-text-3" as string]: "#55555c",
+        ["--m-accent" as string]: "#d4a052",
+        ["--m-accent-muted" as string]: "rgba(212, 160, 82, 0.12)",
+        background: "#08080a",
+        color: "#e8e8ec",
+        minHeight: "100vh",
+      }}
+    >
+      {/* Minimal nav — editorial, not SaaS */}
+      <nav className="fixed top-0 left-0 right-0 z-50" style={{ background: "rgba(8,8,10,0.9)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
+        <div className="max-w-[1120px] mx-auto px-6 h-12 flex items-center justify-between border-b" style={{ borderColor: "var(--m-rule)" }}>
+          <a href="/" className="text-[13px] font-medium tracking-[0.15em] uppercase" style={{ color: "var(--m-text)" }}>
             REB
           </a>
-          <a
-            href="#pricing"
-            className="inline-flex items-center px-5 py-2 rounded-full text-sm font-medium transition-colors"
-            style={{
-              background: "var(--sage)",
-              color: "var(--pure-white)",
-            }}
-          >
-            Get Started
-          </a>
+          <div className="flex items-center gap-5">
+            <a href="#pricing" className="hidden sm:inline text-[12px]" style={{ color: "var(--m-text-3)" }}>Pricing</a>
+            <a
+              href="/onboard"
+              className="text-[12px] font-medium px-3.5 py-1 transition-colors"
+              style={{ color: "var(--m-accent)" }}
+            >
+              Get your site &rarr;
+            </a>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="pt-16">{children}</main>
+      <main className="pt-12">{children}</main>
 
-      {/* Marketing footer */}
-      <footer
-        className="border-t py-12 px-6"
-        style={{
-          borderColor: "var(--cream-dark)",
-          background: "var(--pure-white)",
-        }}
-      >
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <p
-            className="text-sm"
-            style={{ color: "var(--bark-faded)" }}
-          >
-            &copy; {new Date().getFullYear()} REB Studio. Built in Buffalo, NY.
-          </p>
-          <a
-            href="mailto:laney@buffaloprojects.com"
-            className="text-sm hover:underline"
-            style={{ color: "var(--sage-dark)" }}
-          >
-            laney@buffaloprojects.com
-          </a>
+      <footer className="border-t px-6" style={{ borderColor: "var(--m-rule)" }}>
+        <div className="max-w-[1120px] mx-auto py-10 flex flex-col md:flex-row justify-between gap-4">
+          <div className="text-[12px]" style={{ color: "var(--m-text-3)" }}>
+            &copy; {new Date().getFullYear()} REB Studio &middot; Buffalo, NY
+          </div>
+          <div className="flex gap-5 text-[12px]" style={{ color: "var(--m-text-3)" }}>
+            <a href="mailto:laney@buffaloprojects.com" className="hover:underline">Contact</a>
+          </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
