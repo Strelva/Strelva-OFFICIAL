@@ -19,9 +19,12 @@ async function loadTenants(): Promise<TenantConfig[]> {
       `*[_type == "tenant"] | order(createdAt desc)`
     );
     const tenants = (docs || []).map(sanityToTenant);
-    _cache = tenants;
-    _cacheTime = now;
-    return tenants;
+    if (tenants.length > 0) {
+      _cache = tenants;
+      _cacheTime = now;
+      return tenants;
+    }
+    // Fall through to dev file if Sanity has no tenant data
   }
 
   try {
