@@ -56,7 +56,7 @@ const TIER_CAPABILITIES: Record<SubscriptionTier, CapabilityId[]> = {
 
 // v2 stubs — not yet implemented
 const IMPLEMENTED_CAPABILITIES: Set<CapabilityId> = new Set([
-  "website", "analytics", "email",
+  "website", "analytics", "email", "blog",
 ]);
 
 export function getCapabilitiesForTier(tier: SubscriptionTier): Capability[] {

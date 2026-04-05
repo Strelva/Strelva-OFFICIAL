@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
-import { getSectionTimestamps, getClickCounts, getContent } from "./storage";
+import { getSectionTimestamps, getClickCounts, getContent, getSearchData } from "./storage";
 import { getAllTenants } from "./tenants";
 import type { ContentSection } from "./types";
 
@@ -137,13 +137,14 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     "providers", "contact", "settings", "faq",
   ];
 
-  const [timestamps, bookingClicks, settings, testimonials, events] =
+  const [timestamps, bookingClicks, settings, testimonials, events, services] =
     await Promise.all([
       getSectionTimestamps(tenantId),
       getClickCounts("booking-click", tenantId),
       getContent("settings", tenantId),
       getContent("testimonials", tenantId),
       getContent("events", tenantId),
+      getContent("services", tenantId),
     ]);
 
   const created: Suggestion[] = [];
@@ -201,6 +202,42 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       description: "Share your site link on social media or send a newsletter to bring people back.",
       action: "prompt:Help me write a newsletter to bring people back to my site",
     }));
+  }
+
+  // Search-based suggestions
+  const searchData = await getSearchData(tenantId);
+  if (searchData && searchData.queries.length > 0) {
+    const serviceNames = services.services.map((s) => s.name.toLowerCase());
+
+    // High impressions, low clicks = content optimization opportunity
+    const underperforming = searchData.queries
+      .filter((q) => q.impressions >= 10 && q.clicks === 0)
+      .slice(0, 2);
+
+    for (const q of underperforming) {
+      created.push(await addSuggestion({
+        tenantId,
+        type: "growth",
+        title: `People search "${q.query}" but don't click`,
+        description: `${q.impressions} people searched "${q.query}" and saw your site, but none clicked. Want me to optimize your page title and description for this search?`,
+        action: `prompt:Optimize my site for the search term "${q.query}"`,
+      }));
+    }
+
+    // Queries that don't match any service name = content gap
+    const unmatched = searchData.queries
+      .filter((q) => q.clicks > 0 && !serviceNames.some((name) => q.query.toLowerCase().includes(name)))
+      .slice(0, 2);
+
+    for (const q of unmatched) {
+      created.push(await addSuggestion({
+        tenantId,
+        type: "growth",
+        title: `People are searching "${q.query}"`,
+        description: `${q.clicks} people found you searching "${q.query}" — but your site doesn't highlight this topic. Want me to add content about it?`,
+        action: `prompt:Add content about "${q.query}" to my site`,
+      }));
+    }
   }
 
   return created;

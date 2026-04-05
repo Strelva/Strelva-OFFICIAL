@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking } from "./types";
+import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking, SearchData } from "./types";
 import { defaults } from "./defaults";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "./booking";
 import { getSanityClient, getSanityReadClient, sanityImageUrl } from "./sanity";
@@ -883,6 +883,46 @@ export async function removeSubscriber(
   store[tenant] = subscribers;
   await writeDevNewsletter(store);
   return true;
+}
+
+// --- Search Console data ---
+
+export async function getSearchData(tenant: string): Promise<SearchData | null> {
+  if (hasSanity) {
+    const doc = await getSanityReadClient().fetch(
+      `*[_type == "searchData" && tenant == $tenant][0]`,
+      { tenant },
+    );
+    if (!doc) return null;
+    const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...data } = doc;
+    return data as SearchData;
+  }
+
+  try {
+    const raw = await fs.readFile(path.join(process.cwd(), `dev-search-${tenant}.json`), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export async function setSearchData(tenant: string, data: SearchData): Promise<void> {
+  if (hasSanity) {
+    const query = `*[_type == "searchData" && tenant == $tenant][0]._id`;
+    const existingId = await getSanityClient().fetch(query, { tenant });
+    const doc = { _type: "searchData" as const, tenant, ...data };
+    if (existingId) {
+      await getSanityClient().patch(existingId).set(doc).commit();
+    } else {
+      await getSanityClient().create(doc);
+    }
+    return;
+  }
+
+  await fs.writeFile(
+    path.join(process.cwd(), `dev-search-${tenant}.json`),
+    JSON.stringify(data, null, 2),
+  );
 }
 
 // --- Content freshness ---

@@ -1,8 +1,8 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
-import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent } from "./storage";
-import type { TenantConfig, ContentSection } from "./types";
+import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData } from "./storage";
+import type { TenantConfig, ContentSection, SearchQuery } from "./types";
 import type { ActivityEntry } from "./storage";
 
 export interface ServiceClickData {
@@ -16,6 +16,7 @@ export interface WeeklyReportData {
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
   topServices: ServiceClickData[];
+  topSearchQueries: SearchQuery[];
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: ActivityEntry[];
   summary: string;
@@ -48,6 +49,7 @@ async function generateReportSummary(data: {
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
   topServices: ServiceClickData[];
+  topSearchQueries: SearchQuery[];
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: ActivityEntry[];
   serviceNames: Record<string, string>;
@@ -75,6 +77,8 @@ Stats this week:
 
 ${serviceSummary ? `Top services by booking clicks:\n${serviceSummary}` : ""}
 
+${data.topSearchQueries.length > 0 ? `Top searches that found the site:\n${data.topSearchQueries.map((q) => `- "${q.query}" (${q.clicks} clicks, ${q.impressions} impressions)`).join("\n")}` : ""}
+
 ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : "All sections are up to date."}
 
 ${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent activity."}
@@ -82,6 +86,7 @@ ${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent act
 Rules:
 - 3-5 short paragraphs max
 - Lead with the most interesting metric
+- If search query data is available, mention what people are searching to find the site — use their exact words
 - If per-service data is available, mention the most popular service by name
 - If sections are stale, suggest updating one specific section with a concrete idea
 - Use "you" not "your site" — make it personal
@@ -104,7 +109,7 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks] =
+  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData] =
     await Promise.all([
       getClickCounts("page-view", tenantId),
       getClickCounts("booking-click", tenantId),
@@ -113,6 +118,7 @@ export async function generateWeeklyReport(
       getContent("settings", tenantId),
       getContent("services", tenantId),
       getClickCountsByPrefix("booking-click:", tenantId),
+      getSearchData(tenantId),
     ]);
 
   const staleSections = detectStaleSections(
@@ -136,12 +142,15 @@ export async function generateWeeklyReport(
     .sort((a, b) => b.thisWeek - a.thisWeek)
     .slice(0, 3);
 
+  const topSearchQueries = (searchData?.queries || []).slice(0, 5);
+
   const summary = await generateReportSummary({
     siteName: settings.siteName || tenant.siteName,
     ownerName: tenant.ownerName,
     pageViews,
     bookingClicks,
     topServices,
+    topSearchQueries,
     staleSections,
     recentActivity: activity,
     serviceNames,
@@ -152,6 +161,7 @@ export async function generateWeeklyReport(
     pageViews,
     bookingClicks,
     topServices,
+    topSearchQueries,
     staleSections,
     recentActivity: activity,
     summary,

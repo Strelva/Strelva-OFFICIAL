@@ -14,6 +14,7 @@ import { chatSession } from "./chatSession";
 import { activityLog } from "./activityLog";
 import { tenant } from "./tenant";
 import { suggestion } from "./suggestion";
+import { blogPost } from "./blogPost";
 
 export const schemaTypes = [
   hero,
@@ -32,4 +33,5 @@ export const schemaTypes = [
   activityLog,
   tenant,
   suggestion,
+  blogPost,
 ];

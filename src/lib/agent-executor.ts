@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
-import { getActivatedCapabilities, capabilityPromptFragment } from "@/lib/capabilities";
+import { getActivatedCapabilities, getActiveTools, capabilityPromptFragment } from "@/lib/capabilities";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(
@@ -134,7 +134,10 @@ export async function executeAgentPrompt(
     template.contentSections as [string, ...string[]]
   );
 
-  const tools = {
+  const activeTools = getActiveTools(tier);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tools: Record<string, any> = {
     read_section: tool({
       description: "Read current content for a website section",
       inputSchema: z.object({ section: sectionEnum }),
@@ -221,6 +224,58 @@ export async function executeAgentPrompt(
       },
     }),
   };
+
+  // Blog tools — only for Growth+ tenants with blog capability
+  if (activeTools.has("create_post")) {
+    tools.create_blog_post = tool({
+      description: "Write and publish a blog post. Generates slug, excerpt, and publish date automatically.",
+      inputSchema: z.object({
+        title: z.string().describe("Blog post title"),
+        content: z.string().describe("Full blog post content"),
+        tags: z.array(z.string()).optional().describe("Tags for the post"),
+      }),
+      execute: async ({ title, content, tags }) => {
+        const { createBlogPost } = await import("@/lib/blog");
+        const tenantConfig = await getTenantConfig(tenantId);
+        const author = tenantConfig?.ownerName || "The Team";
+        const excerpt = content.slice(0, 160).replace(/\n/g, " ").trim();
+
+        const post = await createBlogPost(tenantId, {
+          slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+          title,
+          excerpt,
+          content,
+          author,
+          status: "published",
+          tags: tags || [],
+        });
+
+        const { logActivity } = await import("@/lib/storage");
+        await logActivity(
+          {
+            text: `AI published blog post: "${title}"`,
+            time: new Date().toISOString(),
+            type: "ai",
+            section: "blog",
+            actor: "ai",
+          },
+          tenantId
+        );
+
+        return { success: true, post: { title: post.title, slug: post.slug, publishedAt: post.publishedAt } };
+      },
+    });
+
+    tools.list_blog_posts = tool({
+      description: "List recent published blog posts with title, slug, and date.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { getBlogPosts } = await import("@/lib/blog");
+        const posts = await getBlogPosts(tenantId, { status: "published", limit: 20 });
+        return posts.map((p) => ({ title: p.title, slug: p.slug, publishedAt: p.publishedAt, tags: p.tags }));
+      },
+    });
+  }
 
   const result = await generateText({
     model: google("gemini-2.5-flash"),

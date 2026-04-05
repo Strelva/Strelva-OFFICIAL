@@ -255,7 +255,37 @@ export interface Booking {
   cancelledAt?: string;
 }
 
+// --- Search Console Types ---
+
+export interface SearchQuery {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number;
+}
+
+export interface SearchData {
+  queries: SearchQuery[];
+  totalClicks: number;
+  totalImpressions: number;
+  fetchedAt: string;
+}
+
 // --- Template Types ---
+
+// --- Blog Types ---
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  author: string;
+  publishedAt: string;
+  status: "draft" | "published";
+  tags: string[];
+}
 
 export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "professional" | (string & {});
 
