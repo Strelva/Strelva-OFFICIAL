@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/lib/auth";
-import { getAllTenants, createTenant } from "@/lib/tenants";
+import { getAllTenants, createTenant, updateTenant } from "@/lib/tenants";
 
 export async function GET() {
   const admin = await isSuperAdmin();
@@ -45,4 +45,23 @@ export async function POST(req: Request) {
       { status: 409 }
     );
   }
+}
+
+export async function PATCH(req: Request) {
+  const admin = await isSuperAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id, ...updates } = await req.json();
+  if (!id) {
+    return NextResponse.json({ error: "Missing tenant id" }, { status: 400 });
+  }
+
+  const updated = await updateTenant(id, updates);
+  if (!updated) {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(updated);
 }

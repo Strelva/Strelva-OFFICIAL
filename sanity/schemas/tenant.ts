@@ -22,6 +22,7 @@ export const tenant = defineType({
     defineField({ name: "bookingProvider", title: "Booking Provider", type: "string" }),
     defineField({ name: "bookingUrl", title: "Booking URL", type: "url" }),
     defineField({ name: "resendDomain", title: "Resend Domain", type: "string" }),
+    defineField({ name: "siteUrl", title: "Site URL", type: "url" }),
   ],
   preview: {
     select: { title: "siteName", subtitle: "subdomain" },
