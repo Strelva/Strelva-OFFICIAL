@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/staleness",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sms-suggestion",
+      "schedule": "0 15 * * 1"
     }
   ]
 }

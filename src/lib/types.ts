@@ -284,4 +284,5 @@ export interface TenantConfig {
   bookingUrl?: string;
   resendDomain?: string;
   siteUrl?: string;
+  ownerPhone?: string;
 }

@@ -1,0 +1,234 @@
+import { generateText, tool, stepCountIs } from "ai";
+import { google } from "@ai-sdk/google";
+import { z } from "zod";
+import { getContent, getClickCounts } from "@/lib/storage";
+import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTenantConfig } from "@/lib/tenants";
+import { getActivatedCapabilities, capabilityPromptFragment } from "@/lib/capabilities";
+import type { ContentSection } from "@/lib/types";
+
+async function buildSystemPrompt(
+  tenant: string,
+  capFragment: string
+): Promise<string> {
+  const template = await getTemplateForTenant(tenant);
+  const sections = template.contentSections;
+
+  const contentEntries = await Promise.all(
+    sections.map(
+      async (s) =>
+        [s, await getContent(s, tenant)] as unknown as [
+          ContentSection,
+          Record<string, unknown>,
+        ]
+    )
+  );
+  const content: Record<string, Record<string, unknown>> =
+    Object.fromEntries(contentEntries);
+  const bookingClicks = await getClickCounts("booking-click", tenant);
+
+  const settings = content.settings || {};
+  const contact = content.contact || {};
+  const hero = content.hero || {};
+  const story = content.story || {};
+
+  const ownerName = (settings.ownerName as string) || "the owner";
+  const ownerTitle = (settings.ownerTitle as string) || "";
+
+  const sectionSummaries: string[] = [];
+
+  sectionSummaries.push(`ABOUT THE BUSINESS:
+- Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
+- Phone: ${contact.phone || "(not set)"}
+- Email: ${contact.email || "(not set)"}
+- Address: ${contact.address || "(not set)"}
+- Hours: ${contact.hours || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${settings.bookingUrl}` : ""}`);
+
+  if (sections.includes("hero")) {
+    sectionSummaries.push(`HERO SECTION:
+- Headline: ${hero.headline || "(not set)"}
+- Subheadline: ${hero.subheadline || "(not set)"}
+- CTA: ${hero.ctaText || "(not set)"}`);
+  }
+
+  if (sections.includes("story")) {
+    sectionSummaries.push(`ABOUT/STORY:
+- Headline: ${story.headline || "(not set)"}
+- Statement: ${story.statement || "(not set)"}
+- ${(story.paragraphs as string[])?.length || 0} paragraphs, ${(story.stats as unknown[])?.length || 0} stats`);
+  }
+
+  if (sections.includes("services") && content.services) {
+    const svc = content.services;
+    const serviceList = (
+      (svc.services as Array<{
+        name: string;
+        duration: string;
+        price: string;
+        id: string;
+      }>) || []
+    )
+      .map((s) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
+      .join("\n");
+    sectionSummaries.push(
+      `CURRENT SERVICES (${((svc.services as unknown[]) || []).length} listed):\n${serviceList}`
+    );
+  }
+
+  if (sections.includes("events") && content.events) {
+    const evt = content.events;
+    const futureEvents = (
+      (evt.events as Array<{ title: string; date: string }>) || []
+    )
+      .filter((e) => new Date(e.date) >= new Date())
+      .map((e) => `- ${e.title} (${e.date})`)
+      .join("\n");
+    sectionSummaries.push(
+      futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed."
+    );
+  }
+
+  if (sections.includes("testimonials") && content.testimonials) {
+    sectionSummaries.push(
+      `TESTIMONIALS: ${(content.testimonials.testimonials as unknown[])?.length || 0} reviews listed.`
+    );
+  }
+
+  sectionSummaries.push(
+    `SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`
+  );
+
+  const sectionNames = sections.join(", ");
+
+  let prompt = `You are the website assistant for ${(settings.siteName as string) || "this business"}.
+
+${sectionSummaries.join("\n\n")}
+
+You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
+
+Available sections: ${sectionNames}.`;
+
+  if (settings.bookingUrl) {
+    const tenantConfig = await getTenantConfig(tenant);
+    const provider = tenantConfig?.bookingProvider || "their booking platform";
+    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there.`;
+  }
+
+  prompt += `\n\n${capFragment}`;
+
+  prompt += `\n\nBe conversational, warm, and helpful. Confirm changes after making them. Never remove content unless explicitly asked. For array items, preserve all existing items unless told to remove specific ones.`;
+
+  return prompt;
+}
+
+export async function executeAgentPrompt(
+  tenantId: string,
+  userMessage: string
+): Promise<string> {
+  const template = await getTemplateForTenant(tenantId);
+  const { tier } = await getActivatedCapabilities(tenantId);
+  const capFragment = capabilityPromptFragment(tier);
+  const systemPrompt = await buildSystemPrompt(tenantId, capFragment);
+
+  const sectionEnum = z.enum(
+    template.contentSections as [string, ...string[]]
+  );
+
+  const tools = {
+    read_section: tool({
+      description: "Read current content for a website section",
+      inputSchema: z.object({ section: sectionEnum }),
+      execute: async ({ section }) => {
+        const { getContent } = await import("@/lib/storage");
+        return await getContent(section as ContentSection, tenantId);
+      },
+    }),
+    update_section: tool({
+      description:
+        "Update content for a website section. Always read first, then send COMPLETE data.",
+      inputSchema: z.object({
+        section: sectionEnum,
+        data: z.record(z.string(), z.unknown()),
+      }),
+      execute: async ({ section, data }) => {
+        const { sectionSchemas } = await import("@/lib/schemas");
+        const schema = sectionSchemas[section as ContentSection];
+        const parsed = schema.safeParse(data);
+        if (!parsed.success)
+          return { success: false, error: parsed.error.message };
+
+        const { getContent, setContent } = await import("@/lib/storage");
+        const current = (await getContent(
+          section as ContentSection,
+          tenantId
+        )) as unknown as Record<string, unknown>;
+
+        for (const key of Object.keys(current)) {
+          if (
+            Array.isArray(current[key]) &&
+            Array.isArray((data as Record<string, unknown>)[key])
+          ) {
+            const oldLen = (current[key] as unknown[]).length;
+            const newLen = (
+              (data as Record<string, unknown>)[key] as unknown[]
+            ).length;
+            if (oldLen > 0 && newLen < oldLen * 0.5) {
+              return {
+                success: false,
+                error: `Would remove ${oldLen - newLen} of ${oldLen} ${key}. Confirm first.`,
+              };
+            }
+          }
+        }
+
+        await setContent(
+          section as ContentSection,
+          parsed.data as Parameters<typeof setContent>[1],
+          tenantId
+        );
+        const { revalidatePath } = await import("next/cache");
+        revalidatePath("/");
+
+        const { logActivity, recordSectionUpdate } = await import(
+          "@/lib/storage"
+        );
+        const { diffFields } = await import("@/lib/utils");
+        const changes = diffFields(current, data as Record<string, unknown>);
+        await logActivity(
+          {
+            text: `AI updated ${section} via SMS`,
+            time: new Date().toISOString(),
+            type: "ai",
+            section,
+            actor: "ai",
+            changes,
+          },
+          tenantId
+        );
+        await recordSectionUpdate(section, tenantId);
+
+        if (process.env.SLACK_WEBHOOK_URL) {
+          fetch(process.env.SLACK_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `Site updated *${section}* via SMS approval (${tenantId})`,
+            }),
+          }).catch(() => {});
+        }
+
+        return { success: true, section, message: `Updated ${section}` };
+      },
+    }),
+  };
+
+  const result = await generateText({
+    model: google("gemini-2.5-flash"),
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+    tools,
+    stopWhen: stepCountIs(8),
+  });
+
+  return result.text;
+}

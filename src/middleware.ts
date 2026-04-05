@@ -62,7 +62,8 @@ function isMarketingDomain(request: NextRequest): boolean {
 }
 
 // Cron routes use CRON_SECRET header auth, not Clerk
-const isCronRoute = createRouteMatcher(["/api/cron(.*)"]);
+// SMS webhook uses Twilio signature verification, not Clerk
+const isCronRoute = createRouteMatcher(["/api/cron(.*)", "/api/sms/webhook"]);
 
 const CORS_ORIGINS = [
   "https://rohlax-wellness.vercel.app",

@@ -14,7 +14,8 @@
     "bookingProvider": "Vagaro",
     "bookingUrl": "https://www.vagaro.com/rohlaxwellness",
     "resendDomain": "updates.rohlaxwellness.com",
-    "siteUrl": "https://rohlax-wellness.vercel.app"
+    "siteUrl": "https://rohlax-wellness.vercel.app",
+    "ownerPhone": "+17165592282"
   },
   {
     "id": "gldf",
