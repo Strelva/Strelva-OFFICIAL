@@ -13,6 +13,7 @@
     "subscriptionStatus": "none",
     "bookingProvider": "Vagaro",
     "bookingUrl": "https://www.vagaro.com/rohlaxwellness",
+    "ownerEmail": "rohlaxwellness@gmail.com",
     "resendDomain": "updates.rohlaxwellness.com",
     "siteUrl": "https://rohlax-wellness.vercel.app",
     "ownerPhone": "+17165592282"

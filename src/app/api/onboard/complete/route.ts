@@ -14,6 +14,7 @@ const completeSchema = z.object({
   template: z.string().min(1),
   content: z.record(z.string(), z.unknown()),
   bookingUrl: z.string().url().optional(),
+  referredBy: z.string().optional(),
 });
 
 function getStripe() {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { businessName, ownerName, ownerEmail, industry, subdomain, template, content, bookingUrl } = parsed.data;
+  const { businessName, ownerName, ownerEmail, industry, subdomain, template, content, bookingUrl, referredBy } = parsed.data;
 
   // Create tenant in DB
   try {
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
       features: ["newsletter"],
       customDomains: [],
       bookingUrl,
+      referredBy,
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("already exists")) {

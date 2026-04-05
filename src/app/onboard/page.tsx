@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 type ChatStep = "name" | "description" | "contact" | "generating" | "preview";
 
@@ -30,9 +31,19 @@ function parseContactInfo(input: string): { location: string; email: string } {
 }
 
 export default function OnboardPage() {
+  return (
+    <Suspense>
+      <OnboardChat />
+    </Suspense>
+  );
+}
+
+function OnboardChat() {
+  const searchParams = useSearchParams();
+  const ref = searchParams.get("ref") || "";
   const [step, setStep] = useState<ChatStep>("name");
   const [messages, setMessages] = useState<Message[]>([
-    { from: "reb", text: "What's your business called?" },
+    { from: "reb", text: ref ? `Hey! ${ref} sent you. What's your business called?` : "What's your business called?" },
   ]);
   const [input, setInput] = useState("");
   const [info, setInfo] = useState<BusinessInfo>({
@@ -164,6 +175,7 @@ export default function OnboardPage() {
           subdomain,
           template: generated.template,
           content: generated.content,
+          referredBy: ref || undefined,
         }),
       });
 

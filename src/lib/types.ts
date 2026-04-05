@@ -285,4 +285,5 @@ export interface TenantConfig {
   resendDomain?: string;
   siteUrl?: string;
   ownerPhone?: string;
+  referredBy?: string;
 }

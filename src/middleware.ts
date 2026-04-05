@@ -49,12 +49,7 @@ function extractTenant(request: NextRequest): string {
 }
 
 // Domains where the marketing landing page should show at /
-const MARKETING_DOMAINS = [
-  "reb.studio",
-  "www.reb.studio",
-  "localhost",
-  "reb-platform.vercel.app",
-];
+const MARKETING_DOMAINS = (process.env.MARKETING_DOMAINS || "reb.studio,www.reb.studio,localhost,reb-platform.vercel.app").split(",").map(d => d.trim());
 
 function isMarketingDomain(request: NextRequest): boolean {
   const host = (request.headers.get("host") || "").split(":")[0];
@@ -65,11 +60,7 @@ function isMarketingDomain(request: NextRequest): boolean {
 // SMS webhook uses Twilio signature verification, not Clerk
 const isCronRoute = createRouteMatcher(["/api/cron(.*)", "/api/sms/webhook"]);
 
-const CORS_ORIGINS = [
-  "https://rohlax-wellness.vercel.app",
-  "https://rohlaxwellness.com",
-  "http://localhost:3001",
-];
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || "https://rohlax-wellness.vercel.app,https://rohlaxwellness.com,http://localhost:3001").split(",").map(d => d.trim());
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (origin && CORS_ORIGINS.includes(origin)) {
@@ -96,6 +87,14 @@ export default clerkMiddleware(async (auth, request) => {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-tenant", tenant);
     return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  // Referral redirect: /refer → onboard with ref param
+  if (request.nextUrl.pathname === "/refer") {
+    const tenant = extractTenant(request);
+    const onboardUrl = new URL("/onboard", request.url);
+    onboardUrl.searchParams.set("ref", tenant);
+    return NextResponse.redirect(onboardUrl);
   }
 
   // Rewrite root of marketing domain to the landing page
