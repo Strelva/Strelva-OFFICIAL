@@ -79,6 +79,7 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                   <TrackedLink
                     href={featured.booking_link}
                     event="booking-click"
+                    extraEvents={[`booking-click:${featured.id}`]}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex text-xs font-bold tracking-widest uppercase px-6 py-3 transition-all duration-300 self-start"
@@ -197,6 +198,7 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                       <TrackedLink
                         href={service.booking_link}
                         event="booking-click"
+                        extraEvents={[`booking-click:${service.id}`]}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"

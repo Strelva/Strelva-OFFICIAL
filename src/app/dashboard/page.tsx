@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
+import { getActivity, getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
@@ -65,7 +65,13 @@ function getSuggestions(
   return suggestions.slice(0, 2);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invited?: string }>;
+}) {
+  const params = await searchParams;
+  const isInvited = params.invited === "true";
   const tenant = await getTenantFromHeaders();
 
   // Verify current user has access to this tenant
@@ -95,6 +101,13 @@ export default async function DashboardPage() {
   const siteScore = computeSiteScore({ hero, services, story, testimonials, events, providers, contact, settings });
   const suggestions = getSuggestions(siteScore, timestamps, bookingClicks);
 
+  // Fetch recent activity for existing client welcome
+  const recentActivity = isInvited
+    ? (await safeFetch(() => getActivity(tenant), []))
+        .slice(0, 5)
+        .map((a) => ({ text: a.text, time: a.time }))
+    : undefined;
+
   return (
     <HubPage
       ownerName={settings.ownerName || "there"}
@@ -104,6 +117,8 @@ export default async function DashboardPage() {
       siteScore={siteScore}
       suggestions={suggestions}
       sectionData={sectionData}
+      isInvited={isInvited}
+      recentActivity={recentActivity}
     />
   );
 }

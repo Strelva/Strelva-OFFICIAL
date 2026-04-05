@@ -523,6 +523,51 @@ export async function getClickCounts(
   return { total, today: todayCount, thisWeek: weekCount };
 }
 
+export async function getClickCountsByPrefix(
+  prefix: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<Record<string, { total: number; thisWeek: number }>> {
+  const result: Record<string, { total: number; thisWeek: number }> = {};
+
+  if (hasSanity) {
+    const docId = `clicks-${tenant}`;
+    const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
+    const clicks = (doc || {}) as Record<string, number>;
+
+    // Collect unique event names matching prefix (from _total keys)
+    for (const key of Object.keys(clicks)) {
+      if (key.startsWith(prefix) && key.endsWith("_total")) {
+        const event = key.slice(0, -"_total".length);
+        let weekCount = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          weekCount += clicks[`${event}_${d.toISOString().slice(0, 10)}`] || 0;
+        }
+        result[event] = { total: clicks[key] || 0, thisWeek: weekCount };
+      }
+    }
+    return result;
+  }
+
+  const store = await readDevContent(tenant);
+  const clicks = (store.__clicks as Record<string, number>) ?? {};
+
+  for (const key of Object.keys(clicks)) {
+    if (key.startsWith(prefix) && key.endsWith(":total")) {
+      const event = key.slice(0, -":total".length);
+      let weekCount = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        weekCount += clicks[`${event}:${d.toISOString().slice(0, 10)}`] || 0;
+      }
+      result[event] = { total: clicks[key] || 0, thisWeek: weekCount };
+    }
+  }
+  return result;
+}
+
 // --- Booking ---
 
 export async function getBookingConfig(

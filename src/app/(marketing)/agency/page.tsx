@@ -140,6 +140,57 @@ export default function MarketingPage() {
       {/* ── Rule ── */}
       <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
 
+      {/* ── Case study — social proof ── */}
+      <section className="px-6 py-20 md:py-32" style={{ background: "var(--m-bg)" }}>
+        <div className="max-w-[1120px] mx-auto">
+          <div className="reveal-section">
+            <div className="text-[11px] font-medium tracking-[0.2em] uppercase mb-10" style={{ color: "var(--m-accent)" }}>
+              Results
+            </div>
+            <div className="grid md:grid-cols-[5fr_7fr] gap-12 md:gap-20 items-start">
+              {/* Left — quote */}
+              <div>
+                <h3 className="text-[clamp(1.25rem,2.5vw,1.75rem)] font-medium leading-[1.2] tracking-[-0.02em] mb-2" style={{ color: "var(--m-text)" }}>
+                  Rohlax Wellness
+                </h3>
+                <p className="text-[14px] mb-6" style={{ color: "var(--m-text-3)" }}>
+                  Assisted stretching studio, Williamsville NY
+                </p>
+                <blockquote className="border-l-2 pl-6" style={{ borderColor: "var(--m-rule-light)" }}>
+                  <p className="text-[clamp(1rem,1.8vw,1.25rem)] leading-[1.6] italic" style={{ color: "var(--m-text-2)", fontFamily: "var(--font-display), Georgia, serif" }}>
+                    &ldquo;I just text it and stuff happens. I haven&rsquo;t thought about my website in weeks.&rdquo;
+                  </p>
+                  <footer className="mt-3 text-[13px]" style={{ color: "var(--m-text-3)" }}>
+                    &mdash; Chelsea, owner
+                  </footer>
+                </blockquote>
+              </div>
+              {/* Right — stats */}
+              <div className="grid grid-cols-2 gap-px" style={{ background: "var(--m-rule)" }}>
+                {[
+                  { stat: "Under 5 min", label: "Site built" },
+                  { stat: "100%", label: "Content completeness" },
+                  { stat: "7", label: "Services with booking links" },
+                  { stat: "Every Monday", label: "Weekly AI reports" },
+                ].map((item, i) => (
+                  <div key={i} className="p-6" style={{ background: "var(--m-bg)" }}>
+                    <div className="text-[clamp(1.5rem,3vw,2rem)] font-semibold tracking-tight tabular-nums mb-1" style={{ color: "var(--m-text)" }}>
+                      {item.stat}
+                    </div>
+                    <div className="text-[13px]" style={{ color: "var(--m-text-3)" }}>
+                      {item.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Rule ── */}
+      <div className="px-6"><div className="max-w-[1120px] mx-auto border-t" style={{ borderColor: "var(--m-rule)" }} /></div>
+
       {/* ── Pricing — two columns, no cards ── */}
       <section id="pricing" className="px-6 py-20 md:py-32" style={{ background: "var(--m-bg)" }}>
         <div className="max-w-[1120px] mx-auto">

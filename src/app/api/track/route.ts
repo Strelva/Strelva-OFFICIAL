@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     }
 
     const { event } = await req.json();
-    if (typeof event !== "string" || event.length > 50) {
+    if (typeof event !== "string" || event.length > 100) {
       return NextResponse.json({ error: "Invalid event" }, { status: 400 });
     }
     const tenant = await getTenantFromHeaders();

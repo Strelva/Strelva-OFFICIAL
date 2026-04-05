@@ -4,7 +4,9 @@ import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { WelcomeBanner } from "./WelcomeBanner";
+import { ExistingClientWelcome } from "./ExistingClientWelcome";
 import { SuggestionCards } from "./SuggestionCards";
+import { useDashboard } from "./DashboardContext";
 import { SECTION_LABELS, SECTION_ICONS } from "@/components/ui/section-labels";
 import type { SectionData } from "./ContentBrowser";
 import { Card } from "@/components/ui/Card";
@@ -24,6 +26,8 @@ interface HubPageProps {
   siteScore: { score: number; items: { label: string; done: boolean }[] };
   suggestions: string[];
   sectionData: Record<string, SectionData>;
+  isInvited?: boolean;
+  recentActivity?: Array<{ text: string; time: string }>;
 }
 
 export function HubPage({
@@ -34,7 +38,10 @@ export function HubPage({
   siteScore,
   suggestions,
   sectionData,
+  isInvited,
+  recentActivity,
 }: HubPageProps) {
+  const { setChatDrawerOpen, siteUrl } = useDashboard();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,7 +100,16 @@ export function HubPage({
 
   return (
     <div ref={containerRef} className="p-5 max-w-xl">
-      <WelcomeBanner siteName={siteName} />
+      {isInvited ? (
+        <ExistingClientWelcome
+          ownerName={ownerName}
+          siteUrl={siteUrl}
+          activity={recentActivity || []}
+          onOpenChat={() => setChatDrawerOpen(true)}
+        />
+      ) : (
+        <WelcomeBanner siteName={siteName} />
+      )}
       {/* Headline */}
       <div data-ov="headline" className="mb-5">
         <h1 className="text-[20px] font-medium tracking-tight text-warm-black" suppressHydrationWarning>

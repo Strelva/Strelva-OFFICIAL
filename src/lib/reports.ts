@@ -1,14 +1,21 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
-import { getClickCounts, getActivity, getSectionTimestamps, getContent } from "./storage";
+import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent } from "./storage";
 import type { TenantConfig, ContentSection } from "./types";
 import type { ActivityEntry } from "./storage";
+
+export interface ServiceClickData {
+  serviceId: string;
+  total: number;
+  thisWeek: number;
+}
 
 export interface WeeklyReportData {
   tenant: TenantConfig;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
+  topServices: ServiceClickData[];
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: ActivityEntry[];
   summary: string;
@@ -40,8 +47,10 @@ async function generateReportSummary(data: {
   ownerName: string;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
+  topServices: ServiceClickData[];
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: ActivityEntry[];
+  serviceNames: Record<string, string>;
 }): Promise<string> {
   const activitySummary = data.recentActivity
     .slice(0, 10)
@@ -52,6 +61,10 @@ async function generateReportSummary(data: {
     .map((s) => `- ${s.section} (${s.daysSinceUpdate} days)`)
     .join("\n");
 
+  const serviceSummary = data.topServices
+    .map((s) => `- ${data.serviceNames[s.serviceId] || s.serviceId}: ${s.thisWeek} clicks this week (${s.total} total)`)
+    .join("\n");
+
   const { text } = await generateText({
     model: google("gemini-2.5-flash"),
     prompt: `Write a short, warm weekly report email for ${data.ownerName} about their business website "${data.siteName}".
@@ -60,6 +73,8 @@ Stats this week:
 - ${data.pageViews.thisWeek} people found the site (${data.pageViews.total} total)
 - ${data.bookingClicks.thisWeek} booking clicks (${data.bookingClicks.total} total)
 
+${serviceSummary ? `Top services by booking clicks:\n${serviceSummary}` : ""}
+
 ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : "All sections are up to date."}
 
 ${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent activity."}
@@ -67,6 +82,7 @@ ${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent act
 Rules:
 - 3-5 short paragraphs max
 - Lead with the most interesting metric
+- If per-service data is available, mention the most popular service by name
 - If sections are stale, suggest updating one specific section with a concrete idea
 - Use "you" not "your site" — make it personal
 - Sound like a helpful coworker texting an update, not a marketing email
@@ -88,13 +104,15 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings] =
+  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks] =
     await Promise.all([
       getClickCounts("page-view", tenantId),
       getClickCounts("booking-click", tenantId),
       getSectionTimestamps(tenantId),
       getActivity(tenantId),
       getContent("settings", tenantId),
+      getContent("services", tenantId),
+      getClickCountsByPrefix("booking-click:", tenantId),
     ]);
 
   const staleSections = detectStaleSections(
@@ -102,19 +120,38 @@ export async function generateWeeklyReport(
     contentSections,
   );
 
+  // Build service ID -> name lookup
+  const serviceNames: Record<string, string> = {};
+  for (const s of services.services) {
+    serviceNames[s.id] = s.name;
+  }
+
+  // Top 3 services by this week's clicks
+  const topServices: ServiceClickData[] = Object.entries(perServiceClicks)
+    .map(([event, counts]) => ({
+      serviceId: event.replace("booking-click:", ""),
+      total: counts.total,
+      thisWeek: counts.thisWeek,
+    }))
+    .sort((a, b) => b.thisWeek - a.thisWeek)
+    .slice(0, 3);
+
   const summary = await generateReportSummary({
     siteName: settings.siteName || tenant.siteName,
     ownerName: tenant.ownerName,
     pageViews,
     bookingClicks,
+    topServices,
     staleSections,
     recentActivity: activity,
+    serviceNames,
   });
 
   return {
     tenant,
     pageViews,
     bookingClicks,
+    topServices,
     staleSections,
     recentActivity: activity,
     summary,
