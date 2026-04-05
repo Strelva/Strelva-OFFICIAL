@@ -64,7 +64,31 @@ function isMarketingDomain(request: NextRequest): boolean {
 // Cron routes use CRON_SECRET header auth, not Clerk
 const isCronRoute = createRouteMatcher(["/api/cron(.*)"]);
 
+const CORS_ORIGINS = [
+  "https://rohlax-wellness.vercel.app",
+  "https://rohlaxwellness.com",
+  "http://localhost:3001",
+];
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  if (origin && CORS_ORIGINS.includes(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+  }
+  return {};
+}
+
 export default clerkMiddleware(async (auth, request) => {
+  const origin = request.headers.get("origin");
+
+  // CORS preflight
+  if (request.method === "OPTIONS") {
+    return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  }
+
   // Skip Clerk auth for cron routes (they verify CRON_SECRET internally)
   if (isCronRoute(request)) {
     const tenant = extractTenant(request);
@@ -116,9 +140,17 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+
+  // Add CORS headers to public API responses
+  const cors = corsHeaders(origin);
+  for (const [key, value] of Object.entries(cors)) {
+    response.headers.set(key, value);
+  }
+
+  return response;
 });
 
 export const config = {
