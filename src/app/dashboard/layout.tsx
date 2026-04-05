@@ -23,8 +23,7 @@ export default async function DashboardLayout({
   const tenant = await getTenantFromHeaders();
   const tenantConfig = await getTenantConfig(tenant);
   const siteUrl = tenantConfig?.siteUrl
-    || (tenantConfig?.customDomains?.[0] ? `https://${tenantConfig.customDomains[0]}` : "")
-    || (tenantConfig?.subdomain ? `https://${tenantConfig.subdomain}.reb.studio` : "");
+    || (tenantConfig?.customDomains?.[0] ? `https://${tenantConfig.customDomains[0]}` : "");
   let siteName = "Your Business";
   let ownerName = "there";
   let bookingUrl = "";
