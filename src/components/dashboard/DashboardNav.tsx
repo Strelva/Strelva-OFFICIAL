@@ -17,6 +17,7 @@ import { useDashboard } from "./DashboardContext";
 interface DashboardNavProps {
   siteName: string;
   bookingUrl?: string;
+  siteUrl?: string;
 }
 
 const NAV_ITEMS = [
@@ -26,7 +27,7 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function DashboardNav({ siteName, bookingUrl }: DashboardNavProps) {
+export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { editMode, setEditMode, setChatDrawerOpen, setActivePanel } = useDashboard();
@@ -135,7 +136,7 @@ export function DashboardNav({ siteName, bookingUrl }: DashboardNavProps) {
             Bookings
           </a>
           <a
-            href="/"
+            href={siteUrl || "/"}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open site in new tab"
@@ -176,7 +177,7 @@ export function DashboardNav({ siteName, bookingUrl }: DashboardNavProps) {
                 Settings
               </button>
               <a
-                href="/"
+                href={siteUrl || "/"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"

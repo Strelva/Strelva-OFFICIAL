@@ -44,6 +44,9 @@ interface DashboardContextValue {
   setEditMode: (mode: EditMode) => void;
   hasDraft: Record<string, boolean>;
   setHasDraft: Dispatch<SetStateAction<Record<string, boolean>>>;
+
+  // Tenant site URL
+  siteUrl: string;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -68,7 +71,7 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
   return { left: false, right: false };
 }
 
-export function DashboardProvider({ children }: { children: ReactNode }) {
+export function DashboardProvider({ children, siteUrl = "" }: { children: ReactNode; siteUrl?: string }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -151,6 +154,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setEditMode,
         hasDraft,
         setHasDraft,
+        siteUrl,
       }}
     >
       {children}

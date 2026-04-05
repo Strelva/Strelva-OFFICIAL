@@ -6,6 +6,7 @@ import { ChatDrawer } from "@/components/dashboard/ChatDrawer";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
 import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 
@@ -20,6 +21,8 @@ export default async function DashboardLayout({
   }
 
   const tenant = await getTenantFromHeaders();
+  const tenantConfig = await getTenantConfig(tenant);
+  const siteUrl = tenantConfig?.siteUrl || "";
   let siteName = "Your Business";
   let ownerName = "there";
   let bookingUrl = "";
@@ -33,10 +36,10 @@ export default async function DashboardLayout({
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
   return (
-    <DashboardProvider>
+    <DashboardProvider siteUrl={siteUrl}>
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
-        <DashboardShell siteName={siteName} bookingUrl={bookingUrl}>
+        <DashboardShell siteName={siteName} bookingUrl={bookingUrl} siteUrl={siteUrl}>
           {children}
         </DashboardShell>
         <ChatDrawer ownerName={ownerName} />

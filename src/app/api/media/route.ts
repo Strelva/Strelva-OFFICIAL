@@ -26,17 +26,7 @@ export async function GET() {
     size
   }`;
 
-  let raw = await getSanityReadClient().fetch(query, { tenant });
-
-  // Fallback: if no tenant-tagged assets, show all (for backwards compat with pre-tag uploads)
-  if (!raw || raw.length === 0) {
-    const fallbackQuery = `*[_type == "sanity.imageAsset"] | order(_createdAt desc) {
-      _id, _createdAt, url, originalFilename,
-      metadata { dimensions { width, height }, lqip },
-      size
-    }`;
-    raw = await getSanityReadClient().fetch(fallbackQuery);
-  }
+  const raw = await getSanityReadClient().fetch(query, { tenant });
 
   const assets: MediaAsset[] = (raw || []).map(
     (doc: {

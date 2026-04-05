@@ -283,4 +283,5 @@ export interface TenantConfig {
   bookingProvider?: string;
   bookingUrl?: string;
   resendDomain?: string;
+  siteUrl?: string;
 }

@@ -13,7 +13,8 @@
     "subscriptionStatus": "none",
     "bookingProvider": "Vagaro",
     "bookingUrl": "https://www.vagaro.com/rohlaxwellness",
-    "resendDomain": "updates.rohlaxwellness.com"
+    "resendDomain": "updates.rohlaxwellness.com",
+    "siteUrl": "https://rohlax-wellness.vercel.app"
   },
   {
     "id": "gldf",
@@ -26,6 +27,7 @@
     "template": "food-brand",
     "features": ["commerce", "newsletter"],
     "customDomains": ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
-    "subscriptionStatus": "none"
+    "subscriptionStatus": "none",
+    "siteUrl": "https://greatlakesdriedfruit.com"
   }
 ]

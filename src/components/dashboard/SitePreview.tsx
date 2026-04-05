@@ -34,6 +34,7 @@ export function SitePreview() {
     activeSection,
     editMode,
     triggerRefresh,
+    siteUrl,
   } = useDashboard();
   const activeDevice = DEVICES.find((d) => d.id === device)!;
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -46,7 +47,8 @@ export function SitePreview() {
   const currentPage = activeSection ? (SECTION_TO_PAGE[activeSection] || "home") : "home";
   const pagePath = PAGE_PATHS[currentPage] || "/";
   const editParam = editMode === "draft" ? "?edit=true" : "";
-  const iframeSrc = `${pagePath}${editParam}`;
+  const baseUrl = siteUrl || "";
+  const iframeSrc = `${baseUrl}${pagePath}${editParam}`;
 
   // Reset loading state when refreshKey changes
   useEffect(() => {
@@ -59,10 +61,10 @@ export function SitePreview() {
       try {
         iframeRef.current.contentWindow.postMessage(
           { type: "reb-scroll-to", section: scrollToSection },
-          window.location.origin
+          "*"
         );
       } catch {
-        iframeRef.current.src = `${pagePath}#${scrollToSection}`;
+        iframeRef.current.src = `${baseUrl}${pagePath}#${scrollToSection}`;
       }
       setScrollToSection(null);
     }
@@ -101,7 +103,11 @@ export function SitePreview() {
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const { data } = event;
-      if (event.origin !== window.location.origin) return;
+      const allowedOrigins = [window.location.origin];
+      if (siteUrl) {
+        try { allowedOrigins.push(new URL(siteUrl).origin); } catch {}
+      }
+      if (!allowedOrigins.includes(event.origin)) return;
       if (!data?.type?.startsWith("reb-")) return;
 
       if (data.type === "reb-section-clicked") {
@@ -113,7 +119,7 @@ export function SitePreview() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setActiveSection, handleInlineEdit]);
+  }, [setActiveSection, handleInlineEdit, siteUrl]);
 
   return (
     <div className="flex flex-col h-full">
@@ -144,7 +150,7 @@ export function SitePreview() {
           </div>
 
           <a
-            href="/"
+            href={siteUrl || "/"}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center w-6 h-6 rounded-md text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"

@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import { useDashboard } from "./DashboardContext";
 
 export function MiniPreview() {
-  const { refreshKey, setActivePanel } = useDashboard();
+  const { refreshKey, setActivePanel, siteUrl } = useDashboard();
   const [flash, setFlash] = useState(false);
   const prevKeyRef = useRef(refreshKey);
 
@@ -30,7 +30,7 @@ export function MiniPreview() {
       <div className="absolute inset-0 overflow-hidden">
         <iframe
           key={refreshKey}
-          src="/"
+          src={siteUrl || "/"}
           className="border-0 pointer-events-none"
           title="Mini preview"
           tabIndex={-1}
