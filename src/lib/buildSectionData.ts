@@ -3,138 +3,121 @@ import { truncate, getFreshness } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, string>) => SectionData> = {
+  hero: (d, ts) => ({
+    preview: truncate((d.headline || "").replace(/\n/g, " "), 50),
+    status: d.headline ? "live" : "empty",
+    chatPrompt: "Update my hero headline",
+    freshness: getFreshness("hero", ts),
+    items: [
+      { label: (d.headline || "").replace(/\n/g, " "), detail: "headline" },
+      { label: d.subheadline || "(no subheadline)", detail: "subheadline" },
+      { label: d.ctaText || "CTA", detail: "CTA" },
+    ].filter((item) => item.label),
+  }),
+  services: (d, ts) => ({
+    preview: (d.services || []).slice(0, 3).map((s: any) => s.name).join(", "),
+    status: (d.services?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.services?.length || 0}`,
+    chatPrompt: "Update my services",
+    freshness: getFreshness("services", ts),
+    items: (d.services || []).map((s: any) => ({ label: s.name, detail: `$${s.price} · ${s.duration}` })),
+  }),
+  products: (d, ts) => ({
+    preview: (d.products || []).slice(0, 3).map((p: any) => p.name).join(", "),
+    status: (d.products?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.products?.length || 0}`,
+    chatPrompt: "Update my products",
+    freshness: getFreshness("products", ts),
+    items: (d.products || []).map((p: any) => ({ label: p.name, detail: p.price ? `$${p.price}` : "" })),
+  }),
+  story: (d, ts) => ({
+    preview: truncate(d.headline || d.statement || "Your story", 50),
+    status: "live",
+    chatPrompt: "Update my about section",
+    freshness: getFreshness("story", ts),
+    items: (d.paragraphs || []).map((p: string, i: number) => ({ label: truncate(p, 60), detail: `paragraph ${i + 1}` })),
+  }),
+  testimonials: (d, ts) => ({
+    preview: (d.testimonials?.length || 0) > 0 ? truncate(d.testimonials[0].quote, 50) : "No reviews yet",
+    status: (d.testimonials?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.testimonials?.length || 0}`,
+    chatPrompt: "Add a new testimonial",
+    freshness: getFreshness("testimonials", ts),
+    items: (d.testimonials || []).map((t: any) => ({ label: `"${truncate(t.quote, 40)}"`, detail: t.author })),
+  }),
+  events: (d, ts) => ({
+    preview: (d.events?.length || 0) > 0 ? d.events[0].title : "No upcoming events",
+    status: (d.events?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.events?.length || 0}`,
+    chatPrompt: "Add a new event",
+    freshness: getFreshness("events", ts),
+    items: (d.events || []).map((e: any) => ({ label: e.title, detail: e.date })),
+  }),
+  providers: (d, ts) => ({
+    preview: (d.providers || []).slice(0, 3).map((p: any) => p.name).join(", "),
+    status: (d.providers?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.providers?.length || 0}`,
+    chatPrompt: "Update my providers list",
+    freshness: getFreshness("providers", ts),
+    items: (d.providers || []).map((p: any) => ({ label: p.name, detail: p.service })),
+  }),
+  contact: (d, ts) => ({
+    preview: [d.phone, d.email].filter(Boolean).join(" · "),
+    status: d.email ? "live" : "empty",
+    chatPrompt: "Update my contact information",
+    freshness: getFreshness("contact", ts),
+    items: [
+      d.phone && { label: d.phone, detail: "phone" },
+      d.email && { label: d.email, detail: "email" },
+      d.address && { label: d.address, detail: "address" },
+      d.hours && { label: truncate(d.hours, 40), detail: "hours" },
+    ].filter(Boolean) as { label: string; detail: string }[],
+  }),
+  settings: (d, ts) => ({
+    preview: d.siteName || "(not set)",
+    status: "configured",
+    chatPrompt: "Update my site settings",
+    freshness: getFreshness("settings", ts),
+    items: [
+      { label: d.siteName || "(not set)", detail: "site name" },
+      { label: d.ownerName || "(not set)", detail: "owner" },
+      d.siteTagline && { label: d.siteTagline, detail: "tagline" },
+      d.siteDescription && { label: truncate(d.siteDescription, 40), detail: "SEO desc" },
+    ].filter(Boolean) as { label: string; detail: string }[],
+  }),
+  faq: (d, ts) => ({
+    preview: (d.faqs?.length || 0) > 0 ? d.faqs[0].question : "No FAQ yet",
+    status: (d.faqs?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.faqs?.length || 0}`,
+    chatPrompt: "Update my FAQ",
+    freshness: getFreshness("faq", ts),
+    items: (d.faqs || []).map((f: any) => ({ label: f.question, detail: "" })),
+  }),
+  shop: (d, ts) => ({
+    preview: (d.items?.length || 0) > 0 ? d.items[0].name : "No shop items",
+    status: (d.items?.length || 0) > 0 ? "live" : "empty",
+    count: `${d.items?.length || 0}`,
+    chatPrompt: "Update my shop",
+    freshness: getFreshness("shop", ts),
+    items: (d.items || []).map((s: any) => ({ label: s.name, detail: s.price ? `$${s.price}` : "" })),
+  }),
+};
+
 /**
- * Builds the sectionData record consumed by ContentBrowser / ContentWorkspace.
- * Shared between /dashboard and /dashboard/content to avoid duplication.
+ * Builds sectionData from whatever sections the template provides.
+ * Works for any template — wellness, food-brand, restaurant, etc.
  */
 export function buildSectionData(
-  sections: {
-    hero: any;
-    services: any;
-    story: any;
-    testimonials: any;
-    events: any;
-    providers: any;
-    contact: any;
-    settings: any;
-  },
+  sections: Record<string, any>,
   timestamps: Record<string, string>,
 ): Record<string, SectionData> {
-  const { hero, services, story, testimonials, events, providers, contact, settings } = sections;
-
-  return {
-    hero: {
-      preview: truncate(hero.headline.replace(/\n/g, " "), 50),
-      status: hero.headline ? "live" : "empty",
-      chatPrompt: "Update my hero headline",
-      freshness: getFreshness("hero", timestamps),
-      items: [
-        { label: hero.headline.replace(/\n/g, " "), detail: "headline" },
-        { label: hero.subheadline || "(no subheadline)", detail: "subheadline" },
-        { label: hero.ctaText || "Book a Session", detail: "CTA" },
-      ].filter((item) => item.label),
-    },
-    services: {
-      preview: services.services
-        .slice(0, 3)
-        .map((s: { name: string }) => s.name)
-        .join(", "),
-      status: services.services.length > 0 ? "live" : "empty",
-      count: `${services.services.length}`,
-      chatPrompt: "Update my services",
-      freshness: getFreshness("services", timestamps),
-      items: services.services.map(
-        (s: { name: string; price: string; duration: string }) => ({
-          label: s.name,
-          detail: `$${s.price} · ${s.duration}`,
-        }),
-      ),
-    },
-    story: {
-      preview: truncate(hero.tagline || "Your story", 50),
-      status: "live",
-      chatPrompt: "Update my about section",
-      freshness: getFreshness("story", timestamps),
-      items:
-        story.paragraphs?.length > 0
-          ? story.paragraphs.map((p: string, i: number) => ({
-              label: truncate(p, 60),
-              detail: `paragraph ${i + 1}`,
-            }))
-          : [{ label: hero.tagline || "Your story", detail: "tagline" }],
-    },
-    testimonials: {
-      preview:
-        testimonials.testimonials.length > 0
-          ? truncate(testimonials.testimonials[0].quote, 50)
-          : "No reviews yet",
-      status: testimonials.testimonials.length > 0 ? "live" : "empty",
-      count: `${testimonials.testimonials.length}`,
-      chatPrompt: "Add a new testimonial",
-      freshness: getFreshness("testimonials", timestamps),
-      items: testimonials.testimonials.map(
-        (t: { author: string; quote: string }) => ({
-          label: `"${truncate(t.quote, 40)}"`,
-          detail: t.author,
-        }),
-      ),
-    },
-    events: {
-      preview:
-        events.events.length > 0
-          ? events.events[0].title
-          : "No upcoming events",
-      status: events.events.length > 0 ? "live" : "empty",
-      count: `${events.events.length}`,
-      chatPrompt: "Add a new event",
-      freshness: getFreshness("events", timestamps),
-      items: events.events.map((e: { title: string; date: string }) => ({
-        label: e.title,
-        detail: e.date,
-      })),
-    },
-    providers: {
-      preview: providers.providers
-        .slice(0, 3)
-        .map((p: { name: string }) => p.name)
-        .join(", "),
-      status: providers.providers.length > 0 ? "live" : "empty",
-      count: `${providers.providers.length}`,
-      chatPrompt: "Update my providers list",
-      freshness: getFreshness("providers", timestamps),
-      items: providers.providers.map(
-        (p: { name: string; service: string }) => ({
-          label: p.name,
-          detail: p.service,
-        }),
-      ),
-    },
-    contact: {
-      preview: [contact.phone, contact.email].filter(Boolean).join(" · "),
-      status: contact.phone ? "live" : "empty",
-      chatPrompt: "Update my contact information",
-      freshness: getFreshness("contact", timestamps),
-      items: [
-        contact.phone && { label: contact.phone, detail: "phone" },
-        contact.email && { label: contact.email, detail: "email" },
-        contact.address && { label: contact.address, detail: "address" },
-        contact.hours && { label: truncate(contact.hours, 40), detail: "hours" },
-      ].filter(Boolean) as { label: string; detail: string }[],
-    },
-    settings: {
-      preview: settings.siteName,
-      status: "configured",
-      chatPrompt: "Update my site settings",
-      freshness: getFreshness("settings", timestamps),
-      items: [
-        { label: settings.siteName || "(not set)", detail: "site name" },
-        { label: settings.ownerName || "(not set)", detail: "owner" },
-        settings.siteTagline && { label: settings.siteTagline, detail: "tagline" },
-        settings.siteDescription && {
-          label: truncate(settings.siteDescription, 40),
-          detail: "SEO desc",
-        },
-      ].filter(Boolean) as { label: string; detail: string }[],
-    },
-  };
+  const result: Record<string, SectionData> = {};
+  for (const [key, data] of Object.entries(sections)) {
+    const builder = SECTION_BUILDERS[key];
+    if (builder && data) {
+      result[key] = builder(data, timestamps);
+    }
+  }
+  return result;
 }

@@ -1,40 +1,52 @@
 import { redirect } from "next/navigation";
 import { getActivity, getClickCounts, getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
+import { getTemplateForTenant } from "@/components/templates/registry";
 import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
 import { HubPage } from "@/components/dashboard/HubPage";
+import type { ContentSection } from "@/lib/types";
 
 const EMPTY_CLICKS = { total: 0, today: 0, thisWeek: 0 };
 
-// Compute site completeness score
-function computeSiteScore(sections: {
-  hero: { headline: string; tagline: string; backgroundImageUrl: string };
-  services: { services: unknown[] };
-  story: { headline: string; paragraphs: string[] };
-  testimonials: { testimonials: unknown[] };
-  events: { events: unknown[] };
-  providers: { providers: unknown[] };
-  contact: { phone?: string; email: string; address?: string; hours?: string };
-  settings: { siteName: string; siteDescription: string };
-}): { score: number; items: { label: string; done: boolean }[] } {
-  const items = [
-    { label: "Business name set", done: !!sections.settings.siteName },
-    { label: "Site description", done: (sections.settings.siteDescription?.length || 0) > 20 },
-    { label: "Hero headline", done: !!sections.hero.headline },
-    { label: "Hero tagline", done: !!sections.hero.tagline },
-    { label: "Services listed", done: sections.services.services.length >= 3 },
-    { label: "Your story written", done: (sections.story.paragraphs?.length || 0) >= 2 },
-    { label: "Client reviews", done: sections.testimonials.testimonials.length >= 3 },
-    { label: "Upcoming events", done: sections.events.events.length >= 1 },
-    { label: "Provider directory", done: sections.providers.providers.length >= 3 },
-    { label: "Phone number", done: !!sections.contact.phone },
-    { label: "Email address", done: !!sections.contact.email },
-    { label: "Business address", done: !!sections.contact.address },
-    { label: "Business hours", done: !!sections.contact.hours },
-  ];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeSiteScore(sections: Record<string, any>, templateSections: string[]): { score: number; items: { label: string; done: boolean }[] } {
+  const items: { label: string; done: boolean }[] = [];
+  const s = sections.settings || {};
+  const h = sections.hero || {};
+  const c = sections.contact || {};
+
+  // Universal checks
+  items.push({ label: "Business name set", done: !!s.siteName });
+  items.push({ label: "Site description", done: (s.siteDescription?.length || 0) > 20 });
+  items.push({ label: "Hero headline", done: !!h.headline });
+  items.push({ label: "Email address", done: !!c.email });
+
+  // Template-specific checks
+  if (templateSections.includes("services") && sections.services) {
+    items.push({ label: "Services listed", done: (sections.services.services?.length || 0) >= 3 });
+  }
+  if (templateSections.includes("products") && sections.products) {
+    items.push({ label: "Products listed", done: (sections.products.products?.length || 0) >= 1 });
+  }
+  if (templateSections.includes("story") && sections.story) {
+    items.push({ label: "Your story written", done: (sections.story.paragraphs?.length || 0) >= 2 });
+  }
+  if (templateSections.includes("testimonials") && sections.testimonials) {
+    items.push({ label: "Client reviews", done: (sections.testimonials.testimonials?.length || 0) >= 1 });
+  }
+  if (templateSections.includes("events") && sections.events) {
+    items.push({ label: "Upcoming events", done: (sections.events.events?.length || 0) >= 1 });
+  }
+  if (templateSections.includes("providers") && sections.providers) {
+    items.push({ label: "Provider directory", done: (sections.providers.providers?.length || 0) >= 3 });
+  }
+  if (c.phone) items.push({ label: "Phone number", done: true });
+  if (c.address) items.push({ label: "Business address", done: true });
+
   const done = items.filter((i) => i.done).length;
   return { score: Math.round((done / items.length) * 100), items };
 }
@@ -57,10 +69,7 @@ function getSuggestions(
     suggestions.push(`Your ${staleSections[0]} section hasn't been updated in 2+ weeks`);
   }
   if (bookingClicks.total === 0) {
-    suggestions.push("Share your site link to start getting booking clicks");
-  }
-  if (suggestions.length === 0) {
-    suggestions.push("Try adding a new event to keep your site fresh");
+    suggestions.push("Share your site link to start getting visitors");
   }
   return suggestions.slice(0, 2);
 }
@@ -74,38 +83,41 @@ export default async function DashboardPage({
   const isInvited = params.invited === "true";
   const tenant = await getTenantFromHeaders();
 
-  // Verify current user has access to this tenant
   const allowed = await hasTenantAccess(tenant);
   if (!allowed) redirect("/");
 
-  const [pageViews, bookingClicks, hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
-    await Promise.all([
-      safeFetch(() => getClickCounts("page-view", tenant), EMPTY_CLICKS),
-      safeFetch(() => getClickCounts("booking-click", tenant), EMPTY_CLICKS),
-      safeFetch(() => getContent("hero", tenant), defaults.hero),
-      safeFetch(() => getContent("services", tenant), defaults.services),
-      safeFetch(() => getContent("story", tenant), defaults.story),
-      safeFetch(() => getContent("testimonials", tenant), defaults.testimonials),
-      safeFetch(() => getContent("events", tenant), defaults.events),
-      safeFetch(() => getContent("providers", tenant), defaults.providers),
-      safeFetch(() => getContent("contact", tenant), defaults.contact),
-      safeFetch(() => getContent("settings", tenant), defaults.settings),
-      safeFetch(() => getSectionTimestamps(tenant), {}),
-    ]);
+  const template = await getTemplateForTenant(tenant);
+  const templateSections = template.contentSections;
 
-  const sectionData = buildSectionData(
-    { hero, services, story, testimonials, events, providers, contact, settings },
-    timestamps,
+  // Fetch only sections this template uses
+  const sectionEntries = await Promise.all(
+    templateSections.map(async (section) => {
+      const data = await safeFetch(
+        () => getContent(section as ContentSection, tenant),
+        (defaults as Record<string, unknown>)[section] || {},
+      );
+      return [section, data] as const;
+    }),
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sections: Record<string, any> = Object.fromEntries(sectionEntries);
 
-  const siteScore = computeSiteScore({ hero, services, story, testimonials, events, providers, contact, settings });
+  const [pageViews, bookingClicks, timestamps] = await Promise.all([
+    safeFetch(() => getClickCounts("page-view", tenant), EMPTY_CLICKS),
+    safeFetch(() => getClickCounts("booking-click", tenant), EMPTY_CLICKS),
+    safeFetch(() => getSectionTimestamps(tenant), {}),
+  ]);
+
+  const sectionData = buildSectionData(sections, timestamps);
+  const siteScore = computeSiteScore(sections, templateSections);
   const suggestions = getSuggestions(siteScore, timestamps, bookingClicks);
 
-  // Fetch recent activity for existing client welcome
+  const settings = sections.settings || {};
+
   const recentActivity = isInvited
     ? (await safeFetch(() => getActivity(tenant), []))
         .slice(0, 5)
-        .map((a) => ({ text: a.text, time: a.time }))
+        .map((a: { text: string; time: string }) => ({ text: a.text, time: a.time }))
     : undefined;
 
   return (

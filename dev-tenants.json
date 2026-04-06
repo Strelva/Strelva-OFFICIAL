@@ -30,6 +30,8 @@
     "features": ["commerce", "newsletter"],
     "customDomains": ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
     "subscriptionStatus": "none",
-    "siteUrl": "https://greatlakesdriedfruit.com"
+    "siteUrl": "https://greatlakesdriedfruit.com",
+    "ownerEmail": "greatlakesdriedfruit@gmail.com",
+    "resendDomain": "updates.greatlakesdriedfruit.com"
   }
 ]

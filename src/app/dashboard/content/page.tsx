@@ -1,34 +1,36 @@
 import { redirect } from "next/navigation";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTemplateForTenant } from "@/components/templates/registry";
 import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
+import type { ContentSection } from "@/lib/types";
 
 export default async function ContentPage() {
   const tenant = await getTenantFromHeaders();
   const allowed = await hasTenantAccess(tenant);
   if (!allowed) redirect("/");
 
-  const [hero, services, story, testimonials, events, providers, contact, settings, timestamps] =
-    await Promise.all([
-      safeFetch(() => getContent("hero", tenant), defaults.hero),
-      safeFetch(() => getContent("services", tenant), defaults.services),
-      safeFetch(() => getContent("story", tenant), defaults.story),
-      safeFetch(() => getContent("testimonials", tenant), defaults.testimonials),
-      safeFetch(() => getContent("events", tenant), defaults.events),
-      safeFetch(() => getContent("providers", tenant), defaults.providers),
-      safeFetch(() => getContent("contact", tenant), defaults.contact),
-      safeFetch(() => getContent("settings", tenant), defaults.settings),
-      safeFetch(() => getSectionTimestamps(tenant), {}),
-    ]);
+  const template = await getTemplateForTenant(tenant);
 
-  const sectionData = buildSectionData(
-    { hero, services, story, testimonials, events, providers, contact, settings },
-    timestamps,
+  const sectionEntries = await Promise.all(
+    template.contentSections.map(async (section) => {
+      const data = await safeFetch(
+        () => getContent(section as ContentSection, tenant),
+        (defaults as Record<string, unknown>)[section] || {},
+      );
+      return [section, data] as const;
+    }),
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sections: Record<string, any> = Object.fromEntries(sectionEntries);
+  const timestamps = await safeFetch(() => getSectionTimestamps(tenant), {});
+
+  const sectionData = buildSectionData(sections, timestamps);
+  const settings = sections.settings || {};
 
   return (
     <ContentWorkspace
