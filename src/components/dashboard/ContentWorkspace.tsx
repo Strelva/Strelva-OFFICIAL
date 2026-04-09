@@ -1,12 +1,14 @@
 "use client";
 
-import { MessageCircle, SlidersHorizontal } from "lucide-react";
+import { MessageCircle, SlidersHorizontal, Layers } from "lucide-react";
+import { useState } from "react";
 import { useDashboard } from "./DashboardContext";
 import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { MiniPreview } from "./MiniPreview";
+import { PageStructurePanel } from "./PageStructurePanel";
 import { Tabs } from "@/components/ui/Tabs";
 
 interface ContentWorkspaceProps {
@@ -31,25 +33,46 @@ export function ContentWorkspace({
     rightCollapsed,
   } = useDashboard();
 
+  // Local tab state so we can extend the right panel with "Structure"
+  // without changing DashboardContext's rightTab type.
+  const [showStructure, setShowStructure] = useState(false);
+
   const rightPanelContent = (
     <>
       {/* Tab switcher */}
-      <div className="h-10 border-b border-gray-border shrink-0 bg-white">
-        <Tabs
-          variant="underline"
-          items={[
-            { value: "properties", label: "Edit", icon: <SlidersHorizontal className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
-            { value: "chat", label: "AI Chat", icon: <MessageCircle className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
-          ]}
-          value={rightTab}
-          onChange={(v) => setRightTab(v as "properties" | "chat")}
-          className="h-full"
-        />
+      <div className="h-10 border-b border-gray-border shrink-0 bg-surface flex items-center">
+        <div className="flex-1">
+          <Tabs
+            variant="underline"
+            items={[
+              { value: "properties", label: "Edit", icon: <SlidersHorizontal className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
+              { value: "chat", label: "AI Chat", icon: <MessageCircle className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
+            ]}
+            value={rightTab}
+            onChange={(v) => {
+              setShowStructure(false);
+              setRightTab(v as "properties" | "chat");
+            }}
+            className="h-full"
+          />
+        </div>
+        <button
+          onClick={() => setShowStructure((v) => !v)}
+          className={`px-3 h-full text-[11px] font-medium uppercase tracking-wider flex items-center gap-1 border-l border-gray-border ${
+            showStructure ? "text-warm-black bg-gray-bg" : "text-gray-muted hover:text-warm-black"
+          }`}
+          title="Page structure"
+        >
+          <Layers className="w-[13px] h-[13px]" strokeWidth={1.5} />
+          Structure
+        </button>
       </div>
 
       {/* Tab content */}
       <div className="flex-1 min-h-0">
-        {rightTab === "properties" ? (
+        {showStructure ? (
+          <PageStructurePanel onClose={() => setShowStructure(false)} />
+        ) : rightTab === "properties" ? (
           <PropertiesEditor activeSection={activeSection} />
         ) : (
           <ChatPanel ownerName={ownerName} />
@@ -59,7 +82,7 @@ export function ContentWorkspace({
   );
 
   return (
-    <div className="flex flex-col h-screen bg-[#faf9f7]">
+    <div className="flex flex-col h-screen bg-surface-base">
       {/* Desktop (lg+): 3-panel layout */}
       <div className="hidden lg:flex flex-1 min-h-0">
         {/* Left: Content Browser */}

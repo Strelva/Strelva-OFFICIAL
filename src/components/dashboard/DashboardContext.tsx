@@ -47,6 +47,9 @@ interface DashboardContextValue {
 
   // Tenant site URL
   siteUrl: string;
+
+  // Template identifier
+  template: string;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -71,7 +74,7 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
   return { left: false, right: false };
 }
 
-export function DashboardProvider({ children, siteUrl = "" }: { children: ReactNode; siteUrl?: string }) {
+export function DashboardProvider({ children, siteUrl = "", template = "wellness" }: { children: ReactNode; siteUrl?: string; template?: string }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -155,6 +158,7 @@ export function DashboardProvider({ children, siteUrl = "" }: { children: ReactN
         hasDraft,
         setHasDraft,
         siteUrl,
+        template,
       }}
     >
       {children}

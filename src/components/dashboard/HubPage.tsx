@@ -11,6 +11,18 @@ import { SECTION_LABELS, SECTION_ICONS } from "@/components/ui/section-labels";
 import type { SectionData } from "./ContentBrowser";
 import { Card } from "@/components/ui/Card";
 
+const CTA_VOCAB: Record<string, { metric: string; action: string; zeroHint: string }> = {
+  wellness: { metric: "Booking clicks", action: "clicked Book Now", zeroHint: "Clicks tracked automatically" },
+  "food-brand": { metric: "Shop clicks", action: "clicked Shop Now", zeroHint: "Clicks tracked automatically" },
+  restaurant: { metric: "Reservation clicks", action: "clicked Reserve", zeroHint: "Clicks tracked automatically" },
+  trades: { metric: "Quote requests", action: "requested a quote", zeroHint: "Clicks tracked automatically" },
+  professional: { metric: "Contact clicks", action: "clicked Contact", zeroHint: "Clicks tracked automatically" },
+};
+
+function getVocab(template: string) {
+  return CTA_VOCAB[template] || CTA_VOCAB.wellness;
+}
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -41,7 +53,8 @@ export function HubPage({
   isInvited,
   recentActivity,
 }: HubPageProps) {
-  const { setChatDrawerOpen, siteUrl } = useDashboard();
+  const { setChatDrawerOpen, siteUrl, template } = useDashboard();
+  const vocab = getVocab(template);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,24 +124,24 @@ export function HubPage({
         <WelcomeBanner siteName={siteName} />
       )}
       {/* Headline */}
-      <div data-ov="headline" className="mb-5">
-        <h1 className="text-[20px] font-medium tracking-tight text-warm-black" suppressHydrationWarning>
+      <div data-ov="headline" className="mb-4">
+        <h1 className="text-[24px] font-semibold tracking-tight text-warm-black" suppressHydrationWarning>
           {pageViews.thisWeek > 0
             ? `${pageViews.thisWeek} people found you this week`
             : `${getGreeting()}, ${ownerName}`}
         </h1>
-        <p className="text-[12px] text-gray-muted mt-1">
+        <p className="text-[13px] text-gray-muted mt-1.5">
           {pageViews.thisWeek > 0
-            ? `${bookingClicks.thisWeek} clicked Book Now`
-            : "Your site is ready \u2014 here\u2019s how it\u2019s doing."}
+            ? `${bookingClicks.thisWeek} ${vocab.action}`
+            : "Your site is live. Here\u2019s what\u2019s happening."}
         </p>
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[11px] font-medium tracking-wider text-gray-muted">People who found you</span>
-          <p className="text-[28px] font-semibold font-display tabular-nums text-warm-black mt-2">
+          <span className="text-[12px] font-medium tracking-wider text-gray-muted">People who found you</span>
+          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
             {pageViews.total > 0 ? pageViews.total : "\u2014"}
           </p>
           <p className="text-[11px] font-mono text-gray-faint mt-0.5">
@@ -136,17 +149,17 @@ export function HubPage({
           </p>
         </Card>
         <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[11px] font-medium tracking-wider text-gray-muted">Booking clicks</span>
-          <p className="text-[28px] font-semibold font-display tabular-nums text-warm-black mt-2">
+          <span className="text-[12px] font-medium tracking-wider text-gray-muted">Clicked to shop</span>
+          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
             {bookingClicks.total > 0 ? bookingClicks.total : "\u2014"}
           </p>
           <p className="text-[11px] font-mono text-gray-faint mt-0.5">
-            {bookingClicks.total > 0 ? `${bookingClicks.thisWeek} this week` : "Clicks tracked automatically"}
+            {bookingClicks.total > 0 ? `${bookingClicks.thisWeek} this week` : vocab.zeroHint}
           </p>
         </Card>
         <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[11px] font-medium tracking-wider text-gray-muted">Site completeness</span>
-          <p className="text-[28px] font-semibold font-display tabular-nums text-warm-black mt-2">
+          <span className="text-[12px] font-medium tracking-wider text-gray-muted">Site readiness</span>
+          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
             {siteScore.score}%
           </p>
           <p className="text-[11px] font-mono text-gray-faint mt-0.5">
@@ -189,14 +202,14 @@ export function HubPage({
       )}
 
       {/* Site sections visual map */}
-      <div data-ov="sitemap" className="bg-white border border-gray-border rounded-lg p-4 mb-5 reb-card-glow">
+      <div data-ov="sitemap" className="bg-surface border border-gray-border rounded-lg p-4 mb-8 reb-card-glow">
         <h3 className="text-[11px] font-medium tracking-wider text-gray-muted mb-3">Your site</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {Object.entries(sectionData).map(([key, data]) => (
             <div
               key={key}
               data-ov="icon"
-              className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg bg-[#faf9f7] border border-transparent hover:border-sage/20 transition-colors"
+              className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg bg-surface-raised border border-transparent hover:border-sage/20 transition-colors"
             >
               {(() => {
                 const Icon = SECTION_ICONS[key];
@@ -216,7 +229,7 @@ export function HubPage({
       </div>
 
       {/* Activity timeline (client component with filtering) */}
-      <div data-ov="activity" className="bg-white border border-gray-border rounded-lg p-4 reb-card-glow">
+      <div data-ov="activity" className="bg-surface border border-gray-border rounded-lg p-4 reb-card-glow">
         <ActivityTimeline />
       </div>
     </div>

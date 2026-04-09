@@ -43,7 +43,7 @@ export function MiniPreview() {
         />
       </div>
       {/* Overlay label */}
-      <div className="absolute bottom-1 right-2 bg-white/80 backdrop-blur-sm rounded px-1.5 py-0.5">
+      <div className="absolute bottom-1 right-2 bg-surface/80 backdrop-blur-sm rounded px-1.5 py-0.5">
         <span className="text-[11px] text-gray-muted font-mono">PREVIEW</span>
       </div>
     </button>

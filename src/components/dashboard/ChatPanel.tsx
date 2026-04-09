@@ -21,10 +21,10 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 const QUICK_PROMPTS = [
-  { label: "Update my hours", icon: Clock },
-  { label: "Add an event", icon: CalendarPlus },
-  { label: "Send a newsletter", icon: Mail },
-  { label: "How's my site?", icon: BarChart3 },
+  { label: "Change my hours", icon: Clock },
+  { label: "Post something new", icon: CalendarPlus },
+  { label: "Send an update to customers", icon: Mail },
+  { label: "How did this week go?", icon: BarChart3 },
 ];
 
 interface ChatMessage {
@@ -283,7 +283,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-surface">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-gray-border shrink-0">
         <Avatar type="bot" size="md" />
@@ -321,9 +321,9 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       {/* Update toast */}
       {updateToast && (
         <div className="mx-3 mt-2 animate-fade-in-up">
-          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
             <CheckCircle2 className="w-[14px] h-[14px] text-emerald-500 shrink-0" strokeWidth={1.5} />
-            <span className="text-[12px] text-emerald-700">
+            <span className="text-[12px] text-emerald-400">
               Site updated — check the preview
             </span>
           </div>
@@ -335,8 +335,8 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
         {isEmpty && (
           <EmptyState
             icon={<Bot className="w-5 h-5 text-sage" strokeWidth={1.5} />}
-            title={`Hey ${ownerName}!`}
-            description="I can update your site, add events, change hours, and more."
+            title={`Hey ${ownerName}.`}
+            description="Your site's looking good. Need anything changed?"
             className="h-full"
             action={
               <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
@@ -347,7 +347,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                     size="sm"
                     onClick={() => handleQuickPrompt(prompt.label)}
                     icon={<prompt.icon className="w-[14px] h-[14px] text-gray-muted shrink-0" strokeWidth={1.5} />}
-                    className="justify-start bg-white border border-gray-border text-warm-black hover:bg-gray-bg"
+                    className="justify-start bg-surface border border-gray-border text-warm-black hover:bg-gray-bg"
                   >
                     {prompt.label}
                   </Button>
@@ -426,7 +426,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
               size="sm"
               onClick={() => handleQuickPrompt(prompt.label)}
               icon={<prompt.icon className="w-3 h-3" strokeWidth={1.5} />}
-              className="bg-white border border-gray-border text-gray-muted hover:text-sage whitespace-nowrap shrink-0"
+              className="bg-surface border border-gray-border text-gray-muted hover:text-sage whitespace-nowrap shrink-0"
             >
               {prompt.label}
             </Button>
@@ -438,7 +438,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       <div className="p-3 border-t border-gray-border">
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 bg-white border border-gray-border rounded-lg px-3 py-1.5 focus-within:border-sage focus-within:shadow-[0_0_0_1px_rgba(124,154,142,0.15)] transition-all duration-150"
+          className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-lg px-3 py-1.5 focus-within:border-sage focus-within:shadow-[0_0_0_1px_rgba(143,176,162,0.15)] transition-all duration-150"
         >
           <input
             ref={inputRef}

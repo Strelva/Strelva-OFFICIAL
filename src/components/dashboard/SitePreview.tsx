@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Monitor, Tablet, Smartphone, ExternalLink, Loader2 } from "lucide-react";
+import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 
-const DEVICES = [
-  { id: "desktop", label: "Desktop", icon: Monitor, width: "100%" },
-  { id: "tablet", label: "Tablet", icon: Tablet, width: "768px" },
-  { id: "mobile", label: "Mobile", icon: Smartphone, width: "390px" },
+type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
+
+const BREAKPOINTS: readonly Breakpoint[] = [
+  { label: "Mobile", icon: Smartphone, width: 375 },
+  { label: "Tablet", icon: Tablet, width: 768 },
+  { label: "Desktop", icon: Monitor, width: 1280 },
+  { label: "Fluid", icon: Maximize2, width: null },
 ] as const;
 
 const PAGE_PATHS: Record<string, string> = {
@@ -21,10 +25,10 @@ const PAGE_PATHS: Record<string, string> = {
   shop: "/shop",
 };
 
-type DeviceId = (typeof DEVICES)[number]["id"];
-
 export function SitePreview() {
-  const [device, setDevice] = useState<DeviceId>("desktop");
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>(
+    BREAKPOINTS[BREAKPOINTS.length - 1]
+  );
   const [iframeLoading, setIframeLoading] = useState(true);
   const {
     refreshKey,
@@ -35,16 +39,19 @@ export function SitePreview() {
     editMode,
     triggerRefresh,
     siteUrl,
+    template,
   } = useDashboard();
-  const activeDevice = DEVICES.find((d) => d.id === device)!;
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Build iframe URL — navigate to the page containing the active section
-  const SECTION_TO_PAGE: Record<string, string> = {
-    hero: "home", services: "services", story: "about", testimonials: "home",
-    events: "events", providers: "providers", contact: "contact", faq: "faq", shop: "shop",
-  };
-  const currentPage = activeSection ? (SECTION_TO_PAGE[activeSection] || "home") : "home";
+  // Build section→page mapping from the template's page config
+  const templatePages = getDefaultPageConfig(template);
+  const sectionToPage: Record<string, string> = {};
+  for (const [page, config] of Object.entries(templatePages)) {
+    for (const s of config.sections) {
+      if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
+    }
+  }
+  const currentPage = activeSection ? (sectionToPage[activeSection] || "home") : "home";
   const pagePath = PAGE_PATHS[currentPage] || "/";
   const editParam = editMode === "draft" ? "?edit=true" : "";
   const baseUrl = siteUrl || "";
@@ -124,29 +131,34 @@ export function SitePreview() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 h-9 border-b border-gray-border shrink-0 bg-white">
+      <div className="flex items-center justify-between px-4 h-9 border-b border-gray-border shrink-0 bg-surface">
         <div className="flex items-center gap-2">
           <div className="w-[6px] h-[6px] rounded-full bg-emerald-500" />
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Device switcher */}
+          {/* Breakpoint switcher */}
           <div className="flex items-center gap-0.5 bg-gray-bg rounded-full p-0.5">
-            {DEVICES.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setDevice(d.id)}
-                className={`flex items-center justify-center w-8 h-8 rounded-full text-[11px] transition-all duration-150 ${
-                  device === d.id
-                    ? "bg-white text-warm-black shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    : "text-gray-muted hover:text-gray-fg"
-                }`}
-                title={d.label}
-                aria-label={`${d.label} view`}
-              >
-                <d.icon className="w-[14px] h-[14px]" strokeWidth={1.5} />
-              </button>
-            ))}
+            {BREAKPOINTS.map((bp) => {
+              const active = breakpoint.label === bp.label;
+              return (
+                <button
+                  key={bp.label}
+                  onClick={() => setBreakpoint(bp)}
+                  aria-pressed={active}
+                  aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
+                  title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
+                  className={`flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium transition-all duration-150 ${
+                    active
+                      ? "bg-surface-raised text-warm-black shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+                      : "text-gray-muted hover:text-gray-fg"
+                  }`}
+                >
+                  <bp.icon className="w-[13px] h-[13px]" strokeWidth={1.5} />
+                  <span>{bp.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <a
@@ -162,12 +174,12 @@ export function SitePreview() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 flex justify-center p-3 overflow-hidden bg-gray-bg-hover">
+      <div className="flex-1 flex justify-center p-3 overflow-hidden bg-surface-base">
         <div
-          className="relative h-full rounded-lg overflow-hidden transition-all duration-300 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+          className="relative h-full w-full rounded-lg overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
           style={{
-            width: activeDevice.width,
-            maxWidth: "100%",
+            maxWidth: breakpoint.width ? `${breakpoint.width}px` : "100%",
+            marginInline: "auto",
           }}
         >
           <iframe

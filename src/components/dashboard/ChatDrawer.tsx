@@ -59,7 +59,7 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
 
       {/* Drawer panel */}
       <div
-        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-white border-l border-gray-border shadow-[-4px_0_12px_rgba(0,0,0,0.05)] flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-surface border-l border-gray-border shadow-[-4px_0_12px_rgba(0,0,0,0.3)] flex flex-col transition-transform duration-300 ease-out ${
           chatDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

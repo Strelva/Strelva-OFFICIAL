@@ -12,10 +12,10 @@ interface SectionRendererProps {
 export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRendererProps) {
   const template = await getTemplateForTenant(tenant);
 
-  // Load page config
+  // Load page config — fall back to template defaults
   let pageConfig: SitePageConfig;
   try {
-    pageConfig = await getPageConfig(tenant);
+    pageConfig = await getPageConfig(tenant) || template.defaultPageConfig;
   } catch {
     pageConfig = template.defaultPageConfig;
   }

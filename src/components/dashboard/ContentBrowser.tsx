@@ -17,12 +17,12 @@ import {
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
 import type { PageSectionConfig, SitePageConfig } from "@/lib/types";
-import { DEFAULT_PAGE_CONFIG } from "@/lib/pageConfigDefaults";
+import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS, SECTION_ICONS, COMPOSITE_SECTIONS, ALL_SECTION_TYPES } from "@/components/ui/section-labels";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 
-const PAGE_OPTIONS = [
+const ALL_PAGE_OPTIONS = [
   { id: "home", label: "Home" },
   { id: "about", label: "About" },
   { id: "contact", label: "Contact" },
@@ -51,7 +51,10 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setActiveSection,
     setScrollToSection,
     triggerRefresh,
+    template,
   } = useDashboard();
+
+  const DEFAULT_PAGE_CONFIG = getDefaultPageConfig(template);
 
   const expandedRef = useRef<HTMLDivElement>(null);
   const [activePage, setActivePage] = useState("home");
@@ -60,22 +63,38 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   const [saveError, setSaveError] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
+  // Build page dropdown options from the live config (union of stored pages
+  // and template defaults). Falls back to defaults pre-fetch so the dropdown
+  // is never empty. `home` is pinned first; remaining pages sort alphabetically.
+  // User-created pages that don't have a human label fall back to their slug.
+  const pageLabelMap = new Map(ALL_PAGE_OPTIONS.map((p) => [p.id, p.label]));
+  const pageSource = pageConfig ?? DEFAULT_PAGE_CONFIG;
+  const PAGE_OPTIONS = Object.keys(pageSource)
+    .sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b)))
+    .map((id) => ({ id, label: pageLabelMap.get(id) ?? id }));
+
   useEffect(() => {
     fetch("/api/page-config", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data) { setPageConfig(DEFAULT_PAGE_CONFIG); return; }
-        // Merge stored config with defaults — add new default sections not yet in stored config
-        const merged = { ...DEFAULT_PAGE_CONFIG };
-        for (const page of Object.keys(merged) as Array<keyof typeof merged>) {
-          const stored = data[page];
-          const defaults = DEFAULT_PAGE_CONFIG[page];
-          if (stored && defaults) {
-            const storedTypes = new Set(stored.sections.map((s: PageSectionConfig) => s.type));
-            const newDefaults = defaults.sections.filter((s) => !storedTypes.has(s.type));
-            merged[page] = { sections: [...stored.sections, ...newDefaults] };
-          } else if (stored) {
-            merged[page] = stored;
+        // Start from defaults, overlay every stored page. This preserves
+        // user-created pages (not in defaults) so they appear in the dropdown,
+        // and still appends any new default sections to pages that exist in
+        // both stored config and defaults.
+        const merged: SitePageConfig = { ...DEFAULT_PAGE_CONFIG };
+        if (data && typeof data === "object") {
+          for (const [slug, pageCfg] of Object.entries(data as SitePageConfig)) {
+            const def = DEFAULT_PAGE_CONFIG[slug];
+            if (def) {
+              const storedTypes = new Set(
+                pageCfg.sections.map((s: PageSectionConfig) => s.type)
+              );
+              const newDefaults = def.sections.filter((s) => !storedTypes.has(s.type));
+              merged[slug] = { sections: [...pageCfg.sections, ...newDefaults] };
+            } else {
+              merged[slug] = pageCfg;
+            }
           }
         }
         setPageConfig(merged);
@@ -166,7 +185,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   // Collapsed state
   if (leftCollapsed) {
     return (
-      <div className="flex flex-col items-center py-3 gap-1 bg-white">
+      <div className="flex flex-col items-center py-3 gap-1 bg-surface">
         <button
           onClick={toggleLeft}
           className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
@@ -206,11 +225,11 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-surface">
       {/* Header — page selector as pill tabs */}
       <div className="border-b border-gray-border shrink-0">
         <div className="flex items-center justify-between px-3 h-10">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-gray-muted">
+          <span className="text-[12px] font-medium uppercase tracking-wider text-gray-muted">
             Pages
           </span>
           <div className="flex items-center gap-1">
@@ -298,7 +317,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                       }`}
                       strokeWidth={1.5}
                     />
-                    <span className={`text-[12px] font-medium flex-1 min-w-0 truncate ${
+                    <span className={`text-[13px] font-medium flex-1 min-w-0 truncate ${
                       isHidden ? "line-through text-gray-muted" : "text-warm-black"
                     }`}>
                       {label}

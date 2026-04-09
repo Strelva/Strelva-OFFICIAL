@@ -104,7 +104,7 @@ export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
   return (
     <>
       {/* Desktop: right side panel */}
-      <div className="hidden md:flex flex-col w-[320px] border-l border-gray-border bg-white shrink-0 overflow-y-auto">
+      <div className="hidden md:flex flex-col w-[320px] border-l border-gray-border bg-surface shrink-0 overflow-y-auto">
         {detail}
       </div>
 
@@ -116,7 +116,7 @@ export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
           onClick={onClose}
         />
         {/* Sheet */}
-        <div className="relative bg-white rounded-t-xl max-h-[85vh] overflow-y-auto animate-fade-in-up">
+        <div className="relative bg-surface rounded-t-xl max-h-[85vh] overflow-y-auto animate-fade-in-up">
           {/* Drag handle */}
           <div className="flex justify-center pt-2 pb-1">
             <div className="w-8 h-1 rounded-full bg-gray-border" />
