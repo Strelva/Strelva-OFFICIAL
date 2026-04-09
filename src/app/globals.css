@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =============================================
-   REB — Rohlax Wellness
+   REB — Design System
    ============================================= */
 
 :root {
@@ -31,6 +31,43 @@
   --gray-subtle:   #cccccc;
   --gray-faint:    #bbbbbb;
   --gray-fg:       #666666;
+
+  /* Surface tokens */
+  --surface:        #ffffff;
+  --surface-base:   #faf9f7;
+  --surface-raised: #f5f5f5;
+  --surface-inset:  #fafafa;
+}
+
+/* Dashboard dark theme — warm bark-tinted darks, not zinc */
+[data-dashboard] {
+  --cream:       #0c0a08;
+  --cream-dark:  #161210;
+  --cream-mid:   #252019;
+  --sage:        #8fb0a2;
+  --sage-light:  #a3c4b6;
+  --sage-dark:   #6d9080;
+  --sage-wash:   rgba(143, 176, 162, 0.06);
+  --bark:        #f5f0eb;
+  --bark-light:  #a89e94;
+  --bark-faded:  #6b6158;
+  --terra:       #e07a5f;
+  --terra-light: #f0a090;
+  --warm-black:  #f5f0eb;
+
+  --gray-border:   rgba(210, 190, 170, 0.10);
+  --gray-bg:       #161210;
+  --gray-bg-hover: #1c1814;
+  --gray-bg-alt:   #110e0c;
+  --gray-muted:    #a89e94;
+  --gray-subtle:   #4a433c;
+  --gray-faint:    #3a332c;
+  --gray-fg:       #d6cfc7;
+
+  --surface:        #110e0c;
+  --surface-base:   #0c0a08;
+  --surface-raised: #161210;
+  --surface-inset:  #0e0c0a;
 }
 
 @theme inline {
@@ -59,6 +96,12 @@
   --color-gray-subtle: var(--gray-subtle);
   --color-gray-faint: var(--gray-faint);
   --color-gray-fg: var(--gray-fg);
+
+  /* Surfaces */
+  --color-surface: var(--surface);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
 }
 
 /* Base */
@@ -272,9 +315,12 @@ body {
   background-size: 24px 24px;
 }
 
-/* Vercel-style card glow on hover */
+/* Card glow on hover */
 .reb-card-glow:hover {
   box-shadow: 0 0 0 1px rgba(124, 154, 142, 0.15), 0 2px 8px rgba(124, 154, 142, 0.08);
+}
+[data-dashboard] .reb-card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(143, 176, 162, 0.12), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* Hide scrollbar for quick prompts */
@@ -301,14 +347,14 @@ body {
 .chat-markdown code {
   font-family: ui-monospace, monospace;
   font-size: 0.8125rem;
-  background: var(--cream-dark);
-  color: var(--bark);
+  background: var(--surface-raised);
+  color: var(--warm-black);
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
 }
 .chat-markdown pre {
-  background: var(--cream-dark);
-  color: var(--bark);
+  background: var(--surface-raised);
+  color: var(--warm-black);
   padding: 0.75rem;
   border-radius: 0.375rem;
   margin-bottom: 0.5rem;

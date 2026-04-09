@@ -84,7 +84,7 @@ function SegmentTabs({ items, value, onChange, className }: TabsProps) {
           className={cn(
             "px-3 py-1.5 text-[11px] font-medium rounded transition-colors duration-150",
             value === item.value
-              ? "bg-white text-warm-black shadow-sm"
+              ? "bg-surface text-warm-black shadow-sm"
               : "text-gray-muted hover:text-gray-fg",
           )}
         >

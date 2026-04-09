@@ -1,10 +1,21 @@
 export interface ArrayFieldDef {
   key: string;
   label: string;
-  type: "text" | "textarea" | "url" | "tel" | "select" | "toggle" | "date" | "image";
+  type:
+    | "text"
+    | "textarea"
+    | "url"
+    | "tel"
+    | "select"
+    | "toggle"
+    | "date"
+    | "image"
+    | "object-array";
   placeholder?: string;
   options?: { value: string; label: string }[];
   required?: boolean;
+  /** For type: "object-array" — schema of each nested row. */
+  itemFields?: ArrayFieldDef[];
 }
 
 export interface ArraySectionConfig {
@@ -36,7 +47,7 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
       { key: "duration", label: "Duration", type: "text", placeholder: "60 min" },
       { key: "price", label: "Price", type: "text", placeholder: "120" },
       { key: "who_its_for", label: "Who It's For", type: "text", placeholder: "Anyone looking to..." },
-      { key: "booking_link", label: "Booking Link", type: "url", placeholder: "https://www.vagaro.com/rohlaxwellness/services" },
+      { key: "booking_link", label: "Booking Link", type: "url", placeholder: "https://example.com/book" },
       { key: "featured", label: "Featured", type: "toggle" },
       { key: "comingSoon", label: "Coming Soon", type: "toggle" },
     ],
@@ -48,7 +59,7 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
       price: "",
       featured: false,
       who_its_for: "",
-      booking_link: "https://www.vagaro.com/rohlaxwellness/services",
+      booking_link: "",
       comingSoon: false,
       image_url: "",
     }),
@@ -64,7 +75,7 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
     fields: [
       { key: "author", label: "Author", type: "text", placeholder: "Client name", required: true },
       { key: "quote", label: "Quote", type: "textarea", placeholder: "What they said...", required: true },
-      { key: "location", label: "Location", type: "text", placeholder: "Buffalo, NY" },
+      { key: "location", label: "Location", type: "text", placeholder: "City, ST" },
     ],
     defaultItem: () => ({
       id: uid(),
@@ -126,16 +137,15 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
         label: "Category",
         type: "select",
         options: [
-          { value: "massage", label: "Massage" },
-          { value: "chiropractic", label: "Chiropractic" },
-          { value: "yoga", label: "Yoga" },
-          { value: "fitness", label: "Fitness" },
+          { value: "general", label: "General" },
           { value: "specialty", label: "Specialty" },
+          { value: "partner", label: "Partner" },
+          { value: "referral", label: "Referral" },
         ],
       },
-      { key: "service", label: "Service", type: "text", placeholder: "Deep tissue massage" },
+      { key: "service", label: "Service", type: "text", placeholder: "What they offer" },
       { key: "why_i_recommend", label: "Why I Recommend", type: "textarea", placeholder: "I love working with..." },
-      { key: "booking_link", label: "Booking Link", type: "url", placeholder: "https://www.vagaro.com/rohlaxwellness/services" },
+      { key: "booking_link", label: "Booking Link", type: "url", placeholder: "https://example.com/book" },
       { key: "phone", label: "Phone", type: "tel", placeholder: "(716) 555-0000" },
       { key: "photo_url", label: "Photo", type: "image" },
     ],
@@ -166,6 +176,38 @@ export const ARRAY_CONFIGS: Record<string, ArraySectionConfig> = {
       id: uid(),
       question: "",
       answer: "",
+    }),
+  },
+
+  products: {
+    sectionKey: "products",
+    arrayKey: "products",
+    nameKey: "name",
+    detailKey: "price",
+    label: "Your products",
+    addLabel: "Add product",
+    fields: [
+      { key: "name", label: "Name", type: "text", placeholder: "Product name", required: true },
+      { key: "description", label: "Description", type: "textarea", placeholder: "What makes it special..." },
+      { key: "ingredients", label: "Ingredients", type: "text", placeholder: "Apples, Cinnamon, Maple" },
+      { key: "price", label: "Price", type: "text", placeholder: "5.99" },
+      { key: "badge", label: "Badge", type: "text", placeholder: "BESTSELLER" },
+      { key: "stripePaymentLink", label: "Payment link", type: "url", placeholder: "https://buy.stripe.com/..." },
+      { key: "imageUrl", label: "Photo", type: "image" },
+      { key: "featured", label: "Featured", type: "toggle" },
+      { key: "comingSoon", label: "Coming Soon", type: "toggle" },
+    ],
+    defaultItem: () => ({
+      id: uid(),
+      name: "",
+      description: "",
+      ingredients: "",
+      price: "",
+      badge: "",
+      stripePaymentLink: "",
+      imageUrl: "",
+      featured: false,
+      comingSoon: false,
     }),
   },
 

@@ -22,7 +22,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   primary:
     "bg-sage text-white hover:bg-sage-dark disabled:opacity-50",
   secondary:
-    "bg-white border border-gray-border text-warm-black hover:bg-gray-bg disabled:opacity-50",
+    "bg-surface border border-gray-border text-warm-black hover:bg-gray-bg disabled:opacity-50",
   ghost:
     "text-gray-muted hover:text-warm-black hover:bg-gray-bg disabled:opacity-50",
   danger:

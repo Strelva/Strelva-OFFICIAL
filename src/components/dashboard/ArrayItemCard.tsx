@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { ChevronDown, ChevronUp, Trash2, Upload, X } from "lucide-react";
-import Image from "next/image";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import type { ArrayFieldDef, ArraySectionConfig } from "./arrayFieldConfigs";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { Toggle } from "@/components/ui/Toggle";
 import { Card } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/Button";
+import { ImageField } from "./ImageField";
 
 interface ArrayItemCardProps {
   item: Record<string, unknown>;
@@ -22,57 +22,102 @@ interface ArrayItemCardProps {
   onMoveDown: () => void;
 }
 
-function ImageField({ value, onChange }: { value: unknown; onChange: (val: unknown) => void }) {
-  const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const url = value as string;
+function NestedArrayEditor({
+  field,
+  value,
+  onChange,
+}: {
+  field: ArrayFieldDef;
+  value: unknown;
+  onChange: (val: unknown) => void;
+}) {
+  const rows: Record<string, unknown>[] = Array.isArray(value)
+    ? (value as Record<string, unknown>[])
+    : [];
+  const itemFields = field.itemFields ?? [];
 
-  async function handleFile(file: File) {
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) {
-        const { url } = await res.json();
-        onChange(url);
-      }
-    } catch {} finally {
-      setUploading(false);
-    }
-  }
+  const updateRow = (idx: number, key: string, val: unknown) => {
+    const next = rows.map((r, i) => (i === idx ? { ...r, [key]: val } : r));
+    onChange(next);
+  };
+  const addRow = () => {
+    const blank: Record<string, unknown> = {};
+    itemFields.forEach((f) => {
+      blank[f.key] = f.type === "toggle" ? false : "";
+    });
+    onChange([...rows, blank]);
+  };
+  const removeRow = (idx: number) => {
+    onChange(rows.filter((_, i) => i !== idx));
+  };
+  const moveRow = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= rows.length) return;
+    const next = rows.slice();
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  };
 
   return (
-    <div>
-      {url ? (
-        <div className="relative inline-block">
-          <Image src={url} alt="" width={80} height={80} className="w-16 h-16 object-cover rounded-lg border border-gray-border" />
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-terra text-white flex items-center justify-center hover:bg-[#943a24] transition-colors"
-          >
-            <X className="w-2.5 h-2.5" strokeWidth={2} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-gray-border text-[11px] text-gray-muted hover:border-sage hover:text-sage transition-colors"
-        >
-          <Upload className="w-3 h-3" strokeWidth={1.5} />
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
+    <div className="space-y-1.5">
+      {rows.length === 0 && (
+        <p className="text-[11px] text-gray-muted italic">No {field.label.toLowerCase()} yet.</p>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-      />
+      {rows.map((row, idx) => (
+        <div
+          key={idx}
+          className="rounded-md border border-gray-border/60 bg-surface px-2 py-1.5 space-y-1.5"
+        >
+          {itemFields.map((f) => (
+            <div key={f.key}>
+              <label className="block text-[10px] text-gray-muted mb-0.5">{f.label}</label>
+              <FieldInput
+                field={f}
+                value={row[f.key]}
+                onChange={(val) => updateRow(idx, f.key, val)}
+              />
+            </div>
+          ))}
+          <div className="flex items-center justify-end gap-1 pt-0.5">
+            <IconButton
+              label="Move up"
+              size="sm"
+              variant="ghost"
+              disabled={idx === 0}
+              onClick={(e) => { e.stopPropagation(); moveRow(idx, -1); }}
+              className="disabled:opacity-0"
+            >
+              <ChevronUp className="w-3 h-3" strokeWidth={2} />
+            </IconButton>
+            <IconButton
+              label="Move down"
+              size="sm"
+              variant="ghost"
+              disabled={idx === rows.length - 1}
+              onClick={(e) => { e.stopPropagation(); moveRow(idx, 1); }}
+              className="disabled:opacity-0"
+            >
+              <ChevronDown className="w-3 h-3" strokeWidth={2} />
+            </IconButton>
+            <IconButton
+              label="Remove row"
+              size="sm"
+              variant="danger"
+              onClick={(e) => { e.stopPropagation(); removeRow(idx); }}
+            >
+              <Trash2 className="w-3 h-3" strokeWidth={1.5} />
+            </IconButton>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); addRow(); }}
+        className="flex items-center gap-1 text-[11px] text-gray-fg hover:text-warm-black transition-colors px-1 py-0.5"
+      >
+        <Plus className="w-3 h-3" strokeWidth={2} />
+        Add row
+      </button>
     </div>
   );
 }
@@ -86,8 +131,12 @@ function FieldInput({
   value: unknown;
   onChange: (val: unknown) => void;
 }) {
+  if (field.type === "object-array") {
+    return <NestedArrayEditor field={field} value={value} onChange={onChange} />;
+  }
+
   if (field.type === "image") {
-    return <ImageField value={value} onChange={onChange} />;
+    return <ImageField value={value} onChange={(v) => onChange(v)} size="sm" />;
   }
 
   if (field.type === "toggle") {

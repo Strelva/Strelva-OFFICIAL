@@ -2,17 +2,27 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
+import { ARRAY_CONFIGS, type ArraySectionConfig } from "./arrayFieldConfigs";
 import { ArrayItemCard } from "./ArrayItemCard";
 
 interface ArrayItemEditorProps {
   section: string;
   data: Record<string, unknown>;
   onDataChange: (updated: Record<string, unknown>) => void;
+  /**
+   * Override the lookup in ARRAY_CONFIGS. Used when a template declares
+   * multiple arrays per section (see templateFieldConfigs.ts).
+   */
+  configOverride?: ArraySectionConfig;
 }
 
-export function ArrayItemEditor({ section, data, onDataChange }: ArrayItemEditorProps) {
-  const config = ARRAY_CONFIGS[section];
+export function ArrayItemEditor({
+  section,
+  data,
+  onDataChange,
+  configOverride,
+}: ArrayItemEditorProps) {
+  const config = configOverride ?? ARRAY_CONFIGS[section];
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [justAdded, setJustAdded] = useState(false);

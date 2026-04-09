@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, Loader2, Check, RotateCcw, AlertCircle, MessageCircle } from "lucide-react";
+import { Save, Check, RotateCcw, AlertCircle, MessageCircle, Pencil, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
+import { StringArrayEditor } from "./StringArrayEditor";
 import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
+import { getTemplateSchema, type SimpleFieldDef, type SectionArrayConfig } from "./templateFieldConfigs";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonLine } from "@/components/ui/Skeleton";
+import { ImageField } from "./ImageField";
+import { VersionHistory } from "./VersionHistory";
 
 // Composite sections that don't have their own content API —
 // they pull from other sections on the public site.
@@ -44,6 +48,16 @@ const COMPOSITE_SECTION_INFO: Record<string, { label: string; sources: string; c
     sources: "built-in",
     chatPrompt: "Update my newsletter section",
   },
+  notify: {
+    label: "Email Signup",
+    sources: "built-in",
+    chatPrompt: "Update my email signup section",
+  },
+  comparison: {
+    label: "Comparison Table",
+    sources: "built-in",
+    chatPrompt: "Update my comparison table",
+  },
   "booking-widget": {
     label: "Booking Widget",
     sources: "Services & Settings",
@@ -60,14 +74,48 @@ interface PropertiesEditorProps {
   activeSection: string | null;
 }
 
-interface FieldDef {
-  key: string;
-  label: string;
-  type: "text" | "textarea" | "url" | "email" | "tel";
-  placeholder?: string;
+type FieldDef = SimpleFieldDef;
+
+// Walk a dot-path and return the leaf. Returns undefined for any missing branch.
+function getNestedValue(obj: unknown, path: string): unknown {
+  if (!obj || typeof obj !== "object") return undefined;
+  const parts = path.split(".");
+  let cur: unknown = obj;
+  for (const p of parts) {
+    if (cur && typeof cur === "object" && p in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
 }
 
-// Field definitions per section — only simple top-level fields (not arrays)
+// Immutably set a dot-path on an object, cloning only the touched branch.
+function setNestedValue(
+  obj: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): Record<string, unknown> {
+  const parts = path.split(".");
+  const next: Record<string, unknown> = { ...obj };
+  let cursor: Record<string, unknown> = next;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    const existing = cursor[k];
+    const cloned: Record<string, unknown> =
+      existing && typeof existing === "object" && !Array.isArray(existing)
+        ? { ...(existing as Record<string, unknown>) }
+        : {};
+    cursor[k] = cloned;
+    cursor = cloned;
+  }
+  cursor[parts[parts.length - 1]] = value;
+  return next;
+}
+
+// Generic/fallback (wellness-shaped) field definitions. Template-specific
+// schemas in templateFieldConfigs.ts override these per tenant.
 const SECTION_FIELDS: Record<string, FieldDef[]> = {
   hero: [
     { key: "headline", label: "Headline", type: "textarea", placeholder: "Main heading..." },
@@ -100,8 +148,8 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
     { key: "bookingUrl", label: "Booking link", type: "url", placeholder: "https://..." },
     { key: "footerTagline", label: "Footer tagline", type: "text", placeholder: "Footer text" },
     { key: "copyrightText", label: "Copyright", type: "text", placeholder: "2026 Business Name" },
-    { key: "instagramHandle", label: "Instagram handle", type: "text", placeholder: "rohlaxwellness" },
-    { key: "vagaro_embed_id", label: "Vagaro business ID", type: "text", placeholder: "rohlaxwellness" },
+    { key: "instagramHandle", label: "Instagram handle", type: "text", placeholder: "yourbusiness" },
+    { key: "vagaro_embed_id", label: "Vagaro business ID", type: "text", placeholder: "yourbusiness" },
   ],
   // Array sections with top-level fields (rendered above the array editor)
   services: [
@@ -117,7 +165,7 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
     { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   providers: [
-    { key: "headline", label: "Title", type: "text", placeholder: "Wellness Network" },
+    { key: "headline", label: "Title", type: "text", placeholder: "My Network" },
     { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
   ],
   testimonials: [
@@ -126,18 +174,30 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
   events: [
     { key: "headline", label: "Title", type: "text", placeholder: "Upcoming Events" },
   ],
+  products: [
+    { key: "headline", label: "Title", type: "text", placeholder: "What We Make" },
+    { key: "description", label: "Intro text", type: "textarea", placeholder: "A brief intro for visitors..." },
+    { key: "bottomNote", label: "Bottom note", type: "text", placeholder: "More flavors coming soon" },
+  ],
 };
 
 // Array sections use the inline editor from ARRAY_CONFIGS
 
 export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
-  const { triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
+  const { triggerRefresh, editMode, hasDraft, setHasDraft, template } = useDashboard();
+  const templateSchema = getTemplateSchema(template);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [tab, setTab] = useState<"edit" | "versions">("edit");
+
+  // Reset tab when switching sections
+  useEffect(() => {
+    setTab("edit");
+  }, [activeSection]);
 
   const isComposite = activeSection ? activeSection in COMPOSITE_SECTION_INFO : false;
 
@@ -161,8 +221,12 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       .finally(() => setLoading(false));
   }, [activeSection]);
 
-  const handleFieldChange = useCallback((key: string, value: string) => {
-    setData((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const handleFieldChange = useCallback((key: string, value: unknown) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      if (key.includes(".")) return setNestedValue(prev, key, value);
+      return { ...prev, [key]: value };
+    });
     setSaved(false);
   }, []);
 
@@ -282,7 +346,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   if (activeSection && isComposite) {
     const info = COMPOSITE_SECTION_INFO[activeSection];
     return (
-      <div className="flex flex-col h-full bg-white">
+      <div className="flex flex-col h-full bg-surface">
         <div className="px-4 py-2.5 border-b border-gray-border bg-gray-bg-alt shrink-0">
           <span className="text-[11px] uppercase tracking-wider text-gray-muted">Viewing</span>
           <h3 className="text-[13px] font-medium text-warm-black mt-0.5">{info.label}</h3>
@@ -306,18 +370,70 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     );
   }
 
-  const fields = SECTION_FIELDS[activeSection];
-  const arrayConfig = ARRAY_CONFIGS[activeSection];
+  // Resolve fields: template-specific → generic fallback
+  const fields: FieldDef[] | undefined =
+    templateSchema?.sectionFields[activeSection] ?? SECTION_FIELDS[activeSection];
+
+  // Resolve array editors: prefer the template's declared arrays (may be multiple),
+  // fall back to the generic single ARRAY_CONFIGS entry.
+  const templateArrays: SectionArrayConfig[] | undefined =
+    templateSchema?.sectionArrays[activeSection];
+  const legacyArrayConfig = ARRAY_CONFIGS[activeSection];
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-surface">
       {/* Section header */}
-      <div className="px-4 py-3 border-b border-gray-border bg-white shrink-0">
-        <h3 className="text-[14px] font-semibold text-warm-black">
-          {SECTION_LABELS[activeSection] || activeSection}
-        </h3>
+      <div className="px-4 py-3 border-b border-gray-border bg-surface shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[16px] font-semibold text-warm-black">
+            {SECTION_LABELS[activeSection] || activeSection}
+          </h3>
+          <div className="flex items-center gap-1 rounded border border-gray-border bg-gray-bg-alt p-0.5">
+            <button
+              onClick={() => setTab("edit")}
+              className={`flex items-center gap-1 px-2 h-6 rounded text-[11px] transition-colors ${
+                tab === "edit"
+                  ? "bg-surface text-warm-black shadow-sm"
+                  : "text-gray-muted hover:text-warm-black"
+              }`}
+            >
+              <Pencil className="w-3 h-3" strokeWidth={1.5} />
+              Edit
+            </button>
+            <button
+              onClick={() => setTab("versions")}
+              className={`flex items-center gap-1 px-2 h-6 rounded text-[11px] transition-colors ${
+                tab === "versions"
+                  ? "bg-surface text-warm-black shadow-sm"
+                  : "text-gray-muted hover:text-warm-black"
+              }`}
+            >
+              <History className="w-3 h-3" strokeWidth={1.5} />
+              Versions
+            </button>
+          </div>
+        </div>
       </div>
 
+      {tab === "versions" ? (
+        <VersionHistory
+          section={activeSection}
+          onRestored={() => {
+            // Re-fetch the section so the editor reflects the restored content
+            fetch(`/api/content/${activeSection}`, { credentials: "same-origin" })
+              .then((res) => (res.ok ? res.json() : null))
+              .then((d) => {
+                if (d) {
+                  setData(d);
+                  setOriginal(d);
+                }
+              })
+              .catch(() => {});
+            triggerRefresh();
+          }}
+        />
+      ) : (
+        <>
       {/* Save bar */}
       {hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0 animate-fade-in-up">
@@ -347,7 +463,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Publish bar — shown in draft mode when a draft exists */}
       {editMode === "draft" && activeSection && hasDraft[activeSection] && !hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
-          <span className="text-[11px] text-amber-700">Draft saved — not yet live</span>
+          <span className="text-[11px] text-amber-400">Draft saved — not yet live</span>
           <Button
             variant="primary"
             size="sm"
@@ -363,7 +479,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {saved && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
           <Check className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
-          <span className="text-[11px] text-emerald-700">Saved — preview updated</span>
+          <span className="text-[11px] text-emerald-400">Saved — preview updated</span>
         </div>
       )}
 
@@ -388,19 +504,96 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         {/* Simple fields */}
         {fields && fields.map((field) => (
           <div key={field.key} className="px-4 py-2">
-            {field.type === "textarea" ? (
+            {field.type === "image" ? (
+              <ImageField
+                label={field.label}
+                value={getNestedValue(data, field.key)}
+                onChange={(val) => handleFieldChange(field.key, val)}
+                size="lg"
+              />
+            ) : field.type === "textarea" ? (
               <TextArea
                 label={field.label}
-                value={(data[field.key] as string) || ""}
+                value={(getNestedValue(data, field.key) as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
                 rows={2}
               />
+            ) : field.type === "color" ? (
+              (() => {
+                const hex = (getNestedValue(data, field.key) as string) || "#000000";
+                return (
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-fg mb-1">
+                      {field.label}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={hex}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                        className="h-8 w-10 rounded border border-gray-border bg-surface p-0.5 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={hex}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                        placeholder="#000000"
+                        className="w-24 h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono"
+                      />
+                    </div>
+                  </div>
+                );
+              })()
+            ) : field.type === "select" ? (
+              (() => {
+                const current = (getNestedValue(data, field.key) as string) || "";
+                const opts = field.options ?? [];
+                return (
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-fg mb-1">
+                      {field.label}
+                    </label>
+                    <select
+                      value={current}
+                      onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                      className="w-full h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black"
+                    >
+                      {current && !opts.some((o) => o.value === current) && (
+                        <option value={current}>{current}</option>
+                      )}
+                      {opts.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()
+            ) : field.type === "number" ? (
+              (() => {
+                const raw = getNestedValue(data, field.key);
+                const displayValue =
+                  typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
+                return (
+                  <TextInput
+                    label={field.label}
+                    type="number"
+                    value={displayValue}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      handleFieldChange(field.key, v === "" ? "" : Number(v));
+                    }}
+                    placeholder={field.placeholder}
+                  />
+                );
+              })()
             ) : (
               <TextInput
                 label={field.label}
                 type={field.type}
-                value={(data[field.key] as string) || ""}
+                value={(getNestedValue(data, field.key) as string) || ""}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
               />
@@ -408,8 +601,47 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
           </div>
         ))}
 
-        {/* Array sections — inline item editor */}
-        {arrayConfig && (
+        {/* Template-declared arrays (may be multiple per section) */}
+        {templateArrays && templateArrays.map((arr) => {
+          if (arr.kind === "strings") {
+            return (
+              <StringArrayEditor
+                key={arr.arrayKey}
+                config={arr}
+                data={data}
+                onDataChange={(updated) => {
+                  setData(updated);
+                  setSaved(false);
+                }}
+              />
+            );
+          }
+          // kind === "objects" — reuse ArrayItemEditor with an inline override
+          return (
+            <ArrayItemEditor
+              key={arr.arrayKey}
+              section={activeSection}
+              configOverride={{
+                sectionKey: activeSection,
+                arrayKey: arr.arrayKey,
+                nameKey: arr.nameKey,
+                detailKey: arr.detailKey,
+                label: arr.label,
+                addLabel: arr.addLabel,
+                fields: arr.fields,
+                defaultItem: arr.defaultItem,
+              }}
+              data={data}
+              onDataChange={(updated) => {
+                setData(updated);
+                setSaved(false);
+              }}
+            />
+          );
+        })}
+
+        {/* Legacy fallback: single array config from ARRAY_CONFIGS */}
+        {!templateArrays && legacyArrayConfig && (
           <ArrayItemEditor
             section={activeSection}
             data={data}
@@ -421,6 +653,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         )}
 
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { forwardRef, useId, type InputHTMLAttributes, type TextareaHTMLAttribute
 import { cn } from "@/lib/cn";
 
 const BASE =
-  "w-full bg-white border border-gray-border rounded-md px-3 py-1.5 text-[13px] text-warm-black placeholder-gray-subtle outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150";
+  "w-full bg-surface border border-gray-border rounded-md px-3 py-1.5 text-[13px] text-warm-black placeholder-gray-subtle outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150";
 
 /* -------------------------------------------------- */
 /*  TextInput (text, url, tel, email, date)            */

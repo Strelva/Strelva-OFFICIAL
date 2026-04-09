@@ -20,7 +20,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        "bg-white border border-gray-border rounded-lg",
+        "bg-surface border border-gray-border rounded-lg",
         paddingStyles[padding],
         variant === "interactive" && "reb-card-glow transition-shadow duration-150",
         className,
