@@ -389,7 +389,7 @@ export const defaultTheme: ThemeContent = {
     terra: "#b5634b",
     terraLight: "#c97a64",
   },
-  fontDisplay: "Fraunces",
+  fontDisplay: "Instrument_Serif",
   fontBody: "Inter",
 };
 
