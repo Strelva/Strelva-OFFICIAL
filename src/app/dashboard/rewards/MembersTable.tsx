@@ -77,7 +77,7 @@ export function MembersTable({ members }: Props) {
             placeholder="Search by email"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 rounded-md bg-white border border-gray-border text-xs text-warm-black placeholder:text-gray-subtle focus:outline-none focus:border-sage"
+            className="w-full pl-8 pr-3 py-2 rounded-md bg-surface border border-gray-border text-xs text-warm-black placeholder:text-gray-subtle focus:outline-none focus:border-sage"
           />
         </div>
         <span className="text-xs text-gray-muted">
@@ -85,7 +85,7 @@ export function MembersTable({ members }: Props) {
         </span>
       </div>
 
-      <div className="bg-white border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-bg-alt border-b border-gray-border">
             <tr>

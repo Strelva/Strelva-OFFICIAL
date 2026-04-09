@@ -112,7 +112,7 @@ export function HubPage({
   }, []);
 
   return (
-    <div ref={containerRef} className="p-5 max-w-xl">
+    <div ref={containerRef} className="p-5 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
       {isInvited ? (
         <ExistingClientWelcome
           ownerName={ownerName}

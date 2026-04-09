@@ -384,8 +384,12 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
                 >
                   {message.content ? (
                     message.role === "assistant" ? (
-                      <div className="chat-markdown">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      <div className="chat-markdown whitespace-pre-wrap">
+                        {/* The stream carries escaped newlines ("\\n") because
+                            the agent route JSON-stringifies tool output. Unescape
+                            before markdown so line breaks render as line breaks
+                            instead of literal backslash-n text. */}
+                        <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{message.content}</p>

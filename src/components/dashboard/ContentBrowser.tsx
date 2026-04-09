@@ -52,12 +52,13 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setScrollToSection,
     triggerRefresh,
     template,
+    activePage,
+    setActivePage,
   } = useDashboard();
 
   const DEFAULT_PAGE_CONFIG = getDefaultPageConfig(template);
 
   const expandedRef = useRef<HTMLDivElement>(null);
-  const [activePage, setActivePage] = useState("home");
   const [pageConfig, setPageConfig] = useState<SitePageConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -127,8 +128,11 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
   const pageSections = pageConfig?.[activePage]?.sections || [];
   const sortedSections = [...pageSections].sort((a, b) => a.order - b.order);
-  // Filter out composite/layout sections that clients don't directly edit
-  const visibleSections = sortedSections.filter((s) => !COMPOSITE_SECTIONS.has(s.type));
+  // Show every stored section so the Pages tab count matches the
+  // Structure tab. Composite/layout sections used to be hidden here
+  // while Structure showed them — the two lists silently diverged.
+  // One source of truth: what Amy actually has in config.
+  const visibleSections = sortedSections;
 
   function handleMoveUp(index: number) {
     if (!pageConfig || index === 0) return;

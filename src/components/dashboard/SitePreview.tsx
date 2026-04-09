@@ -40,10 +40,12 @@ export function SitePreview() {
     triggerRefresh,
     siteUrl,
     template,
+    activePage,
   } = useDashboard();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Build section→page mapping from the template's page config
+  // Build section→page mapping from the template's page config so
+  // clicking a section jumps the preview to the right page.
   const templatePages = getDefaultPageConfig(template);
   const sectionToPage: Record<string, string> = {};
   for (const [page, config] of Object.entries(templatePages)) {
@@ -51,8 +53,15 @@ export function SitePreview() {
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
   }
-  const currentPage = activeSection ? (sectionToPage[activeSection] || "home") : "home";
-  const pagePath = PAGE_PATHS[currentPage] || "/";
+  // Priority: active section's home page > active page > home.
+  // The Pages tab sets activePage; selecting a section overrides with
+  // that section's parent page.
+  const currentPage = activeSection
+    ? (sectionToPage[activeSection] || activePage || "home")
+    : (activePage || "home");
+  // Fall back to `/${slug}` for user-created pages not in the static
+  // PAGE_PATHS map.
+  const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
   const editParam = editMode === "draft" ? "?edit=true" : "";
   const baseUrl = siteUrl || "";
   const iframeSrc = `${baseUrl}${pagePath}${editParam}`;

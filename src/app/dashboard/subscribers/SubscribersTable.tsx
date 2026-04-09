@@ -33,7 +33,7 @@ export function SubscribersTable({ subscribers }: SubscribersTableProps) {
 
   if (subscribers.length === 0) {
     return (
-      <div className="bg-white border border-gray-border rounded-lg p-12 text-center">
+      <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
         <p className="text-sm text-gray-muted">
           Subscribers will appear here once people sign up on your site.
         </p>
@@ -46,14 +46,14 @@ export function SubscribersTable({ subscribers }: SubscribersTableProps) {
       <div className="mb-4 flex justify-end">
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white border border-gray-border text-xs font-medium text-warm-black hover:bg-gray-bg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface border border-gray-border text-xs font-medium text-warm-black hover:bg-gray-bg transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           Export CSV
         </button>
       </div>
 
-      <div className="bg-white border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-bg-alt border-b border-gray-border">
             <tr>

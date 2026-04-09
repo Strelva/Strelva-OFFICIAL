@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { listRewardsMembers } from "@/lib/rewardsProxy";
@@ -10,17 +11,11 @@ export default async function RewardsPage() {
   const tenantConfig = await getTenantConfig(tenant);
   const template = tenantConfig?.template || "wellness";
 
+  // Rewards is a food-brand-only feature. Nav already gates the link on
+  // template, but anyone who hits the URL directly should see 404 instead
+  // of a confusing dead-end card.
   if (template !== "food-brand") {
-    return (
-      <div className="p-6 md:p-8 max-w-4xl">
-        <Header />
-        <div className="bg-white border border-gray-border rounded-lg p-12 text-center">
-          <p className="text-sm text-gray-muted">
-            Rewards is only available for food-brand sites.
-          </p>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
   const result = await listRewardsMembers(tenant);
@@ -35,9 +30,9 @@ export default async function RewardsPage() {
             ? "No members yet."
             : `Could not reach rewards service: ${result.error.message}`;
     return (
-      <div className="p-6 md:p-8 max-w-4xl">
+      <div className="w-full max-w-screen-2xl mx-auto h-full overflow-y-auto p-6 md:p-8">
         <Header />
-        <div className="bg-white border border-gray-border rounded-lg p-12 text-center">
+        <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
           <p className="text-sm text-gray-muted">{message}</p>
         </div>
       </div>
@@ -47,10 +42,10 @@ export default async function RewardsPage() {
   const members = result.data.members;
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl">
+    <div className="w-full max-w-screen-2xl mx-auto h-full overflow-y-auto p-6 md:p-8">
       <Header count={members.length} />
       {members.length === 0 ? (
-        <div className="bg-white border border-gray-border rounded-lg p-12 text-center">
+        <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
           <p className="text-sm text-gray-muted">
             No members yet. They&apos;ll show up here once people sign up on your
             site.

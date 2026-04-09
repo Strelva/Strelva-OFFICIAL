@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
   if (loadError) {
     return (
-      <div className="p-6 md:p-8 max-w-3xl">
+      <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
         <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-sm text-red-600 mb-3">Couldn&apos;t load settings</p>
           <button
@@ -74,7 +74,7 @@ export default function SettingsPage() {
                 .then((data) => setSettings(data))
                 .catch(() => setLoadError(true));
             }}
-            className="px-4 py-2 rounded-md bg-white border border-gray-border text-xs text-gray-fg hover:bg-gray-bg transition-colors"
+            className="px-4 py-2 rounded-md bg-surface border border-gray-border text-xs text-gray-fg hover:bg-gray-bg transition-colors"
           >
             Try again
           </button>
@@ -85,12 +85,12 @@ export default function SettingsPage() {
 
   if (!settings) {
     return (
-      <div className="p-6 md:p-8 max-w-3xl animate-pulse">
+      <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto animate-pulse">
         <div className="mb-8">
           <div className="h-3 w-16 bg-gray-bg-hover rounded mb-2" />
           <div className="h-7 w-40 bg-gray-bg-hover rounded" />
         </div>
-        <div className="bg-white border border-gray-border rounded-lg">
+        <div className="bg-surface border border-gray-border rounded-lg">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="px-5 py-5 border-b border-gray-bg last:border-0">
               <div className="h-3 w-24 bg-gray-bg-hover rounded mb-2" />
@@ -103,7 +103,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-3xl">
+    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
       {/* Header */}
       <div className="mb-8">
         <span className="text-xs uppercase tracking-widest text-gray-muted">
@@ -118,7 +118,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Settings rows */}
-      <div className="bg-white border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
         {SETTING_FIELDS.map((field, i) => {
           const value = settings[field.key] || "";
           const isEmpty = !value.trim();
@@ -196,14 +196,14 @@ export default function SettingsPage() {
       {/* Copied toast */}
       {copiedField && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
-          <div className="bg-white border border-gray-border rounded-lg px-4 py-2 text-xs font-mono text-emerald-600 shadow-lg">
+          <div className="bg-surface border border-gray-border rounded-lg px-4 py-2 text-xs font-mono text-emerald-600 shadow-lg">
             Copied!
           </div>
         </div>
       )}
 
       {/* CTA */}
-      <div className="mt-6 bg-white border border-gray-border rounded-lg px-5 py-4 flex items-center justify-between">
+      <div className="mt-6 bg-surface border border-gray-border rounded-lg px-5 py-4 flex items-center justify-between">
         <div>
           <p className="text-sm text-warm-black">Need to change something?</p>
           <p className="text-xs text-gray-muted mt-0.5">Tell the AI what to update in plain English.</p>

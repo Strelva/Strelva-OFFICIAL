@@ -97,7 +97,7 @@ export function DomainsClient({ initialDomains }: Props) {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-3xl">
+    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
       <div className="mb-8">
         <span className="text-xs uppercase tracking-widest text-gray-muted">
           DOMAINS
@@ -113,7 +113,7 @@ export function DomainsClient({ initialDomains }: Props) {
       {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className="bg-white border border-gray-border rounded-lg p-4 mb-4 flex items-center gap-2"
+        className="bg-surface border border-gray-border rounded-lg p-4 mb-4 flex items-center gap-2"
       >
         <Globe className="w-4 h-4 text-gray-muted shrink-0" strokeWidth={1.5} />
         <input
@@ -143,7 +143,7 @@ export function DomainsClient({ initialDomains }: Props) {
       )}
 
       {/* Domain list */}
-      <div className="bg-white border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
         {domains.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <p className="text-sm text-gray-muted">

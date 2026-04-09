@@ -22,12 +22,20 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
  * The `home` page is protected — it cannot be renamed or deleted so the site
  * always has a root route.
  */
-export function PageStructurePanel({ page: initialPage = "home", onClose }: PageStructurePanelProps) {
-  const { template, triggerRefresh } = useDashboard();
+export function PageStructurePanel({ page: initialPage, onClose }: PageStructurePanelProps) {
+  const { template, triggerRefresh, activePage, setActivePage } = useDashboard();
   const DEFAULTS = getDefaultPageConfig(template);
 
   const [config, setConfig] = useState<SitePageConfig | null>(null);
-  const [page, setPage] = useState(initialPage);
+  // Structure tab reads from the shared activePage so it always shows
+  // the same page as the Pages tab. `initialPage` is honored once on
+  // mount if provided (back-compat for callers that pass it).
+  const page = activePage;
+  const setPage = setActivePage;
+  useEffect(() => {
+    if (initialPage && initialPage !== activePage) setActivePage(initialPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +231,7 @@ export function PageStructurePanel({ page: initialPage = "home", onClose }: Page
         <select
           value={page}
           onChange={(e) => setPage(e.target.value)}
-          className="flex-1 text-xs px-2 py-1.5 border border-gray-border rounded-md bg-white"
+          className="flex-1 text-xs px-2 py-1.5 border border-gray-border rounded-md bg-surface"
           aria-label="Select page"
         >
           {Object.keys(config).sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b))).map((slug) => (
@@ -264,7 +272,7 @@ export function PageStructurePanel({ page: initialPage = "home", onClose }: Page
         {/* Per-page SEO. Collapsed by default so the section list stays
             the primary focus. Empty fields fall back to site settings
             at render time in GLDF's generateMetadata. */}
-        <div className="mb-3 rounded-md border border-gray-border bg-white">
+        <div className="mb-3 rounded-md border border-gray-border bg-surface">
           <button
             type="button"
             onClick={() => setSeoOpen((v) => !v)}
@@ -292,7 +300,7 @@ export function PageStructurePanel({ page: initialPage = "home", onClose }: Page
                   value={currentSeo.title ?? ""}
                   onChange={(e) => updateSeo({ title: e.target.value })}
                   placeholder="Falls back to site name + tagline"
-                  className="w-full text-xs px-2 py-1.5 border border-gray-border rounded-md bg-white"
+                  className="w-full text-xs px-2 py-1.5 border border-gray-border rounded-md bg-surface"
                 />
               </label>
               <label className="block">
@@ -302,7 +310,7 @@ export function PageStructurePanel({ page: initialPage = "home", onClose }: Page
                   onChange={(e) => updateSeo({ description: e.target.value })}
                   placeholder="Falls back to site description"
                   rows={3}
-                  className="w-full text-xs px-2 py-1.5 border border-gray-border rounded-md bg-white resize-y"
+                  className="w-full text-xs px-2 py-1.5 border border-gray-border rounded-md bg-surface resize-y"
                 />
               </label>
               <ImageField
@@ -321,7 +329,7 @@ export function PageStructurePanel({ page: initialPage = "home", onClose }: Page
               <li
                 key={`${s.type}-${i}`}
                 className={`flex items-center gap-2 px-2 py-2 rounded-md border border-gray-border ${
-                  s.visible ? "bg-white" : "bg-gray-bg opacity-60"
+                  s.visible ? "bg-surface" : "bg-gray-bg opacity-60"
                 }`}
               >
                 <div className="flex flex-col">

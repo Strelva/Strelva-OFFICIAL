@@ -19,6 +19,11 @@ interface DashboardContextValue {
   activeSection: string | null;
   setActiveSection: (section: string | null) => void;
 
+  // Active page (selected in ContentBrowser Pages tab). Shared so
+  // SitePreview's iframe src and PageStructurePanel can react to it.
+  activePage: string;
+  setActivePage: (page: string) => void;
+
   // Right panel tab
   rightTab: RightTab;
   setRightTab: (tab: RightTab) => void;
@@ -80,6 +85,7 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<string>("home");
   const [rightTab, setRightTab] = useState<RightTab>("chat");
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
@@ -141,6 +147,8 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
         setChatPrompt,
         activeSection,
         setActiveSection,
+        activePage,
+        setActivePage,
         rightTab,
         setRightTab,
         leftCollapsed,
