@@ -58,6 +58,7 @@ dev-content.json
 *.jpg
 blueprint-*.md
 full-page-snapshot.md
+PRODUCT.md
 .playwright-mcp/
 .claude/worktrees/
 .claude/agent-memory/
