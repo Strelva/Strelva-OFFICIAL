@@ -32,6 +32,19 @@ const CUSTOM_DOMAINS: Record<string, string> = JSON.parse(
   process.env.CUSTOM_DOMAIN_MAP || "{}"
 );
 
+// An "admin host" is a hostname whose first label is `admin` (e.g.
+// admin.greatlakesdriedfruit.com). These hosts serve the REB dashboard only —
+// `/` is redirected to `/dashboard` and tenant resolution uses the *base*
+// domain so the same tenant config that owns the public site owns its admin.
+function isAdminHost(host: string): boolean {
+  return host.split(".")[0] === "admin";
+}
+
+function stripAdminPrefix(host: string): string {
+  const parts = host.split(".");
+  return parts[0] === "admin" ? parts.slice(1).join(".") : host;
+}
+
 function extractTenant(request: NextRequest): string {
   const paramTenant = request.nextUrl.searchParams.get("tenant");
   if (paramTenant) return paramTenant;
@@ -41,6 +54,15 @@ function extractTenant(request: NextRequest): string {
   if (cookieTenant) return cookieTenant;
 
   const host = (request.headers.get("host") || "").split(":")[0];
+
+  // Admin hosts: look up both the full host (explicit mapping wins) and the
+  // stripped base domain. This lets ops map admin.example.com directly OR
+  // rely on example.com already being mapped to its tenant.
+  if (isAdminHost(host)) {
+    if (CUSTOM_DOMAINS[host]) return CUSTOM_DOMAINS[host];
+    const base = stripAdminPrefix(host);
+    if (CUSTOM_DOMAINS[base]) return CUSTOM_DOMAINS[base];
+  }
 
   if (CUSTOM_DOMAINS[host]) return CUSTOM_DOMAINS[host];
 
@@ -109,6 +131,15 @@ export default clerkMiddleware(async (auth, request) => {
     const url = request.nextUrl.clone();
     url.pathname = "/agency";
     return NextResponse.rewrite(url);
+  }
+
+  // Admin-host shortcut: admin.<domain>/ lands on the dashboard directly,
+  // never on the tenant's public site. The subsequent protected-route check
+  // will bounce unauthenticated users to /sign-in as normal.
+  const rawHost = (request.headers.get("host") || "").split(":")[0];
+  if (isAdminHost(rawHost) && request.nextUrl.pathname === "/") {
+    const dashboardUrl = new URL("/dashboard", request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
   const tenant = extractTenant(request);
