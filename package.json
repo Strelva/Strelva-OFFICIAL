@@ -17,6 +17,7 @@
     "@sanity/client": "7.20.0",
     "@sanity/image-url": "2.1.0",
     "@studio-freight/lenis": "^1.0.42",
+    "@upstash/redis": "1.37.0",
     "@vercel/blob": "^1.0.0",
     "ai": "6.0.116",
     "gsap": "^3.14.2",

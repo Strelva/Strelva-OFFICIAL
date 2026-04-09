@@ -1,13 +1,20 @@
 /**
- * Server-side proxy client for the GLDF rewards admin endpoint.
+ * Server-side proxy client for rewards members.
  *
- * Phase 10 MVP: instead of migrating Redis members into REB's KV, REB calls
- * a shared-secret endpoint on GLDF to list/fetch members. Single tenant
- * today (GLDF); `tenant` is accepted as a param so the routing layer is
- * ready for a second food-brand tenant without touching callers.
+ * Phase 15a (shadow): if REB's own Upstash KV is configured, read from it
+ * directly. Otherwise fall through to the Phase 10 signed-secret call into
+ * GLDF. This lets REB stand up the KV-backed path without credentials or
+ * data migration — flip env vars, the dashboard silently switches sources.
  *
- * Full migration is tracked for Phase 11.
+ * Phase 15b will retire the fall-through once GLDF also reads from REB KV.
  */
+
+import {
+  listMembers as kvListMembers,
+  getMember as kvGetMember,
+  getTransactions as kvGetTransactions,
+} from "./rewards/memberRepositoryKv";
+import { getKv, KvNotConfiguredError } from "./rewards/kv";
 
 export type Tier = "snapper" | "super-snapper";
 
@@ -103,18 +110,64 @@ async function call<T>(
   }
 }
 
-export function listRewardsMembers(
+/**
+ * Try the REB-owned KV path first. Returns null (not a result) when KV is
+ * not configured so the caller falls through to the legacy GLDF proxy.
+ * Any other error is surfaced as a normal RewardsProxyResult failure.
+ */
+async function tryDirectKv<T>(
+  fn: () => Promise<T>
+): Promise<RewardsProxyResult<T> | null> {
+  if (!getKv()) return null;
+  try {
+    const data = await fn();
+    return { ok: true, data };
+  } catch (err) {
+    if (err instanceof KvNotConfiguredError) return null;
+    return {
+      ok: false,
+      error: {
+        kind: "network",
+        message: err instanceof Error ? err.message : String(err),
+      },
+    };
+  }
+}
+
+export async function listRewardsMembers(
   tenant: string
 ): Promise<RewardsProxyResult<{ members: RewardsMember[] }>> {
+  const direct = await tryDirectKv(async () => {
+    const members = (await kvListMembers(tenant)) as RewardsMember[];
+    return { members };
+  });
+  if (direct) return direct;
+
   return call(tenant, "/api/admin/rewards/members");
 }
 
-export function getRewardsMember(
+export async function getRewardsMember(
   tenant: string,
   email: string
 ): Promise<
   RewardsProxyResult<{ member: RewardsMember; transactions: StarsTransaction[] }>
 > {
+  const direct = await tryDirectKv(async () => {
+    const member = (await kvGetMember(tenant, email)) as RewardsMember | null;
+    if (!member) throw new Error("not-found");
+    const transactions = (await kvGetTransactions(
+      tenant,
+      email
+    )) as StarsTransaction[];
+    return { member, transactions };
+  });
+  if (direct) {
+    if (!direct.ok && direct.error.kind === "network" && direct.error.message === "not-found") {
+      return { ok: false, error: { kind: "not-found" } };
+    }
+    return direct;
+  }
+
   return call(
     tenant,
     `/api/admin/rewards/members?email=${encodeURIComponent(email)}`
