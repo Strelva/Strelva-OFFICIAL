@@ -94,6 +94,55 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     freshness: getFreshness("faq", ts),
     items: (d.faqs || []).map((f: any) => ({ label: f.question, detail: "" })),
   }),
+  theme: (d, ts) => {
+    const colors = d?.colors || {};
+    const colorCount = Object.values(colors).filter(Boolean).length;
+    return {
+      preview: d?.fontDisplay ? `${d.fontDisplay.split(",")[0]} · ${colorCount} colors` : "Brand palette",
+      status: colorCount > 0 ? "configured" : "empty",
+      chatPrompt: "Update my brand colors and fonts",
+      freshness: getFreshness("theme", ts),
+      items: [
+        d?.fontDisplay && { label: d.fontDisplay, detail: "display font" },
+        d?.fontBody && { label: d.fontBody, detail: "body font" },
+        colors.sage && { label: colors.sage, detail: "sage" },
+        colors.cream && { label: colors.cream, detail: "cream" },
+      ].filter(Boolean) as { label: string; detail: string }[],
+    };
+  },
+  rewardsConfig: (d, ts) => ({
+    preview: `${d?.starsPerBag || 0}★/bag · ${d?.starsToRedeem || 0}★ → $${d?.redemptionValue || 0}`,
+    status: d?.starsPerBag ? "configured" : "empty",
+    chatPrompt: "Update my rewards settings",
+    freshness: getFreshness("rewardsConfig", ts),
+    items: [
+      { label: `${d?.starsPerBag ?? 0}`, detail: "stars per bag" },
+      { label: `${d?.starsToRedeem ?? 0}`, detail: "stars to redeem" },
+      { label: `$${d?.redemptionValue ?? 0}`, detail: "redemption value" },
+      { label: `${d?.newsletterBonus ?? 0}`, detail: "newsletter bonus" },
+      { label: `${d?.subscriptionBonus ?? 0}`, detail: "subscription bonus" },
+      { label: `${d?.tierThresholdSuper ?? 0}`, detail: "super tier at" },
+    ],
+  }),
+  navigation: (d, ts) => ({
+    preview: (d?.menuItems || []).slice(0, 4).map((m: any) => m.label).join(" · ") || "No menu items",
+    status: (d?.menuItems?.length || 0) > 0 ? "live" : "empty",
+    count: `${d?.menuItems?.length || 0}`,
+    chatPrompt: "Update my nav menu",
+    freshness: getFreshness("navigation", ts),
+    items: (d?.menuItems || []).map((m: any) => ({ label: m.label, detail: m.href })),
+  }),
+  footer: (d, ts) => ({
+    preview: truncate(d?.tagline || "Footer", 50),
+    status: (d?.columns?.length || 0) > 0 ? "live" : "empty",
+    count: `${d?.columns?.length || 0}`,
+    chatPrompt: "Update my footer",
+    freshness: getFreshness("footer", ts),
+    items: (d?.columns || []).map((c: any) => ({
+      label: c.heading,
+      detail: `${(c.links || []).length} links`,
+    })),
+  }),
   shop: (d, ts) => ({
     preview: (d.items?.length || 0) > 0 ? d.items[0].name : "No shop items",
     status: (d.items?.length || 0) > 0 ? "live" : "empty",

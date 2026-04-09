@@ -45,6 +45,10 @@ const SECTION_TO_TYPE: Record<ContentSection, string> = {
   faq: "faq",
   shop: "shop",
   products: "products",
+  theme: "theme",
+  rewardsConfig: "rewardsConfig",
+  navigation: "navigation",
+  footer: "footer",
 };
 
 /**
@@ -262,6 +266,12 @@ export interface ActivityEntry {
   section?: string;
   actor?: "user" | "ai";
   changes?: { field: string; before: string; after: string }[];
+  /**
+   * Full previous content blob captured at the time of the save.
+   * Used by Phase 14 version history to restore earlier versions.
+   * Stored as a JSON string in Sanity to avoid schema constraints.
+   */
+  snapshot?: unknown;
 }
 
 export async function logActivity(
@@ -278,6 +288,8 @@ export async function logActivity(
       section: entry.section,
       actor: entry.actor,
       changes: entry.changes,
+      snapshot:
+        entry.snapshot === undefined ? undefined : JSON.stringify(entry.snapshot),
     });
     return;
   }
@@ -304,8 +316,18 @@ export async function getActivity(
       query += ` && actor == $actor`;
       params.actor = filters.actor;
     }
-    query += `] | order(time desc)[0...50]{ text, "type": activityType, time, section, actor, changes }`;
-    return getSanityClient().fetch(query, params);
+    query += `] | order(time desc)[0...50]{ text, "type": activityType, time, section, actor, changes, snapshot }`;
+    const raw = await getSanityClient().fetch<Array<ActivityEntry & { snapshot?: string | unknown }>>(query, params);
+    return raw.map((entry) => {
+      if (typeof entry.snapshot === "string") {
+        try {
+          return { ...entry, snapshot: JSON.parse(entry.snapshot) };
+        } catch {
+          return { ...entry, snapshot: undefined };
+        }
+      }
+      return entry;
+    });
   }
 
   const store = await readDevContent(tenant);
@@ -400,11 +422,10 @@ export async function listDrafts(
 // --- Page Config ---
 
 import type { SitePageConfig } from "./types";
-import { DEFAULT_PAGE_CONFIG } from "./pageConfigDefaults";
 
 export async function getPageConfig(
   tenant: string = DEFAULT_TENANT
-): Promise<SitePageConfig> {
+): Promise<SitePageConfig | null> {
   if (hasSanity) {
     const doc = await getSanityReadClient().fetch(
       `*[_type == "pageConfig" && tenant == $tenant][0]`,
@@ -414,11 +435,11 @@ export async function getPageConfig(
       const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...config } = doc;
       return config.pages as SitePageConfig;
     }
-    return DEFAULT_PAGE_CONFIG;
+    return null;
   }
 
   const store = await readDevContent(tenant);
-  return (store.__pageConfig as SitePageConfig) ?? DEFAULT_PAGE_CONFIG;
+  return (store.__pageConfig as SitePageConfig) ?? null;
 }
 
 export async function setPageConfig(

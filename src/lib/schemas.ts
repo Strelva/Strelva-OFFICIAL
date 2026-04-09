@@ -166,6 +166,83 @@ export const siteSettingsSchema = z.object({
   bookingUrl: z.string(),
 });
 
+export const themeSchema = z.object({
+  colors: z.object({
+    cream: z.string(),
+    creamDark: z.string(),
+    creamMid: z.string(),
+    sage: z.string(),
+    sageLight: z.string(),
+    sageDark: z.string(),
+    bark: z.string(),
+    barkLight: z.string(),
+    barkFaded: z.string(),
+    wheat: z.string(),
+    wheatLight: z.string(),
+    terra: z.string(),
+    terraLight: z.string(),
+  }),
+  fontDisplay: z.string(),
+  fontBody: z.string(),
+});
+
+export const rewardsConfigSchema = z.object({
+  starsPerBag: z.number(),
+  starsToRedeem: z.number(),
+  redemptionValue: z.number(),
+  newsletterBonus: z.number(),
+  subscriptionBonus: z.number(),
+  tierThresholdSuper: z.number(),
+});
+
+export const navMenuItemSchema = z.object({
+  label: z.string(),
+  href: z.string(),
+});
+
+export const navigationSchema = z.object({
+  menuItems: z.array(navMenuItemSchema),
+  ctaLabel: z.string(),
+  ctaHref: z.string(),
+});
+
+export const footerColumnLinkSchema = z.object({
+  label: z.string(),
+  href: z.string(),
+});
+
+export const footerColumnSchema = z.object({
+  heading: z.string(),
+  links: z.array(footerColumnLinkSchema),
+});
+
+export const footerSchema = z.object({
+  tagline: z.string(),
+  columns: z.array(footerColumnSchema),
+  socialLinks: z.array(z.object({ label: z.string(), href: z.string() })),
+  copyrightText: z.string(),
+});
+
+export const seoMetaSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  ogImage: z.string().optional(),
+});
+
+export const pageSectionConfigSchema = z.object({
+  type: z.string(),
+  visible: z.boolean(),
+  order: z.number(),
+  props: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const pageConfigSchema = z.object({
+  sections: z.array(pageSectionConfigSchema),
+  seo: seoMetaSchema.optional(),
+});
+
+export const sitePageConfigSchema = z.record(z.string(), pageConfigSchema);
+
 export const sectionSchemas: Record<ContentSection, z.ZodType> = {
   hero: heroSchema,
   services: servicesSchema,
@@ -178,4 +255,8 @@ export const sectionSchemas: Record<ContentSection, z.ZodType> = {
   faq: faqSchema,
   shop: shopSchema,
   products: productsSchema,
+  theme: themeSchema,
+  rewardsConfig: rewardsConfigSchema,
+  navigation: navigationSchema,
+  footer: footerSchema,
 };

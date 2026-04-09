@@ -8,7 +8,7 @@
 
 import { setContent } from "../src/lib/storage";
 import type { ContentMap } from "../src/lib/types";
-import { defaults as rohlaxDefaults, defaultFaq, defaultShop, defaultProducts } from "../src/lib/defaults";
+import { defaults as rohlaxDefaults, defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";
 
 const caroleeDefaults: ContentMap = {
   hero: {
@@ -159,6 +159,10 @@ const caroleeDefaults: ContentMap = {
     items: [],
   },
   products: defaultProducts,
+  theme: defaultTheme,
+  rewardsConfig: defaultRewardsConfig,
+  navigation: defaultNavigation,
+  footer: defaultFooter,
 };
 
 const TENANT_DEFAULTS: Record<string, ContentMap> = {

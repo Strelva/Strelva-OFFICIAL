@@ -124,6 +124,28 @@ const FOOD_BRAND_PAGE_CONFIG: SitePageConfig = {
       { type: "contact", visible: true, order: 8 },
       { type: "email-popup", visible: true, order: 9 },
     ],
+    seo: {
+      title: "Great Lakes Dried Fruit — Orchard Dried Apple Snacks",
+      description:
+        "Small-batch dried apple snacks from Great Lakes orchards. No preservatives, no added sugar — just fruit.",
+      ogImage: "",
+    },
+  },
+  // Worked example so Amy has a second page to experiment with immediately.
+  // Uses only sections GLDF's SectionRenderer already supports.
+  about: {
+    sections: [
+      { type: "story", visible: true, order: 0 },
+      { type: "typographic-break", visible: true, order: 1 },
+      { type: "testimonials", visible: true, order: 2 },
+      { type: "contact", visible: true, order: 3 },
+    ],
+    seo: {
+      title: "About Great Lakes Dried Fruit — Our Orchard Story",
+      description:
+        "How a small Great Lakes family orchard turned into a preservative-free dried fruit brand.",
+      ogImage: "",
+    },
   },
 };
 
@@ -139,5 +161,5 @@ export const foodBrandTemplate: TemplateDefinition = {
   Footer,
   themeVars: THEME_VARS,
   defaultPageConfig: FOOD_BRAND_PAGE_CONFIG,
-  contentSections: ["hero", "story", "products", "testimonials", "contact", "settings"],
+  contentSections: ["hero", "story", "products", "testimonials", "contact", "settings", "theme", "rewardsConfig", "navigation", "footer"],
 };

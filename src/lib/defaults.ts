@@ -10,6 +10,10 @@ import type {
   FaqContent,
   ShopContent,
   ProductsContent,
+  ThemeContent,
+  RewardsConfigContent,
+  NavigationContent,
+  FooterContent,
   ContentMap,
 } from "./types";
 
@@ -369,6 +373,66 @@ export const defaultProducts: ProductsContent = {
   bottomNote: "More flavors coming soon",
 };
 
+export const defaultTheme: ThemeContent = {
+  colors: {
+    cream: "#faf8f5",
+    creamDark: "#f0ece5",
+    creamMid: "#e8e2d8",
+    sage: "#5a260c",
+    sageLight: "#7a3a18",
+    sageDark: "#3d1a08",
+    bark: "#2c2418",
+    barkLight: "#5a4d3e",
+    barkFaded: "#8a7d6e",
+    wheat: "#c8a96e",
+    wheatLight: "#dcc08a",
+    terra: "#b5634b",
+    terraLight: "#c97a64",
+  },
+  fontDisplay: "Fraunces",
+  fontBody: "Inter",
+};
+
+export const defaultRewardsConfig: RewardsConfigContent = {
+  starsPerBag: 100,
+  starsToRedeem: 100,
+  redemptionValue: 5,
+  newsletterBonus: 50,
+  subscriptionBonus: 30,
+  tierThresholdSuper: 500,
+};
+
+export const defaultNavigation: NavigationContent = {
+  menuItems: [
+    { label: "Shop", href: "#products" },
+    { label: "Our Story", href: "#story" },
+    { label: "Why Us", href: "#comparison" },
+    { label: "Contact", href: "#contact" },
+  ],
+  ctaLabel: "",
+  ctaHref: "",
+};
+
+export const defaultFooter: FooterContent = {
+  tagline: "Orchard-dried. Ingredient-honest.",
+  columns: [
+    {
+      heading: "Navigate",
+      links: [
+        { label: "Products", href: "#products" },
+        { label: "Our Story", href: "#story" },
+        { label: "Why Us", href: "#comparison" },
+      ],
+    },
+    {
+      heading: "Connect",
+      links: [],
+    },
+  ],
+  socialLinks: [],
+  copyrightText: "",
+};
+
 export const defaults: ContentMap = {
   hero: defaultHero,
   services: defaultServices,
@@ -381,4 +445,8 @@ export const defaults: ContentMap = {
   faq: defaultFaq,
   shop: defaultShop,
   products: defaultProducts,
+  theme: defaultTheme,
+  rewardsConfig: defaultRewardsConfig,
+  navigation: defaultNavigation,
+  footer: defaultFooter,
 };

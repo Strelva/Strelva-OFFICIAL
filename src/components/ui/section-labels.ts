@@ -16,6 +16,10 @@ import {
   Bell,
   Megaphone,
   HelpCircle,
+  Palette,
+  Gift,
+  Menu,
+  PanelBottom,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,16 +28,16 @@ import {
  * Customer-friendly language — not developer names.
  */
 export const SECTION_LABELS: Record<string, string> = {
-  hero: "Homepage Banner",
-  services: "Your Services",
-  story: "Your Story",
-  testimonials: "Client Reviews",
-  events: "Events & Classes",
-  providers: "Recommended Providers",
-  contact: "Contact Info",
+  hero: "First Impression",
+  services: "What You Offer",
+  story: "About You",
+  testimonials: "What Customers Say",
+  events: "Upcoming Events",
+  providers: "Your Network",
+  contact: "How to Reach You",
   settings: "Site Settings",
   faq: "Common Questions",
-  shop: "Shop",
+  shop: "Your Shop",
   "trust-strip": "Trust Strip",
   "testimonial-quote": "Featured Quote",
   cta: "Call to Action",
@@ -41,12 +45,16 @@ export const SECTION_LABELS: Record<string, string> = {
   "booking-widget": "Booking Widget",
   "instagram-feed": "Instagram Feed",
   "vagaro-booking": "Vagaro Booking",
-  products: "Products",
-  comparison: "Comparison",
+  products: "Your Products",
+  comparison: "Why You're Different",
   notify: "Email Signup",
   "email-popup": "Email Popup",
   "typographic-break": "Divider",
   newsletter: "Newsletter",
+  theme: "Brand Theme",
+  rewardsConfig: "Rewards",
+  navigation: "Navigation",
+  footer: "Footer",
 };
 
 /**
@@ -76,6 +84,10 @@ export const SECTION_ICONS: Record<string, LucideIcon> = {
   "email-popup": Mail,
   "typographic-break": Type,
   newsletter: Megaphone,
+  theme: Palette,
+  rewardsConfig: Gift,
+  navigation: Menu,
+  footer: PanelBottom,
 };
 
 /**

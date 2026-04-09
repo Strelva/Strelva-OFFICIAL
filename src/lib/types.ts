@@ -170,6 +170,63 @@ export interface ProductsContent {
   bottomNote: string;
 }
 
+export interface RewardsConfigContent {
+  starsPerBag: number;
+  starsToRedeem: number;
+  redemptionValue: number;
+  newsletterBonus: number;
+  subscriptionBonus: number;
+  tierThresholdSuper: number;
+}
+
+export interface NavMenuItem {
+  label: string;
+  href: string;
+}
+
+export interface NavigationContent {
+  menuItems: NavMenuItem[];
+  ctaLabel: string;
+  ctaHref: string;
+}
+
+export interface FooterColumnLink {
+  label: string;
+  href: string;
+}
+
+export interface FooterColumn {
+  heading: string;
+  links: FooterColumnLink[];
+}
+
+export interface FooterContent {
+  tagline: string;
+  columns: FooterColumn[];
+  socialLinks: { label: string; href: string }[];
+  copyrightText: string;
+}
+
+export interface ThemeContent {
+  colors: {
+    cream: string;
+    creamDark: string;
+    creamMid: string;
+    sage: string;
+    sageLight: string;
+    sageDark: string;
+    bark: string;
+    barkLight: string;
+    barkFaded: string;
+    wheat: string;
+    wheatLight: string;
+    terra: string;
+    terraLight: string;
+  };
+  fontDisplay: string;
+  fontBody: string;
+}
+
 export type ContentSection =
   | "hero"
   | "services"
@@ -181,7 +238,11 @@ export type ContentSection =
   | "settings"
   | "faq"
   | "shop"
-  | "products";
+  | "products"
+  | "theme"
+  | "rewardsConfig"
+  | "navigation"
+  | "footer";
 
 export type ContentMap = {
   hero: HeroContent;
@@ -195,6 +256,10 @@ export type ContentMap = {
   faq: FaqContent;
   shop: ShopContent;
   products: ProductsContent;
+  theme: ThemeContent;
+  rewardsConfig: RewardsConfigContent;
+  navigation: NavigationContent;
+  footer: FooterContent;
 };
 
 // --- Page Config Types ---
@@ -206,8 +271,15 @@ export interface PageSectionConfig {
   props?: Record<string, unknown>;
 }
 
+export interface SeoMeta {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
 export interface PageConfig {
   sections: PageSectionConfig[];
+  seo?: SeoMeta;
 }
 
 export type SitePageConfig = Record<string, PageConfig>;

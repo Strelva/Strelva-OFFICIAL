@@ -171,6 +171,7 @@ export async function PUT(
       section: s,
       actor: "user",
       changes,
+      snapshot: current,
     }, tenant);
 
     await clearDraft(s, tenant).catch(() => {});
