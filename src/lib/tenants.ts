@@ -105,6 +105,74 @@ export async function createTenant(
   return tenant;
 }
 
+// In-memory map of when a domain was added to a tenant, keyed "tenantId:domain".
+// Used by the dashboard to show "Pending DNS" for domains added in the last 5 minutes.
+// Intentionally not persisted — on restart, all domains revert to "Connected".
+const _domainAddedAt = new Map<string, number>();
+
+export function markDomainAdded(tenantId: string, domain: string): void {
+  _domainAddedAt.set(`${tenantId}:${domain}`, Date.now());
+}
+
+export function getDomainAddedAt(tenantId: string, domain: string): number | undefined {
+  return _domainAddedAt.get(`${tenantId}:${domain}`);
+}
+
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i;
+
+export function isValidDomain(domain: string): boolean {
+  if (typeof domain !== "string") return false;
+  return DOMAIN_REGEX.test(domain.trim());
+}
+
+export async function addCustomDomain(tenantId: string, domain: string): Promise<
+  | { ok: true; tenant: TenantConfig }
+  | { ok: false; status: 400 | 404 | 409; error: string }
+> {
+  const normalized = domain.trim().toLowerCase();
+  if (!isValidDomain(normalized)) {
+    return { ok: false, status: 400, error: "Invalid domain format" };
+  }
+  const tenant = await getTenantConfig(tenantId);
+  if (!tenant) return { ok: false, status: 404, error: "Tenant not found" };
+
+  const current = tenant.customDomains ?? [];
+  if (current.includes(normalized)) {
+    return { ok: false, status: 409, error: "Domain already connected" };
+  }
+  const next = [...current, normalized];
+  const updated = await updateTenant(tenantId, { customDomains: next });
+  if (!updated) return { ok: false, status: 404, error: "Tenant not found" };
+  markDomainAdded(tenantId, normalized);
+  return { ok: true, tenant: updated };
+}
+
+export async function removeCustomDomain(tenantId: string, domain: string): Promise<
+  | { ok: true; tenant: TenantConfig }
+  | { ok: false; status: 404 | 422; error: string }
+> {
+  const normalized = domain.trim().toLowerCase();
+  const tenant = await getTenantConfig(tenantId);
+  if (!tenant) return { ok: false, status: 404, error: "Tenant not found" };
+
+  const current = tenant.customDomains ?? [];
+  if (!current.includes(normalized)) {
+    return { ok: false, status: 404, error: "Domain not found on tenant" };
+  }
+  if (current.length <= 1) {
+    return {
+      ok: false,
+      status: 422,
+      error: "Cannot remove the last domain — tenants need at least one way to be reachable",
+    };
+  }
+  const next = current.filter((d) => d !== normalized);
+  const updated = await updateTenant(tenantId, { customDomains: next });
+  if (!updated) return { ok: false, status: 404, error: "Tenant not found" };
+  _domainAddedAt.delete(`${tenantId}:${normalized}`);
+  return { ok: true, tenant: updated };
+}
+
 export async function updateTenant(
   id: string,
   updates: Partial<TenantConfig>

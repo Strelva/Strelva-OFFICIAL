@@ -36,6 +36,10 @@ function extractTenant(request: NextRequest): string {
   const paramTenant = request.nextUrl.searchParams.get("tenant");
   if (paramTenant) return paramTenant;
 
+  // Check cookie for tenant (set when ?tenant= param is used)
+  const cookieTenant = request.cookies.get("reb-tenant")?.value;
+  if (cookieTenant) return cookieTenant;
+
   const host = (request.headers.get("host") || "").split(":")[0];
 
   if (CUSTOM_DOMAINS[host]) return CUSTOM_DOMAINS[host];
@@ -60,13 +64,13 @@ function isMarketingDomain(request: NextRequest): boolean {
 // SMS webhook uses Twilio signature verification, not Clerk
 const isCronRoute = createRouteMatcher(["/api/cron(.*)", "/api/sms/webhook"]);
 
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || "https://rohlax-wellness.vercel.app,https://rohlaxwellness.com,http://localhost:3001").split(",").map(d => d.trim());
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || "https://rohlax-wellness.vercel.app,https://rohlaxwellness.com,https://greatlakesdriedfruit.com,https://www.greatlakesdriedfruit.com,http://localhost:3001").split(",").map(d => d.trim());
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (origin && CORS_ORIGINS.includes(origin)) {
     return {
       "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
   }
@@ -143,6 +147,12 @@ export default clerkMiddleware(async (auth, request) => {
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+
+  // Persist tenant to cookie when explicitly set via ?tenant= param
+  const paramTenant = request.nextUrl.searchParams.get("tenant");
+  if (paramTenant) {
+    response.cookies.set("reb-tenant", paramTenant, { path: "/", httpOnly: true, sameSite: "lax" });
+  }
 
   // Add CORS headers to public API responses
   const cors = corsHeaders(origin);

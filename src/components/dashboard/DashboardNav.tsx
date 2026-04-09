@@ -11,6 +11,9 @@ import {
   MessageCircle,
   MoreHorizontal,
   ImageIcon,
+  Mail,
+  Star,
+  Globe,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -20,18 +23,37 @@ interface DashboardNavProps {
   siteUrl?: string;
 }
 
-const NAV_ITEMS = [
-  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Content", href: "/dashboard/content", icon: FileStack },
+type NavItem = {
+  label: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  templates?: string[]; // if set, only show for these templates
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Your Site", href: "/dashboard/content", icon: FileStack },
   { label: "Photos", href: "/dashboard/photos", icon: ImageIcon },
+  { label: "Subscribers", href: "/dashboard/subscribers", icon: Mail },
+  {
+    label: "Rewards",
+    href: "/dashboard/rewards",
+    icon: Star,
+    templates: ["food-brand"],
+  },
+  { label: "Domains", href: "/dashboard/domains", icon: Globe },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { editMode, setEditMode, setChatDrawerOpen, setActivePanel } = useDashboard();
+  const { editMode, setEditMode, setChatDrawerOpen, setActivePanel, template } = useDashboard();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.templates || item.templates.includes(template)
+  );
 
   // Close More menu on Escape
   useEffect(() => {
@@ -43,11 +65,11 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
     return () => document.removeEventListener("keydown", handler);
   }, [moreOpen]);
 
-  const handleNavClick = (item: (typeof NAV_ITEMS)[number]) => {
+  const handleNavClick = (item: NavItem) => {
     router.push(item.href);
   };
 
-  const isActive = (item: (typeof NAV_ITEMS)[number]) => {
+  const isActive = (item: NavItem) => {
     if (item.href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(item.href);
   };
@@ -55,7 +77,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
   return (
     <>
       {/* Desktop nav (lg+) */}
-      <nav className="hidden lg:flex items-center h-12 border-b border-gray-border bg-white shrink-0 px-4">
+      <nav className="hidden lg:flex items-center h-12 border-b border-gray-border bg-surface shrink-0 px-4">
         {/* Left: site name + status dot + toggle */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -64,7 +86,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 editMode === "draft" ? "bg-amber-400" : "bg-emerald-500"
               }`}
             />
-            <span className="font-mono text-[11px] text-gray-muted">{siteName}</span>
+            <span className="font-mono text-[13px] text-gray-muted">{siteName}</span>
           </div>
 
           <button
@@ -103,14 +125,14 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
 
         {/* Center: nav items */}
         <div className="flex items-center gap-1 mx-auto">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = isActive(item);
             return (
               <button
                 key={item.label}
                 onClick={() => handleNavClick(item)}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-1.5 px-3 h-12 text-[11px] font-medium transition-colors duration-150 border-b-2 ${
+                className={`flex items-center gap-1.5 px-3 h-12 text-[13px] font-medium transition-colors duration-150 border-b-2 ${
                   active
                     ? "text-sage border-b-sage"
                     : "text-gray-muted border-b-transparent hover:text-warm-black"
@@ -125,22 +147,24 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
 
         {/* Right: external links */}
         <div className="flex items-center gap-1">
-          <a
-            href={bookingUrl || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Manage bookings on Vagaro"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
-          >
-            <CalendarDays className="w-4 h-4" strokeWidth={1.5} />
-            Bookings
-          </a>
+          {bookingUrl && (
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Manage bookings"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+            >
+              <CalendarDays className="w-4 h-4" strokeWidth={1.5} />
+              Bookings
+            </a>
+          )}
           <a
             href={siteUrl || "/"}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open site in new tab"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
           >
             <ExternalLink className="w-4 h-4" strokeWidth={1.5} />
             Open Site
@@ -155,20 +179,54 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
           <>
             <div className="fixed inset-0 bottom-14 z-40" onClick={() => setMoreOpen(false)} />
             <div className="absolute bottom-full right-2 mb-2 z-50 bg-white border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up">
-              <a
-                href={bookingUrl || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
-                onClick={() => setMoreOpen(false)}
-              >
-                <CalendarDays className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Bookings
-                <ExternalLink className="w-3 h-3 text-gray-subtle ml-auto" strokeWidth={1.5} />
-              </a>
+              {bookingUrl && (
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <CalendarDays className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                  Bookings
+                  <ExternalLink className="w-3 h-3 text-gray-subtle ml-auto" strokeWidth={1.5} />
+                </a>
+              )}
               <button
                 onClick={() => {
-                  handleNavClick(NAV_ITEMS[3]); // Settings
+                  router.push("/dashboard/subscribers");
+                  setMoreOpen(false);
+                }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+              >
+                <Mail className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                Subscribers
+              </button>
+              {template === "food-brand" && (
+                <button
+                  onClick={() => {
+                    router.push("/dashboard/rewards");
+                    setMoreOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                >
+                  <Star className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                  Rewards
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  router.push("/dashboard/domains");
+                  setMoreOpen(false);
+                }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+              >
+                <Globe className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                Domains
+              </button>
+              <button
+                onClick={() => {
+                  router.push("/dashboard/settings");
                   setMoreOpen(false);
                 }}
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
@@ -191,7 +249,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
         )}
 
         {/* Tab bar */}
-        <div className="flex items-center border-t border-gray-border bg-white h-14">
+        <div className="flex items-center border-t border-gray-border bg-surface h-14">
           {/* Home */}
           <button
             onClick={() => handleNavClick(NAV_ITEMS[0])}
@@ -204,7 +262,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
             )}
             <LayoutDashboard className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Home</span>
+            <span className="text-[12px] font-medium">Overview</span>
           </button>
 
           {/* Content */}
@@ -219,7 +277,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
             )}
             <FileStack className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Content</span>
+            <span className="text-[12px] font-medium">Your Site</span>
           </button>
 
           {/* Photos */}
@@ -234,7 +292,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
             )}
             <ImageIcon className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Photos</span>
+            <span className="text-[12px] font-medium">Photos</span>
           </button>
 
           {/* More */}
@@ -246,7 +304,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
             }`}
           >
             <MoreHorizontal className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">More</span>
+            <span className="text-[12px] font-medium">More</span>
           </button>
         </div>
       </nav>

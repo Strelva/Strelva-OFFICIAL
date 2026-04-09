@@ -29,7 +29,8 @@
     "template": "food-brand",
     "features": ["commerce", "newsletter"],
     "customDomains": ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
-    "subscriptionStatus": "none",
+    "subscriptionStatus": "active",
+    "tier": "scale",
     "siteUrl": "https://greatlakesdriedfruit.com",
     "ownerEmail": "greatlakesdriedfruit@gmail.com",
     "resendDomain": "updates.greatlakesdriedfruit.com"
