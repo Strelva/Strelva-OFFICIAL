@@ -73,7 +73,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   const pageSource = pageConfig ?? DEFAULT_PAGE_CONFIG;
   const PAGE_OPTIONS = Object.keys(pageSource)
     .sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b)))
-    .map((id) => ({ id, label: pageLabelMap.get(id) ?? id }));
+    .map((id) => ({ id, label: pageLabelMap.get(id) ?? id.charAt(0).toUpperCase() + id.slice(1) }));
 
   useEffect(() => {
     fetch("/api/page-config", { credentials: "same-origin" })
@@ -196,7 +196,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
       <div className="flex flex-col items-center py-3 gap-1 bg-surface">
         <button
           onClick={toggleLeft}
-          className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
           title="Expand content panel"
         >
           <PanelLeftOpen className="w-4 h-4" strokeWidth={1.5} />
@@ -210,9 +210,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
             <button
               key={section.type}
               onClick={() => { toggleLeft(); setActiveSection(section.type); }}
-              className={`relative w-8 h-8 rounded-md flex items-center justify-center transition-colors duration-150 ${
+              className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-150 ${
                 isActive
-                  ? "text-sage bg-sage/[0.06]"
+                  ? "text-sage bg-gray-bg"
                   : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
               }`}
               title={SECTION_LABELS[section.type] || section.type}
@@ -237,7 +237,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
       {/* Header — page selector as pill tabs */}
       <div className="border-b border-gray-border shrink-0">
         <div className="flex items-center justify-between px-3 h-10">
-          <span className="text-[12px] font-medium uppercase tracking-wider text-gray-muted">
+          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">
             Pages
           </span>
           <div className="flex items-center gap-1">
@@ -249,7 +249,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
             )}
             <button
               onClick={toggleLeft}
-              className="hidden md:flex w-6 h-6 rounded-md items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
+              className="hidden md:flex w-6 h-6 rounded-full items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
               title="Collapse panel"
             >
               <PanelLeftClose className="w-[14px] h-[14px]" strokeWidth={1.5} />
@@ -288,7 +288,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                 {/* Row */}
                 <div className={`flex items-center h-10 transition-colors duration-150 ${
                   isExpanded
-                    ? "bg-sage/[0.06]"
+                    ? "bg-gray-bg"
                     : "hover:bg-gray-bg"
                 }`}>
                   {/* Grip + reorder */}
@@ -349,7 +349,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                   {/* Visibility toggle */}
                   <button
                     onClick={() => handleToggleVisibility(i)}
-                    className="w-7 h-7 flex items-center justify-center text-gray-subtle hover:text-gray-muted transition-colors shrink-0 rounded-md hover:bg-gray-bg"
+                    className="w-7 h-7 flex items-center justify-center text-gray-subtle hover:text-gray-muted transition-colors shrink-0 rounded-full hover:bg-gray-bg"
                     title={isHidden ? "Show section" : "Hide section"}
                   >
                     {isHidden ? (
@@ -405,7 +405,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); setChatPrompt(data.chatPrompt); }}
-                          className="text-[11px] text-sage hover:bg-sage/[0.06]"
+                          className="text-[11px] text-sage hover:bg-gray-bg-hover"
                         >
                           Edit
                         </Button>
@@ -413,7 +413,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); setScrollToSection(section.type); }}
-                          className="text-[11px] text-sage hover:bg-sage/[0.06]"
+                          className="text-[11px] text-sage hover:bg-gray-bg-hover"
                         >
                           View
                         </Button>
@@ -437,9 +437,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         {/* Add Section */}
         <div className="px-3 pb-3">
           {showAddMenu ? (
-            <div className="border border-gray-border rounded-lg bg-surface-raised overflow-hidden animate-fade-in-up shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="border border-gray-border rounded-xl bg-surface-raised overflow-hidden animate-fade-in-up shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-gray-border bg-gray-bg-alt">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-muted">Add Section</span>
+                <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Add Section</span>
                 <button
                   onClick={() => setShowAddMenu(false)}
                   className="text-[11px] text-gray-muted hover:text-warm-black transition-colors"
@@ -461,7 +461,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                         <button
                           key={type}
                           onClick={() => handleAddSection(type)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-sage/[0.06] transition-colors text-left rounded-md mx-1 cursor-pointer group/add"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-bg-hover transition-colors text-left rounded-full mx-1 cursor-pointer group/add"
                           style={{ width: "calc(100% - 8px)" }}
                         >
                           <Icon className="w-[14px] h-[14px] text-gray-fg group-hover/add:text-sage transition-colors" strokeWidth={1.5} />
@@ -505,7 +505,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               size="sm"
               onClick={() => setShowAddMenu(true)}
               icon={<Plus className="w-3.5 h-3.5" strokeWidth={1.5} />}
-              className="w-full justify-center border border-sage/30 md:border-dashed text-sage hover:bg-sage/[0.04] hover:border-sage/40"
+              className="w-full justify-center border border-gray-border md:border-dashed text-gray-muted hover:text-white hover:bg-gray-bg hover:border-gray-faint"
             >
               Add section
             </Button>

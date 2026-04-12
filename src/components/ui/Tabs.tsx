@@ -30,9 +30,9 @@ function UnderlineTabs({ items, value, onChange, className }: TabsProps) {
           aria-selected={value === item.value}
           onClick={() => onChange(item.value)}
           className={cn(
-            "flex items-center gap-1.5 h-full px-4 text-[11px] font-medium transition-colors duration-150 border-b-2",
+            "flex items-center gap-1.5 h-full px-4 text-[11px] font-medium tracking-[-0.01em] transition-colors duration-150 border-b-2",
             value === item.value
-              ? "text-warm-black border-b-sage"
+              ? "text-warm-black border-b-warm-black"
               : "text-gray-muted border-b-transparent hover:text-gray-fg",
           )}
         >
@@ -55,10 +55,10 @@ function PillTabs({ items, value, onChange, className }: TabsProps) {
           aria-selected={value === item.value}
           onClick={() => onChange(item.value)}
           className={cn(
-            "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-150",
+            "px-3 py-1 rounded-full text-[11px] font-medium tracking-[-0.01em] transition-all duration-150",
             value === item.value
-              ? "bg-sage text-white"
-              : "bg-gray-bg text-gray-muted hover:text-warm-black hover:bg-gray-border",
+              ? "bg-white text-black"
+              : "bg-gray-bg text-gray-muted hover:text-warm-black hover:bg-gray-bg-hover",
           )}
         >
           {item.label}
@@ -73,7 +73,7 @@ function SegmentTabs({ items, value, onChange, className }: TabsProps) {
   return (
     <div
       role="tablist"
-      className={cn("flex gap-0.5 bg-gray-bg border border-gray-border rounded-md p-0.5 w-fit", className)}
+      className={cn("flex gap-0.5 bg-gray-bg border border-gray-border rounded-full p-0.5 w-fit", className)}
     >
       {items.map((item) => (
         <button
@@ -82,9 +82,9 @@ function SegmentTabs({ items, value, onChange, className }: TabsProps) {
           aria-selected={value === item.value}
           onClick={() => onChange(item.value)}
           className={cn(
-            "px-3 py-1.5 text-[11px] font-medium rounded transition-colors duration-150",
+            "px-3.5 py-1.5 text-[11px] font-medium tracking-[-0.01em] rounded-full transition-colors duration-150",
             value === item.value
-              ? "bg-surface text-warm-black shadow-sm"
+              ? "bg-surface-raised text-warm-black shadow-sm"
               : "text-gray-muted hover:text-gray-fg",
           )}
         >

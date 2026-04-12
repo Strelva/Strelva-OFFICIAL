@@ -112,7 +112,7 @@ export function HubPage({
   }, []);
 
   return (
-    <div ref={containerRef} className="p-5 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
+    <div ref={containerRef} className="p-6 md:p-10 lg:p-16 w-full max-w-5xl mx-auto h-full overflow-y-auto">
       {isInvited ? (
         <ExistingClientWelcome
           ownerName={ownerName}
@@ -124,13 +124,13 @@ export function HubPage({
         <WelcomeBanner siteName={siteName} />
       )}
       {/* Headline */}
-      <div data-ov="headline" className="mb-4">
-        <h1 className="text-[24px] font-semibold tracking-tight text-warm-black" suppressHydrationWarning>
+      <div data-ov="headline" className="mb-8">
+        <h1 className="text-[32px] md:text-[40px] font-normal tracking-[-0.03em] leading-[1.1] text-warm-black" suppressHydrationWarning>
           {pageViews.thisWeek > 0
             ? `${pageViews.thisWeek} people found you this week`
             : `${getGreeting()}, ${ownerName}`}
         </h1>
-        <p className="text-[13px] text-gray-muted mt-1.5">
+        <p className="text-[14px] font-light tracking-[-0.01em] text-gray-muted mt-3">
           {pageViews.thisWeek > 0
             ? `${bookingClicks.thisWeek} ${vocab.action}`
             : "Your site is live. Here\u2019s what\u2019s happening."}
@@ -138,39 +138,39 @@ export function HubPage({
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[12px] font-medium tracking-wider text-gray-muted">People who found you</span>
-          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        <Card variant="interactive" data-ov="metric" padding="lg" className="h-full">
+          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">People who found you</span>
+          <p className="text-[40px] font-light tracking-[-0.03em] tabular-nums text-warm-black mt-3 leading-none">
             {pageViews.total > 0 ? pageViews.total : "\u2014"}
           </p>
-          <p className="text-[11px] font-mono text-gray-faint mt-0.5">
+          <p className="text-[12px] text-gray-faint mt-2 tracking-[-0.01em]">
             {pageViews.total > 0 ? `${pageViews.thisWeek} this week` : "Share your link to start tracking"}
           </p>
         </Card>
-        <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[12px] font-medium tracking-wider text-gray-muted">Clicked to shop</span>
-          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
+        <Card variant="interactive" data-ov="metric" padding="lg" className="h-full">
+          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">{vocab.metric}</span>
+          <p className="text-[40px] font-light tracking-[-0.03em] tabular-nums text-warm-black mt-3 leading-none">
             {bookingClicks.total > 0 ? bookingClicks.total : "\u2014"}
           </p>
-          <p className="text-[11px] font-mono text-gray-faint mt-0.5">
+          <p className="text-[12px] text-gray-faint mt-2 tracking-[-0.01em]">
             {bookingClicks.total > 0 ? `${bookingClicks.thisWeek} this week` : vocab.zeroHint}
           </p>
         </Card>
-        <Card variant="interactive" data-ov="metric" className="h-full">
-          <span className="text-[12px] font-medium tracking-wider text-gray-muted">Site readiness</span>
-          <p className="text-[32px] font-semibold font-display tabular-nums text-warm-black mt-2">
+        <Card variant="interactive" data-ov="metric" padding="lg" className="h-full">
+          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Site readiness</span>
+          <p className="text-[40px] font-light tracking-[-0.03em] tabular-nums text-warm-black mt-3 leading-none">
             {siteScore.score}%
           </p>
-          <p className="text-[11px] font-mono text-gray-faint mt-0.5">
+          <p className="text-[12px] text-gray-faint mt-2 tracking-[-0.01em]">
             {siteScore.items.filter(i => i.done).length} of {siteScore.items.length} sections
           </p>
-          <div className="mt-2 h-[3px] bg-gray-bg rounded-full overflow-hidden">
+          <div className="mt-3 h-[2px] bg-gray-bg rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${siteScore.score}%`,
-                background: siteScore.score === 100 ? "#10b981" : "#7c9a8e",
+                background: siteScore.score === 100 ? "#10b981" : "#ffffff",
               }}
             />
           </div>
@@ -182,18 +182,18 @@ export function HubPage({
 
       {/* Static fallback suggestions */}
       {suggestions.length === 1 && (
-        <div data-ov="suggestions" className="flex items-center gap-2.5 text-[12px] text-warm-black bg-sage/[0.06] rounded-lg px-4 py-2.5 mb-5">
-          <div className="w-1 h-1 rounded-full bg-sage shrink-0" />
+        <div data-ov="suggestions" className="flex items-center gap-2.5 text-[12px] tracking-[-0.01em] text-gray-fg bg-gray-bg rounded-xl px-4 py-3 mb-8">
+          <div className="w-1 h-1 rounded-full bg-white shrink-0" />
           <span className="flex-1">{suggestions[0]}</span>
         </div>
       )}
       {suggestions.length > 1 && (
-        <Card padding="none" className="bg-sage/[0.06] border-sage/[0.12] px-4 py-3 mb-5">
-          <h2 className="text-[11px] font-medium tracking-wider text-sage mb-2">Tips</h2>
-          <div className="space-y-1.5">
+        <Card padding="none" className="bg-gray-bg border-gray-border rounded-xl px-5 py-4 mb-8">
+          <h2 className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted mb-3">Tips</h2>
+          <div className="space-y-2">
             {suggestions.map((s, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-[12px] text-warm-black">
-                <div className="w-1 h-1 rounded-full bg-sage shrink-0" />
+              <div key={i} className="flex items-center gap-2.5 text-[12px] tracking-[-0.01em] text-gray-fg">
+                <div className="w-1 h-1 rounded-full bg-white shrink-0" />
                 <span className="flex-1">{s}</span>
               </div>
             ))}
@@ -202,25 +202,25 @@ export function HubPage({
       )}
 
       {/* Site sections visual map */}
-      <div data-ov="sitemap" className="bg-surface border border-gray-border rounded-lg p-4 mb-8 reb-card-glow">
-        <h3 className="text-[11px] font-medium tracking-wider text-gray-muted mb-3">Your site</h3>
+      <div data-ov="sitemap" className="bg-surface border border-gray-border rounded-xl p-5 mb-10 reb-card-glow">
+        <h3 className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted mb-4">Your site</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {Object.entries(sectionData).map(([key, data]) => (
             <div
               key={key}
               data-ov="icon"
-              className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg bg-surface-raised border border-transparent hover:border-sage/20 transition-colors"
+              className="flex flex-col items-center gap-2 px-3 py-3 rounded-xl bg-surface-raised border border-transparent hover:border-gray-border transition-colors"
             >
               {(() => {
                 const Icon = SECTION_ICONS[key];
                 const isActive = data.status === "live" || data.status === "configured";
                 return Icon ? (
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-sage" : "text-gray-subtle"}`} strokeWidth={1.5} />
+                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-gray-subtle"}`} strokeWidth={1.5} />
                 ) : (
-                  <div className={`w-2 h-2 rounded-full ${isActive ? "bg-sage" : "bg-gray-border"}`} />
+                  <div className={`w-2 h-2 rounded-full ${isActive ? "bg-white" : "bg-gray-border"}`} />
                 );
               })()}
-              <span className="text-[11px] font-medium text-gray-muted text-center leading-tight">
+              <span className="text-[11px] font-medium tracking-[-0.01em] text-gray-muted text-center leading-tight">
                 {SECTION_LABELS[key] || key}
               </span>
             </div>
@@ -228,8 +228,8 @@ export function HubPage({
         </div>
       </div>
 
-      {/* Activity timeline (client component with filtering) */}
-      <div data-ov="activity" className="bg-surface border border-gray-border rounded-lg p-4 reb-card-glow">
+      {/* Activity timeline */}
+      <div data-ov="activity" className="bg-surface border border-gray-border rounded-xl p-5 reb-card-glow">
         <ActivityTimeline />
       </div>
     </div>

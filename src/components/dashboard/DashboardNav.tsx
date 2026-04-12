@@ -8,7 +8,6 @@ import {
   CalendarDays,
   Settings,
   ExternalLink,
-  MessageCircle,
   MoreHorizontal,
   ImageIcon,
   Mail,
@@ -31,8 +30,8 @@ type NavItem = {
   label: string;
   href: string;
   icon: typeof LayoutDashboard;
-  templates?: string[]; // if set, only show for these templates
-  tiers?: SubscriptionTier[]; // if set, only show for these subscription tiers
+  templates?: string[];
+  tiers?: SubscriptionTier[];
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -41,12 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Photos", href: "/dashboard/photos", icon: ImageIcon },
   { label: "Subscribers", href: "/dashboard/subscribers", icon: Mail },
   { label: "Reviews", href: "/dashboard/reviews", icon: MessageSquareText, tiers: ["growth", "scale"] },
-  {
-    label: "Rewards",
-    href: "/dashboard/rewards",
-    icon: Star,
-    templates: ["food-brand"],
-  },
+  { label: "Rewards", href: "/dashboard/rewards", icon: Star, templates: ["food-brand"] },
   { label: "Social", href: "/dashboard/social", icon: Share2, tiers: ["scale"] },
   { label: "Domains", href: "/dashboard/domains", icon: Globe },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
@@ -55,7 +49,7 @@ const NAV_ITEMS: NavItem[] = [
 export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { editMode, setEditMode, setChatDrawerOpen, setActivePanel, template } = useDashboard();
+  const { editMode, setEditMode, template } = useDashboard();
   const { tier } = useCapabilities();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -65,7 +59,6 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
       (!item.tiers || item.tiers.includes(tier))
   );
 
-  // Close More menu on Escape
   useEffect(() => {
     if (!moreOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -87,45 +80,38 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
   return (
     <>
       {/* Desktop nav (lg+) */}
-      <nav className="hidden lg:flex items-center h-12 border-b border-gray-border bg-surface shrink-0 px-4">
-        {/* Left: site name + status dot + toggle */}
+      <nav className="hidden lg:flex items-center h-12 border-b border-gray-border bg-surface shrink-0 px-5">
+        {/* Left: site name + mode toggle */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-[5px] h-[5px] rounded-full transition-colors ${
-                editMode === "draft" ? "bg-amber-400" : "bg-emerald-500"
-              }`}
-            />
-            <span className="font-mono text-[13px] text-gray-muted">{siteName}</span>
-          </div>
+          <span className="text-[12px] font-mono uppercase tracking-[0.06em] text-gray-muted">{siteName}</span>
 
           <button
             type="button"
             onClick={() => setEditMode(editMode === "live" ? "draft" : "live")}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-bg hover:bg-gray-border transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-border hover:border-gray-faint transition-colors"
             title={editMode === "live" ? "Switch to draft mode" : "Switch to live mode"}
           >
             <span
-              className={`text-[11px] font-medium uppercase tracking-wider transition-colors ${
-                editMode === "live" ? "text-emerald-600" : "text-gray-subtle"
+              className={`text-[10px] font-mono uppercase tracking-[0.06em] transition-colors ${
+                editMode === "live" ? "text-emerald-400" : "text-gray-muted"
               }`}
             >
               Live
             </span>
             <div
               className={`relative w-6 h-3.5 rounded-full transition-colors ${
-                editMode === "draft" ? "bg-amber-400" : "bg-emerald-500"
+                editMode === "draft" ? "bg-gray-faint" : "bg-emerald-500"
               }`}
             >
               <div
-                className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-transform ${
+                className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform ${
                   editMode === "draft" ? "left-[13px]" : "left-[1px]"
                 }`}
               />
             </div>
             <span
-              className={`text-[11px] font-medium uppercase tracking-wider transition-colors ${
-                editMode === "draft" ? "text-amber-600" : "text-gray-subtle"
+              className={`text-[10px] font-mono uppercase tracking-[0.06em] transition-colors ${
+                editMode === "draft" ? "text-white" : "text-gray-muted"
               }`}
             >
               Draft
@@ -133,8 +119,8 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
           </button>
         </div>
 
-        {/* Center: nav items */}
-        <div className="flex items-center gap-1 mx-auto">
+        {/* Center: nav pills */}
+        <div className="flex items-center gap-0.5 mx-auto bg-gray-bg rounded-full p-0.5">
           {visibleNavItems.map((item) => {
             const active = isActive(item);
             return (
@@ -142,13 +128,13 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 key={item.label}
                 onClick={() => handleNavClick(item)}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-1.5 px-3 h-12 text-[13px] font-medium transition-colors duration-150 border-b-2 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium tracking-[-0.01em] transition-all duration-150 ${
                   active
-                    ? "text-sage border-b-sage"
-                    : "text-gray-muted border-b-transparent hover:text-warm-black"
+                    ? "bg-surface-raised text-white shadow-sm"
+                    : "text-gray-muted hover:text-white"
                 }`}
               >
-                <item.icon className="w-4 h-4" strokeWidth={1.5} />
+                <item.icon className="w-3.5 h-3.5" strokeWidth={1.5} />
                 {item.label}
               </button>
             );
@@ -163,9 +149,9 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Manage bookings"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium text-gray-muted hover:text-white transition-colors duration-150"
             >
-              <CalendarDays className="w-4 h-4" strokeWidth={1.5} />
+              <CalendarDays className="w-3.5 h-3.5" strokeWidth={1.5} />
               Bookings
             </a>
           )}
@@ -174,10 +160,9 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open site in new tab"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-medium text-gray-muted hover:text-warm-black transition-colors duration-150"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-gray-muted hover:text-white hover:bg-gray-bg transition-colors duration-150"
           >
-            <ExternalLink className="w-4 h-4" strokeWidth={1.5} />
-            Open Site
+            <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.5} />
           </a>
         </div>
       </nav>
@@ -188,13 +173,13 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
         {moreOpen && (
           <>
             <div className="fixed inset-0 bottom-14 z-40" onClick={() => setMoreOpen(false)} />
-            <div className="absolute bottom-full right-2 mb-2 z-50 bg-surface-raised border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up">
+            <div className="absolute bottom-full right-2 mb-2 z-50 bg-surface-raised border border-gray-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in-up">
               {bookingUrl && (
                 <a
                   href={bookingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
                   onClick={() => setMoreOpen(false)}
                 >
                   <CalendarDays className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
@@ -203,22 +188,16 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 </a>
               )}
               <button
-                onClick={() => {
-                  router.push("/dashboard/subscribers");
-                  setMoreOpen(false);
-                }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                onClick={() => { router.push("/dashboard/subscribers"); setMoreOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
               >
                 <Mail className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Subscribers
               </button>
               {(tier === "growth" || tier === "scale") && (
                 <button
-                  onClick={() => {
-                    router.push("/dashboard/reviews");
-                    setMoreOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                  onClick={() => { router.push("/dashboard/reviews"); setMoreOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
                 >
                   <MessageSquareText className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                   Reviews
@@ -226,11 +205,8 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               )}
               {template === "food-brand" && (
                 <button
-                  onClick={() => {
-                    router.push("/dashboard/rewards");
-                    setMoreOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                  onClick={() => { router.push("/dashboard/rewards"); setMoreOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
                 >
                   <Star className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                   Rewards
@@ -238,32 +214,23 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               )}
               {tier === "scale" && (
                 <button
-                  onClick={() => {
-                    router.push("/dashboard/social");
-                    setMoreOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                  onClick={() => { router.push("/dashboard/social"); setMoreOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
                 >
                   <Share2 className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                   Social
                 </button>
               )}
               <button
-                onClick={() => {
-                  router.push("/dashboard/domains");
-                  setMoreOpen(false);
-                }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                onClick={() => { router.push("/dashboard/domains"); setMoreOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
               >
                 <Globe className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Domains
               </button>
               <button
-                onClick={() => {
-                  router.push("/dashboard/settings");
-                  setMoreOpen(false);
-                }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                onClick={() => { router.push("/dashboard/settings"); setMoreOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
               >
                 <Settings className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Settings
@@ -272,7 +239,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 href={siteUrl || "/"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
                 onClick={() => setMoreOpen(false)}
               >
                 <ExternalLink className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
@@ -284,61 +251,33 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
 
         {/* Tab bar */}
         <div className="flex items-center border-t border-gray-border bg-surface h-14">
-          {/* Home */}
-          <button
-            onClick={() => handleNavClick(NAV_ITEMS[0])}
-            aria-current={isActive(NAV_ITEMS[0]) ? "page" : undefined}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              isActive(NAV_ITEMS[0]) ? "text-sage" : "text-gray-muted"
-            }`}
-          >
-            {isActive(NAV_ITEMS[0]) && (
-              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
-            )}
-            <LayoutDashboard className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[12px] font-medium">Overview</span>
-          </button>
-
-          {/* Content */}
-          <button
-            onClick={() => handleNavClick(NAV_ITEMS[1])}
-            aria-current={isActive(NAV_ITEMS[1]) ? "page" : undefined}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              isActive(NAV_ITEMS[1]) ? "text-sage" : "text-gray-muted"
-            }`}
-          >
-            {isActive(NAV_ITEMS[1]) && (
-              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
-            )}
-            <FileStack className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[12px] font-medium">Your Site</span>
-          </button>
-
-          {/* Photos */}
-          <button
-            onClick={() => handleNavClick(NAV_ITEMS[2])}
-            aria-current={isActive(NAV_ITEMS[2]) ? "page" : undefined}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              isActive(NAV_ITEMS[2]) ? "text-sage" : "text-gray-muted"
-            }`}
-          >
-            {isActive(NAV_ITEMS[2]) && (
-              <div className="absolute top-0 w-8 h-[2px] bg-sage rounded-b" />
-            )}
-            <ImageIcon className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[12px] font-medium">Photos</span>
-          </button>
+          {[NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2]].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => handleNavClick(item)}
+              aria-current={isActive(item) ? "page" : undefined}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
+                isActive(item) ? "text-white" : "text-gray-muted"
+              }`}
+            >
+              {isActive(item) && (
+                <div className="absolute top-0 w-8 h-[2px] bg-white rounded-b" />
+              )}
+              <item.icon className="w-5 h-5" strokeWidth={1.5} />
+              <span className="text-[10px] font-medium tracking-[-0.01em]">{item.label}</span>
+            </button>
+          ))}
 
           {/* More */}
           <button
             onClick={() => setMoreOpen(!moreOpen)}
             aria-label="More options"
             className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              moreOpen ? "text-sage" : "text-gray-muted"
+              moreOpen ? "text-white" : "text-gray-muted"
             }`}
           >
             <MoreHorizontal className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[12px] font-medium">More</span>
+            <span className="text-[10px] font-medium tracking-[-0.01em]">More</span>
           </button>
         </div>
       </nav>

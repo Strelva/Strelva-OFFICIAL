@@ -126,7 +126,7 @@ function CollapsedRight() {
     <div className="flex flex-col items-center py-4 gap-2">
       <button
         onClick={toggleRight}
-        className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
+        className="w-8 h-8 rounded-full flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
         title="Expand panel"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

@@ -20,7 +20,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-sage text-white hover:bg-sage-dark disabled:opacity-50",
+    "bg-white text-black hover:bg-white/90 disabled:opacity-50",
   secondary:
     "bg-surface border border-gray-border text-warm-black hover:bg-gray-bg disabled:opacity-50",
   ghost:
@@ -30,9 +30,9 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "px-2 py-1 text-[11px] gap-1 rounded-md",
-  md: "px-3 py-1.5 text-[13px] gap-1.5 rounded-md",
-  lg: "px-4 py-2.5 text-[13px] gap-2 rounded-md",
+  sm: "px-2.5 py-1 text-[11px] gap-1 rounded-full",
+  md: "px-4 py-1.5 text-[13px] gap-1.5 rounded-full",
+  lg: "px-5 py-2.5 text-[13px] gap-2 rounded-full",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -90,7 +90,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       aria-label={label}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center rounded-md transition-colors duration-150 shrink-0 disabled:opacity-50",
+        "inline-flex items-center justify-center rounded-full transition-colors duration-150 shrink-0 disabled:opacity-50",
         iconSizeStyles[size],
         iconVariantStyles[variant],
         className,

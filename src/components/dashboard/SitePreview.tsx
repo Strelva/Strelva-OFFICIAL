@@ -152,9 +152,10 @@ export function SitePreview() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 h-9 border-b border-gray-border shrink-0 bg-surface">
+      <div className="flex items-center justify-between px-4 h-10 border-b border-gray-border shrink-0 bg-surface">
         <div className="flex items-center gap-2">
-          <div className="w-[6px] h-[6px] rounded-full bg-emerald-500" />
+          <div className="w-[5px] h-[5px] rounded-full bg-emerald-500" />
+          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Preview</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -169,10 +170,10 @@ export function SitePreview() {
                   aria-pressed={active}
                   aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
                   title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
-                  className={`flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium transition-all duration-150 ${
+                  className={`flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium tracking-[-0.01em] transition-all duration-150 ${
                     active
-                      ? "bg-surface-raised text-warm-black shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
-                      : "text-gray-muted hover:text-gray-fg"
+                      ? "bg-surface-raised text-white shadow-sm"
+                      : "text-gray-muted hover:text-white"
                   }`}
                 >
                   <bp.icon className="w-[13px] h-[13px]" strokeWidth={1.5} />
@@ -186,7 +187,7 @@ export function SitePreview() {
             href={siteUrl || "/"}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center w-6 h-6 rounded-md text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
+            className="flex items-center justify-center w-7 h-7 rounded-full text-gray-muted hover:text-white hover:bg-gray-bg transition-colors duration-150"
             title="Open in new tab"
           >
             <ExternalLink className="w-[14px] h-[14px]" strokeWidth={1.5} />
@@ -195,9 +196,9 @@ export function SitePreview() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 flex justify-center p-3 overflow-hidden bg-surface-base">
+      <div className="flex-1 flex justify-center p-4 overflow-hidden bg-surface-base">
         <div
-          className="relative h-full w-full rounded-lg overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+          className="relative h-full w-full rounded-xl overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)]"
           style={{
             maxWidth: breakpoint.width ? `${breakpoint.width}px` : "100%",
             marginInline: "auto",

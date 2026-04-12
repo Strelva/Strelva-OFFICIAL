@@ -39,35 +39,36 @@
   --surface-inset:  #fafafa;
 }
 
-/* Dashboard dark theme — warm bark-tinted darks, not zinc */
+/* Dashboard dark theme — Figma-inspired monochrome + gold accent */
 [data-dashboard] {
-  --cream:       #0c0a08;
-  --cream-dark:  #161210;
-  --cream-mid:   #252019;
-  --sage:        #8fb0a2;
-  --sage-light:  #a3c4b6;
-  --sage-dark:   #6d9080;
-  --sage-wash:   rgba(143, 176, 162, 0.06);
-  --bark:        #f5f0eb;
-  --bark-light:  #a89e94;
-  --bark-faded:  #6b6158;
-  --terra:       #e07a5f;
-  --terra-light: #f0a090;
-  --warm-black:  #f5f0eb;
+  --cream:       #000000;
+  --cream-dark:  #0a0a0a;
+  --cream-mid:   #1a1a1a;
+  --sage:        #ffffff;
+  --sage-light:  #ffffff;
+  --sage-dark:   #e0e0e0;
+  --sage-wash:   rgba(255, 255, 255, 0.03);
+  --bark:        #ffffff;
+  --bark-light:  #888888;
+  --bark-faded:  #555555;
+  --terra:       #e05040;
+  --terra-light: #ff6b5a;
+  --warm-black:  #ffffff;
+  --accent:      #d4a052;
 
-  --gray-border:   rgba(210, 190, 170, 0.10);
-  --gray-bg:       #161210;
-  --gray-bg-hover: #1c1814;
-  --gray-bg-alt:   #110e0c;
-  --gray-muted:    #a89e94;
-  --gray-subtle:   #4a433c;
-  --gray-faint:    #3a332c;
-  --gray-fg:       #d6cfc7;
+  --gray-border:   rgba(255, 255, 255, 0.10);
+  --gray-bg:       rgba(255, 255, 255, 0.04);
+  --gray-bg-hover: rgba(255, 255, 255, 0.08);
+  --gray-bg-alt:   rgba(255, 255, 255, 0.03);
+  --gray-muted:    #777777;
+  --gray-subtle:   #333333;
+  --gray-faint:    #444444;
+  --gray-fg:       #aaaaaa;
 
-  --surface:        #110e0c;
-  --surface-base:   #0c0a08;
-  --surface-raised: #161210;
-  --surface-inset:  #0e0c0a;
+  --surface:        #0e0e0e;
+  --surface-base:   #000000;
+  --surface-raised: #181818;
+  --surface-inset:  #080808;
 }
 
 @theme inline {
@@ -86,6 +87,7 @@
   --color-terra-light: var(--terra-light);
   --color-pure-white: var(--pure-white);
   --color-warm-black: var(--warm-black);
+  --color-accent: var(--accent, #d4a052);
 
   /* Semantic grays */
   --color-gray-border: var(--gray-border);
@@ -144,11 +146,14 @@ body {
   scrollbar-color: var(--cream-mid) transparent;
 }
 
-/* Focus-visible — sage ring, not browser default */
+/* Focus-visible — dashed outline (Figma-inspired) */
 :focus-visible {
-  outline: 2px solid var(--sage);
+  outline: 2px dashed var(--sage);
   outline-offset: 2px;
   border-radius: 4px;
+}
+[data-dashboard] :focus-visible {
+  outline: 2px dashed rgba(255, 255, 255, 0.3);
 }
 
 /* ===== TYPOGRAPHY ===== */
@@ -320,7 +325,7 @@ body {
   box-shadow: 0 0 0 1px rgba(124, 154, 142, 0.15), 0 2px 8px rgba(124, 154, 142, 0.08);
 }
 [data-dashboard] .reb-card-glow:hover {
-  box-shadow: 0 0 0 1px rgba(143, 176, 162, 0.12), 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* Hide scrollbar for quick prompts */
