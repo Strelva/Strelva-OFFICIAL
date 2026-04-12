@@ -33,6 +33,18 @@ export async function POST(req: Request) {
   const tenantId = obj.metadata?.tenantId ?? null;
 
   switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as unknown as {
+        metadata?: Record<string, string>;
+        subscription?: string;
+      };
+      const sessionTenantId = session.metadata?.tenantId;
+      if (sessionTenantId) {
+        await updateTenant(sessionTenantId, { subscriptionStatus: "active" });
+      }
+      break;
+    }
+
     case "invoice.paid":
       if (tenantId) await updateTenant(tenantId, { subscriptionStatus: "active" });
       break;

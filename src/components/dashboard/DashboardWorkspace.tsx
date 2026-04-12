@@ -32,7 +32,7 @@ export function DashboardWorkspace({
   const rightPanelContent = (
     <>
       {/* Tab switcher */}
-      <div className="h-10 border-b border-gray-border shrink-0 bg-white">
+      <div className="h-10 border-b border-gray-border shrink-0 bg-surface">
         <Tabs
           variant="underline"
           items={[
@@ -57,7 +57,7 @@ export function DashboardWorkspace({
   );
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-[#faf9f7]">
+    <div className="flex flex-col flex-1 min-h-0 bg-surface-base">
       {/* Desktop (lg+): 3-panel layout */}
       <div className="hidden lg:flex flex-1 min-h-0">
         {/* Left: Content Browser */}

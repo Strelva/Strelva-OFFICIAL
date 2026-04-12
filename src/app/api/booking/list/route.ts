@@ -9,24 +9,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
-
   try {
     const tenant = await getTenantFromHeaders();
-    const dateRange = from && to ? { from, to } : undefined;
-    const bookings = await getBookings(tenant, dateRange);
 
-    // Sort by date + time, upcoming first
-    bookings.sort((a, b) => {
-      const dateCompare = a.date.localeCompare(b.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.startTime.localeCompare(b.startTime);
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") || "all";
+
+    const bookings = await getBookings(tenant);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const filtered = bookings.filter((b) => {
+      if (status === "upcoming") return b.date >= today;
+      if (status === "past") return b.date < today;
+      return true;
     });
 
-    return NextResponse.json(bookings);
+    // Sort by date descending, then by start time descending
+    filtered.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return b.startTime.localeCompare(a.startTime);
+    });
+
+    return NextResponse.json(filtered);
   } catch {
-    return NextResponse.json([], { status: 500 });
+    return NextResponse.json({ error: "Failed to load bookings" }, { status: 500 });
   }
 }

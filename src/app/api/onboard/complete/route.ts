@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       success_url: `${origin}/dashboard?welcome=true&tenant=${subdomain}`,
       cancel_url: `${origin}/onboard?step=checkout&tenant=${subdomain}`,
       metadata: { tenantId: subdomain },
+      subscription_data: { metadata: { tenantId: subdomain } },
       allow_promotion_codes: true,
     });
 

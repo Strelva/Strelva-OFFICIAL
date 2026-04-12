@@ -3,7 +3,7 @@
 ## What This Is
 An AI agent that runs a business's online presence autonomously. Businesses talk to it via chat — it builds, updates, and manages their website. It reaches out proactively with weekly reports and suggestions. Dashboard shows proof of value.
 
-**Pivoted from agency model to platform on 2026-04-03.** See `.claude/plans/todos.yml` for the full build plan and phase completion status.
+**Pivoted from agency model to platform on 2026-04-03.** See `.claude/plans/todos.yml` for completed phase history and `.claude/plans/remaining.yml` for the 41-item TODO list to finish shipping.
 
 ## One-Liner
 "Your business runs itself. Just text back yes."
@@ -75,16 +75,11 @@ Business owners will pay $49-149/mo for an AI that autonomously manages their we
 - Social media management (out of scope)
 
 ## Build Order
-See `.claude/plans/todos.yml` for complete phase plan with status tracking.
-- Phase 1: Generalize from wellness-specific → DONE
-- Phase 2: Database-backed tenant registry → DONE
-- Phase 3: Subscription enforcement → DONE
-- Phase 4: Self-serve onboarding flow → DONE
-- Phase 5: 3 new templates (restaurant, trades, professional) → DONE
-- Phase 6: Proactive AI (weekly report, staleness, suggestions) → DONE
-- Phase 7: Capability module system → DONE
-- Phase 8: Deploy + Chelsea live test → DONE (code ready, manual deploy steps remain)
-- Phase 9: Marketing site + second client → DONE (code done, manual outreach remains)
+See `.claude/plans/todos.yml` for completed phases 1-9.
+See `.claude/plans/remaining.yml` for 41 items to finish shipping (P0-P4 + deploy + verification).
+
+**Completed:** Phases 1-9 (generalize, tenants, billing, onboarding, templates, proactive AI, capabilities, deploy prep, marketing)
+**Remaining:** 4 P0 ship blockers, 5 P1 trust killers, 7 P2 UX gaps, 6 P3 infra, 7 P4 growth, 7 deploy steps, 5 verifications
 
 ## Validation Signals
 1. Does Chelsea use the chat agent without being prompted?

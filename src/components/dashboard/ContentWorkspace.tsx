@@ -7,7 +7,6 @@ import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
-import { MiniPreview } from "./MiniPreview";
 import { PageStructurePanel } from "./PageStructurePanel";
 import { Tabs } from "@/components/ui/Tabs";
 
@@ -25,12 +24,12 @@ export function ContentWorkspace({
   timestamps,
 }: ContentWorkspaceProps) {
   const {
-    activePanel,
     activeSection,
     rightTab,
     setRightTab,
     leftCollapsed,
     rightCollapsed,
+    siteUrl,
   } = useDashboard();
 
   // Local tab state so we can extend the right panel with "Structure"
@@ -82,7 +81,7 @@ export function ContentWorkspace({
   );
 
   return (
-    <div className="flex flex-col h-screen bg-surface-base">
+    <div className="flex flex-col h-full bg-surface-base">
       {/* Desktop (lg+): 3-panel layout */}
       <div className="hidden lg:flex flex-1 min-h-0">
         {/* Left: Content Browser */}
@@ -123,21 +122,22 @@ export function ContentWorkspace({
         </div>
       </div>
 
-      {/* Mobile: single panel with mini-preview */}
-      <div className="flex md:hidden flex-1 min-h-0">
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {activePanel === "content" && (
-            <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
-          )}
-          {activePanel === "preview" && <SitePreview />}
-          {activePanel === "chat" && (
-            <>
-              <MiniPreview />
-              <div className="flex-1 min-h-0">
-                <ChatPanel ownerName={ownerName} />
-              </div>
-            </>
-          )}
+      {/* Mobile: fallback message — editor isn't usable at this size */}
+      <div className="flex md:hidden flex-1 min-h-0 items-center justify-center px-6">
+        <div className="text-center max-w-xs">
+          <p className="text-lg font-medium text-warm-white mb-2">
+            Edit your site on a larger screen
+          </p>
+          <p className="text-sm text-gray-muted mb-6">
+            The site editor needs a desktop or tablet for the full editing
+            experience.
+          </p>
+          <a
+            href={siteUrl || "/dashboard"}
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-warm-white text-warm-black text-sm font-medium hover:bg-warm-white/90 transition-colors"
+          >
+            View your live site
+          </a>
         </div>
       </div>
 

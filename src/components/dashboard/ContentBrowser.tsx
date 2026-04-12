@@ -13,6 +13,7 @@ import {
   EyeOff,
   Plus,
   GripVertical,
+  Check,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
@@ -184,7 +185,10 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   }
 
   const usedTypes = new Set(sortedSections.map((s) => s.type));
-  const availableTypes = ALL_SECTION_TYPES.filter((t) => !usedTypes.has(t) && !COMPOSITE_SECTIONS.has(t));
+  // Addable types: not already on page, not a composite/layout section
+  const addableTypes = ALL_SECTION_TYPES.filter((t) => !usedTypes.has(t) && !COMPOSITE_SECTIONS.has(t));
+  // Already-added non-composite types (shown in picker with "On page" badge)
+  const onPageTypes = ALL_SECTION_TYPES.filter((t) => usedTypes.has(t) && !COMPOSITE_SECTIONS.has(t));
 
   // Collapsed state
   if (leftCollapsed) {
@@ -384,7 +388,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                     )}
 
                     {/* Actions row */}
-                    <div className="flex items-center justify-between h-9 px-3 pl-[42px] border-t border-gray-border/50 bg-white/50">
+                    <div className="flex items-center justify-between h-9 px-3 pl-[42px] border-t border-gray-border/50 bg-surface-raised/50">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-[5px] h-[5px] rounded-full ${
                           data.freshness === "fresh" ? "bg-emerald-500" :
@@ -433,7 +437,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         {/* Add Section */}
         <div className="px-3 pb-3">
           {showAddMenu ? (
-            <div className="border border-gray-border rounded-lg bg-white overflow-hidden animate-fade-in-up shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="border border-gray-border rounded-lg bg-surface-raised overflow-hidden animate-fade-in-up shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-gray-border bg-gray-bg-alt">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-gray-muted">Add Section</span>
                 <button
@@ -443,26 +447,55 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                   Cancel
                 </button>
               </div>
-              <div className="max-h-52 overflow-y-auto py-1">
-                {availableTypes.length === 0 ? (
+              <div className="max-h-64 overflow-y-auto py-1">
+                {addableTypes.length === 0 && onPageTypes.length === 0 ? (
                   <div className="px-3 py-4 text-[11px] text-gray-muted text-center">
                     All sections added to this page
                   </div>
                 ) : (
-                  availableTypes.map((type) => {
-                    const Icon = SECTION_ICONS[type] || Layers;
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => handleAddSection(type)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-bg transition-colors text-left rounded-md mx-1"
-                        style={{ width: "calc(100% - 8px)" }}
-                      >
-                        <Icon className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                        <span className="text-[12px] text-warm-black">{SECTION_LABELS[type] || type}</span>
-                      </button>
-                    );
-                  })
+                  <>
+                    {/* Addable sections — full contrast, interactive */}
+                    {addableTypes.map((type) => {
+                      const Icon = SECTION_ICONS[type] || Layers;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => handleAddSection(type)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-sage/[0.06] transition-colors text-left rounded-md mx-1 cursor-pointer group/add"
+                          style={{ width: "calc(100% - 8px)" }}
+                        >
+                          <Icon className="w-[14px] h-[14px] text-gray-fg group-hover/add:text-sage transition-colors" strokeWidth={1.5} />
+                          <span className="text-[12px] text-warm-black">{SECTION_LABELS[type] || type}</span>
+                          <Plus className="w-3 h-3 ml-auto text-gray-subtle group-hover/add:text-sage transition-colors opacity-0 group-hover/add:opacity-100" strokeWidth={2} />
+                        </button>
+                      );
+                    })}
+                    {/* Already on page — visible but clearly not clickable */}
+                    {onPageTypes.length > 0 && (
+                      <>
+                        {addableTypes.length > 0 && (
+                          <div className="h-px bg-gray-border mx-3 my-1.5" />
+                        )}
+                        {onPageTypes.map((type) => {
+                          const Icon = SECTION_ICONS[type] || Layers;
+                          return (
+                            <div
+                              key={type}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 mx-1"
+                              style={{ width: "calc(100% - 8px)" }}
+                            >
+                              <Icon className="w-[14px] h-[14px] text-gray-subtle" strokeWidth={1.5} />
+                              <span className="text-[12px] text-gray-muted">{SECTION_LABELS[type] || type}</span>
+                              <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-subtle font-medium">
+                                <Check className="w-3 h-3" strokeWidth={2} />
+                                On page
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             </div>

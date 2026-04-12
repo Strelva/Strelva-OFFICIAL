@@ -37,7 +37,7 @@ export default function DashboardError({
           </button>
           <Link
             href="/dashboard"
-            className="px-4 py-2 rounded-md bg-white border border-gray-border text-sm text-gray-fg hover:text-warm-black transition-colors"
+            className="px-4 py-2 rounded-md bg-surface border border-gray-border text-sm text-gray-fg hover:text-warm-black transition-colors"
           >
             Go to overview
           </Link>

@@ -92,9 +92,9 @@ const variantIcon: Record<ToastVariant, ReactNode> = {
 };
 
 const variantBorder: Record<ToastVariant, string> = {
-  success: "border-emerald-200 bg-emerald-50",
-  error: "border-red-200 bg-red-50",
-  info: "border-gray-border bg-white",
+  success: "border-emerald-500/20 bg-emerald-500/10",
+  error: "border-red-500/20 bg-red-500/10",
+  info: "border-gray-border bg-surface",
 };
 
 function ToastBubble({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {

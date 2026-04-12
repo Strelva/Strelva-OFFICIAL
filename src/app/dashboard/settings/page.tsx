@@ -113,7 +113,8 @@ export default function SettingsPage() {
           Site configuration
         </h1>
         <p className="text-sm text-gray-muted mt-1">
-          Your site&apos;s identity and metadata. Hover any row to edit.
+          <span className="hidden md:inline">Your site&apos;s identity and metadata. Hover any row to edit.</span>
+          <span className="md:hidden">Your site&apos;s identity and metadata. Tap the pencil to edit.</span>
         </p>
       </div>
 
@@ -161,28 +162,43 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Actions — visible on hover */}
-              <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                {field.copyable && value && (
+              {/* Actions — hover on desktop, always visible on mobile */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Desktop: full actions on hover */}
+                <div className="hidden md:flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                  {field.copyable && value && (
+                    <button
+                      onClick={() => handleCopy(field.key, value)}
+                      className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-all duration-150"
+                      title="Copy"
+                    >
+                      {copiedField === field.key ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
                   <button
-                    onClick={() => handleCopy(field.key, value)}
-                    className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-all duration-150"
-                    title="Copy"
+                    onClick={() => {
+                      if (dashboard) {
+                        dashboard.setChatPrompt(field.chatPrompt);
+                      }
+                    }}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-sage hover:bg-sage/[0.06] transition-all duration-150"
+                    title={`Edit ${field.label}`}
                   >
-                    {copiedField === field.key ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
-                )}
+                </div>
+                {/* Mobile: always-visible edit button */}
                 <button
                   onClick={() => {
                     if (dashboard) {
                       dashboard.setChatPrompt(field.chatPrompt);
                     }
                   }}
-                  className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-sage hover:bg-sage/[0.06] transition-all duration-150"
+                  className="md:hidden w-8 h-8 rounded-md flex items-center justify-center text-gray-muted active:text-sage active:bg-sage/[0.06] transition-all duration-150"
                   title={`Edit ${field.label}`}
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -201,6 +217,36 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* AI Publishing */}
+      <div className="mt-6">
+        <h2 className="text-sm font-medium text-warm-black mb-3">AI Publishing</h2>
+        <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+          <div className="flex items-start sm:items-center justify-between gap-4 px-5 py-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm font-medium text-warm-black">
+                  Auto-publish
+                </span>
+                <span
+                  className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
+                    dashboard?.autoPublish
+                      ? "text-emerald-600/80 bg-emerald-500/10"
+                      : "text-amber-600/80 bg-amber-500/10"
+                  }`}
+                >
+                  {dashboard?.autoPublish ? "on" : "off"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-subtle">
+                {dashboard?.autoPublish
+                  ? "AI changes go live immediately when you confirm them in chat."
+                  : "AI changes are saved as drafts for admin review before going live."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* CTA */}
       <div className="mt-6 bg-surface border border-gray-border rounded-lg px-5 py-4 flex items-center justify-between">

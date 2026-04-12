@@ -14,8 +14,12 @@ import {
   Mail,
   Star,
   Globe,
+  Share2,
+  MessageSquareText,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+import { useCapabilities } from "./CapabilityGate";
+import type { SubscriptionTier } from "@/lib/types";
 
 interface DashboardNavProps {
   siteName: string;
@@ -28,6 +32,7 @@ type NavItem = {
   href: string;
   icon: typeof LayoutDashboard;
   templates?: string[]; // if set, only show for these templates
+  tiers?: SubscriptionTier[]; // if set, only show for these subscription tiers
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -35,12 +40,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Your Site", href: "/dashboard/content", icon: FileStack },
   { label: "Photos", href: "/dashboard/photos", icon: ImageIcon },
   { label: "Subscribers", href: "/dashboard/subscribers", icon: Mail },
+  { label: "Reviews", href: "/dashboard/reviews", icon: MessageSquareText, tiers: ["growth", "scale"] },
   {
     label: "Rewards",
     href: "/dashboard/rewards",
     icon: Star,
     templates: ["food-brand"],
   },
+  { label: "Social", href: "/dashboard/social", icon: Share2, tiers: ["scale"] },
   { label: "Domains", href: "/dashboard/domains", icon: Globe },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
@@ -49,10 +56,13 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
   const pathname = usePathname();
   const router = useRouter();
   const { editMode, setEditMode, setChatDrawerOpen, setActivePanel, template } = useDashboard();
+  const { tier } = useCapabilities();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.templates || item.templates.includes(template)
+    (item) =>
+      (!item.templates || item.templates.includes(template)) &&
+      (!item.tiers || item.tiers.includes(tier))
   );
 
   // Close More menu on Escape
@@ -178,7 +188,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
         {moreOpen && (
           <>
             <div className="fixed inset-0 bottom-14 z-40" onClick={() => setMoreOpen(false)} />
-            <div className="absolute bottom-full right-2 mb-2 z-50 bg-white border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up">
+            <div className="absolute bottom-full right-2 mb-2 z-50 bg-surface-raised border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up">
               {bookingUrl && (
                 <a
                   href={bookingUrl}
@@ -202,6 +212,18 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 <Mail className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                 Subscribers
               </button>
+              {(tier === "growth" || tier === "scale") && (
+                <button
+                  onClick={() => {
+                    router.push("/dashboard/reviews");
+                    setMoreOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                >
+                  <MessageSquareText className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                  Reviews
+                </button>
+              )}
               {template === "food-brand" && (
                 <button
                   onClick={() => {
@@ -212,6 +234,18 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
                 >
                   <Star className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
                   Rewards
+                </button>
+              )}
+              {tier === "scale" && (
+                <button
+                  onClick={() => {
+                    router.push("/dashboard/social");
+                    setMoreOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-warm-black hover:bg-gray-bg transition-colors duration-150"
+                >
+                  <Share2 className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
+                  Social
                 </button>
               )}
               <button

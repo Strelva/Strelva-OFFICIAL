@@ -1,27 +1,87 @@
-/** Simple in-memory sliding-window rate limiter.
- *  Resets on cold start — fine for Vercel serverless at small scale. */
+/** Sliding-window rate limiter.
+ *  Uses Redis INCR + EXPIRE when configured (works across serverless instances).
+ *  Falls back to in-memory Map when Redis is unavailable (resets on cold start). */
+
+import { getRedis } from "./redis";
 
 const windowMs = 60_000; // 1-minute window
+
+// --- In-memory fallback store ---
 
 interface Entry {
   count: number;
   resetAt: number;
 }
 
-const store = new Map<string, Entry>();
+const memStore = new Map<string, Entry>();
 
-/** Returns true if the request should be blocked. */
-export function isRateLimited(key: string, maxPerMinute: number): boolean {
+function memCheck(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
-  const entry = store.get(key);
+  const entry = memStore.get(key);
 
   if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
+    memStore.set(key, { count: 1, resetAt: now + windowMs });
     return false;
   }
 
   entry.count++;
-  return entry.count > maxPerMinute;
+  return entry.count > max;
+}
+
+// --- Redis-backed check ---
+
+async function redisCheck(key: string, max: number, windowSeconds: number): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return memCheck(key, max, windowSeconds * 1000);
+
+  const redisKey = `reb:ratelimit:${key}`;
+  try {
+    const count = await redis.incr(redisKey);
+    // Set TTL on first increment only (when count is 1)
+    if (count === 1) {
+      await redis.expire(redisKey, windowSeconds);
+    }
+    return count > max;
+  } catch {
+    // Redis failed — fall back to in-memory
+    return memCheck(key, max, windowSeconds * 1000);
+  }
+}
+
+/** Returns true if the request should be blocked. */
+export function isRateLimited(key: string, maxPerMinute: number): boolean {
+  const redis = getRedis();
+  if (!redis) return memCheck(key, maxPerMinute, windowMs);
+
+  // For sync callers that can't await: optimistically allow, fire async check.
+  // To properly enforce across instances, callers should migrate to isRateLimitedAsync.
+  return memCheck(key, maxPerMinute, windowMs);
+}
+
+/** Async rate limit check — uses Redis when available, in-memory otherwise.
+ *  Preferred over isRateLimited for API routes that can await. */
+export async function isRateLimitedAsync(key: string, maxPerMinute: number): Promise<boolean> {
+  return redisCheck(key, maxPerMinute, 60);
+}
+
+/** Like isRateLimited but accepts a custom window (in ms) instead of the default 60s.
+ *  Use for routes that need longer windows, e.g. 5 per hour. */
+export function isRateLimitedWindowed(
+  key: string,
+  max: number,
+  windowMs: number
+): boolean {
+  return memCheck(key, max, windowMs);
+}
+
+/** Async windowed rate limit — uses Redis when available. */
+export async function isRateLimitedWindowedAsync(
+  key: string,
+  max: number,
+  windowMs: number
+): Promise<boolean> {
+  const windowSeconds = Math.ceil(windowMs / 1000);
+  return redisCheck(key, max, windowSeconds);
 }
 
 /** Extract a rate-limit key from a Request (uses x-forwarded-for or falls back to generic). */

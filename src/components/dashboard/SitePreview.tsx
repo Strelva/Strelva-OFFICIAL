@@ -63,13 +63,25 @@ export function SitePreview() {
   // PAGE_PATHS map.
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
   const editParam = editMode === "draft" ? "?edit=true" : "";
-  const baseUrl = siteUrl || "";
-  const iframeSrc = `${baseUrl}${pagePath}${editParam}`;
+  // Use same-origin relative paths for the iframe to avoid cross-origin
+  // blocking (X-Frame-Options / CORS). The public routes render at /{page}
+  // within this Next.js app, so no external URL is needed.
+  const iframeSrc = `${pagePath}${editParam}`;
 
-  // Reset loading state when refreshKey changes
+  // Reset loading state when refreshKey or page changes
   useEffect(() => {
     setIframeLoading(true);
-  }, [refreshKey]);
+  }, [refreshKey, pagePath]);
+
+  // Clear active section when the user switches pages via the Pages tab,
+  // so the section→page override (line 59-61) doesn't fight the new page.
+  const prevPageRef = useRef(activePage);
+  useEffect(() => {
+    if (activePage !== prevPageRef.current) {
+      prevPageRef.current = activePage;
+      setActiveSection(null);
+    }
+  }, [activePage, setActiveSection]);
 
   // Handle scroll-to-section requests from ContentBrowser
   useEffect(() => {
@@ -80,7 +92,7 @@ export function SitePreview() {
           "*"
         );
       } catch {
-        iframeRef.current.src = `${baseUrl}${pagePath}#${scrollToSection}`;
+        iframeRef.current.src = `${pagePath}#${scrollToSection}`;
       }
       setScrollToSection(null);
     }
@@ -193,7 +205,7 @@ export function SitePreview() {
         >
           <iframe
             ref={iframeRef}
-            key={refreshKey}
+            key={`${refreshKey}-${pagePath}`}
             src={iframeSrc}
             className="w-full h-full border-0"
             title="Live site preview"

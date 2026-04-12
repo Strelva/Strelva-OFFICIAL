@@ -37,7 +37,7 @@ export default async function DashboardLayout({
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
   return (
-    <DashboardProvider siteUrl={siteUrl} template={tenantConfig?.template || "wellness"}>
+    <DashboardProvider siteUrl={siteUrl} template={tenantConfig?.template || "wellness"} autoPublish={tenantConfig?.autoPublish !== false}>
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <DashboardShell siteName={siteName} bookingUrl={bookingUrl} siteUrl={siteUrl}>

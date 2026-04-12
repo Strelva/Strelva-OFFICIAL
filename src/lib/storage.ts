@@ -4,6 +4,7 @@ import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking, 
 import { defaults } from "./defaults";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "./booking";
 import { getSanityClient, getSanityReadClient, sanityImageUrl } from "./sanity";
+import { getRedis } from "./redis";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_CONTENT_PATH = path.join(process.cwd(), "dev-content.json");
@@ -214,6 +215,12 @@ async function writeDevChat(data: Record<string, unknown[]>): Promise<void> {
   await fs.writeFile(DEV_CHAT_PATH, JSON.stringify(data, null, 2));
 }
 
+const CHAT_CACHE_TTL_SECONDS = 3600; // 1 hour
+
+function chatCacheKey(tenant: string, clientId: string): string {
+  return `reb:chat:${tenant}:${clientId}`;
+}
+
 export async function saveChatMessages(
   clientId: string,
   messages: unknown[],
@@ -235,6 +242,18 @@ export async function saveChatMessages(
         messages: trimmed,
       });
     }
+
+    // Write-through to Redis cache
+    const redis = getRedis();
+    if (redis) {
+      try {
+        await redis.set(chatCacheKey(tenant, clientId), trimmed, {
+          ex: CHAT_CACHE_TTL_SECONDS,
+        });
+      } catch {
+        // Redis write failed — Sanity is the source of truth, so this is fine
+      }
+    }
     return;
   }
 
@@ -247,10 +266,34 @@ export async function loadChatMessages(
   clientId: string,
   tenant: string = DEFAULT_TENANT
 ): Promise<unknown[]> {
+  // Try Redis cache first (only when Sanity is the backing store)
   if (hasSanity) {
+    const redis = getRedis();
+    if (redis) {
+      try {
+        const cached = await redis.get<unknown[]>(chatCacheKey(tenant, clientId));
+        if (cached) return cached;
+      } catch {
+        // Redis read failed — fall through to Sanity
+      }
+    }
+
     const query = `*[_type == "chatSession" && tenant == $tenant && clientId == $clientId][0].messages`;
     const messages = await getSanityClient().fetch(query, { tenant, clientId });
-    return messages || [];
+    const result = messages || [];
+
+    // Backfill Redis cache on miss
+    if (redis && result.length > 0) {
+      try {
+        await redis.set(chatCacheKey(tenant, clientId), result, {
+          ex: CHAT_CACHE_TTL_SECONDS,
+        });
+      } catch {
+        // Redis write failed — not fatal
+      }
+    }
+
+    return result;
   }
 
   const store = await readDevChat();
@@ -983,6 +1026,65 @@ export async function getSectionTimestamps(
 
   const store = await readDevContent(tenant);
   return (store.__sectionTimestamps as Record<string, string>) ?? {};
+}
+
+// --- Social posts ---
+
+import type { SocialPost } from "./types";
+
+const DEV_SOCIAL_PATH = (tenant: string) =>
+  path.join(process.cwd(), `dev-social-${tenant}.json`);
+
+async function readDevSocial(tenant: string): Promise<SocialPost[]> {
+  try {
+    const raw = await fs.readFile(DEV_SOCIAL_PATH(tenant), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeDevSocial(tenant: string, posts: SocialPost[]): Promise<void> {
+  await fs.writeFile(DEV_SOCIAL_PATH(tenant), JSON.stringify(posts, null, 2));
+}
+
+export async function getSocialPosts(tenant: string): Promise<SocialPost[]> {
+  if (hasSanity) {
+    const results = await getSanityReadClient().fetch(
+      `*[_type == "socialPost" && tenant == $tenant] | order(createdAt desc) {
+        "id": _id, platform, content, imageUrl, status, scheduledFor, publishedAt, createdAt
+      }`,
+      { tenant }
+    );
+    return results || [];
+  }
+
+  return readDevSocial(tenant);
+}
+
+export async function setSocialPosts(tenant: string, posts: SocialPost[]): Promise<void> {
+  // For Sanity, individual CRUD is handled at the API layer.
+  // This bulk setter is the dev-file fallback and a convenience for the agent tools.
+  if (hasSanity) {
+    // Sanity: delete all existing, recreate. Brute but correct for local-first MVP.
+    const existing = await getSanityClient().fetch(
+      `*[_type == "socialPost" && tenant == $tenant]._id`,
+      { tenant }
+    );
+    for (const id of (existing || [])) {
+      await getSanityClient().delete(id);
+    }
+    for (const post of posts) {
+      await getSanityClient().create({
+        _type: "socialPost",
+        tenant,
+        ...post,
+      });
+    }
+    return;
+  }
+
+  await writeDevSocial(tenant, posts);
 }
 
 export async function getSubscriptionOverride(

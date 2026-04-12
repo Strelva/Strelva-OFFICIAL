@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 import { getSubscribers, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { requireActiveSubscription } from "@/lib/subscription";
+import { isRateLimitedWindowed } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -20,6 +22,17 @@ export async function POST(req: Request) {
     }
 
     const tenant = await getTenantFromHeaders();
+
+    if (isRateLimitedWindowed(`newsletter-send:${tenant}`, 5, 3_600_000)) {
+      return NextResponse.json(
+        { error: "Newsletter send limit reached. Try again in an hour." },
+        { status: 429 }
+      );
+    }
+
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
+
     const subscribers = await getSubscribers(tenant);
     const activeSubscribers = subscribers.filter((s) => s.status === "active");
 

@@ -50,30 +50,30 @@ export async function GET(req: Request) {
   const skipped: string[] = [];
   const errors: string[] = [];
 
-  for (const tenant of tenants.filter((t) => t.active && t.ownerPhone)) {
-    const phone = tenant.ownerPhone!;
+  for (const tenant of tenants.filter((t) => t.active && t.ownerPhone && t.subscriptionStatus !== "cancelled")) {
+    try {
+      const phone = tenant.ownerPhone!;
 
-    // Skip if a pending SMS was sent less than 5 days ago
-    const existing = await getPendingByPhone(phone);
-    if (existing) {
-      const sentAt = new Date(existing.sentAt).getTime();
-      const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
-      if (Date.now() - sentAt < fiveDaysMs) {
+      // Skip if a pending SMS was sent less than 5 days ago
+      const existing = await getPendingByPhone(phone);
+      if (existing) {
+        const sentAt = new Date(existing.sentAt).getTime();
+        const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+        if (Date.now() - sentAt < fiveDaysMs) {
+          skipped.push(tenant.id);
+          continue;
+        }
+      }
+
+      const suggestions = await getSuggestions(tenant.id);
+      if (suggestions.length === 0) {
         skipped.push(tenant.id);
         continue;
       }
-    }
 
-    const suggestions = await getSuggestions(tenant.id);
-    if (suggestions.length === 0) {
-      skipped.push(tenant.id);
-      continue;
-    }
+      const top = suggestions[0];
+      const { text, actionPrompt } = composeSmsBody(tenant.ownerName, top);
 
-    const top = suggestions[0];
-    const { text, actionPrompt } = composeSmsBody(tenant.ownerName, top);
-
-    try {
       await sendSms(phone, text);
       await setPending({
         tenantId: tenant.id,
@@ -86,11 +86,22 @@ export async function GET(req: Request) {
       });
       sent.push(tenant.id);
     } catch (err) {
-      errors.push(
-        `${tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`
-      );
+      const msg = `${tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`;
+      console.error(`[sms-suggestion] Failed for tenant ${tenant.id}:`, err);
+      errors.push(msg);
     }
   }
 
-  return NextResponse.json({ sent, skipped, errors });
+  // Notify Slack if any tenants failed
+  if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
+    fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `⚠ SMS suggestion cron: ${errors.length} tenant(s) failed — ${errors.join(", ")}`,
+      }),
+    }).catch(() => {});
+  }
+
+  return NextResponse.json({ processed: sent.length, failed: errors.length, sent, skipped, errors });
 }

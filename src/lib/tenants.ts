@@ -1,45 +1,87 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { TenantConfig } from "./types";
+import { getRedis } from "./redis";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
 
-let _cache: TenantConfig[] | null = null;
-let _cacheTime = 0;
-const CACHE_TTL = 60_000;
+const REDIS_KEY = "reb:tenants:all";
+const CACHE_TTL_SECONDS = 60;
+
+// In-memory fallback when Redis is not configured
+let _memCache: TenantConfig[] | null = null;
+let _memCacheTime = 0;
 
 async function loadTenants(): Promise<TenantConfig[]> {
+  const redis = getRedis();
+
+  // Try Redis cache first
+  if (redis) {
+    try {
+      const cached = await redis.get<TenantConfig[]>(REDIS_KEY);
+      if (cached) return cached;
+    } catch {
+      // Redis failed — continue to source of truth
+    }
+  }
+
+  // In-memory fallback TTL check (used when Redis is down or not configured)
   const now = Date.now();
-  if (_cache && now - _cacheTime < CACHE_TTL) return _cache;
+  if (_memCache && now - _memCacheTime < CACHE_TTL_SECONDS * 1000) return _memCache;
+
+  let tenants: TenantConfig[];
 
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
     const docs = await getSanityClient().fetch(
       `*[_type == "tenant"] | order(createdAt desc)`
     );
-    const tenants = (docs || []).map(sanityToTenant);
-    if (tenants.length > 0) {
-      _cache = tenants;
-      _cacheTime = now;
-      return tenants;
+    const fromSanity = (docs || []).map(sanityToTenant);
+    if (fromSanity.length > 0) {
+      tenants = fromSanity;
+    } else {
+      // Fall through to dev file if Sanity has no tenant data
+      tenants = await loadFromDevFile();
     }
-    // Fall through to dev file if Sanity has no tenant data
+  } else {
+    tenants = await loadFromDevFile();
   }
 
+  // Write to Redis cache (fire-and-forget)
+  if (redis) {
+    try {
+      await redis.set(REDIS_KEY, tenants, { ex: CACHE_TTL_SECONDS });
+    } catch {
+      // Redis write failed — not fatal
+    }
+  }
+
+  // Always update in-memory fallback
+  _memCache = tenants;
+  _memCacheTime = Date.now();
+  return tenants;
+}
+
+async function loadFromDevFile(): Promise<TenantConfig[]> {
   try {
     const raw = await fs.readFile(DEV_TENANTS_PATH, "utf-8");
-    _cache = JSON.parse(raw) as TenantConfig[];
+    return JSON.parse(raw) as TenantConfig[];
   } catch {
-    _cache = [];
+    return [];
   }
-  _cacheTime = now;
-  return _cache;
 }
 
 function invalidateCache() {
-  _cache = null;
-  _cacheTime = 0;
+  _memCache = null;
+  _memCacheTime = 0;
+
+  const redis = getRedis();
+  if (redis) {
+    redis.del(REDIS_KEY).catch(() => {
+      // Redis delete failed — TTL will expire it
+    });
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

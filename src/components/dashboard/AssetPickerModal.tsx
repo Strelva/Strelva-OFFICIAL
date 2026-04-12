@@ -63,15 +63,15 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl max-h-[80vh] overflow-hidden rounded-xl bg-white shadow-xl flex flex-col"
+        className="relative w-full max-w-3xl max-h-[80vh] overflow-hidden rounded-xl bg-surface-raised shadow-xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-border px-5 py-3">
-          <h2 className="text-sm font-medium text-gray-900">Choose from library</h2>
+          <h2 className="text-sm font-medium text-warm-black">Choose from library</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-muted hover:bg-gray-50 hover:text-gray-900 transition-colors"
+            className="rounded-md p-1 text-gray-muted hover:bg-gray-bg hover:text-warm-black transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
@@ -84,7 +84,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-lg bg-gray-100 animate-pulse"
+                  className="aspect-square rounded-lg bg-gray-bg animate-pulse"
                 />
               ))}
             </div>

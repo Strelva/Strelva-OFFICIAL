@@ -284,6 +284,19 @@ export interface PageConfig {
 
 export type SitePageConfig = Record<string, PageConfig>;
 
+// --- Review Types ---
+
+export interface ReviewItem {
+  id: string;
+  source: "google" | "yelp" | "manual";
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+  reply?: string;
+  repliedAt?: string;
+}
+
 // --- Booking Types ---
 
 export interface BookingConfig {
@@ -365,6 +378,19 @@ export type TenantFeature = "commerce" | "booking" | "newsletter";
 
 export type SubscriptionTier = "starter" | "growth" | "scale";
 
+// --- Social Media Types ---
+
+export interface SocialPost {
+  id: string;
+  platform: "instagram" | "facebook" | "x";
+  content: string;
+  imageUrl?: string;
+  status: "draft" | "scheduled" | "published";
+  scheduledFor?: string;
+  publishedAt?: string;
+  createdAt: string;
+}
+
 // --- Tenant Types ---
 
 export interface TenantConfig {
@@ -388,4 +414,12 @@ export interface TenantConfig {
   siteUrl?: string;
   ownerPhone?: string;
   referredBy?: string;
+  /** When false, AI agent writes to drafts instead of publishing directly. Defaults to true. */
+  autoPublish?: boolean;
+  /** Behold.so feed ID — stable identifier, no token refresh needed. Per-tenant. */
+  beholdFeedId?: string;
+  /** Social media configuration for Scale tier */
+  socialConfig?: { connectedPlatforms?: string[] };
+  /** Review platform IDs for Growth+ tier */
+  reviewsConfig?: { googlePlaceId?: string; yelpBusinessId?: string };
 }

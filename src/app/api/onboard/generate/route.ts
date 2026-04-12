@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { NextResponse } from "next/server";
+import { isRateLimitedWindowed, rateLimitKey } from "@/lib/rate-limit";
 import type { TemplateId } from "@/lib/types";
 
 const businessInputSchema = z.object({
@@ -135,6 +136,13 @@ const generatedContentSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (isRateLimitedWindowed(rateLimitKey(req, "onboard-gen"), 3, 3_600_000)) {
+    return NextResponse.json(
+      { error: "Generation limit reached. Try again in an hour." },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json();
   const parsed = businessInputSchema.safeParse(body);
   if (!parsed.success) {

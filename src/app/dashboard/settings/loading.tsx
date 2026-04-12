@@ -2,7 +2,7 @@
 // must not introduce its own <main>/h-screen wrapper.
 export default function SettingsLoading() {
   return (
-    <div className="p-6 md:p-8 max-w-screen-2xl mx-auto w-full animate-pulse">
+    <div className="p-6 md:p-8 max-w-screen-2xl mx-auto w-full h-full overflow-y-auto animate-pulse">
       <div className="mb-6">
         <div className="h-3 w-16 bg-gray-bg-hover rounded mb-2" />
         <div className="h-7 w-40 bg-gray-bg-hover rounded mb-2" />

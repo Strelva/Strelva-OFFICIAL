@@ -80,7 +80,7 @@ export function CapabilityGate({ capability, children }: CapabilityGateProps) {
         {children}
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="bg-white border border-gray-border rounded-lg p-5 shadow-sm max-w-xs text-center">
+        <div className="bg-surface-raised border border-gray-border rounded-lg p-5 shadow-sm max-w-xs text-center">
           <p className="text-[13px] font-medium text-warm-black mb-1">{cap.name}</p>
           <p className="text-[12px] text-gray-muted mb-3">{cap.description}</p>
           {upgradePrice && (

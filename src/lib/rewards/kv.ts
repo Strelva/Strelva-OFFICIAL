@@ -1,22 +1,14 @@
 /**
  * Upstash Redis (HTTP) client factory for REB-owned rewards data.
  *
- * Required env vars (set in Vercel project for REB):
- *   UPSTASH_REDIS_REST_URL    — e.g. "https://xxxx.upstash.io"
- *   UPSTASH_REDIS_REST_TOKEN  — long-lived REST token from Upstash console
- *
- * When either is unset, getKv() returns null and every repository call throws
- * KvNotConfiguredError. Callers (rewardsProxy.ts) catch that sentinel and
- * fall through to the legacy GLDF signed-proxy path. This lets Phase 15a land
- * on REB before credentials exist without breaking the dashboard.
- *
- * Provider-agnostic: @upstash/redis speaks plain HTTP, so this also works
- * against Vercel KV or any Upstash-compatible endpoint.
+ * Delegates to the shared Redis client in src/lib/redis.ts so the entire
+ * app uses a single connection. When credentials are unset, getKv() returns
+ * null and every repository call throws KvNotConfiguredError. Callers
+ * (rewardsProxy.ts) catch that sentinel and fall through to the legacy
+ * GLDF signed-proxy path.
  */
 
-import { Redis } from "@upstash/redis";
-
-let cached: Redis | null | undefined;
+import { getRedis } from "../redis";
 
 export class KvNotConfiguredError extends Error {
   constructor() {
@@ -25,29 +17,12 @@ export class KvNotConfiguredError extends Error {
   }
 }
 
-export function getKv(): Redis | null {
-  if (cached !== undefined) return cached;
-
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!url || !token) {
-    cached = null;
-    return null;
-  }
-
-  try {
-    cached = new Redis({ url, token });
-    return cached;
-  } catch {
-    // Never throw from the factory — callers rely on null as "not configured".
-    cached = null;
-    return null;
-  }
+export function getKv() {
+  return getRedis();
 }
 
-export function requireKv(): Redis {
-  const kv = getKv();
+export function requireKv() {
+  const kv = getRedis();
   if (!kv) throw new KvNotConfiguredError();
   return kv;
 }

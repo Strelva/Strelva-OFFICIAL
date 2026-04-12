@@ -94,7 +94,7 @@ export function Drawer({ open, onClose, side = "right", title, children, classNa
         aria-label={title || "Panel"}
         onKeyDown={handleKeyDown}
         className={cn(
-          "fixed z-50 bg-white flex flex-col shadow-xl",
+          "fixed z-50 bg-surface flex flex-col shadow-xl",
           isRight
             ? "top-0 right-0 h-full w-full max-w-[380px] animate-panel-right"
             : "bottom-0 left-0 right-0 max-h-[80vh] rounded-t-2xl animate-fade-in-up",

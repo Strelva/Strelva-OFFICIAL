@@ -139,7 +139,7 @@ export default function PhotosPage() {
         {/* Drag overlay */}
         {dragging && (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-sage/10 pointer-events-none">
-            <div className="border-2 border-dashed border-sage rounded-xl px-12 py-10 bg-white/80 text-center">
+            <div className="border-2 border-dashed border-sage rounded-xl px-12 py-10 bg-surface-raised/80 text-center">
               <Upload className="w-8 h-8 text-sage mx-auto mb-2" strokeWidth={1.5} />
               <p className="text-[14px] font-medium text-sage">Drop photos here</p>
             </div>

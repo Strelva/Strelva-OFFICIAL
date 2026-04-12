@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { uploadFile } from "@/lib/storage";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { isRateLimited } from "@/lib/rate-limit";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -11,6 +12,14 @@ export async function POST(request: Request) {
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
+
+  if (isRateLimited(`upload:${tenant}`, 20)) {
+    return NextResponse.json(
+      { error: "Too many uploads. Try again in a minute." },
+      { status: 429 }
+    );
+  }
+
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
 

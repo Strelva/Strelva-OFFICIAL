@@ -99,6 +99,10 @@ function corsHeaders(origin: string | null): Record<string, string> {
   return {};
 }
 
+// Next.js 16 proxy convention: renamed from middleware.ts to proxy.ts.
+// The function export must be named `proxy` or be a default export.
+// clerkMiddleware() returns a NextMiddleware-compatible function that
+// Next.js accepts as the default export here.
 export default clerkMiddleware(async (auth, request) => {
   const origin = request.headers.get("origin");
 

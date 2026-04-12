@@ -41,8 +41,8 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
   },
   social: {
     name: "Social Media",
-    description: "Post to social media and track engagement",
-    tools: ["create_social_post", "get_social_metrics"],
+    description: "Draft and schedule social media posts from site content",
+    tools: ["draft_social_post", "list_social_posts", "schedule_social_post"],
   },
 };
 
@@ -56,7 +56,7 @@ const TIER_CAPABILITIES: Record<SubscriptionTier, CapabilityId[]> = {
 
 // v2 stubs — not yet implemented
 const IMPLEMENTED_CAPABILITIES: Set<CapabilityId> = new Set([
-  "website", "analytics", "email", "blog",
+  "website", "analytics", "email", "blog", "reviews", "social",
 ]);
 
 export function getCapabilitiesForTier(tier: SubscriptionTier): Capability[] {

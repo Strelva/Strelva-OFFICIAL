@@ -43,7 +43,7 @@ export function Popover({ open, onClose, children, className }: PopoverProps) {
     <div
       ref={ref}
       className={cn(
-        "bg-white border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up",
+        "bg-surface-raised border border-gray-border rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden animate-fade-in-up",
         className,
       )}
     >

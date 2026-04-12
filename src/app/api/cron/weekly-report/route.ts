@@ -32,22 +32,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const reports = await generateAllReports();
+  const allReports = await generateAllReports();
+  const reports = allReports.filter((r) => r.tenant.subscriptionStatus !== "cancelled");
   const sent: string[] = [];
+  const skipped = allReports.length - reports.length;
   const errors: string[] = [];
 
   for (const report of reports) {
-    const email = report.tenant.ownerEmail;
-    if (!email) continue;
+    try {
+      const email = report.tenant.ownerEmail;
+      if (!email) continue;
 
-    const subject = report.pageViews.thisWeek > 0
-      ? `${report.pageViews.thisWeek} people found you this week`
-      : `Your weekly site update`;
+      const subject = report.pageViews.thisWeek > 0
+        ? `${report.pageViews.thisWeek} people found you this week`
+        : `Your weekly site update`;
 
-    const html = reportToHtml(report.summary, report.tenant.siteName);
+      const html = reportToHtml(report.summary, report.tenant.siteName);
 
-    if (process.env.RESEND_API_KEY) {
-      try {
+      if (process.env.RESEND_API_KEY) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
         const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.reb.studio";
@@ -60,26 +62,39 @@ export async function GET(req: Request) {
           text: report.summary,
         });
         sent.push(report.tenant.id);
-      } catch (err) {
-        errors.push(`${report.tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`);
+      } else {
+        console.log(`[Weekly report dev] "${subject}" -> ${email}`);
+        console.log(report.summary);
+        sent.push(report.tenant.id);
       }
-    } else {
-      console.log(`[Weekly report dev] "${subject}" -> ${email}`);
-      console.log(report.summary);
-      sent.push(report.tenant.id);
-    }
 
-    // Slack notification
-    if (process.env.SLACK_WEBHOOK_URL) {
-      fetch(process.env.SLACK_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: `Weekly report sent to ${report.tenant.ownerName} (${report.tenant.siteName}): ${report.pageViews.thisWeek} views, ${report.bookingClicks.thisWeek} clicks`,
-        }),
-      }).catch(() => {});
+      // Slack notification
+      if (process.env.SLACK_WEBHOOK_URL) {
+        fetch(process.env.SLACK_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: `Weekly report sent to ${report.tenant.ownerName} (${report.tenant.siteName}): ${report.pageViews.thisWeek} views, ${report.bookingClicks.thisWeek} clicks`,
+          }),
+        }).catch(() => {});
+      }
+    } catch (err) {
+      const msg = `${report.tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`;
+      console.error(`[weekly-report] Failed for tenant ${report.tenant.id}:`, err);
+      errors.push(msg);
     }
   }
 
-  return NextResponse.json({ sent, errors, total: reports.length });
+  // Notify Slack if any tenants failed
+  if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
+    fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `⚠ Weekly report cron: ${errors.length} tenant(s) failed — ${errors.join(", ")}`,
+      }),
+    }).catch(() => {});
+  }
+
+  return NextResponse.json({ processed: sent.length, failed: errors.length, sent, errors, skipped, total: allReports.length });
 }

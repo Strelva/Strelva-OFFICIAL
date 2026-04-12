@@ -8,6 +8,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { getActivatedCapabilities, capabilityPromptFragment } from "@/lib/capabilities";
+import { isRateLimited } from "@/lib/rate-limit";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -136,6 +137,14 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+
+  if (isRateLimited(`agent:${tenant}`, 30)) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Try again in a minute." }),
+      { status: 429, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
 
@@ -205,7 +214,7 @@ export async function POST(req: Request) {
               }
             }
 
-            const autoPublish = process.env.AI_AUTO_PUBLISH !== "false";
+            const autoPublish = tenantConfig?.autoPublish !== false;
 
             if (autoPublish) {
               await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
@@ -217,13 +226,19 @@ export async function POST(req: Request) {
             }
 
             if (process.env.SLACK_WEBHOOK_URL) {
+              const { diffFields } = await import("@/lib/utils");
+              const changeSummary = diffFields(current, data as Record<string, unknown>)
+                .slice(0, 5)
+                .map((c) => `  • ${c.field}: "${c.before}" → "${c.after}"`)
+                .join("\n");
+              const tenantLabel = tenantConfig?.siteName || tenant;
               fetch(process.env.SLACK_WEBHOOK_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   text: autoPublish
-                    ? `Site updated *${section}* via AI chat`
-                    : `AI drafted changes to *${section}* for ${tenant} — review at /admin/drafts`,
+                    ? `[${tenantLabel}] AI updated *${section}*\n${changeSummary}`
+                    : `[${tenantLabel}] AI drafted changes to *${section}* — needs review at /admin/drafts\n${changeSummary}`,
                 }),
               }).catch(() => {});
             }
@@ -248,7 +263,7 @@ export async function POST(req: Request) {
               section,
               message: autoPublish
                 ? `Updated ${section} successfully`
-                : `I've drafted the changes to ${section}. Laney will review and publish them shortly.`,
+                : `I've drafted the changes to ${section}. Your admin will review and publish them shortly.`,
             };
           } catch (err) {
             return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
@@ -385,6 +400,152 @@ export async function POST(req: Request) {
         },
       }),
     },
+    draft_social_post: {
+      capability: "draft_social_post",
+      def: tool({
+        description: "Draft a social media post. Creates it as a draft that the owner can review, schedule, or publish.",
+        inputSchema: z.object({
+          platform: z.enum(["instagram", "facebook", "x"]).describe("Target social platform"),
+          content: z.string().describe("The post content/caption"),
+          imageUrl: z.string().optional().describe("Optional image URL to attach"),
+        }),
+        execute: async ({ platform, content, imageUrl }) => {
+          try {
+            const { getSocialPosts, setSocialPosts } = await import("@/lib/storage");
+            const post = {
+              id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              platform,
+              content,
+              imageUrl: imageUrl || undefined,
+              status: "draft" as const,
+              createdAt: new Date().toISOString(),
+            };
+            const posts = await getSocialPosts(tenant);
+            posts.unshift(post);
+            await setSocialPosts(tenant, posts);
+            return { success: true, post };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : "Failed to create post" };
+          }
+        },
+      }),
+    },
+    list_social_posts: {
+      capability: "list_social_posts",
+      def: tool({
+        description: "List recent social media posts with their status (draft, scheduled, published)",
+        inputSchema: z.object({
+          status: z.enum(["draft", "scheduled", "published"]).optional().describe("Filter by status"),
+        }),
+        execute: async ({ status }) => {
+          try {
+            const { getSocialPosts } = await import("@/lib/storage");
+            let posts = await getSocialPosts(tenant);
+            if (status) posts = posts.filter((p) => p.status === status);
+            return {
+              count: posts.length,
+              posts: posts.slice(0, 20).map((p) => ({
+                id: p.id,
+                platform: p.platform,
+                content: p.content.slice(0, 100) + (p.content.length > 100 ? "..." : ""),
+                status: p.status,
+                scheduledFor: p.scheduledFor,
+                publishedAt: p.publishedAt,
+                createdAt: p.createdAt,
+              })),
+            };
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : "Failed to list posts" };
+          }
+        },
+      }),
+    },
+    schedule_social_post: {
+      capability: "schedule_social_post",
+      def: tool({
+        description: "Schedule a draft social post for a specific date and time",
+        inputSchema: z.object({
+          postId: z.string().describe("The ID of the draft post to schedule"),
+          scheduledFor: z.string().describe("ISO date string for when to publish (e.g. 2026-04-15T10:00:00Z)"),
+        }),
+        execute: async ({ postId, scheduledFor }) => {
+          try {
+            const { getSocialPosts, setSocialPosts } = await import("@/lib/storage");
+            const posts = await getSocialPosts(tenant);
+            const post = posts.find((p) => p.id === postId);
+            if (!post) return { success: false, error: "Post not found" };
+            if (post.status !== "draft") return { success: false, error: `Post is ${post.status}, not a draft` };
+            post.status = "scheduled";
+            post.scheduledFor = scheduledFor;
+            await setSocialPosts(tenant, posts);
+            return { success: true, post };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : "Failed to schedule" };
+          }
+        },
+      }),
+    },
+    get_reviews: {
+      capability: "get_reviews",
+      def: tool({
+        description: "Get all customer reviews across platforms (Google, Yelp, manual)",
+        inputSchema: z.object({}),
+        execute: async () => {
+          try {
+            const { getReviews } = await import("@/lib/reviews");
+            const reviews = await getReviews(tenant);
+            const avg = reviews.length > 0
+              ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+              : 0;
+            return {
+              reviews: reviews.slice(0, 20),
+              total: reviews.length,
+              averageRating: Math.round(avg * 10) / 10,
+              unreplied: reviews.filter((r) => !r.reply).length,
+            };
+          } catch (err) {
+            return { error: `Failed to get reviews: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
+    },
+    reply_to_review: {
+      capability: "respond_review",
+      def: tool({
+        description: "Reply to a customer review by ID. Use get_reviews first to find the review ID.",
+        inputSchema: z.object({
+          reviewId: z.string().describe("The review ID to reply to"),
+          replyText: z.string().describe("The reply text"),
+        }),
+        execute: async ({ reviewId, replyText }) => {
+          try {
+            const { replyToReview } = await import("@/lib/reviews");
+            const updated = await replyToReview(tenant, reviewId, replyText);
+            if (!updated) {
+              return { success: false, error: "Review not found" };
+            }
+
+            try {
+              const { logActivity } = await import("@/lib/storage");
+              await logActivity({
+                text: `AI replied to ${updated.author}'s ${updated.rating}-star review`,
+                time: new Date().toISOString(),
+                type: "review-reply",
+                actor: "ai",
+              }, tenant);
+            } catch {}
+
+            return {
+              success: true,
+              review: updated,
+              message: `Replied to ${updated.author}'s review`,
+            };
+          } catch (err) {
+            return { success: false, error: `Failed to reply: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
+    },
   };
 
   // Filter tools to only those the tenant's tier allows
@@ -422,6 +583,11 @@ export async function POST(req: Request) {
               toolName === "get_activity" ? "Looking at recent activity..." :
               toolName === "send_newsletter" ? "Sending newsletter..." :
               toolName === "list_subscribers" ? "Checking subscribers..." :
+              toolName === "draft_social_post" ? "Drafting social post..." :
+              toolName === "list_social_posts" ? "Checking social posts..." :
+              toolName === "schedule_social_post" ? "Scheduling social post..." :
+              toolName === "get_reviews" ? "Checking your reviews..." :
+              toolName === "reply_to_review" ? "Replying to review..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "text-delta") {

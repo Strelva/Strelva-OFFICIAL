@@ -55,6 +55,9 @@ interface DashboardContextValue {
 
   // Template identifier
   template: string;
+
+  // Whether AI agent auto-publishes or creates drafts
+  autoPublish: boolean;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -79,11 +82,12 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
   return { left: false, right: false };
 }
 
-export function DashboardProvider({ children, siteUrl = "", template = "wellness" }: { children: ReactNode; siteUrl?: string; template?: string }) {
+export function DashboardProvider({ children, siteUrl = "", template = "wellness", autoPublish = true }: { children: ReactNode; siteUrl?: string; template?: string; autoPublish?: boolean }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<string>("home");
   const [rightTab, setRightTab] = useState<RightTab>("chat");
@@ -93,11 +97,15 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
   const [editMode, setEditMode] = useState<EditMode>("live");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
 
-  // Load collapse state from localStorage on mount
+  // Apply localStorage collapse state after hydration completes.
+  // First render always uses server default (false) so the client
+  // tree structure matches what the server rendered — preventing
+  // hydration mismatch and the "parentNode" null error.
   useEffect(() => {
     const stored = getStoredCollapse();
     setLeftCollapsed(stored.left);
     setRightCollapsed(stored.right);
+    setHasMounted(true);
   }, []);
 
   const persistCollapse = (left: boolean, right: boolean) => {
@@ -138,6 +146,11 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
     setChatDrawerOpen(true); // Also open the floating drawer
   }, []);
 
+  // Until hydration is complete, expose the server default (false)
+  // so consumers render the same tree structure the server did.
+  const safeLeftCollapsed = hasMounted ? leftCollapsed : false;
+  const safeRightCollapsed = hasMounted ? rightCollapsed : false;
+
   return (
     <DashboardContext.Provider
       value={{
@@ -151,8 +164,8 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
         setActivePage,
         rightTab,
         setRightTab,
-        leftCollapsed,
-        rightCollapsed,
+        leftCollapsed: safeLeftCollapsed,
+        rightCollapsed: safeRightCollapsed,
         toggleLeft,
         toggleRight,
         refreshKey,
@@ -167,6 +180,7 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
         setHasDraft,
         siteUrl,
         template,
+        autoPublish,
       }}
     >
       {children}
