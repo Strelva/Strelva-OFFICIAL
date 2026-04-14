@@ -183,8 +183,21 @@ async function seed(tenantId: string) {
     process.exit(1);
   }
 
-  // Use tenant-specific defaults if available, otherwise fall back to template defaults
-  const data = TENANT_DEFAULTS[tenantId] ?? rohlaxDefaults;
+  // Use tenant-specific defaults if available, otherwise read from dev-content file
+  let data = TENANT_DEFAULTS[tenantId];
+  if (!data) {
+    const { promises: fs } = await import("fs");
+    const { join } = await import("path");
+    const devPath = join(process.cwd(), `dev-content-${tenantId}.json`);
+    try {
+      const raw = await fs.readFile(devPath, "utf-8");
+      data = JSON.parse(raw) as ContentMap;
+      console.log(`  Using dev-content-${tenantId}.json as seed source`);
+    } catch {
+      console.log(`  No dev-content-${tenantId}.json found, using rohlax defaults`);
+      data = rohlaxDefaults;
+    }
+  }
 
   console.log(`Seeding content for tenant: ${tenantId} (template: ${tenantConfig.template})`);
 

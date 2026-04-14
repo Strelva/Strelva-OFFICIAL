@@ -63,10 +63,10 @@ export function SitePreview() {
   // PAGE_PATHS map.
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
   const editParam = editMode === "draft" ? "?edit=true" : "";
-  // Use same-origin relative paths for the iframe to avoid cross-origin
-  // blocking (X-Frame-Options / CORS). The public routes render at /{page}
-  // within this Next.js app, so no external URL is needed.
-  const iframeSrc = `${pagePath}${editParam}`;
+  // Use the public site URL for the iframe so the preview shows the actual
+  // client site, not the admin dashboard's own routes.
+  const base = siteUrl || "";
+  const iframeSrc = `${base}${pagePath}${editParam}`;
 
   // Reset loading state when refreshKey or page changes
   useEffect(() => {

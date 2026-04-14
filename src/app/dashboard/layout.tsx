@@ -25,7 +25,7 @@ export default async function DashboardLayout({
   const siteUrl = tenantConfig?.siteUrl
     || (tenantConfig?.customDomains?.[0] ? `https://${tenantConfig.customDomains[0]}` : "");
   let siteName = "Your Business";
-  let ownerName = "there";
+  let ownerName = "";
   let bookingUrl = "";
   try {
     const settings = await getContent("settings", tenant);

@@ -62,7 +62,7 @@ export default function MarketingLayout({
             &copy; {new Date().getFullYear()} REB Studio &middot; Buffalo, NY
           </div>
           <div className="flex gap-5 text-[12px]" style={{ color: "var(--m-text-3)" }}>
-            <a href="mailto:laney@buffaloprojects.com" className="hover:underline">Contact</a>
+            <a href="mailto:jacob@reb.studio" className="hover:underline">Contact</a>
           </div>
         </div>
       </footer>

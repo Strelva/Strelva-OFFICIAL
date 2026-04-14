@@ -136,7 +136,7 @@ export function HubPage({
         <h1 className="text-[32px] md:text-[40px] font-normal tracking-[-0.03em] leading-[1.1] text-warm-black" suppressHydrationWarning>
           {pageViews.thisWeek > 0
             ? `${pageViews.thisWeek} people found you this week`
-            : `${getGreeting()}, ${ownerName}`}
+            : ownerName ? `${getGreeting()}, ${ownerName}` : getGreeting()}
         </h1>
         <p className="text-[14px] font-light tracking-[-0.01em] text-gray-muted mt-3">
           {pageViews.thisWeek > 0

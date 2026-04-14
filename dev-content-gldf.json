@@ -91,11 +91,81 @@
   },
   "settings": {
     "siteName": "Great Lakes Dried Fruit",
+    "ownerName": "Amy",
     "siteTagline": "Orchard-Dried Apple Snacks",
     "siteDescription": "Small-batch dried fruit snacks made with real ingredients in Western New York.",
     "logoUrl": "/images/logo.webp",
     "footerTagline": "Orchard-dried. Ingredient-honest.",
     "copyrightText": "Great Lakes Dried Fruit",
     "marqueeText": "DRIED APPLES • CINNAMON • MAPLE •"
+  },
+  "theme": {
+    "colors": {
+      "cream": "#faf8f5",
+      "creamDark": "#f0ece5",
+      "creamMid": "#e8e2d8",
+      "sage": "#5a260c",
+      "sageLight": "#7a3a18",
+      "sageDark": "#3d1a08",
+      "bark": "#2c2418",
+      "barkLight": "#5a4d3e",
+      "barkFaded": "#8a7d6e",
+      "wheat": "#c8a96e",
+      "wheatLight": "#dcc08a",
+      "terra": "#b5634b",
+      "terraLight": "#c97a64"
+    },
+    "fontDisplay": "Instrument_Serif",
+    "fontBody": "Inter"
+  },
+  "navigation": {
+    "menuItems": [
+      {
+        "label": "Shop",
+        "href": "#products"
+      },
+      {
+        "label": "Our Story",
+        "href": "#story"
+      },
+      {
+        "label": "Contact",
+        "href": "#contact"
+      }
+    ],
+    "ctaLabel": "",
+    "ctaHref": ""
+  },
+  "footer": {
+    "tagline": "Orchard-dried. Ingredient-honest.",
+    "columns": [
+      {
+        "heading": "Navigate",
+        "links": [
+          {
+            "label": "Products",
+            "href": "#products"
+          },
+          {
+            "label": "Our Story",
+            "href": "#story"
+          }
+        ]
+      },
+      {
+        "heading": "Connect",
+        "links": []
+      }
+    ],
+    "socialLinks": [],
+    "copyrightText": "Great Lakes Dried Fruit"
+  },
+  "rewardsConfig": {
+    "starsPerBag": 100,
+    "starsToRedeem": 100,
+    "redemptionValue": 5,
+    "newsletterBonus": 50,
+    "subscriptionBonus": 30,
+    "tierThresholdSuper": 500
   }
 }
