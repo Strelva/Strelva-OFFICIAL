@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Check } from "lucide-react";
+import { Check, Bot } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { Tabs } from "@/components/ui/Tabs";
@@ -118,6 +118,7 @@ function setNestedValue(
 const TABS = [
   { value: "identity", label: "Identity" },
   { value: "brand", label: "Brand" },
+  { value: "myai", label: "My AI" },
   { value: "domains", label: "Domains" },
   { value: "publishing", label: "Publishing" },
 ];
@@ -208,7 +209,7 @@ function IdentityTab({
         </div>
       )}
 
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl overflow-hidden">
         {IDENTITY_FIELDS.map((field, i) => (
           <div
             key={field.key}
@@ -335,7 +336,7 @@ function BrandTab() {
       )}
 
       {/* Font pickers */}
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden mb-4">
+      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-gray-bg">
           <span className="text-xs font-medium text-warm-black">Typography</span>
         </div>
@@ -378,7 +379,7 @@ function BrandTab() {
       </div>
 
       {/* Color pickers */}
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-bg">
           <span className="text-xs font-medium text-warm-black">Colors</span>
         </div>
@@ -449,7 +450,7 @@ function PublishingTab() {
 
   return (
     <div>
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl overflow-hidden">
         <div className="flex items-start sm:items-center justify-between gap-4 px-5 py-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
@@ -475,7 +476,7 @@ function PublishingTab() {
         </div>
       </div>
 
-      <div className="mt-4 bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="mt-4 bg-surface rounded-2xl overflow-hidden">
         <div className="px-5 py-4">
           <h3 className="text-sm font-medium text-warm-black mb-2">How it works</h3>
           <div className="space-y-3">
@@ -509,6 +510,243 @@ function PublishingTab() {
 }
 
 // ---------------------------------------------------------------------------
+// My AI Tab
+// ---------------------------------------------------------------------------
+
+const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({
+  day: i,
+  open: "09:00",
+  close: "17:00",
+  closed: i === 0, // Sunday closed by default
+}));
+
+interface AISettings {
+  businessRules: string;
+  personality: string;
+  businessHours: {
+    schedule: { day: number; open: string; close: string; closed: boolean }[];
+    holidays?: { date: string; label: string }[];
+    timezone?: string;
+  } | null;
+}
+
+function MyAITab() {
+  const [data, setData] = useState<AISettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const latestRef = useRef<AISettings | null>(null);
+
+  useEffect(() => {
+    fetch("/api/tenant-settings", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        const settings: AISettings = {
+          businessRules: d?.businessRules || "",
+          personality: d?.personality || "",
+          businessHours: d?.businessHours || { schedule: DEFAULT_SCHEDULE, holidays: [] },
+        };
+        setData(settings);
+        latestRef.current = settings;
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = useCallback(async (settings: AISettings) => {
+    setSaveError(false);
+    try {
+      const res = await fetch("/api/tenant-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(settings),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 3000);
+      }
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    }
+  }, []);
+
+  const handleBlurSave = useCallback(() => {
+    if (latestRef.current) save(latestRef.current);
+  }, [save]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <SkeletonLine width="w-1/3" height="h-4" />
+        <SkeletonLine width="w-full" height="h-20" />
+        <SkeletonLine width="w-full" height="h-20" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
+        <p className="text-sm text-red-600">Couldn&apos;t load AI settings</p>
+      </div>
+    );
+  }
+
+  const schedule = data.businessHours?.schedule || DEFAULT_SCHEDULE;
+
+  return (
+    <div>
+      {saveError && (
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+          Couldn&apos;t save — try again
+        </div>
+      )}
+
+      {/* Personality */}
+      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-bg flex items-center gap-2">
+          <Bot className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
+          <span className="text-xs font-medium text-warm-black">Voice & Personality</span>
+        </div>
+        <div className="px-5 py-4">
+          <TextInput
+            label="AI personality"
+            value={data.personality}
+            onChange={(e) => {
+              const updated = { ...data, personality: e.target.value };
+              setData(updated);
+              latestRef.current = updated;
+            }}
+            onBlur={handleBlurSave}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                (e.target as HTMLElement).blur();
+              }
+            }}
+            placeholder="e.g. warm and casual, professional, friendly but concise"
+          />
+          <p className="text-[11px] text-gray-subtle mt-1.5">
+            Describes how the AI sounds in chat, emails, social posts, and review replies.
+          </p>
+        </div>
+      </div>
+
+      {/* Business Rules */}
+      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-bg">
+          <span className="text-xs font-medium text-warm-black">Instructions for the AI</span>
+        </div>
+        <div className="px-5 py-4">
+          <TextArea
+            label="Business rules"
+            value={data.businessRules}
+            onChange={(e) => {
+              const updated = { ...data, businessRules: e.target.value };
+              setData(updated);
+              latestRef.current = updated;
+            }}
+            onBlur={handleBlurSave}
+            placeholder={"e.g.\n• Always mention we're woman-owned\n• Never discount below 15%\n• Don't change the hero image without asking\n• When responding to reviews, always thank them by name"}
+            rows={6}
+          />
+          <p className="text-[11px] text-gray-subtle mt-1.5">
+            Persistent instructions the AI follows on every interaction — chat, emails, social posts, review replies. 2,000 characters max.
+          </p>
+        </div>
+      </div>
+
+      {/* Business Hours */}
+      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-bg">
+          <span className="text-xs font-medium text-warm-black">Business Hours</span>
+        </div>
+        <div className="divide-y divide-gray-bg">
+          {schedule.map((day, i) => (
+            <div key={day.day} className="flex items-center gap-3 px-5 py-3">
+              <span className="text-[13px] text-warm-black w-24 shrink-0">
+                {DAY_LABELS[day.day]}
+              </span>
+              <label className="flex items-center gap-1.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={!day.closed}
+                  onChange={(e) => {
+                    const newSchedule = [...schedule];
+                    newSchedule[i] = { ...day, closed: !e.target.checked };
+                    const updated = {
+                      ...data,
+                      businessHours: { ...data.businessHours!, schedule: newSchedule },
+                    };
+                    setData(updated);
+                    latestRef.current = updated;
+                    save(updated);
+                  }}
+                  className="w-3.5 h-3.5 rounded border-gray-border text-sage focus:ring-sage/20"
+                />
+                <span className="text-[11px] text-gray-muted">Open</span>
+              </label>
+              {!day.closed ? (
+                <div className="flex items-center gap-1.5 flex-1">
+                  <input
+                    type="time"
+                    value={day.open}
+                    onChange={(e) => {
+                      const newSchedule = [...schedule];
+                      newSchedule[i] = { ...day, open: e.target.value };
+                      const updated = {
+                        ...data,
+                        businessHours: { ...data.businessHours!, schedule: newSchedule },
+                      };
+                      setData(updated);
+                      latestRef.current = updated;
+                    }}
+                    onBlur={handleBlurSave}
+                    className="w-[110px] h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
+                  />
+                  <span className="text-[11px] text-gray-subtle">to</span>
+                  <input
+                    type="time"
+                    value={day.close}
+                    onChange={(e) => {
+                      const newSchedule = [...schedule];
+                      newSchedule[i] = { ...day, close: e.target.value };
+                      const updated = {
+                        ...data,
+                        businessHours: { ...data.businessHours!, schedule: newSchedule },
+                      };
+                      setData(updated);
+                      latestRef.current = updated;
+                    }}
+                    onBlur={handleBlurSave}
+                    className="w-[110px] h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
+                  />
+                </div>
+              ) : (
+                <span className="text-[12px] text-gray-subtle italic">Closed</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-3 border-t border-gray-bg">
+          <p className="text-[11px] text-gray-subtle">
+            The AI uses these hours to answer &quot;are you open?&quot; questions and to update your site&apos;s hours section.
+          </p>
+        </div>
+      </div>
+
+      <SavedToast visible={saved} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -531,7 +769,7 @@ export default function SettingsPage() {
 
   if (loadError) {
     return (
-      <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
+      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
         <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-sm text-red-600 mb-3">Couldn&apos;t load settings</p>
           <button
@@ -557,12 +795,12 @@ export default function SettingsPage() {
 
   if (!settings && activeTab === "identity") {
     return (
-      <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto animate-pulse">
+      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto animate-pulse">
         <div className="mb-8">
           <div className="h-3 w-16 bg-gray-bg-hover rounded mb-2" />
           <div className="h-7 w-40 bg-gray-bg-hover rounded" />
         </div>
-        <div className="bg-surface border border-gray-border rounded-lg">
+        <div className="bg-surface rounded-2xl">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="px-5 py-5 border-b border-gray-bg last:border-0">
               <div className="h-3 w-24 bg-gray-bg-hover rounded mb-2" />
@@ -575,14 +813,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
       {/* Header */}
       <div className="mb-6">
-        <span className="text-xs uppercase tracking-widest text-gray-muted">
-          SETTINGS
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight text-warm-black mt-1">
-          Site configuration
+        <h1 className="text-xl font-medium tracking-tight text-warm-black">
+          Settings
         </h1>
       </div>
 
@@ -602,6 +837,7 @@ export default function SettingsPage() {
         <IdentityTab settings={settings} setSettings={setSettings} />
       )}
       {activeTab === "brand" && <BrandTab />}
+      {activeTab === "myai" && <MyAITab />}
       {activeTab === "domains" && <DomainsTab />}
       {activeTab === "publishing" && <PublishingTab />}
     </div>

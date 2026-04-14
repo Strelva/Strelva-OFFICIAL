@@ -57,7 +57,8 @@ export function Hero({ hero }: { hero: HeroContent }) {
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen flex items-center overflow-hidden"
+      className="relative w-full overflow-hidden"
+      style={{ paddingBottom: "33.333%" /* 3:1 aspect ratio like TopSeedz */ }}
     >
       {/* Full-bleed background image */}
       {hero.backgroundImageUrl && (
@@ -65,7 +66,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
           src={hero.backgroundImageUrl}
           alt=""
           fill
-          className="object-cover"
+          className="object-cover object-center"
           sizes="100vw"
           priority
         />
@@ -73,94 +74,84 @@ export function Hero({ hero }: { hero: HeroContent }) {
       {/* Dark overlay for text legibility */}
       <div className="absolute inset-0 bg-black/40" />
 
-      <div className="container-main w-full relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center py-24 md:py-32">
-          {/* Left — Text */}
-          <div ref={contentRef} className="max-w-xl text-center lg:text-left mx-auto lg:mx-0">
-            {hero.subheadline && (
+      {/* Content positioned absolutely within the aspect-ratio box */}
+      <div className="absolute inset-0 z-10 flex items-center">
+        <div className="container-main w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            {/* Left — Text */}
+            <div ref={contentRef} className="max-w-xl text-center lg:text-left mx-auto lg:mx-0">
+              {hero.subheadline && (
+                <p
+                  data-hero-animate
+                  className="text-xs md:text-sm font-medium tracking-wider uppercase mb-3"
+                  style={{ color: "var(--wheat-light)" }}
+                >
+                  {hero.subheadline}
+                </p>
+              )}
+              <h1
+                data-hero-animate
+                className="font-display text-3xl md:text-5xl lg:text-6xl tracking-tight leading-[0.92] mb-4"
+                style={{ color: "var(--cream)" }}
+              >
+                {hero.headline.split("\n").map((line, i) => (
+                  <span key={i}>
+                    {i > 0 && <br />}
+                    {line}
+                  </span>
+                ))}
+              </h1>
               <p
                 data-hero-animate
-                className="text-sm md:text-base font-medium tracking-wider uppercase mb-4"
-                style={{ color: "var(--wheat-light)" }}
+                className="text-sm md:text-base max-w-md mx-auto lg:mx-0 mb-5 leading-relaxed"
+                style={{ color: "rgba(250, 248, 245, 0.8)" }}
               >
-                {hero.subheadline}
+                {hero.tagline}
               </p>
-            )}
-            <h1
-              data-hero-animate
-              className="font-display text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight leading-[0.92] mb-6"
-              style={{ color: "var(--cream)" }}
-            >
-              {hero.headline.split("\n").map((line, i) => (
-                <span key={i}>
-                  {i > 0 && <br />}
-                  {line}
-                </span>
-              ))}
-            </h1>
-            <p
-              data-hero-animate
-              className="text-base md:text-lg max-w-md mx-auto lg:mx-0 mb-8 leading-relaxed"
-              style={{ color: "rgba(250, 248, 245, 0.8)" }}
-            >
-              {hero.tagline}
-            </p>
-            <div data-hero-animate className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
-              <a
-                href="#products"
-                className="btn-primary"
-                style={{ background: "var(--cream)", color: "var(--sage)" }}
-                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  e.currentTarget.style.background = "var(--wheat-light)";
-                }}
-                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  e.currentTarget.style.background = "var(--cream)";
-                }}
-              >
-                {hero.ctaText}
-              </a>
-              <a
-                href="#story"
-                className="btn-ghost"
-                style={{ borderColor: "rgba(250,248,245,0.5)", color: "var(--cream)" }}
-              >
-                Our Story
-              </a>
+              <div data-hero-animate className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+                <a
+                  href="#products"
+                  className="btn-primary"
+                  style={{ background: "var(--cream)", color: "var(--sage)" }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    e.currentTarget.style.background = "var(--wheat-light)";
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    e.currentTarget.style.background = "var(--cream)";
+                  }}
+                >
+                  {hero.ctaText}
+                </a>
+                <a
+                  href="#story"
+                  className="btn-ghost"
+                  style={{ borderColor: "rgba(250,248,245,0.5)", color: "var(--cream)" }}
+                >
+                  Our Story
+                </a>
+              </div>
             </div>
-          </div>
 
-          {/* Right — Product bag floating over the lake */}
-          <div ref={productRef} className="relative flex items-center justify-center lg:justify-end">
-            <div
-              data-product-img
-              className="relative z-10"
-              style={{ width: "min(380px, 55vw)" }}
-            >
-              <Image
-                src="/images/transparentbag.png"
-                alt="Great Lakes Dried Fruit — Apple Chips"
-                width={1200}
-                height={1703}
-                className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
-                sizes="(max-width: 1024px) 80vw, 380px"
-                priority
-              />
+            {/* Right — Product bag */}
+            <div ref={productRef} className="hidden lg:flex items-center justify-end">
+              <div
+                data-product-img
+                className="relative z-10"
+                style={{ width: "min(280px, 40vw)" }}
+              >
+                <Image
+                  src="/images/transparentbag.png"
+                  alt="Great Lakes Dried Fruit — Apple Chips"
+                  width={1200}
+                  height={1703}
+                  className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
+                  sizes="280px"
+                  priority
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10"
-        style={{ animation: "bounce-subtle 2s ease-in-out infinite" }}
-      >
-        <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
-          <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(250,248,245,0.4)" strokeWidth="1.5" />
-          <circle cx="10" cy="8" r="2" fill="rgba(250,248,245,0.6)">
-            <animate attributeName="cy" values="8;18;8" dur="2s" repeatCount="indefinite" />
-          </circle>
-        </svg>
       </div>
     </section>
   );

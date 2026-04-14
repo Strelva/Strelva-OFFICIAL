@@ -110,7 +110,7 @@ function SocialContent() {
 
   if (loading) {
     return (
-      <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full overflow-y-auto space-y-4">
+      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto space-y-4">
         <SkeletonLine width="w-48" height="h-8" />
         <SkeletonLine width="w-full" height="h-64" />
       </div>
@@ -118,16 +118,15 @@ function SocialContent() {
   }
 
   return (
-    <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full overflow-y-auto">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-warm-black tracking-tight">Social Media</h1>
-          <p className="text-sm text-gray-muted mt-1">Draft and schedule posts from your site content</p>
+          <h1 className="text-xl font-medium text-warm-black tracking-tight">Social</h1>
         </div>
         <button
           onClick={handleNewPost}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sage hover:bg-sage/90 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-surface-base bg-warm-black hover:bg-warm-black/90 rounded-full transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Post

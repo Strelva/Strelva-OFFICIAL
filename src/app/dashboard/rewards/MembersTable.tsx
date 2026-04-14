@@ -85,7 +85,7 @@ export function MembersTable({ members }: Props) {
         </span>
       </div>
 
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-bg-alt border-b border-gray-border">
             <tr>

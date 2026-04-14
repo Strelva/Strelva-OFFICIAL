@@ -167,6 +167,246 @@ export async function setContent<K extends ContentSection>(
   await writeDevContent(store, tenant);
 }
 
+// --- Content Versioning ---
+
+export interface ContentVersion {
+  id: string;
+  section: string;
+  data: unknown;
+  author: "user" | "ai";
+  timestamp: string;
+  status: "live" | "rolled-back";
+  changes?: { field: string; before: string; after: string }[];
+}
+
+export async function appendVersion(
+  section: ContentSection,
+  data: unknown,
+  author: "user" | "ai",
+  tenant: string = DEFAULT_TENANT,
+  changes?: { field: string; before: string; after: string }[]
+): Promise<ContentVersion> {
+  const version: ContentVersion = {
+    id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    section,
+    data,
+    author,
+    timestamp: new Date().toISOString(),
+    status: "live",
+    changes,
+  };
+
+  if (hasSanity) {
+    await getSanityClient().create({
+      _type: "contentVersion",
+      tenant,
+      versionId: version.id,
+      section: version.section,
+      data: JSON.stringify(version.data),
+      author: version.author,
+      time: version.timestamp,
+      status: version.status,
+      changes: version.changes,
+    });
+    return version;
+  }
+
+  const store = await readDevContent(tenant);
+  const key = `__versions:${section}`;
+  const versions = (store[key] as ContentVersion[]) ?? [];
+  // Mark all previous live versions as rolled-back
+  for (const v of versions) {
+    if (v.status === "live") v.status = "rolled-back";
+  }
+  versions.unshift(version);
+  store[key] = versions.slice(0, 50); // keep last 50 versions per section
+  await writeDevContent(store, tenant);
+  return version;
+}
+
+export async function getVersions(
+  section: ContentSection,
+  tenant: string = DEFAULT_TENANT
+): Promise<ContentVersion[]> {
+  if (hasSanity) {
+    const raw = await getSanityReadClient().fetch<
+      Array<{
+        versionId: string;
+        section: string;
+        data: string;
+        author: string;
+        time: string;
+        status: string;
+        changes?: ContentVersion["changes"];
+      }>
+    >(
+      `*[_type == "contentVersion" && tenant == $tenant && section == $section] | order(time desc)[0...50]{
+        versionId, section, data, author, time, status, changes
+      }`,
+      { tenant, section }
+    );
+    return raw.map((v) => ({
+      id: v.versionId,
+      section: v.section,
+      data: typeof v.data === "string" ? JSON.parse(v.data) : v.data,
+      author: v.author as "user" | "ai",
+      timestamp: v.time,
+      status: v.status as "live" | "rolled-back",
+      changes: v.changes,
+    }));
+  }
+
+  const store = await readDevContent(tenant);
+  const key = `__versions:${section}`;
+  return (store[key] as ContentVersion[]) ?? [];
+}
+
+export async function restoreVersion(
+  section: ContentSection,
+  versionId: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<ContentVersion | null> {
+  const versions = await getVersions(section, tenant);
+  const target = versions.find((v) => v.id === versionId);
+  if (!target) return null;
+
+  // Write the restored content as live
+  await setContent(section, target.data as ContentMap[ContentSection], tenant);
+
+  // Create a new version marking this as a restore
+  const restored = await appendVersion(section, target.data, "user", tenant, [
+    { field: "_restore", before: "", after: `Restored from ${versionId}` },
+  ]);
+
+  return restored;
+}
+
+// --- Inbox ---
+
+export interface InboxItem {
+  id: string;
+  type: "ai-action" | "suggestion" | "review-alert" | "booking" | "subscriber" | "system";
+  title: string;
+  detail?: string;
+  timestamp: string;
+  read: boolean;
+  section?: string;
+  actions?: { label: string; href?: string; chatPrompt?: string }[];
+}
+
+export async function addInboxItem(
+  item: Omit<InboxItem, "id" | "timestamp" | "read">,
+  tenant: string = DEFAULT_TENANT
+): Promise<InboxItem> {
+  const full: InboxItem = {
+    ...item,
+    id: `inbox_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: new Date().toISOString(),
+    read: false,
+  };
+
+  if (hasSanity) {
+    await getSanityClient().create({
+      _type: "inboxItem",
+      tenant,
+      itemId: full.id,
+      itemType: full.type,
+      title: full.title,
+      detail: full.detail,
+      time: full.timestamp,
+      read: false,
+      section: full.section,
+      actions: full.actions,
+    });
+    return full;
+  }
+
+  const store = await readDevContent(tenant);
+  const items = (store.__inbox as InboxItem[]) ?? [];
+  items.unshift(full);
+  store.__inbox = items.slice(0, 200);
+  await writeDevContent(store, tenant);
+  return full;
+}
+
+export async function getInboxItems(
+  tenant: string = DEFAULT_TENANT,
+  filters?: { type?: string; unreadOnly?: boolean }
+): Promise<InboxItem[]> {
+  if (hasSanity) {
+    let query = `*[_type == "inboxItem" && tenant == $tenant`;
+    const params: Record<string, string | boolean> = { tenant };
+    if (filters?.type) {
+      query += ` && itemType == $itemType`;
+      params.itemType = filters.type;
+    }
+    if (filters?.unreadOnly) {
+      query += ` && read == false`;
+    }
+    query += `] | order(time desc)[0...50]{
+      "id": itemId, "type": itemType, title, detail, "timestamp": time, read, section, actions
+    }`;
+    return getSanityReadClient().fetch(query, params);
+  }
+
+  const store = await readDevContent(tenant);
+  let items = (store.__inbox as InboxItem[]) ?? [];
+  if (filters?.type) {
+    items = items.filter((i) => i.type === filters.type);
+  }
+  if (filters?.unreadOnly) {
+    items = items.filter((i) => !i.read);
+  }
+  return items.slice(0, 50);
+}
+
+export async function markInboxRead(
+  itemId: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<boolean> {
+  if (hasSanity) {
+    const docId = await getSanityClient().fetch(
+      `*[_type == "inboxItem" && tenant == $tenant && itemId == $itemId][0]._id`,
+      { tenant, itemId }
+    );
+    if (!docId) return false;
+    await getSanityClient().patch(docId).set({ read: true }).commit();
+    return true;
+  }
+
+  const store = await readDevContent(tenant);
+  const items = (store.__inbox as InboxItem[]) ?? [];
+  const item = items.find((i) => i.id === itemId);
+  if (!item) return false;
+  item.read = true;
+  store.__inbox = items;
+  await writeDevContent(store, tenant);
+  return true;
+}
+
+export async function markAllInboxRead(
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  if (hasSanity) {
+    const docs = await getSanityClient().fetch<Array<{ _id: string }>>(
+      `*[_type == "inboxItem" && tenant == $tenant && read == false]{_id}`,
+      { tenant }
+    );
+    const tx = getSanityClient().transaction();
+    for (const doc of docs) {
+      tx.patch(doc._id, (p) => p.set({ read: true }));
+    }
+    await tx.commit();
+    return;
+  }
+
+  const store = await readDevContent(tenant);
+  const items = (store.__inbox as InboxItem[]) ?? [];
+  for (const item of items) item.read = true;
+  store.__inbox = items;
+  await writeDevContent(store, tenant);
+}
+
 // --- File upload ---
 
 export async function uploadFile(file: File): Promise<{ url: string }> {
@@ -334,14 +574,31 @@ export async function logActivity(
       snapshot:
         entry.snapshot === undefined ? undefined : JSON.stringify(entry.snapshot),
     });
-    return;
+  } else {
+    const store = await readDevContent(tenant);
+    const activity = (store.__activity as unknown[]) ?? [];
+    activity.unshift(entry);
+    store.__activity = activity.slice(0, 200);
+    await writeDevContent(store, tenant);
   }
 
-  const store = await readDevContent(tenant);
-  const activity = (store.__activity as unknown[]) ?? [];
-  activity.unshift(entry);
-  store.__activity = activity.slice(0, 200);
-  await writeDevContent(store, tenant);
+  // Auto-create inbox item for AI actions and notable events
+  if (entry.actor === "ai" || entry.type === "ai" || entry.type === "review-reply" || entry.type === "newsletter") {
+    const inboxType =
+      entry.type === "review-reply" ? "review-alert" as const :
+      entry.type === "newsletter" ? "system" as const :
+      "ai-action" as const;
+    try {
+      await addInboxItem({
+        type: inboxType,
+        title: entry.text,
+        section: entry.section,
+        detail: entry.changes?.slice(0, 2).map((c) => `${c.field}: ${c.after}`).join(", "),
+      }, tenant);
+    } catch {
+      // Inbox write failure should never block activity logging
+    }
+  }
 }
 
 export async function getActivity(
@@ -585,6 +842,52 @@ export async function getClickCounts(
     weekCount += clicks[`${event}:${key}`] || 0;
   }
   return { total, today: todayCount, thisWeek: weekCount };
+}
+
+export interface DailyMetric {
+  date: string;
+  pageViews: number;
+  bookingClicks: number;
+}
+
+export async function getDailyMetrics(
+  tenant: string = DEFAULT_TENANT,
+  days: number = 30
+): Promise<DailyMetric[]> {
+  const result: DailyMetric[] = [];
+
+  if (hasSanity) {
+    const docId = `clicks-${tenant}`;
+    const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
+    const clicks = (doc || {}) as Record<string, number>;
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      result.push({
+        date: key,
+        pageViews: clicks[`page-view_${key}`] || 0,
+        bookingClicks: clicks[`booking-click_${key}`] || 0,
+      });
+    }
+    return result;
+  }
+
+  const store = await readDevContent(tenant);
+  const clicks = (store.__clicks as Record<string, number>) ?? {};
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({
+      date: key,
+      pageViews: clicks[`page-view:${key}`] || 0,
+      bookingClicks: clicks[`booking-click:${key}`] || 0,
+    });
+  }
+  return result;
 }
 
 export async function getClickCountsByPrefix(

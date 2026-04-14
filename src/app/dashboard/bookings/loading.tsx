@@ -2,7 +2,7 @@ import { SkeletonLine, SkeletonCard } from "@/components/ui/Skeleton";
 
 export default function BookingsLoading() {
   return (
-    <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full overflow-y-auto animate-pulse">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto animate-pulse">
       {/* Header */}
       <div className="mb-8">
         <SkeletonLine width="w-32" height="h-7" />
@@ -28,7 +28,7 @@ export default function BookingsLoading() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="bg-surface border border-gray-border rounded-lg p-4 flex items-center gap-4"
+            className="bg-surface rounded-2xl p-4 flex items-center gap-4"
           >
             <SkeletonLine width="w-12" height="h-12" className="rounded-lg shrink-0" />
             <div className="flex-1 space-y-2">

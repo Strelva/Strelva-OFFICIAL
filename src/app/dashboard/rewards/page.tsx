@@ -32,7 +32,7 @@ export default async function RewardsPage() {
     return (
       <div className="w-full max-w-screen-2xl mx-auto h-full overflow-y-auto p-6 md:p-8">
         <Header />
-        <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
+        <div className="bg-surface rounded-2xl p-12 text-center">
           <p className="text-sm text-gray-muted">{message}</p>
         </div>
       </div>
@@ -45,7 +45,7 @@ export default async function RewardsPage() {
     <div className="w-full max-w-screen-2xl mx-auto h-full overflow-y-auto p-6 md:p-8">
       <Header count={members.length} />
       {members.length === 0 ? (
-        <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
+        <div className="bg-surface rounded-2xl p-12 text-center">
           <p className="text-sm text-gray-muted">
             No members yet. They&apos;ll show up here once people sign up on your
             site.

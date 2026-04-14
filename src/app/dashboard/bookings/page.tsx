@@ -94,7 +94,7 @@ export default function BookingsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full overflow-y-auto space-y-4">
+      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto space-y-4">
         <SkeletonLine width="w-48" height="h-8" />
         <SkeletonLine width="w-full" height="h-64" />
       </div>
@@ -102,11 +102,10 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full overflow-y-auto">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-warm-black tracking-tight">Bookings</h1>
-        <p className="text-sm text-gray-muted mt-1">Manage your appointment schedule</p>
+        <h1 className="text-xl font-medium text-warm-black tracking-tight">Bookings</h1>
       </div>
 
       {/* Error banner */}

@@ -422,4 +422,28 @@ export interface TenantConfig {
   socialConfig?: { connectedPlatforms?: string[] };
   /** Review platform IDs for Growth+ tier */
   reviewsConfig?: { googlePlaceId?: string; yelpBusinessId?: string };
+  /** Free-text persistent instructions the AI follows on every interaction */
+  businessRules?: string;
+  /** Tone/voice descriptor for AI responses (e.g. "warm and casual", "professional") */
+  personality?: string;
+  /** Structured business hours the AI uses to answer questions and update the site */
+  businessHours?: BusinessHours;
+}
+
+export interface BusinessHoursDay {
+  day: number; // 0=Sun, 1=Mon, ..., 6=Sat
+  open: string; // "09:00"
+  close: string; // "17:00"
+  closed: boolean;
+}
+
+export interface BusinessHoliday {
+  date: string; // ISO date
+  label: string;
+}
+
+export interface BusinessHours {
+  schedule: BusinessHoursDay[];
+  holidays?: BusinessHoliday[];
+  timezone?: string;
 }

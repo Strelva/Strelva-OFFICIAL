@@ -9,6 +9,7 @@ import {
   getDraftContent,
   setDraftContent,
   clearDraft,
+  appendVersion,
 } from "@/lib/storage";
 import { diffFields } from "@/lib/utils";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -163,6 +164,7 @@ export async function PUT(
     const changes = diffFields(current, body);
 
     await setContent(s, body, tenant);
+    await appendVersion(s, body, "user", tenant, changes);
     await recordSectionUpdate(s, tenant);
     await logActivity({
       text: `Updated ${s} via admin`,

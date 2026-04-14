@@ -11,7 +11,7 @@ export default function RewardsLoading() {
       </div>
 
       {/* Table skeleton */}
-      <div className="bg-surface border border-gray-border rounded-lg">
+      <div className="bg-surface rounded-2xl">
         {/* Table header */}
         <div className="px-5 py-3 border-b border-gray-border flex gap-8">
           <SkeletonLine width="w-24" height="h-2.5" />

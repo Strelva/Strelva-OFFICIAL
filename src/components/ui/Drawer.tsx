@@ -82,7 +82,7 @@ export function Drawer({ open, onClose, side = "right", title, children, classNa
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-warm-black/20 transition-opacity duration-200"
+        className="fixed inset-0 z-50 bg-black/30 transition-opacity duration-200"
         aria-hidden
         onClick={onClose}
       />
@@ -94,10 +94,10 @@ export function Drawer({ open, onClose, side = "right", title, children, classNa
         aria-label={title || "Panel"}
         onKeyDown={handleKeyDown}
         className={cn(
-          "fixed z-50 bg-surface flex flex-col shadow-xl",
+          "fixed z-50 bg-surface-base flex flex-col shadow-lg border-l border-gray-border",
           isRight
             ? "top-0 right-0 h-full w-full max-w-[380px] animate-panel-right"
-            : "bottom-0 left-0 right-0 max-h-[80vh] rounded-t-2xl animate-fade-in-up",
+            : "bottom-0 left-0 right-0 max-h-[80vh] rounded-t-3xl animate-fade-in-up border-l-0 border-t",
           className,
         )}
       >

@@ -39,36 +39,36 @@
   --surface-inset:  #fafafa;
 }
 
-/* Dashboard dark theme — Figma-inspired monochrome + gold accent */
+/* Dashboard dark theme — OpenAI-inspired warm dark */
 [data-dashboard] {
-  --cream:       #000000;
-  --cream-dark:  #0a0a0a;
-  --cream-mid:   #1a1a1a;
-  --sage:        #ffffff;
+  --cream:       #212121;
+  --cream-dark:  #1a1a1a;
+  --cream-mid:   #303030;
+  --sage:        #ececec;
   --sage-light:  #ffffff;
-  --sage-dark:   #e0e0e0;
+  --sage-dark:   #b4b4b4;
   --sage-wash:   rgba(255, 255, 255, 0.03);
-  --bark:        #ffffff;
-  --bark-light:  #888888;
-  --bark-faded:  #555555;
-  --terra:       #e05040;
-  --terra-light: #ff6b5a;
-  --warm-black:  #ffffff;
-  --accent:      #d4a052;
+  --bark:        #ececec;
+  --bark-light:  #8e8e8e;
+  --bark-faded:  #676767;
+  --terra:       #ef4444;
+  --terra-light: #f87171;
+  --warm-black:  #ececec;
+  --accent:      #ececec;
 
-  --gray-border:   rgba(255, 255, 255, 0.10);
+  --gray-border:   rgba(255, 255, 255, 0.06);
   --gray-bg:       rgba(255, 255, 255, 0.04);
-  --gray-bg-hover: rgba(255, 255, 255, 0.08);
-  --gray-bg-alt:   rgba(255, 255, 255, 0.03);
-  --gray-muted:    #777777;
-  --gray-subtle:   #333333;
-  --gray-faint:    #444444;
-  --gray-fg:       #aaaaaa;
+  --gray-bg-hover: rgba(255, 255, 255, 0.07);
+  --gray-bg-alt:   rgba(255, 255, 255, 0.025);
+  --gray-muted:    #8e8e8e;
+  --gray-subtle:   #424242;
+  --gray-faint:    #555555;
+  --gray-fg:       #b4b4b4;
 
-  --surface:        #0e0e0e;
-  --surface-base:   #000000;
-  --surface-raised: #181818;
-  --surface-inset:  #080808;
+  --surface:        #2f2f2f;
+  --surface-base:   #212121;
+  --surface-raised: #303030;
+  --surface-inset:  #1a1a1a;
 }
 
 @theme inline {
@@ -153,7 +153,9 @@ body {
   border-radius: 4px;
 }
 [data-dashboard] :focus-visible {
-  outline: 2px dashed rgba(255, 255, 255, 0.3);
+  outline: 2px solid rgba(255, 255, 255, 0.15);
+  outline-offset: 1px;
+  border-radius: 6px;
 }
 
 /* ===== TYPOGRAPHY ===== */
@@ -314,12 +316,15 @@ body {
   background: linear-gradient(90deg, var(--sage) 0%, var(--sage-dark) 50%, transparent 100%);
 }
 
-/* Card glow on hover */
+/* Card hover — subtle surface lift */
+.reb-card-glow {
+  transition: background-color 0.15s ease;
+}
 .reb-card-glow:hover {
-  box-shadow: 0 0 0 1px rgba(124, 154, 142, 0.15), 0 2px 8px rgba(124, 154, 142, 0.08);
+  background-color: rgba(124, 154, 142, 0.04);
 }
 [data-dashboard] .reb-card-glow:hover {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 24px rgba(0, 0, 0, 0.4);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* Hide scrollbar for quick prompts */
@@ -366,23 +371,18 @@ body {
 
 /* ===== CONTENT EDITOR MICRO-INTERACTIONS ===== */
 
-/* Section row hover lift — invites clicking */
+/* Section row hover */
 .section-row {
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
-              background-color 0.15s ease;
+  transition: background-color 0.12s ease;
 }
 .section-row:hover {
-  transform: translateX(2px);
-}
-.section-row:active {
-  transform: translateX(1px);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
-/* Active section accent — sage left border + subtle glow */
+/* Active section accent — left border + subtle bg lift */
 .section-row-active {
   border-left: 2px solid var(--sage);
   background: var(--gray-bg);
-  box-shadow: inset 4px 0 8px -4px rgba(255, 255, 255, 0.06);
 }
 
 /* Section expand/collapse spring */
@@ -568,18 +568,18 @@ body {
 
 /* Section label floating tooltip — glass style */
 .reb-section-label {
-  background: rgba(20, 20, 20, 0.75);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(47, 47, 47, 0.85);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  color: rgba(236, 236, 236, 0.9);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   pointer-events: none;
   font-family: system-ui, sans-serif;
   line-height: 1;
@@ -591,15 +591,14 @@ body {
 /* Glass context menu */
 .glass-menu {
   min-width: 180px;
-  background: rgba(20, 20, 20, 0.78);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(40, 40, 40, 0.85);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    0 0 0 0.5px rgba(255, 255, 255, 0.06),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    0 0 0 0.5px rgba(255, 255, 255, 0.04);
   overflow: hidden;
 }
 
@@ -626,23 +625,21 @@ body {
 
 /* Glass panel treatment — for elevated overlays */
 .glass-panel {
-  background: rgba(14, 14, 14, 0.7);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.3),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(33, 33, 33, 0.8);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 /* Glass pill — for floating indicators */
 .glass-pill {
-  background: rgba(20, 20, 20, 0.65);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(47, 47, 47, 0.7);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* ===== CTA HOVER MICRO-INTERACTION ===== */

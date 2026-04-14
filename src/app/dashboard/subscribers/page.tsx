@@ -9,7 +9,7 @@ export default async function SubscribersPage() {
   const subscribers = await getSubscribers(tenant);
 
   return (
-    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
       <div className="mb-8">
         <span className="text-xs uppercase tracking-widest text-gray-muted">
           NEWSLETTER

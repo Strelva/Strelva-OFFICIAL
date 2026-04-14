@@ -9,7 +9,7 @@ export default function SettingsLoading() {
         <div className="h-4 w-64 bg-gray-bg rounded" />
       </div>
 
-      <div className="bg-surface border border-gray-border rounded-lg">
+      <div className="bg-surface rounded-2xl">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="px-5 py-4 border-b border-gray-bg last:border-0">
             <div className="h-2.5 w-20 bg-gray-bg-hover rounded mb-2" />

@@ -35,7 +35,7 @@ interface SkeletonCardProps {
 
 export function SkeletonCard({ className, lines = 3 }: SkeletonCardProps) {
   return (
-    <div className={cn("bg-surface border border-gray-border rounded-lg p-4 space-y-2.5", className)}>
+    <div className={cn("bg-surface rounded-2xl p-4 space-y-2.5", className)}>
       {Array.from({ length: lines }).map((_, i) => (
         <SkeletonLine key={i} width={i === 0 ? "w-1/3" : i === lines - 1 ? "w-1/2" : "w-3/4"} />
       ))}

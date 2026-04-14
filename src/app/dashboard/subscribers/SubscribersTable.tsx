@@ -33,7 +33,7 @@ export function SubscribersTable({ subscribers }: SubscribersTableProps) {
 
   if (subscribers.length === 0) {
     return (
-      <div className="bg-surface border border-gray-border rounded-lg p-12 text-center">
+      <div className="bg-surface rounded-2xl p-12 text-center">
         <p className="text-sm text-gray-muted">
           Subscribers will appear here once people sign up on your site.
         </p>
@@ -53,9 +53,9 @@ export function SubscribersTable({ subscribers }: SubscribersTableProps) {
         </button>
       </div>
 
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-bg-alt border-b border-gray-border">
+          <thead className="bg-gray-bg-alt border-b border-gray-bg">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-muted uppercase tracking-wider">
                 Email

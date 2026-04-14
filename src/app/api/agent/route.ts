@@ -118,9 +118,34 @@ Available sections: ${sectionNames}.`;
 
   prompt += `\n\n${capFragment}`;
 
-  prompt += `\n\nBe conversational, warm, and helpful — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.
+  // Inject tenant-level AI personality and rules
+  const tenantCfg = await getTenantConfig(tenant);
 
-Never remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
+  const personalityDesc = tenantCfg?.personality || "conversational, warm, and helpful";
+  prompt += `\n\nBe ${personalityDesc} — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.`;
+
+  if (tenantCfg?.businessRules) {
+    prompt += `\n\nBUSINESS RULES (always follow these):\n${tenantCfg.businessRules}`;
+  }
+
+  if (tenantCfg?.businessHours) {
+    const bh = tenantCfg.businessHours;
+    const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const hoursLines = bh.schedule
+      .map((d) => d.closed ? `${DAY_NAMES[d.day]}: Closed` : `${DAY_NAMES[d.day]}: ${d.open} – ${d.close}`)
+      .join("\n");
+    prompt += `\n\nBUSINESS HOURS:\n${hoursLines}`;
+    if (bh.holidays && bh.holidays.length > 0) {
+      const holidayLines = bh.holidays.map((h) => `- ${h.date}: ${h.label}`).join("\n");
+      prompt += `\n\nHOLIDAY CLOSURES:\n${holidayLines}`;
+    }
+    if (bh.timezone) {
+      prompt += `\nTimezone: ${bh.timezone}`;
+    }
+    prompt += `\nUse these hours when answering "are you open?" or related questions. If someone asks outside hours, let them know when you'll next be open.`;
+  }
+
+  prompt += `\n\nNever remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
 
 When ${ownerName} asks "how's my site?" or similar, give a plain-English summary of what's on the site, how many booking clicks, and suggest what to update next.`;
 
@@ -218,6 +243,10 @@ export async function POST(req: Request) {
 
             if (autoPublish) {
               await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
+              // Record version for history
+              const { appendVersion } = await import("@/lib/storage");
+              const { diffFields } = await import("@/lib/utils");
+              await appendVersion(section as ContentSection, parsed.data, "ai", tenant, diffFields(current, data as Record<string, unknown>));
               const { revalidatePath } = await import("next/cache");
               revalidatePath("/");
             } else {
@@ -302,15 +331,28 @@ export async function POST(req: Request) {
     get_metrics: {
       capability: "get_metrics",
       def: tool({
-        description: "Get site traffic metrics — page views, booking clicks, and trends",
+        description: "Get site traffic metrics — page views, booking clicks, trends, and daily breakdown",
         inputSchema: z.object({}),
         execute: async () => {
-          const { getClickCounts } = await import("@/lib/storage");
-          const [pageViews, bookingClicks] = await Promise.all([
+          const { getClickCounts, getDailyMetrics } = await import("@/lib/storage");
+          const [pageViews, bookingClicks, daily] = await Promise.all([
             getClickCounts("page-view", tenant),
             getClickCounts("booking-click", tenant),
+            getDailyMetrics(tenant, 14),
           ]);
-          return { pageViews, bookingClicks };
+          const thisWeekViews = daily.slice(-7).reduce((s, d) => s + d.pageViews, 0);
+          const lastWeekViews = daily.slice(-14, -7).reduce((s, d) => s + d.pageViews, 0);
+          const viewsTrend = lastWeekViews > 0
+            ? Math.round(((thisWeekViews - lastWeekViews) / lastWeekViews) * 100)
+            : 0;
+          return {
+            pageViews,
+            bookingClicks,
+            trends: {
+              viewsChangePercent: viewsTrend,
+              direction: viewsTrend > 0 ? "up" : viewsTrend < 0 ? "down" : "flat",
+            },
+          };
         },
       }),
     },
@@ -509,6 +551,84 @@ export async function POST(req: Request) {
         },
       }),
     },
+    toggle_section_visibility: {
+      capability: "read_section",
+      def: tool({
+        description: "Toggle a section's visibility on the public site. Hidden sections keep their content but don't render.",
+        inputSchema: z.object({
+          section: sectionEnum,
+          visible: z.boolean().describe("true to show, false to hide"),
+          page: z.string().optional().describe("Page slug (default: home)"),
+        }),
+        execute: async ({ section, visible, page }) => {
+          try {
+            const { getPageConfig, setPageConfig } = await import("@/lib/storage");
+            const config = await getPageConfig(tenant);
+            const pageSlug = page || "home";
+            if (!config || !config[pageSlug]) {
+              return { success: false, error: `Page "${pageSlug}" not found in config` };
+            }
+            const pageCfg = config[pageSlug];
+            const sectionCfg = pageCfg.sections.find((s) => s.type === section);
+            if (!sectionCfg) {
+              return { success: false, error: `Section "${section}" not found on page "${pageSlug}"` };
+            }
+            sectionCfg.visible = visible;
+            await setPageConfig(config, tenant);
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/");
+            return {
+              success: true,
+              message: `${section} is now ${visible ? "visible" : "hidden"} on the ${pageSlug} page`,
+            };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : "Failed" };
+          }
+        },
+      }),
+    },
+    reorder_sections: {
+      capability: "read_section",
+      def: tool({
+        description: "Reorder sections on a page. Provide the section types in the desired order.",
+        inputSchema: z.object({
+          page: z.string().optional().describe("Page slug (default: home)"),
+          order: z.array(z.string()).describe("Section types in desired order, e.g. ['hero', 'services', 'story']"),
+        }),
+        execute: async ({ page, order }) => {
+          try {
+            const { getPageConfig, setPageConfig } = await import("@/lib/storage");
+            const config = await getPageConfig(tenant);
+            const pageSlug = page || "home";
+            if (!config || !config[pageSlug]) {
+              return { success: false, error: `Page "${pageSlug}" not found in config` };
+            }
+            const pageCfg = config[pageSlug];
+            const sectionMap = new Map(pageCfg.sections.map((s) => [s.type, s]));
+            const reordered = order
+              .filter((t) => sectionMap.has(t))
+              .map((t, i) => ({ ...sectionMap.get(t)!, order: i }));
+            // Append any sections not in the order list
+            const orderedTypes = new Set(order);
+            for (const s of pageCfg.sections) {
+              if (!orderedTypes.has(s.type)) {
+                reordered.push({ ...s, order: reordered.length });
+              }
+            }
+            config[pageSlug] = { ...pageCfg, sections: reordered };
+            await setPageConfig(config, tenant);
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/");
+            return {
+              success: true,
+              message: `Sections on ${pageSlug} reordered: ${reordered.map((s) => s.type).join(", ")}`,
+            };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : "Failed" };
+          }
+        },
+      }),
+    },
     reply_to_review: {
       capability: "respond_review",
       def: tool({
@@ -588,6 +708,8 @@ export async function POST(req: Request) {
               toolName === "schedule_social_post" ? "Scheduling social post..." :
               toolName === "get_reviews" ? "Checking your reviews..." :
               toolName === "reply_to_review" ? "Replying to review..." :
+              toolName === "toggle_section_visibility" ? "Updating section visibility..." :
+              toolName === "reorder_sections" ? "Reordering sections..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "text-delta") {

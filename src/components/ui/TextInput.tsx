@@ -4,7 +4,7 @@ import { forwardRef, useId, useRef, useEffect, useCallback, type InputHTMLAttrib
 import { cn } from "@/lib/cn";
 
 const BASE =
-  "w-full bg-surface border border-gray-border rounded-md px-3 py-1.5 text-[13px] text-warm-black placeholder-gray-subtle outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150";
+  "w-full bg-surface-inset border-0 rounded-xl px-3.5 py-2 text-[13px] text-warm-black placeholder-gray-subtle outline-none focus:ring-2 focus:ring-white/10 transition-all duration-150";
 
 /* -------------------------------------------------- */
 /*  TextInput (text, url, tel, email, date)            */

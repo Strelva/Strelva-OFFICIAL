@@ -2,7 +2,7 @@ import { SkeletonLine } from "@/components/ui/Skeleton";
 
 export default function SubscribersLoading() {
   return (
-    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto animate-pulse">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto animate-pulse">
       {/* Header */}
       <div className="mb-8">
         <SkeletonLine width="w-20" height="h-3" />
@@ -11,9 +11,9 @@ export default function SubscribersLoading() {
       </div>
 
       {/* Table skeleton */}
-      <div className="bg-surface border border-gray-border rounded-lg">
+      <div className="bg-surface rounded-2xl">
         {/* Table header */}
-        <div className="px-5 py-3 border-b border-gray-border flex gap-8">
+        <div className="px-5 py-3 border-b border-gray-bg flex gap-8">
           <SkeletonLine width="w-32" height="h-2.5" />
           <SkeletonLine width="w-24" height="h-2.5" />
           <SkeletonLine width="w-20" height="h-2.5" />

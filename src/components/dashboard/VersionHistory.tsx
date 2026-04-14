@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 
+interface ContentVersion {
+  id: string;
+  section: string;
+  data: unknown;
+  author: "user" | "ai";
+  timestamp: string;
+  status: "live" | "rolled-back";
+  changes?: { field: string; before: string; after: string }[];
+}
+
+// Legacy format — kept for backward compatibility with old snapshots
 interface ActivityEntry {
   text: string;
   time: string;
@@ -73,16 +84,38 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch(`/api/activity?section=${encodeURIComponent(section)}`, {
-      credentials: "same-origin",
-    })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: ActivityEntry[]) => {
-        // Only entries with a snapshot are restorable; show last 20.
-        const withSnap = Array.isArray(data)
-          ? data.filter((e) => e.snapshot !== undefined && e.snapshot !== null).slice(0, 20)
-          : [];
-        setEntries(withSnap);
+    // Try new versioning API first, fall back to legacy activity snapshots
+    fetch(`/api/content/${section}/versions`, { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((versions: ContentVersion[] | null) => {
+        if (versions && versions.length > 0) {
+          // Convert ContentVersion to ActivityEntry shape for the existing UI
+          const mapped: ActivityEntry[] = versions.map((v) => ({
+            text: v.changes?.some((c) => c.field === "_restore")
+              ? "Restored version"
+              : `Updated by ${v.author}`,
+            time: v.timestamp,
+            type: v.author === "ai" ? "ai" : "admin",
+            section: v.section,
+            actor: v.author,
+            changes: v.changes,
+            snapshot: v.data,
+            _versionId: v.id,
+          }));
+          setEntries(mapped);
+          return;
+        }
+        // Fallback: legacy activity-based versions
+        return fetch(`/api/activity?section=${encodeURIComponent(section)}`, {
+          credentials: "same-origin",
+        })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data: ActivityEntry[]) => {
+            const withSnap = Array.isArray(data)
+              ? data.filter((e) => e.snapshot !== undefined && e.snapshot !== null).slice(0, 20)
+              : [];
+            setEntries(withSnap);
+          });
       })
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
@@ -99,16 +132,28 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
     setRestoring(true);
     setStatus("idle");
     try {
-      const res = await fetch(`/api/content/${section}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify(selected.snapshot),
-      });
+      // Use new versioning API if the entry has a _versionId
+      const versionId = (selected as ActivityEntry & { _versionId?: string })._versionId;
+      let res: Response;
+      if (versionId) {
+        res = await fetch(`/api/content/${section}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ versionId }),
+        });
+      } else {
+        // Legacy: PUT snapshot directly
+        res = await fetch(`/api/content/${section}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(selected.snapshot),
+        });
+      }
       if (res.ok) {
         setStatus("success");
         onRestored();
-        // Reload history so the new snapshot appears at the top.
         load();
         setTimeout(() => setStatus("idle"), 2000);
       } else {

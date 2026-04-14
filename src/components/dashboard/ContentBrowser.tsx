@@ -10,6 +10,9 @@ import {
   AlertTriangle,
   Plus,
   Check,
+  Eye,
+  EyeOff,
+  GripVertical,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
@@ -143,6 +146,31 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setShowAddMenu(false);
   }
 
+  function handleToggleVisibility(type: string) {
+    if (!pageConfig) return;
+    const sections = sortedSections.map((s) =>
+      s.type === type ? { ...s, visible: !s.visible } : s
+    );
+    const updated = { ...pageConfig, [activePage]: { sections } };
+    setPageConfig(updated);
+    saveConfig(updated);
+  }
+
+  function handleMoveSection(type: string, direction: "up" | "down") {
+    if (!pageConfig) return;
+    const sections = [...sortedSections];
+    const idx = sections.findIndex((s) => s.type === type);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sections.length) return;
+    [sections[idx], sections[targetIdx]] = [sections[targetIdx], sections[idx]];
+    // Reassign order values
+    const reordered = sections.map((s, i) => ({ ...s, order: i }));
+    const updated = { ...pageConfig, [activePage]: { sections: reordered } };
+    setPageConfig(updated);
+    saveConfig(updated);
+  }
+
 
   const usedTypes = new Set(sortedSections.map((s) => s.type));
   // Addable types: not already on page, not a composite/layout section
@@ -248,7 +276,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                 {/* Row */}
                 <button
                   onClick={() => setActiveSection(isExpanded ? null : section.type)}
-                  className={`section-row w-full flex items-center h-10 px-3 text-left rounded-lg ${
+                  className={`group/row section-row w-full flex items-center h-10 px-3 text-left rounded-lg ${
                     isExpanded
                       ? "section-row-active"
                       : "hover:bg-gray-bg"
@@ -273,6 +301,22 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                   {data?.freshness === "stale" && (
                     <AlertTriangle className="w-3 h-3 text-amber-400 mr-1" strokeWidth={1.5} />
                   )}
+
+                  {/* Visibility toggle */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); handleToggleVisibility(section.type); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleToggleVisibility(section.type); } }}
+                    className="w-6 h-6 rounded flex items-center justify-center text-gray-subtle hover:text-warm-black hover:bg-gray-bg transition-colors opacity-0 group-hover/row:opacity-100 focus:opacity-100 mr-0.5"
+                    title={isHidden ? "Show section" : "Hide section"}
+                  >
+                    {isHidden ? (
+                      <EyeOff className="w-3 h-3" strokeWidth={1.5} />
+                    ) : (
+                      <Eye className="w-3 h-3" strokeWidth={1.5} />
+                    )}
+                  </span>
 
                   {isExpanded ? (
                     <ChevronDown className="w-3 h-3 text-gray-muted shrink-0" strokeWidth={1.5} />
@@ -322,6 +366,27 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleMoveSection(section.type, "up"); }}
+                          disabled={i === 0}
+                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-20"
+                          title="Move up"
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleMoveSection(section.type, "down"); }}
+                          disabled={i === visibleSections.length - 1}
+                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-20"
+                          title="Move down"
+                        >
+                          ↓
+                        </Button>
+                        <div className="w-px h-4 bg-gray-border mx-0.5" />
                         <Button
                           variant="ghost"
                           size="sm"

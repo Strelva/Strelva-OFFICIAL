@@ -45,7 +45,7 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
       {!chatDrawerOpen && !hideFloatingButton && (
         <button
           onClick={() => setChatDrawerOpen(true)}
-          className="fixed z-40 w-11 h-11 rounded-full bg-sage text-white shadow-md hover:bg-sage-dark hover:scale-105 transition-all duration-200 flex items-center justify-center bottom-[72px] right-4 md:bottom-6 md:right-6"
+          className="fixed z-40 w-11 h-11 rounded-full bg-surface-raised text-gray-fg border border-gray-border shadow-md hover:bg-gray-bg-hover hover:scale-105 transition-all duration-200 flex items-center justify-center bottom-[72px] right-4 md:bottom-6 md:right-6"
           title="Open AI Chat"
           aria-label="Open chat"
         >
@@ -64,7 +64,7 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
 
       {/* Drawer panel — glass treatment */}
       <div
-        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-[rgba(14,14,14,0.85)] backdrop-blur-[24px] saturate-[1.5] border-l border-white/[0.08] shadow-[-8px_0_32px_rgba(0,0,0,0.4)] flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-[rgba(33,33,33,0.92)] backdrop-blur-[20px] saturate-[1.3] border-l border-white/[0.06] shadow-[-4px_0_20px_rgba(0,0,0,0.2)] flex flex-col transition-transform duration-300 ease-out ${
           chatDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

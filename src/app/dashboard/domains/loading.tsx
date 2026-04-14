@@ -2,7 +2,7 @@ import { SkeletonLine } from "@/components/ui/Skeleton";
 
 export default function DomainsLoading() {
   return (
-    <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto animate-pulse">
+    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto animate-pulse">
       {/* Header */}
       <div className="mb-8">
         <SkeletonLine width="w-28" height="h-7" />
@@ -16,7 +16,7 @@ export default function DomainsLoading() {
       </div>
 
       {/* Domain rows */}
-      <div className="bg-surface border border-gray-border rounded-lg divide-y divide-gray-bg">
+      <div className="bg-surface rounded-2xl divide-y divide-gray-bg">
         {[1, 2].map((i) => (
           <div key={i} className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
