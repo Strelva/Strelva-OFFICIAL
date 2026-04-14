@@ -5,14 +5,10 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   PanelLeftClose,
   PanelLeftOpen,
   AlertTriangle,
-  Eye,
-  EyeOff,
   Plus,
-  GripVertical,
   Check,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
@@ -135,34 +131,6 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   // One source of truth: what Amy actually has in config.
   const visibleSections = sortedSections;
 
-  function handleMoveUp(index: number) {
-    if (!pageConfig || index === 0) return;
-    const sections = [...sortedSections];
-    [sections[index - 1], sections[index]] = [sections[index], sections[index - 1]];
-    sections.forEach((s, i) => { s.order = i; });
-    const updated = { ...pageConfig, [activePage]: { sections } };
-    setPageConfig(updated);
-    saveConfig(updated);
-  }
-
-  function handleMoveDown(index: number) {
-    if (!pageConfig || index === sortedSections.length - 1) return;
-    const sections = [...sortedSections];
-    [sections[index], sections[index + 1]] = [sections[index + 1], sections[index]];
-    sections.forEach((s, i) => { s.order = i; });
-    const updated = { ...pageConfig, [activePage]: { sections } };
-    setPageConfig(updated);
-    saveConfig(updated);
-  }
-
-  function handleToggleVisibility(index: number) {
-    if (!pageConfig) return;
-    const sections = [...sortedSections];
-    sections[index] = { ...sections[index], visible: !sections[index].visible };
-    const updated = { ...pageConfig, [activePage]: { sections } };
-    setPageConfig(updated);
-    saveConfig(updated);
-  }
 
   function handleAddSection(type: string) {
     if (!pageConfig) return;
@@ -175,14 +143,6 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setShowAddMenu(false);
   }
 
-  function handleRemoveSection(index: number) {
-    if (!pageConfig) return;
-    const sections = sortedSections.filter((_, i) => i !== index);
-    sections.forEach((s, i) => { s.order = i; });
-    const updated = { ...pageConfig, [activePage]: { sections } };
-    setPageConfig(updated);
-    saveConfig(updated);
-  }
 
   const usedTypes = new Set(sortedSections.map((s) => s.type));
   // Addable types: not already on page, not a composite/layout section
@@ -286,79 +246,40 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                 style={{ animation: "fade-in-up 200ms ease-out both", animationDelay: `${i * 40}ms` }}
               >
                 {/* Row */}
-                <div className={`flex items-center h-10 transition-colors duration-150 ${
-                  isExpanded
-                    ? "bg-gray-bg"
-                    : "hover:bg-gray-bg"
-                }`}>
-                  {/* Grip + reorder */}
-                  <div className="flex items-center w-7 shrink-0 justify-center group/grip">
-                    <div className="hidden group-hover/grip:flex flex-col items-center">
-                      <button
-                        onClick={() => handleMoveUp(i)}
-                        disabled={i === 0}
-                        className="text-gray-muted hover:text-warm-black disabled:opacity-0 transition-colors"
-                        title="Move up"
-                      >
-                        <ChevronUp className="w-3 h-3" strokeWidth={2} />
-                      </button>
-                      <button
-                        onClick={() => handleMoveDown(i)}
-                        disabled={i === visibleSections.length - 1}
-                        className="text-gray-muted hover:text-warm-black disabled:opacity-0 transition-colors"
-                        title="Move down"
-                      >
-                        <ChevronDown className="w-3 h-3" strokeWidth={2} />
-                      </button>
-                    </div>
-                    <GripVertical className="w-3 h-3 text-gray-subtle group-hover/grip:hidden" strokeWidth={1.5} />
-                  </div>
+                <button
+                  onClick={() => setActiveSection(isExpanded ? null : section.type)}
+                  className={`w-full flex items-center h-10 px-3 text-left transition-colors duration-150 ${
+                    isExpanded
+                      ? "bg-gray-bg"
+                      : "hover:bg-gray-bg"
+                  }`}
+                >
+                  <Icon
+                    className={`w-[14px] h-[14px] mr-2.5 shrink-0 transition-colors duration-150 ${
+                      isExpanded ? "text-sage" : "text-gray-muted"
+                    }`}
+                    strokeWidth={1.5}
+                  />
+                  <span className={`text-[13px] font-medium flex-1 min-w-0 truncate ${
+                    isHidden ? "line-through text-gray-muted" : "text-warm-black"
+                  }`}>
+                    {label}
+                  </span>
 
-                  {/* Main row button */}
-                  <button
-                    onClick={() => setActiveSection(isExpanded ? null : section.type)}
-                    className="flex-1 flex items-center h-10 pr-1 text-left min-w-0"
-                  >
-                    <Icon
-                      className={`w-[14px] h-[14px] mr-2.5 shrink-0 transition-colors duration-150 ${
-                        isExpanded ? "text-sage" : "text-gray-muted"
-                      }`}
-                      strokeWidth={1.5}
-                    />
-                    <span className={`text-[13px] font-medium flex-1 min-w-0 truncate ${
-                      isHidden ? "line-through text-gray-muted" : "text-warm-black"
-                    }`}>
-                      {label}
-                    </span>
+                  {data?.count && (
+                    <span className="font-mono text-[11px] text-gray-subtle mr-1">{data.count}</span>
+                  )}
 
-                    {data?.count && (
-                      <span className="font-mono text-[11px] text-gray-subtle mr-1">{data.count}</span>
-                    )}
+                  {data?.freshness === "stale" && (
+                    <AlertTriangle className="w-3 h-3 text-amber-400 mr-1" strokeWidth={1.5} />
+                  )}
 
-                    {data?.freshness === "stale" && (
-                      <AlertTriangle className="w-3 h-3 text-amber-400 mr-1" strokeWidth={1.5} />
-                    )}
-
-                    {isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-gray-muted shrink-0" strokeWidth={1.5} />
-                    ) : (
-                      <ChevronRight className="w-3 h-3 text-gray-subtle shrink-0" strokeWidth={1.5} />
-                    )}
-                  </button>
-
-                  {/* Visibility toggle */}
-                  <button
-                    onClick={() => handleToggleVisibility(i)}
-                    className="w-7 h-7 flex items-center justify-center text-gray-subtle hover:text-gray-muted transition-colors shrink-0 rounded-full hover:bg-gray-bg"
-                    title={isHidden ? "Show section" : "Hide section"}
-                  >
-                    {isHidden ? (
-                      <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
-                    )}
-                  </button>
-                </div>
+                  {isExpanded ? (
+                    <ChevronDown className="w-3 h-3 text-gray-muted shrink-0" strokeWidth={1.5} />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 text-gray-subtle shrink-0" strokeWidth={1.5} />
+                  )}
+                </button>
 
                 {/* Expanded content */}
                 {isExpanded && data && (
@@ -366,7 +287,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                     {data.items && data.items.length > 0 ? (
                       <div className="py-1">
                         {data.items.slice(0, 5).map((item, j) => (
-                          <div key={j} className="flex items-center justify-between h-7 px-4 pl-[42px]">
+                          <div key={j} className="flex items-center justify-between h-7 px-4 pl-[38px]">
                             <span className="text-[11px] text-gray-fg truncate flex-1">{item.label}</span>
                             {item.detail && (
                               <span className="text-[11px] font-mono text-gray-subtle ml-2 shrink-0">{item.detail}</span>
@@ -374,13 +295,13 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           </div>
                         ))}
                         {data.items.length > 5 && (
-                          <div className="h-7 flex items-center px-4 pl-[42px]">
+                          <div className="h-7 flex items-center px-4 pl-[38px]">
                             <span className="text-[11px] font-mono text-gray-subtle">+{data.items.length - 5} more</span>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="h-8 flex items-center px-4 pl-[42px]">
+                      <div className="h-8 flex items-center px-4 pl-[38px]">
                         <span className="text-[11px] text-gray-muted italic">
                           {data.status === "empty" ? "No content yet" : data.preview}
                         </span>
@@ -388,7 +309,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                     )}
 
                     {/* Actions row */}
-                    <div className="flex items-center justify-between h-9 px-3 pl-[42px] border-t border-gray-border/50 bg-surface-raised/50">
+                    <div className="flex items-center justify-between h-9 px-3 pl-[38px] border-t border-gray-border/50 bg-surface-raised/50">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-[5px] h-[5px] rounded-full ${
                           data.freshness === "fresh" ? "bg-emerald-500" :
@@ -416,14 +337,6 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           className="text-[11px] text-sage hover:bg-gray-bg-hover"
                         >
                           View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleRemoveSection(i); }}
-                          className="text-[11px] text-gray-muted hover:text-terra hover:bg-red-500/[0.04]"
-                        >
-                          Remove
                         </Button>
                       </div>
                     </div>

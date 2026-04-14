@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ChatPanel } from "./ChatPanel";
@@ -11,6 +12,10 @@ interface ChatDrawerProps {
 
 export function ChatDrawer({ ownerName }: ChatDrawerProps) {
   const { chatDrawerOpen, setChatDrawerOpen } = useDashboard();
+  const pathname = usePathname();
+
+  // Hide floating button on /dashboard/content — chat is already embedded in the right panel there
+  const hideFloatingButton = pathname === "/dashboard/content";
 
   const close = useCallback(() => setChatDrawerOpen(false), [setChatDrawerOpen]);
 
@@ -36,8 +41,8 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
 
   return (
     <>
-      {/* Floating action button */}
-      {!chatDrawerOpen && (
+      {/* Floating action button — hidden on content page where chat is inline */}
+      {!chatDrawerOpen && !hideFloatingButton && (
         <button
           onClick={() => setChatDrawerOpen(true)}
           className="fixed z-40 w-11 h-11 rounded-full bg-sage text-white shadow-md hover:bg-sage-dark hover:scale-105 transition-all duration-200 flex items-center justify-center bottom-[72px] right-4 md:bottom-6 md:right-6"
