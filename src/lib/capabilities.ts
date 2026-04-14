@@ -1,9 +1,10 @@
 import { getTenantConfig } from "./tenants";
-import type { SubscriptionTier } from "./types";
 
 // --- Capability definitions ---
 
 export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social";
+
+const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social"];
 
 export interface Capability {
   id: CapabilityId;
@@ -46,35 +47,19 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
   },
 };
 
-// --- Tier → capability mapping ---
+// --- Single plan: all capabilities included at $149/mo ---
 
-const TIER_CAPABILITIES: Record<SubscriptionTier, CapabilityId[]> = {
-  starter: ["website", "analytics"],
-  growth: ["website", "analytics", "email", "blog", "reviews"],
-  scale: ["website", "analytics", "email", "blog", "reviews", "social"],
-};
-
-// v2 stubs — not yet implemented
-const IMPLEMENTED_CAPABILITIES: Set<CapabilityId> = new Set([
-  "website", "analytics", "email", "blog", "reviews", "social",
-]);
-
-export function getCapabilitiesForTier(tier: SubscriptionTier): Capability[] {
-  const allowed = TIER_CAPABILITIES[tier];
+export function getAllCapabilities(): Capability[] {
   return Object.entries(CAPABILITY_DEFS).map(([id, def]) => ({
     id: id as CapabilityId,
     ...def,
-    available: allowed.includes(id as CapabilityId),
+    available: true,
   }));
 }
 
-export function getActiveCapabilityIds(tier: SubscriptionTier): CapabilityId[] {
-  return TIER_CAPABILITIES[tier].filter((id) => IMPLEMENTED_CAPABILITIES.has(id));
-}
-
-export function getActiveTools(tier: SubscriptionTier): Set<string> {
+export function getAllTools(): Set<string> {
   const tools = new Set<string>();
-  for (const capId of getActiveCapabilityIds(tier)) {
+  for (const capId of ALL_CAPABILITIES) {
     for (const tool of CAPABILITY_DEFS[capId].tools) {
       tools.add(tool);
     }
@@ -82,61 +67,23 @@ export function getActiveTools(tier: SubscriptionTier): Set<string> {
   return tools;
 }
 
-export function isCapabilityLocked(capId: CapabilityId, tier: SubscriptionTier): boolean {
-  return !TIER_CAPABILITIES[tier].includes(capId);
-}
-
-export function getUpgradeTier(capId: CapabilityId, currentTier: SubscriptionTier): SubscriptionTier | null {
-  const tiers: SubscriptionTier[] = ["starter", "growth", "scale"];
-  const currentIdx = tiers.indexOf(currentTier);
-
-  for (let i = currentIdx + 1; i < tiers.length; i++) {
-    if (TIER_CAPABILITIES[tiers[i]].includes(capId)) return tiers[i];
-  }
-  return null;
-}
-
 export async function getActivatedCapabilities(tenantId: string): Promise<{
-  tier: SubscriptionTier;
   capabilities: Capability[];
   activeTools: Set<string>;
 }> {
-  const config = await getTenantConfig(tenantId);
-  const tier = config?.tier || "starter";
   return {
-    tier,
-    capabilities: getCapabilitiesForTier(tier),
-    activeTools: getActiveTools(tier),
+    capabilities: getAllCapabilities(),
+    activeTools: getAllTools(),
   };
 }
 
-// --- System prompt fragment for active capabilities ---
+// --- System prompt fragment for capabilities ---
 
-export function capabilityPromptFragment(tier: SubscriptionTier): string {
-  const active = getActiveCapabilityIds(tier);
-  const locked = Object.keys(CAPABILITY_DEFS)
-    .filter((id) => !active.includes(id as CapabilityId) && IMPLEMENTED_CAPABILITIES.has(id as CapabilityId)) as CapabilityId[];
-
-  const lines = active.map((id) => {
+export function capabilityPromptFragment(): string {
+  const lines = ALL_CAPABILITIES.map((id) => {
     const def = CAPABILITY_DEFS[id];
     return `- ${def.name}: ${def.description}`;
   });
 
-  let fragment = `ACTIVE CAPABILITIES (${tier} plan):\n${lines.join("\n")}`;
-
-  if (locked.length > 0) {
-    const lockedLines = locked.map((id) => `- ${CAPABILITY_DEFS[id].name}: available on Growth or Scale plan`);
-    fragment += `\n\nLOCKED CAPABILITIES:\n${lockedLines.join("\n")}`;
-    fragment += `\n\nWhen the user asks about locked capabilities, explain what they'd get and suggest upgrading. Don't pretend the feature doesn't exist.`;
-  }
-
-  return fragment;
+  return `CAPABILITIES:\n${lines.join("\n")}`;
 }
-
-// --- Tier pricing for upgrade prompts ---
-
-export const TIER_PRICING: Record<SubscriptionTier, { price: number; label: string }> = {
-  starter: { price: 49, label: "Starter" },
-  growth: { price: 149, label: "Growth" },
-  scale: { price: 399, label: "Scale" },
-};

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
-import { getActivatedCapabilities, getActiveTools, capabilityPromptFragment } from "@/lib/capabilities";
+import { getAllTools, capabilityPromptFragment } from "@/lib/capabilities";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(
@@ -126,15 +126,14 @@ export async function executeAgentPrompt(
   userMessage: string
 ): Promise<string> {
   const template = await getTemplateForTenant(tenantId);
-  const { tier } = await getActivatedCapabilities(tenantId);
-  const capFragment = capabilityPromptFragment(tier);
+  const capFragment = capabilityPromptFragment();
   const systemPrompt = await buildSystemPrompt(tenantId, capFragment);
 
   const sectionEnum = z.enum(
     template.contentSections as [string, ...string[]]
   );
 
-  const activeTools = getActiveTools(tier);
+  const activeTools = getAllTools();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {

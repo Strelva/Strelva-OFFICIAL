@@ -9,35 +9,36 @@ An AI agent that runs a business's online presence autonomously. Businesses talk
 "Your business runs itself. Just text back yes."
 
 ## The Model
-- **Build**: Human-in-the-loop (AI generates 80%, human polishes 20%). $1,500-3,000 one-time.
-- **Starter**: $49/mo — website + analytics capabilities
-- **Growth**: $149/mo — + email + blog + reviews
-- **Scale**: $399/mo — + everything + API + white-label
-- **Agency channel**: $49/mo wholesale, agencies charge $199+
+- **One plan**: $149/mo — everything included, no tiers, no upsells
+- **Everything**: website + analytics + email + blog + reviews + social + weekly reports + proactive suggestions
+- **Build**: Human-in-the-loop (AI generates 80%, human polishes 20%). $1,500-3,000 one-time for custom builds.
+- **Agency channel**: wholesale for agencies to resell (future)
 - **Gross margin**: 90-94%
-- **Solo ceiling**: 50-60 clients before needing help on build side
+- **Pricing anchor**: displaces $400-500/mo agency maintenance spend
 
 ## Value Hypothesis
-Business owners will pay $49-149/mo for an AI that autonomously manages their website and proves its value weekly — IF the AI is proactive (reaches out with reports/suggestions, not just reactive), the onboarding delivers a live site in under 5 minutes, and the dashboard shows "47 people found you this week" within the first week.
+Business owners will pay $149/mo for an AI that autonomously manages their online presence and proves its value weekly — IF the AI is proactive (reaches out with reports/suggestions, not just reactive), the onboarding delivers a live site quickly, and the weekly report shows "47 people found you this week" before the first invoice recurs.
 
-## ICP: Chelsea (and her network)
-- Wellness practitioners, trades, local service businesses
-- Has a bad website or uses LinkTree + booking platform
+## ICP
+- Local businesses with 1-10 people who have a website problem they've stopped trying to solve
+- Has a bad website, or uses LinkTree + booking platform, or left an agency
 - Wants more clients, not a dashboard (but the dashboard proves value)
 - Will never log into a traditional CMS after month 1
 - Talks to the AI like texting a person: "add my new yoga class on Saturdays"
+- Templates cover: wellness, food-brand, restaurant, trades, professional
 
 ## What The Client Sees
-1. **Business OS Dashboard** (Framer-quality, dark mode, premium)
+1. **Custom website** built by Jacob — not a template, not AI-generated
+2. **Business OS Dashboard** (dark monochrome, premium)
    - Overview: "People who found you" / "Booking clicks" / "Site health"
    - AI Chat: "Update my hours" "Write a blog post" "How's my site doing?"
    - My Site: live preview
    - Content: visual map of what's on the site
    - Reports: weekly plain-English performance summary
-2. **AI Agent** that can modify every section of their site via chat
-3. **Weekly report**: "47 people visited. 3 clicked Book Now. I updated your holiday hours."
+3. **AI Agent** that manages the site ongoing — updates, emails, blog, reviews, social
+4. **Weekly report**: "47 people visited. 3 clicked Book Now. I updated your holiday hours."
 
-## What You See (Laney)
+## What You See (Jacob)
 - Slack notifications for every AI change
 - Admin dashboard: all clients, MRR, approve/reject queue
 - Override capability on any change
@@ -67,19 +68,17 @@ Business owners will pay $49-149/mo for an AI that autonomously manages their we
 - "47 people found you this week" NOT "unique visitors: 47"
 
 ## Do NOT Build
-- Drag-and-drop visual editor (you build the sites, AI handles content)
+- Drag-and-drop visual editor (AI handles content, Jacob handles quality)
 - Client-facing code editor (never)
-- Self-serve site generation (you are the quality control)
-- Email marketing / newsletter — NOW IN SCOPE (Chelsea asked for it unprompted, hates Vagaro's email tool)
 - E-commerce / checkout (booking platforms handle this)
-- Social media management (out of scope)
+- Tiered pricing UI (single plan at $149/mo — all capabilities included)
 
 ## Build Order
 See `.claude/plans/todos.yml` for completed phases 1-9.
-See `.claude/plans/remaining.yml` for 41 items to finish shipping (P0-P4 + deploy + verification).
+See `.claude/plans/remaining.yml` for remaining items.
 
-**Completed:** Phases 1-9 (generalize, tenants, billing, onboarding, templates, proactive AI, capabilities, deploy prep, marketing)
-**Remaining:** 4 P0 ship blockers, 5 P1 trust killers, 7 P2 UX gaps, 6 P3 infra, 7 P4 growth, 7 deploy steps, 5 verifications
+**Completed:** Phases 1-9 + all P0/P1/P2, dashboard redesign, single-plan pricing migration
+**Remaining:** Deploy checklist (7 items), verification queue (5 items), growth features (deferred)
 
 ## Validation Signals
 1. Does Chelsea use the chat agent without being prompted?

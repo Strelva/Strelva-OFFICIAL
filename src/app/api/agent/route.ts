@@ -7,7 +7,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { getActivatedCapabilities, capabilityPromptFragment } from "@/lib/capabilities";
+import { getAllTools, capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimited } from "@/lib/rate-limit";
 import type { ContentSection } from "@/lib/types";
 
@@ -151,8 +151,8 @@ export async function POST(req: Request) {
   const tenantConfig = await getTenantConfig(tenant);
   const { messages, activeSection } = await req.json();
   const template = await getTemplateForTenant(tenant);
-  const { activeTools, tier } = await getActivatedCapabilities(tenant);
-  const capFragment = capabilityPromptFragment(tier);
+  const activeTools = getAllTools();
+  const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
 
   if (activeSection) {
