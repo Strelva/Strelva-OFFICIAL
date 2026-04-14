@@ -1,20 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileStack,
-  CalendarDays,
   Settings,
   ExternalLink,
-  MoreHorizontal,
   ImageIcon,
-  Mail,
-  Star,
-  Globe,
-  Share2,
-  MessageSquareText,
+  CalendarDays,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -28,39 +21,19 @@ type NavItem = {
   label: string;
   href: string;
   icon: typeof LayoutDashboard;
-  templates?: string[];
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Your Site", href: "/dashboard/content", icon: FileStack },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { label: "My Site", href: "/dashboard/content", icon: FileStack },
   { label: "Photos", href: "/dashboard/photos", icon: ImageIcon },
-  { label: "Subscribers", href: "/dashboard/subscribers", icon: Mail },
-  { label: "Reviews", href: "/dashboard/reviews", icon: MessageSquareText },
-  { label: "Rewards", href: "/dashboard/rewards", icon: Star, templates: ["food-brand"] },
-  { label: "Social", href: "/dashboard/social", icon: Share2 },
-  { label: "Domains", href: "/dashboard/domains", icon: Globe },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { editMode, setEditMode, template } = useDashboard();
-  const [moreOpen, setMoreOpen] = useState(false);
-
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.templates || item.templates.includes(template)
-  );
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [moreOpen]);
+  const { editMode, setEditMode } = useDashboard();
 
   const handleNavClick = (item: NavItem) => {
     router.push(item.href);
@@ -115,7 +88,7 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
 
         {/* Center: nav pills */}
         <div className="flex items-center gap-0.5 mx-auto bg-gray-bg rounded-full p-0.5">
-          {visibleNavItems.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active = isActive(item);
             return (
               <button
@@ -163,85 +136,8 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
 
       {/* Mobile nav (<lg): bottom tab bar */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
-        {/* More popover */}
-        {moreOpen && (
-          <>
-            <div className="fixed inset-0 bottom-14 z-40" onClick={() => setMoreOpen(false)} />
-            <div className="absolute bottom-full right-2 mb-2 z-50 bg-surface-raised border border-gray-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in-up">
-              {bookingUrl && (
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-                  onClick={() => setMoreOpen(false)}
-                >
-                  <CalendarDays className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                  Bookings
-                  <ExternalLink className="w-3 h-3 text-gray-subtle ml-auto" strokeWidth={1.5} />
-                </a>
-              )}
-              <button
-                onClick={() => { router.push("/dashboard/subscribers"); setMoreOpen(false); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-              >
-                <Mail className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Subscribers
-              </button>
-              <button
-                onClick={() => { router.push("/dashboard/reviews"); setMoreOpen(false); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-              >
-                <MessageSquareText className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Reviews
-              </button>
-              {template === "food-brand" && (
-                <button
-                  onClick={() => { router.push("/dashboard/rewards"); setMoreOpen(false); }}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-                >
-                  <Star className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                  Rewards
-                </button>
-              )}
-              <button
-                onClick={() => { router.push("/dashboard/social"); setMoreOpen(false); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-              >
-                <Share2 className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Social
-              </button>
-              <button
-                onClick={() => { router.push("/dashboard/domains"); setMoreOpen(false); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-              >
-                <Globe className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Domains
-              </button>
-              <button
-                onClick={() => { router.push("/dashboard/settings"); setMoreOpen(false); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-              >
-                <Settings className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Settings
-              </button>
-              <a
-                href={siteUrl || "/"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-[12px] text-white hover:bg-gray-bg transition-colors duration-150"
-                onClick={() => setMoreOpen(false)}
-              >
-                <ExternalLink className="w-[14px] h-[14px] text-gray-muted" strokeWidth={1.5} />
-                Open Site
-              </a>
-            </div>
-          </>
-        )}
-
-        {/* Tab bar */}
         <div className="flex items-center border-t border-gray-border bg-surface h-14">
-          {[NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2]].map((item) => (
+          {NAV_ITEMS.map((item) => (
             <button
               key={item.label}
               onClick={() => handleNavClick(item)}
@@ -257,18 +153,6 @@ export function DashboardNav({ siteName, bookingUrl, siteUrl }: DashboardNavProp
               <span className="text-[10px] font-medium tracking-[-0.01em]">{item.label}</span>
             </button>
           ))}
-
-          {/* More */}
-          <button
-            onClick={() => setMoreOpen(!moreOpen)}
-            aria-label="More options"
-            className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors duration-150 ${
-              moreOpen ? "text-white" : "text-gray-muted"
-            }`}
-          >
-            <MoreHorizontal className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[10px] font-medium tracking-[-0.01em]">More</span>
-          </button>
         </div>
       </nav>
     </>

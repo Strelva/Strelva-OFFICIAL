@@ -10,6 +10,7 @@ import { useDashboard } from "./DashboardContext";
 import { SECTION_LABELS, SECTION_ICONS } from "@/components/ui/section-labels";
 import type { SectionData } from "./ContentBrowser";
 import { Card } from "@/components/ui/Card";
+import { Mail, Star, Share2, Gift, ChevronRight } from "lucide-react";
 
 const CTA_VOCAB: Record<string, { metric: string; action: string; zeroHint: string }> = {
   wellness: { metric: "Booking clicks", action: "clicked Book Now", zeroHint: "Clicks tracked automatically" },
@@ -100,11 +101,18 @@ export function HubPage({
         tl.to(icons, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.04 }, 0.7);
       }
 
+      // Capability cards
+      const capabilities = el.querySelector('[data-ov="capabilities"]');
+      if (capabilities) {
+        gsap.set(capabilities, { opacity: 0, y: 12 });
+        tl.to(capabilities, { opacity: 1, y: 0, duration: 0.4 }, 0.7);
+      }
+
       // Activity card
       const activity = el.querySelector('[data-ov="activity"]');
       if (activity) {
         gsap.set(activity, { opacity: 0, y: 12 });
-        tl.to(activity, { opacity: 1, y: 0, duration: 0.4 }, 0.85);
+        tl.to(activity, { opacity: 1, y: 0, duration: 0.4 }, 0.9);
       }
     }, el);
 
@@ -226,6 +234,52 @@ export function HubPage({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Capability cards */}
+      <div data-ov="capabilities" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
+        <a href="/dashboard/subscribers" className="group bg-surface border border-gray-border rounded-xl p-4 hover:border-gray-faint transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+              <span className="text-[13px] font-medium text-warm-black">Subscribers</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-gray-subtle group-hover:text-gray-muted transition-colors" />
+          </div>
+          <p className="text-[12px] text-gray-muted">Manage your email list and send newsletters</p>
+        </a>
+        <a href="/dashboard/reviews" className="group bg-surface border border-gray-border rounded-xl p-4 hover:border-gray-faint transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+              <span className="text-[13px] font-medium text-warm-black">Reviews</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-gray-subtle group-hover:text-gray-muted transition-colors" />
+          </div>
+          <p className="text-[12px] text-gray-muted">See and respond to customer reviews</p>
+        </a>
+        <a href="/dashboard/social" className="group bg-surface border border-gray-border rounded-xl p-4 hover:border-gray-faint transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Share2 className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+              <span className="text-[13px] font-medium text-warm-black">Social</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-gray-subtle group-hover:text-gray-muted transition-colors" />
+          </div>
+          <p className="text-[12px] text-gray-muted">Draft and schedule social media posts</p>
+        </a>
+        {template === "food-brand" && (
+          <a href="/dashboard/rewards" className="group bg-surface border border-gray-border rounded-xl p-4 hover:border-gray-faint transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Gift className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+                <span className="text-[13px] font-medium text-warm-black">Rewards</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-subtle group-hover:text-gray-muted transition-colors" />
+            </div>
+            <p className="text-[12px] text-gray-muted">Manage your loyalty program</p>
+          </a>
+        )}
       </div>
 
       {/* Activity timeline */}

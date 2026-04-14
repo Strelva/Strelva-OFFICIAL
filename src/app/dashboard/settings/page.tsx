@@ -1,49 +1,526 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  MessageCircle,
-  Copy,
-  Check,
-  ExternalLink,
-  Pencil,
-} from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Check } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { IconButton } from "@/components/ui/Button";
-import { Button } from "@/components/ui/Button";
+import { Tabs } from "@/components/ui/Tabs";
+import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { SkeletonLine } from "@/components/ui/Skeleton";
+import { DomainsClient } from "@/app/dashboard/domains/DomainsClient";
 
-const SETTING_FIELDS: readonly {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type SettingsData = Record<string, string>;
+type ThemeData = Record<string, unknown>;
+
+// ---------------------------------------------------------------------------
+// Identity field definitions
+// ---------------------------------------------------------------------------
+
+const IDENTITY_FIELDS: readonly {
   key: string;
   label: string;
   description: string;
-  copyable?: boolean;
-  isUrl?: boolean;
-  chatPrompt: string;
+  multiline?: boolean;
 }[] = [
-  { key: "siteName", label: "Site Name", description: "Your business name", chatPrompt: "Change my site name to" },
-  { key: "ownerName", label: "Owner Name", description: "Shown in greetings and AI interactions", chatPrompt: "Change my owner name to" },
-  { key: "siteTagline", label: "Tagline", description: "Appears in search results and header", chatPrompt: "Change my tagline to" },
-  { key: "siteDescription", label: "Description", description: "SEO description for Google", chatPrompt: "Update my site description" },
-  { key: "bookingUrl", label: "Booking URL", description: "Where clients book sessions", copyable: true, isUrl: true, chatPrompt: "Change my booking URL to" },
-  { key: "footerTagline", label: "Footer Tagline", description: "Shown at the bottom of your site", chatPrompt: "Change my footer tagline to" },
-  { key: "copyrightText", label: "Copyright", description: "Legal text in footer", chatPrompt: "Change my copyright text to" },
+  { key: "siteName", label: "Site Name", description: "Your business name" },
+  { key: "ownerName", label: "Owner Name", description: "Shown in greetings and AI interactions" },
+  { key: "siteTagline", label: "Tagline", description: "Appears in search results and header" },
+  { key: "siteDescription", label: "Description", description: "SEO description for Google", multiline: true },
+  { key: "bookingUrl", label: "Booking URL", description: "Where clients book sessions" },
+  { key: "footerTagline", label: "Footer Tagline", description: "Shown at the bottom of your site" },
+  { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
 
-type SettingsData = Record<string, string>;
+// ---------------------------------------------------------------------------
+// Theme field definitions (matches food-brand schema — universal token names)
+// ---------------------------------------------------------------------------
+
+const FONT_OPTIONS: { value: string; label: string }[] = [
+  { value: "Fraunces", label: "Fraunces" },
+  { value: "Instrument_Serif", label: "Instrument Serif" },
+  { value: "Playfair_Display", label: "Playfair Display" },
+  { value: "DM_Serif_Display", label: "DM Serif Display" },
+  { value: "Inter", label: "Inter" },
+  { value: "DM_Sans", label: "DM Sans" },
+  { value: "Manrope", label: "Manrope" },
+  { value: "Work_Sans", label: "Work Sans" },
+];
+
+const THEME_FONT_FIELDS: { key: string; label: string }[] = [
+  { key: "fontDisplay", label: "Display font" },
+  { key: "fontBody", label: "Body font" },
+];
+
+const THEME_COLOR_FIELDS: { key: string; label: string }[] = [
+  { key: "colors.cream", label: "Cream" },
+  { key: "colors.creamDark", label: "Cream Dark" },
+  { key: "colors.creamMid", label: "Cream Mid" },
+  { key: "colors.sage", label: "Sage" },
+  { key: "colors.sageLight", label: "Sage Light" },
+  { key: "colors.sageDark", label: "Sage Dark" },
+  { key: "colors.bark", label: "Bark" },
+  { key: "colors.barkLight", label: "Bark Light" },
+  { key: "colors.barkFaded", label: "Bark Faded" },
+  { key: "colors.wheat", label: "Wheat" },
+  { key: "colors.wheatLight", label: "Wheat Light" },
+  { key: "colors.terra", label: "Terra" },
+  { key: "colors.terraLight", label: "Terra Light" },
+];
+
+// ---------------------------------------------------------------------------
+// Nested value helpers (copied from PropertiesEditor)
+// ---------------------------------------------------------------------------
+
+function getNestedValue(obj: unknown, path: string): unknown {
+  if (!obj || typeof obj !== "object") return undefined;
+  const parts = path.split(".");
+  let cur: unknown = obj;
+  for (const p of parts) {
+    if (cur && typeof cur === "object" && p in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
+}
+
+function setNestedValue(
+  obj: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): Record<string, unknown> {
+  const parts = path.split(".");
+  const next: Record<string, unknown> = { ...obj };
+  let cursor: Record<string, unknown> = next;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    const existing = cursor[k];
+    const cloned: Record<string, unknown> =
+      existing && typeof existing === "object" && !Array.isArray(existing)
+        ? { ...(existing as Record<string, unknown>) }
+        : {};
+    cursor[k] = cloned;
+    cursor = cloned;
+  }
+  cursor[parts[parts.length - 1]] = value;
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Tab definitions
+// ---------------------------------------------------------------------------
+
+const TABS = [
+  { value: "identity", label: "Identity" },
+  { value: "brand", label: "Brand" },
+  { value: "domains", label: "Domains" },
+  { value: "publishing", label: "Publishing" },
+];
+
+// ---------------------------------------------------------------------------
+// Saved toast component
+// ---------------------------------------------------------------------------
+
+function SavedToast({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
+      <div className="bg-surface border border-gray-border rounded-lg px-4 py-2 flex items-center gap-1.5 text-xs font-mono text-emerald-600 shadow-lg">
+        <Check className="w-3 h-3" strokeWidth={1.5} />
+        Saved
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Identity Tab
+// ---------------------------------------------------------------------------
+
+function IdentityTab({
+  settings,
+  setSettings,
+}: {
+  settings: SettingsData;
+  setSettings: (s: SettingsData) => void;
+}) {
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const latestRef = useRef(settings);
+  latestRef.current = settings;
+
+  const saveSettings = useCallback(async (data: SettingsData) => {
+    setSaveError(false);
+    try {
+      const res = await fetch("/api/content/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 3000);
+      }
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    }
+  }, []);
+
+  const handleChange = useCallback(
+    (key: string, value: string) => {
+      const updated = { ...latestRef.current, [key]: value };
+      setSettings(updated);
+      latestRef.current = updated;
+    },
+    [setSettings],
+  );
+
+  const handleBlurSave = useCallback(() => {
+    saveSettings(latestRef.current);
+  }, [saveSettings]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        (e.target as HTMLElement).blur();
+        saveSettings(latestRef.current);
+      }
+    },
+    [saveSettings],
+  );
+
+  return (
+    <div>
+      {saveError && (
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+          Couldn&apos;t save — try again
+        </div>
+      )}
+
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+        {IDENTITY_FIELDS.map((field, i) => (
+          <div
+            key={field.key}
+            className={`px-5 py-4 ${
+              i < IDENTITY_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
+            }`}
+          >
+            {field.multiline ? (
+              <TextArea
+                label={field.label}
+                value={settings[field.key] || ""}
+                onChange={(e) => handleChange(field.key, e.target.value)}
+                onBlur={handleBlurSave}
+                onKeyDown={handleKeyDown}
+                placeholder={field.description}
+                rows={2}
+              />
+            ) : (
+              <TextInput
+                label={field.label}
+                value={settings[field.key] || ""}
+                onChange={(e) => handleChange(field.key, e.target.value)}
+                onBlur={handleBlurSave}
+                onKeyDown={handleKeyDown}
+                placeholder={field.description}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <SavedToast visible={saved} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Brand Tab
+// ---------------------------------------------------------------------------
+
+function BrandTab() {
+  const [theme, setTheme] = useState<ThemeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const latestRef = useRef<ThemeData | null>(null);
+
+  useEffect(() => {
+    fetch("/api/content/theme", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        setTheme(data);
+        latestRef.current = data;
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const saveTheme = useCallback(async (data: ThemeData) => {
+    setSaveError(false);
+    try {
+      const res = await fetch("/api/content/theme", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 3000);
+      }
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    }
+  }, []);
+
+  const handleFieldChange = useCallback(
+    (key: string, value: unknown) => {
+      setTheme((prev) => {
+        if (!prev) return prev;
+        const updated = key.includes(".")
+          ? setNestedValue(prev, key, value)
+          : { ...prev, [key]: value };
+        latestRef.current = updated;
+        return updated;
+      });
+    },
+    [],
+  );
+
+  const handleBlurSave = useCallback(() => {
+    if (latestRef.current) saveTheme(latestRef.current);
+  }, [saveTheme]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <SkeletonLine width="w-1/3" height="h-4" />
+        <SkeletonLine width="w-full" height="h-8" />
+        <SkeletonLine width="w-full" height="h-8" />
+        <SkeletonLine width="w-2/3" height="h-8" />
+      </div>
+    );
+  }
+
+  if (!theme) {
+    return (
+      <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
+        <p className="text-sm text-red-600">Couldn&apos;t load theme data</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {saveError && (
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+          Couldn&apos;t save — try again
+        </div>
+      )}
+
+      {/* Font pickers */}
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-bg">
+          <span className="text-xs font-medium text-warm-black">Typography</span>
+        </div>
+        {THEME_FONT_FIELDS.map((field, i) => {
+          const current = (getNestedValue(theme, field.key) as string) || "";
+          return (
+            <div
+              key={field.key}
+              className={`px-5 py-4 ${
+                i < THEME_FONT_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
+              }`}
+            >
+              <label className="block text-[11px] text-gray-muted mb-1">
+                {field.label}
+              </label>
+              <select
+                value={current}
+                onChange={(e) => {
+                  handleFieldChange(field.key, e.target.value);
+                  // Save immediately on select change
+                  const updated = { ...latestRef.current!, [field.key]: e.target.value };
+                  latestRef.current = updated;
+                  setTheme(updated);
+                  saveTheme(updated);
+                }}
+                className="w-full h-9 px-3 text-[13px] rounded-md border border-gray-border bg-surface text-warm-black outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
+              >
+                {current && !FONT_OPTIONS.some((o) => o.value === current) && (
+                  <option value={current}>{current}</option>
+                )}
+                {FONT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Color pickers */}
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-bg">
+          <span className="text-xs font-medium text-warm-black">Colors</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
+          {THEME_COLOR_FIELDS.map((field, i) => {
+            const hex = (getNestedValue(theme, field.key) as string) || "#000000";
+            return (
+              <div
+                key={field.key}
+                className={`px-5 py-3 ${
+                  i < THEME_COLOR_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
+                } ${i % 2 === 0 ? "sm:border-r sm:border-r-gray-bg" : ""}`}
+              >
+                <label className="block text-[11px] text-gray-muted mb-1.5">
+                  {field.label}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={hex}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                    onBlur={handleBlurSave}
+                    className="h-8 w-10 rounded border border-gray-border bg-surface p-0.5 cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={hex}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                    onBlur={handleBlurSave}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        (e.target as HTMLElement).blur();
+                      }
+                    }}
+                    placeholder="#000000"
+                    className="w-24 h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <SavedToast visible={saved} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Domains Tab
+// ---------------------------------------------------------------------------
+
+function DomainsTab() {
+  return (
+    <div className="-mx-5 -mt-2 sm:-mx-0 sm:mt-0">
+      <DomainsClient initialDomains={[]} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Publishing Tab
+// ---------------------------------------------------------------------------
+
+function PublishingTab() {
+  const dashboard = useDashboardOptional();
+
+  return (
+    <div>
+      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
+        <div className="flex items-start sm:items-center justify-between gap-4 px-5 py-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-medium text-warm-black">
+                Auto-publish
+              </span>
+              <span
+                className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
+                  dashboard?.autoPublish
+                    ? "text-emerald-600/80 bg-emerald-500/10"
+                    : "text-amber-600/80 bg-amber-500/10"
+                }`}
+              >
+                {dashboard?.autoPublish ? "on" : "off"}
+              </span>
+            </div>
+            <p className="text-xs text-gray-subtle">
+              {dashboard?.autoPublish
+                ? "AI changes go live immediately when you confirm them in chat."
+                : "AI changes are saved as drafts for admin review before going live."}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-surface border border-gray-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4">
+          <h3 className="text-sm font-medium text-warm-black mb-2">How it works</h3>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </span>
+              <div>
+                <p className="text-xs font-medium text-warm-black">Live mode</p>
+                <p className="text-xs text-gray-subtle">
+                  When you confirm an AI suggestion in chat, the change is published to your live site immediately.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              </span>
+              <div>
+                <p className="text-xs font-medium text-warm-black">Draft mode</p>
+                <p className="text-xs text-gray-subtle">
+                  AI changes are saved as drafts. An admin reviews and publishes them before they go live. Good for businesses that need approval workflows.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
   const dashboard = useDashboardOptional();
 
+  const [activeTab, setActiveTab] = useState("identity");
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/content/settings")
+    fetch("/api/content/settings", { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
@@ -51,14 +528,6 @@ export default function SettingsPage() {
       .then((data) => setSettings(data))
       .catch(() => setLoadError(true));
   }, []);
-
-  const handleCopy = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(key);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch {}
-  };
 
   if (loadError) {
     return (
@@ -69,8 +538,11 @@ export default function SettingsPage() {
             onClick={() => {
               setLoadError(false);
               setSettings(null);
-              fetch("/api/content/settings")
-                .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+              fetch("/api/content/settings", { credentials: "same-origin" })
+                .then((res) => {
+                  if (!res.ok) throw new Error();
+                  return res.json();
+                })
                 .then((data) => setSettings(data))
                 .catch(() => setLoadError(true));
             }}
@@ -83,7 +555,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!settings) {
+  if (!settings && activeTab === "identity") {
     return (
       <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto animate-pulse">
         <div className="mb-8">
@@ -105,167 +577,33 @@ export default function SettingsPage() {
   return (
     <div className="p-6 md:p-8 w-full max-w-screen-2xl mx-auto h-full overflow-y-auto">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <span className="text-xs uppercase tracking-widest text-gray-muted">
           SETTINGS
         </span>
         <h1 className="text-2xl font-semibold tracking-tight text-warm-black mt-1">
           Site configuration
         </h1>
-        <p className="text-sm text-gray-muted mt-1">
-          <span className="hidden md:inline">Your site&apos;s identity and metadata. Hover any row to edit.</span>
-          <span className="md:hidden">Your site&apos;s identity and metadata. Tap the pencil to edit.</span>
-        </p>
       </div>
 
-      {/* Settings rows */}
-      <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
-        {SETTING_FIELDS.map((field, i) => {
-          const value = settings[field.key] || "";
-          const isEmpty = !value.trim();
-
-          return (
-            <div
-              key={field.key}
-              className={`group relative flex items-start sm:items-center justify-between gap-4 px-5 py-4 hover:bg-gray-bg-alt transition-colors duration-150 ${
-                i < SETTING_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium text-warm-black">
-                    {field.label}
-                  </span>
-                  {isEmpty && (
-                    <span className="text-[11px] font-mono text-amber-600/70 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                      empty
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-subtle mb-1.5">{field.description}</p>
-                <div className="flex items-center gap-2">
-                  {field.isUrl && value ? (
-                    <a
-                      href={value}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-sm text-sage hover:text-sage-dark transition-colors truncate flex items-center gap-1"
-                    >
-                      {value.replace(/^https?:\/\//, "")}
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                    </a>
-                  ) : (
-                    <p className={`font-mono text-sm truncate ${isEmpty ? "text-gray-subtle italic" : "text-warm-black"}`}>
-                      {isEmpty ? "Not set" : value}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions — hover on desktop, always visible on mobile */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                {/* Desktop: full actions on hover */}
-                <div className="hidden md:flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                  {field.copyable && value && (
-                    <button
-                      onClick={() => handleCopy(field.key, value)}
-                      className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-all duration-150"
-                      title="Copy"
-                    >
-                      {copiedField === field.key ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (dashboard) {
-                        dashboard.setChatPrompt(field.chatPrompt);
-                      }
-                    }}
-                    className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-sage hover:bg-sage/[0.06] transition-all duration-150"
-                    title={`Edit ${field.label}`}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {/* Mobile: always-visible edit button */}
-                <button
-                  onClick={() => {
-                    if (dashboard) {
-                      dashboard.setChatPrompt(field.chatPrompt);
-                    }
-                  }}
-                  className="md:hidden w-8 h-8 rounded-md flex items-center justify-center text-gray-muted active:text-sage active:bg-sage/[0.06] transition-all duration-150"
-                  title={`Edit ${field.label}`}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      {/* Tabs */}
+      <div className="border-b border-gray-border mb-6 -mx-6 md:-mx-8 px-6 md:px-8">
+        <Tabs
+          items={TABS}
+          value={activeTab}
+          onChange={setActiveTab}
+          variant="underline"
+          className="h-10"
+        />
       </div>
 
-      {/* Copied toast */}
-      {copiedField && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
-          <div className="bg-surface border border-gray-border rounded-lg px-4 py-2 text-xs font-mono text-emerald-600 shadow-lg">
-            Copied!
-          </div>
-        </div>
+      {/* Tab content */}
+      {activeTab === "identity" && settings && (
+        <IdentityTab settings={settings} setSettings={setSettings} />
       )}
-
-      {/* AI Publishing */}
-      <div className="mt-6">
-        <h2 className="text-sm font-medium text-warm-black mb-3">AI Publishing</h2>
-        <div className="bg-surface border border-gray-border rounded-lg overflow-hidden">
-          <div className="flex items-start sm:items-center justify-between gap-4 px-5 py-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm font-medium text-warm-black">
-                  Auto-publish
-                </span>
-                <span
-                  className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
-                    dashboard?.autoPublish
-                      ? "text-emerald-600/80 bg-emerald-500/10"
-                      : "text-amber-600/80 bg-amber-500/10"
-                  }`}
-                >
-                  {dashboard?.autoPublish ? "on" : "off"}
-                </span>
-              </div>
-              <p className="text-xs text-gray-subtle">
-                {dashboard?.autoPublish
-                  ? "AI changes go live immediately when you confirm them in chat."
-                  : "AI changes are saved as drafts for admin review before going live."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* CTA */}
-      <div className="mt-6 bg-surface border border-gray-border rounded-lg px-5 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-warm-black">Need to change something?</p>
-          <p className="text-xs text-gray-muted mt-0.5">Tell the AI what to update in plain English.</p>
-        </div>
-        <button
-          onClick={() => {
-            if (dashboard) {
-              dashboard.setChatPrompt("Update my site settings");
-            }
-          }}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-sage hover:bg-sage-dark text-xs font-medium text-white transition-colors duration-150"
-        >
-          <MessageCircle className="w-3.5 h-3.5" />
-          Open Chat
-        </button>
-      </div>
+      {activeTab === "brand" && <BrandTab />}
+      {activeTab === "domains" && <DomainsTab />}
+      {activeTab === "publishing" && <PublishingTab />}
     </div>
   );
 }
