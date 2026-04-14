@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { isRateLimited } from "@/lib/rate-limit";
+import { isRateLimitedWindowed } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   // Rate limit: 5 submissions per hour per IP
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
-  if (await isRateLimited(`onboard-intake:${ip}`, 5, 3600)) {
+  if (isRateLimitedWindowed(`onboard-intake:${ip}`, 5, 3600_000)) {
     return NextResponse.json({ error: "Too many submissions" }, { status: 429 });
   }
 
