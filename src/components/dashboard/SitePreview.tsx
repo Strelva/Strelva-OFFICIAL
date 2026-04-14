@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2 } from "lucide-react";
+import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2, Pencil, MessageCircle, Eye, Sparkles } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
 
 type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
 
@@ -25,11 +26,19 @@ const PAGE_PATHS: Record<string, string> = {
   shop: "/shop",
 };
 
+interface ContextMenu {
+  section: string;
+  label: string;
+  x: number;
+  y: number;
+}
+
 export function SitePreview() {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
     BREAKPOINTS[BREAKPOINTS.length - 1]
   );
   const [iframeLoading, setIframeLoading] = useState(true);
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const {
     refreshKey,
     scrollToSection,
@@ -41,8 +50,12 @@ export function SitePreview() {
     siteUrl,
     template,
     activePage,
+    setChatPrompt,
+    setRightTab,
   } = useDashboard();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Build section→page mapping from the template's page config so
   // clicking a section jumps the preview to the right page.
@@ -53,18 +66,11 @@ export function SitePreview() {
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
   }
-  // Priority: active section's home page > active page > home.
-  // The Pages tab sets activePage; selecting a section overrides with
-  // that section's parent page.
   const currentPage = activeSection
     ? (sectionToPage[activeSection] || activePage || "home")
     : (activePage || "home");
-  // Fall back to `/${slug}` for user-created pages not in the static
-  // PAGE_PATHS map.
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
   const editParam = editMode === "draft" ? "?edit=true" : "";
-  // Use the public site URL for the iframe so the preview shows the actual
-  // client site, not the admin dashboard's own routes.
   const base = siteUrl || "";
   const iframeSrc = `${base}${pagePath}${editParam}`;
 
@@ -73,8 +79,7 @@ export function SitePreview() {
     setIframeLoading(true);
   }, [refreshKey, pagePath]);
 
-  // Clear active section when the user switches pages via the Pages tab,
-  // so the section→page override (line 59-61) doesn't fight the new page.
+  // Clear active section when the user switches pages via the Pages tab
   const prevPageRef = useRef(activePage);
   useEffect(() => {
     if (activePage !== prevPageRef.current) {
@@ -140,14 +145,75 @@ export function SitePreview() {
 
       if (data.type === "reb-section-clicked") {
         setActiveSection(data.section);
+        setContextMenu(null);
       }
       if (data.type === "reb-inline-edit") {
         handleInlineEdit(data.section, data.field, data.value);
+      }
+      if (data.type === "reb-context-menu") {
+        // Convert iframe coordinates to canvas-relative coordinates
+        const iframeEl = iframeRef.current;
+        const canvasEl = canvasRef.current;
+        if (iframeEl && canvasEl) {
+          const iframeRect = iframeEl.getBoundingClientRect();
+          const canvasRect = canvasEl.getBoundingClientRect();
+          setContextMenu({
+            section: data.section,
+            label: SECTION_LABELS[data.section] || data.label || data.section,
+            x: data.x + iframeRect.left - canvasRect.left,
+            y: data.y + iframeRect.top - canvasRect.top,
+          });
+        }
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [setActiveSection, handleInlineEdit, siteUrl]);
+
+  // Close context menu on click outside or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setContextMenu(null);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [contextMenu]);
+
+  // Context menu actions
+  const handleEditSection = useCallback(() => {
+    if (!contextMenu) return;
+    setActiveSection(contextMenu.section);
+    setRightTab("properties");
+    setContextMenu(null);
+  }, [contextMenu, setActiveSection, setRightTab]);
+
+  const handleAskAI = useCallback(() => {
+    if (!contextMenu) return;
+    const label = contextMenu.label;
+    setChatPrompt(`Update my ${label.toLowerCase()}`);
+    setContextMenu(null);
+  }, [contextMenu, setChatPrompt]);
+
+  const handleViewSection = useCallback(() => {
+    if (!contextMenu) return;
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        { type: "reb-scroll-to", section: contextMenu.section },
+        "*"
+      );
+    }
+    setContextMenu(null);
+  }, [contextMenu]);
 
   return (
     <div className="flex flex-col h-full">
@@ -156,6 +222,7 @@ export function SitePreview() {
         <div className="flex items-center gap-2">
           <div className="w-[5px] h-[5px] rounded-full bg-emerald-500" />
           <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Preview</span>
+          <span className="text-[10px] text-gray-subtle ml-1">Click to select · Right-click for options</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -196,9 +263,10 @@ export function SitePreview() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 flex justify-center p-4 overflow-hidden bg-surface-base">
+      <div ref={canvasRef} className="flex-1 flex justify-center p-4 overflow-hidden bg-surface-base relative">
         <div
-          className="relative h-full w-full rounded-xl overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)]"
+          key={`flash-${refreshKey}`}
+          className={`relative h-full w-full rounded-xl overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] ${refreshKey > 0 ? "preview-flash" : ""}`}
           style={{
             maxWidth: breakpoint.width ? `${breakpoint.width}px` : "100%",
             marginInline: "auto",
@@ -221,6 +289,45 @@ export function SitePreview() {
             </div>
           )}
         </div>
+
+        {/* Glass context menu */}
+        {contextMenu && (
+          <div
+            ref={menuRef}
+            className="glass-menu absolute z-50 animate-overlay-enter"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+          >
+            <div className="px-3 py-2 border-b border-white/[0.06]">
+              <span className="text-[11px] font-medium text-white/90">{contextMenu.label}</span>
+            </div>
+            <div className="py-1">
+              <button
+                onClick={handleEditSection}
+                className="glass-menu-item"
+              >
+                <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Edit fields
+              </button>
+              <button
+                onClick={handleAskAI}
+                className="glass-menu-item"
+              >
+                <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Ask AI to update
+              </button>
+              <button
+                onClick={handleViewSection}
+                className="glass-menu-item"
+              >
+                <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Scroll to section
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

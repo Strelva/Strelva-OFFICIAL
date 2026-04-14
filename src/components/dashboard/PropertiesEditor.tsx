@@ -478,8 +478,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Saved confirmation */}
       {saved && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
-          <Check className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
-          <span className="text-[11px] text-emerald-400">Saved — preview updated</span>
+          <Check className="w-4 h-4 text-emerald-500 animate-check-bounce" strokeWidth={2} />
+          <span className="text-[12px] font-medium text-emerald-400">Done — your site is updated</span>
         </div>
       )}
 

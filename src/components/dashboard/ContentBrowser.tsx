@@ -248,9 +248,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                 {/* Row */}
                 <button
                   onClick={() => setActiveSection(isExpanded ? null : section.type)}
-                  className={`w-full flex items-center h-10 px-3 text-left transition-colors duration-150 ${
+                  className={`section-row w-full flex items-center h-10 px-3 text-left rounded-lg ${
                     isExpanded
-                      ? "bg-gray-bg"
+                      ? "section-row-active"
                       : "hover:bg-gray-bg"
                   }`}
                 >
@@ -283,7 +283,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
                 {/* Expanded content */}
                 {isExpanded && data && (
-                  <div className="bg-gray-bg-alt border-t border-gray-border/50 animate-fade-in-up">
+                  <div className="section-expand bg-gray-bg-alt border-t border-gray-border/50">
                     {data.items && data.items.length > 0 ? (
                       <div className="py-1">
                         {data.items.slice(0, 5).map((item, j) => (

@@ -21,20 +21,43 @@ export function EditModeOverlay() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // Set up section hover/click listeners
+  // Handle highlight-section messages from dashboard
   useEffect(() => {
     if (!editMode) return;
 
-    // Set data attribute on html for CSS targeting
-    document.documentElement.setAttribute("data-reb-edit", "true");
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type === "reb-highlight-section") {
+        // Remove previous highlight
+        document.querySelectorAll(".reb-highlighted").forEach((el) => {
+          el.classList.remove("reb-highlighted");
+        });
+        // Apply new highlight
+        if (event.data.section) {
+          const target =
+            document.querySelector(`[data-reb-section="${event.data.section}"]`) ||
+            document.querySelector(`[data-reb-editable="${event.data.section}"]`);
+          if (target) {
+            target.classList.add("reb-highlighted");
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [editMode]);
 
+  // Set up section hover/click/contextmenu listeners
+  useEffect(() => {
+    if (!editMode) return;
+
+    document.documentElement.setAttribute("data-reb-edit", "true");
     const sections = document.querySelectorAll("[data-reb-section]");
 
     function handleMouseEnter(e: Event) {
       const el = e.currentTarget as HTMLElement;
       const sectionType = el.getAttribute("data-reb-section");
       setHoveredSection(sectionType);
-      // Position label
       const rect = el.getBoundingClientRect();
       setLabelPos({ top: rect.top + window.scrollY, left: rect.left });
       window.parent.postMessage({ type: "reb-section-hovered", section: sectionType }, "*");
@@ -60,10 +83,31 @@ export function EditModeOverlay() {
       }
     }
 
+    function handleContextMenu(e: Event) {
+      const me = e as MouseEvent;
+      const el = (me.currentTarget as HTMLElement);
+      const sectionType = el.getAttribute("data-reb-section");
+      const editable = el.getAttribute("data-reb-editable");
+      const label = el.getAttribute("data-reb-label") || sectionType;
+      if (sectionType) {
+        me.preventDefault();
+        me.stopPropagation();
+        // Send position relative to viewport so parent can position the menu
+        window.parent.postMessage({
+          type: "reb-context-menu",
+          section: editable || sectionType,
+          label,
+          x: me.clientX,
+          y: me.clientY,
+        }, "*");
+      }
+    }
+
     sections.forEach((section) => {
       (section as HTMLElement).addEventListener("mouseenter", handleMouseEnter);
       (section as HTMLElement).addEventListener("mouseleave", handleMouseLeave);
       (section as HTMLElement).addEventListener("click", handleClick, true);
+      (section as HTMLElement).addEventListener("contextmenu", handleContextMenu, true);
     });
 
     return () => {
@@ -72,6 +116,7 @@ export function EditModeOverlay() {
         (section as HTMLElement).removeEventListener("mouseenter", handleMouseEnter);
         (section as HTMLElement).removeEventListener("mouseleave", handleMouseLeave);
         (section as HTMLElement).removeEventListener("click", handleClick, true);
+        (section as HTMLElement).removeEventListener("contextmenu", handleContextMenu, true);
       });
     };
   }, [editMode]);
@@ -142,7 +187,6 @@ export function EditModeOverlay() {
 
   if (!editMode) return null;
 
-  // Floating section label
   const label = hoveredSection
     ? document.querySelector(`[data-reb-section="${hoveredSection}"]`)?.getAttribute("data-reb-label") || hoveredSection
     : null;

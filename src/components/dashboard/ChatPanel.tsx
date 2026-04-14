@@ -321,10 +321,10 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
       {/* Update toast */}
       {updateToast && (
         <div className="mx-3 mt-2 animate-fade-in-up">
-          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-            <CheckCircle2 className="w-[14px] h-[14px] text-emerald-500 shrink-0" strokeWidth={1.5} />
-            <span className="text-[12px] text-emerald-400">
-              Site updated — check the preview
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 animate-check-bounce" strokeWidth={2} />
+            <span className="text-[12px] font-medium text-emerald-400">
+              Done — your site is updated
             </span>
           </div>
         </div>
@@ -361,7 +361,7 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
           <div
             key={message.id}
             className={`flex ${
-              message.role === "user" ? "justify-end" : "justify-start"
+              message.role === "user" ? "justify-end msg-user" : "justify-start msg-bot"
             }`}
           >
             <div
@@ -422,15 +422,15 @@ export function ChatPanel({ ownerName = "there" }: { ownerName?: string }) {
 
       {/* Quick prompts when there are messages */}
       {!isEmpty && !isLoading && (
-        <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="grid grid-cols-2 gap-1.5 px-3 pb-2">
           {QUICK_PROMPTS.map((prompt) => (
             <Button
               key={prompt.label}
               variant="ghost"
               size="sm"
               onClick={() => handleQuickPrompt(prompt.label)}
-              icon={<prompt.icon className="w-3 h-3" strokeWidth={1.5} />}
-              className="bg-surface border border-gray-border text-gray-muted hover:text-sage whitespace-nowrap shrink-0"
+              icon={<prompt.icon className="w-3 h-3 shrink-0" strokeWidth={1.5} />}
+              className="bg-surface border border-gray-border text-gray-muted hover:text-sage text-left justify-start"
             >
               {prompt.label}
             </Button>

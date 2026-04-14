@@ -53,18 +53,18 @@ export function ChatDrawer({ ownerName }: ChatDrawerProps) {
         </button>
       )}
 
-      {/* Backdrop */}
+      {/* Backdrop — glass blur */}
       {chatDrawerOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/10 transition-opacity duration-200"
+          className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[2px] transition-opacity duration-200"
           onClick={close}
           aria-hidden
         />
       )}
 
-      {/* Drawer panel */}
+      {/* Drawer panel — glass treatment */}
       <div
-        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-surface border-l border-gray-border shadow-[-4px_0_12px_rgba(0,0,0,0.3)] flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-[380px] bg-[rgba(14,14,14,0.85)] backdrop-blur-[24px] saturate-[1.5] border-l border-white/[0.08] shadow-[-8px_0_32px_rgba(0,0,0,0.4)] flex flex-col transition-transform duration-300 ease-out ${
           chatDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
