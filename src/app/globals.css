@@ -314,12 +314,6 @@ body {
   background: linear-gradient(90deg, var(--sage) 0%, var(--sage-dark) 50%, transparent 100%);
 }
 
-/* Subtle grid dot pattern */
-.reb-grid-bg {
-  background-image: radial-gradient(circle, var(--cream-mid) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
 /* Card glow on hover */
 .reb-card-glow:hover {
   box-shadow: 0 0 0 1px rgba(124, 154, 142, 0.15), 0 2px 8px rgba(124, 154, 142, 0.08);
