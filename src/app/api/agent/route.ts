@@ -1,6 +1,7 @@
 import { streamText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
+import { auth } from "@clerk/nextjs/server";
 import { verifyAuth } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -9,6 +10,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimited } from "@/lib/rate-limit";
+import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -174,8 +176,37 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
 
   const tenantConfig = await getTenantConfig(tenant);
+  const { userId: clerkUserId } = await auth();
   const { messages, activeSection } = await req.json();
   const template = await getTemplateForTenant(tenant);
+
+  // Capture the latest user message for proof-signal logging (Workstream E).
+  // Vercel AI SDK messages can have parts or plain string content — handle both.
+  const lastUserMessage = (() => {
+    if (!Array.isArray(messages)) return undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m?.role !== "user") continue;
+      if (typeof m.content === "string") return m.content as string;
+      if (Array.isArray(m.content)) {
+        const text = m.content
+          .map((p: { type?: string; text?: string }) => (p?.type === "text" ? p.text || "" : ""))
+          .join(" ")
+          .trim();
+        if (text) return text;
+      }
+      if (Array.isArray(m.parts)) {
+        const text = m.parts
+          .map((p: { type?: string; text?: string }) => (p?.type === "text" ? p.text || "" : ""))
+          .join(" ")
+          .trim();
+        if (text) return text;
+      }
+    }
+    return undefined;
+  })();
+  const signalSource = classifySource(clerkUserId);
+  const signalSiteName = tenantConfig?.siteName || tenant;
   const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
 
@@ -694,6 +725,16 @@ export async function POST(req: Request) {
             const toolName = part.toolName;
             const input = ("args" in part ? part.args : "input" in part ? part.input : undefined) as Record<string, unknown> | undefined;
             const section = input?.section as string | undefined;
+
+            // Proof-signal: fire-and-forget Slack + Redis counter (Workstream E).
+            // Do NOT await — chat latency must not depend on Slack.
+            void recordAgentToolCall({
+              tenantId: tenant,
+              siteName: signalSiteName,
+              userMessage: lastUserMessage,
+              toolName,
+              source: signalSource,
+            });
             const label =
               toolName === "read_section" ? `Reading your ${section || "content"}...` :
               toolName === "update_section" ? `Updating your ${section || "content"}...` :
