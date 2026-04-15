@@ -9,6 +9,10 @@
  *  - recordAgentToolCall: fire Slack + bump Redis counter (fire-and-forget)
  *  - readAndResetDailyCounts: cron rollup reader
  *  - classifySource: "jacob" | "owner" based on Clerk userId
+ *
+ * Coverage note: E1 (this file + agent route wiring) and E2
+ * (/api/cron/daily-summary) together cover the p4-slack-notifications
+ * task in .claude/plans/remaining.yml end-to-end. Do not re-implement.
  */
 
 import { getRedis } from "./redis";
