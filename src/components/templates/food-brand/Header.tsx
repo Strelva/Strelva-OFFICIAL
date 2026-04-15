@@ -6,12 +6,11 @@ import type { SiteSettings } from "@/lib/types";
 
 const navLinks = [
   { label: "Shop", href: "#products" },
-  { label: "Our Story", href: "#story" },
   { label: "Why Us", href: "#comparison" },
   { label: "Contact", href: "#contact" },
 ];
 
-const sectionIds = ["products", "story", "comparison", "notify", "contact"];
+const sectionIds = ["products", "comparison", "notify", "contact"];
 
 export function Header({ settings }: { settings: SiteSettings }) {
   const [scrolled, setScrolled] = useState(false);

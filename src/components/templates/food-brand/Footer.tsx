@@ -29,7 +29,6 @@ export function Footer({ settings, contact }: FooterProps) {
             </p>
             <ul className="space-y-3 text-sm opacity-60">
               <li><a href="#products" className="hover:opacity-100 transition-opacity">Products</a></li>
-              <li><a href="#story" className="hover:opacity-100 transition-opacity">Our Story</a></li>
               <li><a href="#comparison" className="hover:opacity-100 transition-opacity">Why Us</a></li>
             </ul>
           </div>

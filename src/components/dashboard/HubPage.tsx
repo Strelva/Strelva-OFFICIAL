@@ -1,26 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { WelcomeBanner } from "./WelcomeBanner";
-import { ExistingClientWelcome } from "./ExistingClientWelcome";
-import { SuggestionCards } from "./SuggestionCards";
-import { InboxFeed } from "./InboxFeed";
-import { Sparkline } from "@/components/ui/Sparkline";
+import { useState, useRef, useCallback, type FormEvent } from "react";
+import {
+  Sparkles,
+  Timer,
+  FileText,
+  TrendingUp,
+  ArrowUp,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { useDashboard } from "./DashboardContext";
-import type { SectionData } from "./ContentBrowser";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { timeAgo } from "@/lib/utils";
 
-const CTA_VOCAB: Record<string, { metric: string; action: string; zeroHint: string }> = {
-  wellness: { metric: "Booking clicks", action: "clicked Book Now", zeroHint: "Clicks tracked automatically" },
-  "food-brand": { metric: "Shop clicks", action: "clicked Shop Now", zeroHint: "Clicks tracked automatically" },
-  restaurant: { metric: "Reservation clicks", action: "clicked Reserve", zeroHint: "Clicks tracked automatically" },
-  trades: { metric: "Quote requests", action: "requested a quote", zeroHint: "Clicks tracked automatically" },
-  professional: { metric: "Contact clicks", action: "clicked Contact", zeroHint: "Clicks tracked automatically" },
+const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
+  wellness: { metric: "Booking clicks", action: "clicked Book Now" },
+  "food-brand": { metric: "Shop clicks", action: "clicked Shop Now" },
+  restaurant: { metric: "Reservation clicks", action: "clicked Reserve" },
+  trades: { metric: "Quote requests", action: "requested a quote" },
+  professional: { metric: "Contact clicks", action: "clicked Contact" },
 };
-
-function getVocab(template: string) {
-  return CTA_VOCAB[template] || CTA_VOCAB.wellness;
-}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -29,36 +29,17 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-interface AnalyticsData {
-  daily: { date: string; pageViews: number; bookingClicks: number }[];
-  trends: {
-    views: { thisWeek: number; lastWeek: number; change: number };
-    clicks: { thisWeek: number; lastWeek: number; change: number };
-  };
-}
+const SUGGESTION_CHIPS = [
+  { label: "Update my hours", description: "Change business hours and holiday schedules", icon: Timer },
+  { label: "Write a blog post", description: "Draft a new post for your website blog", icon: FileText },
+  { label: "How's my site doing?", description: "Check weekly traffic and booking analytics", icon: TrendingUp },
+];
 
-function TrendBadge({ change }: { change: number }) {
-  if (change === 0) return null;
-  const isUp = change > 0;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[13px] ${
-      isUp ? "text-gray-fg" : "text-gray-muted"
-    }`}>
-      {isUp ? <TrendingUp className="w-3.5 h-3.5" strokeWidth={1.5} /> : <TrendingDown className="w-3.5 h-3.5" strokeWidth={1.5} />}
-      {isUp ? "+" : ""}{change}%
-    </span>
-  );
-}
-
-function useAnalytics() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  useEffect(() => {
-    fetch("/api/analytics?days=30", { credentials: "same-origin" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setData)
-      .catch(() => {});
-  }, []);
-  return data;
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
 }
 
 interface HubPageProps {
@@ -68,125 +49,281 @@ interface HubPageProps {
   bookingClicks: { total: number; today: number; thisWeek: number };
   siteScore: { score: number; items: { label: string; done: boolean }[] };
   suggestions: string[];
-  sectionData: Record<string, SectionData>;
+  sectionData: Record<string, unknown>;
   isInvited?: boolean;
   recentActivity?: Array<{ text: string; time: string }>;
 }
 
 export function HubPage({
   ownerName,
-  siteName,
   pageViews,
   bookingClicks,
   siteScore,
-  suggestions,
-  isInvited,
-  recentActivity,
 }: HubPageProps) {
-  const { setChatDrawerOpen, siteUrl, template } = useDashboard();
-  const vocab = getVocab(template);
-  const analytics = useAnalytics();
-  const hasTraffic = pageViews.thisWeek > 0;
+  const { template, triggerRefresh } = useDashboard();
+  const vocab = CTA_VOCAB[template] || CTA_VOCAB.wellness;
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [updateToast, setUpdateToast] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const hasConversation = messages.length > 0;
+
+  const sendChat = useCallback(async (text: string) => {
+    if (!text.trim() || isLoading) return;
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: text,
+      timestamp: Date.now(),
+    };
+
+    const allMessages = [...messages, userMsg];
+    setMessages(allMessages);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        setMessages((prev) => [...prev, {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `Sorry, something went wrong: ${err.error || res.statusText}`,
+          timestamp: Date.now(),
+        }]);
+        setIsLoading(false);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) { setIsLoading(false); return; }
+
+      const assistantId = (Date.now() + 1).toString();
+      setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "", timestamp: Date.now() }]);
+
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.startsWith("__TOOL__")) { setToolStatus(line.slice(8)); continue; }
+          fullText += line + "\n";
+        }
+        if (buffer && !buffer.startsWith("__TOOL__")) { fullText += buffer; buffer = ""; }
+        if (fullText) setToolStatus(null);
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m));
+      }
+      if (buffer) {
+        if (!buffer.startsWith("__TOOL__")) {
+          fullText += buffer;
+          setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m));
+        }
+      }
+      setToolStatus(null);
+
+      // Check for site update
+      try {
+        const actRes = await fetch("/api/activity", { credentials: "same-origin" });
+        if (actRes.ok) {
+          const items = await actRes.json();
+          if (items.length > 0 && items[0].type === "ai") {
+            setUpdateToast(true);
+            triggerRefresh();
+            setTimeout(() => setUpdateToast(false), 5000);
+          }
+        }
+      } catch {}
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "Sorry, I couldn't connect. Please try again.",
+        timestamp: Date.now(),
+      }]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 100);
+    }
+  }, [messages, isLoading, triggerRefresh]);
+
+  const handleSubmit = (e?: FormEvent) => {
+    e?.preventDefault();
+    sendChat(input);
+  };
+
+  // Proof strip values
+  const siteHealthy = siteScore.score >= 70;
 
   return (
-    <div className="p-6 md:p-8 lg:p-10 w-full max-w-3xl mx-auto h-full overflow-y-auto">
-      {isInvited ? (
-        <ExistingClientWelcome
-          ownerName={ownerName}
-          siteUrl={siteUrl}
-          activity={recentActivity || []}
-          onOpenChat={() => setChatDrawerOpen(true)}
-        />
-      ) : null}
+    <div className="flex flex-col h-full">
+      {/* Scrollable content area */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {!hasConversation ? (
+          /* ─── Empty state: greeting + chips ─── */
+          <div className="flex flex-col items-center justify-center min-h-full px-6 py-12">
+            {/* Greeting icon */}
+            <div className="w-14 h-14 rounded-[18px] bg-surface-raised border border-glass-border flex items-center justify-center mb-6 shadow-[0_4px_24px_rgba(91,141,239,0.07)]">
+              <Sparkles className="w-[26px] h-[26px] text-accent" strokeWidth={1.5} />
+            </div>
 
-      {/* Greeting — calm, not showy */}
-      <div className="mb-10 mt-2">
-        <h1 className="text-[24px] md:text-[28px] font-normal tracking-[-0.02em] leading-[1.2] text-warm-black" suppressHydrationWarning>
-          {hasTraffic
-            ? `${pageViews.thisWeek} people found you this week`
-            : ownerName ? `${getGreeting()}, ${ownerName}` : getGreeting()}
-        </h1>
-        {hasTraffic && (
-          <p className="text-[15px] text-gray-muted mt-2">
-            {bookingClicks.thisWeek} {vocab.action}
-          </p>
+            <h1 className="text-[26px] font-medium text-warm-black tracking-[-0.02em]" suppressHydrationWarning>
+              {getGreeting()}, {ownerName}
+            </h1>
+            <p className="text-[14px] text-gray-muted mt-1.5">
+              What can I help you with today?
+            </p>
+
+            {/* Proof strip */}
+            <div className="flex items-center gap-3 mt-6 text-[12px] text-gray-muted">
+              <span className="font-medium text-warm-black">{pageViews.thisWeek}</span>
+              <span>visitors this week</span>
+              <span className="text-gray-faint">·</span>
+              <span className="font-medium text-warm-black">{bookingClicks.thisWeek}</span>
+              <span>{vocab.action.replace("clicked ", "").toLowerCase()} clicks</span>
+              <span className="text-gray-faint">·</span>
+              <span className={siteHealthy ? "text-success" : "text-gray-muted"}>
+                {siteHealthy ? "✓ site healthy" : `${siteScore.score}% complete`}
+              </span>
+            </div>
+
+            {/* Suggestion chips */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-10 w-full max-w-2xl">
+              {SUGGESTION_CHIPS.map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => sendChat(chip.label)}
+                  className="flex-1 flex items-start gap-3 rounded-2xl bg-surface border border-gray-border p-4 hover:bg-gray-bg-hover hover:border-gray-subtle transition-all text-left group"
+                >
+                  <chip.icon className="w-[18px] h-[18px] text-accent shrink-0 mt-0.5" strokeWidth={1.5} />
+                  <div className="min-w-0">
+                    <span className="text-[13px] font-medium text-warm-black block">{chip.label}</span>
+                    <span className="text-[12px] text-gray-muted mt-0.5 block leading-relaxed">{chip.description}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* ─── Active conversation ─── */
+          <div className="max-w-3xl mx-auto w-full px-6 py-6 space-y-4">
+            {/* Update toast */}
+            {updateToast && (
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-success-dim border border-success/20 rounded-lg animate-fade-in-up">
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0" strokeWidth={2} />
+                <span className="text-[12px] font-medium text-success">Done — your site is updated</span>
+              </div>
+            )}
+
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div className={`max-w-[80%] ${message.role === "user" ? "order-2" : ""}`}>
+                  {message.role === "assistant" && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
+                        <Sparkles className="w-3 h-3 text-accent" strokeWidth={1.5} />
+                      </div>
+                      <span className="text-[11px] text-gray-muted">AI</span>
+                    </div>
+                  )}
+                  <div
+                    className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
+                      message.role === "user"
+                        ? "bg-accent/15 text-warm-black border border-accent/20"
+                        : "bg-surface text-warm-black border border-gray-border"
+                    }`}
+                  >
+                    {message.content ? (
+                      message.role === "assistant" ? (
+                        <div className="chat-markdown whitespace-pre-wrap">
+                          <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )
+                    ) : (
+                      <span className="flex items-center gap-1.5 py-1">
+                        {toolStatus ? (
+                          <>
+                            <Loader2 className="w-3 h-3 text-accent animate-spin" strokeWidth={1.5} />
+                            <span className="text-[11px] text-accent">{toolStatus}</span>
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot" style={{ animationDelay: "0.2s" }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot" style={{ animationDelay: "0.4s" }} />
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-gray-subtle mt-1 block px-1">
+                    {timeAgo(message.timestamp)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Metrics — inline row, not card grid */}
-      <div className="flex flex-wrap gap-x-10 gap-y-6 mb-10">
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-3">
-            <span className="text-[32px] font-light tracking-[-0.03em] tabular-nums text-warm-black leading-none">
-              {pageViews.total > 0 ? pageViews.total.toLocaleString() : "—"}
-            </span>
-            {analytics && <TrendBadge change={analytics.trends.views.change} />}
-          </div>
-          <p className="text-[14px] text-gray-muted mt-1.5">visitors</p>
-          {analytics && analytics.daily.some((d) => d.pageViews > 0) && (
-            <div className="mt-2">
-              <Sparkline
-                data={analytics.daily.map((d) => d.pageViews)}
-                width={140}
-                height={24}
-                color="#ececec"
-                className="opacity-30"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-3">
-            <span className="text-[32px] font-light tracking-[-0.03em] tabular-nums text-warm-black leading-none">
-              {bookingClicks.total > 0 ? bookingClicks.total.toLocaleString() : "—"}
-            </span>
-            {analytics && <TrendBadge change={analytics.trends.clicks.change} />}
-          </div>
-          <p className="text-[14px] text-gray-muted mt-1.5">{vocab.metric.toLowerCase()}</p>
-          {analytics && analytics.daily.some((d) => d.bookingClicks > 0) && (
-            <div className="mt-2">
-              <Sparkline
-                data={analytics.daily.map((d) => d.bookingClicks)}
-                width={140}
-                height={24}
-                color="#ececec"
-                className="opacity-30"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <span className="text-[32px] font-light tracking-[-0.03em] tabular-nums text-warm-black leading-none">
-            {siteScore.score}%
-          </span>
-          <p className="text-[14px] text-gray-muted mt-1.5">site complete</p>
-          <div className="mt-3 w-24 h-[3px] bg-white/[0.06] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${siteScore.score}%`, background: "rgba(236,236,236,0.5)" }}
+      {/* Chat input — always at bottom */}
+      <div className="shrink-0 px-6 pb-6 pt-3">
+        <div className="max-w-3xl mx-auto">
+          <form
+            onSubmit={handleSubmit}
+            className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-2xl px-4 py-2 focus-within:border-accent/30 transition-all"
+          >
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Tell me what you need..."
+              className="flex-1 bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none h-[40px]"
+              disabled={isLoading}
             />
-          </div>
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="w-[34px] h-[34px] rounded-xl bg-accent hover:bg-accent/80 disabled:bg-gray-border flex items-center justify-center transition-all shrink-0"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" strokeWidth={1.5} />
+              ) : (
+                <ArrowUp className="w-4 h-4 text-white" strokeWidth={2} />
+              )}
+            </button>
+          </form>
+          <p className="text-[11px] text-gray-subtle text-center mt-2">
+            Update your site, write content, check analytics, and more
+          </p>
         </div>
       </div>
-
-      {/* AI suggestions */}
-      <SuggestionCards />
-
-      {/* Static suggestions */}
-      {suggestions.length > 0 && (
-        <div className="mb-8 space-y-1.5">
-          {suggestions.map((s, i) => (
-            <p key={i} className="text-[14px] text-gray-muted">
-              {s}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* Activity feed */}
-      <InboxFeed />
     </div>
   );
 }

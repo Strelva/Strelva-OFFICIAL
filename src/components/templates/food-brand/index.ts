@@ -117,7 +117,7 @@ const FOOD_BRAND_PAGE_CONFIG: SitePageConfig = {
       { type: "trust-strip", visible: true, order: 1 },
       { type: "products", visible: true, order: 2 },
       { type: "notify", visible: true, order: 3 },
-      { type: "story", visible: true, order: 4 },
+      { type: "story", visible: false, order: 4 },
       { type: "typographic-break", visible: true, order: 5 },
       { type: "comparison", visible: true, order: 6 },
       { type: "testimonials", visible: true, order: 7 },

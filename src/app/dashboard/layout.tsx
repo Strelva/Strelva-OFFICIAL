@@ -40,7 +40,7 @@ export default async function DashboardLayout({
     <DashboardProvider siteUrl={siteUrl} template={tenantConfig?.template || "wellness"} autoPublish={tenantConfig?.autoPublish !== false}>
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
-        <DashboardShell siteName={siteName} bookingUrl={bookingUrl} siteUrl={siteUrl}>
+        <DashboardShell siteName={siteName} ownerName={ownerName} bookingUrl={bookingUrl} siteUrl={siteUrl}>
           {children}
         </DashboardShell>
         <ChatDrawer ownerName={ownerName} />

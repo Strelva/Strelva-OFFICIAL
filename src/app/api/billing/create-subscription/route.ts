@@ -9,7 +9,7 @@ function getStripe() {
   });
 }
 
-/** Super-admin creates a $199/mo subscription checkout for a client tenant. */
+/** Super-admin creates a $149/mo subscription checkout for a client tenant. */
 export async function POST(req: Request) {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

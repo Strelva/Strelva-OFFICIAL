@@ -39,35 +39,43 @@
   --surface-inset:  #fafafa;
 }
 
-/* Dashboard dark theme — OpenAI-inspired warm dark */
+/* Dashboard dark theme — Figma-inspired dark monochrome + blue accent */
 [data-dashboard] {
-  --cream:       #212121;
-  --cream-dark:  #1a1a1a;
-  --cream-mid:   #303030;
-  --sage:        #ececec;
+  --cream:       #0e0e0e;
+  --cream-dark:  #0a0a0a;
+  --cream-mid:   #262626;
+  --sage:        #e8e8e8;
   --sage-light:  #ffffff;
   --sage-dark:   #b4b4b4;
   --sage-wash:   rgba(255, 255, 255, 0.03);
-  --bark:        #ececec;
-  --bark-light:  #8e8e8e;
-  --bark-faded:  #676767;
+  --bark:        #e8e8e8;
+  --bark-light:  #787878;
+  --bark-faded:  #484848;
   --terra:       #ef4444;
   --terra-light: #f87171;
-  --warm-black:  #ececec;
-  --accent:      #ececec;
+  --warm-black:  #e8e8e8;
+  --accent:      #5B8DEF;
+
+  /* New dashboard tokens */
+  --accent-dim:  rgba(91, 141, 239, 0.1);
+  --accent-text: #5B8DEF;
+  --success:     #34d399;
+  --success-dim: rgba(52, 211, 153, 0.09);
+  --glass:       rgba(255, 255, 255, 0.024);
+  --glass-border: rgba(255, 255, 255, 0.04);
 
   --gray-border:   rgba(255, 255, 255, 0.06);
   --gray-bg:       rgba(255, 255, 255, 0.04);
   --gray-bg-hover: rgba(255, 255, 255, 0.07);
   --gray-bg-alt:   rgba(255, 255, 255, 0.025);
-  --gray-muted:    #8e8e8e;
-  --gray-subtle:   #424242;
-  --gray-faint:    #555555;
+  --gray-muted:    #787878;
+  --gray-subtle:   #484848;
+  --gray-faint:    #484848;
   --gray-fg:       #b4b4b4;
 
-  --surface:        #2f2f2f;
-  --surface-base:   #212121;
-  --surface-raised: #303030;
+  --surface:        #171717;
+  --surface-base:   #0e0e0e;
+  --surface-raised: #1f1f1f;
   --surface-inset:  #1a1a1a;
 }
 
@@ -88,6 +96,12 @@
   --color-pure-white: var(--pure-white);
   --color-warm-black: var(--warm-black);
   --color-accent: var(--accent, #d4a052);
+  --color-accent-dim: var(--accent-dim, rgba(91, 141, 239, 0.1));
+  --color-accent-text: var(--accent-text, #5B8DEF);
+  --color-success: var(--success, #34d399);
+  --color-success-dim: var(--success-dim, rgba(52, 211, 153, 0.09));
+  --color-glass: var(--glass, rgba(255, 255, 255, 0.024));
+  --color-glass-border: var(--glass-border, rgba(255, 255, 255, 0.04));
 
   /* Semantic grays */
   --color-gray-border: var(--gray-border);
