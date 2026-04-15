@@ -7,7 +7,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { getAllTools, capabilityPromptFragment } from "@/lib/capabilities";
+import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimited } from "@/lib/rate-limit";
 import type { ContentSection } from "@/lib/types";
 
@@ -176,7 +176,6 @@ export async function POST(req: Request) {
   const tenantConfig = await getTenantConfig(tenant);
   const { messages, activeSection } = await req.json();
   const template = await getTemplateForTenant(tenant);
-  const activeTools = getAllTools();
   const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
 
@@ -189,7 +188,9 @@ export async function POST(req: Request) {
     template.contentSections as [string, ...string[]]
   );
 
-  // Define all tools, then filter by tenant capabilities
+  // All tools are always available — single plan includes everything.
+  // The `capability` key is legacy bookkeeping kept to minimize diff; see
+  // the flatten step below where it is stripped before passing to streamText.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allTools: Record<string, { capability: string; def: any }> = {
     read_section: {
@@ -668,20 +669,18 @@ export async function POST(req: Request) {
     },
   };
 
-  // Filter tools to only those the tenant's tier allows
+  // Every active-subscription tenant gets every tool. No tier gating.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filteredTools: Record<string, any> = {};
-  for (const [name, { capability, def }] of Object.entries(allTools)) {
-    if (activeTools.has(capability)) {
-      filteredTools[name] = def;
-    }
+  const tools: Record<string, any> = {};
+  for (const [name, { def }] of Object.entries(allTools)) {
+    tools[name] = def;
   }
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
     system: systemPrompt,
     messages,
-    tools: filteredTools,
+    tools,
     stopWhen: stepCountIs(8),
   });
 

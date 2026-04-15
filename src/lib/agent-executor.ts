@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
-import { getAllTools, capabilityPromptFragment } from "@/lib/capabilities";
+import { capabilityPromptFragment } from "@/lib/capabilities";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(
@@ -133,8 +133,6 @@ export async function executeAgentPrompt(
     template.contentSections as [string, ...string[]]
   );
 
-  const activeTools = getAllTools();
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {
     read_section: tool({
@@ -224,8 +222,8 @@ export async function executeAgentPrompt(
     }),
   };
 
-  // Blog tools — only for Growth+ tenants with blog capability
-  if (activeTools.has("create_post")) {
+  // Blog tools — always available under the single plan
+  {
     tools.create_blog_post = tool({
       description: "Write and publish a blog post. Generates slug, excerpt, and publish date automatically.",
       inputSchema: z.object({
