@@ -2,11 +2,11 @@
 
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
-import { ContentBrowser, type SectionData } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { Tabs } from "@/components/ui/Tabs";
+import type { SectionData } from "./ContentBrowser";
 
 interface ContentWorkspaceProps {
   siteName: string;
@@ -16,16 +16,12 @@ interface ContentWorkspaceProps {
 }
 
 export function ContentWorkspace({
-  siteName,
   ownerName,
-  sectionData,
-  timestamps,
 }: ContentWorkspaceProps) {
   const {
     activeSection,
     rightTab,
     setRightTab,
-    leftCollapsed,
     rightCollapsed,
     siteUrl,
   } = useDashboard();
@@ -59,18 +55,9 @@ export function ContentWorkspace({
 
   return (
     <div className="flex flex-col h-full bg-surface-base">
-      {/* Desktop (lg+): 3-panel layout */}
+      {/* Desktop (lg+): preview + right panel */}
       <div className="hidden lg:flex flex-1 min-h-0">
-        {/* Left: Content Browser */}
-        <aside
-          className={`border-r border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
-            leftCollapsed ? "w-[44px]" : "w-[320px]"
-          }`}
-        >
-          <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
-        </aside>
-
-        {/* Center: Site Preview */}
+        {/* Center: Site Preview — right-click to edit */}
         <main className="flex-1 flex flex-col min-w-0">
           <SitePreview />
         </main>
@@ -106,8 +93,7 @@ export function ContentWorkspace({
             Edit your site on a larger screen
           </p>
           <p className="text-sm text-gray-muted mb-6">
-            The site editor needs a desktop or tablet for the full editing
-            experience.
+            Right-click anything on your site to edit it.
           </p>
           <a
             href={siteUrl || "/dashboard"}

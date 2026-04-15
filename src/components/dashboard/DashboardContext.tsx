@@ -94,7 +94,7 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
-  const [editMode, setEditMode] = useState<EditMode>("live");
+  const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
 
   // Apply localStorage collapse state after hydration completes.
