@@ -24,7 +24,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
     >
       <p>
         {isCancelled
-          ? "Your subscription has ended. Upgrade to continue editing your site."
+          ? "Your subscription has ended. Restart it to keep managing your site."
           : "Your payment is past due. Please update your billing info."}
         {" "}
         <a
