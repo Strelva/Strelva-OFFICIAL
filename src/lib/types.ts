@@ -376,8 +376,6 @@ export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "
 
 export type TenantFeature = "commerce" | "booking" | "newsletter";
 
-export type SubscriptionTier = "starter" | "growth" | "scale";
-
 // --- Social Media Types ---
 
 export interface SocialPost {
@@ -407,7 +405,6 @@ export interface TenantConfig {
   customDomains?: string[];
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
-  tier?: SubscriptionTier;
   bookingProvider?: string;
   bookingUrl?: string;
   resendDomain?: string;
@@ -418,9 +415,9 @@ export interface TenantConfig {
   autoPublish?: boolean;
   /** Behold.so feed ID — stable identifier, no token refresh needed. Per-tenant. */
   beholdFeedId?: string;
-  /** Social media configuration for Scale tier */
+  /** Social media platform configuration (post-launch integration). */
   socialConfig?: { connectedPlatforms?: string[] };
-  /** Review platform IDs for Growth+ tier */
+  /** Review platform IDs (post-launch integration). */
   reviewsConfig?: { googlePlaceId?: string; yelpBusinessId?: string };
   /** Free-text persistent instructions the AI follows on every interaction */
   businessRules?: string;

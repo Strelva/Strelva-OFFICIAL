@@ -18,7 +18,6 @@ export const tenant = defineType({
     defineField({ name: "customDomains", title: "Custom Domains", type: "array", of: [{ type: "string" }] }),
     defineField({ name: "stripeCustomerId", title: "Stripe Customer ID", type: "string" }),
     defineField({ name: "subscriptionStatus", title: "Subscription Status", type: "string" }),
-    defineField({ name: "tier", title: "Subscription Tier", type: "string" }),
     defineField({ name: "bookingProvider", title: "Booking Provider", type: "string" }),
     defineField({ name: "bookingUrl", title: "Booking URL", type: "url" }),
     defineField({ name: "resendDomain", title: "Resend Domain", type: "string" }),

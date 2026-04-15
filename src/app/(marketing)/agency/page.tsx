@@ -38,7 +38,7 @@ export default function MarketingPage() {
             <div>
               <p className="text-[clamp(1rem,1.8vw,1.25rem)] leading-[1.6]" style={{ color: "var(--m-text-2)" }}>
                 We build you a custom website. Then AI manages it&mdash;updates,
-                emails, blog posts, reviews, weekly reports. You just
+                emails, blog posts, weekly reports. You just
                 text what you need. It happens.
               </p>
               <div className="mt-8 flex items-center gap-4">
@@ -230,8 +230,6 @@ export default function MarketingPage() {
                     "Weekly reports: who found you, who clicked",
                     "Email newsletters to your client list",
                     "Blog posts, drafted by AI, approved by you",
-                    "Review monitoring and AI-drafted replies",
-                    "Social media post drafting",
                     "Proactive suggestions via text",
                     "Hosting, SSL, and analytics included",
                     "You own everything. Cancel anytime.",
