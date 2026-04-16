@@ -66,3 +66,6 @@ PRODUCT.md
 # design scratch files (Pencil)
 *.pen
 /rebdesigns
+
+# clerk configuration (can include secrets)
+/.clerk/
