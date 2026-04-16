@@ -20,13 +20,16 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
   const [added, setAdded] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  // Reset state when product changes
-  useEffect(() => {
+  // Reset per-product state when the selected product changes
+  // (derived-state pattern, no effect needed).
+  const [prevProductId, setPrevProductId] = useState(product?.id);
+  if (product?.id !== prevProductId) {
+    setPrevProductId(product?.id);
     setQuantity(1);
     setIsSubscription(false);
     setInterval("4 weeks");
     setAdded(false);
-  }, [product]);
+  }
 
   // Lock body scroll
   useEffect(() => {

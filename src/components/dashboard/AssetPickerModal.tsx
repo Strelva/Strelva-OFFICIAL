@@ -19,6 +19,10 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    // Reset fetch state when the modal is opened. React 19 flags these as
+    // cascading renders, but they only run on the open→true transition so
+    // the cascade is bounded.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setAssets(null);
     setSelectedId(null);

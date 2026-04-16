@@ -53,6 +53,10 @@ export default function SmoothScrollProvider({
     }
 
     const lenisInstance = initLenis();
+    // Mount-time subscription: setLenis runs once per mount so consumers
+    // can access the Lenis instance. React 19's set-state-in-effect rule
+    // flags this but the cascade is bounded to mount/unmount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLenis(lenisInstance);
 
     const handleResize = () => {

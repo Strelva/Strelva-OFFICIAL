@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Plus } from "lucide-react";
 import { ARRAY_CONFIGS, type ArraySectionConfig } from "./arrayFieldConfigs";
 import { ArrayItemCard } from "./ArrayItemCard";
@@ -25,15 +25,6 @@ export function ArrayItemEditor({
   const config = configOverride ?? ARRAY_CONFIGS[section];
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [justAdded, setJustAdded] = useState(false);
-
-  // Scroll to bottom when a new item is added
-  useEffect(() => {
-    if (justAdded && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      setJustAdded(false);
-    }
-  }, [justAdded]);
 
   if (!config) return null;
 
@@ -82,7 +73,9 @@ export function ArrayItemEditor({
     const updated = [...items, newItem];
     updateItems(updated);
     setExpandedIndex(updated.length - 1);
-    setJustAdded(true);
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   return (

@@ -5,6 +5,16 @@ import type {
   TemplateId,
 } from "@/lib/types";
 import type { ComponentType, ReactNode } from "react";
+import { wellnessTemplate } from "./wellness";
+import { foodBrandTemplate } from "./food-brand";
+import { restaurantTemplate } from "./restaurant";
+import { tradesTemplate } from "./trades";
+import { professionalTemplate } from "./professional";
+
+// Each template defines its own section/header/footer component shapes,
+// so prop types are intentionally polymorphic. Props are built via buildProps
+// and spread into the component at render time.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface TemplateDefinition {
   id: TemplateId;
@@ -36,24 +46,17 @@ export interface TemplateDefinition {
   contentSections: ContentSection[];
 }
 
-// Templates are registered here — imported lazily to avoid circular deps
-let _registry: Record<string, TemplateDefinition> | null = null;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+const _registry: Record<string, TemplateDefinition> = {
+  wellness: wellnessTemplate,
+  "food-brand": foodBrandTemplate,
+  restaurant: restaurantTemplate,
+  trades: tradesTemplate,
+  professional: professionalTemplate,
+};
 
 export function getTemplateRegistry(): Record<string, TemplateDefinition> {
-  if (!_registry) {
-    const { wellnessTemplate } = require("./wellness");
-    const { foodBrandTemplate } = require("./food-brand");
-    const { restaurantTemplate } = require("./restaurant");
-    const { tradesTemplate } = require("./trades");
-    const { professionalTemplate } = require("./professional");
-    _registry = {
-      wellness: wellnessTemplate,
-      "food-brand": foodBrandTemplate,
-      restaurant: restaurantTemplate,
-      trades: tradesTemplate,
-      professional: professionalTemplate,
-    };
-  }
   return _registry;
 }
 

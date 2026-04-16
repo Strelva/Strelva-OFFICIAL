@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 export function EditModeOverlay() {
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("edit") === "true";
+  });
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [labelPos, setLabelPos] = useState<{ top: number; left: number } | null>(null);
 
-  // Detect edit mode from URL or postMessage
+  // Listen for dashboard-driven edit mode toggles
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("edit") === "true") setEditMode(true);
-
     function handleMessage(event: MessageEvent) {
       if (event.data?.type === "reb-edit-mode") {
         setEditMode(event.data.enabled);

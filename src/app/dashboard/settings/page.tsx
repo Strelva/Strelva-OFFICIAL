@@ -130,7 +130,9 @@ function ProfileSection({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const latestRef = useRef(settings);
-  latestRef.current = settings;
+  useEffect(() => {
+    latestRef.current = settings;
+  });
 
   const saveSettings = useCallback(async (data: SettingsData) => {
     setSaveError(false);

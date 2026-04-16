@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { X, Copy, Check } from "lucide-react";
-import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/Button";
 import type { MediaAsset } from "@/lib/media";
@@ -16,11 +15,13 @@ interface PhotoDetailProps {
 
 export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
   const [copied, setCopied] = useState(false);
+  const [prevAssetId, setPrevAssetId] = useState(asset?.id);
 
-  // Reset copied state when asset changes
-  useEffect(() => {
+  // Reset copied when the selected asset changes (derived-state pattern).
+  if (asset?.id !== prevAssetId) {
+    setPrevAssetId(asset?.id);
     setCopied(false);
-  }, [asset?.id]);
+  }
 
   // Close on Escape
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import type { SiteSettings } from "@/lib/types";
 
@@ -84,7 +85,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
             </nav>
 
             {/* Center — Wordmark */}
-            <a
+            <Link
               href="/"
               className="absolute left-1/2 -translate-x-1/2 group transition-opacity duration-300 hover:opacity-70"
             >
@@ -94,7 +95,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
               >
                 {settings.siteName}
               </span>
-            </a>
+            </Link>
 
             {/* Right — Icons */}
             <div className="flex items-center gap-5 ml-auto">

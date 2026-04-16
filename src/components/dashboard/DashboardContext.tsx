@@ -100,9 +100,11 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
   // Apply localStorage collapse state after hydration completes.
   // First render always uses server default (false) so the client
   // tree structure matches what the server rendered — preventing
-  // hydration mismatch and the "parentNode" null error.
+  // hydration mismatch and the "parentNode" null error. The cascade
+  // only fires once, on mount.
   useEffect(() => {
     const stored = getStoredCollapse();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLeftCollapsed(stored.left);
     setRightCollapsed(stored.right);
     setHasMounted(true);

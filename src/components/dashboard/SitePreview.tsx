@@ -74,10 +74,15 @@ export function SitePreview() {
   const base = siteUrl || "";
   const iframeSrc = `${base}${pagePath}${editParam}`;
 
-  // Reset loading state when refreshKey or page changes
-  useEffect(() => {
+  // Reset loading state when refreshKey or page changes (derived-state pattern).
+  const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath });
+  if (
+    prevIframeKey.refreshKey !== refreshKey ||
+    prevIframeKey.pagePath !== pagePath
+  ) {
+    setPrevIframeKey({ refreshKey, pagePath });
     setIframeLoading(true);
-  }, [refreshKey, pagePath]);
+  }
 
   // Clear active section when the user switches pages via the Pages tab
   const prevPageRef = useRef(activePage);

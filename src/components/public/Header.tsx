@@ -15,6 +15,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,11 +25,6 @@ export function Header({ settings }: { settings: SiteSettings }) {
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  // Close menu on route change
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
 
   // On inner pages, always use scrolled (light bg) style
   const useTransparent = isHome && !scrolled;
@@ -151,6 +147,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={closeMenu}
                 className="font-display text-3xl tracking-tight transition-opacity hover:opacity-60 px-6 py-3"
                 style={{
                   color: isActive(link.href) ? "var(--sage)" : "var(--bark)",
@@ -161,6 +158,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
             ))}
             <Link
               href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
+              onClick={closeMenu}
               className="mt-4 px-8 py-3.5 text-xs font-bold tracking-widest uppercase transition-all"
               style={{ background: "var(--sage)", color: "var(--pure-white)" }}
             >
