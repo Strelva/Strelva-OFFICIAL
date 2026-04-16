@@ -215,6 +215,7 @@ export const wellnessTemplate: TemplateDefinition = {
     "providers",
     "contact",
     "settings",
+    "theme",
     "faq",
     "shop",
   ],

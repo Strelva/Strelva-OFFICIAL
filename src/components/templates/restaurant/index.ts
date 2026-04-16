@@ -174,6 +174,7 @@ export const restaurantTemplate: TemplateDefinition = {
     "events",
     "contact",
     "settings",
+    "theme",
     "faq",
   ],
 };

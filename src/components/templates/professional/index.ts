@@ -167,6 +167,7 @@ export const professionalTemplate: TemplateDefinition = {
     "testimonials",
     "contact",
     "settings",
+    "theme",
     "faq",
   ],
 };

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 
 export type DomainStatus = "connected" | "pending";
 
@@ -34,7 +33,7 @@ export function DomainsClient({ initialDomains }: Props) {
       .catch(() => setLoaded(true));
   }, []);
 
-  // Refresh every 30s so "pending" domains flip to "connected" after the window.
+  // Refresh every 30s so "pending" domains flip to "connected" after DNS propagates.
   useEffect(() => {
     if (!domains.some((d) => d.status === "pending")) return;
     const id = setInterval(() => {
@@ -97,23 +96,11 @@ export function DomainsClient({ initialDomains }: Props) {
   };
 
   return (
-    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
-      <div className="mb-8">
-        <span className="text-xs uppercase tracking-widest text-gray-muted">
-          DOMAINS
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight text-warm-black mt-1">
-          Custom domains
-        </h1>
-        <p className="text-sm text-gray-muted mt-1">
-          Connect your own domain. After adding, configure DNS at your registrar.
-        </p>
-      </div>
-
+    <div>
       {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className="bg-surface rounded-2xl p-4 mb-4 flex items-center gap-2"
+        className="rounded-lg border border-gray-border p-4 mb-4 flex items-center gap-2"
       >
         <Globe className="w-4 h-4 text-gray-muted shrink-0" strokeWidth={1.5} />
         <input
@@ -121,33 +108,35 @@ export function DomainsClient({ initialDomains }: Props) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="yourdomain.com"
-          className="flex-1 font-mono text-sm bg-transparent border-0 outline-none text-warm-black placeholder:text-gray-subtle"
+          className="flex-1 font-mono text-[13px] bg-transparent border-0 outline-none text-warm-white placeholder:text-gray-faint"
           disabled={adding}
         />
-        <Button
+        <button
           type="submit"
-          variant="primary"
-          size="md"
-          loading={adding}
-          icon={<Plus className="w-3.5 h-3.5" />}
           disabled={adding || !input.trim()}
+          className="text-[12px] font-medium text-warm-white bg-accent/80 hover:bg-accent rounded-md px-4 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
         >
+          {adding ? (
+            <span className="w-3 h-3 border border-warm-white/40 border-t-warm-white rounded-full animate-spin" />
+          ) : (
+            <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+          )}
           Add domain
-        </Button>
+        </button>
       </form>
 
       {error && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
           {error}
         </div>
       )}
 
       {/* Domain list */}
-      <div className="bg-surface rounded-2xl overflow-hidden">
+      <div className="rounded-lg border border-gray-border overflow-hidden">
         {domains.length === 0 ? (
           <div className="px-5 py-10 text-center">
-            <p className="text-sm text-gray-muted">
-              {loaded ? "No custom domains yet. Add one above." : "Loading..."}
+            <p className="text-[13px] text-gray-muted">
+              {loaded ? "No custom domains yet. Add one above." : "Loading\u2026"}
             </p>
           </div>
         ) : (
@@ -155,39 +144,39 @@ export function DomainsClient({ initialDomains }: Props) {
             <div
               key={entry.domain}
               className={`px-5 py-4 ${
-                i < domains.length - 1 ? "border-b border-gray-bg" : ""
+                i < domains.length - 1 ? "border-b border-gray-border/50" : ""
               }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-sm text-warm-black truncate">
+                    <span className="font-mono text-[13px] text-warm-white truncate">
                       {entry.domain}
                     </span>
                     {entry.status === "connected" ? (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10">
                         <CheckCircle2 className="w-3 h-3" strokeWidth={2} />
                         Connected
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
                         <Clock className="w-3 h-3" strokeWidth={2} />
                         Pending DNS
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-subtle font-mono">
+                  <div className="text-[11px] text-gray-faint font-mono">
                     {entry.isApex ? (
                       <>
-                        Add an <span className="text-warm-black">A</span> record
+                        Add an <span className="text-warm-white">A</span> record
                         pointing to{" "}
-                        <span className="text-warm-black">76.76.21.21</span>
+                        <span className="text-warm-white">76.76.21.21</span>
                       </>
                     ) : (
                       <>
-                        Add a <span className="text-warm-black">CNAME</span>{" "}
+                        Add a <span className="text-warm-white">CNAME</span>{" "}
                         record pointing to{" "}
-                        <span className="text-warm-black">
+                        <span className="text-warm-white">
                           cname.vercel-dns.com
                         </span>
                       </>
@@ -197,7 +186,7 @@ export function DomainsClient({ initialDomains }: Props) {
                 <button
                   onClick={() => handleRemove(entry.domain)}
                   disabled={removing === entry.domain}
-                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-terra hover:bg-terra/5 transition-all duration-150 disabled:opacity-50"
+                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
                   title={`Remove ${entry.domain}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -208,7 +197,7 @@ export function DomainsClient({ initialDomains }: Props) {
         )}
       </div>
 
-      <p className="text-xs text-gray-subtle mt-4">
+      <p className="text-[11px] text-gray-faint mt-4">
         DNS changes can take up to 48 hours to propagate. SSL certificates are
         issued automatically once DNS resolves.
       </p>

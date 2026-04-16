@@ -62,3 +62,7 @@ PRODUCT.md
 .playwright-mcp/
 .claude/worktrees/
 .claude/agent-memory/
+
+# design scratch files (Pencil)
+*.pen
+/rebdesigns

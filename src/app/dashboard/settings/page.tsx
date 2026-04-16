@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Check, Bot, Globe, CreditCard, Eye } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
-import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
+import { DashSelect, FormRow, SavedToast } from "@/components/dashboard/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -116,52 +115,6 @@ const SETTINGS_SECTIONS = [
   { id: "divider", label: "" },
   { id: "publishing", label: "Publishing" },
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Saved toast
-// ---------------------------------------------------------------------------
-
-function SavedToast({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
-      <div className="bg-surface-raised border border-gray-border rounded-lg px-4 py-2 flex items-center gap-1.5 text-xs font-mono text-emerald-400 shadow-lg">
-        <Check className="w-3 h-3" strokeWidth={1.5} />
-        Saved
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Form row component
-// ---------------------------------------------------------------------------
-
-function FormRow({
-  label,
-  description,
-  children,
-  last,
-}: {
-  label: string;
-  description: string;
-  children: React.ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-start gap-4 px-5 py-4 ${
-        last ? "" : "border-b border-gray-border/50"
-      }`}
-    >
-      <div className="w-[180px] shrink-0 pt-1.5">
-        <div className="text-[13px] text-warm-white">{label}</div>
-        <div className="text-[11px] text-gray-faint mt-0.5">{description}</div>
-      </div>
-      <div className="flex-1">{children}</div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Profile section
@@ -361,7 +314,7 @@ function BrandSection() {
               description="Font family"
               last={i === THEME_FONT_FIELDS.length - 1}
             >
-              <select
+              <DashSelect
                 value={current}
                 onChange={(e) => {
                   handleFieldChange(field.key, e.target.value);
@@ -370,17 +323,13 @@ function BrandSection() {
                   setTheme(updated);
                   saveTheme(updated);
                 }}
-                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none focus:border-accent/40 transition-colors"
-              >
-                {current && !FONT_OPTIONS.some((o) => o.value === current) && (
-                  <option value={current}>{current}</option>
-                )}
-                {FONT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  ...(current && !FONT_OPTIONS.some((o) => o.value === current)
+                    ? [{ value: current, label: current }]
+                    : []),
+                  ...FONT_OPTIONS,
+                ]}
+              />
             </FormRow>
           );
         })}
@@ -649,11 +598,7 @@ function AISection() {
 // ---------------------------------------------------------------------------
 
 function DomainsSection() {
-  return (
-    <div className="-mx-1">
-      <DomainsClient initialDomains={[]} />
-    </div>
-  );
+  return <DomainsClient initialDomains={[]} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -678,7 +623,20 @@ function BillingSection() {
             Everything included. Cancel anytime.
           </p>
         </div>
-        <button className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors">
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch("/api/billing/portal", {
+                method: "POST",
+                credentials: "same-origin",
+              });
+              if (!res.ok) return;
+              const { portalUrl } = await res.json();
+              if (portalUrl) window.open(portalUrl, "_blank");
+            } catch {}
+          }}
+          className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors"
+        >
           Manage billing
         </button>
       </div>
@@ -840,17 +798,14 @@ export default function SettingsPage() {
 
       {/* Mobile section select */}
       <div className="md:hidden border-b border-gray-border px-4 py-3">
-        <select
+        <DashSelect
           value={activeSection}
           onChange={(e) => setActiveSection(e.target.value)}
-          className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none"
-        >
-          {SETTINGS_SECTIONS.filter((s) => s.id !== "divider").map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+          options={SETTINGS_SECTIONS.filter((s) => s.id !== "divider").map((item) => ({
+            value: item.id,
+            label: item.label,
+          }))}
+        />
       </div>
 
       {/* Content */}

@@ -160,6 +160,7 @@ export const tradesTemplate: TemplateDefinition = {
     "testimonials",
     "contact",
     "settings",
+    "theme",
     "faq",
   ],
 };

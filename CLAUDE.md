@@ -86,5 +86,6 @@ See `.claude/plans/remaining.yml` for remaining items.
 3. Would Chelsea refer a provider for the same service?
 4. Does the second client use the dashboard within 7 days?
 
-## Git Rules
+## Execution Rules
+- NEVER use the Agent tool or spawn subagents. Do all work directly in the main conversation.
 - NEVER add "Co-Authored-By" lines to commits
