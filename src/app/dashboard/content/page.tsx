@@ -6,7 +6,7 @@ import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
-import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
+import { ContentViewToggle } from "@/components/dashboard/ContentViewToggle";
 import type { ContentSection } from "@/lib/types";
 
 export default async function ContentPage() {
@@ -33,7 +33,7 @@ export default async function ContentPage() {
   const settings = sections.settings || {};
 
   return (
-    <ContentWorkspace
+    <ContentViewToggle
       siteName={settings.siteName || "Your Business"}
       ownerName={settings.ownerName || "there"}
       sectionData={sectionData}

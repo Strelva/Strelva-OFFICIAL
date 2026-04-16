@@ -68,8 +68,25 @@ export function HubPage({
   const [isLoading, setIsLoading] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [updateToast, setUpdateToast] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
+  const [connectionFilter, setConnectionFilter] = useState("");
+  const [selectedConnectionIdx, setSelectedConnectionIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const CONNECTIONS = [
+    { name: "Google Analytics", tag: "analytics", status: "connected" as const },
+    { name: "Mailchimp", tag: "email", status: "connected" as const },
+    { name: "Instagram", tag: "social", status: "available" as const },
+    { name: "Google Business", tag: "reviews", status: "available" as const },
+    { name: "Calendly", tag: "booking", status: "available" as const },
+    { name: "Stripe", tag: "payments", status: "available" as const },
+  ];
+
+  const filteredConnections = CONNECTIONS.filter((c) =>
+    c.name.toLowerCase().includes(connectionFilter.toLowerCase()) ||
+    c.tag.toLowerCase().includes(connectionFilter.toLowerCase())
+  );
 
   const hasConversation = messages.length > 0;
 
@@ -294,7 +311,49 @@ export function HubPage({
 
       {/* Chat input — always at bottom */}
       <div className="shrink-0 px-6 pb-6 pt-3">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto relative">
+          {/* @ Connections dropdown */}
+          {showConnections && filteredConnections.length > 0 && (
+            <div className="absolute bottom-full mb-1 left-0 w-[260px] rounded-lg bg-surface-raised border border-gray-border py-1 z-20 shadow-lg">
+              <div className="px-3 py-1.5 text-[10px] font-mono tracking-wider uppercase text-gray-faint">
+                Connections
+              </div>
+              {filteredConnections.map((c, i) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  className={`flex items-center gap-2.5 w-full px-3 py-2 mx-0 text-left transition-colors ${
+                    i === selectedConnectionIdx
+                      ? "bg-accent/10"
+                      : "hover:bg-gray-bg"
+                  }`}
+                  onClick={() => {
+                    const atIdx = input.lastIndexOf("@");
+                    const before = atIdx >= 0 ? input.slice(0, atIdx) : input;
+                    setInput(`${before}@${c.name} `);
+                    setShowConnections(false);
+                    setConnectionFilter("");
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      c.status === "connected"
+                        ? "bg-green-400"
+                        : "bg-accent"
+                    }`}
+                  />
+                  <span className="flex-1 text-[13px] text-warm-white">
+                    {c.name}
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-faint">
+                    {c.tag}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <form
             onSubmit={handleSubmit}
             className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-2xl px-4 py-2 focus-within:border-accent/30 transition-all"
@@ -302,8 +361,48 @@ export function HubPage({
             <input
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Tell me what you need..."
+              onChange={(e) => {
+                const val = e.target.value;
+                setInput(val);
+
+                // Detect @ trigger
+                const atIdx = val.lastIndexOf("@");
+                if (atIdx >= 0 && (atIdx === 0 || val[atIdx - 1] === " ")) {
+                  const query = val.slice(atIdx + 1);
+                  // Only show if no space after the query (still typing the mention)
+                  if (!query.includes(" ")) {
+                    setShowConnections(true);
+                    setConnectionFilter(query);
+                    setSelectedConnectionIdx(0);
+                    return;
+                  }
+                }
+                setShowConnections(false);
+                setConnectionFilter("");
+              }}
+              onKeyDown={(e) => {
+                if (!showConnections) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedConnectionIdx((i) =>
+                    Math.min(i + 1, filteredConnections.length - 1)
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedConnectionIdx((i) => Math.max(i - 1, 0));
+                } else if (e.key === "Enter" && filteredConnections.length > 0) {
+                  e.preventDefault();
+                  const c = filteredConnections[selectedConnectionIdx];
+                  const atIdx = input.lastIndexOf("@");
+                  const before = atIdx >= 0 ? input.slice(0, atIdx) : input;
+                  setInput(`${before}@${c.name} `);
+                  setShowConnections(false);
+                  setConnectionFilter("");
+                } else if (e.key === "Escape") {
+                  setShowConnections(false);
+                }
+              }}
+              placeholder="Tell me what you need... (type @ for connections)"
               className="flex-1 bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none h-[40px]"
               disabled={isLoading}
             />
@@ -320,7 +419,7 @@ export function HubPage({
             </button>
           </form>
           <p className="text-[11px] text-gray-subtle text-center mt-2">
-            Update your site, write content, check analytics, and more
+            Update your site, write content, check analytics — type @ to use connections
           </p>
         </div>
       </div>

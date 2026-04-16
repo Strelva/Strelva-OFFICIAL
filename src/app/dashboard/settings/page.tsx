@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Check, Bot } from "lucide-react";
+import { Check, Bot, Globe, CreditCard, Eye } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
-import { Tabs } from "@/components/ui/Tabs";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
@@ -25,18 +24,19 @@ const IDENTITY_FIELDS: readonly {
   label: string;
   description: string;
   multiline?: boolean;
+  mono?: boolean;
 }[] = [
   { key: "siteName", label: "Site Name", description: "Your business name" },
-  { key: "ownerName", label: "Owner Name", description: "Shown in greetings and AI interactions" },
-  { key: "siteTagline", label: "Tagline", description: "Appears in search results and header" },
-  { key: "siteDescription", label: "Description", description: "SEO description for Google", multiline: true },
-  { key: "bookingUrl", label: "Booking URL", description: "Where clients book sessions" },
-  { key: "footerTagline", label: "Footer Tagline", description: "Shown at the bottom of your site" },
+  { key: "ownerName", label: "Owner Name", description: "Shown in greetings" },
+  { key: "siteTagline", label: "Tagline", description: "Search results & header" },
+  { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
+  { key: "bookingUrl", label: "Booking URL", description: "Where clients book", mono: true },
+  { key: "footerTagline", label: "Footer Tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
 
 // ---------------------------------------------------------------------------
-// Theme field definitions (matches food-brand schema — universal token names)
+// Theme fields
 // ---------------------------------------------------------------------------
 
 const FONT_OPTIONS: { value: string; label: string }[] = [
@@ -56,23 +56,15 @@ const THEME_FONT_FIELDS: { key: string; label: string }[] = [
 ];
 
 const THEME_COLOR_FIELDS: { key: string; label: string }[] = [
-  { key: "colors.cream", label: "Cream" },
-  { key: "colors.creamDark", label: "Cream Dark" },
-  { key: "colors.creamMid", label: "Cream Mid" },
-  { key: "colors.sage", label: "Sage" },
-  { key: "colors.sageLight", label: "Sage Light" },
-  { key: "colors.sageDark", label: "Sage Dark" },
-  { key: "colors.bark", label: "Bark" },
-  { key: "colors.barkLight", label: "Bark Light" },
-  { key: "colors.barkFaded", label: "Bark Faded" },
-  { key: "colors.wheat", label: "Wheat" },
-  { key: "colors.wheatLight", label: "Wheat Light" },
-  { key: "colors.terra", label: "Terra" },
-  { key: "colors.terraLight", label: "Terra Light" },
+  { key: "colors.cream", label: "Background" },
+  { key: "colors.sage", label: "Primary" },
+  { key: "colors.bark", label: "Text" },
+  { key: "colors.terra", label: "Accent" },
+  { key: "colors.wheat", label: "Secondary" },
 ];
 
 // ---------------------------------------------------------------------------
-// Nested value helpers (copied from PropertiesEditor)
+// Nested value helpers
 // ---------------------------------------------------------------------------
 
 function getNestedValue(obj: unknown, path: string): unknown {
@@ -112,26 +104,28 @@ function setNestedValue(
 }
 
 // ---------------------------------------------------------------------------
-// Tab definitions
+// Settings nav items
 // ---------------------------------------------------------------------------
 
-const TABS = [
-  { value: "identity", label: "Identity" },
-  { value: "brand", label: "Brand" },
-  { value: "myai", label: "My AI" },
-  { value: "domains", label: "Domains" },
-  { value: "publishing", label: "Publishing" },
-];
+const SETTINGS_SECTIONS = [
+  { id: "profile", label: "Profile" },
+  { id: "brand", label: "Brand" },
+  { id: "ai", label: "AI Agent" },
+  { id: "domains", label: "Domains" },
+  { id: "billing", label: "Plan & Billing" },
+  { id: "divider", label: "" },
+  { id: "publishing", label: "Publishing" },
+] as const;
 
 // ---------------------------------------------------------------------------
-// Saved toast component
+// Saved toast
 // ---------------------------------------------------------------------------
 
 function SavedToast({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
-      <div className="bg-surface border border-gray-border rounded-lg px-4 py-2 flex items-center gap-1.5 text-xs font-mono text-emerald-600 shadow-lg">
+      <div className="bg-surface-raised border border-gray-border rounded-lg px-4 py-2 flex items-center gap-1.5 text-xs font-mono text-emerald-400 shadow-lg">
         <Check className="w-3 h-3" strokeWidth={1.5} />
         Saved
       </div>
@@ -140,10 +134,40 @@ function SavedToast({ visible }: { visible: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Identity Tab
+// Form row component
 // ---------------------------------------------------------------------------
 
-function IdentityTab({
+function FormRow({
+  label,
+  description,
+  children,
+  last,
+}: {
+  label: string;
+  description: string;
+  children: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-start gap-4 px-5 py-4 ${
+        last ? "" : "border-b border-gray-border/50"
+      }`}
+    >
+      <div className="w-[180px] shrink-0 pt-1.5">
+        <div className="text-[13px] text-warm-white">{label}</div>
+        <div className="text-[11px] text-gray-faint mt-0.5">{description}</div>
+      </div>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Profile section
+// ---------------------------------------------------------------------------
+
+function ProfileSection({
   settings,
   setSettings,
 }: {
@@ -190,67 +214,60 @@ function IdentityTab({
     saveSettings(latestRef.current);
   }, [saveSettings]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        (e.target as HTMLElement).blur();
-        saveSettings(latestRef.current);
-      }
-    },
-    [saveSettings],
-  );
-
   return (
-    <div>
+    <>
       {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
           Couldn&apos;t save — try again
         </div>
       )}
 
-      <div className="bg-surface rounded-2xl overflow-hidden">
+      <div className="rounded-lg border border-gray-border overflow-hidden">
         {IDENTITY_FIELDS.map((field, i) => (
-          <div
+          <FormRow
             key={field.key}
-            className={`px-5 py-4 ${
-              i < IDENTITY_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
-            }`}
+            label={field.label}
+            description={field.description}
+            last={i === IDENTITY_FIELDS.length - 1}
           >
             {field.multiline ? (
-              <TextArea
-                label={field.label}
+              <textarea
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 onBlur={handleBlurSave}
-                onKeyDown={handleKeyDown}
-                placeholder={field.description}
                 rows={2}
+                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors"
               />
             ) : (
-              <TextInput
-                label={field.label}
+              <input
+                type="text"
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 onBlur={handleBlurSave}
-                onKeyDown={handleKeyDown}
-                placeholder={field.description}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLElement).blur();
+                }}
+                className={`w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors ${
+                  field.mono
+                    ? "font-mono text-accent text-[12px]"
+                    : "text-warm-white"
+                }`}
               />
             )}
-          </div>
+          </FormRow>
         ))}
       </div>
 
       <SavedToast visible={saved} />
-    </div>
+    </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Brand Tab
+// Brand section
 // ---------------------------------------------------------------------------
 
-function BrandTab() {
+function BrandSection() {
   const [theme, setTheme] = useState<ThemeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -313,56 +330,47 @@ function BrandTab() {
       <div className="space-y-4">
         <SkeletonLine width="w-1/3" height="h-4" />
         <SkeletonLine width="w-full" height="h-8" />
-        <SkeletonLine width="w-full" height="h-8" />
-        <SkeletonLine width="w-2/3" height="h-8" />
       </div>
     );
   }
 
   if (!theme) {
     return (
-      <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
-        <p className="text-sm text-red-600">Couldn&apos;t load theme data</p>
+      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-center">
+        <p className="text-sm text-red-400">Couldn&apos;t load theme data</p>
       </div>
     );
   }
 
   return (
-    <div>
+    <>
       {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
           Couldn&apos;t save — try again
         </div>
       )}
 
-      {/* Font pickers */}
-      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-bg">
-          <span className="text-xs font-medium text-warm-black">Typography</span>
-        </div>
+      {/* Fonts */}
+      <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
         {THEME_FONT_FIELDS.map((field, i) => {
           const current = (getNestedValue(theme, field.key) as string) || "";
           return (
-            <div
+            <FormRow
               key={field.key}
-              className={`px-5 py-4 ${
-                i < THEME_FONT_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
-              }`}
+              label={field.label}
+              description="Font family"
+              last={i === THEME_FONT_FIELDS.length - 1}
             >
-              <label className="block text-[11px] text-gray-muted mb-1">
-                {field.label}
-              </label>
               <select
                 value={current}
                 onChange={(e) => {
                   handleFieldChange(field.key, e.target.value);
-                  // Save immediately on select change
                   const updated = { ...latestRef.current!, [field.key]: e.target.value };
                   latestRef.current = updated;
                   setTheme(updated);
                   saveTheme(updated);
                 }}
-                className="w-full h-9 px-3 text-[13px] rounded-md border border-gray-border bg-surface text-warm-black outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
+                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none focus:border-accent/40 transition-colors"
               >
                 {current && !FONT_OPTIONS.some((o) => o.value === current) && (
                   <option value={current}>{current}</option>
@@ -373,144 +381,53 @@ function BrandTab() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FormRow>
           );
         })}
       </div>
 
-      {/* Color pickers */}
-      <div className="bg-surface rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-bg">
-          <span className="text-xs font-medium text-warm-black">Colors</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
-          {THEME_COLOR_FIELDS.map((field, i) => {
-            const hex = (getNestedValue(theme, field.key) as string) || "#000000";
-            return (
-              <div
-                key={field.key}
-                className={`px-5 py-3 ${
-                  i < THEME_COLOR_FIELDS.length - 1 ? "border-b border-gray-bg" : ""
-                } ${i % 2 === 0 ? "sm:border-r sm:border-r-gray-bg" : ""}`}
-              >
-                <label className="block text-[11px] text-gray-muted mb-1.5">
-                  {field.label}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={hex}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                    onBlur={handleBlurSave}
-                    className="h-8 w-10 rounded border border-gray-border bg-surface p-0.5 cursor-pointer shrink-0"
-                  />
-                  <input
-                    type="text"
-                    value={hex}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                    onBlur={handleBlurSave}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        (e.target as HTMLElement).blur();
-                      }
-                    }}
-                    placeholder="#000000"
-                    className="w-24 h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
-                  />
-                </div>
+      {/* Colors */}
+      <div className="rounded-lg border border-gray-border overflow-hidden">
+        {THEME_COLOR_FIELDS.map((field, i) => {
+          const hex = (getNestedValue(theme, field.key) as string) || "#000000";
+          return (
+            <FormRow
+              key={field.key}
+              label={field.label}
+              description="Color value"
+              last={i === THEME_COLOR_FIELDS.length - 1}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={hex}
+                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                  onBlur={handleBlurSave}
+                  className="h-8 w-8 rounded-md border border-gray-border bg-surface-base p-0.5 cursor-pointer shrink-0"
+                />
+                <input
+                  type="text"
+                  value={hex}
+                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                  onBlur={handleBlurSave}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLElement).blur();
+                  }}
+                  className="w-28 bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
+                />
               </div>
-            );
-          })}
-        </div>
+            </FormRow>
+          );
+        })}
       </div>
 
       <SavedToast visible={saved} />
-    </div>
+    </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Domains Tab
-// ---------------------------------------------------------------------------
-
-function DomainsTab() {
-  return (
-    <div className="-mx-5 -mt-2 sm:-mx-0 sm:mt-0">
-      <DomainsClient initialDomains={[]} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Publishing Tab
-// ---------------------------------------------------------------------------
-
-function PublishingTab() {
-  const dashboard = useDashboardOptional();
-
-  return (
-    <div>
-      <div className="bg-surface rounded-2xl overflow-hidden">
-        <div className="flex items-start sm:items-center justify-between gap-4 px-5 py-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm font-medium text-warm-black">
-                Auto-publish
-              </span>
-              <span
-                className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
-                  dashboard?.autoPublish
-                    ? "text-emerald-600/80 bg-emerald-500/10"
-                    : "text-amber-600/80 bg-amber-500/10"
-                }`}
-              >
-                {dashboard?.autoPublish ? "on" : "off"}
-              </span>
-            </div>
-            <p className="text-xs text-gray-subtle">
-              {dashboard?.autoPublish
-                ? "AI changes go live immediately when you confirm them in chat."
-                : "AI changes are saved as drafts for admin review before going live."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 bg-surface rounded-2xl overflow-hidden">
-        <div className="px-5 py-4">
-          <h3 className="text-sm font-medium text-warm-black mb-2">How it works</h3>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              </span>
-              <div>
-                <p className="text-xs font-medium text-warm-black">Live mode</p>
-                <p className="text-xs text-gray-subtle">
-                  When you confirm an AI suggestion in chat, the change is published to your live site immediately.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              </span>
-              <div>
-                <p className="text-xs font-medium text-warm-black">Draft mode</p>
-                <p className="text-xs text-gray-subtle">
-                  AI changes are saved as drafts. An admin reviews and publishes them before they go live. Good for businesses that need approval workflows.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// My AI Tab
+// AI Agent section
 // ---------------------------------------------------------------------------
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -519,7 +436,7 @@ const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({
   day: i,
   open: "09:00",
   close: "17:00",
-  closed: i === 0, // Sunday closed by default
+  closed: i === 0,
 }));
 
 interface AISettings {
@@ -532,7 +449,7 @@ interface AISettings {
   } | null;
 }
 
-function MyAITab() {
+function AISection() {
   const [data, setData] = useState<AISettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -586,15 +503,14 @@ function MyAITab() {
       <div className="space-y-4">
         <SkeletonLine width="w-1/3" height="h-4" />
         <SkeletonLine width="w-full" height="h-20" />
-        <SkeletonLine width="w-full" height="h-20" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
-        <p className="text-sm text-red-600">Couldn&apos;t load AI settings</p>
+      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-center">
+        <p className="text-sm text-red-400">Couldn&apos;t load AI settings</p>
       </div>
     );
   }
@@ -602,22 +518,18 @@ function MyAITab() {
   const schedule = data.businessHours?.schedule || DEFAULT_SCHEDULE;
 
   return (
-    <div>
+    <>
       {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-600/5 border border-red-200 text-xs text-red-600">
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
           Couldn&apos;t save — try again
         </div>
       )}
 
-      {/* Personality */}
-      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-bg flex items-center gap-2">
-          <Bot className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-          <span className="text-xs font-medium text-warm-black">Voice & Personality</span>
-        </div>
-        <div className="px-5 py-4">
-          <TextInput
-            label="AI personality"
+      {/* Personality + Rules */}
+      <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
+        <FormRow label="Personality" description="How the AI sounds">
+          <input
+            type="text"
             value={data.personality}
             onChange={(e) => {
               const updated = { ...data, personality: e.target.value };
@@ -626,26 +538,14 @@ function MyAITab() {
             }}
             onBlur={handleBlurSave}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                (e.target as HTMLElement).blur();
-              }
+              if (e.key === "Enter") (e.target as HTMLElement).blur();
             }}
-            placeholder="e.g. warm and casual, professional, friendly but concise"
+            placeholder="e.g. warm and casual, professional, friendly"
+            className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none focus:border-accent/40 transition-colors placeholder:text-gray-faint"
           />
-          <p className="text-[11px] text-gray-subtle mt-1.5">
-            Describes how the AI sounds in chat, emails, social posts, and review replies.
-          </p>
-        </div>
-      </div>
-
-      {/* Business Rules */}
-      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-bg">
-          <span className="text-xs font-medium text-warm-black">Instructions for the AI</span>
-        </div>
-        <div className="px-5 py-4">
-          <TextArea
-            label="Business rules"
+        </FormRow>
+        <FormRow label="Business Rules" description="Persistent instructions" last>
+          <textarea
             value={data.businessRules}
             onChange={(e) => {
               const updated = { ...data, businessRules: e.target.value };
@@ -653,107 +553,224 @@ function MyAITab() {
               latestRef.current = updated;
             }}
             onBlur={handleBlurSave}
-            placeholder={"e.g.\n• Always mention we're woman-owned\n• Never discount below 15%\n• Don't change the hero image without asking\n• When responding to reviews, always thank them by name"}
-            rows={6}
+            placeholder={"e.g.\n• Always mention we're woman-owned\n• Never discount below 15%\n• Don't change the hero without asking"}
+            rows={5}
+            className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors placeholder:text-gray-faint"
           />
-          <p className="text-[11px] text-gray-subtle mt-1.5">
-            Persistent instructions the AI follows on every interaction — chat, emails, social posts, review replies. 2,000 characters max.
-          </p>
-        </div>
+        </FormRow>
       </div>
 
-      {/* Business Hours */}
-      <div className="bg-surface rounded-2xl overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-bg">
-          <span className="text-xs font-medium text-warm-black">Business Hours</span>
+      {/* Hours */}
+      <div className="rounded-lg border border-gray-border overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-border/50">
+          <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
+            Business Hours
+          </span>
         </div>
-        <div className="divide-y divide-gray-bg">
-          {schedule.map((day, i) => (
-            <div key={day.day} className="flex items-center gap-3 px-5 py-3">
-              <span className="text-[13px] text-warm-black w-24 shrink-0">
-                {DAY_LABELS[day.day]}
-              </span>
-              <label className="flex items-center gap-1.5 shrink-0">
+        {schedule.map((day, i) => (
+          <div
+            key={day.day}
+            className={`flex items-center gap-3 px-5 py-3 ${
+              i < schedule.length - 1 ? "border-b border-gray-border/50" : ""
+            }`}
+          >
+            <span className="text-[13px] text-warm-white w-24 shrink-0">
+              {DAY_LABELS[day.day]}
+            </span>
+            <label className="flex items-center gap-1.5 shrink-0">
+              <input
+                type="checkbox"
+                checked={!day.closed}
+                onChange={(e) => {
+                  const newSchedule = [...schedule];
+                  newSchedule[i] = { ...day, closed: !e.target.checked };
+                  const updated = {
+                    ...data,
+                    businessHours: { ...data.businessHours!, schedule: newSchedule },
+                  };
+                  setData(updated);
+                  latestRef.current = updated;
+                  save(updated);
+                }}
+                className="w-3.5 h-3.5 rounded border-gray-border accent-accent"
+              />
+              <span className="text-[11px] text-gray-muted">Open</span>
+            </label>
+            {!day.closed ? (
+              <div className="flex items-center gap-1.5">
                 <input
-                  type="checkbox"
-                  checked={!day.closed}
+                  type="time"
+                  value={day.open}
                   onChange={(e) => {
                     const newSchedule = [...schedule];
-                    newSchedule[i] = { ...day, closed: !e.target.checked };
+                    newSchedule[i] = { ...day, open: e.target.value };
                     const updated = {
                       ...data,
                       businessHours: { ...data.businessHours!, schedule: newSchedule },
                     };
                     setData(updated);
                     latestRef.current = updated;
-                    save(updated);
                   }}
-                  className="w-3.5 h-3.5 rounded border-gray-border text-sage focus:ring-sage/20"
+                  onBlur={handleBlurSave}
+                  className="w-[110px] bg-surface-base border border-gray-border rounded-md px-2 py-1.5 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
                 />
-                <span className="text-[11px] text-gray-muted">Open</span>
-              </label>
-              {!day.closed ? (
-                <div className="flex items-center gap-1.5 flex-1">
-                  <input
-                    type="time"
-                    value={day.open}
-                    onChange={(e) => {
-                      const newSchedule = [...schedule];
-                      newSchedule[i] = { ...day, open: e.target.value };
-                      const updated = {
-                        ...data,
-                        businessHours: { ...data.businessHours!, schedule: newSchedule },
-                      };
-                      setData(updated);
-                      latestRef.current = updated;
-                    }}
-                    onBlur={handleBlurSave}
-                    className="w-[110px] h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
-                  />
-                  <span className="text-[11px] text-gray-subtle">to</span>
-                  <input
-                    type="time"
-                    value={day.close}
-                    onChange={(e) => {
-                      const newSchedule = [...schedule];
-                      newSchedule[i] = { ...day, close: e.target.value };
-                      const updated = {
-                        ...data,
-                        businessHours: { ...data.businessHours!, schedule: newSchedule },
-                      };
-                      setData(updated);
-                      latestRef.current = updated;
-                    }}
-                    onBlur={handleBlurSave}
-                    className="w-[110px] h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono outline-none focus:border-sage focus:ring-1 focus:ring-sage/20 transition-all duration-150"
-                  />
-                </div>
-              ) : (
-                <span className="text-[12px] text-gray-subtle italic">Closed</span>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="px-5 py-3 border-t border-gray-bg">
-          <p className="text-[11px] text-gray-subtle">
-            The AI uses these hours to answer &quot;are you open?&quot; questions and to update your site&apos;s hours section.
-          </p>
-        </div>
+                <span className="text-[11px] text-gray-faint">to</span>
+                <input
+                  type="time"
+                  value={day.close}
+                  onChange={(e) => {
+                    const newSchedule = [...schedule];
+                    newSchedule[i] = { ...day, close: e.target.value };
+                    const updated = {
+                      ...data,
+                      businessHours: { ...data.businessHours!, schedule: newSchedule },
+                    };
+                    setData(updated);
+                    latestRef.current = updated;
+                  }}
+                  onBlur={handleBlurSave}
+                  className="w-[110px] bg-surface-base border border-gray-border rounded-md px-2 py-1.5 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
+                />
+              </div>
+            ) : (
+              <span className="text-[12px] text-gray-faint italic">Closed</span>
+            )}
+          </div>
+        ))}
       </div>
 
       <SavedToast visible={saved} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Domains section
+// ---------------------------------------------------------------------------
+
+function DomainsSection() {
+  return (
+    <div className="-mx-1">
+      <DomainsClient initialDomains={[]} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Page
+// Billing section
+// ---------------------------------------------------------------------------
+
+function BillingSection() {
+  return (
+    <div className="rounded-lg border border-gray-border overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-5">
+        <div>
+          <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-2">
+            Current plan
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[20px] font-medium text-warm-white">$149/mo</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-400/10 text-emerald-400">
+              Active
+            </span>
+          </div>
+          <p className="text-[12px] text-gray-faint">
+            Everything included. Cancel anytime.
+          </p>
+        </div>
+        <button className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors">
+          Manage billing
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Publishing section
+// ---------------------------------------------------------------------------
+
+function PublishingSection() {
+  const dashboard = useDashboardOptional();
+
+  return (
+    <div className="rounded-lg border border-gray-border overflow-hidden">
+      <div className="px-5 py-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[14px] font-medium text-warm-white">Auto-publish</span>
+          <span
+            className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+              dashboard?.autoPublish
+                ? "text-emerald-400 bg-emerald-400/10"
+                : "text-amber-400 bg-amber-400/10"
+            }`}
+          >
+            {dashboard?.autoPublish ? "on" : "off"}
+          </span>
+        </div>
+        <p className="text-[13px] text-gray-muted leading-relaxed">
+          {dashboard?.autoPublish
+            ? "AI changes go live immediately when you confirm them in chat."
+            : "AI changes are saved as drafts for admin review before going live."}
+        </p>
+      </div>
+      <div className="border-t border-gray-border/50 px-5 py-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+          <div>
+            <p className="text-[12px] text-warm-white">Live mode</p>
+            <p className="text-[11px] text-gray-faint">Changes publish immediately on confirm.</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+          <div>
+            <p className="text-[12px] text-warm-white">Draft mode</p>
+            <p className="text-[11px] text-gray-faint">Admin reviews changes before they go live.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section headers
+// ---------------------------------------------------------------------------
+
+const SECTION_META: Record<string, { title: string; description: string }> = {
+  profile: {
+    title: "Profile",
+    description: "Your business identity. Appears across your site and AI interactions.",
+  },
+  brand: {
+    title: "Brand",
+    description: "Typography and colors for your public site.",
+  },
+  ai: {
+    title: "AI Agent",
+    description: "Personality, rules, and hours your AI follows on every interaction.",
+  },
+  domains: {
+    title: "Domains",
+    description: "Connect a custom domain to your site.",
+  },
+  billing: {
+    title: "Plan & Billing",
+    description: "Your subscription and payment details.",
+  },
+  publishing: {
+    title: "Publishing",
+    description: "Control how AI changes reach your live site.",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Main page
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
-  const dashboard = useDashboardOptional();
-
-  const [activeTab, setActiveTab] = useState("identity");
+  const [activeSection, setActiveSection] = useState("profile");
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -769,13 +786,12 @@ export default function SettingsPage() {
 
   if (loadError) {
     return (
-      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
-        <div className="bg-red-600/5 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-sm text-red-600 mb-3">Couldn&apos;t load settings</p>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm text-red-400 mb-3">Couldn&apos;t load settings</p>
           <button
             onClick={() => {
               setLoadError(false);
-              setSettings(null);
               fetch("/api/content/settings", { credentials: "same-origin" })
                 .then((res) => {
                   if (!res.ok) throw new Error();
@@ -784,7 +800,7 @@ export default function SettingsPage() {
                 .then((data) => setSettings(data))
                 .catch(() => setLoadError(true));
             }}
-            className="px-4 py-2 rounded-md bg-surface border border-gray-border text-xs text-gray-fg hover:bg-gray-bg transition-colors"
+            className="px-4 py-2 rounded-md border border-gray-border text-xs text-gray-muted hover:bg-surface-raised transition-colors"
           >
             Try again
           </button>
@@ -793,53 +809,79 @@ export default function SettingsPage() {
     );
   }
 
-  if (!settings && activeTab === "identity") {
-    return (
-      <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto animate-pulse">
-        <div className="mb-8">
-          <div className="h-3 w-16 bg-gray-bg-hover rounded mb-2" />
-          <div className="h-7 w-40 bg-gray-bg-hover rounded" />
-        </div>
-        <div className="bg-surface rounded-2xl">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="px-5 py-5 border-b border-gray-bg last:border-0">
-              <div className="h-3 w-24 bg-gray-bg-hover rounded mb-2" />
-              <div className="h-4 w-48 bg-gray-bg rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const meta = SECTION_META[activeSection];
 
   return (
-    <div className="p-6 md:p-8 lg:p-10 w-full max-w-4xl mx-auto h-full overflow-y-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-medium tracking-tight text-warm-black">
+    <div className="flex h-full">
+      {/* Settings nav */}
+      <nav className="w-[200px] shrink-0 border-r border-gray-border p-6 pt-8 space-y-1 hidden md:block">
+        <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-3 px-3">
           Settings
-        </h1>
+        </div>
+        {SETTINGS_SECTIONS.map((item) => {
+          if (item.id === "divider") {
+            return <div key="divider" className="border-t border-gray-border my-2" />;
+          }
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className={`w-full text-left text-[13px] px-3 py-1.5 rounded transition-colors ${
+                activeSection === item.id
+                  ? "bg-surface-raised text-warm-white"
+                  : "text-gray-muted hover:text-warm-white hover:bg-surface-raised/50"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Mobile section select */}
+      <div className="md:hidden border-b border-gray-border px-4 py-3">
+        <select
+          value={activeSection}
+          onChange={(e) => setActiveSection(e.target.value)}
+          className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none"
+        >
+          {SETTINGS_SECTIONS.filter((s) => s.id !== "divider").map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-border mb-6 -mx-6 md:-mx-8 px-6 md:px-8">
-        <Tabs
-          items={TABS}
-          value={activeTab}
-          onChange={setActiveTab}
-          variant="underline"
-          className="h-10"
-        />
-      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
+        <div className="max-w-2xl">
+          {/* Section header */}
+          {meta && (
+            <div className="mb-8">
+              <h1 className="text-[20px] font-medium text-warm-white">{meta.title}</h1>
+              <p className="text-[13px] text-gray-muted mt-1">{meta.description}</p>
+            </div>
+          )}
 
-      {/* Tab content */}
-      {activeTab === "identity" && settings && (
-        <IdentityTab settings={settings} setSettings={setSettings} />
-      )}
-      {activeTab === "brand" && <BrandTab />}
-      {activeTab === "myai" && <MyAITab />}
-      {activeTab === "domains" && <DomainsTab />}
-      {activeTab === "publishing" && <PublishingTab />}
+          {/* Section content */}
+          {activeSection === "profile" && settings && (
+            <ProfileSection settings={settings} setSettings={setSettings} />
+          )}
+          {activeSection === "profile" && !settings && (
+            <div className="space-y-4 animate-pulse">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-12 bg-surface-raised rounded-lg" />
+              ))}
+            </div>
+          )}
+          {activeSection === "brand" && <BrandSection />}
+          {activeSection === "ai" && <AISection />}
+          {activeSection === "domains" && <DomainsSection />}
+          {activeSection === "billing" && <BillingSection />}
+          {activeSection === "publishing" && <PublishingSection />}
+        </div>
+      </div>
     </div>
   );
 }
