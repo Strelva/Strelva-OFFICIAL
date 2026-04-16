@@ -5,7 +5,6 @@ import {
   House,
   Globe,
   Image,
-  ChartNoAxesColumnIncreasing,
   Settings,
   Unplug,
   Plus,
@@ -30,7 +29,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/dashboard", icon: House },
   { label: "My Site", href: "/dashboard/content", icon: Globe },
   { label: "Photos", href: "/dashboard/photos", icon: Image },
-  { label: "Reports", href: "/dashboard/reports", icon: ChartNoAxesColumnIncreasing },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

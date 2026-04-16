@@ -7,7 +7,7 @@ import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { Tabs } from "@/components/ui/Tabs";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { SkeletonLine } from "@/components/ui/Skeleton";
-import { DomainsClient } from "@/app/dashboard/domains/DomainsClient";
+import { DomainsClient } from "./DomainsClient";
 
 // ---------------------------------------------------------------------------
 // Types
