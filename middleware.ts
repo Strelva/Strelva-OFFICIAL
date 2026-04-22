@@ -50,27 +50,20 @@ function extractTenantFromHost(host: string): string | null {
   return null;
 }
 
-async function resolveTenantFromCustomDomain(
-  domain: string
-): Promise<string | null> {
+// Custom domain → tenant mapping from env var (Edge-compatible)
+// Format: {"example.com":"tenant1","other.com":"tenant2"}
+function getCustomDomainMap(): Record<string, string> {
   try {
-    const tenantsPath = process.cwd() + "/dev-tenants.json";
-    const fs = await import("fs/promises");
-    const raw = await fs.readFile(tenantsPath, "utf-8");
-    const tenants = JSON.parse(raw) as Array<{
-      id: string;
-      customDomains?: string[];
-    }>;
-
-    for (const tenant of tenants) {
-      if (tenant.customDomains?.includes(domain)) {
-        return tenant.id;
-      }
-    }
+    const raw = process.env.CUSTOM_DOMAIN_MAP || "{}";
+    return JSON.parse(raw);
   } catch {
-    // File read failed, continue without custom domain mapping
+    return {};
   }
-  return null;
+}
+
+function resolveTenantFromCustomDomain(domain: string): string | null {
+  const map = getCustomDomainMap();
+  return map[domain] || map[domain.replace("www.", "")] || null;
 }
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
@@ -89,7 +82,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   if (!tenantId) {
     const hostWithoutPort = host.split(":")[0];
-    tenantId = await resolveTenantFromCustomDomain(hostWithoutPort);
+    tenantId = resolveTenantFromCustomDomain(hostWithoutPort);
   }
 
   if (tenantId) {
