@@ -425,6 +425,18 @@ export interface TenantConfig {
   personality?: string;
   /** Structured business hours the AI uses to answer questions and update the site */
   businessHours?: BusinessHours;
+  /** Client's Slack webhook for AI change notifications */
+  slackWebhookUrl?: string;
+  /** Client's Twilio config for SMS notifications */
+  twilioConfig?: {
+    accountSid: string;
+    authToken: string;
+    phoneNumber: string;
+  };
+  /** Client's Google Search Console service account key (JSON string) */
+  googleSearchConsoleKey?: string;
+  /** Client's Instagram access token (if not using Behold.so) */
+  instagramAccessToken?: string;
 }
 
 export interface BusinessHoursDay {

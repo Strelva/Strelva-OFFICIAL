@@ -5,7 +5,8 @@ import { getContent, getClickCounts } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { capabilityPromptFragment } from "@/lib/capabilities";
-import type { ContentSection } from "@/lib/types";
+import { sendSlackNotification } from "@/lib/slack";
+import type { ContentSection, TenantConfig } from "@/lib/types";
 
 async function buildSystemPrompt(
   tenant: string,
@@ -126,6 +127,7 @@ export async function executeAgentPrompt(
   userMessage: string
 ): Promise<string> {
   const template = await getTemplateForTenant(tenantId);
+  const tenantConfig = await getTenantConfig(tenantId);
   const capFragment = capabilityPromptFragment();
   const systemPrompt = await buildSystemPrompt(tenantId, capFragment);
 
@@ -207,15 +209,11 @@ export async function executeAgentPrompt(
         );
         await recordSectionUpdate(section, tenantId);
 
-        if (process.env.SLACK_WEBHOOK_URL) {
-          fetch(process.env.SLACK_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `Site updated *${section}* via SMS approval (${tenantId})`,
-            }),
-          }).catch(() => {});
-        }
+        sendSlackNotification(
+          { text: `Site updated *${section}* via SMS approval (${tenantId})` },
+          "tenant",
+          tenantConfig
+        ).catch(() => {});
 
         return { success: true, section, message: `Updated ${section}` };
       },

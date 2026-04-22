@@ -1,9 +1,18 @@
 import crypto from "crypto";
-import type { SearchData } from "./types";
+import type { SearchData, TenantConfig } from "./types";
 
 interface ServiceAccountKey {
   client_email: string;
   private_key: string;
+}
+
+function getSearchConsoleKey(tenantConfig?: TenantConfig | null): string | null {
+  // Tenant-level config takes priority
+  if (tenantConfig?.googleSearchConsoleKey) {
+    return tenantConfig.googleSearchConsoleKey;
+  }
+  // Fall back to platform env var
+  return process.env.GOOGLE_SEARCH_CONSOLE_KEY || null;
 }
 
 function base64url(input: Buffer | string): string {
@@ -51,15 +60,19 @@ const EMPTY_DATA: SearchData = {
   fetchedAt: new Date().toISOString(),
 };
 
-export async function fetchSearchData(siteUrl: string, days = 7): Promise<SearchData> {
-  const keyJson = process.env.GOOGLE_SEARCH_CONSOLE_KEY;
+export async function fetchSearchData(
+  siteUrl: string,
+  days = 7,
+  tenantConfig?: TenantConfig | null
+): Promise<SearchData> {
+  const keyJson = getSearchConsoleKey(tenantConfig);
   if (!keyJson) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
 
   let key: ServiceAccountKey;
   try {
     key = JSON.parse(keyJson);
   } catch {
-    console.error("Failed to parse GOOGLE_SEARCH_CONSOLE_KEY");
+    console.error("Failed to parse Google Search Console key");
     return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
   }
 

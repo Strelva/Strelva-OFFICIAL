@@ -36,9 +36,19 @@ function extractTenantFromHost(host: string): string | null {
     return null;
   }
 
+  // Production: tenant.reb.studio
   if (hostWithoutPort.endsWith(".reb.studio")) {
     const subdomain = hostWithoutPort.replace(".reb.studio", "");
     if (subdomain && subdomain !== "www" && subdomain !== "admin") {
+      return subdomain;
+    }
+    return null;
+  }
+
+  // Local dev: tenant.localhost (e.g., gldf.localhost:3000)
+  if (hostWithoutPort.endsWith(".localhost")) {
+    const subdomain = hostWithoutPort.replace(".localhost", "");
+    if (subdomain) {
       return subdomain;
     }
     return null;
@@ -64,7 +74,8 @@ function getCustomDomainMap(): Record<string, string> {
 
 function resolveTenantFromCustomDomain(domain: string): string | null {
   const map = getCustomDomainMap();
-  return map[domain] || map[domain.replace("www.", "")] || null;
+  const bare = domain.replace(/^(www|admin)\./, "");
+  return map[domain] || map[bare] || null;
 }
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
@@ -84,6 +95,14 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (!tenantId) {
     const hostWithoutPort = host.split(":")[0];
     tenantId = resolveTenantFromCustomDomain(hostWithoutPort);
+  }
+
+  // Fallback: extract tenant from ?tenant= query param (for marketing host access)
+  if (!tenantId) {
+    const tenantParam = req.nextUrl.searchParams.get("tenant");
+    if (tenantParam && /^[a-z0-9-]+$/.test(tenantParam)) {
+      tenantId = tenantParam;
+    }
   }
 
   if (tenantId) {

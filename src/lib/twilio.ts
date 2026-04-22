@@ -1,18 +1,41 @@
-const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
+import type { TenantConfig } from "./types";
+
+interface TwilioConfig {
+  accountSid: string;
+  authToken: string;
+  phoneNumber: string;
+}
+
+function getTwilioConfig(tenantConfig?: TenantConfig | null): TwilioConfig | null {
+  // Tenant-level config takes priority
+  if (tenantConfig?.twilioConfig?.accountSid) {
+    return tenantConfig.twilioConfig;
+  }
+  // Fall back to platform env vars
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (accountSid && authToken && phoneNumber) {
+    return { accountSid, authToken, phoneNumber };
+  }
+  return null;
+}
 
 export async function sendSms(
   to: string,
-  body: string
+  body: string,
+  tenantConfig?: TenantConfig | null
 ): Promise<{ sid: string }> {
-  if (!TWILIO_SID || !TWILIO_TOKEN || !TWILIO_FROM) {
+  const config = getTwilioConfig(tenantConfig);
+
+  if (!config) {
     console.log(`[SMS dev] To: ${to}\n${body}`);
     return { sid: `mock_${Date.now()}` };
   }
 
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`;
-  const auth = Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString("base64");
+  const { accountSid, authToken, phoneNumber } = config;
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
 
   const res = await fetch(url, {
     method: "POST",
@@ -20,7 +43,7 @@ export async function sendSms(
       Authorization: `Basic ${auth}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: to, From: TWILIO_FROM, Body: body }),
+    body: new URLSearchParams({ To: to, From: phoneNumber, Body: body }),
   });
 
   if (!res.ok) {

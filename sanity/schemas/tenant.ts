@@ -22,6 +22,77 @@ export const tenant = defineType({
     defineField({ name: "bookingUrl", title: "Booking URL", type: "url" }),
     defineField({ name: "resendDomain", title: "Resend Domain", type: "string" }),
     defineField({ name: "siteUrl", title: "Site URL", type: "url" }),
+    defineField({ name: "ownerPhone", title: "Owner Phone", type: "string" }),
+    defineField({ name: "referredBy", title: "Referred By", type: "string" }),
+    defineField({ name: "autoPublish", title: "Auto Publish", type: "boolean", initialValue: true }),
+    defineField({ name: "beholdFeedId", title: "Behold.so Feed ID", type: "string" }),
+    defineField({ name: "businessRules", title: "Business Rules", type: "text" }),
+    defineField({ name: "personality", title: "AI Personality", type: "string" }),
+    defineField({
+      name: "socialConfig",
+      title: "Social Config",
+      type: "object",
+      fields: [
+        defineField({ name: "connectedPlatforms", title: "Connected Platforms", type: "array", of: [{ type: "string" }] }),
+      ],
+    }),
+    defineField({
+      name: "reviewsConfig",
+      title: "Reviews Config",
+      type: "object",
+      fields: [
+        defineField({ name: "googlePlaceId", title: "Google Place ID", type: "string" }),
+        defineField({ name: "yelpBusinessId", title: "Yelp Business ID", type: "string" }),
+      ],
+    }),
+    defineField({
+      name: "businessHours",
+      title: "Business Hours",
+      type: "object",
+      fields: [
+        defineField({ name: "timezone", title: "Timezone", type: "string" }),
+        defineField({
+          name: "regular",
+          title: "Regular Hours",
+          type: "array",
+          of: [{
+            type: "object",
+            fields: [
+              defineField({ name: "day", title: "Day", type: "number" }),
+              defineField({ name: "open", title: "Open", type: "string" }),
+              defineField({ name: "close", title: "Close", type: "string" }),
+              defineField({ name: "closed", title: "Closed", type: "boolean" }),
+            ],
+          }],
+        }),
+        defineField({
+          name: "holidays",
+          title: "Holidays",
+          type: "array",
+          of: [{
+            type: "object",
+            fields: [
+              defineField({ name: "date", title: "Date", type: "string" }),
+              defineField({ name: "label", title: "Label", type: "string" }),
+            ],
+          }],
+        }),
+      ],
+    }),
+    // Client integrations (per-tenant, not platform-level)
+    defineField({ name: "slackWebhookUrl", title: "Slack Webhook URL", type: "url" }),
+    defineField({
+      name: "twilioConfig",
+      title: "Twilio Config",
+      type: "object",
+      fields: [
+        defineField({ name: "accountSid", title: "Account SID", type: "string" }),
+        defineField({ name: "authToken", title: "Auth Token", type: "string" }),
+        defineField({ name: "phoneNumber", title: "Phone Number", type: "string" }),
+      ],
+    }),
+    defineField({ name: "googleSearchConsoleKey", title: "Google Search Console Key", type: "text" }),
+    defineField({ name: "instagramAccessToken", title: "Instagram Access Token", type: "string" }),
   ],
   preview: {
     select: { title: "siteName", subtitle: "subdomain" },

@@ -15,6 +15,7 @@ import { activityLog } from "./activityLog";
 import { tenant } from "./tenant";
 import { suggestion } from "./suggestion";
 import { blogPost } from "./blogPost";
+import { apiClient } from "./apiClient";
 
 export const schemaTypes = [
   hero,
@@ -34,4 +35,5 @@ export const schemaTypes = [
   tenant,
   suggestion,
   blogPost,
+  apiClient,
 ];
