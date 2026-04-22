@@ -2,7 +2,7 @@ import type { TenantConfig } from "./types";
 
 type NotificationType = "tenant" | "platform";
 
-export function getSlackWebhook(
+function getSlackWebhook(
   type: NotificationType,
   tenantConfig?: TenantConfig | null
 ): string | null {

@@ -1001,26 +1001,6 @@ export async function getDateOverrides(
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
 }
 
-export async function setDateOverrides(
-  overrides: DateOverride[],
-  tenant: string = DEFAULT_TENANT
-): Promise<void> {
-  if (hasSanity) {
-    const existingId = await getSanityClient().fetch(
-      `*[_type == "bookingConfig" && tenant == $tenant][0]._id`,
-      { tenant }
-    );
-    if (existingId) {
-      await getSanityClient().patch(existingId).set({ dateOverrides: overrides }).commit();
-    }
-    return;
-  }
-
-  const store = await readDevContent(tenant);
-  store[`__dateOverrides_${tenant}`] = overrides;
-  await writeDevContent(store, tenant);
-}
-
 export async function getBookings(
   tenant: string = DEFAULT_TENANT,
   dateRange?: { from: string; to: string }
@@ -1228,30 +1208,6 @@ export async function getSubscribers(
   return (store[tenant] || []).filter((s) => s.status === "active");
 }
 
-export async function removeSubscriber(
-  email: string,
-  tenant: string = DEFAULT_TENANT
-): Promise<boolean> {
-  if (hasSanity) {
-    const existing = await getSanityClient().fetch(
-      `*[_type == "newsletterSubscriber" && tenant == $tenant && email == $email][0]._id`,
-      { tenant, email }
-    );
-    if (!existing) return false;
-    await getSanityClient().patch(existing).set({ status: "unsubscribed" }).commit();
-    return true;
-  }
-
-  const store = await readDevNewsletter();
-  const subscribers = store[tenant] || [];
-  const sub = subscribers.find((s) => s.email === email);
-  if (!sub) return false;
-  sub.status = "unsubscribed";
-  store[tenant] = subscribers;
-  await writeDevNewsletter(store);
-  return true;
-}
-
 // --- Search Console data ---
 
 export async function getSearchData(tenant: string): Promise<SearchData | null> {
@@ -1390,18 +1346,3 @@ export async function setSocialPosts(tenant: string, posts: SocialPost[]): Promi
   await writeDevSocial(tenant, posts);
 }
 
-export async function getSubscriptionOverride(
-  tenant: string
-): Promise<string | null> {
-  const store = await readDevContent(tenant);
-  return (store.__subscriptionStatus as string) ?? null;
-}
-
-export async function setSubscriptionOverride(
-  tenant: string,
-  status: string
-): Promise<void> {
-  const store = await readDevContent(tenant);
-  store.__subscriptionStatus = status;
-  await writeDevContent(store, tenant);
-}

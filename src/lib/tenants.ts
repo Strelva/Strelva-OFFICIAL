@@ -97,17 +97,6 @@ export async function getTenantConfig(
   return tenants.find((t) => t.id === tenantId);
 }
 
-export async function getCustomDomainMap(): Promise<Record<string, string>> {
-  const tenants = await loadTenants();
-  const map: Record<string, string> = {};
-  for (const t of tenants) {
-    for (const domain of t.customDomains ?? []) {
-      map[domain] = t.id;
-    }
-  }
-  return map;
-}
-
 export async function getAllTenants(): Promise<TenantConfig[]> {
   return loadTenants();
 }
