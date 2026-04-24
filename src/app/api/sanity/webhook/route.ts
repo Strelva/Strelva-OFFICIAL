@@ -10,6 +10,7 @@ import { logActivity } from "@/lib/storage";
  */
 
 const SANITY_WEBHOOK_SECRET = process.env.SANITY_WEBHOOK_SECRET;
+const REVALIDATION_SECRET = process.env.REVALIDATION_SECRET;
 
 interface SanityWebhookPayload {
   _id: string;
@@ -74,8 +75,8 @@ async function revalidateClientSite(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // Client sites can validate this matches their expected tenant
         "X-Tenant-Id": tenantId,
+        ...(REVALIDATION_SECRET && { "X-Revalidation-Secret": REVALIDATION_SECRET }),
       },
       body: JSON.stringify({
         tenant: tenantId,
