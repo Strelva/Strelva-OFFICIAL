@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getBlogPost } from "@/lib/blog";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -51,60 +52,63 @@ export default async function BlogPostPage({
   const paragraphs = post.content.split("\n\n").filter(Boolean);
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-20">
-      <Link
-        href="/blog"
-        className="text-sm uppercase tracking-wider hover:opacity-70 transition-opacity"
-        style={{ color: "var(--color-muted, #8a9b8c)" }}
-      >
-        &larr; Back to Blog
-      </Link>
+    <>
+      <PageViewTracker />
+      <main className="max-w-2xl mx-auto px-6 py-20">
+        <Link
+          href="/blog"
+          className="text-sm uppercase tracking-wider hover:opacity-70 transition-opacity"
+          style={{ color: "var(--color-muted, #8a9b8c)" }}
+        >
+          &larr; Back to Blog
+        </Link>
 
-      <article className="mt-8">
-        <header className="mb-10">
-          <h1
-            className="text-4xl font-semibold mb-4"
-            style={{ color: "var(--color-heading, #2d3a2e)" }}
-          >
-            {post.title}
-          </h1>
-          <div className="flex items-center gap-3 text-sm" style={{ color: "var(--color-muted, #8a9b8c)" }}>
-            <span>{post.author}</span>
-            <span>&middot;</span>
-            <time dateTime={post.publishedAt}>
-              {new Date(post.publishedAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </time>
-          </div>
-          {post.tags.length > 0 && (
-            <div className="flex gap-2 mt-4">
-              {post.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs px-2 py-1 rounded-full"
-                  style={{
-                    backgroundColor: "var(--color-accent-bg, #e8ede4)",
-                    color: "var(--color-accent, #5a6b5c)",
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
+        <article className="mt-8">
+          <header className="mb-10">
+            <h1
+              className="text-4xl font-semibold mb-4"
+              style={{ color: "var(--color-heading, #2d3a2e)" }}
+            >
+              {post.title}
+            </h1>
+            <div className="flex items-center gap-3 text-sm" style={{ color: "var(--color-muted, #8a9b8c)" }}>
+              <span>{post.author}</span>
+              <span>&middot;</span>
+              <time dateTime={post.publishedAt}>
+                {new Date(post.publishedAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </time>
             </div>
-          )}
-        </header>
+            {post.tags.length > 0 && (
+              <div className="flex gap-2 mt-4">
+                {post.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-xs px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: "var(--color-accent-bg, #e8ede4)",
+                      color: "var(--color-accent, #5a6b5c)",
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </header>
 
-        <div className="space-y-5" style={{ color: "var(--color-body, #5a6b5c)" }}>
-          {paragraphs.map((p, i) => (
-            <p key={i} className="text-lg leading-relaxed">
-              {p}
-            </p>
-          ))}
-        </div>
-      </article>
-    </main>
+          <div className="space-y-5" style={{ color: "var(--color-body, #5a6b5c)" }}>
+            {paragraphs.map((p, i) => (
+              <p key={i} className="text-lg leading-relaxed">
+                {p}
+              </p>
+            ))}
+          </div>
+        </article>
+      </main>
+    </>
   );
 }

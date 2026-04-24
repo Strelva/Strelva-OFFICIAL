@@ -9,7 +9,7 @@ import {
   Unplug,
   Plus,
   MessageSquare,
-  Sparkles,
+  FileText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -28,6 +28,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/dashboard", icon: House },
   { label: "My Site", href: "/dashboard/content", icon: Globe },
+  { label: "Reports", href: "/dashboard/reports", icon: FileText },
   { label: "Photos", href: "/dashboard/photos", icon: Image },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
@@ -62,7 +63,7 @@ export function DashboardSidebar({ siteName, ownerName, recentChats }: Dashboard
         {/* Brand */}
         <div className="flex items-center gap-2.5 px-2 py-2">
           <div className="w-8 h-8 rounded-[10px] bg-surface-raised flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-accent" strokeWidth={1.5} />
+            <Globe className="w-4 h-4 text-accent" strokeWidth={1.5} />
           </div>
           <div className="flex flex-col gap-px min-w-0">
             <span className="text-[14px] font-semibold text-warm-black truncate">{siteName}</span>

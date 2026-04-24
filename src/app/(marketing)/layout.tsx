@@ -48,7 +48,7 @@ export default function MarketingLayout({
           style={{ borderColor: "var(--m-rule)" }}
         >
           <a
-            href="/agency"
+            href="/"
             className="text-[13px] font-medium tracking-[0.15em] uppercase"
             style={{ color: "var(--m-text)" }}
           >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2, Pencil, MessageCircle, Eye, Sparkles } from "lucide-react";
+import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2, Pencil, MessageCircle, Eye } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
@@ -320,7 +320,7 @@ export function SitePreview() {
                 onClick={handleAskAI}
                 className="glass-menu-item"
               >
-                <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
                 Ask AI to update
               </button>
               <button

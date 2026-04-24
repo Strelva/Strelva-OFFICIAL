@@ -2,13 +2,13 @@
 
 import { useState, useRef, useCallback, type FormEvent } from "react";
 import {
-  Sparkles,
   Timer,
   FileText,
   TrendingUp,
   ArrowUp,
   Loader2,
   CheckCircle2,
+  MessageCircle,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useDashboard } from "./DashboardContext";
@@ -202,7 +202,7 @@ export function HubPage({
           <div className="flex flex-col items-center justify-center min-h-full px-6 py-12">
             {/* Greeting icon */}
             <div className="w-14 h-14 rounded-[18px] bg-surface-raised border border-glass-border flex items-center justify-center mb-6 shadow-[0_4px_24px_rgba(91,141,239,0.07)]">
-              <Sparkles className="w-[26px] h-[26px] text-accent" strokeWidth={1.5} />
+              <MessageCircle className="w-[26px] h-[26px] text-accent" strokeWidth={1.5} />
             </div>
 
             <h1 className="text-[26px] font-medium text-warm-black tracking-[-0.02em]" suppressHydrationWarning>
@@ -262,7 +262,7 @@ export function HubPage({
                   {message.role === "assistant" && (
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
-                        <Sparkles className="w-3 h-3 text-accent" strokeWidth={1.5} />
+                        <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
                       </div>
                       <span className="text-[11px] text-gray-muted">AI</span>
                     </div>

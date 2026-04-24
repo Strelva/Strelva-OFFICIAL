@@ -9,8 +9,8 @@ import {
   Square,
   MousePointerClick,
   TextCursorInput,
-  Sparkles,
   Layers,
+  Star,
 } from "lucide-react";
 import type { DesignNode } from "../DesignMode";
 
@@ -30,7 +30,7 @@ const TYPE_ICONS: Record<DesignNode["type"], typeof Square> = {
   section: Layers,
   button: MousePointerClick,
   input: TextCursorInput,
-  icon: Sparkles,
+  icon: Star,
 };
 
 export function LayersPanel({

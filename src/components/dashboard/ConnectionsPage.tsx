@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, CircleCheck } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 
 export interface Connection {
   id: string;
@@ -14,7 +14,27 @@ export interface Connection {
   connected: boolean;
 }
 
-const CONNECTIONS: Connection[] = [
+type ConnectionId = "google-analytics" | "newsletter" | "google-business" | "instagram" | "calendly" | "yelp";
+
+interface ConnectionStates {
+  googleAnalytics: boolean;
+  newsletter: boolean;
+  googleBusiness: boolean;
+  instagram: boolean;
+  calendly: boolean;
+  yelp: boolean;
+}
+
+const CONNECTION_KEY_MAP: Record<ConnectionId, keyof ConnectionStates> = {
+  "google-analytics": "googleAnalytics",
+  "newsletter": "newsletter",
+  "google-business": "googleBusiness",
+  "instagram": "instagram",
+  "calendly": "calendly",
+  "yelp": "yelp",
+};
+
+const CONNECTION_TEMPLATES: Omit<Connection, "connected">[] = [
   {
     id: "google-analytics",
     name: "Google Analytics",
@@ -22,7 +42,6 @@ const CONNECTIONS: Connection[] = [
     icon: "GA",
     iconBg: "bg-accent-dim",
     iconColor: "text-accent",
-    connected: true,
   },
   {
     id: "newsletter",
@@ -31,7 +50,6 @@ const CONNECTIONS: Connection[] = [
     icon: "NL",
     iconBg: "bg-[rgba(129,140,248,0.09)]",
     iconColor: "text-[#818cf8]",
-    connected: true,
   },
   {
     id: "google-business",
@@ -40,7 +58,6 @@ const CONNECTIONS: Connection[] = [
     icon: "GB",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
-    connected: false,
   },
   {
     id: "instagram",
@@ -49,7 +66,6 @@ const CONNECTIONS: Connection[] = [
     icon: "IG",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
-    connected: false,
   },
   {
     id: "calendly",
@@ -58,7 +74,6 @@ const CONNECTIONS: Connection[] = [
     icon: "CL",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
-    connected: false,
   },
   {
     id: "yelp",
@@ -67,7 +82,6 @@ const CONNECTIONS: Connection[] = [
     icon: "YP",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
-    connected: false,
   },
 ];
 
@@ -101,8 +115,38 @@ function ConnectionRow({ connection, onClick }: { connection: Connection; onClic
 
 export function ConnectionsPage() {
   const router = useRouter();
+  const [connectionStates, setConnectionStates] = useState<ConnectionStates>({
+    googleAnalytics: false,
+    newsletter: false,
+    googleBusiness: false,
+    instagram: false,
+    calendly: false,
+    yelp: false,
+  });
 
-  const featured = CONNECTIONS[0]; // Google Analytics as featured
+  useEffect(() => {
+    fetch("/api/tenant-settings", { credentials: "same-origin" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.connections) {
+          setConnectionStates(data.connections);
+        }
+      })
+      .catch(() => {
+        // Keep defaults (all false) on error
+      });
+  }, []);
+
+  const connections: Connection[] = useMemo(
+    () =>
+      CONNECTION_TEMPLATES.map((t) => ({
+        ...t,
+        connected: connectionStates[CONNECTION_KEY_MAP[t.id as ConnectionId]] ?? false,
+      })),
+    [connectionStates]
+  );
+
+  const featured = connections[0]; // Google Analytics as featured
 
   return (
     <div className="flex-1 overflow-y-auto p-8 lg:px-12 lg:py-8">
@@ -110,7 +154,7 @@ export function ConnectionsPage() {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[22px] font-semibold text-warm-black tracking-[-0.01em]">Connections</h1>
-          <span className="text-[13px] text-gray-muted">{CONNECTIONS.filter((c) => c.connected).length} active</span>
+          <span className="text-[13px] text-gray-muted">{connections.filter((c) => c.connected).length} active</span>
         </div>
         <div className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-xl px-3.5 py-2">
           <Search className="w-4 h-4 text-gray-subtle" strokeWidth={1.5} />
@@ -174,9 +218,9 @@ export function ConnectionsPage() {
 
       {/* Grid — two columns */}
       <div className="space-y-1">
-        {Array.from({ length: Math.ceil(CONNECTIONS.length / 2) }, (_, rowIdx) => (
+        {Array.from({ length: Math.ceil(connections.length / 2) }, (_, rowIdx) => (
           <div key={rowIdx} className="flex gap-1">
-            {CONNECTIONS.slice(rowIdx * 2, rowIdx * 2 + 2).map((connection) => (
+            {connections.slice(rowIdx * 2, rowIdx * 2 + 2).map((connection) => (
               <div key={connection.id} className="flex-1">
                 <ConnectionRow
                   connection={connection}
@@ -184,7 +228,7 @@ export function ConnectionsPage() {
                 />
               </div>
             ))}
-            {CONNECTIONS.slice(rowIdx * 2, rowIdx * 2 + 2).length === 1 && <div className="flex-1" />}
+            {connections.slice(rowIdx * 2, rowIdx * 2 + 2).length === 1 && <div className="flex-1" />}
           </div>
         ))}
       </div>

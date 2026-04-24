@@ -21,6 +21,15 @@ export async function GET() {
       businessRules: config.businessRules || "",
       personality: config.personality || "",
       businessHours: config.businessHours || null,
+      // Connection status flags (presence of config = connected)
+      connections: {
+        googleAnalytics: !!config.googleSearchConsoleKey,
+        newsletter: !!config.resendDomain,
+        googleBusiness: !!config.reviewsConfig?.googlePlaceId,
+        instagram: !!(config.instagramAccessToken || config.beholdFeedId),
+        calendly: !!config.bookingUrl,
+        yelp: !!config.reviewsConfig?.yelpBusinessId,
+      },
     });
   } catch (err) {
     console.error("[tenant-settings GET]", err);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isRateLimitedWindowed } from "@/lib/rate-limit";
+import { getRedis } from "@/lib/redis";
 
 export async function POST(req: Request) {
   // Rate limit: 5 submissions per hour per IP
@@ -31,8 +32,26 @@ export async function POST(req: Request) {
     }
   }
 
-  // Log to console for now — Sanity/DB storage can be added later
-  console.log("[onboard/intake]", { businessName, description, location, email, currentWebsite, referredBy });
+  // Persist to Redis
+  const leadData = {
+    businessName,
+    description: description || null,
+    location: location || null,
+    email,
+    currentWebsite: currentWebsite || null,
+    referredBy: referredBy || null,
+    createdAt: new Date().toISOString(),
+  };
+
+  console.log("[onboard/intake]", leadData);
+
+  const redis = getRedis();
+  if (redis) {
+    const leadKey = `lead:${email.toLowerCase()}`;
+    await redis.set(leadKey, JSON.stringify(leadData));
+    // Also add to a sorted set for chronological listing
+    await redis.zadd("leads:all", { score: Date.now(), member: leadKey });
+  }
 
   return NextResponse.json({ success: true });
 }
