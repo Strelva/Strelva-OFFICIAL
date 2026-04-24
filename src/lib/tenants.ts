@@ -101,6 +101,111 @@ export async function getAllTenants(): Promise<TenantConfig[]> {
   return loadTenants();
 }
 
+// ---------------------------------------------------------------------------
+// Domain-based tenant lookup (for middleware custom domain resolution)
+// ---------------------------------------------------------------------------
+
+const DOMAIN_CACHE_KEY = "reb:domain-map";
+const DOMAIN_CACHE_TTL = 60;
+
+let _domainMapCache: Record<string, { tenantId: string; isAdmin: boolean }> | null = null;
+let _domainMapCacheTime = 0;
+
+/**
+ * Build a domain -> tenant mapping from all tenants.
+ * Includes productionDomain, adminDomain, and customDomains.
+ */
+async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAdmin: boolean }>> {
+  const tenants = await loadTenants();
+  const map: Record<string, { tenantId: string; isAdmin: boolean }> = {};
+
+  for (const tenant of tenants) {
+    // Production domain
+    if (tenant.productionDomain) {
+      const prod = tenant.productionDomain.toLowerCase();
+      map[prod] = { tenantId: tenant.id, isAdmin: false };
+      map[`www.${prod}`] = { tenantId: tenant.id, isAdmin: false };
+    }
+
+    // Admin domain (explicit or derived)
+    const adminDomain = tenant.adminDomain || (tenant.productionDomain ? `admin.${tenant.productionDomain}` : null);
+    if (adminDomain) {
+      map[adminDomain.toLowerCase()] = { tenantId: tenant.id, isAdmin: true };
+    }
+
+    // Legacy customDomains array (for backward compatibility)
+    for (const domain of tenant.customDomains ?? []) {
+      const d = domain.toLowerCase();
+      if (!map[d]) {
+        const isAdmin = d.startsWith("admin.");
+        map[d] = { tenantId: tenant.id, isAdmin };
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Look up tenant by custom domain. Returns null if no match.
+ * Uses Redis cache when available, falls back to in-memory cache.
+ */
+export async function getTenantByDomain(
+  domain: string
+): Promise<{ tenantId: string; isAdmin: boolean } | null> {
+  const normalized = domain.toLowerCase().replace(/^www\./, "");
+  const redis = getRedis();
+
+  // Try Redis cache
+  if (redis) {
+    try {
+      const cached = await redis.get<Record<string, { tenantId: string; isAdmin: boolean }>>(DOMAIN_CACHE_KEY);
+      if (cached) {
+        return cached[normalized] || cached[domain.toLowerCase()] || null;
+      }
+    } catch {
+      // Redis failed, continue to rebuild
+    }
+  }
+
+  // Check in-memory cache
+  const now = Date.now();
+  if (_domainMapCache && now - _domainMapCacheTime < DOMAIN_CACHE_TTL * 1000) {
+    return _domainMapCache[normalized] || _domainMapCache[domain.toLowerCase()] || null;
+  }
+
+  // Rebuild map
+  const map = await buildDomainMap();
+
+  // Write to Redis
+  if (redis) {
+    try {
+      await redis.set(DOMAIN_CACHE_KEY, map, { ex: DOMAIN_CACHE_TTL });
+    } catch {
+      // Redis write failed, not fatal
+    }
+  }
+
+  // Update in-memory cache
+  _domainMapCache = map;
+  _domainMapCacheTime = Date.now();
+
+  return map[normalized] || map[domain.toLowerCase()] || null;
+}
+
+/**
+ * Invalidate domain map cache (call after tenant domain changes)
+ */
+export function invalidateDomainMapCache(): void {
+  _domainMapCache = null;
+  _domainMapCacheTime = 0;
+
+  const redis = getRedis();
+  if (redis) {
+    redis.del(DOMAIN_CACHE_KEY).catch(() => {});
+  }
+}
+
 export async function createTenant(
   config: Omit<TenantConfig, "id" | "createdAt" | "active" | "subscriptionStatus">
 ): Promise<TenantConfig> {
@@ -175,6 +280,7 @@ export async function addCustomDomain(tenantId: string, domain: string): Promise
   const updated = await updateTenant(tenantId, { customDomains: next });
   if (!updated) return { ok: false, status: 404, error: "Tenant not found" };
   markDomainAdded(tenantId, normalized);
+  invalidateDomainMapCache();
   return { ok: true, tenant: updated };
 }
 
@@ -201,6 +307,7 @@ export async function removeCustomDomain(tenantId: string, domain: string): Prom
   const updated = await updateTenant(tenantId, { customDomains: next });
   if (!updated) return { ok: false, status: 404, error: "Tenant not found" };
   _domainAddedAt.delete(`${tenantId}:${normalized}`);
+  invalidateDomainMapCache();
   return { ok: true, tenant: updated };
 }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getBlogPosts } from "@/lib/blog";
 import { getContent } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function BlogPage() {
   const tenant = await getTenantFromHeaders();
-  const posts = await getBlogPosts(tenant, { status: "published" });
-  const settings = await getContent("settings", tenant);
+  const preview = await isPreviewMode();
+  // In preview mode, show all posts including drafts; in production, only published
+  const posts = await getBlogPosts(tenant, preview ? {} : { status: "published" });
+  const settings = await getContent("settings", tenant, preview ? { preview: true } : undefined);
 
   if (posts.length === 0) {
     return (

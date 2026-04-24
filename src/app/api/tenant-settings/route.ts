@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
-import { getTenantConfig, updateTenant } from "@/lib/tenants";
+import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/tenants";
 import type { BusinessHours } from "@/lib/types";
 
 /** Tenant-level settings: businessRules, personality, businessHours */
@@ -21,6 +21,8 @@ export async function GET() {
       businessRules: config.businessRules || "",
       personality: config.personality || "",
       businessHours: config.businessHours || null,
+      productionDomain: config.productionDomain || "",
+      adminDomain: config.adminDomain || "",
       // Connection status flags (presence of config = connected)
       connections: {
         googleAnalytics: !!config.googleSearchConsoleKey,
@@ -76,10 +78,22 @@ export async function PUT(req: Request) {
         }
       }
     }
+    // Domain fields (lowercase, trim)
+    if (typeof body.productionDomain === "string") {
+      updates.productionDomain = body.productionDomain.trim().toLowerCase() || undefined;
+    }
+    if (typeof body.adminDomain === "string") {
+      updates.adminDomain = body.adminDomain.trim().toLowerCase() || undefined;
+    }
 
     const updated = await updateTenant(tenant, updates);
     if (!updated) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+
+    // Invalidate domain map cache if domain fields were updated
+    if (updates.productionDomain !== undefined || updates.adminDomain !== undefined) {
+      invalidateDomainMapCache();
     }
 
     return NextResponse.json({ success: true });

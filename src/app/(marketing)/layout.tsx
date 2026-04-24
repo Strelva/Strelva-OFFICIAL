@@ -1,16 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "REB — We build your site. The AI handles the rest.",
-  description:
-    "Cut out the marketing agency. We build your website by hand, then AI manages updates, blog, email, reviews, and social. $149/mo, everything included.",
-  openGraph: {
-    title: "REB — We build your site. The AI handles the rest.",
-    description:
-      "No more chasing your agency for a text change. We build it. The AI runs it. You just text back yes.",
-    type: "website",
-    locale: "en_US",
-  },
+  title: "REB — Sign in to your dashboard",
+  description: "Access your business dashboard.",
 };
 
 export default function MarketingLayout({
@@ -35,58 +27,10 @@ export default function MarketingLayout({
         minHeight: "100vh",
       }}
     >
-      <nav
-        className="fixed top-0 left-0 right-0 z-50"
-        style={{
-          background: "rgba(14,14,14,0.9)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-        }}
-      >
-        <div
-          className="max-w-[1040px] mx-auto px-6 h-12 flex items-center justify-between border-b"
-          style={{ borderColor: "var(--m-rule)" }}
-        >
-          <a
-            href="/"
-            className="text-[13px] font-medium tracking-[0.15em] uppercase"
-            style={{ color: "var(--m-text)" }}
-          >
-            REB
-          </a>
-          <div className="flex items-center gap-6">
-            <a
-              href="#pricing"
-              className="hidden sm:inline text-[13px]"
-              style={{ color: "var(--m-text-3)" }}
-            >
-              Pricing
-            </a>
-            <a
-              href="#how"
-              className="hidden sm:inline text-[13px]"
-              style={{ color: "var(--m-text-3)" }}
-            >
-              How it works
-            </a>
-            <a
-              href="/onboard"
-              className="text-[13px] font-medium px-4 py-1.5 border transition-colors hover:bg-white/5"
-              style={{
-                borderColor: "var(--m-text)",
-                color: "var(--m-text)",
-              }}
-            >
-              See the demo
-            </a>
-          </div>
-        </div>
-      </nav>
-
-      <main className="pt-12">{children}</main>
+      <main>{children}</main>
 
       <footer className="border-t px-6" style={{ borderColor: "var(--m-rule)" }}>
-        <div className="max-w-[1040px] mx-auto py-8 flex flex-col md:flex-row justify-between gap-4">
+        <div className="max-w-[1040px] mx-auto py-6 flex flex-col md:flex-row justify-between gap-4">
           <div className="text-[12px]" style={{ color: "var(--m-text-3)" }}>
             &copy; {new Date().getFullYear()} REB
           </div>
@@ -97,8 +41,6 @@ export default function MarketingLayout({
             <a href="mailto:jacob@reb.studio" className="hover:underline">
               Contact
             </a>
-            <span>Privacy</span>
-            <span>Terms</span>
           </div>
         </div>
       </footer>

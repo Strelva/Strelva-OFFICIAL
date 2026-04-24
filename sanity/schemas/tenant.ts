@@ -16,6 +16,8 @@ export const tenant = defineType({
     defineField({ name: "template", title: "Template", type: "string" }),
     defineField({ name: "features", title: "Features", type: "array", of: [{ type: "string" }] }),
     defineField({ name: "customDomains", title: "Custom Domains", type: "array", of: [{ type: "string" }] }),
+    defineField({ name: "productionDomain", title: "Production Domain", type: "string", description: "Primary production domain (e.g., rohlaxwellness.com)" }),
+    defineField({ name: "adminDomain", title: "Admin Domain", type: "string", description: "Admin dashboard domain (e.g., admin.rohlaxwellness.com). Derived from productionDomain if not set." }),
     defineField({ name: "stripeCustomerId", title: "Stripe Customer ID", type: "string" }),
     defineField({ name: "subscriptionStatus", title: "Subscription Status", type: "string" }),
     defineField({ name: "bookingProvider", title: "Booking Provider", type: "string" }),
@@ -93,6 +95,7 @@ export const tenant = defineType({
     }),
     defineField({ name: "googleSearchConsoleKey", title: "Google Search Console Key", type: "text" }),
     defineField({ name: "instagramAccessToken", title: "Instagram Access Token", type: "string" }),
+    defineField({ name: "revalidateUrl", title: "Revalidate URL", type: "url", description: "URL to POST to when content changes (e.g., https://clientsite.com/api/revalidate)" }),
   ],
   preview: {
     select: { title: "siteName", subtitle: "subdomain" },

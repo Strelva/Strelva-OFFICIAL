@@ -65,16 +65,27 @@ export async function getBlogPosts(
 
 export async function getBlogPost(
   tenant: string,
-  slug: string
+  slug: string,
+  options?: { includeDrafts?: boolean }
 ): Promise<BlogPost | null> {
   if (hasSanity) {
-    const query = `*[_type == "blogPost" && tenant == $tenant && slug == $slug][0]{ "id": _id, slug, title, excerpt, content, author, publishedAt, status, tags }`;
+    // In preview/draft mode, allow fetching any post regardless of status
+    // In production, only fetch published posts
+    let query = `*[_type == "blogPost" && tenant == $tenant && slug == $slug`;
+    if (!options?.includeDrafts) {
+      query += ` && status == "published"`;
+    }
+    query += `][0]{ "id": _id, slug, title, excerpt, content, author, publishedAt, status, tags }`;
     const doc = await getSanityReadClient().fetch(query, { tenant, slug });
     return doc || null;
   }
 
   const posts = await readDevBlog(tenant);
-  return posts.find((p) => p.slug === slug) || null;
+  const post = posts.find((p) => p.slug === slug);
+  if (!post) return null;
+  // In production mode (no includeDrafts), only return published posts
+  if (!options?.includeDrafts && post.status !== "published") return null;
+  return post;
 }
 
 export async function createBlogPost(

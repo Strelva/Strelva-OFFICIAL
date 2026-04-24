@@ -123,8 +123,15 @@ function transformSanityImages<K extends ContentSection>(
 
 export async function getContent<K extends ContentSection>(
   section: K,
-  tenant: string = DEFAULT_TENANT
+  tenant: string = DEFAULT_TENANT,
+  options?: { preview?: boolean }
 ): Promise<ContentMap[K]> {
+  // If preview mode is enabled, check for draft content first
+  if (options?.preview) {
+    const draft = await getDraftContent(section, tenant);
+    if (draft) return draft;
+  }
+
   if (hasSanity) {
     const type = SECTION_TO_TYPE[section];
     const query = `*[_type == $type && tenant == $tenant][0]`;

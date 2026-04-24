@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import { IframeScrollListener } from "@/components/public/IframeScrollListener";
 import { EditModeOverlay } from "@/components/public/EditModeOverlay";
+import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
+
+async function isAdminDomain(): Promise<boolean> {
+  const h = await headers();
+  const host = h.get("host") || "";
+  return host.startsWith("admin.");
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
@@ -155,12 +164,24 @@ export default async function TenantPublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const tenant = await getTenantFromHeaders();
+  const [tenant, isPreview, isAdmin] = await Promise.all([
+    getTenantFromHeaders(),
+    isPreviewMode(),
+    isAdminDomain(),
+  ]);
+
+  // Gate public routes: only allow access in preview mode or from tenant subdomains
+  // Admin subdomain requests without preview flag should redirect to dashboard
+  if (isAdmin && !isPreview) {
+    redirect("/dashboard");
+  }
+
   const template = await getTemplateForTenant(tenant);
 
+  const fetchOptions = isPreview ? { preview: true } : undefined;
   const [settings, contact] = await Promise.all([
-    getContent("settings", tenant),
-    getContent("contact", tenant),
+    getContent("settings", tenant, fetchOptions),
+    getContent("contact", tenant, fetchOptions),
   ]);
 
   const HeaderComponent = template.Header;
@@ -181,6 +202,7 @@ export default async function TenantPublicLayout({
         <LocalBusinessSchema />
         <IframeScrollListener />
         <EditModeOverlay />
+        {isPreview && <PreviewBanner />}
         {Wrapper ? <Wrapper>{content}</Wrapper> : content}
       </SmoothScrollProvider>
     </div>

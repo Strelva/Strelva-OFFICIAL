@@ -70,9 +70,14 @@ export function SitePreview() {
     ? (sectionToPage[activeSection] || activePage || "home")
     : (activePage || "home");
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
-  const editParam = editMode === "draft" ? "?edit=true" : "";
+  // Build query params: always include preview=true, optionally edit=true
+  const params = new URLSearchParams();
+  params.set("preview", "true");
+  if (editMode === "draft") {
+    params.set("edit", "true");
+  }
   const base = siteUrl || "";
-  const iframeSrc = `${base}${pagePath}${editParam}`;
+  const iframeSrc = `${base}${pagePath}?${params.toString()}`;
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath });

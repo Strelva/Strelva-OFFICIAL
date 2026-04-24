@@ -403,6 +403,10 @@ export interface TenantConfig {
   template: TemplateId;
   features?: TenantFeature[];
   customDomains?: string[];
+  /** Primary production domain (e.g., "rohlaxwellness.com") */
+  productionDomain?: string;
+  /** Admin dashboard domain (e.g., "admin.rohlaxwellness.com"). Derived from productionDomain if not set. */
+  adminDomain?: string;
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
   bookingProvider?: string;
@@ -437,6 +441,8 @@ export interface TenantConfig {
   googleSearchConsoleKey?: string;
   /** Client's Instagram access token (if not using Behold.so) */
   instagramAccessToken?: string;
+  /** URL to POST to when content changes (e.g., https://clientsite.com/api/revalidate) */
+  revalidateUrl?: string;
 }
 
 export interface BusinessHoursDay {

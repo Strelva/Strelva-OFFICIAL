@@ -7,9 +7,10 @@ interface SectionRendererProps {
   pageSlug: string;
   tenant: string;
   editMode?: boolean;
+  preview?: boolean;
 }
 
-export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRendererProps) {
+export async function SectionRenderer({ pageSlug, tenant, editMode, preview }: SectionRendererProps) {
   const template = await getTemplateForTenant(tenant);
 
   // Load page config — fall back to template defaults
@@ -50,9 +51,10 @@ export async function SectionRenderer({ pageSlug, tenant, editMode }: SectionRen
     }
   }
 
-  // Fetch all content in parallel
+  // Fetch all content in parallel (with preview mode if enabled)
   const contentKeys = Array.from(contentKeysSet);
-  const results = await Promise.all(contentKeys.map((k) => getContent(k, tenant)));
+  const fetchOptions = preview ? { preview: true } : undefined;
+  const results = await Promise.all(contentKeys.map((k) => getContent(k, tenant, fetchOptions)));
   const content: Record<string, unknown> = {};
   contentKeys.forEach((k, i) => {
     content[k] = results[i];

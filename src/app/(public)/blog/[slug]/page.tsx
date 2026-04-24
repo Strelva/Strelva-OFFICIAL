@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBlogPost } from "@/lib/blog";
 import { getContent } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +45,9 @@ export default async function BlogPostPage({
 }) {
   const { slug } = await params;
   const tenant = await getTenantFromHeaders();
-  const post = await getBlogPost(tenant, slug);
+  const preview = await isPreviewMode();
+  // In preview mode, allow viewing draft posts
+  const post = await getBlogPost(tenant, slug, preview ? { includeDrafts: true } : undefined);
 
   if (!post) notFound();
 

@@ -1,5 +1,5 @@
 import { getContent } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { SectionRenderer } from "@/components/public/SectionRenderer";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
@@ -21,6 +21,7 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const tenant = await getTenantFromHeaders();
+  const preview = await isPreviewMode();
 
   return (
     <>
@@ -37,6 +38,7 @@ export default async function Home({
           pageSlug="home"
           tenant={tenant}
           editMode={params.edit === "true"}
+          preview={preview}
         />
       </main>
     </>
