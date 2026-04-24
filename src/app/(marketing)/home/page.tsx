@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MarketingAnimations } from "./agency/animations";
+import { MarketingAnimations } from "../agency/animations";
 
 export const metadata: Metadata = {
   title: "REB — Your business runs itself. Just text back yes.",

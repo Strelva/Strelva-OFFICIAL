@@ -90,6 +90,15 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Rewrite marketing host root to /home to avoid route conflict with tenant pages
+  const hostWithoutPort = host.split(":")[0];
+  const isMarketingHost = MARKETING_HOSTS.has(host) || MARKETING_HOSTS.has(hostWithoutPort);
+  if (isMarketingHost && pathname === "/") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/home";
+    return NextResponse.rewrite(url);
+  }
+
   let tenantId = extractTenantFromHost(host);
 
   if (!tenantId) {
