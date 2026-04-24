@@ -13,7 +13,6 @@ const MARKETING_HOSTS = new Set([
 
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/agency",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/onboard(.*)",
