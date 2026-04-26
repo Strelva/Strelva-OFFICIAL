@@ -1,10 +1,4 @@
-// This fallback is rendered inside DashboardShell's <main>. It MUST NOT
-// duplicate the shell structure (h-screen, <nav>, <main>) — that nests
-// <main> inside <main>, which the browser flattens and breaks hydration
-// (producing "server rendered <Suspense> where client has <main>" errors
-// and the classic "Cannot read properties of null (reading 'parentNode')"
-// downstream crash in React reconciliation). Keep it a plain block that
-// slots into the existing layout.
+// Loading fallback for dashboard pages. Slots into ConversationShell's main area.
 export default function DashboardLoading() {
   return (
     <div className="h-full w-full flex items-center justify-center animate-pulse">
