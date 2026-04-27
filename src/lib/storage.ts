@@ -1,3 +1,55 @@
+/**
+ * =============================================================================
+ * REB STORAGE ARCHITECTURE
+ * =============================================================================
+ *
+ * OVERVIEW:
+ * This file handles all content persistence for REB. There are three storage
+ * backends with a clear hierarchy:
+ *
+ * 1. SANITY CMS (Production)
+ *    - Source of truth for all tenant content in production
+ *    - Used when: NEXT_PUBLIC_SANITY_PROJECT_ID and SANITY_API_TOKEN are set
+ *    - Stores: content sections, versions, inbox, activity, chat, bookings,
+ *              newsletter subscribers, social posts, search data, page config
+ *
+ * 2. REDIS (Cache Layer)
+ *    - Read-through cache for hot paths (chat messages)
+ *    - TTL: 1 hour for chat, varies for other uses
+ *    - Write-through: on Sanity write, also writes to Redis
+ *    - Backfill: on cache miss, fetches from Sanity and populates cache
+ *    - Falls back gracefully if Redis unavailable (not fatal)
+ *
+ * 3. DEV FILES (Local Development)
+ *    - Used when Sanity is NOT configured (no env vars)
+ *    - Files: dev-content.json, dev-chat.json, dev-newsletter.json,
+ *             dev-tenants.json, dev-social-{tenant}.json, dev-search-{tenant}.json
+ *    - Also used as fallback if Sanity query returns null for a tenant
+ *
+ * FALLBACK ORDER:
+ *   getContent():  Sanity → dev-content.json → defaults (from defaults.ts)
+ *   loadChatMessages():  Redis cache → Sanity → [] (empty)
+ *   For most other getters: Sanity → dev file → empty/default
+ *
+ * MULTI-TENANT:
+ *   - All content is namespaced by tenant ID
+ *   - Sanity: `tenant` field on every document, filtered in queries
+ *   - Dev files: default tenant uses dev-content.json, others use dev-content-{tenant}.json
+ *   - Default tenant is "rohlax" (see DEFAULT_TENANT)
+ *
+ * REDIS USAGE:
+ *   - Chat messages only (read-through + write-through cache)
+ *   - Tenant config is cached in tenants.ts (separate file)
+ *   - Content sections are NOT cached in Redis (Sanity CDN handles this)
+ *
+ * NOTES:
+ *   - Images from Sanity are transformed back to URL strings for frontend compatibility
+ *   - Content versioning is separate from Sanity's built-in revisions (uses contentVersion type)
+ *   - Click tracking uses a single document per tenant with counter fields
+ *
+ * =============================================================================
+ */
+
 import { promises as fs } from "fs";
 import path from "path";
 import type { ContentSection, ContentMap, BookingConfig, DateOverride, Booking, SearchData } from "./types";

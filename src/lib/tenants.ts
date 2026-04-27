@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { TenantConfig } from "./types";
 import { getRedis } from "./redis";
+import { assignUserToTenant } from "./auth";
+import { clerkClient } from "@clerk/nextjs/server";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
@@ -227,17 +229,30 @@ export async function createTenant(
 
     await getSanityClient().create({ _type: "tenant", ...tenant });
     invalidateCache();
-    return tenant;
+  } else {
+    const tenants = await loadTenants();
+    if (tenants.find((t) => t.id === tenant.id)) {
+      throw new Error(`Tenant "${tenant.id}" already exists`);
+    }
+
+    tenants.push(tenant);
+    await fs.writeFile(DEV_TENANTS_PATH, JSON.stringify(tenants, null, 2));
+    invalidateCache();
   }
 
-  const tenants = await loadTenants();
-  if (tenants.find((t) => t.id === tenant.id)) {
-    throw new Error(`Tenant "${tenant.id}" already exists`);
+  // Auto-assign owner if they already exist in Clerk
+  if (config.ownerEmail) {
+    try {
+      const client = await clerkClient();
+      const users = await client.users.getUserList({ emailAddress: [config.ownerEmail] });
+      if (users.data.length > 0) {
+        await assignUserToTenant(users.data[0].id, tenant.id);
+      }
+    } catch {
+      // Owner not in Clerk yet — will be assigned when they sign up
+    }
   }
 
-  tenants.push(tenant);
-  await fs.writeFile(DEV_TENANTS_PATH, JSON.stringify(tenants, null, 2));
-  invalidateCache();
   return tenant;
 }
 

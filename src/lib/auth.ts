@@ -21,17 +21,20 @@ export async function isSuperAdmin(): Promise<boolean> {
   return !!email && adminEmails.includes(email);
 }
 
-/** Auto-assign a user to a tenant if they have no tenants yet.
- *  This makes sign-up frictionless: sign up on rohlax.reb.studio → get rohlax access. */
-async function autoAssignTenant(userId: string, tenant: string, existingTenants: string[]): Promise<boolean> {
-  // Only auto-assign if tenant is valid and user has no tenants yet
-  if (existingTenants.length > 0) return false;
+/** Assign a user to a tenant. Call this from admin or onboarding flows only.
+ *  Do NOT call from hasTenantAccess — that creates a security hole. */
+export async function assignUserToTenant(userId: string, tenant: string): Promise<boolean> {
   if (!(await getTenantConfig(tenant))) return false;
 
   try {
     const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const existingTenants = (user.publicMetadata?.tenants as string[] | undefined) || [];
+
+    if (existingTenants.includes(tenant)) return true; // Already assigned
+
     await client.users.updateUserMetadata(userId, {
-      publicMetadata: { tenants: [tenant] },
+      publicMetadata: { tenants: [...existingTenants, tenant] },
     });
     return true;
   } catch {
@@ -41,7 +44,7 @@ async function autoAssignTenant(userId: string, tenant: string, existingTenants:
 
 /** Check if current user has access to a specific tenant.
  *  Uses Clerk publicMetadata.tenants (string[]) set per user.
- *  Auto-assigns first-time users to the tenant they signed up on. */
+ *  Tenants must be explicitly assigned via admin or onboarding flow. */
 export async function hasTenantAccess(tenant: string): Promise<boolean> {
   if (await isSuperAdmin()) return true;
 
@@ -49,11 +52,7 @@ export async function hasTenantAccess(tenant: string): Promise<boolean> {
   if (!user) return false;
 
   const tenants = (user.publicMetadata?.tenants as string[] | undefined) || [];
-  if (tenants.includes(tenant)) return true;
-
-  // Auto-assign first-time users to their tenant
-  const assigned = await autoAssignTenant(user.id, tenant, tenants);
-  return assigned;
+  return tenants.includes(tenant);
 }
 
 /** Guard for API routes — returns a 403 Response if the user lacks tenant access.

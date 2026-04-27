@@ -16,6 +16,7 @@
     "ownerEmail": "rohlaxwellness@gmail.com",
     "resendDomain": "updates.rohlaxwellness.com",
     "siteUrl": "https://rohlax-wellness.vercel.app",
+    "revalidateUrl": "https://rohlax-wellness.vercel.app/api/revalidate",
     "ownerPhone": "+17165592282"
   },
   {
