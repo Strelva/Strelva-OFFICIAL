@@ -171,7 +171,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       headers.set("x-preview-mode", "true");
     }
 
-    // Admin subdomains (e.g., admin.rohlaxwellness.com) require auth for all routes
+    // Admin subdomains (e.g., admin.{tenantdomain}.com) require auth for all routes
     if (isAdminSubdomain) {
       await auth.protect();
     }

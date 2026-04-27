@@ -41,7 +41,7 @@ export function TrustStrip({ settings, contact }: { settings: SiteSettings; cont
           className="flex flex-wrap items-center justify-center gap-x-10 gap-y-2 text-[0.625rem] font-medium tracking-[0.15em] uppercase"
           style={{ color: "var(--bark-faded)" }}
         >
-          <span data-trust-item>{settings.ownerTitle || "Wellness Professional"}</span>
+          <span data-trust-item>{settings.ownerTitle || "Owner-Operated"}</span>
           <span data-trust-item style={{ color: "var(--cream-mid)" }}>|</span>
           <span data-trust-item>Personalized Sessions</span>
           <span data-trust-item style={{ color: "var(--cream-mid)" }}>|</span>

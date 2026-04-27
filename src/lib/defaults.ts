@@ -19,358 +19,103 @@ import type {
 
 export const defaultHero: HeroContent = {
   headline: "Move Better.\nFeel Better.\nLive Better.",
-  subheadline: "Assisted Stretching in Williamsville, NY",
-  tagline: "Release. Restore. ROHLAX. — Personalized assisted stretching sessions in-studio and mobile, tailored to your body.",
+  subheadline: "Your business, in one place",
+  tagline: "Tell visitors what you do and how to book. The AI keeps this up to date.",
   ctaText: "Book a Session",
-  ctaLink: "https://www.vagaro.com/rohlaxwellness",
-  backgroundImageUrl: "/images/chelsea/studio-wide.webp",
+  ctaLink: "",
+  backgroundImageUrl: "",
 };
 
 export const defaultServices: ServicesContent = {
   sectionLabel: "Services",
   headline: "What We Offer",
   description:
-    "Every assisted stretch session is thoughtfully tailored to each individual — in-studio or mobile, wherever you're most comfortable. You don't have to be an athlete or have a chronic condition to benefit.",
-  services: [
-    {
-      id: "flexibility-foundation",
-      name: "Flexibility Foundation",
-      description:
-        "Required for new clients. This 90-minute session begins with an in-depth discussion of your medical history — past or current injuries, medications, sleep hygiene, and stress levels — along with your mobility goals. Followed by a full-body, hands-on assisted stretching and mobility assessment. You'll receive personalized recommendations for future sessions and curated product suggestions to support your well-being.",
-      duration: "90 min",
-      price: "85",
-      featured: true,
-      who_its_for: "New clients or those who haven't visited in over a year",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "/images/chelsea/studio-table.webp",
-    },
-    {
-      id: "prenatal-foundation",
-      name: "Prenatal Flexibility Foundation",
-      description:
-        "Required for new pregnant clients. This 90-minute session covers your medical history, pregnancy-specific considerations, and mobility goals. Followed by a full-body assisted stretching assessment using supportive positioning aides for comfort and safety throughout.",
-      duration: "90 min",
-      price: "85",
-      featured: false,
-      who_its_for: "New pregnant clients seeking safe, supported stretching",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-    {
-      id: "stretch-360",
-      name: "Stretch 360",
-      description:
-        "Full-body assisted stretching targeting all major muscle groups. You'll move comfortably between back and stomach positioning as we work through each area. Concludes with a heating pad and deep-tissue massage gun for optimal relaxation.",
-      duration: "60 min",
-      price: "60",
-      featured: false,
-      who_its_for: "Returning clients wanting comprehensive full-body stretching",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-    {
-      id: "spinal-sequence",
-      name: "Spinal Sequence",
-      description:
-        "Focused on the neck, mid-back, and low back. Perfect for anyone who spends long hours sitting at a desk or experiencing back stiffness. Concludes with a heating pad and deep-tissue massage gun.",
-      duration: "60 min",
-      price: "60",
-      featured: false,
-      who_its_for: "Desk workers and anyone with back stiffness or tension",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-    {
-      id: "upper-body",
-      name: "Upper Body Focused Stretch",
-      description:
-        "Targeting the neck, mid-back, shoulders, shoulder blades, forearms, wrists, and hands. Concludes with a heating pad and deep-tissue massage gun for enhanced relaxation.",
-      duration: "60 min",
-      price: "60",
-      featured: false,
-      who_its_for: "Those carrying tension in shoulders, neck, or arms",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-    {
-      id: "lower-body",
-      name: "Lower Body Focused Stretch",
-      description:
-        "Targeting the low back, hips, knees, and ankles. Positioning includes back, stomach, and sides for comfort and optimal access. Concludes with a heating pad and deep-tissue massage gun.",
-      duration: "60 min",
-      price: "60",
-      featured: false,
-      who_its_for: "Runners, athletes, and anyone with hip or leg tightness",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-    {
-      id: "prenatal-stretch",
-      name: "Prenatal Stretch",
-      description:
-        "A fully customized 60-minute session designed around mom's needs that day. We gently target key areas of tension with safe, pregnancy-supported techniques and positioning aides. Heating pad and massage gun use based entirely on your preference.",
-      duration: "60 min",
-      price: "60",
-      featured: false,
-      who_its_for: "Expecting mothers at any stage of pregnancy",
-      booking_link: "https://www.vagaro.com/rohlaxwellness",
-      comingSoon: false,
-      image_url: "",
-    },
-  ],
+    "Describe your offerings here. Each service has a name, price, duration, and booking link.",
+  services: [],
 };
 
 export const defaultStory: StoryContent = {
-  sectionLabel: "About Chelsea",
-  headline: "Your body\ndeserves better.",
-  accentText: "Buffalo native, physical therapist, wellness advocate — in-studio & mobile sessions",
+  sectionLabel: "About",
+  headline: "Your story\ngoes here.",
+  accentText: "Owner, founder, your role",
   statement:
-    "I started Rohlax because I believe everyone deserves to move freely and feel good in their body.",
+    "A short opening line that tells visitors what you stand for.",
   paragraphs: [
-    "I'm a physical therapist with nearly a decade of healthcare experience across various clinical settings. After experiencing burnout — made worse by COVID's impact on healthcare — I took a step back and asked myself what kind of care I really wanted to provide.",
-    "That's when I found assisted stretching. It was the professional pivot I needed — a way to create personalized 1:1 connections with clients while helping them feel calm, relaxed, and truly heard about their physical symptoms.",
-    "At Rohlax Wellness, every session is tailored to your body. Whether you're an athlete, a desk worker, a new parent, or just someone who wants to feel better — you don't have to have a chronic condition to benefit. I'm here to help you move better, feel better, and live better.",
+    "Tell your story. Why did you start this? Who do you serve?",
+    "Add another paragraph about your approach and what makes you different.",
   ],
-  stats: [
-    { value: "10+", label: "Years in Healthcare" },
-    { value: "1:1", label: "Personalized Sessions" },
-  ],
-  quote: "Your presence is your power.",
-  quoteAttribution: "Chelsea Rohl, Founder",
-  imageUrl: "/images/chelsea/portrait.jpg",
+  stats: [],
+  quote: "",
+  quoteAttribution: "",
+  imageUrl: "",
 };
 
 export const defaultTestimonials: TestimonialsContent = {
   sectionLabel: "Testimonials",
   headline: "What Clients Are Saying",
-  testimonials: [
-    {
-      id: "t1",
-      quote:
-        "Chelsea truly works wonders. I left my first full-body stretch session feeling amazing — my body hasn't felt this good in years.",
-      author: "Vagaro Client",
-      location: "",
-    },
-    {
-      id: "t2",
-      quote:
-        "Chelsea was extremely professional, thorough, and focused on my key pain points. She explained everything extremely well without pushing anything.",
-      author: "Vagaro Client",
-      location: "",
-    },
-    {
-      id: "t3",
-      quote:
-        "Through many years in sports, Chelsea provided the most proficient and effective upper-body stretch I've ever had, by far.",
-      author: "Vagaro Client",
-      location: "",
-    },
-    {
-      id: "t4",
-      quote:
-        "Had my first stretch postpartum and Chelsea really targeted the tense areas to work toward better mobility. Highly recommend!",
-      author: "Vagaro Client",
-      location: "",
-    },
-  ],
+  testimonials: [],
 };
 
 export const defaultEvents: EventsContent = {
   sectionLabel: "Events",
   headline: "Upcoming Events",
-  events: [
-    {
-      id: "e5",
-      title: "Beauty Boost Buffalo",
-      date: "2026-04-15",
-      time: "",
-      location: "Buffalo, NY",
-      description: "Supporting women-owned businesses in WNY. Rohlax Wellness will be there — come say hi and learn about assisted stretching.",
-      hosted_by: "community",
-      external_link: "https://www.thebeautyboost.net/buffalo",
-      image_url: "",
-    },
-  ],
+  events: [],
 };
 
 export const defaultProviders: ProvidersContent = {
   sectionLabel: "Trusted Providers",
-  headline: "My Wellness Network",
+  headline: "My Network",
   description:
-    "I partner with and recommend these incredible local practitioners. When you need care beyond stretching, these are the people I trust with my own clients.",
-  providers: [
-    {
-      id: "p-trent",
-      name: "Trent, LMT",
-      category: "massage",
-      service: "Licensed Massage Therapy",
-      why_i_recommend: "Incredible hands and deep knowledge of muscular anatomy. My go-to for massage referrals.",
-      booking_link: "https://nickelcitywellnesswny.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-recoverlab",
-      name: "RecoverLab Performance Chiropractic",
-      category: "chiropractic",
-      service: "Performance Chiropractic",
-      why_i_recommend: "Sports-focused chiropractic care that complements stretching perfectly. Great for athletes and active clients.",
-      booking_link: "https://recoverlabbuffalo.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-abby",
-      name: "Dr. Abby Borkowski",
-      category: "chiropractic",
-      service: "Chiropractic & Functional Medicine",
-      why_i_recommend: "Combines chiropractic with functional medicine for a whole-body approach. Fantastic for chronic issues.",
-      booking_link: "https://thrivemedicalwny.com/abby-borkowski-dc",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-revival",
-      name: "Revival Chiropractic & Wellness",
-      category: "chiropractic",
-      service: "Chiropractic Care",
-      why_i_recommend: "Wonderful wellness-focused chiropractic practice. Great energy and excellent care.",
-      booking_link: "https://revivalchirobuf.janeapp.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-vibe",
-      name: "Vibe Yoga Lab",
-      category: "yoga",
-      service: "Yoga Classes & Events",
-      why_i_recommend: "Beautiful studio with incredible instructors. The perfect complement to assisted stretching.",
-      booking_link: "https://vibeyogalab.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-revamp",
-      name: "Revamp",
-      category: "fitness",
-      service: "Personal Training & Massage",
-      why_i_recommend: "Combines personal training with massage therapy. A one-stop shop for strength and recovery.",
-      booking_link: "https://revamp-hq.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-enrgi",
-      name: "ENRGI Fitness Studio",
-      category: "fitness",
-      service: "Fitness Studio",
-      why_i_recommend: "High-energy fitness classes that build the strength side of your wellness routine.",
-      booking_link: "https://enrgifitnessstudio.com",
-      phone: "",
-      photo_url: "",
-    },
-    {
-      id: "p-soul",
-      name: "Soul Healing Center",
-      category: "specialty",
-      service: "Holistic Wellness Space",
-      why_i_recommend: "A truly holistic approach to wellness. Wonderful for anyone looking to heal mind, body, and spirit.",
-      booking_link: "https://shapiroholistichealth.com",
-      phone: "",
-      photo_url: "",
-    },
-  ],
+    "Practitioners I trust and recommend for complementary care.",
+  providers: [],
 };
 
 export const defaultContact: ContactContent = {
-  email: "rohlaxwellness@gmail.com",
-  phone: "(716) 559-2282",
-  address: "7158 Transit Road, Williamsville, NY 14221",
-  hours: "Tuesday: 12:00 PM – 6:00 PM\nWednesday: 10:00 AM – 4:00 PM\nThursday: 12:00 PM – 6:00 PM\nFriday: 10:00 AM – 4:00 PM\nSaturday–Monday: Closed",
-  locationTitle: "Williamsville,\nNew York",
-  locationDescription: "Located inside Bel Viso Skin Studio, 2nd floor. Free parking available behind the building at 7158 Transit Rd.",
-  instagramUrl: "https://instagram.com/rohlaxwellness",
-  facebookUrl: "https://facebook.com/rohlaxwellness",
-  googleMapsUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2920.5!2d-78.7!3d42.97!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNDLCsDU4JzEyLjAiTiA3OMKwNDInMDAuMCJX!5e0!3m2!1sen!2sus!4v1!5m2!1sen!2sus",
+  email: "",
+  phone: "",
+  address: "",
+  hours: "",
+  locationTitle: "",
+  locationDescription: "",
+  instagramUrl: "",
+  facebookUrl: "",
+  googleMapsUrl: "",
 };
 
 export const defaultSettings: SiteSettings = {
-  siteName: "Rohlax Wellness",
-  siteTagline: "Assisted Stretching in Williamsville, NY",
-  siteDescription:
-    "Professional assisted stretching in Williamsville, NY. Personalized 1-on-1 sessions to relieve tension, improve mobility, and support your well-being. Book with Chelsea Rohl today.",
-  siteKeywords: "assisted stretching, Buffalo NY, Williamsville NY, stretch therapy, mobility, wellness, Chelsea Rohl, Rohlax",
-  ownerName: "Chelsea",
-  ownerTitle: "Physical Therapist & Stretch Therapist",
-  footerTagline: "Move Better. Feel Better. Live Better.",
-  copyrightText: "Rohlax Wellness",
-  bookingUrl: "https://www.vagaro.com/rohlaxwellness",
-  instagramHandle: "rohlaxwellness",
-  vagaro_embed_id: "rohlaxwellness",
+  siteName: "Your Business",
+  siteTagline: "",
+  siteDescription: "",
+  siteKeywords: "",
+  ownerName: "",
+  ownerTitle: "",
+  footerTagline: "",
+  copyrightText: "Your Business",
+  bookingUrl: "",
+  instagramHandle: "",
+  vagaro_embed_id: "",
 };
 
 export const defaultFaq: FaqContent = {
   sectionLabel: "FAQ",
   headline: "Frequently Asked Questions",
-  description: "Common questions about assisted stretching and what to expect at your session.",
-  faqs: [
-    {
-      id: "faq-1",
-      question: "What should I wear to my stretching session?",
-      answer: "Wear comfortable, stretchy clothing — think yoga pants, leggings, or athletic shorts and a t-shirt. Avoid jeans, belts, or anything restrictive. You'll be moving through various positions, so comfort is key.",
-    },
-    {
-      id: "faq-2",
-      question: "Do I need to be flexible to benefit from assisted stretching?",
-      answer: "Not at all! Assisted stretching is for everyone — athletes, desk workers, new parents, and anyone who wants to feel better in their body. Every session is tailored to your current range of motion and goals.",
-    },
-    {
-      id: "faq-3",
-      question: "How is assisted stretching different from massage?",
-      answer: "Massage focuses on soft tissue manipulation to relieve muscle tension. Assisted stretching actively moves your joints and muscles through their range of motion to improve flexibility, mobility, and body awareness. They complement each other beautifully.",
-    },
-    {
-      id: "faq-4",
-      question: "How often should I get stretched?",
-      answer: "For best results, we recommend starting with weekly sessions. As your flexibility improves, many clients transition to every other week for maintenance. We'll build a plan that fits your goals and schedule.",
-    },
-  ],
+  description: "Common questions and what visitors should know.",
+  faqs: [],
 };
 
 export const defaultShop: ShopContent = {
   sectionLabel: "Shop",
-  headline: "Chelsea's Picks",
-  description: "Products I personally use and recommend to support your wellness between sessions.",
+  headline: "Picks",
+  description: "Products and tools we recommend.",
   items: [],
 };
 
 export const defaultProducts: ProductsContent = {
-  sectionLabel: "Our Products",
-  headline: "Simple Ingredients,\nReal Flavor",
-  description:
-    "Thin-sliced, slow-dried apple chips with real ingredients you can pronounce. Light, crispy, and naturally sweet.",
-  products: [
-    {
-      id: "apple-snaps",
-      name: "Apple Snaps",
-      description:
-        "Thin-sliced, slow-dried apple chips with a hint of warmth from cinnamon and pure maple syrup.",
-      ingredients: "Dried Apples, Cinnamon, Maple",
-      imageUrl: "/images/kraft-bag.png",
-      badge: "BESTSELLER",
-      featured: true,
-      price: "5.99",
-      stripePaymentLink: "",
-      comingSoon: false,
-    },
-  ],
-  bottomNote: "More flavors coming soon",
+  sectionLabel: "Products",
+  headline: "What We Make",
+  description: "A short intro to your products.",
+  products: [],
+  bottomNote: "",
 };
 
 export const defaultTheme: ThemeContent = {
@@ -404,9 +149,8 @@ export const defaultRewardsConfig: RewardsConfigContent = {
 
 export const defaultNavigation: NavigationContent = {
   menuItems: [
-    { label: "Shop", href: "#products" },
-    { label: "Our Story", href: "#story" },
-    { label: "Why Us", href: "#comparison" },
+    { label: "Services", href: "#services" },
+    { label: "About", href: "#story" },
     { label: "Contact", href: "#contact" },
   ],
   ctaLabel: "",
@@ -414,15 +158,11 @@ export const defaultNavigation: NavigationContent = {
 };
 
 export const defaultFooter: FooterContent = {
-  tagline: "Orchard-dried. Ingredient-honest.",
+  tagline: "",
   columns: [
     {
       heading: "Navigate",
-      links: [
-        { label: "Products", href: "#products" },
-        { label: "Our Story", href: "#story" },
-        { label: "Why Us", href: "#comparison" },
-      ],
+      links: [],
     },
     {
       heading: "Connect",

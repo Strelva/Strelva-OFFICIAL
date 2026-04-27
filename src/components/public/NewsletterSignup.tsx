@@ -89,7 +89,7 @@ export function NewsletterSignup() {
             className="text-sm leading-relaxed mb-8"
             style={{ color: "var(--bark-light)" }}
           >
-            Monthly updates on new services, events, and wellness tips — no spam, ever.
+            Monthly updates on new offerings, events, and tips — no spam, ever.
           </p>
 
           {status === "success" ? (

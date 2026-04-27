@@ -81,10 +81,10 @@ See `.claude/plans/remaining.yml` for remaining items.
 **Remaining:** Deploy checklist (7 items), verification queue (5 items), growth features (deferred)
 
 ## Validation Signals
-1. Does Chelsea use the chat agent without being prompted?
-2. Does Chelsea prefer chat over the existing form-based admin?
-3. Would Chelsea refer a provider for the same service?
-4. Does the second client use the dashboard within 7 days?
+1. Does the first customer use the chat agent without being prompted?
+2. Do customers prefer chat over the form-based admin?
+3. Would a customer refer a peer for the same service?
+4. Does the second customer use the dashboard within 7 days?
 
 ## Execution Rules
 - NEVER use the Agent tool or spawn subagents. Do all work directly in the main conversation.

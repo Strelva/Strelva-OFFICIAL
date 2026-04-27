@@ -63,9 +63,9 @@ const MOCK_TREE: DesignNode[] = [
             label: "Services Grid",
             type: "frame",
             children: [
-              { id: "service-1", label: "Yoga Classes", type: "frame" },
-              { id: "service-2", label: "Meditation", type: "frame" },
-              { id: "service-3", label: "Wellness Coaching", type: "frame" },
+              { id: "service-1", label: "Service One", type: "frame" },
+              { id: "service-2", label: "Service Two", type: "frame" },
+              { id: "service-3", label: "Service Three", type: "frame" },
             ],
           },
         ],

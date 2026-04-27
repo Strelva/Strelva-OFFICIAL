@@ -47,7 +47,7 @@ describe("content validation rules", () => {
     expect(VALID_SECTIONS).toHaveLength(8);
   });
 
-  it("includes required sections for a wellness business", () => {
+  it("includes the canonical content sections", () => {
     expect(VALID_SECTIONS).toContain("services");
     expect(VALID_SECTIONS).toContain("contact");
     expect(VALID_SECTIONS).toContain("events");

@@ -88,7 +88,7 @@ export function Providers({ providers, ownerName }: { providers: ProvidersConten
                 Directory coming soon
               </p>
               <p className="text-sm" style={{ color: "var(--bark-faded)" }}>
-                We&apos;re building a list of trusted providers to help you on your wellness journey.
+                We&apos;re building a list of trusted providers to recommend.
               </p>
             </div>
           ) : (

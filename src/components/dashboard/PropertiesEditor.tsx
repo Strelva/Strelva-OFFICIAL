@@ -132,7 +132,7 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
     { key: "quoteAttribution", label: "Quote by", type: "text", placeholder: "— Name" },
   ],
   contact: [
-    { key: "phone", label: "Phone number", type: "tel", placeholder: "(716) 555-0000" },
+    { key: "phone", label: "Phone number", type: "tel", placeholder: "(555) 555-0000" },
     { key: "email", label: "Email", type: "email", placeholder: "hello@example.com" },
     { key: "address", label: "Address", type: "text", placeholder: "123 Main St, City, ST" },
     { key: "hours", label: "Business hours", type: "textarea", placeholder: "Mon-Fri: 9am-5pm" },

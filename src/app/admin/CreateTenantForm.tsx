@@ -91,7 +91,7 @@ export function CreateTenantForm() {
             type="text"
             value={form.siteName}
             onChange={(e) => setForm({ ...form, siteName: e.target.value })}
-            placeholder="Rohlax Wellness"
+            placeholder="Sunrise Yoga Studio"
             required
             className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
           />
@@ -104,7 +104,7 @@ export function CreateTenantForm() {
               type="text"
               value={form.subdomain}
               onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
-              placeholder="rohlax"
+              placeholder="sunrise"
               required
               className="w-full rounded-l-lg bg-zinc-800 border border-zinc-700 border-r-0 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
             />
@@ -120,7 +120,7 @@ export function CreateTenantForm() {
             type="text"
             value={form.ownerName}
             onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
-            placeholder="Chelsea"
+            placeholder="First name"
             required
             className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
           />
@@ -132,7 +132,7 @@ export function CreateTenantForm() {
             type="email"
             value={form.ownerEmail}
             onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
-            placeholder="chelsea@example.com"
+            placeholder="owner@example.com"
             className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
           />
         </div>

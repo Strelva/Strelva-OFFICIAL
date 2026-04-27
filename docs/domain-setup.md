@@ -1,21 +1,21 @@
 # Domain Setup Checklist
 
-## rohlaxwellness.com (Chelsea's site)
+## Adding a new tenant's custom domain
 
 1. Purchase domain (Namecheap, Google Domains, etc.)
-2. Add to Vercel project `rohlax-wellness`:
+2. Add to the Vercel project (`scaffold-web`):
    ```
-   vercel domains add rohlaxwellness.com --project rohlax-wellness
-   vercel domains add www.rohlaxwellness.com --project rohlax-wellness
+   vercel domains add yourbusiness.com
+   vercel domains add www.yourbusiness.com
    ```
 3. Configure DNS per Vercel instructions (A record + CNAME for www)
-4. Set env var on `scaffold-web`:
+4. Update env on `scaffold-web`:
    ```
-   CUSTOM_DOMAIN_MAP={"rohlaxwellness.com":"rohlax","www.rohlaxwellness.com":"rohlax"}
-   CORS_ORIGINS=https://rohlaxwellness.com,https://www.rohlaxwellness.com,https://rohlax-wellness.vercel.app
+   CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid","www.yourbusiness.com":"tenantid"}
+   CORS_ORIGINS=https://yourbusiness.com,https://www.yourbusiness.com
    ```
-5. Update rohlax tenant `siteUrl` in Sanity to `https://rohlaxwellness.com`
-6. Verify Resend domain for `updates.rohlaxwellness.com`
+5. Update the tenant's `siteUrl` in Sanity to `https://yourbusiness.com`
+6. Verify a Resend domain for `updates.yourbusiness.com` if using newsletter
 
 ## scaffoldweb.com (platform + wildcard subdomains)
 
@@ -34,8 +34,8 @@
 
 ## Verification
 
-- [ ] `rohlaxwellness.com` shows Chelsea's public site
-- [ ] `rohlaxwellness.com/dashboard` redirects to platform dashboard
+- [ ] `yourbusiness.com` shows the tenant's public site
+- [ ] `yourbusiness.com/dashboard` redirects to platform dashboard
 - [ ] `scaffoldweb.com` shows marketing page
 - [ ] `scaffoldweb.com/onboard` shows chat onboarding
-- [ ] `rohlax.scaffoldweb.com` shows Chelsea's public site (via subdomain routing)
+- [ ] `tenantid.scaffoldweb.com` shows the tenant's public site (via subdomain routing)

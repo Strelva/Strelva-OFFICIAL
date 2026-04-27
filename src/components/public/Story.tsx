@@ -6,8 +6,6 @@ import gsap from "gsap";
 import { ScrollTrigger } from "@/lib/lenis";
 import type { StoryContent } from "@/lib/types";
 
-const FALLBACK_IMAGE = "/images/chelsea/portrait.jpg";
-
 export function Story({ story, ownerName }: { story: StoryContent; ownerName?: string }) {
   const sectionRef = useRef<HTMLElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
@@ -108,13 +106,17 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
             <div className="lg:col-span-7 lg:-ml-12">
               <div>
                 <div className="relative aspect-[4/3] md:aspect-[3/2] overflow-hidden" ref={imageRef}>
-                  <Image
-                    src={story.imageUrl || FALLBACK_IMAGE}
-                    alt={ownerName ? `${ownerName}, founder` : "Business owner"}
-                    fill
-                    className="object-cover"
-                    sizes="(min-width: 1024px) 58vw, 100vw"
-                  />
+                  {story.imageUrl ? (
+                    <Image
+                      src={story.imageUrl}
+                      alt={ownerName ? `${ownerName}, founder` : "Business owner"}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 58vw, 100vw"
+                    />
+                  ) : (
+                    <div className="absolute inset-0" style={{ background: "var(--cream-dark)" }} />
+                  )}
                 </div>
                 <p
                   className="text-sm italic mt-4 ml-1"

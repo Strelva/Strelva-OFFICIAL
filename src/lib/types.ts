@@ -403,9 +403,9 @@ export interface TenantConfig {
   template: TemplateId;
   features?: TenantFeature[];
   customDomains?: string[];
-  /** Primary production domain (e.g., "rohlaxwellness.com") */
+  /** Primary production domain (e.g., "yourbusiness.com") */
   productionDomain?: string;
-  /** Admin dashboard domain (e.g., "admin.rohlaxwellness.com"). Derived from productionDomain if not set. */
+  /** Admin dashboard domain (e.g., "admin.yourbusiness.com"). Derived from productionDomain if not set. */
   adminDomain?: string;
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";

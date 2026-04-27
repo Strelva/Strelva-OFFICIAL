@@ -15,7 +15,6 @@ import type { ContentSection } from "../lib/types";
 const TEST_TENANT = "__test_content_crud";
 
 function devContentPath(tenant: string): string {
-  if (tenant === "rohlax") return path.join(process.cwd(), "dev-content.json");
   return path.join(process.cwd(), `dev-content-${tenant}.json`);
 }
 

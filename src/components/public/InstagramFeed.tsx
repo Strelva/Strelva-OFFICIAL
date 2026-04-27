@@ -35,7 +35,7 @@ export function InstagramFeed({ handle, posts }: InstagramFeedProps) {
             Follow Along
           </h2>
           <p className="text-base mb-6" style={{ color: "var(--bark-light)" }}>
-            See behind the scenes, client transformations, and wellness tips.
+            See behind the scenes, client work, and updates.
           </p>
           <a
             href={`https://instagram.com/${handle}`}

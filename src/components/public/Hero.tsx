@@ -8,7 +8,7 @@ import { ScrollTrigger } from "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
 import type { HeroContent } from "@/lib/types";
 
-export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: string }) {
+export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerName?: string; siteName?: string }) {
   const sectionRef = useRef<HTMLElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -64,15 +64,19 @@ export function Hero({ hero, ownerName }: { hero: HeroContent; ownerName?: strin
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-end pb-20 md:pb-28 overflow-hidden">
       <div ref={imageRef} className="absolute inset-0" style={{ willChange: "transform" }}>
-        <Image
-          src={hero.backgroundImageUrl || "/images/chelsea/studio-wide.webp"}
-          alt="Rohlax Wellness studio"
-          fill
-          className="object-cover"
-          sizes="100vw"
-          priority
-          style={{ transform: "scale(1.2)" }}
-        />
+        {hero.backgroundImageUrl ? (
+          <Image
+            src={hero.backgroundImageUrl}
+            alt={siteName ? `${siteName} — hero` : "Hero image"}
+            fill
+            className="object-cover"
+            sizes="100vw"
+            priority
+            style={{ transform: "scale(1.2)" }}
+          />
+        ) : (
+          <div className="absolute inset-0" style={{ background: "var(--bark)" }} />
+        )}
         <div
           className="absolute inset-0"
           style={{

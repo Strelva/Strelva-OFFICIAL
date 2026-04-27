@@ -228,7 +228,7 @@ function OnboardChat() {
                     : step === "description"
                       ? "e.g. We offer private and group yoga classes..."
                       : step === "contact"
-                        ? "e.g. Buffalo, NY — hello@mybiz.com"
+                        ? "e.g. City, ST — hello@mybiz.com"
                         : "e.g. www.mybusiness.com or \"no\""
                 }
                 className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors"

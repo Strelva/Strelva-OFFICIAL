@@ -1,14 +1,17 @@
 /**
- * Seed a tenant's content in Redis (or dev-content.json)
+ * Seed a tenant's content in Sanity (or dev-content-{tenant}.json)
  *
  * Usage:
- *   npx tsx scripts/seed-tenant.ts carolee
- *   npx tsx scripts/seed-tenant.ts rohlax
+ *   npx tsx scripts/seed-tenant.ts <tenant-id>
+ *
+ * Source data resolution:
+ *   1. If TENANT_DEFAULTS[tenantId] is defined here, use that.
+ *   2. Otherwise, read dev-content-{tenantId}.json from the project root.
  */
 
 import { setContent } from "../src/lib/storage";
 import type { ContentMap } from "../src/lib/types";
-import { defaults as rohlaxDefaults, defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";
+import { defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";
 
 const caroleeDefaults: ContentMap = {
   hero: {
@@ -121,9 +124,9 @@ const caroleeDefaults: ContentMap = {
     siteName: "Carolee Fraass",
     siteTagline: "Holistic Healing & Natural Vitality",
     siteDescription:
-      "Holistic wellness with Carolee Fraass — Reiki energy work, spiritual mentorship, and Bella Grace natural products. Virtual and in-person sessions available.",
+      "Holistic healing with Carolee Fraass — Reiki energy work, spiritual mentorship, and Bella Grace natural products. Virtual and in-person sessions available.",
     siteKeywords:
-      "Reiki, energy healing, holistic wellness, mentorship, spiritual guidance, Bella Grace, natural products",
+      "Reiki, energy healing, mentorship, spiritual guidance, Bella Grace, natural products",
     ownerName: "Carolee",
     ownerTitle: "Holistic Healer & Mentor",
     footerTagline: "We are our own healers.",
@@ -166,7 +169,6 @@ const caroleeDefaults: ContentMap = {
 };
 
 const TENANT_DEFAULTS: Record<string, ContentMap> = {
-  rohlax: rohlaxDefaults,
   carolee: caroleeDefaults,
 };
 
@@ -194,8 +196,8 @@ async function seed(tenantId: string) {
       data = JSON.parse(raw) as ContentMap;
       console.log(`  Using dev-content-${tenantId}.json as seed source`);
     } catch {
-      console.log(`  No dev-content-${tenantId}.json found, using rohlax defaults`);
-      data = rohlaxDefaults;
+      console.error(`  No seed source found for "${tenantId}". Add a TENANT_DEFAULTS entry or create dev-content-${tenantId}.json.`);
+      process.exit(1);
     }
   }
 

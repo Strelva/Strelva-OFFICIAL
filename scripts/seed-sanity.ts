@@ -23,7 +23,12 @@ const client = createClient({
   useCdn: false,
 });
 
-const tenant = process.argv[2] || "rohlax";
+const tenant = process.argv[2];
+
+if (!tenant) {
+  console.error("Usage: npx tsx scripts/seed-sanity.ts <tenant-id>");
+  process.exit(1);
+}
 
 async function seed() {
   console.log(`Seeding Sanity for tenant: ${tenant}`);
@@ -38,7 +43,7 @@ async function seed() {
       tagline: defaults.hero.tagline,
       ctaText: defaults.hero.ctaText,
       ctaLink: defaults.hero.ctaLink,
-      // backgroundImage left empty — Chelsea uploads her own
+      // backgroundImage left empty — owner uploads their own
     },
     {
       _type: "services",
@@ -69,7 +74,7 @@ async function seed() {
       stats: defaults.story.stats.map((s, i) => ({ _key: `stat-${i}`, ...s })),
       quote: defaults.story.quote,
       quoteAttribution: defaults.story.quoteAttribution,
-      // portraitImage left empty — Chelsea uploads her own
+      // portraitImage left empty — owner uploads their own
     },
     {
       _type: "testimonials",

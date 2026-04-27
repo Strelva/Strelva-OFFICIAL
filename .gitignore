@@ -40,7 +40,6 @@ yarn-error.log*
 next-env.d.ts
 
 # content
-dev-content.json
 /public/uploads/
 .claude/sessions/
 .claude/rules/

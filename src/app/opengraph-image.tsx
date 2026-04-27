@@ -9,14 +9,6 @@ const TENANT_OG: Record<
   string,
   { name: string; tagline: string; initials: string; bg: string; accent: string; fg: string }
 > = {
-  rohlax: {
-    name: "Rohlax Wellness",
-    tagline: "Wellness Services in Buffalo, NY",
-    initials: "RW",
-    bg: "#3d3229",
-    accent: "#7c9a8e",
-    fg: "#faf9f7",
-  },
   gldf: {
     name: "Great Lakes Dried Fruit",
     tagline: "Orchard-Dried Apple Snacks",
@@ -30,7 +22,7 @@ const TENANT_OG: Record<
 const DEFAULT_OG = {
   name: "Scaffold Web",
   tagline: "Your site works while you sleep",
-  initials: "R",
+  initials: "S",
   bg: "#3d3229",
   accent: "#7c9a8e",
   fg: "#faf9f7",
@@ -38,7 +30,7 @@ const DEFAULT_OG = {
 
 export default async function Image() {
   const h = await headers();
-  const tenant = h.get("x-tenant") || "rohlax";
+  const tenant = h.get("x-tenant") || "";
   const og = TENANT_OG[tenant] || DEFAULT_OG;
 
   return new ImageResponse(

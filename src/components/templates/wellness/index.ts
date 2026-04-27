@@ -112,6 +112,7 @@ function buildSectionProps(
       return {
         hero: content.hero,
         ownerName: (content.settings as Record<string, unknown>)?.ownerName,
+        siteName: (content.settings as Record<string, unknown>)?.siteName,
       };
     case "services":
       return {
@@ -171,8 +172,10 @@ function buildSectionProps(
     }
     case "vagaro-booking": {
       const settings = content.settings as Record<string, unknown>;
+      const embedId = (settings?.vagaro_embed_id as string) || "";
+      if (!embedId && !settings?.bookingUrl) return null;
       return {
-        embedId: (settings?.vagaro_embed_id as string) || "rohlaxwellness",
+        embedId,
         fallbackUrl: (settings?.bookingUrl as string) || undefined,
       };
     }

@@ -34,8 +34,8 @@
  * MULTI-TENANT:
  *   - All content is namespaced by tenant ID
  *   - Sanity: `tenant` field on every document, filtered in queries
- *   - Dev files: default tenant uses dev-content.json, others use dev-content-{tenant}.json
- *   - Default tenant is "rohlax" (see DEFAULT_TENANT)
+ *   - Dev files: per-tenant `dev-content-{tenant}.json`
+ *   - Default tenant is "demo" (see DEFAULT_TENANT) — used only when no tenant is in scope
  *
  * REDIS USAGE:
  *   - Chat messages only (read-through + write-through cache)
@@ -59,15 +59,13 @@ import { getSanityClient, getSanityReadClient, sanityImageUrl } from "./sanity";
 import { getRedis } from "./redis";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
-const DEV_CONTENT_PATH = path.join(process.cwd(), "dev-content.json");
 
-/** Default tenant — used until multi-tenant routing is wired */
-export const DEFAULT_TENANT = "rohlax";
+/** Default tenant — used only when no tenant is in scope. Real tenants always pass an explicit tenant ID. */
+export const DEFAULT_TENANT = "demo";
 
 // --- Dev file fallback (no Sanity configured) ---
 
 function devContentPath(tenant: string): string {
-  if (tenant === DEFAULT_TENANT) return DEV_CONTENT_PATH;
   return path.join(process.cwd(), `dev-content-${tenant}.json`);
 }
 

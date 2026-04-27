@@ -16,7 +16,6 @@ const TENANT_B = "__test_tenant_b";
 const MISSING_TENANT = "__test_tenant_missing";
 
 function devContentPath(tenant: string): string {
-  if (tenant === "rohlax") return path.join(process.cwd(), "dev-content.json");
   return path.join(process.cwd(), `dev-content-${tenant}.json`);
 }
 
@@ -44,12 +43,12 @@ describe("tenant isolation", () => {
   // --- getTenantConfig ---
 
   it("getTenantConfig returns correct config for a known tenant", async () => {
-    // getTenantConfig reads from dev-tenants.json which has "rohlax" and "gldf"
+    // getTenantConfig reads from dev-tenants.json
     const { getTenantConfig } = await import("../lib/tenants");
-    const config = await getTenantConfig("rohlax");
+    const config = await getTenantConfig("gldf");
     expect(config).toBeDefined();
-    expect(config!.id).toBe("rohlax");
-    expect(config!.siteName).toBe("Rohlax Wellness");
+    expect(config!.id).toBe("gldf");
+    expect(config!.siteName).toBe("Great Lakes Dried Fruit");
   });
 
   it("getTenantConfig returns undefined for a non-existent tenant", async () => {
@@ -125,7 +124,7 @@ describe("tenant isolation", () => {
 
   it("reading content for a tenant with no stored data returns defaults", async () => {
     const hero = await getContent("hero", MISSING_TENANT);
-    // defaults.hero has this headline
+    // defaults.hero has this headline (generic placeholder)
     expect(hero.headline).toContain("Move Better");
   });
 

@@ -67,7 +67,7 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
         title: "How many subscribers do I have?",
         prompt: "How many newsletter subscribers do I have?",
         response:
-          "You have 142 active subscribers. Your last email had a 34% open rate, which is above average for wellness businesses. Want me to send another update?",
+          "You have 142 active subscribers. Your last email had a 34% open rate, which is above average for small businesses. Want me to send another update?",
       },
     ],
     metadata: {

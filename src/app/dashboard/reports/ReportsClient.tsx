@@ -11,6 +11,8 @@ const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
   professional: { metric: "Contact clicks", action: "clicked Contact" },
 };
 
+const DEFAULT_VOCAB = { metric: "CTA clicks", action: "clicked your call to action" };
+
 interface ReportsClientProps {
   siteName: string;
   pageViews: { total: number; thisWeek: number; today: number };
@@ -52,7 +54,7 @@ export function ReportsClient({
   recentActivity,
   template,
 }: ReportsClientProps) {
-  const vocab = CTA_VOCAB[template] || CTA_VOCAB.wellness;
+  const vocab = CTA_VOCAB[template] || DEFAULT_VOCAB;
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const weekLabel = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
