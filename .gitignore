@@ -69,3 +69,5 @@ PRODUCT.md
 
 # clerk configuration (can include secrets)
 /.clerk/
+*.shape/
+.claude/scheduled_tasks.lock
