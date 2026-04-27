@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "REB — Sign in to your dashboard",
+  title: "Scaffold Web — Sign in to your dashboard",
   description: "Access your business dashboard.",
 };
 
@@ -14,7 +14,7 @@ export default function HomePage() {
           className="text-[13px] font-medium tracking-[0.15em] uppercase mb-8"
           style={{ color: "var(--m-text)" }}
         >
-          REB
+          Scaffold Web
         </div>
         <h1
           className="text-[clamp(1.8rem,5vw,2.5rem)] font-medium leading-[1.1] tracking-[-0.02em] mb-4"

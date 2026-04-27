@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllTenants } from "@/lib/tenants";
 import { getActivity, listDrafts } from "@/lib/storage";
+import { CreateTenantForm } from "./CreateTenantForm";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function AdminPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-white">Agency Overview</h1>
+        <h1 className="text-2xl font-semibold text-white">Client Overview</h1>
         <p className="text-sm text-zinc-500 mt-1">
           {TENANTS.length} client{TENANTS.length !== 1 ? "s" : ""} across your
           portfolio
@@ -90,6 +91,9 @@ export default async function AdminPage() {
           )}
         </Link>
       </div>
+
+      {/* Create tenant form */}
+      <CreateTenantForm />
 
       {/* Tenant table */}
       <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
@@ -162,7 +166,7 @@ export default async function AdminPage() {
                         Dashboard
                       </Link>
                       <a
-                        href={`https://${t.subdomain}.reb.studio`}
+                        href={`https://${t.subdomain}.scaffoldweb.com`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-zinc-400 hover:text-white transition-colors"

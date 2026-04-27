@@ -28,7 +28,7 @@ const TENANT_OG: Record<
 };
 
 const DEFAULT_OG = {
-  name: "REB",
+  name: "Scaffold Web",
   tagline: "Your site works while you sleep",
   initials: "R",
   bg: "#3d3229",

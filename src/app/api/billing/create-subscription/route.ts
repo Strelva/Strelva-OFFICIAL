@@ -15,10 +15,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const REB_MONTHLY_PRICE = process.env.STRIPE_REB_PRICE_ID;
-  if (!process.env.STRIPE_SECRET_KEY || !REB_MONTHLY_PRICE) {
+  const SCAFFOLD_MONTHLY_PRICE = process.env.STRIPE_SCAFFOLD_PRICE_ID;
+  if (!process.env.STRIPE_SECRET_KEY || !SCAFFOLD_MONTHLY_PRICE) {
     return NextResponse.json(
-      { error: "Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_REB_PRICE_ID." },
+      { error: "Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_SCAFFOLD_PRICE_ID." },
       { status: 500 }
     );
   }
@@ -49,12 +49,12 @@ export async function POST(req: Request) {
     customerId = customer.id;
   }
 
-  const origin = req.headers.get("origin") || "https://reb.studio";
+  const origin = req.headers.get("origin") || "https://scaffoldweb.com";
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
-    line_items: [{ price: REB_MONTHLY_PRICE, quantity: 1 }],
+    line_items: [{ price: SCAFFOLD_MONTHLY_PRICE, quantity: 1 }],
     success_url: `${origin}/admin?subscription=success&tenant=${tenantId}`,
     cancel_url: `${origin}/admin?subscription=cancelled&tenant=${tenantId}`,
     metadata: { tenantId },

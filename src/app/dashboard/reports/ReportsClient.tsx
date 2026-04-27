@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, MousePointerClick, AlertCircle, TrendingUp, Calendar, Clock } from "lucide-react";
+import { Check } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 
 const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
@@ -24,22 +24,15 @@ function StatCard({
   label,
   value,
   subvalue,
-  icon: Icon,
 }: {
   label: string;
   value: number;
   subvalue?: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }) {
   return (
     <div className="rounded-xl border border-gray-border bg-surface p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
-          <Icon className="w-4 h-4 text-accent" strokeWidth={1.5} />
-        </div>
-        <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
-          {label}
-        </span>
+      <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-3">
+        {label}
       </div>
       <div className="text-[32px] font-medium text-warm-white tracking-tight">
         {value.toLocaleString()}
@@ -77,11 +70,8 @@ export function ReportsClient({
 
         {/* Current week banner */}
         <div className="rounded-xl border border-accent/20 bg-accent/5 p-5 mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-accent" strokeWidth={1.5} />
-            <span className="text-[11px] font-mono tracking-wider uppercase text-accent">
-              Week of {weekLabel}
-            </span>
+          <div className="text-[11px] font-mono tracking-wider uppercase text-accent mb-2">
+            Week of {weekLabel}
           </div>
           <p className="text-[20px] font-medium text-warm-white">
             {pageViews.thisWeek > 0
@@ -101,19 +91,16 @@ export function ReportsClient({
             label="Visitors this week"
             value={pageViews.thisWeek}
             subvalue={`${pageViews.total.toLocaleString()} all time`}
-            icon={Users}
           />
           <StatCard
             label={vocab.metric}
             value={bookingClicks.thisWeek}
             subvalue={`${bookingClicks.total.toLocaleString()} all time`}
-            icon={MousePointerClick}
           />
           <StatCard
             label="Today"
             value={pageViews.today}
             subvalue={bookingClicks.today > 0 ? `${bookingClicks.today} ${vocab.action.toLowerCase()}` : undefined}
-            icon={TrendingUp}
           />
         </div>
 
@@ -122,12 +109,9 @@ export function ReportsClient({
           {/* Stale sections */}
           <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-border/50">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400" strokeWidth={1.5} />
-                <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
-                  Content to refresh
-                </span>
-              </div>
+              <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
+                Content to refresh
+              </span>
             </div>
             <div className="p-5">
               {staleSections.length > 0 ? (
@@ -145,8 +129,8 @@ export function ReportsClient({
                 </ul>
               ) : (
                 <div className="text-center py-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-3">
-                    <TrendingUp className="w-5 h-5 text-emerald-400" strokeWidth={1.5} />
+                  <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-3">
+                    <Check className="w-4 h-4 text-emerald-400" strokeWidth={2} />
                   </div>
                   <p className="text-[13px] text-gray-muted">All sections are up to date</p>
                 </div>
@@ -157,12 +141,9 @@ export function ReportsClient({
           {/* Recent activity */}
           <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-border/50">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-accent" strokeWidth={1.5} />
-                <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
-                  Recent activity
-                </span>
-              </div>
+              <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
+                Recent activity
+              </span>
             </div>
             <div className="p-5">
               {recentActivity.length > 0 ? (

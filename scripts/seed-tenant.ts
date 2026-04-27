@@ -210,7 +210,7 @@ async function seed(tenantId: string) {
   console.log(`\nDone! ${sections.length} sections seeded for "${tenantId}".`);
   console.log(`\nOnboarding checklist:`);
   console.log(`  □ Set Clerk publicMetadata: { tenants: ["${tenantId}"] } on client's user`);
-  console.log(`  □ Add Vercel domain: ${tenantConfig.subdomain}.reb.studio`);
+  console.log(`  □ Add Vercel domain: ${tenantConfig.subdomain}.scaffoldweb.com`);
   if (tenantConfig.customDomains?.length) {
     console.log(`  □ Configure custom domains: ${tenantConfig.customDomains.join(", ")}`);
   }

@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   const stripe = getStripe();
-  const origin = req.headers.get("origin") || "https://reb.studio";
+  const origin = req.headers.get("origin") || "https://scaffoldweb.com";
 
   const session = await stripe.billingPortal.sessions.create({
     customer: config.stripeCustomerId,

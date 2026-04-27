@@ -46,7 +46,7 @@ export function ConversationShell({
           >
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
-          <span className="text-[14px] font-medium text-warm-black">REB</span>
+          <span className="text-[14px] font-medium text-warm-black">Scaffold</span>
         </header>
 
         {/* Content */}

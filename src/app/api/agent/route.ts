@@ -429,7 +429,7 @@ export async function POST(req: Request) {
                 const batch = emails.slice(i, i + batchSize);
                 await resend.batch.send(
                   batch.map((to) => ({
-                    from: `${fromName} <newsletter@${tenantConfig?.resendDomain || process.env.RESEND_DOMAIN || "updates.reb.studio"}>`,
+                    from: `${fromName} <newsletter@${tenantConfig?.resendDomain || process.env.RESEND_DOMAIN || "updates.scaffoldweb.com"}>`,
                     to,
                     subject,
                     html: body,
@@ -931,7 +931,7 @@ export async function POST(req: Request) {
           const settings = await getContent("settings", tenant);
 
           // Build the site URL
-          const domain = config?.productionDomain || `${tenant}.reb.studio`;
+          const domain = config?.productionDomain || `${tenant}.scaffoldweb.com`;
           const url = `https://${domain}`;
 
           return {

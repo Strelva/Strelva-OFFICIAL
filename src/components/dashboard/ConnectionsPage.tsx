@@ -113,8 +113,11 @@ function ConnectionRow({ connection, onClick }: { connection: Connection; onClic
   );
 }
 
+type FilterTab = "All" | "Connected" | "Available";
+
 export function ConnectionsPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<FilterTab>("All");
   const [connectionStates, setConnectionStates] = useState<ConnectionStates>({
     googleAnalytics: false,
     newsletter: false,
@@ -137,7 +140,7 @@ export function ConnectionsPage() {
       });
   }, []);
 
-  const connections: Connection[] = useMemo(
+  const allConnections: Connection[] = useMemo(
     () =>
       CONNECTION_TEMPLATES.map((t) => ({
         ...t,
@@ -146,7 +149,13 @@ export function ConnectionsPage() {
     [connectionStates]
   );
 
-  const featured = connections[0]; // Google Analytics as featured
+  const connections = useMemo(() => {
+    if (activeTab === "Connected") return allConnections.filter((c) => c.connected);
+    if (activeTab === "Available") return allConnections.filter((c) => !c.connected);
+    return allConnections;
+  }, [allConnections, activeTab]);
+
+  const featured = allConnections[0]; // Google Analytics as featured
 
   return (
     <div className="flex-1 overflow-y-auto p-8 lg:px-12 lg:py-8">
@@ -202,11 +211,12 @@ export function ConnectionsPage() {
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-glass-border mb-4 pb-0">
-        {["All", "Connected", "Available"].map((tab, i) => (
+        {(["All", "Connected", "Available"] as const).map((tab) => (
           <button
             key={tab}
+            onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-[13px] transition-colors border-b-2 -mb-px ${
-              i === 0
+              activeTab === tab
                 ? "text-warm-black border-accent font-medium"
                 : "text-gray-muted border-transparent hover:text-warm-black"
             }`}

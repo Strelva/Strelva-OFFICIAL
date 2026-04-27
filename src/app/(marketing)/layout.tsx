@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "REB — Sign in to your dashboard",
+  title: "Scaffold Web — Sign in to your dashboard",
   description: "Access your business dashboard.",
 };
 
@@ -32,13 +32,19 @@ export default function MarketingLayout({
       <footer className="border-t px-6" style={{ borderColor: "var(--m-rule)" }}>
         <div className="max-w-[1040px] mx-auto py-6 flex flex-col md:flex-row justify-between gap-4">
           <div className="text-[12px]" style={{ color: "var(--m-text-3)" }}>
-            &copy; {new Date().getFullYear()} REB
+            &copy; {new Date().getFullYear()} Scaffold Web
           </div>
           <div
             className="flex gap-6 text-[12px]"
             style={{ color: "var(--m-text-3)" }}
           >
-            <a href="mailto:jacob@reb.studio" className="hover:underline">
+            <a href="/privacy" className="hover:underline">
+              Privacy
+            </a>
+            <a href="/terms" className="hover:underline">
+              Terms
+            </a>
+            <a href="mailto:jacob@scaffoldweb.com" className="hover:underline">
               Contact
             </a>
           </div>

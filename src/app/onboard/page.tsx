@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 type ChatStep = "name" | "description" | "contact" | "website" | "submitted";
 
 interface Message {
-  from: "reb" | "user";
+  from: "scaffold" | "user";
   text: string;
 }
 
@@ -31,7 +31,7 @@ function OnboardChat() {
   const ref = searchParams.get("ref") || "";
   const [step, setStep] = useState<ChatStep>("name");
   const [messages, setMessages] = useState<Message[]>([
-    { from: "reb", text: ref ? `Hey! ${ref} sent you. What's your business called?` : "What's your business called?" },
+    { from: "scaffold", text: ref ? `Hey! ${ref} sent you. What's your business called?` : "What's your business called?" },
   ]);
   const [input, setInput] = useState("");
   const [info, setInfo] = useState<IntakeInfo>({
@@ -69,14 +69,14 @@ function OnboardChat() {
       setInfo((prev) => ({ ...prev, businessName: value }));
       addMessages(
         { from: "user", text: value },
-        { from: "reb", text: `Tell me about ${value}. What do you do, and who are your customers?` }
+        { from: "scaffold", text: `Tell me about ${value}. What do you do, and who are your customers?` }
       );
       setStep("description");
     } else if (step === "description") {
       setInfo((prev) => ({ ...prev, description: value }));
       addMessages(
         { from: "user", text: value },
-        { from: "reb", text: "Where are you located? And what's the best email to reach you?" }
+        { from: "scaffold", text: "Where are you located? And what's the best email to reach you?" }
       );
       setStep("contact");
     } else if (step === "contact") {
@@ -86,14 +86,14 @@ function OnboardChat() {
       setInfo((prev) => ({ ...prev, location, email }));
       addMessages(
         { from: "user", text: value },
-        { from: "reb", text: "Do you have a current website? Paste the URL, or say \"no\" if you're starting fresh." }
+        { from: "scaffold", text: "Do you have a current website? Paste the URL, or say \"no\" if you're starting fresh." }
       );
       setStep("website");
     } else if (step === "website") {
       setInfo((prev) => ({ ...prev, currentWebsite: value }));
       addMessages(
         { from: "user", text: value },
-        { from: "reb", text: `Got it. Sending this over to the team now — we'll be in touch within 24 hours to talk about ${info.businessName}'s new site.` }
+        { from: "scaffold", text: `Got it. Sending this over to the team now — we'll be in touch within 24 hours to talk about ${info.businessName}'s new site.` }
       );
       setStep("submitted");
       submitIntake({ ...info, currentWebsite: value });
@@ -139,12 +139,12 @@ function OnboardChat() {
               }}
             >
               <div className={msg.from === "user" ? "max-w-[80%]" : "max-w-[85%]"}>
-                {msg.from === "reb" && (
+                {msg.from === "scaffold" && (
                   <span
                     className="block text-xs font-medium mb-1 tracking-wide"
                     style={{ color: "#d4a052" }}
                   >
-                    REB
+                    Scaffold Web
                   </span>
                 )}
                 <div

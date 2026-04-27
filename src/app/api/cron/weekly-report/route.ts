@@ -17,7 +17,7 @@ function reportToHtml(summary: string, siteName: string): string {
       ${paragraphs}
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
       <p style="font-size: 12px; color: #999; margin: 0;">
-        Sent by REB for ${siteName}
+        Sent by Scaffold Web for ${siteName}
       </p>
     </div>
   </div>
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       if (process.env.RESEND_API_KEY) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
-        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.reb.studio";
+        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
 
         await resend.emails.send({
           from: `${report.tenant.siteName} <report@${domain}>`,

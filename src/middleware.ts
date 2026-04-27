@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const MARKETING_HOSTS = new Set([
-  "reb.studio",
-  "www.reb.studio",
+  "scaffoldweb.com",
+  "www.scaffoldweb.com",
   "localhost",
   "localhost:3000",
   "localhost:3001",
@@ -37,9 +37,9 @@ function extractTenantFromHost(host: string): { tenant: string | null; isAdminSu
     return { tenant: null, isAdminSubdomain: false };
   }
 
-  // Production: tenant.reb.studio
-  if (hostWithoutPort.endsWith(".reb.studio")) {
-    const subdomain = hostWithoutPort.replace(".reb.studio", "");
+  // Production: tenant.scaffoldweb.com
+  if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
+    const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
     if (subdomain && subdomain !== "www" && subdomain !== "admin") {
       return { tenant: subdomain, isAdminSubdomain: false };
     }

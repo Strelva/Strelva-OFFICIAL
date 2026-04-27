@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         const batch = emails.slice(i, i + batchSize);
         await resend.batch.send(
           batch.map((to) => ({
-            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.reb.studio"}>`,
+            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.scaffoldweb.com"}>`,
             to,
             subject,
             html: body,

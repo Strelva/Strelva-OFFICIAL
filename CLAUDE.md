@@ -1,4 +1,4 @@
-# REB — AI Website Management Platform
+# Scaffold Web — AI Website Management Platform
 
 ## What This Is
 An AI agent that runs a business's online presence autonomously. Businesses talk to it via chat — it builds, updates, and manages their website. It reaches out proactively with weekly reports and suggestions. Dashboard shows proof of value.
@@ -45,7 +45,7 @@ Business owners will pay $149/mo for an AI that autonomously manages their onlin
 - Escalation system: auto-approve factual changes, review new content, block code/layout
 
 ## Architecture (existing + new)
-**Existing (REB codebase):**
+**Existing (Scaffold Web codebase):**
 - Next.js 15, Tailwind, TypeScript
 - 8 content sections with typed schemas (types.ts)
 - REST API for content CRUD (/api/content/[section]) with validation
