@@ -32,6 +32,7 @@
     "customDomains": ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com", "admin.greatlakesdriedfruit.com"],
     "subscriptionStatus": "active",
     "siteUrl": "https://greatlakesdriedfruit.com",
+    "revalidateUrl": "https://greatlakesdriedfruit.com/api/revalidate",
     "ownerEmail": "greatlakesdriedfruit@gmail.com",
     "resendDomain": "updates.greatlakesdriedfruit.com"
   }

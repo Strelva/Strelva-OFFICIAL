@@ -16,6 +16,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { requireTenantAccess } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { revalidateClientSite } from "@/lib/revalidate-client";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateForTenant(tenant);
@@ -179,6 +180,11 @@ export async function PUT(
     await clearDraft(s, tenant).catch(() => {});
 
     revalidatePath("/");
+
+    // Trigger revalidation on standalone client site
+    revalidateClientSite(tenant, ["/"]).catch((err) => {
+      console.error("[content PUT] Failed to revalidate client site:", err);
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

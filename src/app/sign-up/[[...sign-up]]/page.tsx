@@ -25,7 +25,7 @@ export default function SignUpPage() {
             dividerText: "!text-[#55555c]",
           },
         }}
-        fallbackRedirectUrl="/dashboard"
+        fallbackRedirectUrl="/account"
       />
     </div>
   );

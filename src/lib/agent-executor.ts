@@ -7,6 +7,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { capabilityPromptFragment } from "@/lib/capabilities";
 import { sendSlackNotification } from "@/lib/slack";
 import type { ContentSection, TenantConfig } from "@/lib/types";
+import { revalidateClientSite } from "@/lib/revalidate-client";
 
 async function buildSystemPrompt(
   tenant: string,
@@ -190,6 +191,11 @@ export async function executeAgentPrompt(
         );
         const { revalidatePath } = await import("next/cache");
         revalidatePath("/");
+
+        // Trigger revalidation on standalone client site
+        revalidateClientSite(tenantId, ["/"]).catch((err) => {
+          console.error("[agent] Failed to revalidate client site:", err);
+        });
 
         const { logActivity, recordSectionUpdate } = await import(
           "@/lib/storage"
