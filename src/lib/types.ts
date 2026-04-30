@@ -443,6 +443,8 @@ export interface TenantConfig {
   instagramAccessToken?: string;
   /** URL to POST to when content changes (e.g., https://clientsite.com/api/revalidate) */
   revalidateUrl?: string;
+  /** Per-tenant secret for revalidation webhook auth */
+  revalidationSecret?: string;
 }
 
 export interface BusinessHoursDay {

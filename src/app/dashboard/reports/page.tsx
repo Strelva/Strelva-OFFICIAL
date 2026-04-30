@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
-import { getClickCounts, getSectionTimestamps, getActivity, getContent } from "@/lib/storage";
+import { getClickCounts, getSectionTimestamps, getActivity, getContent, getWeeklyReports } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { detectStaleSections } from "@/lib/reports";
 import { safeFetch } from "@/lib/utils";
@@ -16,12 +16,13 @@ export default async function ReportsPage() {
   const template = await getTemplateForTenant(tenant);
   const contentSections: ContentSection[] = template.contentSections as ContentSection[];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings] = await Promise.all([
+  const [pageViews, bookingClicks, timestamps, activity, settings, reportHistory] = await Promise.all([
     safeFetch(() => getClickCounts("page-view", tenant), { total: 0, thisWeek: 0, today: 0 }),
     safeFetch(() => getClickCounts("booking-click", tenant), { total: 0, thisWeek: 0, today: 0 }),
     safeFetch(() => getSectionTimestamps(tenant), {}),
     safeFetch(() => getActivity(tenant), []),
     safeFetch(() => getContent("settings", tenant), { siteName: "", siteTagline: "", siteDescription: "", footerTagline: "", copyrightText: "" }),
+    safeFetch(() => getWeeklyReports(tenant, 12), []),
   ]);
 
   const staleSections = detectStaleSections(timestamps, contentSections);
@@ -43,6 +44,7 @@ export default async function ReportsPage() {
       staleSections={staleSections}
       recentActivity={recentActivity}
       template={template.id}
+      reportHistory={reportHistory}
     />
   );
 }

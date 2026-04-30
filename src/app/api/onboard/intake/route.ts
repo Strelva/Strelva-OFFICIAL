@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { isRateLimitedWindowed } from "@/lib/rate-limit";
 import { getRedis } from "@/lib/redis";
+import { getSanityClient } from "@/lib/sanity";
+
+const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
 export async function POST(req: Request) {
   // Rate limit: 5 submissions per hour per IP
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Persist to Redis
+  // Persist to Sanity (primary) + Redis (cache for quick listing)
   const leadData = {
     businessName,
     description: description || null,
@@ -40,16 +43,33 @@ export async function POST(req: Request) {
     email,
     currentWebsite: currentWebsite || null,
     referredBy: referredBy || null,
-    createdAt: new Date().toISOString(),
   };
 
-  console.log("[onboard/intake]", leadData);
+  if (hasSanity) {
+    // Check if lead already exists by email
+    const existing = await getSanityClient().fetch(
+      `*[_type == "onboardLead" && email == $email][0]._id`,
+      { email: email.toLowerCase() }
+    );
+    if (existing) {
+      // Update existing lead
+      await getSanityClient().patch(existing).set(leadData).commit();
+    } else {
+      // Create new lead
+      await getSanityClient().create({
+        _type: "onboardLead",
+        ...leadData,
+        email: email.toLowerCase(),
+        status: "new",
+      });
+    }
+  }
 
+  // Also persist to Redis for quick listing/caching
   const redis = getRedis();
   if (redis) {
     const leadKey = `lead:${email.toLowerCase()}`;
-    await redis.set(leadKey, JSON.stringify(leadData));
-    // Also add to a sorted set for chronological listing
+    await redis.set(leadKey, JSON.stringify({ ...leadData, createdAt: new Date().toISOString() }));
     await redis.zadd("leads:all", { score: Date.now(), member: leadKey });
   }
 

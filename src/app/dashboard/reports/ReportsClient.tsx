@@ -1,7 +1,9 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
+import type { StoredWeeklyReport } from "@/lib/storage";
 
 const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
   wellness: { metric: "Booking clicks", action: "clicked Book Now" },
@@ -20,6 +22,7 @@ interface ReportsClientProps {
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: { text: string; time: string; type?: string }[];
   template: string;
+  reportHistory: StoredWeeklyReport[];
 }
 
 function StatCard({
@@ -46,6 +49,68 @@ function StatCard({
   );
 }
 
+function formatWeekLabel(weekStart: string): string {
+  const d = new Date(weekStart + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; vocab: { metric: string; action: string } }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border-b border-gray-border/50 last:border-b-0">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-bg/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {expanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
+          )}
+          <span className="text-[13px] font-medium text-warm-white">
+            Week of {formatWeekLabel(report.weekStart)}
+          </span>
+        </div>
+        <div className="flex items-center gap-4 text-[12px] text-gray-muted">
+          <span>{report.pageViews.thisWeek} visitors</span>
+          <span>{report.bookingClicks.thisWeek} {vocab.action.toLowerCase()}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 pt-2 border-t border-gray-border/30 bg-surface-inset/50">
+          {report.summary ? (
+            <p className="text-[13px] text-gray-fg leading-relaxed whitespace-pre-wrap">
+              {report.summary}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-1">
+                  Visitors
+                </div>
+                <div className="text-[18px] font-medium text-warm-white">
+                  {report.pageViews.thisWeek}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-1">
+                  {vocab.metric}
+                </div>
+                <div className="text-[18px] font-medium text-warm-white">
+                  {report.bookingClicks.thisWeek}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReportsClient({
   siteName,
   pageViews,
@@ -53,6 +118,7 @@ export function ReportsClient({
   staleSections,
   recentActivity,
   template,
+  reportHistory,
 }: ReportsClientProps) {
   const vocab = CTA_VOCAB[template] || DEFAULT_VOCAB;
   const weekStart = new Date();
@@ -173,14 +239,26 @@ export function ReportsClient({
           </div>
         </div>
 
-        {/* Report history placeholder */}
-        <div className="mt-8 rounded-xl border border-gray-border bg-surface p-6">
-          <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-4">
-            Report history
+        {/* Report history */}
+        <div className="mt-8 rounded-xl border border-gray-border bg-surface overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-border/50">
+            <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
+              Report history
+            </span>
           </div>
-          <p className="text-[13px] text-gray-muted">
-            Weekly reports are sent to your email every Monday. Past reports will appear here.
-          </p>
+          {reportHistory.length > 0 ? (
+            <div>
+              {reportHistory.map((report) => (
+                <ReportHistoryItem key={report.id} report={report} vocab={vocab} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-[13px] text-gray-muted">
+                Weekly reports are generated every Monday. Past reports will appear here.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

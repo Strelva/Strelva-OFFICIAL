@@ -1,5 +1,7 @@
 import {
-  Sparkles,
+  Home,
+  Award,
+  ArrowRight,
   Layers,
   BookOpen,
   Star,
@@ -61,7 +63,7 @@ export const SECTION_LABELS: Record<string, string> = {
  * Icons for each section type.
  */
 export const SECTION_ICONS: Record<string, LucideIcon> = {
-  hero: Sparkles,
+  hero: Home,
   services: Layers,
   story: BookOpen,
   testimonials: Star,
@@ -71,9 +73,9 @@ export const SECTION_ICONS: Record<string, LucideIcon> = {
   settings: Settings,
   faq: HelpCircle,
   shop: ShoppingBag,
-  "trust-strip": Sparkles,
+  "trust-strip": Award,
   "testimonial-quote": Star,
-  cta: Sparkles,
+  cta: ArrowRight,
   "page-header": BookOpen,
   "booking-widget": Calendar,
   "instagram-feed": Instagram,

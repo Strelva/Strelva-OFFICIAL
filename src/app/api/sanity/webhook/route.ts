@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { getTenantConfig } from "@/lib/tenants";
 import { logActivity } from "@/lib/storage";
+import { revalidateClientSite } from "@/lib/revalidate-client";
 
 /**
  * Sanity webhook endpoint for cache invalidation.
@@ -10,7 +11,6 @@ import { logActivity } from "@/lib/storage";
  */
 
 const SANITY_WEBHOOK_SECRET = process.env.SANITY_WEBHOOK_SECRET;
-const REVALIDATION_SECRET = process.env.REVALIDATION_SECRET;
 
 interface SanityWebhookPayload {
   _id: string;
@@ -65,42 +65,6 @@ function verifySignature(body: string, signature: string | null): boolean {
   return providedSig === expectedSignature;
 }
 
-async function revalidateClientSite(
-  tenantId: string,
-  revalidateUrl: string,
-  paths: string[] | "all"
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const response = await fetch(revalidateUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Id": tenantId,
-        ...(REVALIDATION_SECRET && { "X-Revalidation-Secret": REVALIDATION_SECRET }),
-      },
-      body: JSON.stringify({
-        tenant: tenantId,
-        paths,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${text.slice(0, 200)}`,
-      };
-    }
-
-    return { success: true };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,11 +97,7 @@ export async function POST(request: NextRequest) {
       if (_type === "tenant" && payload.id) {
         const config = await getTenantConfig(payload.id as string);
         if (config?.revalidateUrl) {
-          const result = await revalidateClientSite(
-            config.id,
-            config.revalidateUrl,
-            "all"
-          );
+          const result = await revalidateClientSite(config.id, "all");
 
           await logActivity({
             text: `Cache invalidation triggered for tenant config change`,
@@ -182,11 +142,7 @@ export async function POST(request: NextRequest) {
     const paths = TYPE_TO_PATHS[_type] || ["/"];
 
     // Trigger revalidation on client site
-    const result = await revalidateClientSite(
-      tenantId,
-      tenantConfig.revalidateUrl,
-      paths
-    );
+    const result = await revalidateClientSite(tenantId, paths);
 
     // Log the cache invalidation
     await logActivity({

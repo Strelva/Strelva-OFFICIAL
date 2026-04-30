@@ -87,5 +87,4 @@ See `.claude/plans/remaining.yml` for remaining items.
 4. Does the second customer use the dashboard within 7 days?
 
 ## Execution Rules
-- NEVER use the Agent tool or spawn subagents. Do all work directly in the main conversation.
 - NEVER add "Co-Authored-By" lines to commits
