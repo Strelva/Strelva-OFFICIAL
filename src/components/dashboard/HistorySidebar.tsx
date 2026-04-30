@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Plus, Search, Settings, X, MessageSquare } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 
@@ -133,12 +134,13 @@ export function HistorySidebar({
           <span className="text-[13px] text-warm-black flex-1 truncate">
             {ownerName}
           </span>
-          <button
+          <Link
+            href="/dashboard/settings"
             className="w-7 h-7 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
             title="Settings"
           >
             <Settings className="w-4 h-4" strokeWidth={1.5} />
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CircleCheck, Unplug } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, CircleCheck, Unplug, Loader2 } from "lucide-react";
 
 interface ConnectionDetail {
   id: string;
@@ -19,9 +20,38 @@ interface ConnectionDetail {
     connectedSince: string;
     usedIn: string;
   };
+  configField?: string; // tenant config field name, e.g. "googleSearchConsoleKey"
 }
 
 const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
+  "google-search-console": {
+    id: "google-search-console",
+    name: "Google Search Console",
+    icon: "SC",
+    connected: false, // Will be overridden by actual connection status
+    description:
+      "Connect your Google Search Console to let your AI track how people find you on Google. See which search terms bring visitors, which pages rank highest, and get suggestions to improve your SEO. Powers your weekly \"how people found you\" report.",
+    usageExamples: [
+      {
+        title: "What are people searching to find me?",
+        prompt: "What search terms bring people to my site?",
+        response:
+          "Your top searches this week: 'yoga studio downtown' (23 clicks), 'morning yoga class' (15 clicks), 'beginner yoga near me' (8 clicks). Your 'Services' page ranks #3 for 'yoga studio downtown.'",
+      },
+      {
+        title: "How can I rank higher?",
+        prompt: "How can I improve my Google ranking?",
+        response:
+          "You're showing up for 'beginner yoga' but not getting clicks — your title might be too generic. Want me to update it to 'Beginner-Friendly Yoga Classes | [Your Studio]'?",
+      },
+    ],
+    metadata: {
+      frequency: "Every 24 hours",
+      connectedSince: "",
+      usedIn: "Weekly reports, SEO insights, AI suggestions",
+    },
+    configField: "googleSearchConsoleKey",
+  },
   "google-analytics": {
     id: "google-analytics",
     name: "Google Analytics",
@@ -190,6 +220,39 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const router = useRouter();
   const detail = CONNECTION_DETAILS[connectionId];
 
+  const [credentialsValue, setCredentialsValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSaveCredentials = async () => {
+    if (!detail?.configField || !credentialsValue.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+
+    try {
+      const res = await fetch("/api/tenant-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [detail.configField]: credentialsValue }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save");
+      }
+
+      setSaved(true);
+      setCredentialsValue(""); // Clear after save
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!detail) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -272,6 +335,51 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <p className="text-[13px] text-warm-black mt-1">{detail.metadata.usedIn}</p>
         </div>
       </div>
+
+      {/* Credentials form for configurable connections */}
+      {detail.configField && (
+        <div className="mb-8 max-w-[600px]">
+          <h3 className="text-[13px] font-medium text-warm-black mb-3">
+            {detail.id === "google-search-console" ? "Service Account Key (JSON)" : "Credentials"}
+          </h3>
+          <textarea
+            value={credentialsValue}
+            onChange={(e) => setCredentialsValue(e.target.value)}
+            placeholder={
+              detail.id === "google-search-console"
+                ? 'Paste your Google Cloud service account JSON key here...'
+                : "Enter credentials..."
+            }
+            rows={6}
+            className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-3 text-[13px] text-warm-black placeholder:text-gray-faint font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent/50"
+          />
+          <div className="flex items-center gap-4 mt-3">
+            <button
+              onClick={handleSaveCredentials}
+              disabled={saving || !credentialsValue.trim()}
+              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saving ? "Saving..." : "Save Credentials"}
+            </button>
+            {saved && (
+              <span className="text-[12px] text-accent flex items-center gap-1.5">
+                <CircleCheck className="w-3.5 h-3.5" />
+                Saved
+              </span>
+            )}
+            {error && (
+              <span className="text-[12px] text-terra">{error}</span>
+            )}
+          </div>
+          {detail.id === "google-search-console" && (
+            <p className="text-[11px] text-gray-faint mt-3 leading-relaxed">
+              Create a service account in Google Cloud Console, download the JSON key, and paste it above.
+              Make sure the service account has access to your Search Console property.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Disconnect */}
       {detail.connected && (

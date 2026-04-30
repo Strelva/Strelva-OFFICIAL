@@ -25,6 +25,7 @@ export async function GET() {
       adminDomain: config.adminDomain || "",
       // Connection status flags (presence of config = connected)
       connections: {
+        googleSearchConsole: !!config.googleSearchConsoleKey,
         googleAnalytics: !!config.googleSearchConsoleKey,
         newsletter: !!config.resendDomain,
         googleBusiness: !!config.reviewsConfig?.googlePlaceId,
@@ -77,6 +78,11 @@ export async function PUT(req: Request) {
           };
         }
       }
+    }
+    // Google Search Console key (JSON string)
+    if (typeof body.googleSearchConsoleKey === "string") {
+      // Store as-is (JSON string) or clear if empty
+      updates.googleSearchConsoleKey = body.googleSearchConsoleKey.trim() || undefined;
     }
     // Domain fields (lowercase, trim)
     if (typeof body.productionDomain === "string") {
