@@ -168,11 +168,8 @@ async function pollTenant(tenantId: string): Promise<number> {
   return newMedia.length;
 }
 
-export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET() {
+  // Auth handled by middleware (CRON_SECRET check)
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);

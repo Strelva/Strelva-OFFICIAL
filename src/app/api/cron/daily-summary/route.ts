@@ -6,7 +6,7 @@
  * This is the daily grade on whether owners are texting the agent
  * unprompted (the core bet).
  *
- * Auth: same pattern as other cron routes — Bearer ${CRON_SECRET}.
+ * Auth: handled by middleware (CRON_SECRET check).
  * Schedule: see vercel.json.
  */
 
@@ -20,12 +20,8 @@ function yesterdayKey(): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function GET(req: Request) {
-  // Verify cron secret in production (matches weekly-report pattern)
-  const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET() {
+  // Auth handled by middleware (CRON_SECRET check)
 
   const day = yesterdayKey();
   const tenants = await getAllTenants();

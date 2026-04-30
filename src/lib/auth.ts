@@ -14,11 +14,15 @@ export async function getCurrentUserEmail(): Promise<string | null> {
   return user?.emailAddresses?.[0]?.emailAddress || null;
 }
 
-/** Check if current user is the super admin (Laney) */
+/** Check if current user is a super admin */
 export async function isSuperAdmin(): Promise<boolean> {
   const email = await getCurrentUserEmail();
-  const adminEmails = (process.env.SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim()).filter(Boolean);
-  return !!email && adminEmails.includes(email);
+  if (!email) return false;
+  const adminEmails = (process.env.SUPER_ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
 }
 
 /** Assign a user to a tenant. Call this from admin or onboarding flows only.

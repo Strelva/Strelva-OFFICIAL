@@ -25,12 +25,8 @@ function reportToHtml(summary: string, siteName: string): string {
 </html>`;
 }
 
-export async function GET(req: Request) {
-  // Verify cron secret in production
-  const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET() {
+  // Auth handled by middleware (CRON_SECRET check)
 
   const allReports = await generateAllReports();
   const reports = allReports.filter((r) => r.tenant.subscriptionStatus !== "cancelled");
