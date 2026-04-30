@@ -69,7 +69,7 @@ export function HistorySidebar({
         <span className="text-[13px] font-medium text-warm-black">Menu</span>
         <button
           onClick={onClose}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+          className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
         >
           <X className="w-4 h-4" strokeWidth={1.5} />
         </button>
@@ -87,7 +87,7 @@ export function HistorySidebar({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[44px] text-[13px] font-medium transition-colors ${
                 isActive
                   ? "bg-gray-bg-hover text-warm-black"
                   : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
@@ -112,7 +112,7 @@ export function HistorySidebar({
             {/* New chat button */}
             <button
               onClick={onNewChat}
-              className="flex items-center gap-2 w-full rounded-lg bg-surface-raised border border-glass-border px-3 py-2 text-gray-muted hover:text-warm-black hover:bg-gray-bg-hover transition-colors"
+              className="flex items-center gap-2 w-full rounded-lg bg-surface-raised border border-glass-border px-3 py-2.5 min-h-[44px] text-gray-muted hover:text-warm-black hover:bg-gray-bg-hover transition-colors"
             >
               <Plus className="w-4 h-4" strokeWidth={1.5} />
               <span className="text-[12px]">New chat</span>
@@ -147,7 +147,7 @@ export function HistorySidebar({
                     <button
                       key={thread.id}
                       onClick={() => onSelectThread(thread.id)}
-                      className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${
+                      className={`w-full text-left rounded-lg px-2.5 py-2.5 min-h-[44px] transition-colors ${
                         isActive ? "bg-gray-bg-hover" : "hover:bg-gray-bg"
                       }`}
                     >
@@ -192,7 +192,7 @@ export function HistorySidebar({
           <Link
             href="/dashboard/settings"
             onClick={onClose}
-            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
               pathname?.startsWith("/dashboard/settings")
                 ? "text-warm-black bg-gray-bg"
                 : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"

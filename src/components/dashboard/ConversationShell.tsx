@@ -43,10 +43,10 @@ export function ConversationShell({
       {/* Main content area */}
       <main className="flex-1 flex flex-col min-w-0 bg-surface">
         {/* Mobile header with menu toggle */}
-        <header className="lg:hidden flex items-center gap-3 px-4 h-12 border-b border-gray-border bg-surface shrink-0">
+        <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-gray-border bg-surface shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
           >
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>

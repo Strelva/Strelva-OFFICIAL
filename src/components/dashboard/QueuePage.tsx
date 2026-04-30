@@ -62,21 +62,21 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const currentEvents = tab === "pending" ? pending : resolved;
 
   return (
-    <div className="flex flex-col h-full animate-page-enter">
+    <div className="flex flex-col h-full animate-route-enter">
       {/* Header */}
-      <header className="shrink-0 px-6 pt-6 pb-4 border-b border-glass-border">
-        <h1 className="text-[20px] font-semibold text-warm-black">Queue</h1>
+      <header className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-glass-border">
+        <h1 className="text-[18px] sm:text-[20px] font-semibold text-warm-black">Queue</h1>
         <p className="text-[13px] text-gray-muted mt-1">
           {pendingCount > 0 ? `${pendingCount} items need your attention` : "You're all caught up"}
         </p>
       </header>
 
-      {/* Tabs */}
-      <div className="shrink-0 px-6 pt-4">
+      {/* Tabs - min-h ensures 44px tap targets */}
+      <div className="shrink-0 px-4 sm:px-6 pt-4">
         <div className="flex gap-1 p-1 bg-surface-inset rounded-lg w-fit">
           <button
             onClick={() => setTab("pending")}
-            className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-all duration-200 ${
+            className={`px-4 py-2 min-h-[44px] text-[13px] font-medium rounded-md transition-all duration-200 ${
               tab === "pending"
                 ? "bg-surface text-warm-black shadow-sm"
                 : "text-gray-muted hover:text-gray-fg"
@@ -91,7 +91,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           </button>
           <button
             onClick={() => setTab("resolved")}
-            className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-all duration-200 ${
+            className={`px-4 py-2 min-h-[44px] text-[13px] font-medium rounded-md transition-all duration-200 ${
               tab === "resolved"
                 ? "bg-surface text-warm-black shadow-sm"
                 : "text-gray-muted hover:text-gray-fg"
@@ -103,7 +103,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       </div>
 
       {/* Content with crossfade */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         <div className="queue-tab-content">
           {currentEvents.length === 0 ? (
             tab === "pending" ? (

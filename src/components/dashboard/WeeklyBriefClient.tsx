@@ -73,7 +73,7 @@ function formatWeekRange(start: string, end: string): string {
 export function WeeklyBriefClient({ brief }: WeeklyBriefClientProps) {
   if (!brief) {
     return (
-      <div className="flex flex-col items-center justify-center h-full animate-page-enter">
+      <div className="flex flex-col items-center justify-center h-full animate-route-enter">
         <div className="w-16 h-16 rounded-2xl bg-surface-inset flex items-center justify-center mb-6">
           <FileText className="w-7 h-7 text-gray-muted" strokeWidth={1.5} />
         </div>
@@ -86,15 +86,15 @@ export function WeeklyBriefClient({ brief }: WeeklyBriefClientProps) {
   }
 
   return (
-    <div className="flex flex-col h-full animate-page-enter">
-      <header className="shrink-0 px-6 pt-6 pb-4 border-b border-glass-border">
-        <h1 className="text-[20px] font-semibold text-warm-black">Weekly Brief</h1>
+    <div className="flex flex-col h-full animate-route-enter">
+      <header className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-glass-border">
+        <h1 className="text-[18px] sm:text-[20px] font-semibold text-warm-black">Weekly Brief</h1>
         <p className="text-[13px] text-gray-muted mt-1">
           {formatWeekRange(brief.weekStart, brief.weekEnd)}
         </p>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
         <div className="max-w-2xl space-y-6">
           <div
             className="text-[15px] text-gray-fg leading-relaxed animate-fade-in-up"

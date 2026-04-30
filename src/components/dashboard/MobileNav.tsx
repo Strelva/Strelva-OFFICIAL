@@ -43,7 +43,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-base border-t border-glass-border"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-base border-t border-glass-border pb-safe"
       data-dashboard
     >
       <div className="relative flex items-center justify-around h-16" ref={navRef}>
