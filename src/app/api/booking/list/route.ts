@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBookings } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const authed = await verifyAuth();
@@ -11,6 +11,8 @@ export async function GET(request: Request) {
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "all";

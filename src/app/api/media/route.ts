@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getSanityClient, getSanityReadClient } from "@/lib/sanity";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import type { MediaAsset } from "@/lib/media";
@@ -15,6 +15,8 @@ export async function GET() {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
 
   // Query assets tagged with this tenant's label, falling back to all assets
   const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) {
@@ -60,6 +62,8 @@ export async function POST(request: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;

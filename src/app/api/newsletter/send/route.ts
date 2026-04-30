@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getSubscribers, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -12,6 +12,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const { subject, body, previewText } = await req.json();
 
     if (!subject || !body) {
@@ -20,8 +24,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    const tenant = await getTenantFromHeaders();
 
     if (isRateLimitedWindowed(`newsletter-send:${tenant}`, 5, 3_600_000)) {
       return NextResponse.json(

@@ -125,8 +125,14 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
 
   if (isCronRoute(req)) {
+    const expectedSecret = process.env.CRON_SECRET;
+    // Fail closed: if CRON_SECRET is not configured, block all cron routes
+    if (!expectedSecret) {
+      console.error("[middleware] CRON_SECRET env var not set - blocking cron route");
+      return new NextResponse("CRON_SECRET not configured", { status: 500 });
+    }
     const cronSecret = req.headers.get("authorization")?.replace("Bearer ", "");
-    if (cronSecret === process.env.CRON_SECRET || !process.env.CRON_SECRET) {
+    if (cronSecret === expectedSecret) {
       return NextResponse.next();
     }
     return new NextResponse("Unauthorized", { status: 401 });

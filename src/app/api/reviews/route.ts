@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getReviews, addReview, replyToReview } from "@/lib/reviews";
 
@@ -11,6 +11,9 @@ export async function GET() {
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const reviews = await getReviews(tenant);
     return NextResponse.json(reviews);
   } catch {
@@ -26,6 +29,9 @@ export async function POST(req: Request) {
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const body = await req.json();
 
     const { source, author, rating, text, date } = body;
@@ -58,6 +64,9 @@ export async function PATCH(req: Request) {
 
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const body = await req.json();
 
     const { reviewId, replyText } = body;

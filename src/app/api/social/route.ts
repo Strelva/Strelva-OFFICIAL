@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSocialPosts, setSocialPosts } from "@/lib/storage";
 import type { SocialPost } from "@/lib/types";
@@ -13,6 +13,9 @@ export async function GET() {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const posts = await getSocialPosts(tenant);
   return NextResponse.json(posts);
 }
@@ -26,6 +29,9 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const body = await req.json();
 
   const platform = body.platform;
@@ -65,6 +71,9 @@ export async function PATCH(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const body = await req.json();
   const { id, status, scheduledFor } = body;
 
@@ -114,6 +123,9 @@ export async function DELETE(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 

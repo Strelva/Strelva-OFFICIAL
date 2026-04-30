@@ -20,6 +20,7 @@ vi.mock("../lib/tenants", () => ({
 import {
   getEffectiveSubscriptionStatus,
   requireActiveSubscription,
+  isWithinPastDueGrace,
 } from "../lib/subscription";
 
 function makeTenantConfig(overrides: Record<string, unknown> = {}) {
@@ -84,16 +85,54 @@ describe("requireActiveSubscription", () => {
     expect(result).toBeNull();
   });
 
-  it("allows past_due subscriptions (returns null)", async () => {
-    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: "past_due" }));
+  it("allows trialing subscriptions (returns null)", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: "trialing" }));
     const result = await requireActiveSubscription("test");
     expect(result).toBeNull();
   });
 
-  it("allows 'none' status — no subscription required to start", async () => {
-    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: "none" }));
+  it("allows past_due within grace period (returns null)", async () => {
+    const recentDate = new Date().toISOString();
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: recentDate,
+    }));
     const result = await requireActiveSubscription("test");
     expect(result).toBeNull();
+  });
+
+  it("allows past_due with no timestamp recorded (lenient)", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: undefined,
+    }));
+    const result = await requireActiveSubscription("test");
+    expect(result).toBeNull();
+  });
+
+  it("blocks past_due after grace period with 402", async () => {
+    const oldDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(); // 5 days ago
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: oldDate,
+    }));
+    const result = await requireActiveSubscription("test");
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(402);
+
+    const body = await result!.json();
+    expect(body.error).toBe("Payment past due");
+    expect(body.portalUrl).toBe("/api/billing/portal");
+  });
+
+  it("blocks 'none' status with 402", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: "none" }));
+    const result = await requireActiveSubscription("test");
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(402);
+
+    const body = await result!.json();
+    expect(body.error).toBe("Subscription required");
   });
 
   it("blocks cancelled subscriptions with 402", async () => {
@@ -105,6 +144,47 @@ describe("requireActiveSubscription", () => {
     const body = await result!.json();
     expect(body.error).toBe("Subscription required");
     expect(body.portalUrl).toBe("/api/billing/portal");
+  });
+});
+
+describe("isWithinPastDueGrace", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns false for non-past_due statuses", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: "active" }));
+    const result = await isWithinPastDueGrace("test");
+    expect(result).toBe(false);
+  });
+
+  it("returns true for past_due within 3 days", async () => {
+    const recentDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: recentDate,
+    }));
+    const result = await isWithinPastDueGrace("test");
+    expect(result).toBe(true);
+  });
+
+  it("returns false for past_due beyond 3 days", async () => {
+    const oldDate = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(); // 4 days ago
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: oldDate,
+    }));
+    const result = await isWithinPastDueGrace("test");
+    expect(result).toBe(false);
+  });
+
+  it("returns true if no timestamp recorded (lenient)", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({
+      subscriptionStatus: "past_due",
+      subscriptionPastDueSince: undefined,
+    }));
+    const result = await isWithinPastDueGrace("test");
+    expect(result).toBe(true);
   });
 });
 
@@ -124,25 +204,34 @@ describe("billing webhook event mapping", () => {
     mockUpdateTenant.mockResolvedValue(makeTenantConfig());
   });
 
-  const EVENT_TO_STATUS: Record<string, string> = {
-    "invoice.paid": "active",
-    "invoice.payment_failed": "past_due",
-    "customer.subscription.deleted": "cancelled",
-  };
-
-  for (const [eventType, expectedStatus] of Object.entries(EVENT_TO_STATUS)) {
-    it(`${eventType} maps to subscriptionStatus="${expectedStatus}"`, async () => {
-      const { updateTenant } = await import("../lib/tenants");
-
-      // Simulate what the webhook handler does
-      const tenantId = "test-tenant";
-      await updateTenant(tenantId, { subscriptionStatus: expectedStatus as "active" | "past_due" | "cancelled" });
-
-      expect(mockUpdateTenant).toHaveBeenCalledWith(tenantId, {
-        subscriptionStatus: expectedStatus,
-      });
+  it("invoice.paid maps to subscriptionStatus='active' and clears grace period", async () => {
+    const { updateTenant } = await import("../lib/tenants");
+    const tenantId = "test-tenant";
+    await updateTenant(tenantId, { subscriptionStatus: "active", subscriptionPastDueSince: undefined });
+    expect(mockUpdateTenant).toHaveBeenCalledWith(tenantId, {
+      subscriptionStatus: "active",
+      subscriptionPastDueSince: undefined,
     });
-  }
+  });
+
+  it("invoice.payment_failed maps to subscriptionStatus='past_due' with timestamp", async () => {
+    const { updateTenant } = await import("../lib/tenants");
+    const tenantId = "test-tenant";
+    const now = new Date().toISOString();
+    await updateTenant(tenantId, { subscriptionStatus: "past_due", subscriptionPastDueSince: now });
+    expect(mockUpdateTenant).toHaveBeenCalledWith(tenantId, expect.objectContaining({
+      subscriptionStatus: "past_due",
+    }));
+  });
+
+  it("customer.subscription.deleted maps to subscriptionStatus='cancelled'", async () => {
+    const { updateTenant } = await import("../lib/tenants");
+    const tenantId = "test-tenant";
+    await updateTenant(tenantId, { subscriptionStatus: "cancelled" });
+    expect(mockUpdateTenant).toHaveBeenCalledWith(tenantId, {
+      subscriptionStatus: "cancelled",
+    });
+  });
 
   it("webhook skips update when tenantId is missing from metadata", () => {
     // The webhook handler checks `if (tenantId)` before calling updateTenant.

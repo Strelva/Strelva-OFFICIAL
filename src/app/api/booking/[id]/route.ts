@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateBooking, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 export async function PUT(
   request: Request,
@@ -15,14 +15,16 @@ export async function PUT(
   const { id } = await params;
 
   try {
+    const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
+
     const body = await request.json();
     const { status, notes } = body;
 
     if (status && !["confirmed", "cancelled", "completed"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
-
-    const tenant = await getTenantFromHeaders();
     const updates: Record<string, unknown> = {};
     if (status) updates.status = status;
     if (notes !== undefined) updates.notes = notes;

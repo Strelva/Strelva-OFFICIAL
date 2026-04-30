@@ -12,7 +12,7 @@ import {
   appendVersion,
 } from "@/lib/storage";
 import { diffFields } from "@/lib/utils";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { requireTenantAccess } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -135,7 +135,7 @@ export async function PUT(
   const { section } = await params;
 
   try {
-    const tenant = await getTenantFromHeaders();
+    const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
     const blocked = await requireActiveSubscription(tenant);
@@ -200,7 +200,7 @@ export async function DELETE(
   const { section } = await params;
 
   try {
-    const tenant = await getTenantFromHeaders();
+    const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
     const blocked = await requireActiveSubscription(tenant);

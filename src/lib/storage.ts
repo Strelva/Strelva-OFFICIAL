@@ -1087,6 +1087,71 @@ export async function getBookings(
   return bookings;
 }
 
+/**
+ * Atomically claim a booking slot using Redis SETNX.
+ * Returns true if the slot was claimed, false if already taken.
+ * The lock expires after 10 minutes to prevent stuck slots.
+ */
+async function claimBookingSlot(
+  tenant: string,
+  date: string,
+  startTime: string,
+  serviceId: string
+): Promise<{ claimed: boolean; release: () => Promise<void> }> {
+  const redis = getRedis();
+  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
+  const lockTTL = 600; // 10 minutes
+
+  if (redis) {
+    // SETNX with expiry - atomic slot claim
+    const claimed = await redis.set(slotKey, "pending", { nx: true, ex: lockTTL });
+    return {
+      claimed: !!claimed,
+      release: async () => {
+        await redis.del(slotKey);
+      },
+    };
+  }
+
+  // No Redis - fall back to non-atomic behavior (acceptable for dev)
+  return { claimed: true, release: async () => {} };
+}
+
+/**
+ * Mark a slot as permanently booked (after successful booking creation).
+ * The slot key remains with a longer TTL so getAvailableSlots can check it.
+ */
+async function confirmBookingSlot(
+  tenant: string,
+  date: string,
+  startTime: string,
+  serviceId: string
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
+  // Keep slot marked as booked for 48 hours (covers day-of and next-day edge cases)
+  await redis.set(slotKey, "confirmed", { ex: 172800 });
+}
+
+/**
+ * Check if a slot is already claimed/booked in Redis.
+ */
+export async function isSlotClaimed(
+  tenant: string,
+  date: string,
+  startTime: string,
+  serviceId: string
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
+  const value = await redis.get(slotKey);
+  return !!value;
+}
+
 export async function createBooking(
   booking: Omit<Booking, "id" | "createdAt" | "status">,
   tenant: string = DEFAULT_TENANT
@@ -1101,6 +1166,9 @@ export async function createBooking(
       ...booking,
       status: "confirmed",
     });
+
+    // Mark slot as confirmed in Redis after successful DB write
+    await confirmBookingSlot(tenant, booking.date, booking.startTime, booking.serviceId);
 
     return {
       ...booking,
@@ -1122,7 +1190,49 @@ export async function createBooking(
   bookings.push(newBooking);
   store[`__bookings_${tenant}`] = bookings;
   await writeDevContent(store, tenant);
+
+  // Mark slot as confirmed in Redis after successful write
+  await confirmBookingSlot(tenant, booking.date, booking.startTime, booking.serviceId);
+
   return newBooking;
+}
+
+/**
+ * Atomically claim a slot, verify availability, and create booking.
+ * Prevents race conditions where two requests check availability simultaneously.
+ */
+export async function createBookingAtomic(
+  booking: Omit<Booking, "id" | "createdAt" | "status">,
+  tenant: string = DEFAULT_TENANT
+): Promise<{ success: true; booking: Booking } | { success: false; error: string }> {
+  // Step 1: Atomically claim the slot
+  const { claimed, release } = await claimBookingSlot(
+    tenant,
+    booking.date,
+    booking.startTime,
+    booking.serviceId
+  );
+
+  if (!claimed) {
+    return { success: false, error: "This time slot is no longer available. Please choose another time." };
+  }
+
+  try {
+    // Step 2: Double-check availability (handles case where slot was booked before Redis key expired)
+    const available = await getAvailableSlots(booking.date, booking.serviceId, tenant);
+    if (!available.includes(booking.startTime)) {
+      await release();
+      return { success: false, error: "This time slot is no longer available. Please choose another time." };
+    }
+
+    // Step 3: Create the booking (this also confirms the slot in Redis)
+    const created = await createBooking(booking, tenant);
+    return { success: true, booking: created };
+  } catch (error) {
+    // Release the slot claim on any error
+    await release();
+    throw error;
+  }
 }
 
 export async function updateBooking(

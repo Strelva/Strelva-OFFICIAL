@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createBooking, getAvailableSlots, logActivity } from "@/lib/storage";
+import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimited, rateLimitKey } from "@/lib/rate-limit";
 
@@ -26,17 +26,7 @@ export async function POST(request: Request) {
 
     const tenant = await getTenantFromHeaders();
 
-    // Verify slot is still available
-    const available = await getAvailableSlots(date, serviceId, tenant);
-    if (!available.includes(startTime)) {
-      return NextResponse.json(
-        { error: "This time slot is no longer available. Please choose another time." },
-        { status: 409 }
-      );
-    }
-
     // Calculate end time (parse service duration or default 60)
-    const { getContent } = await import("@/lib/storage");
     const services = await getContent("services", tenant);
     const service = services.services.find((s) => s.id === serviceId);
     const duration = service ? parseInt(service.duration) || 60 : 60;
@@ -45,7 +35,9 @@ export async function POST(request: Request) {
     const endMinutes = startH * 60 + startM + duration;
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
 
-    const booking = await createBooking(
+    // Atomic booking: claims slot with Redis SETNX, then creates booking
+    // Prevents race condition where two concurrent requests both pass availability check
+    const result = await createBookingAtomic(
       {
         serviceId,
         serviceName,
@@ -60,6 +52,10 @@ export async function POST(request: Request) {
       tenant
     );
 
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 409 });
+    }
+
     await logActivity(
       {
         text: `New booking: ${serviceName} on ${date} at ${startTime} for ${clientName}`,
@@ -69,7 +65,7 @@ export async function POST(request: Request) {
       tenant
     );
 
-    return NextResponse.json({ success: true, booking });
+    return NextResponse.json({ success: true, booking: result.booking });
   } catch {
     return NextResponse.json({ error: "Failed to create booking" }, { status: 500 });
   }

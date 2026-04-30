@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getSubscribers } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
@@ -10,6 +10,9 @@ export async function GET() {
   }
 
   const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+
   const subscribers = await getSubscribers(tenant);
 
   return NextResponse.json({ subscribers, count: subscribers.length });

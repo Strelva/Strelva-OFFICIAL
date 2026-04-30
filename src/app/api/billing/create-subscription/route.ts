@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { isSuperAdmin } from "@/lib/auth";
-import { getTenantConfig } from "@/lib/tenants";
+import { getTenantConfig, updateTenant } from "@/lib/tenants";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -47,6 +47,8 @@ export async function POST(req: Request) {
       metadata: { tenantId },
     });
     customerId = customer.id;
+    // Persist the new Stripe customer ID to tenant config
+    await updateTenant(tenantId, { stripeCustomerId: customerId });
   }
 
   const origin = req.headers.get("origin") || "https://scaffoldweb.com";

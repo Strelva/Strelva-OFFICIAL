@@ -408,7 +408,9 @@ export interface TenantConfig {
   /** Admin dashboard domain (e.g., "admin.yourbusiness.com"). Derived from productionDomain if not set. */
   adminDomain?: string;
   stripeCustomerId?: string;
-  subscriptionStatus?: "active" | "past_due" | "cancelled" | "none";
+  subscriptionStatus?: "active" | "trialing" | "past_due" | "cancelled" | "none";
+  /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation. */
+  subscriptionPastDueSince?: string;
   bookingProvider?: string;
   bookingUrl?: string;
   resendDomain?: string;
