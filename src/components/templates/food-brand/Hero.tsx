@@ -132,24 +132,26 @@ export function Hero({ hero }: { hero: HeroContent }) {
               </div>
             </div>
 
-            {/* Right — Product bag */}
-            <div ref={productRef} className="hidden lg:flex items-center justify-end">
-              <div
-                data-product-img
-                className="relative z-10"
-                style={{ width: "min(280px, 40vw)" }}
-              >
-                <Image
-                  src="/images/transparentbag.png"
-                  alt="Great Lakes Dried Fruit — Apple Chips"
-                  width={1200}
-                  height={1703}
-                  className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
-                  sizes="280px"
-                  priority
-                />
+            {/* Right — Product bag (only show if logoUrl is set as product image) */}
+            {hero.logoUrl && (
+              <div ref={productRef} className="hidden lg:flex items-center justify-end">
+                <div
+                  data-product-img
+                  className="relative z-10"
+                  style={{ width: "min(280px, 40vw)" }}
+                >
+                  <Image
+                    src={hero.logoUrl}
+                    alt={`${hero.headline} — Product`}
+                    width={1200}
+                    height={1703}
+                    className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
+                    sizes="280px"
+                    priority
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
