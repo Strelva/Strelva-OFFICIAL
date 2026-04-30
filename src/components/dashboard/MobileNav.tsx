@@ -1,0 +1,87 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Inbox, FileText, MessageSquare, MoreHorizontal } from "lucide-react";
+import { useRef, useEffect, useState } from "react";
+
+const NAV_ITEMS = [
+  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
+  { href: "/dashboard/brief", label: "Brief", icon: FileText },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/settings", label: "More", icon: MoreHorizontal },
+];
+
+export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
+  const pathname = usePathname();
+  const navRef = useRef<HTMLDivElement>(null);
+  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
+
+  const getActiveIndex = () => {
+    return NAV_ITEMS.findIndex(
+      (item) =>
+        pathname === item.href || pathname?.startsWith(item.href + "/")
+    );
+  };
+
+  useEffect(() => {
+    const activeIndex = getActiveIndex();
+    if (activeIndex === -1 || !navRef.current) return;
+
+    const buttons = navRef.current.querySelectorAll<HTMLAnchorElement>("a");
+    const activeButton = buttons[activeIndex];
+    if (!activeButton) return;
+
+    const navRect = navRef.current.getBoundingClientRect();
+    const buttonRect = activeButton.getBoundingClientRect();
+
+    setPillStyle({
+      left: buttonRect.left - navRect.left,
+      width: buttonRect.width,
+    });
+  }, [pathname]);
+
+  return (
+    <nav
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-base border-t border-glass-border"
+      data-dashboard
+    >
+      <div className="relative flex items-center justify-around h-16" ref={navRef}>
+        <div
+          className="mobile-nav-pill absolute top-1 h-[calc(100%-8px)] rounded-xl bg-gray-bg-hover pointer-events-none"
+          style={{
+            left: pillStyle.left,
+            width: pillStyle.width,
+            opacity: pillStyle.width > 0 ? 1 : 0,
+          }}
+        />
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            pathname === item.href || pathname?.startsWith(item.href + "/");
+          const Icon = item.icon;
+          const showBadge = item.href === "/dashboard/queue" && pendingCount > 0;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`relative flex flex-col items-center justify-center gap-1 w-16 h-14 rounded-xl transition-colors ${
+                isActive ? "text-warm-black" : "text-gray-muted"
+              }`}
+            >
+              <div className="relative">
+                <Icon className="w-5 h-5" strokeWidth={1.5} />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-2 w-4 h-4 text-[9px] font-semibold bg-accent text-surface-base rounded-full flex items-center justify-center">
+                    {pendingCount > 9 ? "9+" : pendingCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

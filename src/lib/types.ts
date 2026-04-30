@@ -481,3 +481,23 @@ export interface UnifiedEvent {
   createdAt: string;
   resolvedAt?: string;
 }
+
+// --- Weekly Brief Types ---
+
+export interface WeeklyBriefStats {
+  pageViews: number;
+  bookingClicks: number;
+  reviewsReceived: number;
+  contentUpdates: number;
+}
+
+export interface WeeklyBrief {
+  id: string;
+  tenantId: string;
+  weekStart: string;
+  weekEnd: string;
+  summary: string;
+  stats: WeeklyBriefStats;
+  highlights: string[];
+  createdAt: string;
+}

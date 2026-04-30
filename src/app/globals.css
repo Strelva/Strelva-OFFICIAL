@@ -677,6 +677,13 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* ===== MOBILE NAV PILL ANIMATION ===== */
+.mobile-nav-pill {
+  transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.15s ease;
+}
+
 /* ===== CTA HOVER MICRO-INTERACTION ===== */
 a[href*="booking"], a[href*="services#booking"],
 .cta-primary {

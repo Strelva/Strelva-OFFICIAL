@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { HistorySidebar, type Thread } from "./HistorySidebar";
+import { MobileNav } from "./MobileNav";
 
 interface ConversationShellProps {
   children: ReactNode;
@@ -52,9 +53,12 @@ export function ConversationShell({
           <span className="text-[14px] font-medium text-warm-black">Scaffold</span>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0">{children}</div>
+        {/* Content — add bottom padding on mobile for tab bar */}
+        <div className="flex-1 min-h-0 pb-16 lg:pb-0">{children}</div>
       </main>
+
+      {/* Mobile bottom tab bar */}
+      <MobileNav pendingCount={pendingCount} />
     </div>
   );
 }
