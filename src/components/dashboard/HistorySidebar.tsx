@@ -12,7 +12,9 @@ import {
   X,
   Search,
   Plus,
+  LogOut,
 } from "lucide-react";
+import { SignOutButton } from "@clerk/nextjs";
 import { timeAgo } from "@/lib/utils";
 
 export interface Thread {
@@ -201,6 +203,14 @@ export function HistorySidebar({
           >
             <Settings className="w-4 h-4" strokeWidth={1.5} />
           </Link>
+          <SignOutButton>
+            <button
+              className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          </SignOutButton>
         </div>
       </div>
     </div>
