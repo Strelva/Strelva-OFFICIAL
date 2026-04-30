@@ -25,7 +25,7 @@ export default async function DashboardLayout({
 
   const hasAccess = await hasTenantAccess(tenant);
   if (!hasAccess) {
-    redirect("/sign-in");
+    redirect("/no-access");
   }
   const tenantConfig = await getTenantConfig(tenant);
   const siteUrl = tenantConfig?.siteUrl

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { requireTenantAccess } from "@/lib/auth";
 import { loadChatMessages, saveChatMessages } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function GET() {
-  const authed = await verifyAuth();
-  if (!authed) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
@@ -23,13 +20,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const authed = await verifyAuth();
-  if (!authed) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const tenant = await getTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 

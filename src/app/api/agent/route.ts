@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
-import { verifyAuth } from "@/lib/auth";
+import { requireTenantAccess } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
@@ -155,15 +155,10 @@ When ${ownerName} asks "how's my site?" or similar, give a plain-English summary
 }
 
 export async function POST(req: Request) {
-  const authed = await verifyAuth();
-  if (!authed) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   const tenant = await getTenantFromHeaders();
+
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
 
   if (isRateLimited(`agent:${tenant}`, 30)) {
     return new Response(

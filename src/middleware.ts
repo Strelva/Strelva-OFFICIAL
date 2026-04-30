@@ -15,6 +15,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/no-access",
   "/onboard(.*)",
   "/api/onboard/(.*)",
   "/api/health",
@@ -153,11 +154,14 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     isAdminSubdomain = customDomainResult.isAdminSubdomain;
   }
 
-  // Fallback: extract tenant from ?tenant= query param (for marketing host access)
+  // Fallback: extract tenant from ?tenant= query param (for super admin access only)
+  // This requires authentication to prevent tenant spoofing
+  let tenantFromQueryParam = false;
   if (!tenantId) {
     const tenantParam = req.nextUrl.searchParams.get("tenant");
     if (tenantParam && /^[a-z0-9-]+$/.test(tenantParam)) {
       tenantId = tenantParam;
+      tenantFromQueryParam = true;
     }
   }
 
@@ -171,9 +175,13 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       headers.set("x-preview-mode", "true");
     }
 
-    // Admin subdomains (e.g., admin.{tenantdomain}.com) require auth for all routes
-    if (isAdminSubdomain) {
-      await auth.protect();
+    // Require auth for: admin subdomains, tenant from query param on protected routes
+    const needsAuth = isAdminSubdomain || (tenantFromQueryParam && !isPublicRoute(req));
+    if (needsAuth) {
+      const signInUrl = new URL("/sign-in", req.url);
+      await auth.protect({
+        unauthenticatedUrl: signInUrl.toString(),
+      });
     }
 
     const response = NextResponse.next({

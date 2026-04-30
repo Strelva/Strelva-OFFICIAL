@@ -8,6 +8,11 @@ import { getTenantByDomain } from "@/lib/tenants";
  * GET /api/internal/domain-map?domain=example.com
  */
 export async function GET(request: Request) {
+  const internalHeader = request.headers.get("x-internal-request");
+  if (internalHeader !== "1") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const url = new URL(request.url);
   const domain = url.searchParams.get("domain");
 
