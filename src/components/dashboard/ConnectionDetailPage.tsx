@@ -21,7 +21,7 @@ interface ConnectionDetail {
     usedIn: string;
   };
   configField?: string; // tenant config field name, e.g. "googleSearchConsoleKey"
-  provider?: "google" | "yelp"; // For API-based connections
+  provider?: "google" | "yelp" | "calendly" | "instagram"; // For API-based connections
 }
 
 const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
@@ -161,6 +161,7 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
       connectedSince: "",
       usedIn: "Social media, content marketing",
     },
+    provider: "instagram",
   },
   calendly: {
     id: "calendly",
@@ -188,6 +189,7 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
       connectedSince: "",
       usedIn: "Booking, scheduling, availability",
     },
+    provider: "calendly",
   },
   yelp: {
     id: "yelp",
@@ -279,7 +281,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         }
       })
       .catch(() => {});
-  }, [detail?.provider]);
+  }, [detail?.provider, searchParams]);
 
   const handleSaveCredentials = async () => {
     if (!detail?.configField || !credentialsValue.trim()) return;
@@ -347,7 +349,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     setError(null);
 
     try {
-      const endpoint = detail.provider === "yelp" ? "/api/connections/yelp" : "/api/connections/google";
+      const endpointMap: Record<string, string> = {
+        google: "/api/connections/google",
+        yelp: "/api/connections/yelp",
+        calendly: "/api/connections/calendly",
+        instagram: "/api/connections/instagram",
+      };
+      const endpoint = endpointMap[detail.provider] || "/api/connections/google";
       const res = await fetch(endpoint, { method: "DELETE" });
 
       if (!res.ok) {
@@ -405,6 +413,20 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
           >
             Connect with Google
+          </a>
+        ) : detail.provider === "calendly" ? (
+          <a
+            href="/api/oauth/calendly"
+            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+          >
+            Connect with Calendly
+          </a>
+        ) : detail.provider === "instagram" ? (
+          <a
+            href="/api/oauth/instagram"
+            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+          >
+            Connect with Instagram
           </a>
         ) : (
           <span className="text-[13px] text-gray-muted">Not connected</span>

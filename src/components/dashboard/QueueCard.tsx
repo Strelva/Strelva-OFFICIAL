@@ -1,7 +1,10 @@
 "use client";
 
+import { useRef, useState, useCallback } from "react";
 import { Check, X, Star, Calendar, MessageSquare, Bot, Zap } from "lucide-react";
 import type { UnifiedEvent } from "@/lib/types";
+
+const SWIPE_THRESHOLD = 100;
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
   google: { bg: "bg-blue-500/15", text: "text-blue-400" },
@@ -51,12 +54,100 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
   const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
   const isPending = event.status === "pending";
 
+  // Swipe state
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isHorizontalSwipe = useRef<boolean | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (disabled || !isPending) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isHorizontalSwipe.current = null;
+    setIsSwiping(true);
+  }, [disabled, isPending]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isSwiping || disabled || !isPending) return;
+
+    const deltaX = e.touches[0].clientX - touchStartX.current;
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+
+    // Determine swipe direction on first significant move
+    if (isHorizontalSwipe.current === null) {
+      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        isHorizontalSwipe.current = Math.abs(deltaX) > Math.abs(deltaY);
+      }
+    }
+
+    // Only handle horizontal swipes
+    if (isHorizontalSwipe.current) {
+      e.preventDefault();
+      setSwipeX(deltaX);
+    }
+  }, [isSwiping, disabled, isPending]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isSwiping) return;
+
+    if (swipeX > SWIPE_THRESHOLD) {
+      onApprove(event.id);
+    } else if (swipeX < -SWIPE_THRESHOLD) {
+      onDismiss(event.id);
+    }
+
+    setSwipeX(0);
+    setIsSwiping(false);
+    isHorizontalSwipe.current = null;
+  }, [isSwiping, swipeX, event.id, onApprove, onDismiss]);
+
+  // Calculate background hint based on swipe distance
+  const swipeProgress = Math.min(Math.abs(swipeX) / SWIPE_THRESHOLD, 1);
+  const isApproveSwipe = swipeX > 0;
+  const isDismissSwipe = swipeX < 0;
+
   return (
-    <div
-      className={`group rounded-xl border border-glass-border bg-surface-raised p-4 transition-all duration-150 ${
-        disabled ? "opacity-50" : "hover:bg-gray-bg"
-      }`}
-    >
+    <div className="queue-card-swipe-container relative overflow-hidden rounded-xl">
+      {/* Swipe hint backgrounds */}
+      {isPending && !disabled && (
+        <>
+          <div
+            className="absolute inset-0 bg-success pointer-events-none transition-opacity"
+            style={{ opacity: isApproveSwipe ? swipeProgress * 0.3 : 0 }}
+          />
+          <div
+            className="absolute inset-0 bg-gray-muted pointer-events-none transition-opacity"
+            style={{ opacity: isDismissSwipe ? swipeProgress * 0.3 : 0 }}
+          />
+          {/* Swipe icons */}
+          {isApproveSwipe && swipeProgress > 0.3 && (
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-success transition-opacity" style={{ opacity: swipeProgress }}>
+              <Check className="w-6 h-6" strokeWidth={2} />
+            </div>
+          )}
+          {isDismissSwipe && swipeProgress > 0.3 && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-fg transition-opacity" style={{ opacity: swipeProgress }}>
+              <X className="w-6 h-6" strokeWidth={2} />
+            </div>
+          )}
+        </>
+      )}
+      <div
+        ref={cardRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateX(${swipeX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        className={`queue-card-swipeable group rounded-xl border border-glass-border bg-surface-raised p-4 relative ${
+          disabled ? "opacity-50" : "hover:bg-gray-bg"
+        }`}
+      >
       <div className="flex items-start gap-3">
         {/* Source icon */}
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colors.bg} ${colors.text}`}>
@@ -115,6 +206,7 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

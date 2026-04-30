@@ -148,6 +148,8 @@ export function ConnectionsPage() {
           for (const conn of connectionsData.connections) {
             if (conn.provider === "google") states.googleBusiness = conn.connected;
             if (conn.provider === "yelp") states.yelp = conn.connected;
+            if (conn.provider === "calendly") states.calendly = conn.connected;
+            if (conn.provider === "instagram") states.instagram = conn.connected;
           }
         }
 

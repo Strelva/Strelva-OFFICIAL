@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/poll-google-reviews",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/poll-instagram",
+      "schedule": "0 6 * * *"
     }
   ]
 }

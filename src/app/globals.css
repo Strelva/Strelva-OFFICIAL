@@ -684,6 +684,36 @@ body {
               opacity 0.15s ease;
 }
 
+/* ===== QUEUE CARD SWIPE GESTURES (MOBILE) ===== */
+
+/* Full-width cards on mobile — touch screen edges */
+@media (max-width: 639px) {
+  .queue-card-swipe-container {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+  .queue-card-swipeable {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+/* GPU acceleration for smooth 60fps swipe */
+.queue-card-swipeable {
+  will-change: transform;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Swipe hint backgrounds */
+.queue-card-swipe-container > .bg-success,
+.queue-card-swipe-container > .bg-gray-muted {
+  transition: opacity 0.1s ease-out;
+}
+
 /* ===== CTA HOVER MICRO-INTERACTION ===== */
 a[href*="booking"], a[href*="services#booking"],
 .cta-primary {
