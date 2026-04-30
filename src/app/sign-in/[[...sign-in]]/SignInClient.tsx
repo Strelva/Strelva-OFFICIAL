@@ -35,7 +35,7 @@ export function SignInClient({ siteName }: { siteName: string }) {
             dividerText: "!text-[#55555c]",
           },
         }}
-        fallbackRedirectUrl="/account"
+        fallbackRedirectUrl="/dashboard"
       />
     </div>
   );
