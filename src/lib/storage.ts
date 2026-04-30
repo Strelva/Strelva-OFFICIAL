@@ -58,6 +58,7 @@ import { defaults } from "./defaults";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "./booking";
 import { getSanityClient, getSanityReadClient, sanityImageUrl } from "./sanity";
 import { getRedis } from "./redis";
+import { emitEventFromActivity } from "./events";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
@@ -655,6 +656,15 @@ export async function logActivity(
       }, tenant);
     } catch {
       // Inbox write failure should never block activity logging
+    }
+  }
+
+  // Emit UnifiedEvent for AI content changes
+  if (entry.actor === "ai" || entry.type === "ai") {
+    try {
+      await emitEventFromActivity(entry, tenant);
+    } catch {
+      // Event emission failure should never block activity logging
     }
   }
 }

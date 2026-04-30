@@ -4,17 +4,17 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChatPanel } from "@/components/dashboard/ChatPanel";
 
-interface DashboardPageClientProps {
+interface ChatPageClientProps {
   threadId?: string;
   ownerName: string;
 }
 
-export function DashboardPageClient({ threadId, ownerName }: DashboardPageClientProps) {
+export function ChatPageClient({ threadId, ownerName }: ChatPageClientProps) {
   const router = useRouter();
 
   const handleThreadCreated = useCallback(
     (id: string) => {
-      router.replace(`/dashboard?thread=${id}`);
+      router.replace(`/dashboard/chat?thread=${id}`);
     },
     [router]
   );

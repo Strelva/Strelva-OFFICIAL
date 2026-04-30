@@ -9,6 +9,7 @@ import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { hasTenantAccess } from "@/lib/auth";
 import { listThreads } from "@/lib/threads";
+import { getQueueCount } from "@/lib/events";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -40,8 +41,11 @@ export default async function DashboardLayout({
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
-  // Fetch threads for the history sidebar
-  const threads = await listThreads(tenant);
+  // Fetch threads for the history sidebar and queue count
+  const [threads, pendingCount] = await Promise.all([
+    listThreads(tenant),
+    getQueueCount(tenant),
+  ]);
   const threadSummaries = threads.map((t) => ({
     id: t.id,
     title: t.title,
@@ -56,6 +60,7 @@ export default async function DashboardLayout({
         <ConversationLayoutClient
           threads={threadSummaries}
           ownerName={ownerName || siteName}
+          pendingCount={pendingCount}
         >
           {children}
         </ConversationLayoutClient>

@@ -11,6 +11,7 @@ interface ConversationShellProps {
   onNewChat: () => void;
   onSelectThread: (id: string) => void;
   ownerName: string;
+  pendingCount?: number;
 }
 
 export function ConversationShell({
@@ -20,12 +21,13 @@ export function ConversationShell({
   onNewChat,
   onSelectThread,
   ownerName,
+  pendingCount = 0,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-surface-base" data-dashboard>
-      {/* History sidebar */}
+      {/* Navigation sidebar */}
       <HistorySidebar
         threads={threads}
         activeThreadId={activeThreadId}
@@ -34,6 +36,7 @@ export function ConversationShell({
         ownerName={ownerName}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        pendingCount={pendingCount}
       />
 
       {/* Main content area */}

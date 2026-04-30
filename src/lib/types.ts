@@ -466,3 +466,18 @@ export interface BusinessHours {
   holidays?: BusinessHoliday[];
   timezone?: string;
 }
+
+// --- Unified Event Types ---
+
+export interface UnifiedEvent {
+  id: string;
+  tenantId: string;
+  source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai';
+  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion';
+  title: string;
+  body: string;
+  status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt?: string;
+}

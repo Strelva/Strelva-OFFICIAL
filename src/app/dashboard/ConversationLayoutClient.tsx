@@ -9,12 +9,14 @@ interface ConversationLayoutClientProps {
   children: ReactNode;
   threads: Thread[];
   ownerName: string;
+  pendingCount?: number;
 }
 
 export function ConversationLayoutClient({
   children,
   threads: initialThreads,
   ownerName,
+  pendingCount = 0,
 }: ConversationLayoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,12 +26,12 @@ export function ConversationLayoutClient({
 
   const handleNewChat = useCallback(() => {
     // Clear thread from URL to start fresh
-    router.push("/dashboard");
+    router.push("/dashboard/chat");
   }, [router]);
 
   const handleSelectThread = useCallback(
     (id: string) => {
-      router.push(`/dashboard?thread=${id}`);
+      router.push(`/dashboard/chat?thread=${id}`);
     },
     [router]
   );
@@ -47,7 +49,7 @@ export function ConversationLayoutClient({
         ...prev,
       ]);
       // Update URL with new thread ID
-      router.replace(`/dashboard?thread=${id}`);
+      router.replace(`/dashboard/chat?thread=${id}`);
     },
     [router]
   );
@@ -59,6 +61,7 @@ export function ConversationLayoutClient({
       onNewChat={handleNewChat}
       onSelectThread={handleSelectThread}
       ownerName={ownerName}
+      pendingCount={pendingCount}
     >
       {children}
     </ConversationShell>

@@ -492,6 +492,25 @@ body {
   opacity: 0;
 }
 
+/* Queue card staggered slide-up */
+@keyframes queue-card-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-queue-card-enter {
+  animation: queue-card-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Queue tab crossfade */
+.queue-tab-content {
+  animation: queue-tab-fade 0.2s ease-out;
+}
+@keyframes queue-tab-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ===== PAGE TRANSITIONS ===== */
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(8px); }
@@ -510,6 +529,8 @@ body {
   .animate-overlay-enter,
   .animate-card-enter,
   .animate-check-bounce,
+  .animate-queue-card-enter,
+  .queue-tab-content,
   .section-expand,
   .msg-user,
   .msg-bot {
