@@ -21,7 +21,7 @@ interface ConnectionDetail {
     usedIn: string;
   };
   configField?: string; // tenant config field name, e.g. "googleSearchConsoleKey"
-  provider?: "google" | "yelp" | "calendly" | "instagram"; // For API-based connections
+  provider?: "google" | "yelp" | "calendly" | "instagram" | "vegaro"; // For API-based connections
 }
 
 const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
@@ -219,6 +219,34 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
     },
     provider: "yelp",
   },
+  vegaro: {
+    id: "vegaro",
+    name: "Vegaro",
+    icon: "VG",
+    connected: false,
+    description:
+      "Connect your Vegaro booking system to receive instant notifications when clients book appointments. Your AI can confirm bookings, send reminders, and keep your calendar in sync.",
+    usageExamples: [
+      {
+        title: "Any new bookings today?",
+        prompt: "Do I have any new bookings?",
+        response:
+          "You have 3 new bookings today: Sarah M. at 10am for a haircut, James K. at 2pm for a color treatment, and Emily R. at 4:30pm for a trim. All confirmed.",
+      },
+      {
+        title: "Who's coming in tomorrow?",
+        prompt: "Show me tomorrow's schedule",
+        response:
+          "Tomorrow you have 5 appointments starting at 9am. Your busiest time is 1-3pm with back-to-back color sessions. Want me to send reminder texts to your clients?",
+      },
+    ],
+    metadata: {
+      frequency: "Real-time webhooks",
+      connectedSince: "",
+      usedIn: "Booking notifications, calendar sync",
+    },
+    provider: "vegaro",
+  },
 };
 
 function formatRelativeTime(isoDate: string): string {
@@ -244,6 +272,8 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const [credentialsValue, setCredentialsValue] = useState("");
   const [yelpApiKey, setYelpApiKey] = useState("");
   const [yelpBusinessId, setYelpBusinessId] = useState("");
+  const [vegaroApiKey, setVegaroApiKey] = useState("");
+  const [vegaroBusinessId, setVegaroBusinessId] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,6 +372,37 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     }
   };
 
+  const handleVegaroConnect = async () => {
+    if (!vegaroApiKey.trim() || !vegaroBusinessId.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+
+    try {
+      const res = await fetch("/api/connections/vegaro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: vegaroApiKey, businessId: vegaroBusinessId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to connect");
+      }
+
+      setSaved(true);
+      setIsConnected(true);
+      setLastSyncedAt(new Date().toISOString());
+      setVegaroApiKey("");
+      setVegaroBusinessId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!detail?.provider) return;
 
@@ -354,6 +415,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         yelp: "/api/connections/yelp",
         calendly: "/api/connections/calendly",
         instagram: "/api/connections/instagram",
+        vegaro: "/api/connections/vegaro",
       };
       const endpoint = endpointMap[detail.provider] || "/api/connections/google";
       const res = await fetch(endpoint, { method: "DELETE" });
@@ -381,7 +443,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-14 py-10">
+    <div className="flex-1 overflow-y-auto px-14 py-10 animate-route-enter">
       {/* Back link */}
       <button
         onClick={() => router.push("/dashboard/connections")}
@@ -403,8 +465,11 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           </p>
         </div>
         {isConnected ? (
-          <span className="flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white">
-            <CircleCheck className="w-4 h-4" strokeWidth={2} />
+          <span className="flex items-center gap-2.5 rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white connection-toggle">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-white status-dot-pulse" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+            </span>
             Connected
           </span>
         ) : detail.provider === "google" ? (
@@ -537,6 +602,46 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
                 Yelp Fusion API
               </a>
               . Your Business ID is the last part of your Yelp page URL.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Vegaro credentials form */}
+      {detail.provider === "vegaro" && !isConnected && (
+        <div className="mb-8 max-w-[600px]">
+          <h3 className="text-[13px] font-medium text-warm-black mb-3">Vegaro API Credentials</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[12px] text-gray-muted block mb-1.5">API Key</label>
+              <input
+                type="password"
+                value={vegaroApiKey}
+                onChange={(e) => setVegaroApiKey(e.target.value)}
+                placeholder="Your Vegaro API key"
+                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] text-gray-muted block mb-1.5">Business ID</label>
+              <input
+                type="text"
+                value={vegaroBusinessId}
+                onChange={(e) => setVegaroBusinessId(e.target.value)}
+                placeholder="Your Vegaro business ID"
+                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
+              />
+            </div>
+            <button
+              onClick={handleVegaroConnect}
+              disabled={saving || !vegaroApiKey.trim() || !vegaroBusinessId.trim()}
+              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saving ? "Connecting..." : "Connect Vegaro"}
+            </button>
+            <p className="text-[11px] text-gray-faint leading-relaxed">
+              Get your API key and Business ID from your Vegaro admin dashboard under Settings &gt; Integrations.
             </p>
           </div>
         </div>

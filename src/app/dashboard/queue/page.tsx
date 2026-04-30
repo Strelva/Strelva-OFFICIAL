@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
 import { getEvents, getQueueCount } from "@/lib/events";
 import { QueuePage } from "@/components/dashboard/QueuePage";
+import { QueueSkeleton } from "@/components/dashboard/QueueSkeleton";
 
-export default async function QueueRoute() {
+async function QueueContent() {
   const tenant = await getTenantFromHeaders();
   const hasAccess = await hasTenantAccess(tenant);
   if (!hasAccess) redirect("/");
@@ -23,5 +25,13 @@ export default async function QueueRoute() {
       initialResolved={resolved}
       pendingCount={pendingCount}
     />
+  );
+}
+
+export default function QueueRoute() {
+  return (
+    <Suspense fallback={<QueueSkeleton />}>
+      <QueueContent />
+    </Suspense>
   );
 }

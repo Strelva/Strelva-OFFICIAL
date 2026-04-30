@@ -87,8 +87,11 @@ const CONNECTION_TEMPLATES: Omit<Connection, "connected">[] = [
 
 function ConnectionBadge() {
   return (
-    <span className="flex items-center gap-1 rounded-[10px] bg-success-dim px-2.5 py-1 text-[11px] font-medium text-success">
-      <CircleCheck className="w-3 h-3" strokeWidth={2} />
+    <span className="flex items-center gap-1.5 rounded-[10px] bg-success-dim px-2.5 py-1 text-[11px] font-medium text-success">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full rounded-full bg-success status-dot-pulse" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+      </span>
       Connected
     </span>
   );
@@ -178,7 +181,7 @@ export function ConnectionsPage() {
   const featured = allConnections[0]; // Google Analytics as featured
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 lg:px-12 lg:py-8">
+    <div className="flex-1 overflow-y-auto p-8 lg:px-12 lg:py-8 animate-route-enter">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-baseline gap-3">

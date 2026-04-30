@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
+import { BriefSkeleton } from "@/components/dashboard/BriefSkeleton";
 
-export default async function BriefPage() {
+async function BriefContent() {
   const tenant = await getTenantFromHeaders();
   const hasAccess = await hasTenantAccess(tenant);
   if (!hasAccess) redirect("/");
@@ -12,4 +14,12 @@ export default async function BriefPage() {
   const brief = await getWeeklyBrief(tenant);
 
   return <WeeklyBriefClient brief={brief} />;
+}
+
+export default function BriefPage() {
+  return (
+    <Suspense fallback={<BriefSkeleton />}>
+      <BriefContent />
+    </Suspense>
+  );
 }
