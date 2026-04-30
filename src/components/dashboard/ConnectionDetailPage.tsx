@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ArrowLeft, CircleCheck, Unplug, Loader2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { ArrowLeft, CircleCheck, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ConnectionDetail {
   id: string;
@@ -21,6 +21,7 @@ interface ConnectionDetail {
     usedIn: string;
   };
   configField?: string; // tenant config field name, e.g. "googleSearchConsoleKey"
+  provider?: "google" | "yelp"; // For API-based connections
 }
 
 const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
@@ -28,7 +29,7 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
     id: "google-search-console",
     name: "Google Search Console",
     icon: "SC",
-    connected: false, // Will be overridden by actual connection status
+    connected: false,
     description:
       "Connect your Google Search Console to let your AI track how people find you on Google. See which search terms bring visitors, which pages rank highest, and get suggestions to improve your SEO. Powers your weekly \"how people found you\" report.",
     usageExamples: [
@@ -51,6 +52,34 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
       usedIn: "Weekly reports, SEO insights, AI suggestions",
     },
     configField: "googleSearchConsoleKey",
+  },
+  "google-business": {
+    id: "google-business",
+    name: "Google Business",
+    icon: "GB",
+    connected: false,
+    description:
+      "Connect your Google Business Profile so your AI can keep your listing up to date, respond to reviews, and sync your hours automatically. When you update your site, your Google listing updates too.",
+    usageExamples: [
+      {
+        title: "Respond to my latest review",
+        prompt: "Respond to my latest Google review",
+        response:
+          "You got a 5-star review from Sarah M: \"Best yoga studio in town!\" I've drafted a reply thanking her and mentioning your new Saturday class. Want me to post it?",
+      },
+      {
+        title: "Are my Google hours up to date?",
+        prompt: "Check if my Google Business hours match my site",
+        response:
+          "Your Google listing shows Mon-Fri 6am-8pm but your site says 7am-9pm. Want me to update Google to match?",
+      },
+    ],
+    metadata: {
+      frequency: "Daily sync",
+      connectedSince: "",
+      usedIn: "Reviews, business listing, hours",
+    },
+    provider: "google",
   },
   "google-analytics": {
     id: "google-analytics",
@@ -104,33 +133,6 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
       frequency: "On demand",
       connectedSince: "March 15, 2026",
       usedIn: "Email campaigns, subscriber management",
-    },
-  },
-  "google-business": {
-    id: "google-business",
-    name: "Google Business",
-    icon: "GB",
-    connected: false,
-    description:
-      "Connect your Google Business Profile so your AI can keep your listing up to date, respond to reviews, and sync your hours automatically. When you update your site, your Google listing updates too.",
-    usageExamples: [
-      {
-        title: "Respond to my latest review",
-        prompt: "Respond to my latest Google review",
-        response:
-          "You got a 5-star review from Sarah M: \"Best yoga studio in town!\" I've drafted a reply thanking her and mentioning your new Saturday class. Want me to post it?",
-      },
-      {
-        title: "Are my Google hours up to date?",
-        prompt: "Check if my Google Business hours match my site",
-        response:
-          "Your Google listing shows Mon-Fri 6am-8pm but your site says 7am-9pm. Want me to update Google to match?",
-      },
-    ],
-    metadata: {
-      frequency: "Daily sync",
-      connectedSince: "",
-      usedIn: "Reviews, business listing, hours",
     },
   },
   instagram: {
@@ -213,17 +215,71 @@ const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
       connectedSince: "",
       usedIn: "Review management, reputation",
     },
+    provider: "yelp",
   },
 };
 
+function formatRelativeTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
 export function ConnectionDetailPage({ connectionId }: { connectionId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const detail = CONNECTION_DETAILS[connectionId];
 
   const [credentialsValue, setCredentialsValue] = useState("");
+  const [yelpApiKey, setYelpApiKey] = useState("");
+  const [yelpBusinessId, setYelpBusinessId] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  // Check URL params for OAuth callback results
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const errorParam = searchParams.get("error");
+    if (success === "true") {
+      setSaved(true);
+      setIsConnected(true);
+      setLastSyncedAt(new Date().toISOString());
+    }
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
+
+  // Fetch actual connection status
+  useEffect(() => {
+    if (!detail?.provider) return;
+
+    fetch("/api/connections", { credentials: "same-origin" })
+      .then((res) => res.json())
+      .then((data) => {
+        const conn = data.connections?.find(
+          (c: { provider: string }) => c.provider === detail.provider
+        );
+        if (conn) {
+          setIsConnected(conn.connected);
+          setLastSyncedAt(conn.lastSyncedAt);
+        }
+      })
+      .catch(() => {});
+  }, [detail?.provider]);
 
   const handleSaveCredentials = async () => {
     if (!detail?.configField || !credentialsValue.trim()) return;
@@ -245,11 +301,66 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       }
 
       setSaved(true);
-      setCredentialsValue(""); // Clear after save
+      setCredentialsValue("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleYelpConnect = async () => {
+    if (!yelpApiKey.trim() || !yelpBusinessId.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+
+    try {
+      const res = await fetch("/api/connections/yelp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: yelpApiKey, businessId: yelpBusinessId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to connect");
+      }
+
+      setSaved(true);
+      setIsConnected(true);
+      setLastSyncedAt(new Date().toISOString());
+      setYelpApiKey("");
+      setYelpBusinessId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!detail?.provider) return;
+
+    setDisconnecting(true);
+    setError(null);
+
+    try {
+      const endpoint = detail.provider === "yelp" ? "/api/connections/yelp" : "/api/connections/google";
+      const res = await fetch(endpoint, { method: "DELETE" });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to disconnect");
+      }
+
+      setIsConnected(false);
+      setLastSyncedAt(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to disconnect");
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -283,15 +394,20 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             Traffic data for reports & AI suggestions
           </p>
         </div>
-        {detail.connected ? (
+        {isConnected ? (
           <span className="flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white">
             <CircleCheck className="w-4 h-4" strokeWidth={2} />
             Connected
           </span>
+        ) : detail.provider === "google" ? (
+          <a
+            href="/api/oauth/google"
+            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+          >
+            Connect with Google
+          </a>
         ) : (
-          <button className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors">
-            Connect
-          </button>
+          <span className="text-[13px] text-gray-muted">Not connected</span>
         )}
       </div>
 
@@ -324,10 +440,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">Sync frequency</span>
           <p className="text-[13px] text-warm-black mt-1">{detail.metadata.frequency}</p>
         </div>
-        {detail.metadata.connectedSince && (
+        {lastSyncedAt && (
           <div>
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Connected since</span>
-            <p className="text-[13px] text-warm-black mt-1">{detail.metadata.connectedSince}</p>
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Last synced</span>
+            <p className="text-[13px] text-warm-black mt-1 flex items-center gap-1.5">
+              <RefreshCw className="w-3 h-3 text-gray-faint" />
+              {formatRelativeTime(lastSyncedAt)}
+            </p>
           </div>
         )}
         <div>
@@ -335,6 +454,71 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <p className="text-[13px] text-warm-black mt-1">{detail.metadata.usedIn}</p>
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="mb-6 flex items-center gap-2 rounded-xl bg-terra/10 border border-terra/20 px-4 py-3 text-[13px] text-terra">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+        </div>
+      )}
+
+      {/* Success message */}
+      {saved && (
+        <div className="mb-6 flex items-center gap-2 rounded-xl bg-accent/10 border border-accent/20 px-4 py-3 text-[13px] text-accent">
+          <CircleCheck className="w-4 h-4" />
+          Connection saved successfully
+        </div>
+      )}
+
+      {/* Yelp credentials form */}
+      {detail.provider === "yelp" && !isConnected && (
+        <div className="mb-8 max-w-[600px]">
+          <h3 className="text-[13px] font-medium text-warm-black mb-3">Yelp API Credentials</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[12px] text-gray-muted block mb-1.5">API Key</label>
+              <input
+                type="password"
+                value={yelpApiKey}
+                onChange={(e) => setYelpApiKey(e.target.value)}
+                placeholder="Your Yelp Fusion API key"
+                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] text-gray-muted block mb-1.5">Business ID</label>
+              <input
+                type="text"
+                value={yelpBusinessId}
+                onChange={(e) => setYelpBusinessId(e.target.value)}
+                placeholder="your-business-name-city"
+                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
+              />
+            </div>
+            <button
+              onClick={handleYelpConnect}
+              disabled={saving || !yelpApiKey.trim() || !yelpBusinessId.trim()}
+              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saving ? "Connecting..." : "Connect Yelp"}
+            </button>
+            <p className="text-[11px] text-gray-faint leading-relaxed">
+              Get your API key from the{" "}
+              <a
+                href="https://www.yelp.com/developers/v3/manage_app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                Yelp Fusion API
+              </a>
+              . Your Business ID is the last part of your Yelp page URL.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Credentials form for configurable connections */}
       {detail.configField && (
@@ -382,10 +566,18 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       )}
 
       {/* Disconnect */}
-      {detail.connected && (
-        <button className="flex items-center gap-3 text-terra hover:text-terra-light transition-colors">
-          <Unplug className="w-4 h-4" strokeWidth={1.5} />
-          <span className="text-[13px] font-medium">Disconnect</span>
+      {isConnected && detail.provider && (
+        <button
+          onClick={handleDisconnect}
+          disabled={disconnecting}
+          className="flex items-center gap-3 text-terra hover:text-terra-light transition-colors disabled:opacity-50"
+        >
+          {disconnecting ? (
+            <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+          ) : (
+            <Unplug className="w-4 h-4" strokeWidth={1.5} />
+          )}
+          <span className="text-[13px] font-medium">{disconnecting ? "Disconnecting..." : "Disconnect"}</span>
         </button>
       )}
     </div>

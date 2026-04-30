@@ -20,6 +20,14 @@
     {
       "path": "/api/cron/daily-summary",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/poll-yelp",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/poll-google-reviews",
+      "schedule": "0 6 * * *"
     }
   ]
 }

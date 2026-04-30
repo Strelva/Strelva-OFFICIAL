@@ -376,6 +376,19 @@ export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "
 
 export type TenantFeature = "commerce" | "booking" | "newsletter";
 
+export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
+
+export interface Connection {
+  provider: IntegrationProvider;
+  tenantId: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  apiKey?: string;
+  lastSyncedAt?: string;
+  status: "connected" | "disconnected" | "error";
+}
+
 // --- Social Media Types ---
 
 export interface SocialPost {
@@ -402,6 +415,7 @@ export interface TenantConfig {
   createdAt: string;
   template: TemplateId;
   features?: TenantFeature[];
+  integrations?: IntegrationProvider[];
   customDomains?: string[];
   /** Primary production domain (e.g., "yourbusiness.com") */
   productionDomain?: string;

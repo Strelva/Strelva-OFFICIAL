@@ -128,12 +128,30 @@ export function ConnectionsPage() {
   });
 
   useEffect(() => {
-    fetch("/api/tenant-settings", { credentials: "same-origin" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.connections) {
-          setConnectionStates(data.connections);
+    // Fetch from both tenant-settings (legacy) and connections API
+    Promise.all([
+      fetch("/api/tenant-settings", { credentials: "same-origin" }).then((r) => r.json()),
+      fetch("/api/connections", { credentials: "same-origin" }).then((r) => r.json()),
+    ])
+      .then(([settingsData, connectionsData]) => {
+        const states: ConnectionStates = {
+          googleAnalytics: settingsData.connections?.googleAnalytics || false,
+          newsletter: settingsData.connections?.newsletter || false,
+          googleBusiness: false,
+          instagram: settingsData.connections?.instagram || false,
+          calendly: settingsData.connections?.calendly || false,
+          yelp: false,
+        };
+
+        // Override with actual connection status from Redis
+        if (connectionsData.connections) {
+          for (const conn of connectionsData.connections) {
+            if (conn.provider === "google") states.googleBusiness = conn.connected;
+            if (conn.provider === "yelp") states.yelp = conn.connected;
+          }
         }
+
+        setConnectionStates(states);
       })
       .catch(() => {
         // Keep defaults (all false) on error
