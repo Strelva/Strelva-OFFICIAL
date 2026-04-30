@@ -184,7 +184,9 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   }
 
   if (!isPublicRoute(req)) {
-    await auth.protect();
+    await auth.protect({
+      unauthenticatedUrl: "/sign-in",
+    });
   }
 
   return NextResponse.next();
