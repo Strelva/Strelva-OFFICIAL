@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, FileText, MessageSquare, MoreHorizontal } from "lucide-react";
+import { Inbox, FileText, LayoutPanelLeft, MessageSquare } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard/brief", label: "Brief", icon: FileText },
-  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
-  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/settings", label: "More", icon: MoreHorizontal },
+  { href: "/dashboard/brief", label: "Report", icon: FileText },
+  { href: "/dashboard/queue", label: "Review", icon: Inbox },
+  { href: "/dashboard/chat", label: "AI", icon: MessageSquare },
+  { href: "/dashboard/content", label: "Site", icon: LayoutPanelLeft },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {

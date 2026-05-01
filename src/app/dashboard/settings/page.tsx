@@ -700,28 +700,28 @@ function PublishingSection() {
 
 const SECTION_META: Record<string, { title: string; description: string }> = {
   profile: {
-    title: "Profile",
-    description: "Your business identity. Appears across your site and AI interactions.",
+    title: "Business profile",
+    description: "The source of truth for how customers find, understand, and book with you.",
   },
   brand: {
-    title: "Brand",
-    description: "Typography and colors for your public site.",
+    title: "Brand system",
+    description: "The visual rules your site uses when the AI adds or refreshes content.",
   },
   ai: {
-    title: "AI Agent",
-    description: "Personality, rules, and hours your AI follows on every interaction.",
+    title: "AI guardrails",
+    description: "Rules, hours, and tone the AI follows before it changes anything customer-facing.",
   },
   domains: {
     title: "Domains",
-    description: "Connect a custom domain to your site.",
+    description: "Where customers and owners access the live site and dashboard.",
   },
   billing: {
     title: "Plan & Billing",
-    description: "Your subscription and payment details.",
+    description: "One plan, one operating cost, no maintenance upsells.",
   },
   publishing: {
-    title: "Publishing",
-    description: "Control how AI changes reach your live site.",
+    title: "Publishing control",
+    description: "Decide whether confirmed AI work ships immediately or waits for review.",
   },
 };
 
@@ -813,6 +813,18 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
         <div className="max-w-2xl">
+          <div className="mb-8 rounded-2xl border border-glass-border bg-glass p-5">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
+              Operating rules
+            </p>
+            <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-warm-white">
+              Keep the AI aligned with the business
+            </h1>
+            <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
+              Settings should reduce owner review time: accurate identity, reliable booking links, clear brand rules, and explicit boundaries for what the AI can publish.
+            </p>
+          </div>
+
           {/* Section header */}
           {meta && (
             <div className="mb-8">

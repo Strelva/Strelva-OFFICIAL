@@ -17,10 +17,10 @@ import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
 
 const SUGGESTION_CHIPS = [
-  { label: "Update my hours", icon: Clock, description: "Change business hours and holiday schedules" },
-  { label: "Write a blog post", icon: CalendarPlus, description: "Draft a new post for your website blog" },
-  { label: "Send an update to customers", icon: Mail, description: "Email your subscribers about news" },
-  { label: "How's my site doing?", icon: BarChart3, description: "Check weekly traffic and booking analytics" },
+  { label: "Add my Saturday class", icon: Clock, description: "Turn a real schedule change into updated site copy" },
+  { label: "Write this week's update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
+  { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note" },
+  { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, clicks, and freshness to pick the next move" },
 ];
 
 interface ToolCall {
@@ -338,7 +338,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
               {getGreeting()}, {ownerName}
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 text-center max-w-xl">
-              Tell the AI what to change, publish, check, or draft for your site.
+              Make the site match the business today. The AI can update copy, draft customer-facing content, and flag what is worth improving next.
             </p>
 
             {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}

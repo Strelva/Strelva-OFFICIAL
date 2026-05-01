@@ -7,6 +7,7 @@ import {
   Inbox,
   FileText,
   MessageSquare,
+  Image as ImageIcon,
   Link2,
   Settings,
   X,
@@ -14,6 +15,7 @@ import {
   Plus,
   LogOut,
   Sparkles,
+  LayoutPanelLeft,
 } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { timeAgo } from "@/lib/utils";
@@ -37,11 +39,23 @@ interface HistorySidebarProps {
   valueProof?: string;
 }
 
-const NAV_ITEMS = [
-  { href: "/dashboard/brief", label: "Brief", icon: FileText },
-  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
-  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/connections", label: "Connections", icon: Link2 },
+const NAV_GROUPS = [
+  {
+    label: "Run the business",
+    items: [
+      { href: "/dashboard/brief", label: "Weekly Report", icon: FileText },
+      { href: "/dashboard/queue", label: "Needs Review", icon: Inbox },
+      { href: "/dashboard/chat", label: "Ask the AI", icon: MessageSquare },
+    ],
+  },
+  {
+    label: "Improve the site",
+    items: [
+      { href: "/dashboard/content", label: "Site Content", icon: LayoutPanelLeft },
+      { href: "/dashboard/photos", label: "Photo Library", icon: ImageIcon },
+      { href: "/dashboard/connections", label: "Data Sources", icon: Link2 },
+    ],
+  },
 ];
 
 export function HistorySidebar({
@@ -96,33 +110,42 @@ export function HistorySidebar({
       </div>
 
       {/* Main navigation */}
-      <nav className="px-2 py-2 space-y-0.5" aria-label="Dashboard">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/") || (item.href === "/dashboard/chat" && pathname?.startsWith("/dashboard/chat"));
-          const Icon = item.icon;
-          const showBadge = item.href === "/dashboard/queue" && pendingCount > 0;
+      <nav className="px-2 py-2 space-y-4" aria-label="Dashboard">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + "/") || (item.href === "/dashboard/chat" && pathname?.startsWith("/dashboard/chat"));
+                const Icon = item.icon;
+                const showBadge = item.href === "/dashboard/queue" && pendingCount > 0;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[42px] text-[13px] font-medium transition-all ${
-                isActive
-                  ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
-                  : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
-              }`}
-            >
-              <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-              <span className="flex-1">{item.label}</span>
-              {showBadge && (
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent-dim text-accent rounded-full">
-                  {pendingCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[42px] text-[13px] font-medium transition-all ${
+                      isActive
+                        ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
+                        : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                    <span className="flex-1">{item.label}</span>
+                    {showBadge && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent-dim text-accent rounded-full">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Chat history section - only show when on chat page */}

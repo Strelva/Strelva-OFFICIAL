@@ -2,6 +2,7 @@
 
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+import { ContentBrowser } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
@@ -16,7 +17,10 @@ interface ContentWorkspaceProps {
 }
 
 export function ContentWorkspace({
+  siteName,
   ownerName,
+  sectionData,
+  timestamps,
 }: ContentWorkspaceProps) {
   const {
     activeSection,
@@ -57,6 +61,10 @@ export function ContentWorkspace({
     <div className="flex flex-col h-full bg-surface-base">
       {/* Desktop (lg+): preview + right panel */}
       <div className="hidden lg:flex flex-1 min-h-0">
+        <aside className="w-[300px] shrink-0 border-r border-gray-border">
+          <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
+        </aside>
+
         {/* Center: Site Preview — right-click to edit */}
         <main className="flex-1 flex flex-col min-w-0">
           <SitePreview />
@@ -78,7 +86,10 @@ export function ContentWorkspace({
 
       {/* Tablet (md to lg): vertical split -- preview top, editor bottom */}
       <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0">
-        <div className="h-[45%] border-b border-gray-border shrink-0">
+        <div className="h-[45%] border-b border-gray-border shrink-0 flex min-h-0">
+          <aside className="w-[280px] shrink-0 border-r border-gray-border">
+            <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
+          </aside>
           <SitePreview />
         </div>
         <div className="flex-1 flex flex-col min-h-0">
@@ -90,10 +101,10 @@ export function ContentWorkspace({
       <div className="flex md:hidden flex-1 min-h-0 items-center justify-center px-6">
         <div className="text-center max-w-xs">
           <p className="text-lg font-medium text-warm-white mb-2">
-            Edit your site on a larger screen
+            Manage {siteName} on a larger screen
           </p>
           <p className="text-sm text-gray-muted mb-6">
-            Right-click anything on your site to edit it.
+            Review sections, edit copy, and ask the AI to make changes with the live preview open.
           </p>
           <a
             href={siteUrl || "/dashboard"}

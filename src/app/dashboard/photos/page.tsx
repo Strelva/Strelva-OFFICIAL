@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Upload, ImageIcon, Loader2 } from "lucide-react";
+import { Camera, ImageIcon, Loader2, Upload } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,6 +17,16 @@ export default function PhotosPage() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const newestUpload = Math.max(
+    0,
+    ...assets.map((asset) => new Date(asset.createdAt || 0).getTime()).filter(Number.isFinite),
+  );
+  const recentCount = newestUpload
+    ? assets.filter((asset) => {
+        const uploaded = new Date(asset.createdAt || 0).getTime();
+        return Number.isFinite(uploaded) && newestUpload - uploaded < 30 * 86_400_000;
+      }).length
+    : 0;
 
   // Fetch assets on mount
   useEffect(() => {
@@ -106,26 +116,29 @@ export default function PhotosPage() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 shrink-0">
+        <div className="px-4 py-5 sm:px-8 sm:py-7 shrink-0 border-b border-glass-border">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-[20px] font-medium tracking-tight text-warm-black">
-              Photos
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
+              Visual proof
+            </p>
+            <h1 className="text-[24px] sm:text-[30px] font-semibold tracking-[-0.02em] text-warm-black">
+              Photo library
             </h1>
-            <p className="text-[12px] text-gray-muted mt-0.5">
-              {assets.length > 0
-                ? `${assets.length} photo${assets.length === 1 ? "" : "s"}`
-                : "Upload photos of your business"}
+            <p className="text-[13px] text-gray-muted mt-2 max-w-xl">
+              Keep a bank of real photos the site and AI can use for trust, seasonal updates, service pages, and weekly content.
             </p>
           </div>
-          <Button
-            variant="primary"
-            size="md"
-            icon={uploading ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : <Upload className="w-4 h-4" strokeWidth={1.5} />}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? "Uploading..." : "Upload"}
-          </Button>
+            <Button
+              variant="primary"
+              size="md"
+              icon={uploading ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : <Upload className="w-4 h-4" strokeWidth={1.5} />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading..." : "Upload photos"}
+            </Button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -147,7 +160,7 @@ export default function PhotosPage() {
         )}
 
         {/* Content */}
-        <div className="flex-1 px-6 pb-6">
+        <div className="flex-1 px-4 sm:px-8 py-5">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -161,8 +174,8 @@ export default function PhotosPage() {
             <div className="flex-1 flex items-center justify-center min-h-[400px]">
               <EmptyState
                 icon={<ImageIcon className="w-5 h-5 text-gray-muted" strokeWidth={1.5} />}
-                title="No photos yet"
-                description="Upload photos of your business, services, or team"
+                title="No visual proof yet"
+                description="Start with your storefront, team, best-selling service, and one recent customer-facing moment."
                 action={
                   <Button
                     variant="primary"
@@ -170,36 +183,60 @@ export default function PhotosPage() {
                     icon={<Upload className="w-4 h-4" strokeWidth={1.5} />}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    Upload photos
+                    Add first photos
                   </Button>
                 }
               />
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {assets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  onClick={() => setSelected(selected?.id === asset.id ? null : asset)}
-                  className={cn(
-                    "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-150",
-                    selected?.id === asset.id
-                      ? "border-sage ring-2 ring-sage/20"
-                      : "border-gray-border hover:border-gray-muted hover:shadow-md",
-                  )}
-                >
-                  <Image
-                    src={asset.url}
-                    alt={asset.filename}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
-                  />
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-warm-black/0 group-hover:bg-warm-black/10 transition-colors duration-150" />
-                </button>
-              ))}
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-glass-border bg-glass p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-muted">Library</p>
+                  <p className="mt-2 text-[26px] font-semibold leading-none text-warm-black">{assets.length}</p>
+                  <p className="mt-1 text-[12px] text-gray-muted">photos ready for site updates</p>
+                </div>
+                <div className="rounded-xl border border-glass-border bg-glass p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-muted">Freshness</p>
+                  <p className="mt-2 text-[26px] font-semibold leading-none text-warm-black">{recentCount}</p>
+                  <p className="mt-1 text-[12px] text-gray-muted">added in the last 30 days</p>
+                </div>
+                <div className="rounded-xl border border-accent/20 bg-accent-dim/35 p-4">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-accent" strokeWidth={1.5} />
+                    <p className="text-[13px] font-medium text-warm-black">Next useful upload</p>
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-gray-fg">
+                    Add one current photo that proves what changed this week.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                {assets.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    onClick={() => setSelected(selected?.id === asset.id ? null : asset)}
+                    className={cn(
+                      "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-150",
+                      selected?.id === asset.id
+                        ? "border-accent ring-2 ring-accent/20"
+                        : "border-gray-border hover:border-gray-muted hover:shadow-md",
+                    )}
+                  >
+                    <Image
+                      src={asset.url}
+                      alt={asset.filename}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
+                    />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-warm-black/0 group-hover:bg-warm-black/10 transition-colors duration-150" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
