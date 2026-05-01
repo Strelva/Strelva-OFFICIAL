@@ -321,29 +321,33 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-surface">
+    <div className="flex flex-col h-full">
       {/* Scrollable content area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {isEmpty ? (
           /* Empty state: greeting + chips */
-          <div className="flex flex-col items-center justify-center min-h-full px-4 sm:px-6 py-8 sm:py-12">
+          <div className="flex flex-col items-center justify-center min-h-full px-4 sm:px-8 py-8 sm:py-12">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              Site agent online
+            </div>
             <h1
-              className="text-[24px] sm:text-[28px] font-medium text-warm-black tracking-[-0.02em] text-center"
+              className="text-[28px] sm:text-[38px] font-semibold text-warm-black tracking-[-0.03em] text-center"
               suppressHydrationWarning
             >
               {getGreeting()}, {ownerName}
             </h1>
-            <p className="text-[14px] text-gray-muted mt-1.5 text-center">
-              What can I help you with today?
+            <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 text-center max-w-xl">
+              Tell the AI what to change, publish, check, or draft for your site.
             </p>
 
             {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}
-            <div className="flex flex-col sm:flex-row gap-3 mt-8 sm:mt-10 w-full max-w-2xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 sm:mt-10 w-full max-w-3xl">
               {SUGGESTION_CHIPS.map((chip) => (
                 <button
                   key={chip.label}
                   onClick={() => sendChat(chip.label)}
-                  className="flex-1 rounded-xl bg-surface border border-gray-border px-4 py-3 min-h-[48px] hover:bg-gray-bg-hover hover:border-gray-subtle active:bg-gray-bg transition-all text-left"
+                  className="rounded-xl bg-glass border border-glass-border px-4 py-3.5 min-h-[72px] hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
@@ -358,7 +362,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
           </div>
         ) : (
           /* Active conversation */
-          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-6 space-y-4">
+          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7 space-y-4">
             {/* Update toast */}
             {updateToast && (
               <div className="flex items-center gap-2 px-3 py-2.5 bg-success-dim border border-success/20 rounded-lg animate-fade-in-up">
@@ -374,7 +378,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                 key={message.id}
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div className={`max-w-[80%] ${message.role === "user" ? "order-2" : ""}`}>
+                <div className={`max-w-[88%] sm:max-w-[80%] ${message.role === "user" ? "order-2" : ""}`}>
                   {message.role === "assistant" && (
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
@@ -384,10 +388,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                     </div>
                   )}
                   <div
-                    className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
+                    className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
                       message.role === "user"
                         ? "bg-accent/15 text-warm-black border border-accent/20"
-                        : "bg-surface text-warm-black border border-gray-border"
+                        : "bg-glass text-warm-black border border-glass-border"
                     }`}
                   >
                     {message.content ? (
@@ -451,11 +455,11 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       </div>
 
       {/* Chat input - always at bottom, with safe area for notched devices */}
-      <div className="shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 border-t border-gray-border bg-surface keyboard-safe">
+      <div className="shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe">
         <div className="max-w-3xl mx-auto">
           <form
             onSubmit={handleSubmit}
-            className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-2xl px-4 py-2 focus-within:border-accent/30 transition-all"
+            className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-2xl px-4 py-2 focus-within:border-accent/40 focus-within:bg-surface-raised transition-all"
           >
             <input
               ref={inputRef}

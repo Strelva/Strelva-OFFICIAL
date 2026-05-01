@@ -72,21 +72,35 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   return (
     <div className="flex flex-col h-full animate-route-enter">
       {/* Header */}
-      <header className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-glass-border">
-        <h1 className="text-[18px] sm:text-[20px] font-semibold text-warm-black">Queue</h1>
-        <p className="text-[13px] text-gray-muted mt-1">
-          {pendingCount > 0 ? `${pendingCount} items need your attention` : "You're all caught up"}
-        </p>
+      <header className="shrink-0 px-4 sm:px-8 pt-5 sm:pt-7 pb-5 border-b border-glass-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
+              Approval queue
+            </p>
+            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+              Needs your eye
+            </h1>
+            <p className="text-[13px] text-gray-muted mt-2">
+              {pendingCount > 0 ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for approval` : "Everything that needed review is handled"}
+            </p>
+          </div>
+          {staleSectionCount > 0 && (
+            <div className="rounded-xl border border-glass-border bg-glass px-3 py-2 text-[12px] text-gray-fg">
+              {staleSectionCount} stale section{staleSectionCount === 1 ? "" : "s"} monitored
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Tabs - min-h ensures 44px tap targets */}
-      <div className="shrink-0 px-4 sm:px-6 pt-4">
-        <div className="flex gap-1 p-1 bg-surface-inset rounded-lg w-fit">
+      <div className="shrink-0 px-4 sm:px-8 pt-4">
+        <div className="flex gap-1 p-1 bg-surface-inset border border-glass-border rounded-xl w-fit">
           <button
             onClick={() => setTab("pending")}
-            className={`px-4 py-2 min-h-[44px] text-[13px] font-medium rounded-md transition-all duration-200 ${
+            className={`px-4 py-2 min-h-[42px] text-[13px] font-medium rounded-lg transition-all duration-200 ${
               tab === "pending"
-                ? "bg-surface text-warm-black shadow-sm"
+                ? "bg-surface-raised text-warm-black shadow-sm"
                 : "text-gray-muted hover:text-gray-fg"
             }`}
           >
@@ -99,9 +113,9 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           </button>
           <button
             onClick={() => setTab("resolved")}
-            className={`px-4 py-2 min-h-[44px] text-[13px] font-medium rounded-md transition-all duration-200 ${
+            className={`px-4 py-2 min-h-[42px] text-[13px] font-medium rounded-lg transition-all duration-200 ${
               tab === "resolved"
-                ? "bg-surface text-warm-black shadow-sm"
+                ? "bg-surface-raised text-warm-black shadow-sm"
                 : "text-gray-muted hover:text-gray-fg"
             }`}
           >
@@ -111,8 +125,8 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       </div>
 
       {/* Content with crossfade */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-        <div className="queue-tab-content">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5">
+        <div className="queue-tab-content max-w-3xl">
           {tab === "resolved" && aiHandledThisMonth > 0 && (
             <p className="text-[13px] text-gray-muted mb-3">
               The AI handled {aiHandledThisMonth} item{aiHandledThisMonth === 1 ? "" : "s"} this month.

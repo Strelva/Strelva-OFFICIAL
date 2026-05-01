@@ -181,35 +181,40 @@ export function ConnectionsPage() {
   const featured = allConnections[0]; // Google Analytics as featured
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 lg:px-12 lg:py-8 animate-route-enter">
+    <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 animate-route-enter">
       {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-[22px] font-semibold text-warm-black tracking-[-0.01em]">Connections</h1>
-          <span className="text-[13px] text-gray-muted">{connections.filter((c) => c.connected).length} active</span>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
+            Integrations
+          </p>
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">Connections</h1>
+            <span className="text-[13px] text-gray-muted">{connections.filter((c) => c.connected).length} active</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 bg-surface-inset border border-gray-border rounded-xl px-3.5 py-2">
+        <div className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-xl px-3.5 py-2 w-full sm:w-fit">
           <Search className="w-4 h-4 text-gray-subtle" strokeWidth={1.5} />
           <input
             placeholder="Search connections..."
-            className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-[180px]"
+            className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-full sm:w-[180px]"
           />
         </div>
       </div>
-      <p className="text-[14px] text-gray-muted leading-relaxed max-w-[600px] mb-8">
+      <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
         Connect your tools to make your AI smarter. It pulls real data into your reports, drafts, and suggestions.
       </p>
 
       {/* Featured hero card */}
       <div
         onClick={() => router.push(`/dashboard/connections/${featured.id}`)}
-        className="flex rounded-3xl bg-surface-raised border border-gray-border overflow-hidden mb-8 cursor-pointer hover:border-gray-subtle transition-colors shadow-[0_8px_40px_rgba(0,0,0,0.12)]"
+        className="flex flex-col lg:flex-row rounded-2xl dashboard-panel overflow-hidden mb-8 cursor-pointer hover:border-gray-border transition-colors"
       >
-        <div className="flex-1 flex flex-col justify-center gap-4 p-10">
-          <div className="w-12 h-12 rounded-[14px] bg-glass border border-gray-border flex items-center justify-center">
+        <div className="flex-1 flex flex-col justify-center gap-4 p-5 sm:p-7 lg:p-8">
+          <div className="w-12 h-12 rounded-xl bg-glass border border-gray-border flex items-center justify-center">
             <span className="text-[16px] font-bold text-accent">{featured.icon}</span>
           </div>
-          <h2 className="text-[22px] font-semibold text-white">{featured.name}</h2>
+          <h2 className="text-[22px] font-semibold text-white">Make reports smarter with {featured.name}</h2>
           <p className="text-[13px] text-[#ffffffaa] leading-relaxed max-w-[340px]">
             Your AI reads your traffic data and turns it into plain-English weekly reports. No dashboards to learn.
           </p>
@@ -217,7 +222,7 @@ export function ConnectionsPage() {
             View
           </button>
         </div>
-        <div className="w-[380px] flex items-center justify-center p-6">
+        <div className="lg:w-[390px] flex items-center justify-center p-5 sm:p-6 pt-0 lg:pt-6">
           <div className="w-full rounded-2xl bg-glass border border-gray-border overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
             <div className="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-gray-border">
               <span className="text-[11px] font-medium text-accent">@Analytics</span>
@@ -250,19 +255,13 @@ export function ConnectionsPage() {
       </div>
 
       {/* Grid — two columns */}
-      <div className="space-y-1">
-        {Array.from({ length: Math.ceil(connections.length / 2) }, (_, rowIdx) => (
-          <div key={rowIdx} className="flex gap-1">
-            {connections.slice(rowIdx * 2, rowIdx * 2 + 2).map((connection) => (
-              <div key={connection.id} className="flex-1">
-                <ConnectionRow
-                  connection={connection}
-                  onClick={() => router.push(`/dashboard/connections/${connection.id}`)}
-                />
-              </div>
-            ))}
-            {connections.slice(rowIdx * 2, rowIdx * 2 + 2).length === 1 && <div className="flex-1" />}
-          </div>
+      <div className="grid gap-1 md:grid-cols-2">
+        {connections.map((connection) => (
+          <ConnectionRow
+            key={connection.id}
+            connection={connection}
+            onClick={() => router.push(`/dashboard/connections/${connection.id}`)}
+          />
         ))}
       </div>
     </div>

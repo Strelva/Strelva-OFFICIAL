@@ -43,12 +43,13 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-base border-t border-glass-border pb-safe"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-base/92 border-t border-glass-border pb-safe backdrop-blur-xl"
       data-dashboard
+      aria-label="Primary navigation"
     >
       <div className="relative flex items-center justify-around h-16" ref={navRef}>
         <div
-          className="mobile-nav-pill absolute top-1 h-[calc(100%-8px)] rounded-xl bg-gray-bg-hover pointer-events-none"
+          className="mobile-nav-pill absolute top-1 h-[calc(100%-8px)] rounded-xl bg-gray-bg-hover shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] pointer-events-none"
           style={{
             left: pillStyle.left,
             width: pillStyle.width,
@@ -68,6 +69,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
               className={`relative flex flex-col items-center justify-center gap-1 w-16 h-14 rounded-xl transition-colors ${
                 isActive ? "text-warm-black" : "text-gray-muted"
               }`}
+              aria-current={isActive ? "page" : undefined}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" strokeWidth={1.5} />

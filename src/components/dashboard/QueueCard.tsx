@@ -144,7 +144,7 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
           transform: `translateX(${swipeX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
-        className={`queue-card-swipeable group rounded-xl border border-glass-border bg-surface-raised p-4 relative ${
+        className={`queue-card-swipeable group rounded-xl border border-glass-border bg-glass p-4 relative transition-colors ${
           disabled ? "opacity-50" : "hover:bg-gray-bg"
         }`}
       >

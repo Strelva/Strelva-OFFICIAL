@@ -29,7 +29,7 @@ export function ConversationShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-surface-base" data-dashboard>
+    <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
       {/* Navigation sidebar */}
       <HistorySidebar
         threads={threads}
@@ -44,16 +44,20 @@ export function ConversationShell({
       />
 
       {/* Main content area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-surface">
+      <main className="flex-1 flex flex-col min-w-0 dashboard-gradient">
         {/* Mobile header with menu toggle */}
-        <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-gray-border bg-surface shrink-0">
+        <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-glass-border bg-surface-base/90 backdrop-blur-xl shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            aria-label="Open navigation"
           >
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
-          <span className="text-[14px] font-medium text-warm-black">Scaffold</span>
+          <div className="min-w-0">
+            <span className="block text-[13px] font-medium text-warm-black leading-tight">Scaffold</span>
+            <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
+          </div>
         </header>
 
         {/* Content — add bottom padding on mobile for tab bar */}

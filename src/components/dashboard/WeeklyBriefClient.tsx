@@ -56,8 +56,8 @@ function StatCard({
   const showDelta = typeof delta === "number" && delta !== 0;
 
   return (
-    <div className="flex-1 min-w-0 p-4 rounded-xl bg-surface-raised border border-glass-border">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="flex-1 min-w-[140px] rounded-xl dashboard-panel p-4">
+      <div className="flex items-center gap-2 mb-3">
         <Icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
         <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
           {label}
@@ -104,27 +104,39 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
   return (
     <div className="flex flex-col h-full animate-route-enter">
-      <header className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-glass-border">
-        <h1 className="text-[18px] sm:text-[20px] font-semibold text-warm-black">Weekly Brief</h1>
-        <p className="text-[13px] text-gray-muted mt-1">
-          {formatWeekRange(brief.weekStart, brief.weekEnd)}
-        </p>
-        <p className="text-[12px] text-gray-muted mt-1">
-          Managed by Scaffold Web. No ticket thread needed.
-        </p>
+      <header className="shrink-0 px-4 sm:px-8 pt-5 sm:pt-7 pb-5 border-b border-glass-border">
+        <div className="max-w-5xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
+            {formatWeekRange(brief.weekStart, brief.weekEnd)}
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+                Your weekly report
+              </h1>
+              <p className="text-[13px] text-gray-muted mt-2 max-w-xl">
+                Plain-English performance, site changes, and the next useful action.
+              </p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              AI managed
+            </span>
+          </div>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
-        <div className="max-w-2xl space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5 sm:py-8">
+        <div className="max-w-5xl space-y-6">
           <div
-            className="text-[15px] text-gray-fg leading-relaxed animate-fade-in-up"
+            className="max-w-3xl text-[16px] text-gray-fg leading-relaxed animate-fade-in-up"
             style={{ animationDelay: "50ms" }}
           >
             {brief.summary}
           </div>
 
           <div
-            className="flex flex-col sm:flex-row gap-3 animate-fade-in-up"
+            className="grid grid-cols-2 xl:grid-cols-4 gap-3 animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
             <StatCard
@@ -153,7 +165,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
           {brief.nextAction && (
             <div
-              className="rounded-xl border border-accent/20 bg-accent-dim/40 p-4 animate-fade-in-up"
+              className="rounded-xl border border-accent/20 bg-accent-dim/40 p-4 sm:p-5 animate-fade-in-up"
               style={{ animationDelay: "125ms" }}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -173,11 +185,11 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
           {(topServices.length > 0 || topSearchQueries.length > 0 || staleSections.length > 0) && (
             <div
-              className="grid gap-3 sm:grid-cols-3 animate-fade-in-up"
+              className="grid gap-3 md:grid-cols-3 animate-fade-in-up"
               style={{ animationDelay: "140ms" }}
             >
               {topServices[0] && (
-                <div className="rounded-xl border border-glass-border bg-surface-raised p-4">
+                <div className="rounded-xl border border-glass-border bg-glass p-4">
                   <p className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
                     Top Service
                   </p>
@@ -190,7 +202,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
                 </div>
               )}
               {topSearchQueries[0] && (
-                <div className="rounded-xl border border-glass-border bg-surface-raised p-4">
+                <div className="rounded-xl border border-glass-border bg-glass p-4">
                   <p className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
                     Search Signal
                   </p>
@@ -203,7 +215,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
                 </div>
               )}
               {staleSections[0] && (
-                <div className="rounded-xl border border-glass-border bg-surface-raised p-4">
+                <div className="rounded-xl border border-glass-border bg-glass p-4">
                   <p className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
                     Freshness
                   </p>
@@ -226,13 +238,13 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               <h2 className="text-[13px] font-medium text-gray-muted uppercase tracking-wide mb-3">
                 Highlights
               </h2>
-              <ul className="space-y-2">
+              <ul className="grid gap-2 md:grid-cols-2">
                 {brief.highlights.map((highlight, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2 text-[13px] text-gray-fg"
+                    className="flex items-start gap-2 rounded-lg border border-glass-border bg-glass px-3 py-2.5 text-[13px] text-gray-fg"
                   >
-                    <span className="shrink-0 w-1 h-1 rounded-full bg-gray-muted mt-2" />
+                    <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-accent mt-1.5" />
                     {highlight}
                   </li>
                 ))}

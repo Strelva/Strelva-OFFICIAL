@@ -13,6 +13,7 @@ import {
   Search,
   Plus,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { timeAgo } from "@/lib/utils";
@@ -69,18 +70,33 @@ export function HistorySidebar({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Mobile close button */}
-      <div className="flex items-center justify-between p-3 lg:hidden">
-        <span className="text-[13px] font-medium text-warm-black">Menu</span>
+      <div className="flex items-center justify-between p-3 lg:hidden border-b border-glass-border">
+        <span className="text-[13px] font-medium text-warm-black">Scaffold</span>
         <button
           onClick={onClose}
-          className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+          className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+          aria-label="Close navigation"
         >
           <X className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
 
+      <div className="hidden lg:block px-3 pt-4 pb-3">
+        <div className="rounded-xl border border-glass-border bg-glass px-3 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-accent-dim text-accent flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5" strokeWidth={1.6} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-warm-black truncate">{ownerName}</p>
+              <p className="text-[10px] text-gray-muted truncate">{valueProof || "AI site management"}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main navigation */}
-      <nav className="px-2 py-3 space-y-0.5">
+      <nav className="px-2 py-2 space-y-0.5" aria-label="Dashboard">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + "/") || (item.href === "/dashboard/chat" && pathname?.startsWith("/dashboard/chat"));
           const Icon = item.icon;
@@ -91,13 +107,13 @@ export function HistorySidebar({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[44px] text-[13px] font-medium transition-colors ${
+              className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[42px] text-[13px] font-medium transition-all ${
                 isActive
-                  ? "bg-gray-bg-hover text-warm-black"
+                  ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
                   : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
               }`}
             >
-              <Icon className="w-4 h-4" strokeWidth={1.5} />
+              <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
               <span className="flex-1">{item.label}</span>
               {showBadge && (
                 <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent-dim text-accent rounded-full">
@@ -116,7 +132,7 @@ export function HistorySidebar({
             {/* New chat button */}
             <button
               onClick={onNewChat}
-              className="flex items-center gap-2 w-full rounded-lg bg-surface-raised border border-glass-border px-3 py-2.5 min-h-[44px] text-gray-muted hover:text-warm-black hover:bg-gray-bg-hover transition-colors"
+              className="flex items-center gap-2 w-full rounded-lg bg-surface-raised border border-glass-border px-3 py-2.5 min-h-[42px] text-gray-fg hover:text-warm-black hover:bg-gray-bg-hover transition-colors"
             >
               <Plus className="w-4 h-4" strokeWidth={1.5} />
               <span className="text-[12px]">New chat</span>
@@ -130,7 +146,7 @@ export function HistorySidebar({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search chats..."
-                className="w-full bg-surface-inset border border-gray-border rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-warm-black placeholder-gray-subtle outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-surface-inset border border-gray-border rounded-lg pl-8 pr-3 py-2 text-[12px] text-warm-black placeholder-gray-subtle outline-none focus:border-accent/45 transition-colors"
               />
             </div>
           </div>
@@ -152,7 +168,7 @@ export function HistorySidebar({
                       key={thread.id}
                       onClick={() => onSelectThread(thread.id)}
                       className={`w-full text-left rounded-lg px-2.5 py-2.5 min-h-[44px] transition-colors ${
-                        isActive ? "bg-gray-bg-hover" : "hover:bg-gray-bg"
+                        isActive ? "bg-gray-bg-hover shadow-[inset_2px_0_0_var(--accent)]" : "hover:bg-gray-bg"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -185,10 +201,7 @@ export function HistorySidebar({
       {/* User footer with settings */}
       <div className="p-3 border-t border-glass-border mt-auto">
         {valueProof && (
-          <div className="mb-2 rounded-lg border border-glass-border bg-surface-raised px-3 py-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-muted">
-              This week
-            </p>
+          <div className="lg:hidden mb-2 rounded-lg border border-glass-border bg-surface-raised px-3 py-2">
             <p className="text-[12px] font-medium text-warm-black mt-0.5">
               {valueProof}
             </p>
@@ -231,7 +244,7 @@ export function HistorySidebar({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[240px] h-full bg-surface-base shrink-0 border-r border-glass-border">
+      <aside className="hidden lg:flex flex-col w-[260px] h-full bg-surface-base/95 shrink-0 border-r border-glass-border">
         {sidebarContent}
       </aside>
 
@@ -244,7 +257,7 @@ export function HistorySidebar({
             onClick={onClose}
           />
           {/* Sidebar panel */}
-          <aside className="absolute left-0 top-0 bottom-0 w-[280px] bg-surface-base animate-panel-left">
+          <aside className="absolute left-0 top-0 bottom-0 w-[296px] bg-surface-base animate-panel-left border-r border-glass-border">
             {sidebarContent}
           </aside>
         </div>

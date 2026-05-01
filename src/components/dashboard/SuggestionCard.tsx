@@ -17,7 +17,7 @@ export function SuggestionCard({
   disabled,
 }: SuggestionCardProps) {
   return (
-    <div className={`rounded-xl border border-accent/20 bg-surface-raised p-4 ${disabled ? "opacity-50" : ""}`}>
+    <div className={`rounded-xl border border-accent/20 bg-accent-dim/35 p-4 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-lg bg-accent-dim text-accent flex items-center justify-center shrink-0">
           <Sparkles className="w-4 h-4" strokeWidth={1.5} />
