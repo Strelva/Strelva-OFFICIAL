@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { isSuperAdmin } from "@/lib/auth";
-import { getAllTenants, getTenantConfig } from "@/lib/tenants";
+import { getAllTenants } from "@/lib/tenants";
 import {
   listDrafts,
   getDraftContent,

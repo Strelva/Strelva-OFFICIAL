@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Search, ChevronRight, CircleCheck } from "lucide-react";
+import { Search, ChevronRight } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 
 export interface Connection {

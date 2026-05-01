@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { resolveEvent } from "@/lib/events";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { resolveEventAction } from "@/lib/event-actions";
 
 export async function PATCH(
   request: Request,
@@ -28,9 +28,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    await resolveEvent(id, status);
+    const result = await resolveEventAction(tenant, id, status);
+    if (result.reason === "not_found" || result.reason === "wrong_tenant") {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, changed: result.changed });
   } catch {
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
   }

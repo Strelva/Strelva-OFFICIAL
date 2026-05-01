@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Inbox, FileText, MessageSquare, MoreHorizontal } from "lucide-react";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
   { href: "/dashboard/brief", label: "Brief", icon: FileText },
+  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/settings", label: "More", icon: MoreHorizontal },
 ];
@@ -17,12 +17,12 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const navRef = useRef<HTMLDivElement>(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
-  const getActiveIndex = () => {
+  const getActiveIndex = useCallback(() => {
     return NAV_ITEMS.findIndex(
       (item) =>
         pathname === item.href || pathname?.startsWith(item.href + "/")
     );
-  };
+  }, [pathname]);
 
   useEffect(() => {
     const activeIndex = getActiveIndex();
@@ -39,7 +39,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
       left: buttonRect.left - navRect.left,
       width: buttonRect.width,
     });
-  }, [pathname]);
+  }, [getActiveIndex]);
 
   return (
     <nav

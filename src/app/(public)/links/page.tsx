@@ -1,6 +1,5 @@
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
-import Image from "next/image";
 import Link from "next/link";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
@@ -19,10 +18,9 @@ export default async function LinksPage() {
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
   const fetchOptions = preview ? { preview: true } : undefined;
-  const [settings, contact, services, events] = await Promise.all([
+  const [settings, contact, events] = await Promise.all([
     getContent("settings", tenant, fetchOptions),
     getContent("contact", tenant, fetchOptions),
-    getContent("services", tenant, fetchOptions),
     getContent("events", tenant, fetchOptions),
   ]);
 

@@ -1,12 +1,14 @@
 import { generateText, tool, stepCountIs } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { getContent, getClickCounts } from "@/lib/storage";
+import { getContent, getClickCounts, getSectionTimestamps } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { capabilityPromptFragment } from "@/lib/capabilities";
 import { sendSlackNotification } from "@/lib/slack";
-import type { ContentSection, TenantConfig } from "@/lib/types";
+import { detectStaleSections } from "@/lib/reports";
+import { decideAiContentGovernance } from "@/lib/ai-governance";
+import type { ContentSection } from "@/lib/types";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 
 async function buildSystemPrompt(
@@ -27,7 +29,10 @@ async function buildSystemPrompt(
   );
   const content: Record<string, Record<string, unknown>> =
     Object.fromEntries(contentEntries);
-  const bookingClicks = await getClickCounts("booking-click", tenant);
+  const [bookingClicks, timestamps] = await Promise.all([
+    getClickCounts("booking-click", tenant),
+    getSectionTimestamps(tenant),
+  ]);
 
   const settings = content.settings || {};
   const contact = content.contact || {};
@@ -99,6 +104,15 @@ async function buildSystemPrompt(
   sectionSummaries.push(
     `SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`
   );
+
+  const staleSections = detectStaleSections(timestamps, sections).slice(0, 5);
+  if (staleSections.length > 0) {
+    sectionSummaries.push(
+      `STALE SECTIONS TO WATCH:\n${staleSections
+        .map((s) => `- ${s.section}: ${s.daysSinceUpdate} days since update`)
+        .join("\n")}`
+    );
+  }
 
   const sectionNames = sections.join(", ");
 
@@ -184,18 +198,40 @@ export async function executeAgentPrompt(
           }
         }
 
-        await setContent(
-          section as ContentSection,
-          parsed.data as Parameters<typeof setContent>[1],
-          tenantId
-        );
-        const { revalidatePath } = await import("next/cache");
-        revalidatePath("/");
-
-        // Trigger revalidation on standalone client site
-        revalidateClientSite(tenantId, ["/"]).catch((err) => {
-          console.error("[agent] Failed to revalidate client site:", err);
+        const governance = decideAiContentGovernance(section as ContentSection, parsed.data, {
+          tenantAutoPublish: tenantConfig?.autoPublish,
         });
+
+        if (governance.action === "block") {
+          return {
+            success: false,
+            blocked: true,
+            reason: governance.reason,
+            message: "Structural site changes require manual admin work.",
+          };
+        }
+
+        if (governance.action === "publish") {
+          await setContent(
+            section as ContentSection,
+            parsed.data as Parameters<typeof setContent>[1],
+            tenantId
+          );
+          const { revalidatePath } = await import("next/cache");
+          revalidatePath("/");
+
+          // Trigger revalidation on standalone client site
+          revalidateClientSite(tenantId, ["/"]).catch((err) => {
+            console.error("[agent] Failed to revalidate client site:", err);
+          });
+        } else {
+          const { setDraftContent } = await import("@/lib/storage");
+          await setDraftContent(
+            section as ContentSection,
+            parsed.data as Parameters<typeof setContent>[1],
+            tenantId
+          );
+        }
 
         const { logActivity, recordSectionUpdate } = await import(
           "@/lib/storage"
@@ -204,7 +240,10 @@ export async function executeAgentPrompt(
         const changes = diffFields(current, data as Record<string, unknown>);
         await logActivity(
           {
-            text: `AI updated ${section} via SMS`,
+            text:
+              governance.action === "publish"
+                ? `AI updated ${section} via approved action`
+                : `AI drafted changes to ${section} via approved action`,
             time: new Date().toISOString(),
             type: "ai",
             section,
@@ -213,15 +252,59 @@ export async function executeAgentPrompt(
           },
           tenantId
         );
-        await recordSectionUpdate(section, tenantId);
+        if (governance.action === "publish") {
+          await recordSectionUpdate(section, tenantId);
+        }
 
         sendSlackNotification(
-          { text: `Site updated *${section}* via SMS approval (${tenantId})` },
+          {
+            text:
+              governance.action === "publish"
+                ? `Site updated *${section}* via AI approval (${tenantId})`
+                : `AI drafted *${section}* via approval (${tenantId}) — needs admin review`,
+          },
           "tenant",
           tenantConfig
         ).catch(() => {});
 
-        return { success: true, section, message: `Updated ${section}` };
+        return {
+          success: true,
+          section,
+          governance,
+          message:
+            governance.action === "publish"
+              ? `Updated ${section}`
+              : `Drafted ${section} for admin review`,
+        };
+      },
+    }),
+    get_suggestions: tool({
+      description: "List pending proactive suggestions for this website.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { getSuggestions } = await import("@/lib/suggestions");
+        return await getSuggestions(tenantId);
+      },
+    }),
+    create_suggestion: tool({
+      description: "Create a proactive suggestion for the owner to review later.",
+      inputSchema: z.object({
+        type: z.enum(["stale", "missing", "growth", "engagement"]),
+        title: z.string(),
+        description: z.string(),
+        action: z.string().describe("Use prompt:<owner-facing request> for chat-triggered suggestions."),
+        section: sectionEnum.optional(),
+      }),
+      execute: async ({ type, title, description, action, section }) => {
+        const { addSuggestion } = await import("@/lib/suggestions");
+        return await addSuggestion({
+          tenantId,
+          type,
+          title,
+          description,
+          action,
+          section,
+        });
       },
     }),
   };

@@ -1,7 +1,10 @@
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
-import { getSectionTimestamps, getClickCounts, getContent, getSearchData } from "./storage";
+import { addEvent } from "./events";
+import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getAllTenants } from "./tenants";
 import type { ContentSection } from "./types";
 
@@ -74,6 +77,7 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
       ...entry,
       suggestionType: entry.type,
     });
+    await addSuggestionEvent(entry);
     return entry;
   }
 
@@ -89,7 +93,27 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
   tenantSuggestions.push(entry);
   store[suggestion.tenantId] = tenantSuggestions;
   await writeSuggestions(store);
+  await addSuggestionEvent(entry);
   return entry;
+}
+
+async function addSuggestionEvent(suggestion: Suggestion): Promise<void> {
+  await addEvent({
+    tenantId: suggestion.tenantId,
+    source: "ai",
+    type: "suggestion",
+    title: suggestion.title,
+    body: suggestion.description,
+    status: "pending",
+    metadata: {
+      suggestionId: suggestion.id,
+      action: suggestion.action,
+      actionPrompt: suggestion.action.startsWith("prompt:")
+        ? suggestion.action.slice("prompt:".length)
+        : suggestion.action,
+      section: suggestion.section,
+    },
+  });
 }
 
 export async function updateSuggestion(
@@ -137,7 +161,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     "providers", "contact", "settings", "faq",
   ];
 
-  const [timestamps, bookingClicks, settings, testimonials, events, services] =
+  const [timestamps, bookingClicks, settings, testimonials, events, services, dailyMetrics] =
     await Promise.all([
       getSectionTimestamps(tenantId),
       getClickCounts("booking-click", tenantId),
@@ -145,6 +169,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       getContent("testimonials", tenantId),
       getContent("events", tenantId),
       getContent("services", tenantId),
+      getDailyMetrics(tenantId, 14),
     ]);
 
   const created: Suggestion[] = [];
@@ -158,6 +183,18 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       title: `Freshen up your ${section}`,
       description: `Your ${section} section hasn't been updated in ${daysSinceUpdate} days. Fresh content helps people trust your business.`,
       action: `update_section:${section}`,
+      section,
+    }));
+  }
+
+  const unknownFreshness = contentSections.filter((section) => !timestamps[section]);
+  for (const section of unknownFreshness.slice(0, 1)) {
+    created.push(await addSuggestion({
+      tenantId,
+      type: "stale",
+      title: `Check your ${section} section`,
+      description: `I don't have a recent update recorded for ${section}. Want me to review it and bring it current?`,
+      action: `prompt:Review my ${section} section and suggest updates based on the current business.`,
       section,
     }));
   }
@@ -204,6 +241,34 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     }));
   }
 
+  const lastWeekViews = dailyMetrics.slice(0, 7).reduce((sum, day) => sum + day.pageViews, 0);
+  const thisWeekViews = dailyMetrics.slice(7).reduce((sum, day) => sum + day.pageViews, 0);
+  if (lastWeekViews > 10 && thisWeekViews < lastWeekViews * 0.5) {
+    created.push(await addSuggestion({
+      tenantId,
+      type: "growth",
+      title: "Traffic dropped this week",
+      description: `${thisWeekViews} people found you this week, down from ${lastWeekViews} last week. Want me to draft a quick post or email to bring people back?`,
+      action: "prompt:Help me bring website traffic back after this week's drop.",
+    }));
+  }
+
+  const today = new Date();
+  const expiredEvents = (events.events || []).filter((event: { date?: string }) => {
+    if (!event.date) return false;
+    return new Date(event.date) < today;
+  });
+  if (expiredEvents.length > 0) {
+    created.push(await addSuggestion({
+      tenantId,
+      type: "stale",
+      title: "Clean up past events",
+      description: `You have ${expiredEvents.length} past event${expiredEvents.length === 1 ? "" : "s"} still showing. Want me to archive old events and keep the page current?`,
+      action: "prompt:Clean up past events on my site and keep upcoming events visible.",
+      section: "events",
+    }));
+  }
+
   // Search-based suggestions
   const searchData = await getSearchData(tenantId);
   if (searchData && searchData.queries.length > 0) {
@@ -240,7 +305,77 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     }
   }
 
+  const pending = await getSuggestions(tenantId);
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const hasRecentLlmSuggestion = pending.some(
+    (suggestion) =>
+      suggestion.title === "Recommended site improvement" &&
+      new Date(suggestion.createdAt).getTime() >= weekAgo
+  );
+  if (!hasRecentLlmSuggestion) {
+    const llmSuggestion = await generateLlmSuggestion({
+      tenantId,
+      settings,
+      services,
+      staleSections: stale,
+      bookingClicks,
+      searchQueries: searchData?.queries || [],
+      thisWeekViews,
+      lastWeekViews,
+    });
+    if (llmSuggestion) {
+      created.push(await addSuggestion(llmSuggestion));
+    }
+  }
+
   return created;
+}
+
+async function generateLlmSuggestion(data: {
+  tenantId: string;
+  settings: { siteName?: string; siteDescription?: string };
+  services: { services?: Array<{ name: string }> };
+  staleSections: Array<{ section: string; daysSinceUpdate: number }>;
+  bookingClicks: { total: number; thisWeek: number };
+  searchQueries: Array<{ query: string; clicks: number; impressions: number }>;
+  thisWeekViews: number;
+  lastWeekViews: number;
+}): Promise<Omit<Suggestion, "id" | "createdAt" | "status"> | null> {
+  try {
+    const { text } = await generateText({
+      model: google("gemini-2.5-flash"),
+      prompt: `What is the single most impactful proactive improvement for this local business website?
+
+Business: ${data.settings.siteName || "Unknown"}
+Description: ${data.settings.siteDescription || "Not set"}
+Services: ${(data.services.services || []).map((service) => service.name).join(", ") || "None listed"}
+Booking clicks this week: ${data.bookingClicks.thisWeek}
+Page views this week: ${data.thisWeekViews}
+Page views last week: ${data.lastWeekViews}
+Stale sections: ${data.staleSections.map((section) => `${section.section} (${section.daysSinceUpdate} days)`).join(", ") || "none"}
+Search queries: ${data.searchQueries.map((query) => `${query.query} (${query.clicks} clicks, ${query.impressions} impressions)`).join(", ") || "none"}
+
+Return strict JSON with:
+{
+  "title": "short action title",
+  "description": "one sentence explaining why it matters",
+  "prompt": "owner-approved instruction for the AI to execute"
+}
+
+No markdown. No extra text.`,
+    });
+    const parsed = JSON.parse(text.trim()) as { title?: string; description?: string; prompt?: string };
+    if (!parsed.title || !parsed.description || !parsed.prompt) return null;
+    return {
+      tenantId: data.tenantId,
+      type: "growth",
+      title: "Recommended site improvement",
+      description: `${parsed.title}: ${parsed.description}`,
+      action: `prompt:${parsed.prompt}`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateSuggestionsForAll(): Promise<void> {

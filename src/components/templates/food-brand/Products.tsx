@@ -8,8 +8,6 @@ import { ProductModal } from "./ProductModal";
 import type { ProductsContent, ProductItem } from "@/lib/types";
 
 export function Products({ products }: { products: ProductsContent }) {
-  const headerRef = useReveal();
-  const featuredRef = useReveal();
   const scrollRef = useReveal();
   const { addItem } = useCart();
   const [modalProduct, setModalProduct] = useState<ProductItem | null>(null);

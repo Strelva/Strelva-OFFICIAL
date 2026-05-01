@@ -11,6 +11,7 @@ import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimited } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
+import { decideAiContentGovernance } from "@/lib/ai-governance";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -266,7 +267,20 @@ export async function POST(req: Request) {
               }
             }
 
-            const autoPublish = tenantConfig?.autoPublish !== false;
+            const governance = decideAiContentGovernance(section as ContentSection, parsed.data, {
+              tenantAutoPublish: tenantConfig?.autoPublish,
+            });
+
+            if (governance.action === "block") {
+              return {
+                success: false,
+                blocked: true,
+                reason: governance.reason,
+                message: "I can't make that change directly. Jacob needs to handle structural site changes.",
+              };
+            }
+
+            const autoPublish = governance.action === "publish";
 
             if (autoPublish) {
               await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
@@ -292,9 +306,9 @@ export async function POST(req: Request) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  text: autoPublish
-                    ? `[${tenantLabel}] AI updated *${section}*\n${changeSummary}`
-                    : `[${tenantLabel}] AI drafted changes to *${section}* — needs review at /admin/drafts\n${changeSummary}`,
+                text: autoPublish
+                  ? `[${tenantLabel}] AI updated *${section}*\n${changeSummary}`
+                  : `[${tenantLabel}] AI drafted changes to *${section}* — needs review at /admin/drafts\nReason: ${governance.reason}\n${changeSummary}`,
                 }),
               }).catch(() => {});
             }
@@ -317,9 +331,10 @@ export async function POST(req: Request) {
             return {
               success: true,
               section,
+              governance,
               message: autoPublish
                 ? `Updated ${section} successfully`
-                : `I've drafted the changes to ${section}. Your admin will review and publish them shortly.`,
+                : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`,
             };
           } catch (err) {
             return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };

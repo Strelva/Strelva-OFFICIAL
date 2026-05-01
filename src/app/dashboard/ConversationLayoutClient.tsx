@@ -10,6 +10,7 @@ interface ConversationLayoutClientProps {
   threads: Thread[];
   ownerName: string;
   pendingCount?: number;
+  valueProof?: string;
 }
 
 export function ConversationLayoutClient({
@@ -17,10 +18,11 @@ export function ConversationLayoutClient({
   threads: initialThreads,
   ownerName,
   pendingCount = 0,
+  valueProof,
 }: ConversationLayoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [threads, setThreads] = useState<Thread[]>(initialThreads);
+  const [threads] = useState<Thread[]>(initialThreads);
 
   const activeThreadId = searchParams.get("thread");
 
@@ -36,24 +38,6 @@ export function ConversationLayoutClient({
     [router]
   );
 
-  const handleThreadCreated = useCallback(
-    (id: string) => {
-      // Add new thread to the list optimistically
-      setThreads((prev) => [
-        {
-          id,
-          title: "New chat",
-          preview: "",
-          updatedAt: Date.now(),
-        },
-        ...prev,
-      ]);
-      // Update URL with new thread ID
-      router.replace(`/dashboard/chat?thread=${id}`);
-    },
-    [router]
-  );
-
   return (
     <ConversationShell
       threads={threads}
@@ -62,6 +46,7 @@ export function ConversationLayoutClient({
       onSelectThread={handleSelectThread}
       ownerName={ownerName}
       pendingCount={pendingCount}
+      valueProof={valueProof}
     >
       {children}
     </ConversationShell>

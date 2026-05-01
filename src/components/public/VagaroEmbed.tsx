@@ -1,7 +1,5 @@
 "use client";
 
-import Script from "next/script";
-
 interface VagaroEmbedProps {
   embedId: string;
   fallbackUrl?: string;

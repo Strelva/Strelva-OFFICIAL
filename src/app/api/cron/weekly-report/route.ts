@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { generateAllReports } from "@/lib/reports";
+import { generateWeeklyBrief } from "@/lib/weekly-brief";
 
-function reportToHtml(summary: string, siteName: string): string {
+function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
   const paragraphs = summary
     .split("\n\n")
     .filter(Boolean)
@@ -15,6 +16,11 @@ function reportToHtml(summary: string, siteName: string): string {
     <div style="background: #fff; border-radius: 12px; padding: 32px; border: 1px solid #e8e6e3;">
       <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #7c9a8e; margin: 0 0 24px; font-weight: 600;">Weekly Update</p>
       ${paragraphs}
+      <p style="margin: 24px 0 0;">
+        <a href="${dashboardUrl}" style="display: inline-block; color: #5d7f70; font-size: 14px; font-weight: 600; text-decoration: none;">
+          View in dashboard &rarr;
+        </a>
+      </p>
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
       <p style="font-size: 12px; color: #999; margin: 0;">
         Sent by Scaffold Web for ${siteName}
@@ -43,7 +49,10 @@ export async function GET() {
         ? `${report.pageViews.thisWeek} people found you this week`
         : `Your weekly site update`;
 
-      const html = reportToHtml(report.summary, report.tenant.siteName);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL
+        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://scaffoldweb.com");
+      const html = reportToHtml(report.summary, report.tenant.siteName, `${appUrl}/dashboard/brief`);
+      await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {
         const { Resend } = await import("resend");

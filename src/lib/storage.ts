@@ -878,7 +878,7 @@ export async function trackClick(
 export async function getClickCounts(
   event: string,
   tenant: string = DEFAULT_TENANT
-): Promise<{ total: number; today: number; thisWeek: number }> {
+): Promise<{ total: number; today: number; thisWeek: number; lastWeek: number }> {
   const today = new Date().toISOString().slice(0, 10);
 
   if (hasSanity) {
@@ -889,13 +889,20 @@ export async function getClickCounts(
     const total = clicks[`${event}_total`] || 0;
     const todayCount = clicks[`${event}_${today}`] || 0;
     let weekCount = 0;
+    let lastWeekCount = 0;
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
       weekCount += clicks[`${event}_${key}`] || 0;
     }
-    return { total, today: todayCount, thisWeek: weekCount };
+    for (let i = 7; i < 14; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      lastWeekCount += clicks[`${event}_${key}`] || 0;
+    }
+    return { total, today: todayCount, thisWeek: weekCount, lastWeek: lastWeekCount };
   }
 
   const store = await readDevContent(tenant);
@@ -903,13 +910,20 @@ export async function getClickCounts(
   const total = clicks[`${event}:total`] || 0;
   const todayCount = clicks[`${event}:${today}`] || 0;
   let weekCount = 0;
+  let lastWeekCount = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     weekCount += clicks[`${event}:${key}`] || 0;
   }
-  return { total, today: todayCount, thisWeek: weekCount };
+  for (let i = 7; i < 14; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    lastWeekCount += clicks[`${event}:${key}`] || 0;
+  }
+  return { total, today: todayCount, thisWeek: weekCount, lastWeek: lastWeekCount };
 }
 
 export interface DailyMetric {
@@ -1447,16 +1461,18 @@ export async function getSectionTimestamps(
   tenant: string = DEFAULT_TENANT
 ): Promise<Record<string, string>> {
   if (hasSanity) {
-    // Query _updatedAt from all content documents for this tenant
-    const sections = Object.entries(SECTION_TO_TYPE);
+    const types = Object.values(SECTION_TO_TYPE);
+    const rows = await getSanityReadClient().fetch<Array<{ _type: string; _updatedAt: string }>>(
+      `*[_type in $types && tenant == $tenant]{ _type, _updatedAt }`,
+      { types, tenant }
+    );
+    const typeToSection = Object.fromEntries(
+      Object.entries(SECTION_TO_TYPE).map(([section, type]) => [type, section])
+    );
     const timestamps: Record<string, string> = {};
-
-    for (const [section, type] of sections) {
-      const doc = await getSanityClient().fetch(
-        `*[_type == $type && tenant == $tenant][0]._updatedAt`,
-        { type, tenant }
-      );
-      if (doc) timestamps[section] = doc;
+    for (const row of rows || []) {
+      const section = typeToSection[row._type];
+      if (section && row._updatedAt) timestamps[section] = row._updatedAt;
     }
     return timestamps;
   }
@@ -1640,4 +1656,3 @@ export async function getWeeklyReports(
   const reports = await readDevReports(tenant);
   return reports.slice(0, limit);
 }
-

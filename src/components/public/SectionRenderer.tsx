@@ -10,7 +10,7 @@ interface SectionRendererProps {
   preview?: boolean;
 }
 
-export async function SectionRenderer({ pageSlug, tenant, editMode, preview }: SectionRendererProps) {
+export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, preview }: SectionRendererProps) {
   const template = await getTemplateForTenant(tenant);
 
   // Load page config — fall back to template defaults

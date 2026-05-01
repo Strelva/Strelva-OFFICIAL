@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import {
   Layers,
   ChevronDown,
@@ -12,7 +12,6 @@ import {
   Check,
   Eye,
   EyeOff,
-  GripVertical,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { timeAgo } from "@/lib/utils";
@@ -56,7 +55,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setActivePage,
   } = useDashboard();
 
-  const DEFAULT_PAGE_CONFIG = getDefaultPageConfig(template);
+  const DEFAULT_PAGE_CONFIG = useMemo(() => getDefaultPageConfig(template), [template]);
 
   const expandedRef = useRef<HTMLDivElement>(null);
   const [pageConfig, setPageConfig] = useState<SitePageConfig | null>(null);
@@ -101,7 +100,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         setPageConfig(merged);
       })
       .catch(() => { setPageConfig(DEFAULT_PAGE_CONFIG); });
-  }, []);
+  }, [DEFAULT_PAGE_CONFIG]);
 
   useEffect(() => {
     if (activeSection && expandedRef.current) {

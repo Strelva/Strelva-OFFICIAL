@@ -79,23 +79,49 @@ export async function getEvents(
   return events;
 }
 
+export async function getEvent(id: string): Promise<UnifiedEvent | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+}
+
 /**
  * Resolve an event (approve or dismiss).
  */
 export async function resolveEvent(
   id: string,
-  status: "approved" | "dismissed"
-): Promise<void> {
+  status: "approved" | "dismissed",
+  opts?: { actor?: string }
+): Promise<{ event: UnifiedEvent | null; changed: boolean }> {
   const redis = getRedis();
-  if (!redis) return;
+  if (!redis) return { event: null, changed: false };
 
   const existing = await redis.get<UnifiedEvent>(eventKey(id));
-  if (!existing) return;
+  if (!existing) return { event: null, changed: false };
+
+  if (existing.status !== "pending") {
+    return { event: existing, changed: false };
+  }
+
+  const resolutionHistory = Array.isArray(existing.metadata?.resolutionHistory)
+    ? existing.metadata.resolutionHistory
+    : [];
 
   const updated: UnifiedEvent = {
     ...existing,
     status,
     resolvedAt: new Date().toISOString(),
+    metadata: {
+      ...existing.metadata,
+      resolutionHistory: [
+        ...resolutionHistory,
+        {
+          status,
+          actor: opts?.actor || "system",
+          resolvedAt: new Date().toISOString(),
+        },
+      ],
+    },
   };
 
   // Update individual event
@@ -108,6 +134,8 @@ export async function resolveEvent(
     score: new Date(existing.createdAt).getTime(),
     member: JSON.stringify(updated),
   });
+
+  return { event: updated, changed: true };
 }
 
 /**

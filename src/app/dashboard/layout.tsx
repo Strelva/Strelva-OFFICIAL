@@ -5,7 +5,7 @@ import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { getContent } from "@/lib/storage";
+import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { hasTenantAccess } from "@/lib/auth";
 import { listThreads } from "@/lib/threads";
@@ -42,10 +42,17 @@ export default async function DashboardLayout({
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
   // Fetch threads for the history sidebar and queue count
-  const [threads, pendingCount] = await Promise.all([
+  const [threads, pendingCount, pageViews, activity] = await Promise.all([
     listThreads(tenant),
     getQueueCount(tenant),
+    getClickCounts("page-view", tenant),
+    getActivity(tenant, { actor: "ai" }),
   ]);
+  const monthAgo = Date.now() - 30 * 86_400_000;
+  const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
+  const valueProof = pageViews.thisWeek > 0
+    ? `${pageViews.thisWeek} visitors this week`
+    : `${aiUpdatesThisMonth} AI updates this month`;
   const threadSummaries = threads.map((t) => ({
     id: t.id,
     title: t.title,
@@ -61,6 +68,7 @@ export default async function DashboardLayout({
           threads={threadSummaries}
           ownerName={ownerName || siteName}
           pendingCount={pendingCount}
+          valueProof={valueProof}
         >
           {children}
         </ConversationLayoutClient>

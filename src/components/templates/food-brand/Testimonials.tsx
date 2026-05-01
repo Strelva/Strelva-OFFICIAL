@@ -44,7 +44,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
             className="grid md:grid-cols-3 gap-8 md:gap-12 pt-8 md:pt-10"
             style={{ borderTop: "1px solid var(--cream-mid)" }}
           >
-            {items.slice(1, 4).map((item, i) => (
+            {items.slice(1, 4).map((item) => (
               <div key={item.id}>
                 <blockquote
                   className="text-base md:text-lg leading-relaxed"

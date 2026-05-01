@@ -14,6 +14,8 @@ import { getContent, setContent } from "../lib/storage";
 const TENANT_A = "__test_tenant_a";
 const TENANT_B = "__test_tenant_b";
 const MISSING_TENANT = "__test_tenant_missing";
+const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
+let originalDevTenants: string | null = null;
 
 function devContentPath(tenant: string): string {
   return path.join(process.cwd(), `dev-content-${tenant}.json`);
@@ -32,12 +34,46 @@ describe("tenant isolation", () => {
     await cleanupTenantFile(TENANT_A);
     await cleanupTenantFile(TENANT_B);
     await cleanupTenantFile(MISSING_TENANT);
+    try {
+      originalDevTenants = await fs.readFile(DEV_TENANTS_PATH, "utf-8");
+    } catch {
+      originalDevTenants = null;
+    }
+    await fs.writeFile(
+      DEV_TENANTS_PATH,
+      JSON.stringify(
+        [
+          {
+            id: "gldf",
+            subdomain: "gldf",
+            siteName: "Great Lakes Dried Fruit",
+            ownerName: "Great Lakes Dried Fruit",
+            ownerEmail: "owner@example.com",
+            industry: "food",
+            active: true,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            template: "food-brand",
+            features: ["commerce", "newsletter"],
+            subscriptionStatus: "active",
+          },
+        ],
+        null,
+        2
+      )
+    );
   });
 
   afterAll(async () => {
     await cleanupTenantFile(TENANT_A);
     await cleanupTenantFile(TENANT_B);
     await cleanupTenantFile(MISSING_TENANT);
+    if (originalDevTenants === null) {
+      try {
+        await fs.unlink(DEV_TENANTS_PATH);
+      } catch {}
+    } else {
+      await fs.writeFile(DEV_TENANTS_PATH, originalDevTenants);
+    }
   });
 
   // --- getTenantConfig ---

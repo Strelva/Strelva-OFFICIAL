@@ -1,5 +1,3 @@
-import { getTenantConfig } from "./tenants";
-
 // --- Capability definitions ---
 
 export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social";
@@ -67,7 +65,7 @@ export function getAllTools(): Set<string> {
   return tools;
 }
 
-export async function getActivatedCapabilities(tenantId: string): Promise<{
+export async function getActivatedCapabilities(_tenantId: string): Promise<{
   capabilities: Capability[];
   activeTools: Set<string>;
 }> {

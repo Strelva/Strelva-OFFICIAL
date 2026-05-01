@@ -33,11 +33,12 @@ interface HistorySidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
+  valueProof?: string;
 }
 
 const NAV_ITEMS = [
-  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
   { href: "/dashboard/brief", label: "Brief", icon: FileText },
+  { href: "/dashboard/queue", label: "Queue", icon: Inbox },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/connections", label: "Connections", icon: Link2 },
 ];
@@ -51,6 +52,7 @@ export function HistorySidebar({
   isOpen = true,
   onClose,
   pendingCount = 0,
+  valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
@@ -182,6 +184,16 @@ export function HistorySidebar({
 
       {/* User footer with settings */}
       <div className="p-3 border-t border-glass-border mt-auto">
+        {valueProof && (
+          <div className="mb-2 rounded-lg border border-glass-border bg-surface-raised px-3 py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-muted">
+              This week
+            </p>
+            <p className="text-[12px] font-medium text-warm-black mt-0.5">
+              {valueProof}
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
           <div className="w-7 h-7 rounded-full bg-accent-dim flex items-center justify-center shrink-0">
             <span className="text-[11px] font-semibold text-accent">

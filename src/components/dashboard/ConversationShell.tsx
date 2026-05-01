@@ -13,6 +13,7 @@ interface ConversationShellProps {
   onSelectThread: (id: string) => void;
   ownerName: string;
   pendingCount?: number;
+  valueProof?: string;
 }
 
 export function ConversationShell({
@@ -23,6 +24,7 @@ export function ConversationShell({
   onSelectThread,
   ownerName,
   pendingCount = 0,
+  valueProof,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -38,6 +40,7 @@ export function ConversationShell({
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}
+        valueProof={valueProof}
       />
 
       {/* Main content area */}

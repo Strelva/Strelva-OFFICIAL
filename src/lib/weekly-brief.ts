@@ -1,7 +1,11 @@
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 import type { WeeklyBrief, WeeklyBriefStats } from "./types";
 import { getRedis } from "./redis";
-import { getClickCounts, getActivity } from "./storage";
+import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSearchData, getSectionTimestamps } from "./storage";
 import { getEvents } from "./events";
+import { getSuggestions } from "./suggestions";
+import { detectStaleSections } from "./reports";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
@@ -76,11 +80,15 @@ export async function saveWeeklyBrief(brief: WeeklyBrief): Promise<void> {
 export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief> {
   const { weekStart, weekEnd } = getWeekBounds();
 
-  const [pageViewCounts, bookingCounts, events, activity] = await Promise.all([
+  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps] = await Promise.all([
     getClickCounts("page-view", tenantId),
     getClickCounts("booking-click", tenantId),
     getEvents(tenantId, { limit: 100 }),
     getActivity(tenantId),
+    getClickCountsByPrefix("booking-click:", tenantId),
+    getContent("services", tenantId),
+    getSearchData(tenantId),
+    getSectionTimestamps(tenantId),
   ]);
 
   const weekStartDate = new Date(weekStart);
@@ -100,10 +108,47 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     bookingClicks: bookingCounts.thisWeek,
     reviewsReceived,
     contentUpdates,
+    pageViewsDelta: pageViewCounts.thisWeek - pageViewCounts.lastWeek,
+    bookingClicksDelta: bookingCounts.thisWeek - bookingCounts.lastWeek,
   };
 
+  const [suggestion] = await getSuggestions(tenantId);
+  const nextAction = suggestion
+    ? { title: suggestion.title, description: suggestion.description }
+    : undefined;
+
+  const serviceNames: Record<string, string> = {};
+  for (const service of services.services || []) {
+    serviceNames[service.id] = service.name;
+  }
+
+  const topServices = Object.entries(perServiceClicks)
+    .map(([event, counts]) => {
+      const serviceId = event.replace("booking-click:", "");
+      return {
+        name: serviceNames[serviceId] || serviceId,
+        clicks: counts.thisWeek,
+      };
+    })
+    .filter((service) => service.clicks > 0)
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 3);
+
+  const topSearchQueries = (searchData?.queries || []).slice(0, 3);
+  const staleSections = detectStaleSections(
+    timestamps,
+    ["hero", "services", "story", "testimonials", "events", "providers", "contact", "settings", "faq"]
+  ).slice(0, 3);
+
   const highlights = buildHighlights(stats, weeklyEvents, activity);
-  const summary = buildSummary(stats, highlights);
+  const summary = await buildSummary({
+    stats,
+    highlights,
+    topServices,
+    topSearchQueries,
+    staleSections,
+    nextAction,
+  });
 
   const brief: WeeklyBrief = {
     id: `brief_${weekStart}_${tenantId}`,
@@ -113,6 +158,10 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     summary,
     stats,
     highlights,
+    nextAction,
+    topServices,
+    topSearchQueries,
+    staleSections,
     createdAt: new Date().toISOString(),
   };
 
@@ -149,7 +198,43 @@ function buildHighlights(
   return highlights.slice(0, 5);
 }
 
-function buildSummary(stats: WeeklyBriefStats, highlights: string[]): string {
+async function buildSummary(data: {
+  stats: WeeklyBriefStats;
+  highlights: string[];
+  topServices: Array<{ name: string; clicks: number }>;
+  topSearchQueries: Array<{ query: string; clicks: number; impressions: number }>;
+  staleSections: Array<{ section: string; daysSinceUpdate: number }>;
+  nextAction?: { title: string; description: string };
+}): Promise<string> {
+  try {
+    const { text } = await generateText({
+      model: google("gemini-2.5-flash"),
+      prompt: `Write a concise weekly dashboard brief for a local business owner.
+
+Stats:
+- ${data.stats.pageViews} people found the site (${formatDelta(data.stats.pageViewsDelta)} vs last week)
+- ${data.stats.bookingClicks} booking clicks (${formatDelta(data.stats.bookingClicksDelta)} vs last week)
+- ${data.stats.reviewsReceived} reviews received
+- ${data.stats.contentUpdates} AI site updates
+
+${data.topServices.length ? `Top services:\n${data.topServices.map((s) => `- ${s.name}: ${s.clicks} clicks`).join("\n")}` : "No service click data this week."}
+${data.topSearchQueries.length ? `Top searches:\n${data.topSearchQueries.map((q) => `- ${q.query}: ${q.clicks} clicks, ${q.impressions} impressions`).join("\n")}` : "No search query data this week."}
+${data.staleSections.length ? `Stale sections:\n${data.staleSections.map((s) => `- ${s.section}: ${s.daysSinceUpdate} days`).join("\n")}` : "No stale sections."}
+${data.nextAction ? `Suggested next action: ${data.nextAction.title} - ${data.nextAction.description}` : ""}
+
+Rules:
+- 1 short paragraph, 2 sentences max
+- Lead with value proof, using "people found you" if page views are available
+- Mention one concrete thing the AI handled or recommends
+- No greeting, no markdown, no sign-off`,
+    });
+    return text.trim();
+  } catch {
+    return buildFallbackSummary(data.stats);
+  }
+}
+
+function buildFallbackSummary(stats: WeeklyBriefStats): string {
   const parts: string[] = [];
 
   if (stats.pageViews > 0) {
@@ -167,4 +252,9 @@ function buildSummary(stats: WeeklyBriefStats, highlights: string[]): string {
   }
 
   return parts.join(". ") + ".";
+}
+
+function formatDelta(delta: number): string {
+  if (delta > 0) return `+${delta}`;
+  return `${delta}`;
 }

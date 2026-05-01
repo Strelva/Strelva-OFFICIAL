@@ -1,4 +1,4 @@
-import type { BookingConfig, WeeklySlot, DateOverride, Booking } from "./types";
+import type { BookingConfig, DateOverride, Booking } from "./types";
 
 export const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   timezone: "America/New_York",

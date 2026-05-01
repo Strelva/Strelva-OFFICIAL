@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, useCallback, useTransition } from "react";
+import { Clock3 } from "lucide-react";
 import { QueueCard } from "./QueueCard";
 import { EmptyQueue } from "./EmptyQueue";
+import { SuggestionCard } from "./SuggestionCard";
 import type { UnifiedEvent } from "@/lib/types";
 
 interface QueuePageProps {
   initialPending: UnifiedEvent[];
   initialResolved: UnifiedEvent[];
   pendingCount: number;
+  staleSectionCount?: number;
 }
 
-export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount }: QueuePageProps) {
+export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0 }: QueuePageProps) {
   const [tab, setTab] = useState<"pending" | "resolved">("pending");
   const [pending, setPending] = useState(initialPending);
   const [resolved, setResolved] = useState(initialResolved);
@@ -60,6 +63,11 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const handleDismiss = useCallback((id: string) => handleResolve(id, "dismissed"), [handleResolve]);
 
   const currentEvents = tab === "pending" ? pending : resolved;
+  const monthAgo = Date.now() - 30 * 86_400_000;
+  const aiHandledThisMonth = resolved.filter((event) => {
+    const resolvedAt = event.resolvedAt || event.createdAt;
+    return event.source === "ai" && new Date(resolvedAt).getTime() >= monthAgo;
+  }).length;
 
   return (
     <div className="flex flex-col h-full animate-route-enter">
@@ -105,9 +113,32 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       {/* Content with crossfade */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         <div className="queue-tab-content">
+          {tab === "resolved" && aiHandledThisMonth > 0 && (
+            <p className="text-[13px] text-gray-muted mb-3">
+              The AI handled {aiHandledThisMonth} item{aiHandledThisMonth === 1 ? "" : "s"} this month.
+            </p>
+          )}
           {currentEvents.length === 0 ? (
             tab === "pending" ? (
-              <EmptyQueue />
+              staleSectionCount > 0 ? (
+                <div className="rounded-xl border border-glass-border bg-surface-raised p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-accent-dim text-accent flex items-center justify-center shrink-0">
+                      <Clock3 className="w-4 h-4" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-warm-black">
+                        {staleSectionCount} section{staleSectionCount === 1 ? "" : "s"} could use a refresh
+                      </p>
+                      <p className="text-[12px] text-gray-fg mt-1">
+                        Nothing needs approval, but the AI is watching older site content.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyQueue />
+              )
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <p className="text-[13px] text-gray-muted">No completed items yet</p>
@@ -121,12 +152,21 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                   className="animate-queue-card-enter"
                   style={{ animationDelay: `${index * 40}ms` }}
                 >
-                  <QueueCard
-                    event={event}
-                    onApprove={handleApprove}
-                    onDismiss={handleDismiss}
-                    disabled={processingIds.has(event.id)}
-                  />
+                  {event.type === "suggestion" ? (
+                    <SuggestionCard
+                      event={event}
+                      onApprove={handleApprove}
+                      onDismiss={handleDismiss}
+                      disabled={processingIds.has(event.id)}
+                    />
+                  ) : (
+                    <QueueCard
+                      event={event}
+                      onApprove={handleApprove}
+                      onDismiss={handleDismiss}
+                      disabled={processingIds.has(event.id)}
+                    />
+                  )}
                 </div>
               ))}
             </div>

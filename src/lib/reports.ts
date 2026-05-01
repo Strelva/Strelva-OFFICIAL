@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData } from "./storage";
+import { STALE_DAYS } from "./utils";
 import type { TenantConfig, ContentSection, SearchQuery } from "./types";
 import type { ActivityEntry } from "./storage";
 
@@ -22,8 +23,6 @@ export interface WeeklyReportData {
   summary: string;
 }
 
-const STALE_THRESHOLD_DAYS = 30;
-
 export function detectStaleSections(
   timestamps: Record<string, string>,
   sections: string[],
@@ -35,7 +34,7 @@ export function detectStaleSections(
     const ts = timestamps[section];
     if (!ts) continue;
     const days = Math.floor((now - new Date(ts).getTime()) / 86_400_000);
-    if (days >= STALE_THRESHOLD_DAYS) {
+    if (days >= STALE_DAYS) {
       stale.push({ section, daysSinceUpdate: days });
     }
   }

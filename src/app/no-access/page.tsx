@@ -16,7 +16,7 @@ export default async function NoAccessPage() {
           No access to this site
         </h1>
         <p className="text-zinc-400 mb-6">
-          You're signed in, but you don't have permission to access this dashboard.
+          You&apos;re signed in, but you don&apos;t have permission to access this dashboard.
           If you believe this is an error, contact the site owner.
         </p>
         <div className="flex gap-3 justify-center">

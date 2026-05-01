@@ -11,6 +11,8 @@ export async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T
   }
 }
 
+export const STALE_DAYS = 30;
+
 export function getFreshness(
   sectionId: string,
   timestamps: Record<string, string>,
@@ -20,7 +22,7 @@ export function getFreshness(
   const age = Date.now() - new Date(ts).getTime();
   const days = age / (86400 * 1000);
   if (days < 7) return "fresh";
-  if (days < 14) return "aging";
+  if (days < STALE_DAYS) return "aging";
   return "stale";
 }
 

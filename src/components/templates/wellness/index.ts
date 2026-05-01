@@ -103,7 +103,7 @@ const EDITABLE_SECTION_MAP: Record<string, string> = {
 function buildSectionProps(
   sectionConfig: PageSectionConfig,
   content: Record<string, unknown>,
-  pageSlug: string
+  _pageSlug: string
 ): Record<string, unknown> | null {
   const { type, props: customProps } = sectionConfig;
 

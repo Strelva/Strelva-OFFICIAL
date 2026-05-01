@@ -503,6 +503,23 @@ export interface WeeklyBriefStats {
   bookingClicks: number;
   reviewsReceived: number;
   contentUpdates: number;
+  pageViewsDelta: number;
+  bookingClicksDelta: number;
+}
+
+export interface WeeklyBriefNextAction {
+  title: string;
+  description: string;
+}
+
+export interface WeeklyBriefService {
+  name: string;
+  clicks: number;
+}
+
+export interface WeeklyBriefStaleSection {
+  section: string;
+  daysSinceUpdate: number;
 }
 
 export interface WeeklyBrief {
@@ -513,5 +530,9 @@ export interface WeeklyBrief {
   summary: string;
   stats: WeeklyBriefStats;
   highlights: string[];
+  nextAction?: WeeklyBriefNextAction;
+  topServices: WeeklyBriefService[];
+  topSearchQueries: SearchQuery[];
+  staleSections: WeeklyBriefStaleSection[];
   createdAt: string;
 }

@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import gsap from "gsap";
-import { ScrollTrigger } from "@/lib/lenis";
+import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
 import type { TestimonialsContent } from "@/lib/types";
 
 export function TestimonialQuote({ testimonials }: { testimonials: TestimonialsContent }) {
