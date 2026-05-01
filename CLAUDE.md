@@ -40,7 +40,7 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant "gldf".
 ## What This Is
 A dashboard that shows local businesses what's happening with their online presence — and an AI that handles the updates. Business owners see proof of value (visitors, clicks, reviews), chat with the AI to make changes, and get weekly reports.
 
-**Pivoted from agency model to platform on 2026-04-03.** See `.claude/plans/todos.yml` for completed phase history and `.claude/plans/remaining.yml` for the 41-item TODO list to finish shipping.
+**Pivoted from agency model to platform on 2026-04-03.**
 
 ## One-Liner
 "See what's working. Tell the AI what to change."
@@ -111,11 +111,8 @@ Business owners will pay $149/mo for a dashboard that proves their website is wo
 - Tiered pricing UI (single plan at $149/mo — all capabilities included)
 
 ## Build Order
-See `.claude/plans/todos.yml` for completed phases 1-9.
-See `.claude/plans/remaining.yml` for remaining items.
-
 **Completed:** Phases 1-9 + all P0/P1/P2, dashboard redesign, single-plan pricing migration
-**Remaining:** Deploy checklist (7 items), verification queue (5 items), growth features (deferred)
+**Remaining:** Deploy checklist, verification queue, growth features (deferred)
 
 ## Validation Signals
 1. Does the first customer check the dashboard within 7 days?
