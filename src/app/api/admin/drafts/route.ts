@@ -5,10 +5,17 @@ import { getAllTenants } from "@/lib/tenants";
 import {
   listDrafts,
   getDraftContent,
+  getContent,
   setContent,
   clearDraft,
+  appendVersion,
+  recordSectionUpdate,
+  logActivity,
 } from "@/lib/storage";
 import type { ContentSection, ContentMap } from "@/lib/types";
+import { sectionSchemas } from "@/lib/schemas";
+import { diffFields } from "@/lib/utils";
+import { revalidateClientSite } from "@/lib/revalidate-client";
 
 export async function GET() {
   if (!(await isSuperAdmin())) {
@@ -70,6 +77,9 @@ export async function POST(request: Request) {
   }
 
   const typedSection = section as ContentSection;
+  if (!sectionSchemas[typedSection]) {
+    return NextResponse.json({ error: "Unknown section" }, { status: 400 });
+  }
 
   if (action === "approve") {
     const draftData = await getDraftContent(typedSection, tenant);
@@ -79,9 +89,31 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    await setContent(typedSection, draftData as ContentMap[typeof typedSection], tenant);
+    const parsed = sectionSchemas[typedSection].safeParse(draftData);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid draft content" },
+        { status: 422 }
+      );
+    }
+
+    const current = await getContent(typedSection, tenant) as unknown as Record<string, unknown>;
+    const changes = diffFields(current, parsed.data as Record<string, unknown>);
+    await setContent(typedSection, parsed.data as ContentMap[typeof typedSection], tenant);
+    await appendVersion(typedSection, parsed.data, "user", tenant, changes);
+    await recordSectionUpdate(typedSection, tenant);
+    await logActivity({
+      text: `Approved AI draft for ${typedSection}`,
+      time: new Date().toISOString(),
+      type: "admin",
+      section: typedSection,
+      actor: "user",
+      changes,
+      snapshot: current,
+    }, tenant);
     await clearDraft(typedSection, tenant);
     revalidatePath("/");
+    revalidateClientSite(tenant, ["/"]).catch(() => {});
   } else {
     await clearDraft(typedSection, tenant);
   }

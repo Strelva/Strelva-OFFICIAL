@@ -217,6 +217,15 @@ export async function executeAgentPrompt(
             parsed.data as Parameters<typeof setContent>[1],
             tenantId
           );
+          const { appendVersion } = await import("@/lib/storage");
+          const { diffFields } = await import("@/lib/utils");
+          await appendVersion(
+            section as ContentSection,
+            parsed.data,
+            "ai",
+            tenantId,
+            diffFields(current, data as Record<string, unknown>)
+          );
           const { revalidatePath } = await import("next/cache");
           revalidatePath("/");
 
@@ -249,6 +258,8 @@ export async function executeAgentPrompt(
             section,
             actor: "ai",
             changes,
+            eventStatus: governance.action === "publish" ? "auto_approved" : "pending",
+            governanceReason: governance.reason,
           },
           tenantId
         );

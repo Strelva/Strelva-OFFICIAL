@@ -29,6 +29,45 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function dayOfWeekForDate(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+function zonedNowAsUtcTimestamp(timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)])
+  );
+
+  const hour = values.hour === 24 ? 0 : values.hour;
+  return Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    hour,
+    values.minute,
+    values.second
+  );
+}
+
+function localSlotAsUtcTimestamp(date: string, time: string): number {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return Date.UTC(year, month - 1, day, hour, minute, 0);
+}
+
 export function generateSlots(
   config: BookingConfig,
   date: string,
@@ -36,8 +75,7 @@ export function generateSlots(
   existingBookings: Booking[],
   overrides: DateOverride[]
 ): string[] {
-  const dateObj = new Date(date + "T00:00:00");
-  const dayOfWeek = dateObj.getDay();
+  const dayOfWeek = dayOfWeekForDate(date);
 
   // Check date override
   const override = overrides.find((o) => o.date === date);
@@ -87,13 +125,12 @@ export function generateSlots(
   }
 
   // Check lead time — filter out slots that are too soon
-  const now = new Date();
   const leadTimeMs = config.bookingLeadTime * 60 * 60 * 1000;
-  const minBookingTime = new Date(now.getTime() + leadTimeMs);
+  const minBookingTime = zonedNowAsUtcTimestamp(config.timezone) + leadTimeMs;
 
   return slots.filter((slot) => {
-    const slotDate = new Date(`${date}T${slot}:00`);
-    return slotDate > minBookingTime;
+    const slotTime = localSlotAsUtcTimestamp(date, slot);
+    return slotTime > minBookingTime;
   });
 }
 
@@ -102,8 +139,7 @@ export function isDateBookable(
   date: string,
   overrides: DateOverride[]
 ): boolean {
-  const dateObj = new Date(date + "T00:00:00");
-  const dayOfWeek = dateObj.getDay();
+  const dayOfWeek = dayOfWeekForDate(date);
 
   const override = overrides.find((o) => o.date === date);
   if (override) return override.available;

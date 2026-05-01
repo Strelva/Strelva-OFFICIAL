@@ -8,6 +8,7 @@ export const heroSchema = z.object({
   ctaText: z.string().min(1),
   ctaLink: z.string(),
   backgroundImageUrl: z.string(),
+  logoUrl: z.string().optional(),
 });
 
 export const serviceItemSchema = z.object({
@@ -40,6 +41,7 @@ export const storySchema = z.object({
   quote: z.string(),
   quoteAttribution: z.string(),
   imageUrl: z.string(),
+  secondaryImageUrl: z.string().optional(),
 });
 
 export const testimonialItemSchema = z.object({
@@ -123,14 +125,14 @@ export const shopSchema = z.object({
 
 export const contactSchema = z.object({
   email: z.string().email(),
-  phone: z.string(),
-  address: z.string(),
-  hours: z.string(),
+  phone: z.string().optional().default(""),
+  address: z.string().optional().default(""),
+  hours: z.string().optional().default(""),
   locationTitle: z.string(),
   locationDescription: z.string(),
   instagramUrl: z.string(),
   facebookUrl: z.string(),
-  googleMapsUrl: z.string(),
+  googleMapsUrl: z.string().optional().default(""),
 });
 
 export const productItemSchema = z.object({
@@ -163,7 +165,11 @@ export const siteSettingsSchema = z.object({
   ownerTitle: z.string().optional().default(""),
   footerTagline: z.string(),
   copyrightText: z.string(),
-  bookingUrl: z.string(),
+  bookingUrl: z.string().optional().default(""),
+  instagramHandle: z.string().optional().default(""),
+  vagaro_embed_id: z.string().optional().default(""),
+  logoUrl: z.string().optional().default(""),
+  marqueeText: z.string().optional().default(""),
 });
 
 export const themeSchema = z.object({

@@ -157,6 +157,8 @@ export async function emitEventFromActivity(
     section?: string;
     actor?: "user" | "ai";
     changes?: { field: string; before: string; after: string }[];
+    eventStatus?: UnifiedEvent["status"];
+    governanceReason?: string;
   },
   tenant: string = DEFAULT_TENANT
 ): Promise<UnifiedEvent | null> {
@@ -169,10 +171,11 @@ export async function emitEventFromActivity(
     type: "content_update",
     title: entry.text,
     body: entry.changes?.map((c) => `${c.field}: ${c.after}`).join("\n") ?? "",
-    status: "auto_approved",
+    status: entry.eventStatus ?? "auto_approved",
     metadata: {
       section: entry.section,
       changes: entry.changes,
+      governanceReason: entry.governanceReason,
     },
   });
 

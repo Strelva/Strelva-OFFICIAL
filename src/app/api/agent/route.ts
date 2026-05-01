@@ -324,6 +324,8 @@ export async function POST(req: Request) {
                 section,
                 actor: "ai",
                 changes,
+                eventStatus: autoPublish ? "auto_approved" : "pending",
+                governanceReason: governance.reason,
               }, tenant);
               if (autoPublish) await recordSectionUpdate(section, tenant);
             } catch {}
@@ -604,24 +606,35 @@ export async function POST(req: Request) {
         }),
         execute: async ({ section, visible, page }) => {
           try {
-            const { getPageConfig, setPageConfig } = await import("@/lib/storage");
-            const config = await getPageConfig(tenant);
+            const { addEvent } = await import("@/lib/events");
+            const { getPageConfig } = await import("@/lib/storage");
             const pageSlug = page || "home";
+            const config = await getPageConfig(tenant);
             if (!config || !config[pageSlug]) {
               return { success: false, error: `Page "${pageSlug}" not found in config` };
             }
-            const pageCfg = config[pageSlug];
-            const sectionCfg = pageCfg.sections.find((s) => s.type === section);
-            if (!sectionCfg) {
+            if (!config[pageSlug].sections.some((s) => s.type === section)) {
               return { success: false, error: `Section "${section}" not found on page "${pageSlug}"` };
             }
-            sectionCfg.visible = visible;
-            await setPageConfig(config, tenant);
-            const { revalidatePath } = await import("next/cache");
-            revalidatePath("/");
+            await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "content_update",
+              title: `AI requested ${section} visibility change`,
+              body: `${section} should be ${visible ? "shown" : "hidden"} on ${pageSlug}.`,
+              status: "pending",
+              metadata: {
+                kind: "manual_structural_change",
+                page: pageSlug,
+                section,
+                visible,
+                governanceReason: "Section visibility is a structural site change and requires manual admin review.",
+              },
+            });
             return {
-              success: true,
-              message: `${section} is now ${visible ? "visible" : "hidden"} on the ${pageSlug} page`,
+              success: false,
+              blocked: true,
+              message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
             };
           } catch (err) {
             return { success: false, error: err instanceof Error ? err.message : "Failed" };
@@ -632,38 +645,43 @@ export async function POST(req: Request) {
     reorder_sections: {
       capability: "read_section",
       def: tool({
-        description: "Reorder sections on a page. Provide the section types in the desired order.",
+        description: "Request a section reorder for admin review. Structural layout changes do not publish directly.",
         inputSchema: z.object({
           page: z.string().optional().describe("Page slug (default: home)"),
           order: z.array(z.string()).describe("Section types in desired order, e.g. ['hero', 'services', 'story']"),
         }),
         execute: async ({ page, order }) => {
           try {
-            const { getPageConfig, setPageConfig } = await import("@/lib/storage");
+            const { addEvent } = await import("@/lib/events");
+            const { getPageConfig } = await import("@/lib/storage");
             const config = await getPageConfig(tenant);
             const pageSlug = page || "home";
             if (!config || !config[pageSlug]) {
               return { success: false, error: `Page "${pageSlug}" not found in config` };
             }
-            const pageCfg = config[pageSlug];
-            const sectionMap = new Map(pageCfg.sections.map((s) => [s.type, s]));
-            const reordered = order
-              .filter((t) => sectionMap.has(t))
-              .map((t, i) => ({ ...sectionMap.get(t)!, order: i }));
-            // Append any sections not in the order list
-            const orderedTypes = new Set(order);
-            for (const s of pageCfg.sections) {
-              if (!orderedTypes.has(s.type)) {
-                reordered.push({ ...s, order: reordered.length });
-              }
+            const pageTypes = new Set(config[pageSlug].sections.map((s) => s.type));
+            const unknown = order.filter((sectionType) => !pageTypes.has(sectionType));
+            if (unknown.length > 0) {
+              return { success: false, error: `Unknown section(s) for ${pageSlug}: ${unknown.join(", ")}` };
             }
-            config[pageSlug] = { ...pageCfg, sections: reordered };
-            await setPageConfig(config, tenant);
-            const { revalidatePath } = await import("next/cache");
-            revalidatePath("/");
+            await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "content_update",
+              title: `AI requested section reorder`,
+              body: `Requested ${pageSlug} order: ${order.join(", ")}`,
+              status: "pending",
+              metadata: {
+                kind: "manual_structural_change",
+                page: pageSlug,
+                order,
+                governanceReason: "Section order is a structural site change and requires manual admin review.",
+              },
+            });
             return {
-              success: true,
-              message: `Sections on ${pageSlug} reordered: ${reordered.map((s) => s.type).join(", ")}`,
+              success: false,
+              blocked: true,
+              message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
             };
           } catch (err) {
             return { success: false, error: err instanceof Error ? err.message : "Failed" };

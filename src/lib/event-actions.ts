@@ -1,6 +1,16 @@
 import { executeAgentPrompt } from "./agent-executor";
 import { getEvent, resolveEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
+import {
+  appendVersion,
+  clearDraft,
+  getContent,
+  getDraftContent,
+  recordSectionUpdate,
+  setContent,
+} from "./storage";
+import { diffFields } from "./utils";
+import type { ContentMap, ContentSection } from "./types";
 
 export async function resolveEventAction(
   tenantId: string,
@@ -14,6 +24,38 @@ export async function resolveEventAction(
   const resolved = await resolveEvent(eventId, action, { actor: "user" });
   if (!resolved.changed) {
     return { changed: false, reason: "already_resolved" };
+  }
+
+  if (event.type === "content_update") {
+    const section = typeof event.metadata?.section === "string"
+      ? event.metadata.section as ContentSection
+      : null;
+
+    if (section && event.metadata?.kind !== "manual_structural_change") {
+      if (action === "approved") {
+        const draft = await getDraftContent(section, tenantId);
+        if (!draft) return { changed: true, reason: "draft_not_found" };
+
+        const current = await getContent(section, tenantId) as unknown as Record<string, unknown>;
+        await setContent(section, draft as ContentMap[typeof section], tenantId);
+        await appendVersion(
+          section,
+          draft,
+          "user",
+          tenantId,
+          diffFields(current, draft as unknown as Record<string, unknown>)
+        );
+        await recordSectionUpdate(section, tenantId);
+        const { revalidatePath } = await import("next/cache");
+        revalidatePath("/");
+        const { revalidateClientSite } = await import("./revalidate-client");
+        revalidateClientSite(tenantId, ["/"]).catch(() => {});
+      }
+
+      await clearDraft(section, tenantId);
+    }
+
+    return { changed: true };
   }
 
   if (event.type !== "suggestion") return { changed: true };
