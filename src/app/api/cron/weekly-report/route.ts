@@ -51,7 +51,7 @@ export async function GET() {
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL
         || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://scaffoldweb.com");
-      const html = reportToHtml(report.summary, report.tenant.siteName, `${appUrl}/dashboard/brief`);
+      const html = reportToHtml(report.summary, report.tenant.siteName, `${appUrl}/dashboard`);
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {

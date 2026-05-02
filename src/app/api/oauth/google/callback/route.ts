@@ -69,7 +69,7 @@ export async function GET(req: Request) {
   const error = url.searchParams.get("error");
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const connectionsUrl = `${appUrl}/dashboard/connections/google-business`;
+  const connectionsUrl = `${appUrl}/dashboard/sources/google-business`;
 
   // Handle OAuth errors from Google
   if (error) {

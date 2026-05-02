@@ -207,7 +207,7 @@ export function ConnectionsPage() {
 
       {/* Featured hero card */}
       <div
-        onClick={() => router.push(`/dashboard/connections/${featured.id}`)}
+        onClick={() => router.push(`/dashboard/sources/${featured.id}`)}
         className="flex flex-col lg:flex-row rounded-2xl dashboard-panel overflow-hidden mb-8 cursor-pointer hover:border-gray-border transition-colors"
       >
         <div className="flex-1 flex flex-col justify-center gap-4 p-5 sm:p-7 lg:p-8">
@@ -260,7 +260,7 @@ export function ConnectionsPage() {
           <ConnectionRow
             key={connection.id}
             connection={connection}
-            onClick={() => router.push(`/dashboard/connections/${connection.id}`)}
+            onClick={() => router.push(`/dashboard/sources/${connection.id}`)}
           />
         ))}
       </div>

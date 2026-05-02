@@ -446,7 +446,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     <div className="flex-1 overflow-y-auto px-14 py-10 animate-route-enter">
       {/* Back link */}
       <button
-        onClick={() => router.push("/dashboard/connections")}
+        onClick={() => router.push("/dashboard/sources")}
         className="flex items-center gap-1.5 text-gray-faint hover:text-gray-muted transition-colors mb-8"
       >
         <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />

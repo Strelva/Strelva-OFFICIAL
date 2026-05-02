@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const error = url.searchParams.get("error");
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const connectionsUrl = `${appUrl}/dashboard/connections`;
+  const connectionsUrl = `${appUrl}/dashboard/sources`;
 
   if (error) {
     const errorDesc = url.searchParams.get("error_description") || error;

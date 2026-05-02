@@ -30,11 +30,11 @@ export async function GET(req: Request) {
 
   if (error) {
     console.error("[instagram-callback] OAuth error:", error);
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?error=oauth_denied`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=oauth_denied`);
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?error=missing_params`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=missing_params`);
   }
 
   // Decode state to get tenantId
@@ -43,14 +43,14 @@ export async function GET(req: Request) {
     const decoded = JSON.parse(Buffer.from(state, "base64url").toString());
     tenantId = decoded.tenantId;
   } catch {
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?error=invalid_state`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=invalid_state`);
   }
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
   const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?error=not_configured`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=not_configured`);
   }
 
   const redirectUri = `${appUrl}/api/oauth/instagram/callback`;
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
       console.error("[instagram-callback] Token exchange failed:", errText);
-      return NextResponse.redirect(`${appUrl}/dashboard/connections?error=token_exchange`);
+      return NextResponse.redirect(`${appUrl}/dashboard/sources?error=token_exchange`);
     }
 
     const shortLived: ShortLivedTokenResponse = await tokenRes.json();
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
     if (!longLivedRes.ok) {
       const errText = await longLivedRes.text();
       console.error("[instagram-callback] Long-lived token exchange failed:", errText);
-      return NextResponse.redirect(`${appUrl}/dashboard/connections?error=long_lived_token`);
+      return NextResponse.redirect(`${appUrl}/dashboard/sources?error=long_lived_token`);
     }
 
     const longLived: LongLivedTokenResponse = await longLivedRes.json();
@@ -104,9 +104,9 @@ export async function GET(req: Request) {
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000).toISOString(),
     });
 
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?success=instagram`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?success=instagram`);
   } catch (err) {
     console.error("[instagram-callback] Error:", err);
-    return NextResponse.redirect(`${appUrl}/dashboard/connections?error=unknown`);
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=unknown`);
   }
 }

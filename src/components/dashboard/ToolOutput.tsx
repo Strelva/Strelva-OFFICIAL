@@ -395,7 +395,7 @@ function PhotosOutput({ data }: { data: PhotoData }) {
               </div>
               {remaining > 0 && (
                 <a
-                  href="/dashboard/photos"
+                  href="/dashboard/assets"
                   className="flex items-center justify-center gap-1.5 mt-3 py-2 text-[12px] text-accent hover:text-accent/80 transition-colors"
                 >
                   View all {data.total} photos

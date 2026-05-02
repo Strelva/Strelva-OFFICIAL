@@ -2,15 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
-import { HistorySidebar, type Thread } from "./HistorySidebar";
+import { HistorySidebar } from "./HistorySidebar";
 import { MobileNav } from "./MobileNav";
 
 interface ConversationShellProps {
   children: ReactNode;
-  threads: Thread[];
-  activeThreadId: string | null;
-  onNewChat: () => void;
-  onSelectThread: (id: string) => void;
   ownerName: string;
   pendingCount?: number;
   valueProof?: string;
@@ -18,10 +14,6 @@ interface ConversationShellProps {
 
 export function ConversationShell({
   children,
-  threads,
-  activeThreadId,
-  onNewChat,
-  onSelectThread,
   ownerName,
   pendingCount = 0,
   valueProof,
@@ -32,10 +24,6 @@ export function ConversationShell({
     <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
       {/* Navigation sidebar */}
       <HistorySidebar
-        threads={threads}
-        activeThreadId={activeThreadId}
-        onNewChat={onNewChat}
-        onSelectThread={onSelectThread}
         ownerName={ownerName}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

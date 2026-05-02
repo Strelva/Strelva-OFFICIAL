@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, FileText, LayoutPanelLeft, MessageSquare } from "lucide-react";
+import { Inbox, FileText, LayoutPanelLeft, Image as ImageIcon, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard/brief", label: "Report", icon: FileText },
-  { href: "/dashboard/queue", label: "Review", icon: Inbox },
-  { href: "/dashboard/chat", label: "AI", icon: MessageSquare },
-  { href: "/dashboard/content", label: "Site", icon: LayoutPanelLeft },
+  { href: "/dashboard", label: "Today", icon: FileText },
+  { href: "/dashboard/review", label: "Review", icon: Inbox },
+  { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
+  { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
+  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
@@ -18,9 +19,10 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const getActiveIndex = useCallback(() => {
-    return NAV_ITEMS.findIndex(
-      (item) =>
-        pathname === item.href || pathname?.startsWith(item.href + "/")
+    return NAV_ITEMS.findIndex((item) =>
+      item.href === "/dashboard"
+        ? pathname === "/dashboard"
+        : pathname?.startsWith(item.href)
     );
   }, [pathname]);
 
@@ -57,10 +59,11 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
           }}
         />
         {NAV_ITEMS.map((item) => {
-          const isActive =
-            pathname === item.href || pathname?.startsWith(item.href + "/");
+          const isActive = item.href === "/dashboard"
+            ? pathname === "/dashboard"
+            : pathname?.startsWith(item.href);
           const Icon = item.icon;
-          const showBadge = item.href === "/dashboard/queue" && pendingCount > 0;
+          const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
 
           return (
             <Link

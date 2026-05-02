@@ -8,7 +8,6 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { hasTenantAccess } from "@/lib/auth";
-import { listThreads } from "@/lib/threads";
 import { getQueueCount } from "@/lib/events";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
@@ -41,9 +40,8 @@ export default async function DashboardLayout({
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
-  // Fetch threads for the history sidebar and queue count
-  const [threads, pendingCount, pageViews, activity] = await Promise.all([
-    listThreads(tenant),
+  // Fetch queue count and stats
+  const [pendingCount, pageViews, activity] = await Promise.all([
     getQueueCount(tenant),
     getClickCounts("page-view", tenant),
     getActivity(tenant, { actor: "ai" }),
@@ -53,19 +51,12 @@ export default async function DashboardLayout({
   const valueProof = pageViews.thisWeek > 0
     ? `${pageViews.thisWeek} visitors this week`
     : `${aiUpdatesThisMonth} AI updates this month`;
-  const threadSummaries = threads.map((t) => ({
-    id: t.id,
-    title: t.title,
-    preview: t.messages[t.messages.length - 1]?.content.slice(0, 60) || "",
-    updatedAt: new Date(t.updatedAt).getTime(),
-  }));
 
   return (
     <DashboardProvider siteUrl={siteUrl} template={tenantConfig?.template || "wellness"} autoPublish={tenantConfig?.autoPublish !== false}>
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationLayoutClient
-          threads={threadSummaries}
           ownerName={ownerName || siteName}
           pendingCount={pendingCount}
           valueProof={valueProof}
