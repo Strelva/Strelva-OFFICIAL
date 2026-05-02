@@ -487,7 +487,7 @@ export interface UnifiedEvent {
   id: string;
   tenantId: string;
   source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai';
-  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion';
+  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft';
   title: string;
   body: string;
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';

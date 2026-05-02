@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getAllTenants } from "@/lib/tenants";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
+import { InviteButton } from "./InviteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +160,11 @@ export default async function AdminPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
+                      <InviteButton
+                        tenantId={t.id}
+                        siteName={t.siteName}
+                        ownerEmail={t.ownerEmail}
+                      />
                       <Link
                         href={`/dashboard?tenant=${t.id}`}
                         className="text-xs text-zinc-400 hover:text-white transition-colors"

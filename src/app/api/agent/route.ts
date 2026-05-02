@@ -9,7 +9,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment } from "@/lib/capabilities";
-import { isRateLimited } from "@/lib/rate-limit";
+import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
 import type { ContentSection } from "@/lib/types";
@@ -161,7 +161,7 @@ export async function POST(req: Request) {
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
 
-  if (isRateLimited(`agent:${tenant}`, 30)) {
+  if (await isRateLimitedAsync(`agent:${tenant}`, 30)) {
     return new Response(
       JSON.stringify({ error: "Too many requests. Try again in a minute." }),
       { status: 429, headers: { "Content-Type": "application/json" } }
@@ -414,55 +414,52 @@ export async function POST(req: Request) {
         },
       }),
     },
-    send_newsletter: {
-      capability: "send_newsletter",
+    draft_newsletter: {
+      capability: "draft_newsletter",
       def: tool({
-        description: "Compose and send an email newsletter to all subscribers",
+        description: "Draft an email newsletter. Creates a draft that must be approved before sending. Use this instead of sending newsletters directly.",
         inputSchema: z.object({
           subject: z.string(),
           body: z.string().describe("The email content in plain text or simple HTML"),
         }),
         execute: async ({ subject, body }) => {
           try {
-            const { getSubscribers, getContent, logActivity } = await import("@/lib/storage");
+            const { getSubscribers, logActivity } = await import("@/lib/storage");
+            const { addEvent } = await import("@/lib/events");
             const subscribers = await getSubscribers(tenant);
             const active = subscribers.filter((s) => s.status === "active");
             if (active.length === 0) return { success: false, error: "No active subscribers" };
 
-            const settings = await getContent("settings", tenant);
-            const fromName = settings.siteName || "Newsletter";
-
-            if (process.env.RESEND_API_KEY) {
-              const { Resend } = await import("resend");
-              const resend = new Resend(process.env.RESEND_API_KEY);
-              const emails = active.map((s) => s.email);
-              const batchSize = 100;
-              for (let i = 0; i < emails.length; i += batchSize) {
-                const batch = emails.slice(i, i + batchSize);
-                await resend.batch.send(
-                  batch.map((to) => ({
-                    from: `${fromName} <newsletter@${tenantConfig?.resendDomain || process.env.RESEND_DOMAIN || "updates.scaffoldweb.com"}>`,
-                    to,
-                    subject,
-                    html: body,
-                    text: body.replace(/<[^>]*>/g, ""),
-                  }))
-                );
-              }
-            } else {
-              console.log(`[Newsletter dev] "${subject}" → ${active.length} subscribers`);
-            }
+            await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "newsletter_draft",
+              title: `Newsletter draft: "${subject}"`,
+              body: `To ${active.length} subscribers.\n\n${body.slice(0, 500)}${body.length > 500 ? "..." : ""}`,
+              status: "pending",
+              metadata: {
+                kind: "newsletter_approval",
+                subject,
+                body,
+                subscriberCount: active.length,
+              },
+            });
 
             await logActivity({
-              text: `AI sent newsletter: "${subject}" to ${active.length} subscribers`,
+              text: `AI drafted newsletter: "${subject}" for ${active.length} subscribers (pending approval)`,
               time: new Date().toISOString(),
               type: "newsletter",
               actor: "ai",
             }, tenant);
 
-            return { success: true, subscriberCount: active.length };
+            return {
+              success: true,
+              drafted: true,
+              subscriberCount: active.length,
+              message: `I've drafted the newsletter "${subject}" for ${active.length} subscribers. It's in the review queue for Jacob to approve before sending.`,
+            };
           } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed to send" };
+            return { success: false, error: err instanceof Error ? err.message : "Failed to draft" };
           }
         },
       }),

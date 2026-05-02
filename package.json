@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "provision-tenant": "npx tsx scripts/provision-tenant.ts"
+    "provision-tenant": "npx tsx scripts/provision-tenant.ts",
+    "check:prod": "tsx scripts/production-checklist.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/google": "3.0.43",

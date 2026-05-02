@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { uploadFile } from "@/lib/storage";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimited } from "@/lib/rate-limit";
-
-const MAX_SIZE = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+import { isRateLimitedAsync } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const authed = await verifyAuth();
@@ -13,7 +10,7 @@ export async function POST(request: Request) {
 
   const tenant = await getTenantFromHeaders();
 
-  if (isRateLimited(`upload:${tenant}`, 20)) {
+  if (await isRateLimitedAsync(`upload:${tenant}`, 20)) {
     return NextResponse.json(
       { error: "Too many uploads. Try again in a minute." },
       { status: 429 }
@@ -30,17 +27,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
+  try {
+    const { url } = await uploadFile(file);
+    return NextResponse.json({ url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json(
-      { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF" },
-      { status: 400 }
-    );
-  }
-
-  const { url } = await uploadFile(file);
-  return NextResponse.json({ url });
 }

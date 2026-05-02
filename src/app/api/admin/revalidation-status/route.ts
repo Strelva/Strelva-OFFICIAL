@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const failures = getRecentFailures();
+  const failures = await getRecentFailures();
   return NextResponse.json({
     failures,
     count: failures.length,

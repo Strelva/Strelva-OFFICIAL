@@ -9,39 +9,55 @@ function getStripe() {
   });
 }
 
-// Simple in-memory store for processed event IDs (idempotency)
-// In production with multiple instances, use Redis or database
-const processedEvents = new Set<string>();
-const MAX_PROCESSED_EVENTS = 10000;
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-async function claimStripeEvent(eventId: string): Promise<boolean> {
+type EventStatus = "processing" | "processed" | "failed";
+
+async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate" | "retry"> {
   const redis = getRedis();
-  if (redis) {
-    try {
-      const key = `stripe:event:${eventId}`;
-      const claimed = await redis.set(key, "1", {
-        nx: true,
-        ex: PROCESSED_EVENT_TTL_SECONDS,
-      });
-      return claimed === "OK";
-    } catch {
-      // Fall through to local process memory if Redis is unavailable.
-    }
+  if (!redis) {
+    return "claimed";
   }
 
-  if (processedEvents.has(eventId)) return false;
+  const key = `stripe:event:${eventId}`;
+  try {
+    const existing = await redis.get<EventStatus>(key);
 
-  if (processedEvents.size >= MAX_PROCESSED_EVENTS) {
-    const iterator = processedEvents.values();
-    for (let i = 0; i < 1000; i++) {
-      const next = iterator.next();
-      if (next.done) break;
-      processedEvents.delete(next.value);
+    if (existing === "processed") {
+      return "duplicate";
     }
+
+    if (existing === "processing") {
+      return "retry";
+    }
+
+    await redis.set(key, "processing" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+    return "claimed";
+  } catch {
+    return "claimed";
   }
-  processedEvents.add(eventId);
-  return true;
+}
+
+async function markEventProcessed(eventId: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  const key = `stripe:event:${eventId}`;
+  try {
+    await redis.set(key, "processed" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+  } catch {}
+}
+
+async function markEventFailed(eventId: string, error: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  const key = `stripe:event:${eventId}`;
+  const errorKey = `stripe:event:error:${eventId}`;
+  try {
+    await redis.set(key, "failed" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+    await redis.set(errorKey, error, { ex: PROCESSED_EVENT_TTL_SECONDS });
+  } catch {}
 }
 
 function extractTenantId(object: unknown): string | null {
@@ -112,58 +128,69 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const claimed = await claimStripeEvent(event.id);
-  if (!claimed) {
+  const claimResult = await claimStripeEvent(event.id);
+  if (claimResult === "duplicate") {
     return NextResponse.json({ received: true, duplicate: true });
+  }
+  if (claimResult === "retry") {
+    return NextResponse.json({ received: true, retry: true });
   }
 
   const tenantId = extractTenantId(event.data.object);
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "active" }, event);
-      break;
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "active" }, event);
+        break;
+      }
+
+      case "invoice.paid":
+        await applyTenantSubscriptionStatus(tenantId, {
+          subscriptionStatus: "active",
+          subscriptionPastDueSince: undefined,
+        }, event);
+        break;
+
+      case "invoice.payment_failed":
+        await applyTenantSubscriptionStatus(tenantId, {
+          subscriptionStatus: "past_due",
+          subscriptionPastDueSince: new Date().toISOString(),
+        }, event);
+        if (process.env.SLACK_WEBHOOK_URL) {
+          fetch(process.env.SLACK_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
+            }),
+          }).catch(() => {});
+        }
+        break;
+
+      case "customer.subscription.deleted":
+        await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);
+        if (process.env.SLACK_WEBHOOK_URL) {
+          fetch(process.env.SLACK_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `Subscription cancelled for tenant *${tenantId}*.`,
+            }),
+          }).catch(() => {});
+        }
+        break;
+
+      default:
+        break;
     }
 
-    case "invoice.paid":
-      await applyTenantSubscriptionStatus(tenantId, {
-        subscriptionStatus: "active",
-        subscriptionPastDueSince: undefined, // Clear grace period timestamp
-      }, event);
-      break;
-
-    case "invoice.payment_failed":
-      await applyTenantSubscriptionStatus(tenantId, {
-        subscriptionStatus: "past_due",
-        subscriptionPastDueSince: new Date().toISOString(),
-      }, event);
-      if (process.env.SLACK_WEBHOOK_URL) {
-        fetch(process.env.SLACK_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: `Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
-          }),
-        }).catch(() => {});
-      }
-      break;
-
-    case "customer.subscription.deleted":
-      await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);
-      if (process.env.SLACK_WEBHOOK_URL) {
-        fetch(process.env.SLACK_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: `Subscription cancelled for tenant *${tenantId}*.`,
-          }),
-        }).catch(() => {});
-      }
-      break;
-
-    default:
-      break;
+    await markEventProcessed(event.id);
+    return NextResponse.json({ received: true });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Unknown error";
+    await markEventFailed(event.id, errorMsg);
+    console.error(`[billing webhook] Failed to process ${event.type} for ${tenantId}: ${errorMsg}`);
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
-
-  return NextResponse.json({ received: true });
 }

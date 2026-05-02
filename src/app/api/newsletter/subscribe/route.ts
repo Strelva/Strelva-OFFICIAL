@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { addSubscriber } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimited, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
-    if (isRateLimited(rateLimitKey(req, "subscribe"), 5)) {
+    if (await isRateLimitedAsync(rateLimitKey(req, "subscribe"), 5)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 

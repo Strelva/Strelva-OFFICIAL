@@ -1,6 +1,6 @@
 import { getTenantConfig } from "./tenants";
+import { getRedis } from "./redis";
 
-// In-memory store for recent failures (last 100)
 export interface RevalidationFailure {
   tenantId: string;
   url: string;
@@ -9,17 +9,47 @@ export interface RevalidationFailure {
   attempts: number;
 }
 
+const FAILURES_KEY = "reb:revalidation:failures";
 const MAX_FAILURES = 100;
-const recentFailures: RevalidationFailure[] = [];
+const FAILURE_TTL_DAYS = 7;
 
-export function getRecentFailures(): RevalidationFailure[] {
-  return [...recentFailures];
+export async function getRecentFailures(): Promise<RevalidationFailure[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+
+  try {
+    const raw = await redis.zrange(FAILURES_KEY, 0, MAX_FAILURES - 1, { rev: true });
+    return raw.map((item) => (typeof item === "string" ? JSON.parse(item) : item) as RevalidationFailure);
+  } catch {
+    return [];
+  }
 }
 
-function recordFailure(failure: RevalidationFailure) {
-  recentFailures.unshift(failure);
-  if (recentFailures.length > MAX_FAILURES) {
-    recentFailures.pop();
+async function recordFailure(failure: RevalidationFailure): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    const score = Date.now();
+    await redis.zadd(FAILURES_KEY, { score, member: JSON.stringify(failure) });
+
+    const count = await redis.zcard(FAILURES_KEY);
+    if (count > MAX_FAILURES) {
+      await redis.zremrangebyrank(FAILURES_KEY, 0, count - MAX_FAILURES - 1);
+    }
+
+    const cutoff = Date.now() - FAILURE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    await redis.zremrangebyscore(FAILURES_KEY, 0, cutoff);
+  } catch {}
+
+  if (process.env.SLACK_WEBHOOK_URL) {
+    fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `Revalidation failed for *${failure.tenantId}* after ${failure.attempts} attempts: ${failure.error}`,
+      }),
+    }).catch(() => {});
   }
 }
 
@@ -80,8 +110,7 @@ export async function revalidateClientSite(
     }
   }
 
-  // All retries exhausted - record failure
-  recordFailure({
+  await recordFailure({
     tenantId,
     url: config.revalidateUrl,
     error: lastError || "Unknown error",

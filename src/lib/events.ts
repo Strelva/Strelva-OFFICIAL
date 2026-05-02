@@ -7,6 +7,9 @@ import type { UnifiedEvent } from "./types";
 import { getRedis } from "./redis";
 import { DEFAULT_TENANT } from "./storage/core";
 
+const EVENT_RETENTION_DAYS = 90;
+const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
+
 /**
  * Redis key for tenant event sorted set.
  * Score = timestamp (ms), Member = JSON-encoded event
@@ -35,13 +38,11 @@ export async function addEvent(
   const redis = getRedis();
   if (redis) {
     const score = Date.now();
-    // Store in sorted set for listing
     await redis.zadd(eventsKey(event.tenantId), {
       score,
       member: JSON.stringify(full),
     });
-    // Store individual event for direct lookup
-    await redis.set(eventKey(id), full);
+    await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
   }
 
   return full;
@@ -144,6 +145,23 @@ export async function resolveEvent(
 export async function getQueueCount(tenantId: string): Promise<number> {
   const events = await getEvents(tenantId, { status: "pending", limit: 1000 });
   return events.length;
+}
+
+/**
+ * Prune old events from a tenant's sorted set.
+ * Call periodically (e.g., from a cron) to enforce retention.
+ */
+export async function pruneOldEvents(tenantId: string): Promise<number> {
+  const redis = getRedis();
+  if (!redis) return 0;
+
+  const cutoff = Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  try {
+    const removed = await redis.zremrangebyscore(eventsKey(tenantId), 0, cutoff);
+    return typeof removed === "number" ? removed : 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**
