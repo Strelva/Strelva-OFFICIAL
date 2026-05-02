@@ -25,6 +25,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/billing/webhook",
   "/api/sms/webhook",
   "/api/sanity/webhook",
+  "/api/clerk/webhook",
   "/api/internal/(.*)",
   "/((?!api|dashboard|admin|studio).*)",
 ]);
@@ -123,6 +124,13 @@ async function resolveTenantFromCustomDomain(
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+
+  // Bypass internal API routes immediately to prevent recursion.
+  // The middleware fetches /api/internal/domain-map for custom domain resolution,
+  // so these routes must skip tenant resolution entirely.
+  if (pathname.startsWith("/api/internal/")) {
+    return NextResponse.next();
+  }
 
   if (isCronRoute(req)) {
     const expectedSecret = process.env.CRON_SECRET;

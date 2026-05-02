@@ -39,6 +39,12 @@ function composeSmsBody(
 export async function GET() {
   // Auth handled by middleware (CRON_SECRET check)
 
+  // Feature gate: skip if SMS suggestions are disabled
+  if (process.env.SMS_SUGGESTIONS_ENABLED !== "true") {
+    console.log("[sms-suggestions] Feature disabled via SMS_SUGGESTIONS_ENABLED");
+    return NextResponse.json({ skipped: true, reason: "SMS_SUGGESTIONS_ENABLED is not true" });
+  }
+
   const tenants = await getAllTenants();
   const sent: string[] = [];
   const skipped: string[] = [];
