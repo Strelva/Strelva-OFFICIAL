@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { DEFAULT_TENANT } from "./storage";
+import { DEFAULT_TENANT } from "./storage/core";
 
 export async function getTenantFromHeaders(): Promise<string> {
   const h = await headers();

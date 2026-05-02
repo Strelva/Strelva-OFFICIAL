@@ -5,7 +5,7 @@
 
 import type { UnifiedEvent } from "./types";
 import { getRedis } from "./redis";
-import { DEFAULT_TENANT } from "./storage";
+import { DEFAULT_TENANT } from "./storage/core";
 
 /**
  * Redis key for tenant event sorted set.

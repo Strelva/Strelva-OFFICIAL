@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Naming**: Product is "Scaffold Web". Repo folder is "REB" (internal). Package name is "scaffold-web".
+
 ## Commands
 
 ```bash
@@ -19,7 +21,7 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant "gldf".
 
 **Multi-tenant SaaS**: Subdomain routing in `middleware.ts` extracts tenant from host (e.g., `gldf.scaffoldweb.com` → tenant `gldf`). Marketing site lives on root domain.
 
-**Stack**: Next.js 15 + React 19 + Tailwind 4 + TypeScript. Clerk for auth. Redis (Upstash) for all tenant data. Vercel Blob for images.
+**Stack**: Next.js 16 + React 19 + Tailwind 4 + TypeScript. Clerk for auth. Redis (Upstash) for all tenant data. Vercel Blob for images.
 
 **Content system**: Typed schemas in `src/lib/types.ts` (HeroContent, ServicesContent, etc.). CRUD via `/api/content/[section]`. Templates in `src/components/templates/` define which sections each tenant type uses.
 
@@ -83,7 +85,7 @@ Business owners will pay $149/mo for a dashboard that proves their website is wo
 
 ## Architecture (existing + new)
 **Existing (Scaffold Web codebase):**
-- Next.js 15, Tailwind, TypeScript
+- Next.js 16, Tailwind, TypeScript
 - 8 content sections with typed schemas (types.ts)
 - REST API for content CRUD (/api/content/[section]) with validation
 - JWT auth, image upload (Vercel Blob), Redis storage
@@ -95,7 +97,7 @@ Business owners will pay $149/mo for a dashboard that proves their website is wo
 - Chat interface: useChat with streaming, tool status, image drop
 - Multi-tenant: subdomain routing + Redis namespace per tenant
 - Notifications: Slack webhook on content updates
-- Billing: Stripe ($3K + $199/mo)
+- Billing: Stripe ($149/mo)
 - Analytics: PostHog or Vercel Analytics feeding dashboard + reports
 
 ## Customer Language (USE THIS)
