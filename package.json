@@ -19,6 +19,7 @@
     "@clerk/nextjs": "7.0.7",
     "@sanity/client": "7.20.0",
     "@sanity/image-url": "2.1.0",
+    "@sentry/nextjs": "10.51.0",
     "@studio-freight/lenis": "^1.0.42",
     "@upstash/redis": "1.37.0",
     "@vercel/blob": "^1.0.0",

@@ -1,0 +1,14 @@
+{
+  "app": "reb",
+  "version": "reb-v2026.05.02.1",
+  "compatibleGldf": {
+    "tag": "gldf-v2026.05.02.1",
+    "commit": "3808e65c0cb2356e1ab542a774c6c4f35a12d031"
+  },
+  "contractVersion": "v1",
+  "requiredEnv": [
+    "REVALIDATE_SECRET",
+    "SENTRY_DSN",
+    "NEXT_PUBLIC_SENTRY_DSN"
+  ]
+}
