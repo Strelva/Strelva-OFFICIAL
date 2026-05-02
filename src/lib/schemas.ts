@@ -1,14 +1,42 @@
 import { z } from "zod";
 import type { ContentSection } from "./types";
 
+const SAFE_URL_PROTOCOLS = ["http:", "https:", "mailto:", "tel:"];
+
+const safeUrl = z.string().refine(
+  (val) => {
+    if (!val || val.trim() === "") return true;
+    try {
+      const url = new URL(val);
+      return SAFE_URL_PROTOCOLS.includes(url.protocol);
+    } catch {
+      return val.startsWith("/") || val.startsWith("#");
+    }
+  },
+  { message: "Invalid URL or unsafe protocol" }
+);
+
+const safeImageUrl = z.string().refine(
+  (val) => {
+    if (!val || val.trim() === "") return true;
+    try {
+      const url = new URL(val);
+      return ["http:", "https:"].includes(url.protocol);
+    } catch {
+      return val.startsWith("/");
+    }
+  },
+  { message: "Invalid image URL" }
+);
+
 export const heroSchema = z.object({
   headline: z.string().min(1),
   subheadline: z.string(),
   tagline: z.string(),
   ctaText: z.string().min(1),
-  ctaLink: z.string(),
-  backgroundImageUrl: z.string(),
-  logoUrl: z.string().optional(),
+  ctaLink: safeUrl,
+  backgroundImageUrl: safeImageUrl,
+  logoUrl: safeImageUrl.optional(),
 });
 
 export const serviceItemSchema = z.object({
@@ -19,9 +47,9 @@ export const serviceItemSchema = z.object({
   price: z.string(),
   featured: z.boolean(),
   who_its_for: z.string(),
-  booking_link: z.string(),
+  booking_link: safeUrl,
   comingSoon: z.boolean(),
-  image_url: z.string().optional().default(""),
+  image_url: safeImageUrl.optional().default(""),
 });
 
 export const servicesSchema = z.object({
@@ -40,8 +68,8 @@ export const storySchema = z.object({
   stats: z.array(z.object({ value: z.string(), label: z.string() })),
   quote: z.string(),
   quoteAttribution: z.string(),
-  imageUrl: z.string(),
-  secondaryImageUrl: z.string().optional(),
+  imageUrl: safeImageUrl,
+  secondaryImageUrl: safeImageUrl.optional(),
 });
 
 export const testimonialItemSchema = z.object({
@@ -65,8 +93,8 @@ export const eventItemSchema = z.object({
   location: z.string(),
   description: z.string(),
   hosted_by: z.string(),
-  external_link: z.string(),
-  image_url: z.string().optional().default(""),
+  external_link: safeUrl,
+  image_url: safeImageUrl.optional().default(""),
 });
 
 export const eventsSchema = z.object({
@@ -81,9 +109,9 @@ export const providerItemSchema = z.object({
   category: z.string(),
   service: z.string(),
   why_i_recommend: z.string(),
-  booking_link: z.string(),
+  booking_link: safeUrl,
   phone: z.string(),
-  photo_url: z.string(),
+  photo_url: safeImageUrl,
 });
 
 export const providersSchema = z.object({
@@ -112,8 +140,8 @@ export const shopItemSchema = z.object({
   description: z.string(),
   category: z.string(),
   price: z.string(),
-  external_link: z.string(),
-  image_url: z.string(),
+  external_link: safeUrl,
+  image_url: safeImageUrl,
 });
 
 export const shopSchema = z.object({
@@ -130,9 +158,9 @@ export const contactSchema = z.object({
   hours: z.string().optional().default(""),
   locationTitle: z.string(),
   locationDescription: z.string(),
-  instagramUrl: z.string(),
-  facebookUrl: z.string(),
-  googleMapsUrl: z.string().optional().default(""),
+  instagramUrl: safeUrl,
+  facebookUrl: safeUrl,
+  googleMapsUrl: safeUrl.optional().default(""),
 });
 
 export const productItemSchema = z.object({
@@ -140,11 +168,11 @@ export const productItemSchema = z.object({
   name: z.string().min(1),
   description: z.string(),
   ingredients: z.string(),
-  imageUrl: z.string(),
+  imageUrl: safeImageUrl,
   badge: z.string(),
   featured: z.boolean(),
   price: z.string(),
-  stripePaymentLink: z.string(),
+  stripePaymentLink: safeUrl,
   comingSoon: z.boolean(),
 });
 
@@ -165,10 +193,10 @@ export const siteSettingsSchema = z.object({
   ownerTitle: z.string().optional().default(""),
   footerTagline: z.string(),
   copyrightText: z.string(),
-  bookingUrl: z.string().optional().default(""),
+  bookingUrl: safeUrl.optional().default(""),
   instagramHandle: z.string().optional().default(""),
   vagaro_embed_id: z.string().optional().default(""),
-  logoUrl: z.string().optional().default(""),
+  logoUrl: safeImageUrl.optional().default(""),
   marqueeText: z.string().optional().default(""),
 });
 

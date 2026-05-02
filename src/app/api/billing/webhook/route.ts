@@ -24,7 +24,19 @@ async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate
   }
 
   const key = `stripe:event:${eventId}`;
+  const lockKey = `stripe:event:lock:${eventId}`;
+
   try {
+    const record: EventRecord = { status: "processing", startedAt: Date.now() };
+    const claimed = await redis.set(key, record, {
+      nx: true,
+      ex: PROCESSED_EVENT_TTL_SECONDS,
+    });
+
+    if (claimed === "OK") {
+      return "claimed";
+    }
+
     const existing = await redis.get<EventRecord>(key);
 
     if (existing?.status === "processed") {
@@ -36,11 +48,25 @@ async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate
       if (existing.startedAt && existing.startedAt > staleThreshold) {
         return "retry";
       }
+
+      const gotLock = await redis.set(lockKey, "1", { nx: true, ex: 60 });
+      if (gotLock === "OK") {
+        await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
+        return "claimed";
+      }
+      return "retry";
     }
 
-    const record: EventRecord = { status: "processing", startedAt: Date.now() };
-    await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
-    return "claimed";
+    if (existing?.status === "failed") {
+      const gotLock = await redis.set(lockKey, "1", { nx: true, ex: 60 });
+      if (gotLock === "OK") {
+        await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
+        return "claimed";
+      }
+      return "retry";
+    }
+
+    return "retry";
   } catch {
     return "claimed";
   }
