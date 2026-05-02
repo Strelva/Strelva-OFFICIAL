@@ -269,6 +269,15 @@ export interface PageSectionConfig {
   visible: boolean;
   order: number;
   props?: Record<string, unknown>;
+  variant?: string;
+  layout?: {
+    gap?: 'tight' | 'normal' | 'loose';
+    padding?: 'none' | 'normal' | 'spacious';
+  };
+  responsive?: {
+    mobile?: Partial<Omit<PageSectionConfig, 'responsive'>>;
+    tablet?: Partial<Omit<PageSectionConfig, 'responsive'>>;
+  };
 }
 
 export interface SeoMeta {

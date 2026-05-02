@@ -12,11 +12,16 @@ import {
 import { Tabs } from "@/components/ui/Tabs";
 import type { SelectedNode } from "../DesignMode";
 
+type LayoutGap = 'tight' | 'normal' | 'loose';
+type LayoutPadding = 'none' | 'normal' | 'spacious';
+
 interface DesignPropertiesPanelProps {
   selectedNode: SelectedNode | null;
   activeTab: "design" | "content" | "ai";
   onTabChange: (tab: "design" | "content" | "ai") => void;
   onContentUpdate?: (section: string, field: string, value: string) => void;
+  onLayoutUpdate?: (section: string, layout: { gap?: LayoutGap; padding?: LayoutPadding }) => void;
+  sectionLayout?: { gap?: LayoutGap; padding?: LayoutPadding };
   editMode?: "live" | "draft";
   hasDraft?: boolean;
 }
@@ -26,6 +31,8 @@ export function DesignPropertiesPanel({
   activeTab,
   onTabChange,
   onContentUpdate,
+  onLayoutUpdate,
+  sectionLayout,
   editMode = "draft",
   hasDraft = false,
 }: DesignPropertiesPanelProps) {
@@ -50,7 +57,7 @@ export function DesignPropertiesPanel({
             <p className="text-[12px] text-gray-faint">Select a layer to edit</p>
           </div>
         ) : activeTab === "design" ? (
-          <DesignTab node={selectedNode} />
+          <DesignTab node={selectedNode} onLayoutUpdate={onLayoutUpdate} sectionLayout={sectionLayout} />
         ) : activeTab === "content" ? (
           <ContentTab
             node={selectedNode}
@@ -142,9 +149,76 @@ function ColorSwatch({ color }: { color: string }) {
   );
 }
 
-function DesignTab({ node }: { node: SelectedNode }) {
+function DesignTab({
+  node,
+  onLayoutUpdate,
+  sectionLayout,
+}: {
+  node: SelectedNode;
+  onLayoutUpdate?: (section: string, layout: { gap?: LayoutGap; padding?: LayoutPadding }) => void;
+  sectionLayout?: { gap?: LayoutGap; padding?: LayoutPadding };
+}) {
+  const currentGap = sectionLayout?.gap || 'normal';
+  const currentPadding = sectionLayout?.padding || 'normal';
+
+  const handleGapChange = (gap: LayoutGap) => {
+    if (onLayoutUpdate && node.sectionType) {
+      onLayoutUpdate(node.sectionType, { gap, padding: currentPadding });
+    }
+  };
+
+  const handlePaddingChange = (padding: LayoutPadding) => {
+    if (onLayoutUpdate && node.sectionType) {
+      onLayoutUpdate(node.sectionType, { gap: currentGap, padding });
+    }
+  };
+
   return (
     <div className="py-2">
+      {node.type === "section" && (
+        <>
+          <SectionLabel>Section Layout</SectionLabel>
+          <div className="px-4 py-3 space-y-3">
+            <div>
+              <span className="text-[10px] text-gray-faint mb-1.5 block">Gap</span>
+              <div className="flex items-center gap-1">
+                {(['tight', 'normal', 'loose'] as const).map((gap) => (
+                  <button
+                    key={gap}
+                    onClick={() => handleGapChange(gap)}
+                    className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
+                      currentGap === gap
+                        ? "bg-accent/15 text-accent border border-accent/30"
+                        : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
+                    }`}
+                  >
+                    {gap.charAt(0).toUpperCase() + gap.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-gray-faint mb-1.5 block">Padding</span>
+              <div className="flex items-center gap-1">
+                {(['none', 'normal', 'spacious'] as const).map((padding) => (
+                  <button
+                    key={padding}
+                    onClick={() => handlePaddingChange(padding)}
+                    className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
+                      currentPadding === padding
+                        ? "bg-accent/15 text-accent border border-accent/30"
+                        : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
+                    }`}
+                  >
+                    {padding.charAt(0).toUpperCase() + padding.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <SectionLabel>Layout</SectionLabel>
       <div className="px-4 py-3 space-y-2.5">
         <div className="flex items-center gap-1">
@@ -385,34 +459,97 @@ function ContentTab({
 
 function AITab({
   node,
-  onContentUpdate: _onContentUpdate,
+  onContentUpdate,
 }: {
   node: SelectedNode;
   onContentUpdate?: (section: string, field: string, value: string) => void;
 }) {
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
 
-  const handleApply = useCallback(async () => {
-    if (!prompt.trim() || !node.sectionType) return;
+  const executeAgentPrompt = useCallback(async (userPrompt: string) => {
+    if (!userPrompt.trim() || !node.sectionType) return;
 
     setIsApplying(true);
+    setResponse(null);
+    setToolStatus(null);
+
     try {
-      // TODO: Wire to agent executor
-      console.log("AI prompt:", prompt, "for section:", node.sectionType);
-      await new Promise(r => setTimeout(r, 1000)); // Placeholder
+      // Build context-aware prompt
+      const contextualPrompt = `I'm looking at the ${node.label} section (${node.sectionType}). ${userPrompt}`;
+
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: contextualPrompt }],
+          activeSection: node.sectionType,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed: ${res.status}`);
+      }
+
+      // Stream the response
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("__TOOL__")) {
+            setToolStatus(line.replace("__TOOL__", ""));
+          } else {
+            fullText += line;
+          }
+        }
+      }
+
+      setToolStatus(null);
+      setResponse({ type: "success", message: fullText.trim() || "Done." });
+
+      // Trigger content refresh if we have a callback
+      if (onContentUpdate && node.sectionType) {
+        // Refetch by triggering a dummy update signal
+        window.dispatchEvent(new CustomEvent("reb-content-refresh", { detail: { section: node.sectionType } }));
+      }
+    } catch (err) {
+      setResponse({
+        type: "error",
+        message: err instanceof Error ? err.message : "Something went wrong",
+      });
     } finally {
       setIsApplying(false);
       setPrompt("");
     }
-  }, [prompt, node.sectionType]);
+  }, [node.sectionType, node.label, onContentUpdate]);
+
+  const handleApply = useCallback(() => {
+    executeAgentPrompt(prompt);
+  }, [prompt, executeAgentPrompt]);
+
+  const handleQuickAction = useCallback((actionPrompt: string) => {
+    executeAgentPrompt(actionPrompt);
+  }, [executeAgentPrompt]);
 
   const quickActions = [
-    { label: "Rewrite copy", prompt: "Rewrite the copy in this section to be more compelling" },
-    { label: "Shorten", prompt: "Make this section more concise" },
-    { label: "Add emphasis", prompt: "Add more emphasis and urgency to this section" },
-    { label: "Fix grammar", prompt: "Fix any grammar or spelling issues in this section" },
-    { label: "Improve layout", prompt: "Suggest improvements to this section's layout" },
+    { label: "Rewrite copy", prompt: "Rewrite the copy to be more compelling and engaging" },
+    { label: "Shorten", prompt: "Make the content more concise while keeping the key message" },
+    { label: "Add emphasis", prompt: "Add more emphasis and urgency to the messaging" },
+    { label: "Fix grammar", prompt: "Fix any grammar or spelling issues" },
+    { label: "Improve layout", prompt: "Suggest improvements to how this section is structured" },
   ];
 
   return (
@@ -426,26 +563,43 @@ function AITab({
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={`e.g. "Make the heading larger and more bold" or "Change the background to a gradient"`}
+          placeholder={`e.g. "Make the headline punchier" or "Add a second paragraph about pricing"`}
           rows={4}
-          className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none placeholder:text-gray-faint focus:border-accent/50 transition-colors"
+          disabled={isApplying}
+          className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none placeholder:text-gray-faint focus:border-accent/50 transition-colors disabled:opacity-50"
         />
         <button
           onClick={handleApply}
           disabled={isApplying || !prompt.trim()}
           className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
         >
-          {isApplying ? "Applying..." : "Apply with AI"}
+          {isApplying ? (toolStatus || "Working...") : "Apply with AI"}
         </button>
       </div>
+
+      {response && (
+        <div className="px-4 pb-3">
+          <div
+            className={`p-3 rounded-lg text-[11px] leading-relaxed ${
+              response.type === "success"
+                ? "bg-green-50 text-green-800 border border-green-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            {response.message.slice(0, 300)}
+            {response.message.length > 300 && "..."}
+          </div>
+        </div>
+      )}
 
       <SectionLabel>Quick Actions</SectionLabel>
       <div className="px-4 py-3 flex flex-wrap gap-1.5">
         {quickActions.map((action) => (
           <button
             key={action.label}
-            onClick={() => setPrompt(action.prompt)}
-            className="px-2.5 py-1 rounded-md bg-surface-base border border-gray-border text-[10px] text-gray-muted hover:text-warm-black hover:border-gray-muted transition-colors"
+            onClick={() => handleQuickAction(action.prompt)}
+            disabled={isApplying}
+            className="px-2.5 py-1 rounded-md bg-surface-base border border-gray-border text-[10px] text-gray-muted hover:text-warm-black hover:border-gray-muted transition-colors disabled:opacity-50"
           >
             {action.label}
           </button>

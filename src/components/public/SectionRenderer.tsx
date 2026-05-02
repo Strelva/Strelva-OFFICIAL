@@ -1,4 +1,4 @@
-import type { ContentSection, SitePageConfig } from "@/lib/types";
+import type { ContentSection, SitePageConfig, PageSectionConfig } from "@/lib/types";
 import { getContent, getPageConfig } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
@@ -8,6 +8,32 @@ interface SectionRendererProps {
   tenant: string;
   editMode?: boolean;
   preview?: boolean;
+}
+
+function getLayoutClasses(layout?: PageSectionConfig['layout']): string {
+  const classes: string[] = [];
+
+  // Gap classes
+  const gapMap = {
+    tight: 'reb-gap-tight',
+    normal: 'reb-gap-normal',
+    loose: 'reb-gap-loose',
+  };
+  if (layout?.gap) {
+    classes.push(gapMap[layout.gap]);
+  }
+
+  // Padding classes
+  const paddingMap = {
+    none: 'reb-padding-none',
+    normal: 'reb-padding-normal',
+    spacious: 'reb-padding-spacious',
+  };
+  if (layout?.padding) {
+    classes.push(paddingMap[layout.padding]);
+  }
+
+  return classes.join(' ');
 }
 
 export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, preview }: SectionRendererProps) {
@@ -70,6 +96,7 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
         if (!props) return null;
 
         const editableSection = template.editableSections[sectionConfig.type];
+        const layoutClasses = getLayoutClasses(sectionConfig.layout);
 
         return (
           <div
@@ -77,6 +104,7 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
             data-reb-section={sectionConfig.type}
             data-reb-editable={editableSection || undefined}
             data-reb-label={template.labels[sectionConfig.type]}
+            className={layoutClasses || undefined}
           >
             <SectionErrorBoundary>
               <Component {...props} />

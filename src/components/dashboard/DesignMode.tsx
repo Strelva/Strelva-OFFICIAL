@@ -5,7 +5,7 @@ import { useDashboard } from "./DashboardContext";
 import { LayersPanel } from "./design/LayersPanel";
 import { DesignCanvas } from "./design/DesignCanvas";
 import { DesignPropertiesPanel } from "./design/DesignPropertiesPanel";
-import type { PageConfig } from "@/lib/types";
+import type { PageConfig, PageSectionConfig } from "@/lib/types";
 
 export type DesignNode = {
   id: string;
@@ -278,6 +278,75 @@ export function DesignMode() {
     }
   }, [pageConfig, siteUrl, activePage, triggerRefresh]);
 
+  const handleReorder = useCallback(async (id: string, direction: 'up' | 'down') => {
+    if (!pageConfig) return;
+
+    const sections = [...pageConfig.sections].sort((a, b) => a.order - b.order);
+    const idx = sections.findIndex(s => s.type === id);
+    if (idx === -1) return;
+
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sections.length) return;
+
+    // Swap orders
+    const currentOrder = sections[idx].order;
+    const swapOrder = sections[swapIdx].order;
+    const updatedSections = pageConfig.sections.map(s => {
+      if (s.type === id) return { ...s, order: swapOrder };
+      if (s.type === sections[swapIdx].type) return { ...s, order: currentOrder };
+      return s;
+    });
+
+    try {
+      const url = new URL(siteUrl || window.location.origin);
+      const tenant = url.hostname.split(".")[0];
+
+      await fetch(`/api/v1/page-config/${tenant}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          [activePage]: { ...pageConfig, sections: updatedSections }
+        }),
+      });
+
+      setPageConfig({ ...pageConfig, sections: updatedSections });
+      setTree(buildTreeFromPageConfig({ ...pageConfig, sections: updatedSections }, activePage));
+      triggerRefresh();
+    } catch (err) {
+      console.error("Failed to reorder:", err);
+    }
+  }, [pageConfig, siteUrl, activePage, triggerRefresh]);
+
+  // Handle layout updates from properties panel
+  const handleLayoutUpdate = useCallback(async (sectionType: string, layout: NonNullable<PageSectionConfig['layout']>) => {
+    if (!pageConfig) return;
+
+    const updatedSections = pageConfig.sections.map(s =>
+      s.type === sectionType ? { ...s, layout } : s
+    );
+
+    try {
+      const url = new URL(siteUrl || window.location.origin);
+      const tenant = url.hostname.split(".")[0];
+
+      await fetch(`/api/v1/page-config/${tenant}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          [activePage]: { ...pageConfig, sections: updatedSections }
+        }),
+      });
+
+      setPageConfig({ ...pageConfig, sections: updatedSections });
+      triggerRefresh();
+    } catch (err) {
+      console.error("Failed to update layout:", err);
+    }
+  }, [pageConfig, siteUrl, activePage, triggerRefresh]);
+
+  // Get current section layout
+  const currentSectionLayout = pageConfig?.sections.find(s => s.type === selectedNode?.sectionType)?.layout;
+
   // Handle content updates from properties panel
   const handleContentUpdate = useCallback(async (section: string, field: string, value: string) => {
     try {
@@ -330,6 +399,7 @@ export function DesignMode() {
         onSelect={handleSelect}
         onToggleExpand={toggleExpand}
         onToggleVisibility={toggleVisibility}
+        onReorder={handleReorder}
         isLoading={isLoading}
       />
       <DesignCanvas
@@ -345,6 +415,8 @@ export function DesignMode() {
         activeTab={rightTab}
         onTabChange={setRightTab}
         onContentUpdate={handleContentUpdate}
+        onLayoutUpdate={handleLayoutUpdate}
+        sectionLayout={currentSectionLayout}
         editMode={editMode}
         hasDraft={hasDraft[selectedNode?.sectionType || ""] || false}
       />

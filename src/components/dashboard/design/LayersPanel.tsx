@@ -2,6 +2,8 @@
 
 import {
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Eye,
   EyeOff,
   Type,
@@ -21,6 +23,7 @@ interface LayersPanelProps {
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  onReorder: (id: string, direction: 'up' | 'down') => void;
   isLoading?: boolean;
 }
 
@@ -41,6 +44,7 @@ export function LayersPanel({
   onSelect,
   onToggleExpand,
   onToggleVisibility,
+  onReorder,
   isLoading,
 }: LayersPanelProps) {
   return (
@@ -70,6 +74,7 @@ export function LayersPanel({
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
               onToggleVisibility={onToggleVisibility}
+              onReorder={onReorder}
             />
           ))
         )}
@@ -86,6 +91,7 @@ function TreeNode({
   onSelect,
   onToggleExpand,
   onToggleVisibility,
+  onReorder,
 }: {
   node: DesignNode;
   depth: number;
@@ -94,6 +100,7 @@ function TreeNode({
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  onReorder: (id: string, direction: 'up' | 'down') => void;
 }) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
@@ -127,6 +134,28 @@ function TreeNode({
         </button>
         <Icon className="w-3.5 h-3.5 mx-1.5 shrink-0 text-gray-faint" strokeWidth={1.5} />
         <span className="text-[12px] truncate flex-1">{node.label}</span>
+        {node.type === "section" && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReorder(node.id, 'up');
+              }}
+              className="w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            >
+              <ChevronUp className="w-3 h-3 text-gray-faint hover:text-gray-muted" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReorder(node.id, 'down');
+              }}
+              className="w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            >
+              <ChevronDown className="w-3 h-3 text-gray-faint hover:text-gray-muted" strokeWidth={1.5} />
+            </button>
+          </>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -153,6 +182,7 @@ function TreeNode({
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
               onToggleVisibility={onToggleVisibility}
+              onReorder={onReorder}
             />
           ))}
         </>
