@@ -13,10 +13,10 @@ export function Footer({ settings, contact }: FooterProps) {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-10 lg:gap-8">
           {/* Brand */}
           <div>
-            <p className="font-display text-lg tracking-tight mb-4 opacity-80">
+            <p className="font-display text-lg tracking-tight mb-4 opacity-80" data-reb-field="siteName">
               {settings.siteName}
             </p>
-            <p className="text-sm leading-relaxed opacity-50 max-w-xs">
+            <p className="text-sm leading-relaxed opacity-50 max-w-xs" data-reb-field="siteDescription">
               {settings.siteDescription}
             </p>
           </div>
@@ -56,8 +56,8 @@ export function Footer({ settings, contact }: FooterProps) {
       {/* Bottom bar */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="container-main py-5 flex flex-wrap justify-between items-center gap-4 text-[0.625rem] tracking-wider uppercase opacity-40">
-          <p suppressHydrationWarning>&copy; {new Date().getFullYear()} {settings.copyrightText}</p>
-          <p>{settings.footerTagline}</p>
+          <p suppressHydrationWarning data-reb-field="copyrightText">&copy; {new Date().getFullYear()} {settings.copyrightText}</p>
+          <p data-reb-field="footerTagline">{settings.footerTagline}</p>
         </div>
       </div>
     </footer>

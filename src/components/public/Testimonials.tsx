@@ -12,6 +12,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
             <blockquote
               className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.15] max-w-3xl"
               style={{ color: "var(--bark)" }}
+              data-reb-field="testimonials[0].quote"
             >
               &ldquo;{items[0].quote}&rdquo;
             </blockquote>
@@ -23,6 +24,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
               <span
                 className="text-sm font-medium tracking-wide"
                 style={{ color: "var(--bark)" }}
+                data-reb-field="testimonials[0].author"
               >
                 {items[0].author}
               </span>
@@ -30,6 +32,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                 <span
                   className="text-sm"
                   style={{ color: "var(--bark-faded)" }}
+                  data-reb-field="testimonials[0].location"
                 >
                   {items[0].location}
                 </span>
@@ -44,11 +47,12 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
             className="grid md:grid-cols-3 gap-8 md:gap-12 pt-8 md:pt-10"
             style={{ borderTop: "1px solid var(--cream-mid)" }}
           >
-            {items.slice(1, 4).map((item) => (
+            {items.slice(1, 4).map((item, idx) => (
               <div key={item.id}>
                 <blockquote
                   className="text-base md:text-lg leading-relaxed"
                   style={{ color: "var(--bark-light)" }}
+                  data-reb-field={`testimonials[${idx + 1}].quote`}
                 >
                   &ldquo;{item.quote}&rdquo;
                 </blockquote>
@@ -56,6 +60,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                   <span
                     className="text-xs font-medium tracking-wider uppercase"
                     style={{ color: "var(--bark-faded)" }}
+                    data-reb-field={`testimonials[${idx + 1}].author`}
                   >
                     {item.author}
                   </span>
@@ -63,6 +68,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                     <span
                       className="text-xs"
                       style={{ color: "var(--bark-faded)", opacity: 0.5 }}
+                      data-reb-field={`testimonials[${idx + 1}].location`}
                     >
                       · {item.location}
                     </span>

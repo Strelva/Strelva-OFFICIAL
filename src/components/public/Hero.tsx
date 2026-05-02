@@ -101,6 +101,7 @@ export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerNa
             )}
             <h1
               data-hero-animate
+              data-reb-field="headline"
               className="font-display text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight leading-[0.92] mb-6"
               style={{ color: "var(--cream)" }}
             >
@@ -135,7 +136,7 @@ export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerNa
               >
                 {hero.ctaText}
               </TrackedLink>
-              <Link href="/about" className="btn-ghost">
+              <Link href="/about" className="btn-ghost" data-reb-field="ctaLink">
                 About {ownerName || "Us"}
               </Link>
             </div>

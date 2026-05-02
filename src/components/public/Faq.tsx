@@ -51,6 +51,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
               data-faq-heading
               className="text-base leading-relaxed max-w-2xl mb-10"
               style={{ color: "var(--bark-light)" }}
+              data-reb-field="description"
             >
               {faq.description}
             </p>
@@ -73,6 +74,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
                     <span
                       className="font-display text-lg md:text-xl tracking-tight pr-8"
                       style={{ color: "var(--bark)" }}
+                      data-reb-field={`faqs[${faq.faqs.indexOf(item)}].question`}
                     >
                       {item.question}
                     </span>
@@ -96,6 +98,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
                     <p
                       className="text-sm leading-relaxed pb-6"
                       style={{ color: "var(--bark-light)" }}
+                      data-reb-field={`faqs[${faq.faqs.indexOf(item)}].answer`}
                     >
                       {item.answer}
                     </p>

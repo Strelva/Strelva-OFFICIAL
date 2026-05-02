@@ -42,12 +42,13 @@ export function Contact({ contact }: { contact: ContactContent }) {
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
             {/* Left */}
             <div data-contact-animate>
-              <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-4">
+              <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-4" data-reb-field="headline">
                 Get in touch.
               </h2>
               <p
                 className="text-base leading-relaxed max-w-sm mb-10"
                 style={{ color: "var(--bark-light)" }}
+                data-reb-field="description"
               >
                 Have questions? Want to learn more before booking? We&apos;d love to hear from you.
               </p>
@@ -69,6 +70,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                   <span
                     className="text-sm font-medium group-hover:opacity-60 transition-opacity"
                     style={{ color: "var(--bark)" }}
+                    data-reb-field="email"
                   >
                     {contact.email}
                   </span>
@@ -92,6 +94,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                   <span
                     className="text-sm font-medium group-hover:opacity-60 transition-opacity"
                     style={{ color: "var(--bark)" }}
+                    data-reb-field="phone"
                   >
                     {contact.phone}
                   </span>
@@ -126,7 +129,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                   <h3 className="text-xs font-bold tracking-[0.2em] uppercase mb-3" style={{ color: "var(--bark-faded)" }}>
                     Hours
                   </h3>
-                  <div className="text-sm leading-relaxed" style={{ color: "var(--bark-light)" }}>
+                  <div className="text-sm leading-relaxed" style={{ color: "var(--bark-light)" }} data-reb-field="hours">
                     {contact.hours.split("\n").map((line, i) => (
                       <p key={i}>{line}</p>
                     ))}
@@ -141,7 +144,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 className="p-10 md:p-14"
                 style={{ background: "var(--cream-dark)" }}
               >
-                <h3 className="font-display text-3xl md:text-4xl tracking-tight mb-4">
+                <h3 className="font-display text-3xl md:text-4xl tracking-tight mb-4" data-reb-field="locationTitle">
                   {(contact.locationTitle || "Visit Us").split("\n").map((line, i) => (
                     <span key={i}>
                       {i > 0 && <br />}
@@ -152,11 +155,12 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 <p
                   className="text-sm leading-relaxed mb-4"
                   style={{ color: "var(--bark-light)" }}
+                  data-reb-field="locationDescription"
                 >
                   {contact.locationDescription}
                 </p>
                 {contact.address && (
-                  <p className="text-sm" style={{ color: "var(--bark-faded)" }}>
+                  <p className="text-sm" style={{ color: "var(--bark-faded)" }} data-reb-field="address">
                     {contact.address}
                   </p>
                 )}

@@ -121,6 +121,7 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
                 <p
                   className="text-sm italic mt-4 ml-1"
                   style={{ color: "var(--bark-faded)" }}
+                  data-reb-field="accentText"
                 >
                   {story.accentText}
                 </p>
@@ -132,6 +133,7 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
               <h2
                 className="font-display text-4xl md:text-5xl tracking-tight leading-[1.05] mb-6"
                 data-story-animate
+                data-reb-field="headline"
               >
                 {(story.headline || "").split("\n").map((line, i) => (
                   <span key={i}>
@@ -147,7 +149,7 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
                 data-story-animate
               >
                 {story.paragraphs.map((p, i) => (
-                  <p key={i}>{p}</p>
+                  <p key={i} data-reb-field={`paragraphs[${i}]`}>{p}</p>
                 ))}
               </div>
 
@@ -162,12 +164,14 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
                     <span
                       className="font-display text-2xl tracking-tight"
                       style={{ color: "var(--bark)" }}
+                      data-reb-field={`stats[${i}].value`}
                     >
                       {stat.value}
                     </span>
                     <span
                       className="text-[0.625rem] tracking-widest uppercase"
                       style={{ color: "var(--bark-faded)" }}
+                      data-reb-field={`stats[${i}].label`}
                     >
                       {stat.label}
                     </span>
@@ -189,12 +193,13 @@ export function Story({ story, ownerName }: { story: StoryContent; ownerName?: s
             className="mt-8 md:mt-12 py-8 md:py-10 text-center"
             style={{ borderTop: "1px solid var(--cream-dark)" }}
           >
-            <blockquote className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight max-w-3xl mx-auto leading-[1.15]">
+            <blockquote className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight max-w-3xl mx-auto leading-[1.15]" data-reb-field="quote">
               &ldquo;{story.quote.replace(/^"|"$/g, "")}&rdquo;
             </blockquote>
             <p
               className="text-xs font-medium tracking-wider uppercase mt-6"
               style={{ color: "var(--bark-faded)" }}
+              data-reb-field="quoteAttribution"
             >
               {story.quoteAttribution}
             </p>

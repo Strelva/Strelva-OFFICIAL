@@ -28,6 +28,7 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
             <p
               className="text-base md:text-lg leading-relaxed max-w-md"
               style={{ color: "var(--bark-light)" }}
+              data-reb-field="description"
             >
               {services.description}
             </p>
@@ -45,17 +46,17 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                 <span className="text-[0.625rem] font-bold tracking-widest uppercase mb-4 inline-block" style={{ color: "rgba(255,255,255,0.7)" }}>
                   Most Popular
                 </span>
-                <h3 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4">
+                <h3 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4" data-reb-field="services[featured].name">
                   {featured.name}
                 </h3>
-                <p className="text-base leading-relaxed mb-6 opacity-90">
+                <p className="text-base leading-relaxed mb-6 opacity-90" data-reb-field="services[featured].description">
                   {featured.description}
                 </p>
                 {(featured.price || featured.duration) && (
                   <div className="flex items-center gap-6 mb-6">
                     {featured.price && (
                       <div>
-                        <span className="font-display text-2xl md:text-3xl tracking-tight">
+                        <span className="font-display text-2xl md:text-3xl tracking-tight" data-reb-field="services[featured].price">
                           ${featured.price}
                         </span>
                       </div>
@@ -65,14 +66,14 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                     )}
                     {featured.duration && (
                       <div>
-                        <span className="text-sm opacity-80">{featured.duration}</span>
+                        <span className="text-sm opacity-80" data-reb-field="services[featured].duration">{featured.duration}</span>
                       </div>
                     )}
                   </div>
                 )}
                 {featured.who_its_for && (
                   <p className="text-sm opacity-70 mb-6">
-                    <span className="font-medium">Best for:</span> {featured.who_its_for}
+                    <span className="font-medium">Best for:</span> <span data-reb-field="services[featured].who_its_for">{featured.who_its_for}</span>
                   </p>
                 )}
                 {featured.booking_link ? (
@@ -154,7 +155,9 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
         {others.length > 0 && (
           <div ref={gridRef} className="reveal">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {others.map((service, i) => (
+              {others.map((service, i) => {
+                const serviceIndex = services.services.indexOf(service);
+                return (
                 <div
                   key={service.id}
                   className={`reveal-delay-${Math.min(i + 1, 3)} overflow-hidden`}
@@ -168,17 +171,18 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                         fill
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        data-reb-field={`services[${serviceIndex}].image_url`}
                       />
                     </div>
                   )}
                   <div className="p-8">
                   <div className="flex items-start justify-between gap-4 mb-4">
-                    <h3 className="font-display text-xl tracking-tight">
+                    <h3 className="font-display text-xl tracking-tight" data-reb-field={`services[${serviceIndex}].name`}>
                       {service.name}
                     </h3>
                     {service.price && (
                       <div className="flex-shrink-0 text-right">
-                        <span className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }}>
+                        <span className="font-display text-xl tracking-tight" style={{ color: "var(--sage)" }} data-reb-field={`services[${serviceIndex}].price`}>
                           ${service.price}
                         </span>
                       </div>
@@ -187,11 +191,12 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                   <p
                     className="text-sm leading-relaxed mb-4"
                     style={{ color: "var(--bark-light)" }}
+                    data-reb-field={`services[${serviceIndex}].description`}
                   >
                     {service.description}
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: "var(--bark-faded)" }}>
+                    <span className="text-xs" style={{ color: "var(--bark-faded)" }} data-reb-field={`services[${serviceIndex}].duration`}>
                       {service.duration}
                     </span>
                     {service.booking_link ? (
@@ -225,12 +230,12 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
                   </div>
                   {service.who_its_for && (
                     <p className="text-xs mt-4 pt-4" style={{ color: "var(--bark-faded)", borderTop: "1px solid var(--cream-mid)" }}>
-                      <span className="font-medium">Best for:</span> {service.who_its_for}
+                      <span className="font-medium">Best for:</span> <span data-reb-field={`services[${serviceIndex}].who_its_for`}>{service.who_its_for}</span>
                     </p>
                   )}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}
