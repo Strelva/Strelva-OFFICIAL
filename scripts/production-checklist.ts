@@ -86,7 +86,8 @@ console.log("\n─── Cron & Internal API Security ────────�
 checkEnvVar("CRON_SECRET", true);
 checkEnvVar("INTERNAL_API_SECRET", true);
 
-console.log("\n─── Notifications ───────────────────────────────────────────────");
+console.log("\n─── Monitoring & Notifications ──────────────────────────────────");
+checkEnvVar("SENTRY_DSN", true, false);
 checkEnvVar("SLACK_WEBHOOK_URL", false, false);
 checkEnvVar("FOUNDER_CLERK_USER_ID", false, false);
 
@@ -111,6 +112,10 @@ checkEnvVar("CALENDLY_WEBHOOK_SECRET", false);
 console.log("\n─── Site Configuration ──────────────────────────────────────────");
 checkEnvVar("NEXT_PUBLIC_SITE_URL", true, false);
 checkEnvVar("CUSTOM_DOMAIN_MAP", false, false);
+checkEnvVar("MARKETING_DOMAINS", false, false);
+
+console.log("\n─── AI & Launch Flags ───────────────────────────────────────────");
+checkEnvVar("AI_AUTO_PUBLISH", false, false);
 
 console.log("\n─── Google Search Console ───────────────────────────────────────");
 checkEnvVar("GOOGLE_SEARCH_CONSOLE_KEY", false);
@@ -380,6 +385,7 @@ function printCronJobs() {
   console.log("═══════════════════════════════════════════════════════════════\n");
 
   const crons = [
+    { path: "/api/cron/maintenance", schedule: "0 3 * * *", desc: "Maintenance cleanup (daily 3am UTC)" },
     { path: "/api/cron/weekly-report", schedule: "0 14 * * 1", desc: "Weekly reports (Mon 2pm UTC)" },
     { path: "/api/cron/staleness", schedule: "0 6 * * *", desc: "Content staleness check (daily 6am UTC)" },
     { path: "/api/cron/sms-suggestion", schedule: "0 15 * * 1", desc: "SMS suggestions (Mon 3pm UTC)" },

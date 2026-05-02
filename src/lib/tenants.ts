@@ -4,6 +4,7 @@ import type { TenantConfig } from "./types";
 import { getRedis } from "./redis";
 import { assignUserToTenant } from "./auth";
 import { clerkClient } from "@clerk/nextjs/server";
+import { assertNotProductionFallback, isProductionEnv } from "./production-guard";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
@@ -42,10 +43,13 @@ async function loadTenants(): Promise<TenantConfig[]> {
     const fromSanity = (docs || []).map(sanityToTenant);
     if (fromSanity.length > 0) {
       tenants = fromSanity;
+    } else if (isProductionEnv()) {
+      throw new Error("[PRODUCTION] Sanity returned no tenants — cannot fall back to dev file");
     } else {
-      // Fall through to dev file if Sanity has no tenant data
       tenants = await loadFromDevFile();
     }
+  } else if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Sanity not configured — cannot fall back to dev file");
   } else {
     tenants = await loadFromDevFile();
   }

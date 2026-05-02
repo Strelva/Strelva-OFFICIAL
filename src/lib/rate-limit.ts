@@ -1,8 +1,9 @@
 /** Sliding-window rate limiter.
  *  Uses Redis INCR + EXPIRE when configured (works across serverless instances).
- *  Falls back to in-memory Map when Redis is unavailable (resets on cold start). */
+ *  Falls back to in-memory Map in development only — production requires Redis. */
 
 import { getRedis } from "./redis";
+import { isProductionEnv } from "./production-guard";
 
 const windowMs = 60_000; // 1-minute window
 
@@ -32,7 +33,12 @@ function memCheck(key: string, max: number, windowMs: number): boolean {
 
 async function redisCheck(key: string, max: number, windowSeconds: number): Promise<boolean> {
   const redis = getRedis();
-  if (!redis) return memCheck(key, max, windowSeconds * 1000);
+  if (!redis) {
+    if (isProductionEnv()) {
+      throw new Error("[PRODUCTION] Redis required for rate limiting but not configured");
+    }
+    return memCheck(key, max, windowSeconds * 1000);
+  }
 
   const redisKey = `reb:ratelimit:${key}`;
   try {
@@ -42,8 +48,10 @@ async function redisCheck(key: string, max: number, windowSeconds: number): Prom
       await redis.expire(redisKey, windowSeconds);
     }
     return count > max;
-  } catch {
-    // Redis failed — fall back to in-memory
+  } catch (err) {
+    if (isProductionEnv()) {
+      throw new Error(`[PRODUCTION] Redis rate limit failed: ${err}`);
+    }
     return memCheck(key, max, windowSeconds * 1000);
   }
 }
