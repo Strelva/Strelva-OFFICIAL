@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "smoke": "playwright test",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "tsc --noEmit"

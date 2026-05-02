@@ -19,6 +19,7 @@ const isPublicRoute = createRouteMatcher([
   "/onboard(.*)",
   "/api/onboard/(.*)",
   "/api/health",
+  "/api/public/(.*)",
   "/api/newsletter/subscribe",
   "/api/track",
   "/api/cron/(.*)",

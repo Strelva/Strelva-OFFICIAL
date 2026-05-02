@@ -1,0 +1,10 @@
+title = "REB secret scanning"
+
+[allowlist]
+description = "Allow placeholders and documented env names."
+regexes = [
+  '''CLERK_SECRET_KEY=''',
+  '''CRON_SECRET=''',
+  '''INTERNAL_API_SECRET=''',
+  '''STRIPE_SECRET_KEY='''
+]

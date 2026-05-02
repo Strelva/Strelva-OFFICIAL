@@ -1,5 +1,7 @@
+import { createRevalidationBody, signRevalidationBody } from "./reb-contracts";
 import { getTenantConfig } from "./tenants";
 import { getRedis } from "./redis";
+import { alert } from "./monitoring";
 
 export interface RevalidationFailure {
   tenantId: string;
@@ -51,6 +53,8 @@ async function recordFailure(failure: RevalidationFailure): Promise<void> {
       }),
     }).catch(() => {});
   }
+
+  alert("revalidation_failed", "high", { ...failure });
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -67,8 +71,19 @@ export async function revalidateClientSite(
     return { success: true, skipped: true };
   }
 
-  // Use tenant-specific secret, no fallback to global
   const secret = config.revalidationSecret;
+  if (!secret) {
+    const error = "Missing tenant revalidationSecret";
+    await recordFailure({
+      tenantId,
+      url: config.revalidateUrl,
+      error,
+      timestamp: new Date().toISOString(),
+      attempts: 0,
+    });
+    return { success: false, error };
+  }
+
   const maxRetries = 2;
   let lastError: string | undefined;
 
@@ -78,18 +93,17 @@ export async function revalidateClientSite(
     }
 
     try {
+      const body = createRevalidationBody(
+        paths === "all"
+          ? { tenant: tenantId, all: true }
+          : { tenant: tenantId, paths }
+      );
+      const signed = signRevalidationBody(body, secret);
+
       const response = await fetch(config.revalidateUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Tenant-Id": tenantId,
-          ...(secret && { "X-Revalidation-Secret": secret }),
-        },
-        body: JSON.stringify({
-          tenant: tenantId,
-          paths,
-          timestamp: new Date().toISOString(),
-        }),
+        headers: signed.headers,
+        body: signed.body,
       });
 
       if (!response.ok) {

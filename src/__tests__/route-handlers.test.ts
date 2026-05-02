@@ -40,7 +40,8 @@ vi.mock("@/lib/tenants", () => ({
 
 vi.mock("@/lib/storage", () => ({
   trackClick: vi.fn(() => Promise.resolve()),
-  getContent: vi.fn(() => Promise.resolve({})),
+  getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
+  getPageConfig: vi.fn(() => Promise.resolve({ home: { sections: [] } })),
   setContent: vi.fn(() => Promise.resolve()),
   uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
@@ -97,6 +98,44 @@ describe("Track API Route Handler", () => {
     });
 
     const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("Public Content API Route Handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("GET /api/public/content/:tenant/:section returns tenant content without Clerk auth", async () => {
+    const { GET } = await import("@/app/api/public/content/[tenant]/[section]/route");
+
+    const response = await GET(new Request("http://localhost/api/public/content/test-tenant/hero"), {
+      params: Promise.resolve({ tenant: "test-tenant", section: "hero" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ headline: "Fresh content" });
+  });
+
+  it("GET /api/public/page-config/:tenant returns tenant page config without Clerk auth", async () => {
+    const { GET } = await import("@/app/api/public/page-config/[tenant]/route");
+
+    const response = await GET(new Request("http://localhost/api/public/page-config/test-tenant"), {
+      params: Promise.resolve({ tenant: "test-tenant" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ home: { sections: [] } });
+  });
+
+  it("GET /api/public/content/:tenant/:section rejects invalid tenant slugs", async () => {
+    const { GET } = await import("@/app/api/public/content/[tenant]/[section]/route");
+
+    const response = await GET(new Request("http://localhost/api/public/content/../hero"), {
+      params: Promise.resolve({ tenant: "../", section: "hero" }),
+    });
+
     expect(response.status).toBe(400);
   });
 });
