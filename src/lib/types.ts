@@ -513,6 +513,62 @@ export interface UnifiedEvent {
   resolvedAt?: string;
 }
 
+// --- Site Operation Types ---
+
+export type OperationSource = "user" | "agent" | "integration" | "system";
+export type OperationSurface = "site" | "assets" | "sources" | "review" | "newsletter" | "social";
+export type OperationStatus = "draft" | "pending_review" | "approved" | "published" | "dismissed" | "blocked";
+export type OperationRisk = "low" | "medium" | "high";
+
+export interface SiteOperation {
+  id: string;
+  tenantId: string;
+  source: OperationSource;
+  surface: OperationSurface;
+  status: OperationStatus;
+  title: string;
+  description?: string;
+  reason?: string;
+  risk?: OperationRisk;
+  affectedNodes?: string[];
+  before?: unknown;
+  after?: unknown;
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export type ContentOperation = SiteOperation & {
+  surface: "site";
+  nodeType: "content";
+  section: string;
+  field?: string;
+};
+
+export type LayoutOperation = SiteOperation & {
+  surface: "site";
+  nodeType: "layout";
+  changes: Record<string, unknown>;
+};
+
+export type AssetOperation = SiteOperation & {
+  surface: "assets";
+  assetId: string;
+  action: "upload" | "replace" | "delete";
+};
+
+export type NewsletterOperation = SiteOperation & {
+  surface: "newsletter";
+  subject: string;
+  recipientCount: number;
+};
+
+export type SocialOperation = SiteOperation & {
+  surface: "social";
+  platform: string;
+  postContent: string;
+};
+
 // --- Weekly Brief Types ---
 
 export interface WeeklyBriefStats {
