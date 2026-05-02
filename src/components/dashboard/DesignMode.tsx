@@ -108,6 +108,7 @@ export function DesignMode() {
   const [tree, setTree] = useState<DesignNode[]>([]);
   const [pageConfig, setPageConfig] = useState<PageConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sectionAnalytics, setSectionAnalytics] = useState<Record<string, { clicks?: number; views?: number; trend?: "up" | "down" | "flat" }>>({});
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Fetch page config
@@ -127,6 +128,17 @@ export function DesignMode() {
           setTree(buildTreeFromPageConfig(currentPageConfig, activePage));
           // Auto-expand page node
           setExpandedIds(new Set(["page"]));
+        }
+
+        // Fetch section analytics
+        try {
+          const analyticsRes = await fetch("/api/section-analytics", { credentials: "same-origin" });
+          if (analyticsRes.ok) {
+            const analytics = await analyticsRes.json();
+            setSectionAnalytics(analytics);
+          }
+        } catch {
+          // Analytics not available — skip
         }
       } catch (err) {
         console.error("Failed to fetch page config:", err);
@@ -480,6 +492,7 @@ export function DesignMode() {
           sectionLayout={currentSectionLayout}
           editMode={editMode}
           hasDraft={hasDraft[selectedNode?.sectionType || ""] || false}
+          sectionAnalytics={sectionAnalytics}
         />
       </div>
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Check, X, Star, Calendar, MessageSquare, Bot, Zap } from "lucide-react";
+import { Check, X, Star, Calendar, MessageSquare, Bot, Zap, Quote } from "lucide-react";
 import type { UnifiedEvent } from "@/lib/types";
+import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
 
 const SWIPE_THRESHOLD = 100;
 
@@ -53,6 +54,21 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
   const colors = SOURCE_COLORS[event.source] || SOURCE_COLORS.default;
   const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
   const isPending = event.status === "pending";
+
+  // "Use as testimonial" modal state
+  const [testimonialModalOpen, setTestimonialModalOpen] = useState(false);
+
+  // Check if this event is a review that can be converted to testimonial
+  const isReview = event.source === "google" || event.source === "yelp";
+  const reviewData = isReview && event.metadata
+    ? {
+        id: event.id,
+        author: (event.metadata as Record<string, unknown>).author as string || "Customer",
+        text: event.body || "",
+        source: event.source,
+        rating: (event.metadata as Record<string, unknown>).rating as number || 5,
+      }
+    : null;
 
   // Swipe state
   const cardRef = useRef<HTMLDivElement>(null);
@@ -188,6 +204,17 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
         {/* Actions - always visible on mobile, hover on desktop */}
         {isPending && !disabled && (
           <div className="flex items-center gap-1.5 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {/* Use as Testimonial button for reviews */}
+            {isReview && reviewData && (
+              <button
+                onClick={() => setTestimonialModalOpen(true)}
+                disabled={disabled}
+                className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-sage/10 text-sage hover:bg-sage hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                title="Use as Testimonial"
+              >
+                <Quote className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={1.5} />
+              </button>
+            )}
             <button
               onClick={() => onApprove(event.id)}
               disabled={disabled}
@@ -208,6 +235,19 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
         )}
       </div>
       </div>
+
+      {/* Use as Testimonial Modal */}
+      {reviewData && (
+        <UseAsTestimonialModal
+          open={testimonialModalOpen}
+          onClose={() => setTestimonialModalOpen(false)}
+          review={reviewData}
+          onSuccess={() => {
+            // Optionally auto-approve the review after converting
+            onApprove(event.id);
+          }}
+        />
+      )}
     </div>
   );
 }

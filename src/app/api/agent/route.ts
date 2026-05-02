@@ -104,6 +104,48 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
 
   sectionSummaries.push(`SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`);
 
+  // Add reviews/sources context for agent knowledge
+  try {
+    const { getReviews } = await import("@/lib/reviews");
+    const { getClickCountsByPrefix } = await import("@/lib/storage");
+
+    const reviews = await getReviews(tenant);
+    if (reviews.length > 0) {
+      const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+      const unreplied = reviews.filter((r) => !r.reply).length;
+      const recentReviews = reviews.slice(0, 3);
+
+      // Find common themes in reviews
+      const allText = reviews.map((r) => r.text.toLowerCase()).join(" ");
+      const themes: string[] = [];
+      if (allText.includes("friendly") || allText.includes("welcoming")) themes.push("friendly service");
+      if (allText.includes("clean") || allText.includes("comfortable")) themes.push("clean environment");
+      if (allText.includes("professional")) themes.push("professionalism");
+      if (allText.includes("relaxing") || allText.includes("peaceful")) themes.push("relaxing atmosphere");
+
+      let reviewSummary = `CUSTOMER REVIEWS:\n- ${reviews.length} total reviews (${avgRating.toFixed(1)} avg rating)`;
+      if (unreplied > 0) reviewSummary += `\n- ${unreplied} awaiting reply`;
+      if (themes.length > 0) reviewSummary += `\n- Customers mention: ${themes.join(", ")}`;
+      reviewSummary += `\n\nRecent reviews:\n${recentReviews.map((r) => `- "${r.text.slice(0, 80)}..." — ${r.author} (${r.rating} stars, ${r.source})`).join("\n")}`;
+
+      sectionSummaries.push(reviewSummary);
+    }
+
+    // Service click data for insights
+    const serviceClicks = await getClickCountsByPrefix("service-click:", tenant);
+    if (Object.keys(serviceClicks).length > 0) {
+      const sorted = Object.entries(serviceClicks)
+        .map(([key, data]) => ({ name: key.replace("service-click:", ""), ...data }))
+        .sort((a, b) => b.thisWeek - a.thisWeek);
+
+      if (sorted.length > 0 && sorted[0].thisWeek > 0) {
+        sectionSummaries.push(`SERVICE POPULARITY:\n- Most clicked: ${sorted[0].name} (${sorted[0].thisWeek} clicks this week)`);
+      }
+    }
+  } catch {
+    // Source data not available — skip
+  }
+
   const sectionNames = sections.join(", ");
 
   let prompt = `You are the website assistant for ${(settings.siteName as string) || "this business"}.
