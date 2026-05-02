@@ -1,23 +1,10 @@
 import { ImageResponse } from "next/og";
 import { headers } from "next/headers";
+import { getTenantConfig } from "@/lib/tenants";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-const TENANT_OG: Record<
-  string,
-  { name: string; tagline: string; initials: string; bg: string; accent: string; fg: string }
-> = {
-  gldf: {
-    name: "Great Lakes Dried Fruit",
-    tagline: "Orchard-Dried Apple Snacks",
-    initials: "GL",
-    bg: "#2c2418",
-    accent: "#5a260c",
-    fg: "#faf8f5",
-  },
-};
 
 const DEFAULT_OG = {
   name: "Scaffold Web",
@@ -31,7 +18,28 @@ const DEFAULT_OG = {
 export default async function Image() {
   const h = await headers();
   const tenant = h.get("x-tenant") || "";
-  const og = TENANT_OG[tenant] || DEFAULT_OG;
+
+  let og = DEFAULT_OG;
+
+  if (tenant) {
+    const config = await getTenantConfig(tenant);
+    if (config?.branding) {
+      og = {
+        name: config.siteName || DEFAULT_OG.name,
+        tagline: config.branding.tagline || DEFAULT_OG.tagline,
+        initials: config.branding.initials || config.siteName?.slice(0, 1) || DEFAULT_OG.initials,
+        bg: config.branding.bgColor || DEFAULT_OG.bg,
+        accent: config.branding.accentColor || DEFAULT_OG.accent,
+        fg: config.branding.fgColor || DEFAULT_OG.fg,
+      };
+    } else if (config) {
+      og = {
+        ...DEFAULT_OG,
+        name: config.siteName || DEFAULT_OG.name,
+        initials: config.siteName?.slice(0, 1) || DEFAULT_OG.initials,
+      };
+    }
+  }
 
   return new ImageResponse(
     (
