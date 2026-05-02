@@ -97,7 +97,10 @@ async function resolveTenantFromCustomDomain(
   try {
     const baseUrl = req.nextUrl.origin;
     const res = await fetch(`${baseUrl}/api/internal/domain-map?domain=${encodeURIComponent(bare)}`, {
-      headers: { "x-internal-request": "1" },
+      headers: {
+        "x-internal-request": "1",
+        "x-internal-secret": process.env.INTERNAL_API_SECRET || "",
+      },
     });
     if (res.ok) {
       const data = await res.json();

@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { validateRequest } from "twilio";
-import { getPendingByPhone, clearPending } from "@/lib/sms-pending";
+import { claimPendingByPhone, clearPending } from "@/lib/sms-pending";
 import { updateSuggestion } from "@/lib/suggestions";
 import { executeAgentPrompt } from "@/lib/agent-executor";
 import { sendSms } from "@/lib/twilio";
@@ -26,35 +26,38 @@ export async function POST(req: Request) {
     });
   }
 
+  // Fail closed: if SMS is enabled but auth token is missing, reject requests
   const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    console.error("[SMS webhook] SMS enabled but TWILIO_AUTH_TOKEN not configured");
+    return new Response("SMS enabled but TWILIO_AUTH_TOKEN not configured", { status: 500 });
+  }
   const twilioSignature = req.headers.get("X-Twilio-Signature") || "";
 
   const formData = await req.text();
   const params = new URLSearchParams(formData);
 
-  // Validate Twilio signature if auth token is configured
-  if (authToken) {
-    const webhookUrl = getWebhookUrl(req);
-    // Convert URLSearchParams to Record<string, string> for validateRequest
-    const paramsObj: Record<string, string> = {};
-    params.forEach((value, key) => {
-      paramsObj[key] = value;
-    });
+  // Validate Twilio signature
+  const webhookUrl = getWebhookUrl(req);
+  // Convert URLSearchParams to Record<string, string> for validateRequest
+  const paramsObj: Record<string, string> = {};
+  params.forEach((value, key) => {
+    paramsObj[key] = value;
+  });
 
-    const isValid = validateRequest(authToken, twilioSignature, webhookUrl, paramsObj);
-    if (!isValid) {
-      console.error("[SMS webhook] Invalid Twilio signature");
-      return new Response("Forbidden", { status: 403 });
-    }
-  } else {
-    console.warn("[SMS webhook] TWILIO_AUTH_TOKEN not set, skipping signature validation");
+  const isValid = validateRequest(authToken, twilioSignature, webhookUrl, paramsObj);
+  if (!isValid) {
+    console.error("[SMS webhook] Invalid Twilio signature");
+    return new Response("Forbidden", { status: 403 });
   }
   const from = params.get("From") || "";
   const body = (params.get("Body") || "").trim();
 
-  const pending = await getPendingByPhone(from);
+  // Atomically claim the pending entry — prevents duplicate execution if two webhooks arrive
+  const pending = await claimPendingByPhone(from);
 
   if (!pending) {
+    // Either no pending, already claimed by another webhook, or expired
     after(async () => {
       await sendSms(
         from,

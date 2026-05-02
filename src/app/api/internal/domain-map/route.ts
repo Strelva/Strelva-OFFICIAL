@@ -8,6 +8,14 @@ import { getTenantByDomain } from "@/lib/tenants";
  * GET /api/internal/domain-map?domain=example.com
  */
 export async function GET(request: Request) {
+  // Validate internal API secret
+  const expectedSecret = process.env.INTERNAL_API_SECRET;
+  const providedSecret = request.headers.get("x-internal-secret");
+  if (!expectedSecret || providedSecret !== expectedSecret) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Additional validation: require internal request header
   const internalHeader = request.headers.get("x-internal-request");
   if (internalHeader !== "1") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
