@@ -12,6 +12,7 @@ import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
+import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -173,7 +174,11 @@ export async function POST(req: Request) {
 
   const tenantConfig = await getTenantConfig(tenant);
   const { userId: clerkUserId } = await auth();
-  const { messages, activeSection } = await req.json();
+  const { messages, activeSection, nodeContext } = await req.json() as {
+    messages: unknown[];
+    activeSection?: string;
+    nodeContext?: NodeContext;
+  };
   const template = await getTemplateForTenant(tenant);
 
   // Capture the latest user message for proof-signal logging (Workstream E).
@@ -208,6 +213,23 @@ export async function POST(req: Request) {
 
   if (activeSection) {
     systemPrompt += `\n\nCONTEXT: The user is currently viewing the "${activeSection}" section in their dashboard editor. When they say "this", "it", "add one", "update this", etc., they are referring to ${activeSection}. Proactively reference this section in your responses.`;
+  }
+
+  // Enhanced node context from canvas selection
+  if (nodeContext) {
+    let contextBlock = `\n\nSELECTED ELEMENT CONTEXT:`;
+    contextBlock += `\n- Section: ${nodeContext.selectedSection}`;
+    if (nodeContext.selectedField) {
+      contextBlock += `\n- Field: ${nodeContext.selectedField}`;
+    }
+    if (nodeContext.currentValue) {
+      const truncated = nodeContext.currentValue.length > 200
+        ? nodeContext.currentValue.slice(0, 200) + "..."
+        : nodeContext.currentValue;
+      contextBlock += `\n- Current value: "${truncated}"`;
+    }
+    contextBlock += `\n\nWhen the user says "this", "it", "make it", "change this", they are referring to the selected element above. Apply changes directly to this specific field.`;
+    systemPrompt += contextBlock;
   }
 
   // Build dynamic section enum from template
@@ -254,6 +276,13 @@ export async function POST(req: Request) {
 
             const { getContent, setContent } = await import("@/lib/storage");
             const current = (await getContent(section as ContentSection, tenant)) as unknown as Record<string, unknown>;
+
+            // Classify operation and assess risk
+            const operation = classifyOperation(section as ContentSection, current, data as Record<string, unknown>);
+            const risk = assessRisk(operation);
+            const diffs = generatePreviewDiffs(current, data as Record<string, unknown>);
+
+            // Legacy array reduction check (kept for backwards compatibility)
             for (const key of Object.keys(current)) {
               if (Array.isArray(current[key]) && Array.isArray((data as Record<string, unknown>)[key])) {
                 const oldLen = (current[key] as unknown[]).length;
@@ -262,6 +291,8 @@ export async function POST(req: Request) {
                   return {
                     success: false,
                     error: `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`,
+                    risk,
+                    diffs,
                   };
                 }
               }
@@ -277,10 +308,13 @@ export async function POST(req: Request) {
                 blocked: true,
                 reason: governance.reason,
                 message: "I can't make that change directly. Jacob needs to handle structural site changes.",
+                risk,
               };
             }
 
-            const autoPublish = governance.action === "publish";
+            // Route high/medium risk operations to review queue
+            const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
+            const autoPublish = governance.action === "publish" && !shouldRouteToReview;
 
             if (autoPublish) {
               await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
@@ -293,6 +327,28 @@ export async function POST(req: Request) {
             } else {
               const { setDraftContent } = await import("@/lib/storage");
               await setDraftContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
+
+              // For medium/high risk, also add to the event queue for explicit review
+              if (shouldRouteToReview) {
+                const { addEvent } = await import("@/lib/events");
+                await addEvent({
+                  tenantId: tenant,
+                  source: "ai",
+                  type: "content_update",
+                  title: `AI proposed ${risk.level}-risk changes to ${section}`,
+                  body: diffs.slice(0, 5).map((d) => `${d.field}: ${d.type}`).join("\n"),
+                  status: "pending",
+                  metadata: {
+                    kind: "agent_preview",
+                    section,
+                    risk: risk.level,
+                    riskReason: risk.reason,
+                    diffs,
+                    proposedData: parsed.data,
+                    currentData: current,
+                  },
+                });
+              }
             }
 
             if (process.env.SLACK_WEBHOOK_URL) {
@@ -302,13 +358,14 @@ export async function POST(req: Request) {
                 .map((c) => `  • ${c.field}: "${c.before}" → "${c.after}"`)
                 .join("\n");
               const tenantLabel = tenantConfig?.siteName || tenant;
+              const riskLabel = risk.level !== "low" ? ` [${risk.level.toUpperCase()} RISK]` : "";
               fetch(process.env.SLACK_WEBHOOK_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                 text: autoPublish
-                  ? `[${tenantLabel}] AI updated *${section}*\n${changeSummary}`
-                  : `[${tenantLabel}] AI drafted changes to *${section}* — needs review at /admin/drafts\nReason: ${governance.reason}\n${changeSummary}`,
+                  ? `[${tenantLabel}] AI updated *${section}*${riskLabel}\n${changeSummary}`
+                  : `[${tenantLabel}] AI drafted changes to *${section}*${riskLabel} — needs review at /admin/drafts\nReason: ${governance.reason}\n${changeSummary}`,
                 }),
               }).catch(() => {});
             }
@@ -326,6 +383,7 @@ export async function POST(req: Request) {
                 changes,
                 eventStatus: autoPublish ? "auto_approved" : "pending",
                 governanceReason: governance.reason,
+                riskLevel: risk.level,
               }, tenant);
               if (autoPublish) await recordSectionUpdate(section, tenant);
             } catch {}
@@ -334,9 +392,14 @@ export async function POST(req: Request) {
               success: true,
               section,
               governance,
+              risk,
+              diffs,
+              applied: autoPublish,
               message: autoPublish
                 ? `Updated ${section} successfully`
-                : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`,
+                : shouldRouteToReview
+                  ? `I've queued these ${risk.level}-risk changes to ${section} for review. They'll go live after approval.`
+                  : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`,
             };
           } catch (err) {
             return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };

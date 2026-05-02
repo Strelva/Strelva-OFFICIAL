@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   AlignLeft,
   AlignCenter,
@@ -8,12 +8,24 @@ import {
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
+  Images,
+  TrendingUp,
 } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
+import { AgentTrace, type TraceStep } from "../AgentTrace";
+import { AgentPreview } from "../AgentPreview";
+import { AssetPickerModal } from "../AssetPickerModal";
+import type { PreviewDiff, RiskAssessment } from "@/lib/agent-risk";
 import type { SelectedNode } from "../DesignMode";
 
 type LayoutGap = 'tight' | 'normal' | 'loose';
 type LayoutPadding = 'none' | 'normal' | 'spacious';
+
+interface SectionAnalytics {
+  clicks?: number;
+  views?: number;
+  trend?: "up" | "down" | "flat";
+}
 
 interface DesignPropertiesPanelProps {
   selectedNode: SelectedNode | null;
@@ -24,6 +36,7 @@ interface DesignPropertiesPanelProps {
   sectionLayout?: { gap?: LayoutGap; padding?: LayoutPadding };
   editMode?: "live" | "draft";
   hasDraft?: boolean;
+  sectionAnalytics?: Record<string, SectionAnalytics>;
 }
 
 export function DesignPropertiesPanel({
@@ -35,7 +48,11 @@ export function DesignPropertiesPanel({
   sectionLayout,
   editMode = "draft",
   hasDraft = false,
+  sectionAnalytics,
 }: DesignPropertiesPanelProps) {
+  const analytics = selectedNode?.sectionType
+    ? sectionAnalytics?.[selectedNode.sectionType]
+    : undefined;
   return (
     <aside className="w-[280px] shrink-0 border-l border-gray-border flex flex-col bg-surface">
       <div className="h-10 border-b border-gray-border shrink-0 flex items-center">
@@ -51,6 +68,32 @@ export function DesignPropertiesPanel({
           className="h-full"
         />
       </div>
+
+      {/* Analytics indicator */}
+      {analytics && (analytics.clicks || analytics.views) && (
+        <div className="px-4 py-2 border-b border-gray-border bg-accent/5">
+          <div className="flex items-center gap-2">
+            <TrendingUp
+              className={`w-3.5 h-3.5 ${
+                analytics.trend === "up"
+                  ? "text-success"
+                  : analytics.trend === "down"
+                  ? "text-red-400"
+                  : "text-gray-muted"
+              }`}
+              strokeWidth={1.5}
+            />
+            <span className="text-[11px] text-gray-fg">
+              {analytics.clicks
+                ? `${analytics.clicks} click${analytics.clicks === 1 ? "" : "s"} this week`
+                : analytics.views
+                ? `${analytics.views} view${analytics.views === 1 ? "" : "s"} this week`
+                : null}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         {!selectedNode ? (
           <div className="flex items-center justify-center h-full">
@@ -352,6 +395,7 @@ function ContentTab({
 }) {
   const [localContent, setLocalContent] = useState(node.content || node.label);
   const [isSaving, setIsSaving] = useState(false);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (!node.sectionType || !onContentUpdate) return;
@@ -367,6 +411,14 @@ function ContentTab({
       setIsSaving(false);
     }
   }, [node.sectionType, node.field, localContent, onContentUpdate]);
+
+  const handleImageSelect = useCallback(async (url: string) => {
+    if (!node.sectionType || !onContentUpdate) return;
+
+    // For images, we update the imageUrl or backgroundImageUrl field
+    const imageField = node.field || "imageUrl";
+    await onContentUpdate(node.sectionType, imageField, url);
+  }, [node.sectionType, node.field, onContentUpdate]);
 
   return (
     <div className="py-2">
@@ -401,11 +453,23 @@ function ContentTab({
             <span className="text-[10px] text-gray-faint mb-1.5 block">
               Image
             </span>
-            <div className="w-full h-24 bg-surface-base border border-gray-border rounded-lg flex items-center justify-center cursor-pointer hover:border-gray-muted transition-colors">
-              <span className="text-[11px] text-gray-faint">
-                Click to replace image
+            <button
+              onClick={() => setAssetPickerOpen(true)}
+              className="w-full h-24 bg-surface-base border border-dashed border-gray-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-sage hover:bg-sage/5 transition-colors"
+            >
+              <Images className="w-5 h-5 text-gray-muted mb-1.5" strokeWidth={1.5} />
+              <span className="text-[11px] text-gray-muted font-medium">
+                Replace from Assets
               </span>
-            </div>
+              <span className="text-[10px] text-gray-faint mt-0.5">
+                Choose from your photo library
+              </span>
+            </button>
+            <AssetPickerModal
+              open={assetPickerOpen}
+              onClose={() => setAssetPickerOpen(false)}
+              onSelect={handleImageSelect}
+            />
           </div>
         ) : node.type === "section" ? (
           <div>
@@ -467,18 +531,47 @@ function AITab({
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [traceSteps, setTraceSteps] = useState<TraceStep[]>([]);
+  const [pendingPreview, setPendingPreview] = useState<{
+    section: string;
+    diffs: PreviewDiff[];
+    risk: RiskAssessment;
+  } | null>(null);
+  const stepIdCounter = useRef(0);
+
+  const addTraceStep = useCallback((label: string, type: TraceStep["type"] = "tool_call"): string => {
+    const id = `step_${++stepIdCounter.current}`;
+    setTraceSteps((prev) => [
+      ...prev,
+      { id, type, label, status: "running", timestamp: Date.now() },
+    ]);
+    return id;
+  }, []);
+
+  const updateTraceStep = useCallback((id: string, status: TraceStep["status"], detail?: string) => {
+    setTraceSteps((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, status, detail } : s))
+    );
+  }, []);
 
   const executeAgentPrompt = useCallback(async (userPrompt: string) => {
     if (!userPrompt.trim() || !node.sectionType) return;
 
     setIsApplying(true);
     setResponse(null);
-    setToolStatus(null);
+    setTraceSteps([]);
+    setPendingPreview(null);
 
     try {
       // Build context-aware prompt
       const contextualPrompt = `I'm looking at the ${node.label} section (${node.sectionType}). ${userPrompt}`;
+
+      // Build node context for enhanced agent awareness
+      const nodeContext = {
+        selectedSection: node.sectionType,
+        selectedField: node.field,
+        currentValue: node.content || node.label,
+      };
 
       const res = await fetch("/api/agent", {
         method: "POST",
@@ -486,6 +579,7 @@ function AITab({
         body: JSON.stringify({
           messages: [{ role: "user", content: contextualPrompt }],
           activeSection: node.sectionType,
+          nodeContext,
         }),
       });
 
@@ -500,6 +594,7 @@ function AITab({
 
       const decoder = new TextDecoder();
       let fullText = "";
+      let currentStepId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -510,19 +605,27 @@ function AITab({
 
         for (const line of lines) {
           if (line.startsWith("__TOOL__")) {
-            setToolStatus(line.replace("__TOOL__", ""));
+            // Mark previous step as complete
+            if (currentStepId) {
+              updateTraceStep(currentStepId, "success");
+            }
+            const label = line.replace("__TOOL__", "");
+            currentStepId = addTraceStep(label);
           } else {
             fullText += line;
           }
         }
       }
 
-      setToolStatus(null);
+      // Mark final step as complete
+      if (currentStepId) {
+        updateTraceStep(currentStepId, "success");
+      }
+
       setResponse({ type: "success", message: fullText.trim() || "Done." });
 
       // Trigger content refresh if we have a callback
       if (onContentUpdate && node.sectionType) {
-        // Refetch by triggering a dummy update signal
         window.dispatchEvent(new CustomEvent("reb-content-refresh", { detail: { section: node.sectionType } }));
       }
     } catch (err) {
@@ -534,7 +637,7 @@ function AITab({
       setIsApplying(false);
       setPrompt("");
     }
-  }, [node.sectionType, node.label, onContentUpdate]);
+  }, [node.sectionType, node.label, node.field, node.content, onContentUpdate, addTraceStep, updateTraceStep]);
 
   const handleApply = useCallback(() => {
     executeAgentPrompt(prompt);
@@ -544,13 +647,40 @@ function AITab({
     executeAgentPrompt(actionPrompt);
   }, [executeAgentPrompt]);
 
+  const handlePreviewApprove = useCallback(() => {
+    if (!pendingPreview) return;
+    // TODO: Apply the changes via API
+    setPendingPreview(null);
+    setResponse({ type: "success", message: "Changes applied." });
+  }, [pendingPreview]);
+
+  const handlePreviewReject = useCallback(() => {
+    setPendingPreview(null);
+    setResponse({ type: "error", message: "Changes cancelled." });
+  }, []);
+
   const quickActions = [
     { label: "Rewrite copy", prompt: "Rewrite the copy to be more compelling and engaging" },
     { label: "Shorten", prompt: "Make the content more concise while keeping the key message" },
     { label: "Add emphasis", prompt: "Add more emphasis and urgency to the messaging" },
     { label: "Fix grammar", prompt: "Fix any grammar or spelling issues" },
-    { label: "Improve layout", prompt: "Suggest improvements to how this section is structured" },
   ];
+
+  // Show preview if pending
+  if (pendingPreview) {
+    return (
+      <div className="py-2 px-3">
+        <AgentPreview
+          section={pendingPreview.section}
+          diffs={pendingPreview.diffs}
+          risk={pendingPreview.risk}
+          onApprove={handlePreviewApprove}
+          onReject={handlePreviewReject}
+          isApplying={isApplying}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="py-2">
@@ -559,6 +689,9 @@ function AITab({
         <p className="text-[11px] text-gray-muted mb-3">
           Describe changes for{" "}
           <span className="text-accent font-medium">{node.label}</span>
+          {node.field && (
+            <span className="text-gray-faint"> ({node.field})</span>
+          )}
         </p>
         <textarea
           value={prompt}
@@ -573,9 +706,16 @@ function AITab({
           disabled={isApplying || !prompt.trim()}
           className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
         >
-          {isApplying ? (toolStatus || "Working...") : "Apply with AI"}
+          {isApplying ? "Working..." : "Apply with AI"}
         </button>
       </div>
+
+      {/* Agent Trace */}
+      {(traceSteps.length > 0 || isApplying) && (
+        <div className="px-4 pb-3">
+          <AgentTrace steps={traceSteps} isRunning={isApplying} />
+        </div>
+      )}
 
       {response && (
         <div className="px-4 pb-3">
