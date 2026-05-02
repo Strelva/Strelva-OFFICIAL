@@ -48,13 +48,12 @@ async function redisCheck(key: string, max: number, windowSeconds: number): Prom
   }
 }
 
-/** Returns true if the request should be blocked. */
+/**
+ * @deprecated Use isRateLimitedAsync() for proper Redis-backed distributed rate limiting.
+ * This sync version only uses in-memory checks and resets on cold start.
+ */
 export function isRateLimited(key: string, maxPerMinute: number): boolean {
-  const redis = getRedis();
-  if (!redis) return memCheck(key, maxPerMinute, windowMs);
-
-  // For sync callers that can't await: optimistically allow, fire async check.
-  // To properly enforce across instances, callers should migrate to isRateLimitedAsync.
+  console.warn("[rate-limit] isRateLimited() is deprecated — use isRateLimitedAsync()");
   return memCheck(key, maxPerMinute, windowMs);
 }
 

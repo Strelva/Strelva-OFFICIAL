@@ -10,8 +10,12 @@ function getStripe() {
 }
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
+const PROCESSING_STALE_MINUTES = 5;
 
-type EventStatus = "processing" | "processed" | "failed";
+interface EventRecord {
+  status: "processing" | "processed" | "failed";
+  startedAt?: number;
+}
 
 async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate" | "retry"> {
   const redis = getRedis();
@@ -21,17 +25,21 @@ async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate
 
   const key = `stripe:event:${eventId}`;
   try {
-    const existing = await redis.get<EventStatus>(key);
+    const existing = await redis.get<EventRecord>(key);
 
-    if (existing === "processed") {
+    if (existing?.status === "processed") {
       return "duplicate";
     }
 
-    if (existing === "processing") {
-      return "retry";
+    if (existing?.status === "processing") {
+      const staleThreshold = Date.now() - PROCESSING_STALE_MINUTES * 60 * 1000;
+      if (existing.startedAt && existing.startedAt > staleThreshold) {
+        return "retry";
+      }
     }
 
-    await redis.set(key, "processing" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+    const record: EventRecord = { status: "processing", startedAt: Date.now() };
+    await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
     return "claimed";
   } catch {
     return "claimed";
@@ -44,7 +52,8 @@ async function markEventProcessed(eventId: string): Promise<void> {
 
   const key = `stripe:event:${eventId}`;
   try {
-    await redis.set(key, "processed" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+    const record: EventRecord = { status: "processed" };
+    await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
   } catch {}
 }
 
@@ -55,7 +64,8 @@ async function markEventFailed(eventId: string, error: string): Promise<void> {
   const key = `stripe:event:${eventId}`;
   const errorKey = `stripe:event:error:${eventId}`;
   try {
-    await redis.set(key, "failed" as EventStatus, { ex: PROCESSED_EVENT_TTL_SECONDS });
+    const record: EventRecord = { status: "failed" };
+    await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
     await redis.set(errorKey, error, { ex: PROCESSED_EVENT_TTL_SECONDS });
   } catch {}
 }
