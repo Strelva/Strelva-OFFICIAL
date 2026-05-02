@@ -3,9 +3,11 @@
  *
  * Stores pending SMS approval requests in Redis with 24-hour TTL.
  * Falls back to in-memory storage if Redis is unavailable (dev only).
+ * Production requires Redis — memory fallback is blocked.
  */
 
 import { getRedis } from "./redis";
+import { isProductionEnv } from "./production-guard";
 
 export interface PendingSms {
   approvalId: string;
@@ -60,6 +62,8 @@ export async function setPending(
     await redis.set(phoneIndexKey(normalizedPhone), pending.tenantId, {
       ex: TTL_SECONDS,
     });
+  } else if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Redis required for SMS pending storage");
   } else {
     memoryStore.set(pending.tenantId, full);
   }
@@ -94,7 +98,11 @@ export async function getPendingByPhone(
     return entry;
   }
 
-  // Memory fallback
+  if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Redis required for SMS pending lookup");
+  }
+
+  // Memory fallback (dev only)
   const entries = Array.from(memoryStore.values());
   for (const entry of entries) {
     if (entry.phone === normalized && entry.status === "waiting") {
@@ -159,6 +167,10 @@ export async function claimPendingByPhone(
     return typeof result === "string" ? JSON.parse(result) : result;
   }
 
+  if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Redis required for SMS claim operation");
+  }
+
   // Memory fallback (not atomic, acceptable for dev)
   const entries = Array.from(memoryStore.values());
   for (const entry of entries) {
@@ -192,7 +204,11 @@ export async function getPendingByTenant(
     return entry;
   }
 
-  // Memory fallback
+  if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Redis required for SMS pending lookup");
+  }
+
+  // Memory fallback (dev only)
   const entry = memoryStore.get(tenantId);
   if (!entry) return null;
   if (new Date(entry.expiresAt) < new Date()) {
@@ -232,7 +248,11 @@ export async function clearPending(
     return true;
   }
 
-  // Memory fallback
+  if (isProductionEnv()) {
+    throw new Error("[PRODUCTION] Redis required for SMS clear operation");
+  }
+
+  // Memory fallback (dev only)
   const entry = memoryStore.get(tenantId);
   if (!entry || (entry.status !== "waiting" && entry.status !== "claimed")) return false;
   entry.status = status;

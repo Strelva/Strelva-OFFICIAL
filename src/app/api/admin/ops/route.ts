@@ -45,9 +45,12 @@ export async function GET() {
     const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
     for (const tenant of active) {
       const pendingKey = `sms:pending:${tenant.id}`;
-      const pending = await redis.get<{ createdAt: number }>(pendingKey);
-      if (pending && pending.createdAt < staleCutoff) {
-        metrics.staleSmsApprovals++;
+      const pending = await redis.get<{ sentAt?: string; expiresAt?: string }>(pendingKey);
+      if (pending?.sentAt) {
+        const sentAtMs = new Date(pending.sentAt).getTime();
+        if (sentAtMs < staleCutoff) {
+          metrics.staleSmsApprovals++;
+        }
       }
     }
   }

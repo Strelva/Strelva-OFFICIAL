@@ -96,6 +96,20 @@ export const tenant = defineType({
     defineField({ name: "googleSearchConsoleKey", title: "Google Search Console Key", type: "text" }),
     defineField({ name: "instagramAccessToken", title: "Instagram Access Token", type: "string" }),
     defineField({ name: "revalidateUrl", title: "Revalidate URL", type: "url", description: "URL to POST to when content changes (e.g., https://clientsite.com/api/revalidate)" }),
+    defineField({ name: "revalidationSecret", title: "Revalidation Secret", type: "string", description: "Shared secret for HMAC-signed revalidation requests" }),
+    // Branding (for OG images, favicons, etc.)
+    defineField({
+      name: "branding",
+      title: "Branding",
+      type: "object",
+      fields: [
+        defineField({ name: "initials", title: "Initials", type: "string", description: "1-2 letter monogram (e.g., GL)" }),
+        defineField({ name: "tagline", title: "Tagline", type: "string", description: "Short tagline for OG images" }),
+        defineField({ name: "bgColor", title: "Background Color", type: "string", description: "Hex color (e.g., #2c2418)" }),
+        defineField({ name: "accentColor", title: "Accent Color", type: "string", description: "Hex color (e.g., #5a260c)" }),
+        defineField({ name: "fgColor", title: "Foreground Color", type: "string", description: "Hex color (e.g., #faf8f5)" }),
+      ],
+    }),
   ],
   preview: {
     select: { title: "siteName", subtitle: "subdomain" },

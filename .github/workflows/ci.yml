@@ -35,8 +35,15 @@ jobs:
         run: pnpm test
 
       - name: Audit dependencies
-        continue-on-error: true
         run: pnpm audit --audit-level high
 
       - name: Build
         run: pnpm build
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Smoke tests
+        run: pnpm smoke
+        env:
+          CI: true

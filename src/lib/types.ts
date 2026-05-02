@@ -461,6 +461,14 @@ export interface TenantConfig {
   revalidateUrl?: string;
   /** Per-tenant secret for revalidation webhook auth */
   revalidationSecret?: string;
+  /** Branding for OG images, favicons, etc. */
+  branding?: {
+    initials?: string;
+    tagline?: string;
+    bgColor?: string;
+    accentColor?: string;
+    fgColor?: string;
+  };
 }
 
 export interface BusinessHoursDay {

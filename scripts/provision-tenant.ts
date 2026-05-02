@@ -68,6 +68,13 @@ interface TenantConfig {
   siteUrl: string;
   revalidateUrl: string;
   revalidationSecret?: string;
+  branding?: {
+    initials?: string;
+    tagline?: string;
+    bgColor?: string;
+    accentColor?: string;
+    fgColor?: string;
+  };
 }
 
 function generateSecret(): string {

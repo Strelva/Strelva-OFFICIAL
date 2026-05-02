@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { updateTenant } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
+import { isProductionEnv } from "@/lib/production-guard";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -20,6 +21,9 @@ interface EventRecord {
 async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate" | "retry"> {
   const redis = getRedis();
   if (!redis) {
+    if (isProductionEnv()) {
+      throw new Error("[PRODUCTION] Redis required for Stripe webhook idempotency");
+    }
     return "claimed";
   }
 
@@ -67,7 +71,10 @@ async function claimStripeEvent(eventId: string): Promise<"claimed" | "duplicate
     }
 
     return "retry";
-  } catch {
+  } catch (err) {
+    if (isProductionEnv()) {
+      throw new Error(`[PRODUCTION] Redis idempotency check failed: ${err}`);
+    }
     return "claimed";
   }
 }
@@ -118,8 +125,16 @@ async function applyTenantSubscriptionStatus(
   event: Stripe.Event
 ) {
   if (!tenantId) {
-    console.warn(`[billing webhook] ${event.type} missing tenantId metadata`);
-    return;
+    const msg = `[billing webhook] ${event.type} missing tenantId metadata — cannot apply subscription status`;
+    console.error(msg);
+    if (process.env.SLACK_WEBHOOK_URL) {
+      fetch(process.env.SLACK_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: `⚠️ ${msg}` }),
+      }).catch(() => {});
+    }
+    throw new Error(msg);
   }
 
   const redis = getRedis();
