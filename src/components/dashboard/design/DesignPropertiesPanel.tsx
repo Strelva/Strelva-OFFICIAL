@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import {
   AlignLeft,
   AlignCenter,
@@ -15,12 +16,18 @@ interface DesignPropertiesPanelProps {
   selectedNode: SelectedNode | null;
   activeTab: "design" | "content" | "ai";
   onTabChange: (tab: "design" | "content" | "ai") => void;
+  onContentUpdate?: (section: string, field: string, value: string) => void;
+  editMode?: "live" | "draft";
+  hasDraft?: boolean;
 }
 
 export function DesignPropertiesPanel({
   selectedNode,
   activeTab,
   onTabChange,
+  onContentUpdate,
+  editMode = "draft",
+  hasDraft = false,
 }: DesignPropertiesPanelProps) {
   return (
     <aside className="w-[280px] shrink-0 border-l border-gray-border flex flex-col bg-surface">
@@ -45,9 +52,14 @@ export function DesignPropertiesPanel({
         ) : activeTab === "design" ? (
           <DesignTab node={selectedNode} />
         ) : activeTab === "content" ? (
-          <ContentTab node={selectedNode} />
+          <ContentTab
+            node={selectedNode}
+            onContentUpdate={onContentUpdate}
+            editMode={editMode}
+            hasDraft={hasDraft}
+          />
         ) : (
-          <AITab node={selectedNode} />
+          <AITab node={selectedNode} onContentUpdate={onContentUpdate} />
         )}
       </div>
     </aside>
@@ -83,20 +95,32 @@ function NumberInput({
   value,
   unit,
   width = 56,
+  onChange,
 }: {
   value: number;
   unit?: string;
   width?: number;
+  onChange?: (value: number) => void;
 }) {
+  const [localValue, setLocalValue] = useState(value.toString());
+
+  const handleBlur = useCallback(() => {
+    const num = parseFloat(localValue);
+    if (!isNaN(num) && onChange) {
+      onChange(num);
+    }
+  }, [localValue, onChange]);
+
   return (
     <div
-      className="flex items-center bg-surface-base border border-gray-border rounded-md px-2 h-[26px]"
+      className="flex items-center bg-surface-base border border-gray-border rounded-md px-2 h-[26px] focus-within:border-accent/50"
       style={{ width }}
     >
       <input
         type="text"
-        value={value}
-        readOnly
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
         className="w-full bg-transparent text-[11px] text-warm-black text-right outline-none tabular-nums"
       />
       {unit && (
@@ -241,33 +265,82 @@ function DesignTab({ node }: { node: SelectedNode }) {
   );
 }
 
-function ContentTab({ node }: { node: SelectedNode }) {
+function ContentTab({
+  node,
+  onContentUpdate,
+  editMode,
+  hasDraft,
+}: {
+  node: SelectedNode;
+  onContentUpdate?: (section: string, field: string, value: string) => void;
+  editMode?: "live" | "draft";
+  hasDraft?: boolean;
+}) {
+  const [localContent, setLocalContent] = useState(node.content || node.label);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (!node.sectionType || !onContentUpdate) return;
+
+    setIsSaving(true);
+    try {
+      await onContentUpdate(
+        node.sectionType,
+        node.field || "content",
+        localContent
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }, [node.sectionType, node.field, localContent, onContentUpdate]);
+
   return (
     <div className="py-2">
       <SectionLabel>Content</SectionLabel>
       <div className="px-4 py-3">
         {node.type === "text" || node.type === "button" ? (
           <div>
-            <span className="text-[10px] text-gray-faint mb-1.5 block">
-              Text
-            </span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-gray-faint">Text</span>
+              {hasDraft && (
+                <span className="text-[9px] text-amber-500 font-medium">Draft</span>
+              )}
+            </div>
             <textarea
-              value={node.content || node.label}
-              readOnly
+              value={localContent}
+              onChange={(e) => setLocalContent(e.target.value)}
               rows={3}
               className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none focus:border-accent/50 transition-colors"
             />
+            {onContentUpdate && node.sectionType && (
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : editMode === "draft" ? "Save Draft" : "Publish"}
+              </button>
+            )}
           </div>
         ) : node.type === "image" ? (
           <div>
             <span className="text-[10px] text-gray-faint mb-1.5 block">
               Image
             </span>
-            <div className="w-full h-24 bg-surface-base border border-gray-border rounded-lg flex items-center justify-center">
+            <div className="w-full h-24 bg-surface-base border border-gray-border rounded-lg flex items-center justify-center cursor-pointer hover:border-gray-muted transition-colors">
               <span className="text-[11px] text-gray-faint">
                 Click to replace image
               </span>
             </div>
+          </div>
+        ) : node.type === "section" ? (
+          <div>
+            <p className="text-[11px] text-gray-muted mb-3">
+              Editing section: <span className="text-accent font-medium">{node.label}</span>
+            </p>
+            <p className="text-[10px] text-gray-faint">
+              Click on text elements in the canvas to edit them directly, or use the AI tab to make changes.
+            </p>
           </div>
         ) : (
           <p className="text-[11px] text-gray-faint">
@@ -283,9 +356,26 @@ function ContentTab({ node }: { node: SelectedNode }) {
             <input
               type="text"
               placeholder="https://"
-              readOnly
-              className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-1.5 text-[11px] text-warm-black outline-none"
+              className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-1.5 text-[11px] text-warm-black outline-none focus:border-accent/50 transition-colors"
             />
+          </div>
+        </>
+      )}
+
+      {node.sectionType && (
+        <>
+          <SectionLabel>Section Info</SectionLabel>
+          <div className="px-4 py-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-faint">Type</span>
+              <span className="text-[11px] text-gray-muted font-mono">{node.sectionType}</span>
+            </div>
+            {node.field && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-faint">Field</span>
+                <span className="text-[11px] text-gray-muted font-mono">{node.field}</span>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -293,7 +383,38 @@ function ContentTab({ node }: { node: SelectedNode }) {
   );
 }
 
-function AITab({ node }: { node: SelectedNode }) {
+function AITab({
+  node,
+  onContentUpdate: _onContentUpdate,
+}: {
+  node: SelectedNode;
+  onContentUpdate?: (section: string, field: string, value: string) => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [isApplying, setIsApplying] = useState(false);
+
+  const handleApply = useCallback(async () => {
+    if (!prompt.trim() || !node.sectionType) return;
+
+    setIsApplying(true);
+    try {
+      // TODO: Wire to agent executor
+      console.log("AI prompt:", prompt, "for section:", node.sectionType);
+      await new Promise(r => setTimeout(r, 1000)); // Placeholder
+    } finally {
+      setIsApplying(false);
+      setPrompt("");
+    }
+  }, [prompt, node.sectionType]);
+
+  const quickActions = [
+    { label: "Rewrite copy", prompt: "Rewrite the copy in this section to be more compelling" },
+    { label: "Shorten", prompt: "Make this section more concise" },
+    { label: "Add emphasis", prompt: "Add more emphasis and urgency to this section" },
+    { label: "Fix grammar", prompt: "Fix any grammar or spelling issues in this section" },
+    { label: "Improve layout", prompt: "Suggest improvements to this section's layout" },
+  ];
+
   return (
     <div className="py-2">
       <SectionLabel>AI Edit</SectionLabel>
@@ -303,29 +424,30 @@ function AITab({ node }: { node: SelectedNode }) {
           <span className="text-accent font-medium">{node.label}</span>
         </p>
         <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
           placeholder={`e.g. "Make the heading larger and more bold" or "Change the background to a gradient"`}
           rows={4}
           className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none placeholder:text-gray-faint focus:border-accent/50 transition-colors"
         />
-        <button className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors">
-          Apply with AI
+        <button
+          onClick={handleApply}
+          disabled={isApplying || !prompt.trim()}
+          className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
+        >
+          {isApplying ? "Applying..." : "Apply with AI"}
         </button>
       </div>
 
       <SectionLabel>Quick Actions</SectionLabel>
       <div className="px-4 py-3 flex flex-wrap gap-1.5">
-        {[
-          "Rewrite copy",
-          "Add animation",
-          "Change style",
-          "Generate image",
-          "Improve layout",
-        ].map((action) => (
+        {quickActions.map((action) => (
           <button
-            key={action}
+            key={action.label}
+            onClick={() => setPrompt(action.prompt)}
             className="px-2.5 py-1 rounded-md bg-surface-base border border-gray-border text-[10px] text-gray-muted hover:text-warm-black hover:border-gray-muted transition-colors"
           >
-            {action}
+            {action.label}
           </button>
         ))}
       </div>

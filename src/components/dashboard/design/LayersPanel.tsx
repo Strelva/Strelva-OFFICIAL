@@ -21,6 +21,7 @@ interface LayersPanelProps {
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  isLoading?: boolean;
 }
 
 const TYPE_ICONS: Record<DesignNode["type"], typeof Square> = {
@@ -40,6 +41,7 @@ export function LayersPanel({
   onSelect,
   onToggleExpand,
   onToggleVisibility,
+  isLoading,
 }: LayersPanelProps) {
   return (
     <aside className="w-[240px] shrink-0 border-r border-gray-border flex flex-col bg-surface">
@@ -49,18 +51,28 @@ export function LayersPanel({
         </span>
       </div>
       <div className="flex-1 overflow-y-auto py-1">
-        {tree.map((node) => (
-          <TreeNode
-            key={node.id}
-            node={node}
-            depth={0}
-            selectedId={selectedId}
-            expandedIds={expandedIds}
-            onSelect={onSelect}
-            onToggleExpand={onToggleExpand}
-            onToggleVisibility={onToggleVisibility}
-          />
-        ))}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-24">
+            <span className="text-[11px] text-gray-faint">Loading...</span>
+          </div>
+        ) : tree.length === 0 ? (
+          <div className="flex items-center justify-center h-24">
+            <span className="text-[11px] text-gray-faint">No sections found</span>
+          </div>
+        ) : (
+          tree.map((node) => (
+            <TreeNode
+              key={node.id}
+              node={node}
+              depth={0}
+              selectedId={selectedId}
+              expandedIds={expandedIds}
+              onSelect={onSelect}
+              onToggleExpand={onToggleExpand}
+              onToggleVisibility={onToggleVisibility}
+            />
+          ))
+        )}
       </div>
     </aside>
   );

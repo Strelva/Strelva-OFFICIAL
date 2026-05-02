@@ -42,6 +42,26 @@ export function EditModeOverlay() {
           }
         }
       }
+
+      // Handle rect request from parent
+      if (event.data?.type === "reb-request-rect") {
+        const section = event.data.section;
+        const el = document.querySelector(`[data-reb-section="${section}"]`) ||
+                   document.querySelector(`[data-reb-editable="${section}"]`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          window.parent.postMessage({
+            type: "reb-node-rect",
+            section,
+            rect: {
+              top: rect.top + window.scrollY,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            },
+          }, "*");
+        }
+      }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
@@ -73,9 +93,29 @@ export function EditModeOverlay() {
       const el = (e.currentTarget as HTMLElement);
       const sectionType = el.getAttribute("data-reb-section");
       const editable = el.getAttribute("data-reb-editable");
+      const label = el.getAttribute("data-reb-label") || sectionType;
+
       if (sectionType) {
         e.preventDefault();
         e.stopPropagation();
+
+        const rect = el.getBoundingClientRect();
+
+        // Send enhanced message with DOM rect
+        window.parent.postMessage({
+          type: "reb-node-selected",
+          section: editable || sectionType,
+          label,
+          nodeType: "section",
+          rect: {
+            top: rect.top + window.scrollY,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          },
+        }, "*");
+
+        // Also send legacy message for backwards compat
         window.parent.postMessage({
           type: "reb-section-clicked",
           section: editable || sectionType,
@@ -162,6 +202,35 @@ export function EditModeOverlay() {
       }
     }
 
+    // Handle field clicks to send node-selected with field info
+    function handleFieldClick(e: Event) {
+      const el = e.target as HTMLElement;
+      const field = el.getAttribute("data-reb-field");
+      const sectionEl = el.closest("[data-reb-section]");
+      const section = sectionEl?.getAttribute("data-reb-editable") || sectionEl?.getAttribute("data-reb-section");
+      const label = el.getAttribute("data-reb-label") || field;
+
+      if (section && field) {
+        e.stopPropagation();
+
+        const rect = el.getBoundingClientRect();
+
+        window.parent.postMessage({
+          type: "reb-node-selected",
+          section,
+          field,
+          label,
+          nodeType: "text",
+          rect: {
+            top: rect.top + window.scrollY,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          },
+        }, "*");
+      }
+    }
+
     fields.forEach((field) => {
       const el = field as HTMLElement;
       el.setAttribute("contenteditable", "true");
@@ -170,6 +239,7 @@ export function EditModeOverlay() {
       el.addEventListener("focus", handleFocus);
       el.addEventListener("blur", handleBlur);
       el.addEventListener("keydown", handleKeyDown as EventListener);
+      el.addEventListener("click", handleFieldClick, true);
     });
 
     return () => {
@@ -181,6 +251,7 @@ export function EditModeOverlay() {
         el.removeEventListener("focus", handleFocus);
         el.removeEventListener("blur", handleBlur);
         el.removeEventListener("keydown", handleKeyDown as EventListener);
+        el.removeEventListener("click", handleFieldClick, true);
       });
     };
   }, [editMode]);

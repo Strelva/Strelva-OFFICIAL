@@ -1,12 +1,16 @@
 "use client";
 
+import { useEffect, useState, useMemo, type RefObject } from "react";
 import { Minus, Plus, Maximize2 } from "lucide-react";
+import type { NodeRect } from "../DesignMode";
 
 interface DesignCanvasProps {
   siteUrl: string;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   selectedId: string | null;
+  nodeRect: NodeRect | null;
+  iframeRef: RefObject<HTMLIFrameElement | null>;
 }
 
 export function DesignCanvas({
@@ -14,8 +18,44 @@ export function DesignCanvas({
   zoom,
   onZoomChange,
   selectedId,
+  nodeRect,
+  iframeRef,
 }: DesignCanvasProps) {
   const scale = zoom / 100;
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [rectFromMessage, setRectFromMessage] = useState<{ id: string; rect: NodeRect } | null>(null);
+
+  // Listen for rect updates from iframe
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      const section = event.data?.section;
+      const rect = event.data?.rect;
+      if ((event.data?.type === "reb-node-rect" || event.data?.type === "reb-node-selected") && section && rect) {
+        setRectFromMessage({ id: section, rect });
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Enable edit mode in iframe when loaded
+  useEffect(() => {
+    if (iframeLoaded && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, "*");
+    }
+  }, [iframeLoaded, iframeRef]);
+
+  // Use message rect if it matches current selection, otherwise use prop
+  const displayRect = useMemo(() => {
+    if (rectFromMessage && rectFromMessage.id === selectedId) {
+      return rectFromMessage.rect;
+    }
+    return nodeRect;
+  }, [rectFromMessage, selectedId, nodeRect]);
+
+  const handleIframeLoad = () => {
+    setIframeLoaded(true);
+  };
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#0a0a0a] relative">
@@ -30,20 +70,23 @@ export function DesignCanvas({
           }}
         >
           <iframe
-            src={siteUrl || "/preview"}
+            ref={iframeRef}
+            src={siteUrl ? `${siteUrl}?edit=true` : "/preview?edit=true"}
             className="w-full h-full min-h-[800px] border-0"
             title="Site preview"
+            onLoad={handleIframeLoad}
           />
-          {selectedId && (
+          {/* Selection overlay - positioned based on real DOM rect */}
+          {selectedId && displayRect && displayRect.width > 0 && (
             <div
-              className="absolute pointer-events-none border-2 border-accent rounded-sm"
+              className="absolute pointer-events-none border-2 border-accent rounded-sm transition-all duration-150"
               style={{
-                top: "120px",
-                left: "40px",
-                width: "calc(100% - 80px)",
-                height: "300px",
+                top: displayRect.top,
+                left: displayRect.left,
+                width: displayRect.width,
+                height: displayRect.height,
                 boxShadow:
-                  "0 0 0 1px rgba(91, 141, 239, 0.2), 0 0 0 4000px rgba(0,0,0,0.05)",
+                  "0 0 0 1px rgba(91, 141, 239, 0.2), 0 0 0 4000px rgba(0,0,0,0.03)",
               }}
             >
               {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map(
@@ -60,9 +103,15 @@ export function DesignCanvas({
                   />
                 )
               )}
-              <div className="absolute -top-7 left-0 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded">
+              <div className="absolute -top-7 left-0 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
                 {selectedId}
               </div>
+            </div>
+          )}
+          {/* Fallback: show label without rect if no rect available */}
+          {selectedId && (!displayRect || displayRect.width === 0) && (
+            <div className="absolute top-4 left-4 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
+              Selected: {selectedId}
             </div>
           )}
         </div>
