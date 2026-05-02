@@ -19,7 +19,7 @@ export function ContentViewToggle({
   sectionData,
   timestamps,
 }: ContentViewToggleProps) {
-  const [view, setView] = useState<"edit" | "design">("edit");
+  const [view, setView] = useState<"edit" | "design">("design");
   const sections = Object.values(sectionData);
   const staleCount = sections.filter((section) => section.freshness === "stale").length;
   const liveCount = sections.filter((section) => section.status === "live").length;

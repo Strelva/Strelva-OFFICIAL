@@ -5,6 +5,8 @@ import { useDashboard } from "./DashboardContext";
 import { LayersPanel } from "./design/LayersPanel";
 import { DesignCanvas } from "./design/DesignCanvas";
 import { DesignPropertiesPanel } from "./design/DesignPropertiesPanel";
+import { PageSelector } from "./design/PageSelector";
+import { PublishBar } from "./design/PublishBar";
 import type { PageConfig, PageSectionConfig } from "@/lib/types";
 
 export type DesignNode = {
@@ -390,35 +392,101 @@ export function DesignMode() {
     }
   }, [siteUrl, editMode, setHasDraft, triggerRefresh]);
 
+  // Check if any section has a draft
+  const hasAnyDraft = Object.values(hasDraft).some(Boolean);
+
+  // Publish all drafts
+  const handlePublishAll = useCallback(async () => {
+    const sectionsWithDrafts = Object.entries(hasDraft)
+      .filter(([, has]) => has)
+      .map(([section]) => section);
+
+    const url = new URL(siteUrl || window.location.origin);
+    const tenant = url.hostname.split(".")[0];
+
+    for (const section of sectionsWithDrafts) {
+      try {
+        // Fetch draft content
+        const res = await fetch(`/api/content/${section}?draft=true`, {
+          headers: { "X-Tenant": tenant },
+        });
+        if (!res.ok) continue;
+        const draftData = await res.json();
+
+        // Publish it (write without draft flag)
+        await fetch(`/api/content/${section}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Tenant": tenant,
+          },
+          body: JSON.stringify(draftData),
+        });
+      } catch (err) {
+        console.error(`Failed to publish ${section}:`, err);
+      }
+    }
+
+    // Clear all draft flags
+    setHasDraft({});
+    triggerRefresh();
+  }, [hasDraft, siteUrl, setHasDraft, triggerRefresh]);
+
   return (
-    <div className="flex h-full bg-surface-base">
-      <LayersPanel
-        tree={tree}
-        selectedId={selectedId}
-        expandedIds={expandedIds}
-        onSelect={handleSelect}
-        onToggleExpand={toggleExpand}
-        onToggleVisibility={toggleVisibility}
-        onReorder={handleReorder}
-        isLoading={isLoading}
-      />
-      <DesignCanvas
-        siteUrl={siteUrl}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        selectedId={selectedId}
-        nodeRect={nodeRect}
-        iframeRef={iframeRef}
-      />
-      <DesignPropertiesPanel
-        selectedNode={selectedNode}
-        activeTab={rightTab}
-        onTabChange={setRightTab}
-        onContentUpdate={handleContentUpdate}
-        onLayoutUpdate={handleLayoutUpdate}
-        sectionLayout={currentSectionLayout}
-        editMode={editMode}
-        hasDraft={hasDraft[selectedNode?.sectionType || ""] || false}
+    <div className="flex flex-col h-full bg-surface-base">
+      {/* Top bar with page selector */}
+      <div className="h-11 border-b border-gray-border flex items-center justify-between px-4 shrink-0 bg-surface">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-gray-muted">
+            Page
+          </span>
+          <PageSelector />
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-gray-faint">
+          {editMode === "draft" && (
+            <span className="px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 font-medium">
+              Draft mode
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Main workspace */}
+      <div className="flex flex-1 min-h-0">
+        <LayersPanel
+          tree={tree}
+          selectedId={selectedId}
+          expandedIds={expandedIds}
+          onSelect={handleSelect}
+          onToggleExpand={toggleExpand}
+          onToggleVisibility={toggleVisibility}
+          onReorder={handleReorder}
+          isLoading={isLoading}
+        />
+        <DesignCanvas
+          siteUrl={siteUrl}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          selectedId={selectedId}
+          nodeRect={nodeRect}
+          iframeRef={iframeRef}
+        />
+        <DesignPropertiesPanel
+          selectedNode={selectedNode}
+          activeTab={rightTab}
+          onTabChange={setRightTab}
+          onContentUpdate={handleContentUpdate}
+          onLayoutUpdate={handleLayoutUpdate}
+          sectionLayout={currentSectionLayout}
+          editMode={editMode}
+          hasDraft={hasDraft[selectedNode?.sectionType || ""] || false}
+        />
+      </div>
+
+      {/* Publish bar */}
+      <PublishBar
+        hasDrafts={hasAnyDraft}
+        onPublish={handlePublishAll}
       />
     </div>
   );
