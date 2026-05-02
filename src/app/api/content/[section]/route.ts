@@ -12,7 +12,7 @@ import {
   appendVersion,
 } from "@/lib/storage";
 import { diffFields } from "@/lib/utils";
-import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
+import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { requireTenantAccess } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -31,7 +31,7 @@ export async function GET(
   const { section } = await params;
 
   try {
-    const tenant = await getTenantFromHeaders();
+    const tenant = await requireTenantFromHeaders();
 
     if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });

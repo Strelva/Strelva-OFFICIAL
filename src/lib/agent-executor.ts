@@ -335,20 +335,27 @@ export async function executeAgentPrompt(
         const author = tenantConfig?.ownerName || "The Team";
         const excerpt = content.slice(0, 160).replace(/\n/g, " ").trim();
 
+        const globalAutoPublishOff = process.env.AI_AUTO_PUBLISH === "false";
+        const tenantAutoPublishOff = tenantConfig?.autoPublish === false;
+        const shouldDraft = globalAutoPublishOff || tenantAutoPublishOff;
+        const status = shouldDraft ? "draft" : "published";
+
         const post = await createBlogPost(tenantId, {
           slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
           title,
           excerpt,
           content,
           author,
-          status: "published",
+          status,
           tags: tags || [],
         });
 
         const { logActivity } = await import("@/lib/storage");
         await logActivity(
           {
-            text: `AI published blog post: "${title}"`,
+            text: shouldDraft
+              ? `AI drafted blog post for review: "${title}"`
+              : `AI published blog post: "${title}"`,
             time: new Date().toISOString(),
             type: "ai",
             section: "blog",
@@ -357,7 +364,11 @@ export async function executeAgentPrompt(
           tenantId
         );
 
-        return { success: true, post: { title: post.title, slug: post.slug, publishedAt: post.publishedAt } };
+        return {
+          success: true,
+          status,
+          post: { title: post.title, slug: post.slug, publishedAt: post.publishedAt },
+        };
       },
     });
 
