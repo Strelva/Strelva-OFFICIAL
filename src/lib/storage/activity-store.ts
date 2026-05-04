@@ -16,6 +16,7 @@ export interface ActivityEntry {
   changes?: { field: string; before: string; after: string }[];
   eventStatus?: "pending" | "approved" | "dismissed" | "auto_approved";
   governanceReason?: string;
+  riskLevel?: string;
   /**
    * Full previous content blob captured at the time of the save.
    * Used by Phase 14 version history to restore earlier versions.

@@ -1,4 +1,5 @@
 import { streamText, tool, stepCountIs } from "ai";
+import type { ModelMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
@@ -14,6 +15,41 @@ import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
+
+type IncomingMessagePart = { type?: string; text?: string };
+
+type IncomingMessage = {
+  role?: string;
+  content?: string | IncomingMessagePart[];
+  parts?: IncomingMessagePart[];
+};
+
+function isIncomingMessage(value: unknown): value is IncomingMessage {
+  return value !== null && typeof value === "object";
+}
+
+function isModelMessageArray(value: unknown): value is ModelMessage[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((message) => {
+    if (!isIncomingMessage(message)) return false;
+    return (
+      message.role === "system" ||
+      message.role === "user" ||
+      message.role === "assistant" ||
+      message.role === "tool"
+    );
+  });
+}
+
+function textFromMessage(message: IncomingMessage): string | undefined {
+  if (typeof message.content === "string") return message.content;
+  const parts = Array.isArray(message.content) ? message.content : message.parts;
+  const text = parts
+    ?.map((part) => (part?.type === "text" ? part.text || "" : ""))
+    .join(" ")
+    .trim();
+  return text || undefined;
+}
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
   const template = await getTemplateForTenant(tenant);
@@ -216,35 +252,28 @@ export async function POST(req: Request) {
 
   const tenantConfig = await getTenantConfig(tenant);
   const { userId: clerkUserId } = await auth();
-  const { messages, activeSection, nodeContext } = await req.json() as {
-    messages: unknown[];
+  const { messages: rawMessages, activeSection, nodeContext } = await req.json() as {
+    messages: unknown;
     activeSection?: string;
     nodeContext?: NodeContext;
   };
+  if (!isModelMessageArray(rawMessages)) {
+    return new Response(
+      JSON.stringify({ error: "Invalid message payload." }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const messages = rawMessages;
   const template = await getTemplateForTenant(tenant);
 
   // Capture the latest user message for proof-signal logging (Workstream E).
   // Vercel AI SDK messages can have parts or plain string content — handle both.
   const lastUserMessage = (() => {
-    if (!Array.isArray(messages)) return undefined;
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m?.role !== "user") continue;
-      if (typeof m.content === "string") return m.content as string;
-      if (Array.isArray(m.content)) {
-        const text = m.content
-          .map((p: { type?: string; text?: string }) => (p?.type === "text" ? p.text || "" : ""))
-          .join(" ")
-          .trim();
-        if (text) return text;
-      }
-      if (Array.isArray(m.parts)) {
-        const text = m.parts
-          .map((p: { type?: string; text?: string }) => (p?.type === "text" ? p.text || "" : ""))
-          .join(" ")
-          .trim();
-        if (text) return text;
-      }
+      if (m.role !== "user") continue;
+      const text = textFromMessage(m as IncomingMessage);
+      if (text) return text;
     }
     return undefined;
   })();

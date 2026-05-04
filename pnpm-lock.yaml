@@ -35,6 +35,9 @@ importers:
       ai:
         specifier: 6.0.116
         version: 6.0.116(zod@4.3.6)
+      date-fns:
+        specifier: 4.1.0
+        version: 4.1.0
       gsap:
         specifier: ^3.14.2
         version: 3.14.2

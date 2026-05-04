@@ -47,12 +47,19 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
     pageConfig = template.defaultPageConfig;
   }
 
-  const storedPage = pageConfig[pageSlug];
+  const rawStoredPage = pageConfig[pageSlug];
   const defaultPage = template.defaultPageConfig[pageSlug];
-  if (!storedPage && !defaultPage) return null;
+  const storedPage = rawStoredPage?.sections?.length ? rawStoredPage : undefined;
+  const fallbackPage = pageSlug === "contact" && template.components.contact
+    ? {
+        sections: [{ type: "contact", visible: true, order: 0 }],
+        seo: {},
+      }
+    : undefined;
+  if (!storedPage && !defaultPage && !fallbackPage) return null;
 
   // Merge: use stored config but add any new default sections not present
-  let pageSections = (storedPage || defaultPage)!.sections;
+  let pageSections = (storedPage || defaultPage || fallbackPage)!.sections;
   if (storedPage && defaultPage) {
     const storedTypes = new Set(storedPage.sections.map((s) => s.type));
     const newDefaults = defaultPage.sections.filter((s) => !storedTypes.has(s.type));
