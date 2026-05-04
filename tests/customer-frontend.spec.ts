@@ -76,4 +76,5 @@ test("sign-in page allows Clerk JS to load", async ({ request }) => {
   expect(csp).toContain("script-src");
   expect(csp).toContain("https://*.clerk.accounts.dev");
   expect(csp).toContain("https://*.clerk.com");
+  expect(csp).toContain("https://clerk.scaffoldweb.com");
 });
