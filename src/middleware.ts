@@ -11,6 +11,17 @@ const MARKETING_HOSTS = new Set([
   "reb-studio.vercel.app",
 ]);
 
+const cspBaseDirectives = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://images.unsplash.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
+  "base-uri 'self'",
+  "form-action 'self'",
+];
+
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
@@ -34,10 +45,11 @@ const isPublicRoute = createRouteMatcher([
 
 const isCronRoute = createRouteMatcher(["/api/cron/(.*)"]);
 
-function extractTenantFromHost(host: string): { tenant: string | null; isAdminSubdomain: boolean } {
-  const hostWithoutPort = host.split(":")[0];
+export function extractTenantFromHost(host: string): { tenant: string | null; isAdminSubdomain: boolean } {
+  const normalizedHost = host.toLowerCase();
+  const hostWithoutPort = normalizedHost.split(":")[0];
 
-  if (MARKETING_HOSTS.has(host) || MARKETING_HOSTS.has(hostWithoutPort)) {
+  if (MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort)) {
     return { tenant: null, isAdminSubdomain: false };
   }
 
@@ -68,13 +80,103 @@ function extractTenantFromHost(host: string): { tenant: string | null; isAdminSu
 
 // Custom domain → tenant mapping from env var (Edge-compatible fallback)
 // Format: {"example.com":"tenant1","other.com":"tenant2"}
-function getEnvDomainMap(): Record<string, string> {
+export function getEnvDomainMap(raw = process.env.CUSTOM_DOMAIN_MAP || "{}"): Record<string, string> {
   try {
-    const raw = process.env.CUSTOM_DOMAIN_MAP || "{}";
     return JSON.parse(raw);
   } catch {
     return {};
   }
+}
+
+export function resolveTenantFromDomainMap(
+  domain: string,
+  envMap: Record<string, string>
+): { tenant: string | null; isAdminSubdomain: boolean } {
+  const normalized = domain.toLowerCase();
+  const isAdminPrefix = normalized.startsWith("admin.");
+  const bare = normalized.replace(/^(www|admin)\./, "");
+  const tenant = envMap[normalized] || envMap[bare] || null;
+  return { tenant, isAdminSubdomain: isAdminPrefix && tenant !== null };
+}
+
+export function shouldRewriteMarketingRoot(host: string, pathname: string): boolean {
+  const normalizedHost = host.toLowerCase();
+  const hostWithoutPort = normalizedHost.split(":")[0];
+  const isMarketingHost = MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort);
+  return isMarketingHost && pathname === "/";
+}
+
+export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: string): boolean {
+  return isAdminSubdomain && pathname === "/";
+}
+
+export function validateCronRequest(expectedSecret: string | undefined, authorization: string | null) {
+  if (!expectedSecret) {
+    return { allowed: false, status: 500, message: "CRON_SECRET not configured" };
+  }
+
+  const cronSecret = authorization?.replace("Bearer ", "");
+  if (cronSecret === expectedSecret) {
+    return { allowed: true, status: 200, message: "OK" };
+  }
+
+  return { allowed: false, status: 401, message: "Unauthorized" };
+}
+
+function isPreviewRequest(req: NextRequest): boolean {
+  return req.nextUrl.searchParams.get("preview") === "true";
+}
+
+function getPreviewFrameAncestors(host: string, protocol: string): string[] {
+  const ancestors = new Set([
+    "'self'",
+    "https://scaffoldweb.com",
+    "https://www.scaffoldweb.com",
+    "https://admin.scaffoldweb.com",
+    "https://reb-studio.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ]);
+
+  if (host && !MARKETING_HOSTS.has(host) && !host.endsWith(".scaffoldweb.com")) {
+    const bare = host.replace(/^(www|admin)\./, "");
+    ancestors.add(`${protocol}//${bare}`);
+    ancestors.add(`${protocol}//www.${bare}`);
+    ancestors.add(`${protocol}//admin.${bare}`);
+  }
+
+  return [...ancestors];
+}
+
+export function buildContentSecurityPolicy(params: {
+  isPreview: boolean;
+  host: string;
+  protocol: string;
+}): string {
+  const host = params.host.split(":")[0].toLowerCase();
+  const frameAncestors = params.isPreview
+    ? getPreviewFrameAncestors(host, params.protocol).join(" ")
+    : "'none'";
+
+  return [...cspBaseDirectives, `frame-ancestors ${frameAncestors}`].join("; ");
+}
+
+function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
+  response.headers.set(
+    "Content-Security-Policy",
+    buildContentSecurityPolicy({
+      isPreview: isPreviewRequest(req),
+      host: req.headers.get("host") || "",
+      protocol: req.nextUrl.protocol,
+    })
+  );
+  if (isPreviewRequest(req)) {
+    response.headers.delete("X-Frame-Options");
+  } else {
+    response.headers.set("X-Frame-Options", "DENY");
+  }
+
+  return response;
 }
 
 // In-memory cache for domain lookups (refreshed via internal API)
@@ -122,8 +224,7 @@ async function resolveTenantFromCustomDomain(
 
   // Fallback to env var for cold starts or when API is unavailable
   const envMap = getEnvDomainMap();
-  const tenant = envMap[normalized] || envMap[bare] || null;
-  return { tenant, isAdminSubdomain: isAdminPrefix && tenant !== null };
+  return resolveTenantFromDomainMap(normalized, envMap);
 }
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
@@ -134,30 +235,26 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   // The middleware fetches /api/internal/domain-map for custom domain resolution,
   // so these routes must skip tenant resolution entirely.
   if (pathname.startsWith("/api/internal/")) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next(), req);
   }
 
   if (isCronRoute(req)) {
-    const expectedSecret = process.env.CRON_SECRET;
-    // Fail closed: if CRON_SECRET is not configured, block all cron routes
-    if (!expectedSecret) {
+    const cron = validateCronRequest(process.env.CRON_SECRET, req.headers.get("authorization"));
+    if (!cron.allowed && cron.status === 500) {
       console.error("[middleware] CRON_SECRET env var not set - blocking cron route");
-      return new NextResponse("CRON_SECRET not configured", { status: 500 });
     }
-    const cronSecret = req.headers.get("authorization")?.replace("Bearer ", "");
-    if (cronSecret === expectedSecret) {
-      return NextResponse.next();
+    if (cron.allowed) {
+      return applySecurityHeaders(NextResponse.next(), req);
     }
-    return new NextResponse("Unauthorized", { status: 401 });
+    return applySecurityHeaders(new NextResponse(cron.message, { status: cron.status }), req);
   }
 
   // Rewrite marketing host root to /home to avoid route conflict with tenant pages
   const hostWithoutPort = host.split(":")[0];
-  const isMarketingHost = MARKETING_HOSTS.has(host) || MARKETING_HOSTS.has(hostWithoutPort);
-  if (isMarketingHost && pathname === "/") {
+  if (shouldRewriteMarketingRoot(host, pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/home";
-    return NextResponse.rewrite(url);
+    return applySecurityHeaders(NextResponse.rewrite(url), req);
   }
 
   let tenantId: string | null = null;
@@ -185,6 +282,12 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   }
 
   if (tenantId) {
+    if (shouldRedirectAdminRoot(isAdminSubdomain, pathname)) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return applySecurityHeaders(NextResponse.redirect(url), req);
+    }
+
     const headers = new Headers(req.headers);
     headers.set("x-tenant", tenantId);
 
@@ -207,7 +310,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       request: { headers },
     });
 
-    return response;
+    return applySecurityHeaders(response, req);
   }
 
   if (!isPublicRoute(req)) {
@@ -217,7 +320,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     });
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next(), req);
 });
 
 export const config = {

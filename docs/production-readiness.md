@@ -19,13 +19,54 @@
 
 ## Tenant Deployment Checklist
 
-- Provision tenant with a unique `revalidationSecret`.
+- Confirm required platform env vars are set in production:
+  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`,
+  `SANITY_PROJECT_ID`, `SANITY_DATASET`, `SANITY_API_TOKEN`, `INTERNAL_API_SECRET`,
+  `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, and
+  tenant-specific revalidation secrets.
+- Keep `AI_AUTO_PUBLISH=false` for first production tenants unless the tenant has explicitly approved automatic publish.
+- Provision tenant with `pnpm provision-tenant` and store a unique `revalidationSecret`.
 - Set the storefront `REVALIDATE_SECRET` to the same value.
 - Set tenant `revalidateUrl` to the storefront `/api/v1/revalidate` endpoint.
 - Confirm custom domain mapping resolves tenant from host or use `/api/v1/*` public routes.
-- Run `pnpm check`.
+- Add production domains in Vercel, including `www` and `admin` variants where used.
+- Configure DNS and wait for Vercel domain verification before sending traffic.
+- Configure Sanity webhook to call `/api/sanity/webhook` with the production webhook secret.
+- Configure Stripe webhook to call `/api/billing/webhook`.
+- Configure Clerk webhook to call `/api/clerk/webhook`.
+- Run `pnpm lint`.
+- Run `pnpm typecheck`.
+- Run `pnpm test`.
+- Run `pnpm audit --audit-level=high`.
+- Run `pnpm build`.
 - Run `pnpm check:prod` against production env values.
 - Run `PLAYWRIGHT_BASE_URL=<deployment-url> pnpm smoke`.
+- Verify `/dashboard/content` loads, the preview iframe renders with `?preview=true`, a content edit saves, and the preview refreshes.
+- Verify public tenant pages cannot be framed without `?preview=true`.
+- Verify `admin.<custom-domain>` redirects root traffic to `/dashboard`.
+- Verify `/api/cron/*` returns 401 without the bearer secret and succeeds with it.
+
+## Tenant Provisioning Runbook
+
+1. Create or update the tenant record with `id`, `subdomain`, `siteUrl`, `customDomains`, `ownerEmail`, enabled features, and subscription status.
+2. Generate a unique revalidation secret with `openssl rand -hex 32`.
+3. Store the revalidation secret in tenant config and the matching storefront environment.
+4. Add domain entries to `CUSTOM_DOMAIN_MAP` for the apex domain; `www.` and `admin.` resolve through the apex fallback.
+5. Add the apex, `www`, and `admin` domains to Vercel if the tenant uses a custom domain.
+6. Configure DNS from the registrar to Vercel and confirm Vercel marks each domain valid.
+7. Confirm Sanity content exists for the tenant before switching DNS.
+8. Run the verification checklist above against the deployment URL and final domains.
+
+## Incident And Rollback Runbook
+
+- Broken deploy: redeploy the previous known-good Vercel deployment, then run smoke tests against the restored URL.
+- Tenant fails to load: check `CUSTOM_DOMAIN_MAP`, Sanity tenant status, Redis/domain-map cache, and the `x-tenant` response path in middleware logs.
+- DNS issue: verify apex and `www` records in the registrar, then re-check Vercel domain verification.
+- Dashboard preview fails: inspect the preview response CSP; preview pages should include dashboard frame ancestors and should not emit `X-Frame-Options: DENY`.
+- Revalidation fails: confirm tenant `revalidateUrl`, matching `REVALIDATE_SECRET`, `INTERNAL_API_SECRET`, and webhook delivery status.
+- Stripe webhook fails: check webhook signing secret, endpoint URL, Stripe event delivery, and tenant subscription status.
+- Sanity webhook fails: confirm webhook URL, secret, and that content publish events include the changed tenant.
+- AI content published unexpectedly: set `AI_AUTO_PUBLISH=false`, audit recent generated changes, restore prior content version if needed, and re-run revalidation.
 
 ## Content Schema Rollback Plan
 
