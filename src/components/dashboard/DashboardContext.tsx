@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 type Panel = "content" | "preview" | "chat";
 type RightTab = "properties" | "chat";
 type EditMode = "live" | "draft";
+type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 interface DashboardContextValue {
   // Mobile tab
@@ -58,6 +59,10 @@ interface DashboardContextValue {
 
   // Whether AI agent auto-publishes or creates drafts
   autoPublish: boolean;
+
+  // Billing state from the tenant record
+  subscriptionStatus: SubscriptionStatus;
+  hasStripeCustomer: boolean;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -82,7 +87,21 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
   return { left: false, right: false };
 }
 
-export function DashboardProvider({ children, siteUrl = "", template = "wellness", autoPublish = true }: { children: ReactNode; siteUrl?: string; template?: string; autoPublish?: boolean }) {
+export function DashboardProvider({
+  children,
+  siteUrl = "",
+  template = "wellness",
+  autoPublish = true,
+  subscriptionStatus = "none",
+  hasStripeCustomer = false,
+}: {
+  children: ReactNode;
+  siteUrl?: string;
+  template?: string;
+  autoPublish?: boolean;
+  subscriptionStatus?: SubscriptionStatus;
+  hasStripeCustomer?: boolean;
+}) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -183,6 +202,8 @@ export function DashboardProvider({ children, siteUrl = "", template = "wellness
         siteUrl,
         template,
         autoPublish,
+        subscriptionStatus,
+        hasStripeCustomer,
       }}
     >
       {children}

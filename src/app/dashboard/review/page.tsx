@@ -13,7 +13,7 @@ import type { ContentSection } from "@/lib/types";
 async function QueueContent() {
   const tenant = await getTenantFromHeaders();
   const hasAccess = await hasTenantAccess(tenant);
-  if (!hasAccess) redirect("/");
+  if (!hasAccess) redirect("/no-access");
 
   const template = await getTemplateForTenant(tenant);
   const [pending, resolved, pendingCount, timestamps] = await Promise.all([

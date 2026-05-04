@@ -9,7 +9,7 @@ import { BriefSkeleton } from "@/components/dashboard/BriefSkeleton";
 async function TodayContent() {
   const tenant = await getTenantFromHeaders();
   const hasAccess = await hasTenantAccess(tenant);
-  if (!hasAccess) redirect("/");
+  if (!hasAccess) redirect("/no-access");
 
   const [brief, history] = await Promise.all([
     getWeeklyBrief(tenant),

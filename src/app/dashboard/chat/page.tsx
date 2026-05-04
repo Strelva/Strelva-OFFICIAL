@@ -13,7 +13,7 @@ export default async function ChatPage({
   const tenant = await getTenantFromHeaders();
 
   const allowed = await hasTenantAccess(tenant);
-  if (!allowed) redirect("/");
+  if (!allowed) redirect("/no-access");
 
   let ownerName = "there";
   try {

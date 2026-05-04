@@ -21,12 +21,13 @@ export async function GET() {
       businessRules: config.businessRules || "",
       personality: config.personality || "",
       businessHours: config.businessHours || null,
+      autoPublish: config.autoPublish !== false,
       productionDomain: config.productionDomain || "",
       adminDomain: config.adminDomain || "",
       // Connection status flags (presence of config = connected)
       connections: {
         googleSearchConsole: !!config.googleSearchConsoleKey,
-        googleAnalytics: !!config.googleSearchConsoleKey,
+        googleAnalytics: false,
         newsletter: !!config.resendDomain,
         googleBusiness: !!config.reviewsConfig?.googlePlaceId,
         instagram: !!(config.instagramAccessToken || config.beholdFeedId),
@@ -78,6 +79,9 @@ export async function PUT(req: Request) {
           };
         }
       }
+    }
+    if (typeof body.autoPublish === "boolean") {
+      updates.autoPublish = body.autoPublish;
     }
     // Google Search Console key (JSON string)
     if (typeof body.googleSearchConsoleKey === "string") {

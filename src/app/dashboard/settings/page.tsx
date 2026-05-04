@@ -13,6 +13,7 @@ import { DashSelect, FormRow, SavedToast } from "@/components/dashboard/ui";
 
 type SettingsData = Record<string, string>;
 type ThemeData = Record<string, unknown>;
+type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 // ---------------------------------------------------------------------------
 // Identity field definitions
@@ -607,7 +608,41 @@ function DomainsSection() {
 // Billing section
 // ---------------------------------------------------------------------------
 
+const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className: string; note: string }> = {
+  active: {
+    label: "Active",
+    className: "bg-emerald-400/10 text-emerald-400",
+    note: "Everything included. Cancel anytime.",
+  },
+  trialing: {
+    label: "Trialing",
+    className: "bg-sky-400/10 text-sky-400",
+    note: "Trial access is active.",
+  },
+  past_due: {
+    label: "Past due",
+    className: "bg-amber-400/10 text-amber-400",
+    note: "Payment needs attention to keep the dashboard fully available.",
+  },
+  cancelled: {
+    label: "Canceled",
+    className: "bg-red-400/10 text-red-400",
+    note: "This subscription is canceled.",
+  },
+  none: {
+    label: "Not set up",
+    className: "bg-gray-border text-gray-muted",
+    note: "No subscription is connected to this tenant yet.",
+  },
+};
+
 function BillingSection() {
+  const dashboard = useDashboardOptional();
+  const [billingError, setBillingError] = useState("");
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const status = dashboard?.subscriptionStatus ?? "none";
+  const copy = BILLING_STATUS_COPY[status];
+
   return (
     <div className="rounded-lg border border-gray-border overflow-hidden">
       <div className="flex items-center justify-between px-5 py-5">
@@ -617,29 +652,47 @@ function BillingSection() {
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[20px] font-medium text-warm-white">$149/mo</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-400/10 text-emerald-400">
-              Active
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${copy.className}`}>
+              {copy.label}
             </span>
           </div>
           <p className="text-[12px] text-gray-faint">
-            Everything included. Cancel anytime.
+            {copy.note}
           </p>
+          {billingError && (
+            <p className="mt-3 text-[12px] text-amber-300">{billingError}</p>
+          )}
         </div>
         <button
           onClick={async () => {
+            setBillingError("");
+            setOpeningPortal(true);
             try {
               const res = await fetch("/api/billing/portal", {
                 method: "POST",
                 credentials: "same-origin",
               });
-              if (!res.ok) return;
-              const { portalUrl } = await res.json();
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                setBillingError(
+                  res.status === 404 || !dashboard?.hasStripeCustomer
+                    ? "No Stripe billing account is connected yet. Ask Scaffold Web to connect billing before using the portal."
+                    : body?.error || "Couldn't open the billing portal. Try again.",
+                );
+                return;
+              }
+              const { portalUrl } = body;
               if (portalUrl) window.open(portalUrl, "_blank");
-            } catch {}
+            } catch {
+              setBillingError("Couldn't open the billing portal. Check your connection and try again.");
+            } finally {
+              setOpeningPortal(false);
+            }
           }}
-          className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors"
+          disabled={openingPortal}
+          className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors disabled:opacity-60"
         >
-          Manage billing
+          {openingPortal ? "Opening..." : "Manage billing"}
         </button>
       </div>
     </div>
@@ -652,27 +705,77 @@ function BillingSection() {
 
 function PublishingSection() {
   const dashboard = useDashboardOptional();
+  const [autoPublish, setAutoPublish] = useState(dashboard?.autoPublish ?? true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenant-settings", { credentials: "same-origin" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load publishing settings");
+        return res.json();
+      })
+      .then((data) => {
+        if (typeof data?.autoPublish === "boolean") {
+          setAutoPublish(data.autoPublish);
+        }
+      })
+      .catch(() => setError("Couldn't load publishing mode. Showing the last known dashboard value."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const saveAutoPublish = useCallback(async (next: boolean) => {
+    setError("");
+    setSaved(false);
+    setSaving(true);
+    const previous = autoPublish;
+    setAutoPublish(next);
+    try {
+      const res = await fetch("/api/tenant-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ autoPublish: next }),
+      });
+      if (!res.ok) throw new Error("Failed to save publishing mode");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setAutoPublish(previous);
+      setError("Couldn't save publishing mode. No change was made.");
+    } finally {
+      setSaving(false);
+    }
+  }, [autoPublish]);
 
   return (
     <div className="rounded-lg border border-gray-border overflow-hidden">
       <div className="px-5 py-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[14px] font-medium text-warm-white">Auto-publish</span>
-          <span
-            className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-              dashboard?.autoPublish
+          <button
+            type="button"
+            onClick={() => saveAutoPublish(!autoPublish)}
+            disabled={loading || saving}
+            aria-pressed={autoPublish}
+            className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors disabled:opacity-60 ${
+              autoPublish
                 ? "text-emerald-400 bg-emerald-400/10"
                 : "text-amber-400 bg-amber-400/10"
             }`}
           >
-            {dashboard?.autoPublish ? "on" : "off"}
-          </span>
+            {saving ? "saving" : autoPublish ? "on" : "off"}
+          </button>
         </div>
         <p className="text-[13px] text-gray-muted leading-relaxed">
-          {dashboard?.autoPublish
+          {autoPublish
             ? "AI changes go live immediately when you confirm them in chat."
             : "AI changes are saved as drafts for admin review before going live."}
         </p>
+        {error && <p className="mt-3 text-[12px] text-amber-300">{error}</p>}
+        {saved && <p className="mt-3 text-[12px] text-emerald-300">Publishing mode saved.</p>}
       </div>
       <div className="border-t border-gray-border/50 px-5 py-4 space-y-3">
         <div className="flex items-start gap-3">

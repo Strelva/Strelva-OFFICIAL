@@ -41,7 +41,7 @@
 - Run `pnpm build`.
 - Run `pnpm check:prod` against production env values.
 - Run `PLAYWRIGHT_BASE_URL=<deployment-url> pnpm smoke`.
-- Verify `/dashboard/content` loads, the preview iframe renders with `?preview=true`, a content edit saves, and the preview refreshes.
+- Verify `/dashboard/site` loads, the preview iframe renders with `?preview=true`, a content edit saves, and the preview refreshes. Confirm `/dashboard/content` redirects to `/dashboard/site`.
 - Verify public tenant pages cannot be framed without `?preview=true`.
 - Verify `admin.<custom-domain>` redirects root traffic to `/dashboard`.
 - Verify `/api/cron/*` returns 401 without the bearer secret and succeeds with it.

@@ -42,7 +42,7 @@ function OnboardChat() {
     currentWebsite: "",
   });
   const [error, setError] = useState("");
-  const [, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,12 +60,24 @@ function OnboardChat() {
     setMessages((prev) => [...prev, ...msgs]);
   }
 
-  function handleSend() {
+  function getEmailFromContact(value: string) {
+    const emailMatch = value.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+    const email = emailMatch ? emailMatch[0] : "";
+    const location = value.replace(emailMatch?.[0] ?? "", "").replace(/[—\-,]\s*$/, "").trim();
+    return { email, location };
+  }
+
+  function isValidEmail(email: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  async function handleSend() {
     const value = input.trim();
-    if (!value) return;
-    setInput("");
+    if (!value || submitting) return;
+    setError("");
 
     if (step === "name") {
+      setInput("");
       setInfo((prev) => ({ ...prev, businessName: value }));
       addMessages(
         { from: "user", text: value },
@@ -73,6 +85,7 @@ function OnboardChat() {
       );
       setStep("description");
     } else if (step === "description") {
+      setInput("");
       setInfo((prev) => ({ ...prev, description: value }));
       addMessages(
         { from: "user", text: value },
@@ -80,9 +93,12 @@ function OnboardChat() {
       );
       setStep("contact");
     } else if (step === "contact") {
-      const emailMatch = value.match(/[\w.+-]+@[\w.-]+\.\w+/);
-      const email = emailMatch ? emailMatch[0] : "";
-      const location = value.replace(emailMatch?.[0] ?? "", "").replace(/[—\-,]\s*$/, "").trim();
+      const { email, location } = getEmailFromContact(value);
+      if (!isValidEmail(email)) {
+        setError("Add a valid email before we move on, e.g. hello@yourbusiness.com.");
+        return;
+      }
+      setInput("");
       setInfo((prev) => ({ ...prev, location, email }));
       addMessages(
         { from: "user", text: value },
@@ -90,22 +106,23 @@ function OnboardChat() {
       );
       setStep("website");
     } else if (step === "website") {
-      setInfo((prev) => ({ ...prev, currentWebsite: value }));
+      setInput("");
+      const nextInfo = { ...info, currentWebsite: value };
+      setInfo(nextInfo);
       addMessages(
         { from: "user", text: value },
-        { from: "scaffold", text: `Got it. Sending this over to the team now — we'll be in touch within 24 hours to talk about ${info.businessName}'s new site.` }
+        { from: "scaffold", text: "Got it. Sending this over now..." }
       );
-      setStep("submitted");
-      submitIntake({ ...info, currentWebsite: value });
+      await submitIntake(nextInfo);
     }
   }
 
   async function submitIntake(data: IntakeInfo) {
     setError("");
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      await fetch("/api/onboard/intake", {
+      const res = await fetch("/api/onboard/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -117,10 +134,28 @@ function OnboardChat() {
           referredBy: ref || undefined,
         }),
       });
+      if (!res.ok) {
+        let message = "We couldn't send this. Your answers are still here — try again.";
+        if (res.status === 429) {
+          message = "Too many attempts right now. Wait a bit, then try again.";
+        } else {
+          try {
+            const body = await res.json();
+            if (typeof body?.error === "string") message = body.error;
+          } catch {}
+        }
+        setError(message);
+        return;
+      }
+      addMessages({
+        from: "scaffold",
+        text: `You're all set. We'll be in touch within 24 hours to talk about ${data.businessName}'s new site.`,
+      });
+      setStep("submitted");
     } catch {
-      // Intake submission is best-effort — don't block the user
+      setError("We couldn't reach the server. Your answers are still here — try again.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
@@ -199,7 +234,17 @@ function OnboardChat() {
               className="rounded-lg px-4 py-2.5 text-sm"
               style={{ background: "rgba(220, 38, 38, 0.1)", color: "#f87171" }}
             >
-              {error}
+              <div>{error}</div>
+              {step === "website" && info.currentWebsite && (
+                <button
+                  type="button"
+                  onClick={() => submitIntake(info)}
+                  disabled={submitting}
+                  className="mt-2 text-xs font-medium underline disabled:opacity-60"
+                >
+                  {submitting ? "Retrying..." : "Try sending again"}
+                </button>
+              )}
             </div>
           )}
 
@@ -222,6 +267,7 @@ function OnboardChat() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                disabled={submitting}
                 placeholder={
                   step === "name"
                     ? "e.g. Sunrise Yoga Studio"
@@ -236,6 +282,7 @@ function OnboardChat() {
                   background: "#0f0f12",
                   color: "#e8e8ec",
                   border: "1px solid #26262b",
+                  opacity: submitting ? 0.6 : 1,
                 }}
                 onFocus={(e) => (e.currentTarget.style.borderColor = "#d4a052")}
                 onBlur={(e) => (e.currentTarget.style.borderColor = "#26262b")}

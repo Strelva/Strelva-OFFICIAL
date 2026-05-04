@@ -12,7 +12,7 @@ import type { ContentSection } from "@/lib/types";
 export default async function SitePage() {
   const tenant = await getTenantFromHeaders();
   const allowed = await hasTenantAccess(tenant);
-  if (!allowed) redirect("/");
+  if (!allowed) redirect("/no-access");
 
   const template = await getTemplateForTenant(tenant);
 

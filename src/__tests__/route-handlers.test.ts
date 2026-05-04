@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const mockUpdateTenant = vi.fn();
+
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
   currentUser: vi.fn(() =>
@@ -32,10 +34,12 @@ vi.mock("@/lib/tenants", () => ({
     Promise.resolve({
       id: "test-tenant",
       subscriptionStatus: "active",
+      autoPublish: false,
     })
   ),
   getAllTenants: vi.fn(() => Promise.resolve([])),
-  updateTenant: vi.fn(),
+  updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+  invalidateDomainMapCache: vi.fn(),
 }));
 
 vi.mock("@/lib/storage", () => ({
@@ -233,5 +237,37 @@ describe("Booking Route Handler", () => {
 
     const data = await response.json();
     expect(data.error).toContain("Invalid email");
+  });
+});
+
+describe("Tenant Settings Route Handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUpdateTenant.mockResolvedValue({ id: "test-tenant", autoPublish: true });
+  });
+
+  it("GET /api/tenant-settings returns the tenant auto-publish setting", async () => {
+    const { GET } = await import("@/app/api/tenant-settings/route");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.autoPublish).toBe(false);
+  });
+
+  it("PUT /api/tenant-settings persists auto-publish changes", async () => {
+    const { PUT } = await import("@/app/api/tenant-settings/route");
+
+    const request = new Request("http://localhost/api/tenant-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoPublish: true }),
+    });
+
+    const response = await PUT(request);
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith("test-tenant", { autoPublish: true });
   });
 });

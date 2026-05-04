@@ -3,8 +3,9 @@
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, AlertCircle, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
+import type { IntegrationStatus } from "@/lib/integration-registry";
 
-type ConnectionStatus = "connected" | "stale" | "error" | "disconnected";
+type ConnectionStatus = IntegrationStatus | "stale" | "error" | "disconnected";
 
 interface SourceHealthBadgeProps {
   status: ConnectionStatus;
@@ -27,6 +28,41 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
     bg: "bg-success-dim",
     text: "text-success",
     dot: "bg-success",
+  },
+  not_configured: {
+    icon: RefreshCw,
+    label: "Not configured",
+    bg: "bg-gray-bg",
+    text: "text-gray-muted",
+    dot: "bg-gray-muted",
+  },
+  sync_failed: {
+    icon: AlertCircle,
+    label: "Sync failed",
+    bg: "bg-red-500/10",
+    text: "text-red-400",
+    dot: "bg-red-400",
+  },
+  needs_reauth: {
+    icon: AlertCircle,
+    label: "Needs reauth",
+    bg: "bg-amber-500/10",
+    text: "text-amber-500",
+    dot: "bg-amber-500",
+  },
+  coming_soon: {
+    icon: Clock,
+    label: "Coming soon",
+    bg: "bg-gray-bg",
+    text: "text-gray-muted",
+    dot: "bg-gray-muted",
+  },
+  unknown: {
+    icon: AlertCircle,
+    label: "Unknown",
+    bg: "bg-gray-bg",
+    text: "text-gray-muted",
+    dot: "bg-gray-muted",
   },
   stale: {
     icon: Clock,
@@ -123,13 +159,13 @@ export function getConnectionStatus(
   lastSync?: string | Date | null,
   staleThresholdHours = 24
 ): ConnectionStatus {
-  if (!connected) return "disconnected";
+  if (!connected) return "not_configured";
   if (!lastSync) return "connected"; // No sync tracking, assume OK
 
   const syncTime = new Date(lastSync);
   const hoursSinceSync = (Date.now() - syncTime.getTime()) / (1000 * 60 * 60);
 
-  if (hoursSinceSync > staleThresholdHours * 2) return "error";
+  if (hoursSinceSync > staleThresholdHours * 2) return "sync_failed";
   if (hoursSinceSync > staleThresholdHours) return "stale";
   return "connected";
 }

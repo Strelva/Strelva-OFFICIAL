@@ -3,251 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ArrowLeft, CircleCheck, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-
-interface ConnectionDetail {
-  id: string;
-  name: string;
-  icon: string;
-  connected: boolean;
-  description: string;
-  usageExamples: Array<{
-    title: string;
-    prompt: string;
-    response: string;
-  }>;
-  metadata: {
-    frequency: string;
-    connectedSince: string;
-    usedIn: string;
-  };
-  configField?: string; // tenant config field name, e.g. "googleSearchConsoleKey"
-  provider?: "google" | "yelp" | "calendly" | "instagram" | "vegaro"; // For API-based connections
-}
-
-const CONNECTION_DETAILS: Record<string, ConnectionDetail> = {
-  "google-search-console": {
-    id: "google-search-console",
-    name: "Google Search Console",
-    icon: "SC",
-    connected: false,
-    description:
-      "Connect your Google Search Console to let your AI track how people find you on Google. See which search terms bring visitors, which pages rank highest, and get suggestions to improve your SEO. Powers your weekly \"how people found you\" report.",
-    usageExamples: [
-      {
-        title: "What are people searching to find me?",
-        prompt: "What search terms bring people to my site?",
-        response:
-          "Your top searches this week: 'yoga studio downtown' (23 clicks), 'morning yoga class' (15 clicks), 'beginner yoga near me' (8 clicks). Your 'Services' page ranks #3 for 'yoga studio downtown.'",
-      },
-      {
-        title: "How can I rank higher?",
-        prompt: "How can I improve my Google ranking?",
-        response:
-          "You're showing up for 'beginner yoga' but not getting clicks — your title might be too generic. Want me to update it to 'Beginner-Friendly Yoga Classes | [Your Studio]'?",
-      },
-    ],
-    metadata: {
-      frequency: "Every 24 hours",
-      connectedSince: "",
-      usedIn: "Weekly reports, SEO insights, AI suggestions",
-    },
-    configField: "googleSearchConsoleKey",
-  },
-  "google-business": {
-    id: "google-business",
-    name: "Google Business",
-    icon: "GB",
-    connected: false,
-    description:
-      "Connect your Google Business Profile so your AI can keep your listing up to date, respond to reviews, and sync your hours automatically. When you update your site, your Google listing updates too.",
-    usageExamples: [
-      {
-        title: "Respond to my latest review",
-        prompt: "Respond to my latest Google review",
-        response:
-          "You got a 5-star review from Sarah M: \"Best yoga studio in town!\" I've drafted a reply thanking her and mentioning your new Saturday class. Want me to post it?",
-      },
-      {
-        title: "Are my Google hours up to date?",
-        prompt: "Check if my Google Business hours match my site",
-        response:
-          "Your Google listing shows Mon-Fri 6am-8pm but your site says 7am-9pm. Want me to update Google to match?",
-      },
-    ],
-    metadata: {
-      frequency: "Daily sync",
-      connectedSince: "",
-      usedIn: "Reviews, business listing, hours",
-    },
-    provider: "google",
-  },
-  "google-analytics": {
-    id: "google-analytics",
-    name: "Google Analytics",
-    icon: "GA",
-    connected: true,
-    description:
-      "Your AI reads your Google Analytics data and turns it into plain-English insights you can actually use. It powers your weekly report (\"47 people found you this week\"), surfaces which pages are working, spots trends, and suggests actions — like adding a call-to-action to your most-visited page. No dashboards to learn. No numbers to interpret. Just ask.",
-    usageExamples: [
-      {
-        title: "@Analytics: how did my site do this week?",
-        prompt: "@Analytics: how did my site do this week?",
-        response:
-          "Your site had 47 visitors this week, up 12% from last week. Your Services page got the most views (28). 3 people clicked Book Now — all on Tuesday after you posted about the new class.",
-      },
-      {
-        title: "@Analytics: which page gets the most traffic?",
-        prompt: "@Analytics: which page gets the most traffic?",
-        response:
-          "Your Services page is your top performer with 28 views this week. Your homepage didn't get 7. Turn me to add a stronger call-to-action on Services?",
-      },
-    ],
-    metadata: {
-      frequency: "Every 24 hours",
-      connectedSince: "March 20, 2026",
-      usedIn: "Weekly reports, AI suggestions, chat",
-    },
-  },
-  newsletter: {
-    id: "newsletter",
-    name: "Newsletter",
-    icon: "NL",
-    connected: true,
-    description:
-      "Your AI drafts and sends email newsletters to your subscriber list. Tell it what to write about and it'll create a professional email, preview it for your approval, and send it when you say go. Great for monthly updates, new service announcements, or seasonal promotions.",
-    usageExamples: [
-      {
-        title: "Send an update about my new class",
-        prompt: "Send an update to subscribers about my new Saturday yoga class",
-        response:
-          "I've drafted a newsletter about your Saturday Morning Yoga class. It highlights the 8AM start time, the 75-minute grounding practice, and includes a Book Now button. Want me to send it?",
-      },
-      {
-        title: "How many subscribers do I have?",
-        prompt: "How many newsletter subscribers do I have?",
-        response:
-          "You have 142 active subscribers. Your last email had a 34% open rate, which is above average for small businesses. Want me to send another update?",
-      },
-    ],
-    metadata: {
-      frequency: "On demand",
-      connectedSince: "March 15, 2026",
-      usedIn: "Email campaigns, subscriber management",
-    },
-  },
-  instagram: {
-    id: "instagram",
-    name: "Instagram",
-    icon: "IG",
-    connected: false,
-    description:
-      "Let your AI auto-post to Instagram from your site's content. When you add a new blog post, service, or event, it can create and schedule an Instagram post with the right hashtags and a compelling caption.",
-    usageExamples: [
-      {
-        title: "Post about my new class",
-        prompt: "Create an Instagram post about my Saturday yoga class",
-        response:
-          "I've created a post with your class photo, a caption about the grounding practice, and relevant hashtags. Scheduled for Thursday at 10am when your followers are most active.",
-      },
-      {
-        title: "What should I post this week?",
-        prompt: "Suggest Instagram content for this week",
-        response:
-          "Based on your upcoming schedule: Monday — behind-the-scenes studio prep. Wednesday — client testimonial (Sarah's review was great). Friday — Saturday class reminder with early-bird CTA.",
-      },
-    ],
-    metadata: {
-      frequency: "On demand + scheduled",
-      connectedSince: "",
-      usedIn: "Social media, content marketing",
-    },
-    provider: "instagram",
-  },
-  calendly: {
-    id: "calendly",
-    name: "Calendly",
-    icon: "CL",
-    connected: false,
-    description:
-      "Sync your Calendly availability with your site. Your AI can check your schedule, suggest appointment times to clients, and automatically update your site's booking links.",
-    usageExamples: [
-      {
-        title: "When am I free this week?",
-        prompt: "Check my availability for Thursday",
-        response:
-          "You have openings at 10am, 1pm, and 3:30pm on Thursday. Want me to send a booking link to a specific client?",
-      },
-      {
-        title: "Update my booking page",
-        prompt: "Add a 30-minute consultation option to my booking",
-        response:
-          "I've added a '30-min Free Consultation' option to your Calendly. It's now showing on your site's booking page too.",
-      },
-    ],
-    metadata: {
-      frequency: "Real-time sync",
-      connectedSince: "",
-      usedIn: "Booking, scheduling, availability",
-    },
-    provider: "calendly",
-  },
-  yelp: {
-    id: "yelp",
-    name: "Yelp",
-    icon: "YP",
-    connected: false,
-    description:
-      "Monitor and respond to your Yelp reviews through your AI. Get notified when new reviews come in, draft professional responses, and keep your Yelp listing accurate.",
-    usageExamples: [
-      {
-        title: "Any new Yelp reviews?",
-        prompt: "Check for new Yelp reviews",
-        response:
-          "You got 2 new reviews this week — both 5 stars! One mentions your instructor by name. Want me to draft thank-you responses?",
-      },
-      {
-        title: "What's my Yelp rating?",
-        prompt: "What's my current Yelp rating?",
-        response:
-          "You're at 4.7 stars from 38 reviews. Your highest-rated aspect is 'friendly staff.' Your competitors average 4.2 stars.",
-      },
-    ],
-    metadata: {
-      frequency: "Every 12 hours",
-      connectedSince: "",
-      usedIn: "Review management, reputation",
-    },
-    provider: "yelp",
-  },
-  vegaro: {
-    id: "vegaro",
-    name: "Vegaro",
-    icon: "VG",
-    connected: false,
-    description:
-      "Connect your Vegaro booking system to receive instant notifications when clients book appointments. Your AI can confirm bookings, send reminders, and keep your calendar in sync.",
-    usageExamples: [
-      {
-        title: "Any new bookings today?",
-        prompt: "Do I have any new bookings?",
-        response:
-          "You have 3 new bookings today: Sarah M. at 10am for a haircut, James K. at 2pm for a color treatment, and Emily R. at 4:30pm for a trim. All confirmed.",
-      },
-      {
-        title: "Who's coming in tomorrow?",
-        prompt: "Show me tomorrow's schedule",
-        response:
-          "Tomorrow you have 5 appointments starting at 9am. Your busiest time is 1-3pm with back-to-back color sessions. Want me to send reminder texts to your clients?",
-      },
-    ],
-    metadata: {
-      frequency: "Real-time webhooks",
-      connectedSince: "",
-      usedIn: "Booking notifications, calendar sync",
-    },
-    provider: "vegaro",
-  },
-};
+import {
+  getIntegrationDefinition,
+  normalizeIntegrationStatus,
+  type IntegrationStatus,
+  type RawConnectionStatus,
+  type RawTenantConnectionSettings,
+} from "@/lib/integration-registry";
+import { SourceHealthBadge } from "./SourceHealthBadge";
 
 function formatRelativeTime(isoDate: string): string {
   const date = new Date(isoDate);
@@ -267,19 +30,18 @@ function formatRelativeTime(isoDate: string): string {
 export function ConnectionDetailPage({ connectionId }: { connectionId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const detail = CONNECTION_DETAILS[connectionId];
+  const detail = getIntegrationDefinition(connectionId);
 
   const [credentialsValue, setCredentialsValue] = useState("");
   const [yelpApiKey, setYelpApiKey] = useState("");
   const [yelpBusinessId, setYelpBusinessId] = useState("");
-  const [vegaroApiKey, setVegaroApiKey] = useState("");
-  const [vegaroBusinessId, setVegaroBusinessId] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [status, setStatus] = useState<IntegrationStatus>("not_configured");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const isConnected = status === "connected";
 
   // Check URL params for OAuth callback results
   useEffect(() => {
@@ -287,7 +49,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     const errorParam = searchParams.get("error");
     if (success === "true") {
       setSaved(true);
-      setIsConnected(true);
+      setStatus("connected");
       setLastSyncedAt(new Date().toISOString());
     }
     if (errorParam) {
@@ -295,23 +57,39 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     }
   }, [searchParams]);
 
-  // Fetch actual connection status
+  // Fetch actual connection/settings status; never infer a connection from static metadata.
   useEffect(() => {
-    if (!detail?.provider) return;
+    if (!detail) return;
 
-    fetch("/api/connections", { credentials: "same-origin" })
-      .then((res) => res.json())
-      .then((data) => {
-        const conn = data.connections?.find(
-          (c: { provider: string }) => c.provider === detail.provider
-        );
-        if (conn) {
-          setIsConnected(conn.connected);
-          setLastSyncedAt(conn.lastSyncedAt);
-        }
-      })
-      .catch(() => {});
-  }, [detail?.provider, searchParams]);
+    Promise.allSettled([
+      fetch("/api/tenant-settings", { credentials: "same-origin" }).then((res) => {
+        if (!res.ok) throw new Error("Failed to load tenant settings");
+        return res.json();
+      }),
+      fetch("/api/connections", { credentials: "same-origin" }).then((res) => {
+        if (!res.ok) throw new Error("Failed to load connections");
+        return res.json();
+      }),
+    ]).then(([settingsResult, connectionsResult]) => {
+      const settings: RawTenantConnectionSettings =
+        settingsResult.status === "fulfilled" ? settingsResult.value.connections ?? {} : {};
+      const connections: RawConnectionStatus[] =
+        connectionsResult.status === "fulfilled" ? connectionsResult.value.connections ?? [] : [];
+      const conn = detail.connectionProvider
+        ? connections.find((item) => item.provider === detail.connectionProvider) ?? null
+        : null;
+
+      setStatus(
+        normalizeIntegrationStatus(detail, {
+          connection: conn,
+          settings,
+          connectionLoaded: connectionsResult.status === "fulfilled",
+          settingsLoaded: settingsResult.status === "fulfilled",
+        })
+      );
+      setLastSyncedAt(conn?.lastSyncedAt ?? null);
+    });
+  }, [detail, searchParams]);
 
   const handleSaveCredentials = async () => {
     if (!detail?.configField || !credentialsValue.trim()) return;
@@ -333,6 +111,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       }
 
       setSaved(true);
+      setStatus("connected");
       setCredentialsValue("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -361,7 +140,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       }
 
       setSaved(true);
-      setIsConnected(true);
+      setStatus("connected");
       setLastSyncedAt(new Date().toISOString());
       setYelpApiKey("");
       setYelpBusinessId("");
@@ -372,39 +151,8 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     }
   };
 
-  const handleVegaroConnect = async () => {
-    if (!vegaroApiKey.trim() || !vegaroBusinessId.trim()) return;
-
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-
-    try {
-      const res = await fetch("/api/connections/vegaro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: vegaroApiKey, businessId: vegaroBusinessId }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to connect");
-      }
-
-      setSaved(true);
-      setIsConnected(true);
-      setLastSyncedAt(new Date().toISOString());
-      setVegaroApiKey("");
-      setVegaroBusinessId("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDisconnect = async () => {
-    if (!detail?.provider) return;
+    if (!detail?.connectionProvider) return;
 
     setDisconnecting(true);
     setError(null);
@@ -417,7 +165,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         instagram: "/api/connections/instagram",
         vegaro: "/api/connections/vegaro",
       };
-      const endpoint = endpointMap[detail.provider] || "/api/connections/google";
+      const endpoint = endpointMap[detail.connectionProvider] || "/api/connections/google";
       const res = await fetch(endpoint, { method: "DELETE" });
 
       if (!res.ok) {
@@ -425,7 +173,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         throw new Error(data.error || "Failed to disconnect");
       }
 
-      setIsConnected(false);
+      setStatus("not_configured");
       setLastSyncedAt(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to disconnect");
@@ -459,43 +207,38 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <span className="text-[20px] font-bold text-accent">{detail.icon}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-[22px] font-semibold text-warm-black">{detail.name}</h1>
+          <h1 className="text-[22px] font-semibold text-warm-black">{detail.displayName}</h1>
           <p className="text-[13px] text-gray-muted mt-1">
-            Traffic data for reports & AI suggestions
+            {detail.shortDescription}
           </p>
         </div>
-        {isConnected ? (
-          <span className="flex items-center gap-2.5 rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white connection-toggle">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-white status-dot-pulse" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-            </span>
-            Connected
-          </span>
-        ) : detail.provider === "google" ? (
-          <a
-            href="/api/oauth/google"
-            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
-          >
-            Connect with Google
-          </a>
-        ) : detail.provider === "calendly" ? (
-          <a
-            href="/api/oauth/calendly"
-            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
-          >
-            Connect with Calendly
-          </a>
-        ) : detail.provider === "instagram" ? (
-          <a
-            href="/api/oauth/instagram"
-            className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
-          >
-            Connect with Instagram
-          </a>
-        ) : (
-          <span className="text-[13px] text-gray-muted">Not connected</span>
-        )}
+        <div className="flex items-center gap-3">
+          <SourceHealthBadge status={status} lastSync={lastSyncedAt} compact />
+          {!isConnected && detail.connectionProvider === "google" && (
+            <a
+              href="/api/oauth/google"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+            >
+              Connect with Google
+            </a>
+          )}
+          {!isConnected && detail.connectionProvider === "calendly" && (
+            <a
+              href="/api/oauth/calendly"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+            >
+              Connect with Calendly
+            </a>
+          )}
+          {!isConnected && detail.connectionProvider === "instagram" && (
+            <a
+              href="/api/oauth/instagram"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+            >
+              Connect with Instagram
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Usage examples */}
@@ -506,8 +249,8 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             className="flex-1 rounded-[20px] bg-surface-raised border border-gray-border p-6 flex flex-col justify-center gap-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
           >
             <div className="flex items-center gap-1.5 text-[12px]">
-              <span className="font-medium text-accent">@{detail.name.split(" ")[0]}</span>
-              <span className="text-[#ffffffcc]">{example.title.replace(`@${detail.name.split(" ")[0]}: `, "")}</span>
+              <span className="font-medium text-accent">@{detail.displayName.split(" ")[0]}</span>
+              <span className="text-[#ffffffcc]">{example.title.replace(`@${detail.displayName.split(" ")[0]}: `, "")}</span>
             </div>
             <p className="text-[12px] text-[#ffffffcc] leading-relaxed">
               {example.response}
@@ -525,7 +268,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       <div className="flex gap-8 mb-8">
         <div>
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">Sync frequency</span>
-          <p className="text-[13px] text-warm-black mt-1">{detail.metadata.frequency}</p>
+          <p className="text-[13px] text-warm-black mt-1">{detail.syncFrequency}</p>
         </div>
         {lastSyncedAt && (
           <div>
@@ -538,7 +281,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         )}
         <div>
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">Used in</span>
-          <p className="text-[13px] text-warm-black mt-1">{detail.metadata.usedIn}</p>
+          <p className="text-[13px] text-warm-black mt-1">{detail.usedIn}</p>
         </div>
       </div>
 
@@ -559,7 +302,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       )}
 
       {/* Yelp credentials form */}
-      {detail.provider === "yelp" && !isConnected && (
+      {detail.connectionProvider === "yelp" && !isConnected && (
         <div className="mb-8 max-w-[600px]">
           <h3 className="text-[13px] font-medium text-warm-black mb-3">Yelp API Credentials</h3>
           <div className="space-y-3">
@@ -607,43 +350,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         </div>
       )}
 
-      {/* Vegaro credentials form */}
-      {detail.provider === "vegaro" && !isConnected && (
-        <div className="mb-8 max-w-[600px]">
-          <h3 className="text-[13px] font-medium text-warm-black mb-3">Vegaro API Credentials</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[12px] text-gray-muted block mb-1.5">API Key</label>
-              <input
-                type="password"
-                value={vegaroApiKey}
-                onChange={(e) => setVegaroApiKey(e.target.value)}
-                placeholder="Your Vegaro API key"
-                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
-              />
-            </div>
-            <div>
-              <label className="text-[12px] text-gray-muted block mb-1.5">Business ID</label>
-              <input
-                type="text"
-                value={vegaroBusinessId}
-                onChange={(e) => setVegaroBusinessId(e.target.value)}
-                placeholder="Your Vegaro business ID"
-                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
-              />
-            </div>
-            <button
-              onClick={handleVegaroConnect}
-              disabled={saving || !vegaroApiKey.trim() || !vegaroBusinessId.trim()}
-              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving ? "Connecting..." : "Connect Vegaro"}
-            </button>
-            <p className="text-[11px] text-gray-faint leading-relaxed">
-              Get your API key and Business ID from your Vegaro admin dashboard under Settings &gt; Integrations.
-            </p>
-          </div>
+      {/* Coming soon */}
+      {status === "coming_soon" && (
+        <div className="mb-8 max-w-[600px] rounded-2xl border border-glass-border bg-surface-raised px-5 py-4">
+          <h3 className="text-[13px] font-medium text-warm-black mb-1">Connection coming soon</h3>
+          <p className="text-[12px] text-gray-muted leading-relaxed">
+            This source is visible so you can see what it will support, but setup is not available yet.
+          </p>
         </div>
       )}
 
@@ -693,7 +406,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       )}
 
       {/* Disconnect */}
-      {isConnected && detail.provider && (
+      {isConnected && detail.connectionProvider && (
         <button
           onClick={handleDisconnect}
           disabled={disconnecting}

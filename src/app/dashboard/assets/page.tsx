@@ -9,12 +9,21 @@ import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
 import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
 
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+type UploadResult = {
+  name: string;
+  status: "uploaded" | "too-large" | "unsupported" | "failed";
+  message: string;
+};
+
 export default function PhotosPage() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const newestUpload = Math.max(
@@ -39,13 +48,35 @@ export default function PhotosPage() {
 
   // Upload handler
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) return;
+    const selectedFiles = Array.from(files);
+    if (selectedFiles.length === 0) return;
 
     setUploading(true);
+    setUploadResults([]);
     const newAssets: MediaAsset[] = [];
+    const results: UploadResult[] = [];
 
-    for (const file of imageFiles) {
+    for (const file of selectedFiles) {
+      if (!file.type.startsWith("image/")) {
+        results.push({
+          name: file.name,
+          status: "unsupported",
+          message: "Unsupported file type. Upload an image file.",
+        });
+        setUploadResults([...results]);
+        continue;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        results.push({
+          name: file.name,
+          status: "too-large",
+          message: "Too large. Max size is 5MB.",
+        });
+        setUploadResults([...results]);
+        continue;
+      }
+
       try {
         const formData = new FormData();
         formData.append("file", file);
@@ -57,10 +88,26 @@ export default function PhotosPage() {
         if (res.ok) {
           const asset: MediaAsset = await res.json();
           newAssets.push(asset);
+          results.push({
+            name: file.name,
+            status: "uploaded",
+            message: "Uploaded",
+          });
+        } else {
+          results.push({
+            name: file.name,
+            status: "failed",
+            message: "Upload failed. Try again.",
+          });
         }
       } catch {
-        // Skip failed uploads silently
+        results.push({
+          name: file.name,
+          status: "failed",
+          message: "Upload failed. Check your connection and try again.",
+        });
       }
+      setUploadResults([...results]);
     }
 
     if (newAssets.length > 0) {
@@ -70,6 +117,13 @@ export default function PhotosPage() {
     }
     setUploading(false);
   }, []);
+
+  const uploadSummary = uploadResults.length
+    ? {
+        uploaded: uploadResults.filter((result) => result.status === "uploaded").length,
+        failed: uploadResults.filter((result) => result.status !== "uploaded").length,
+      }
+    : null;
 
   // File input change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,6 +201,35 @@ export default function PhotosPage() {
             className="hidden"
             onChange={handleFileChange}
           />
+          {uploadSummary && (
+            <div
+              className={cn(
+                "mt-4 rounded-lg border px-4 py-3 text-[12px]",
+                uploadSummary.failed > 0
+                  ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
+                  : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+              )}
+            >
+              <p className="font-medium text-warm-white">
+                {uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped
+              </p>
+              <div className="mt-2 space-y-1">
+                {uploadResults.map((result, index) => (
+                  <div key={`${result.name}-${index}`} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="truncate text-gray-muted">{result.name}</span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-medium",
+                        result.status === "uploaded" ? "text-emerald-300" : "text-amber-300",
+                      )}
+                    >
+                      {result.message}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Drag overlay */}

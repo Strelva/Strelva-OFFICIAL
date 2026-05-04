@@ -172,7 +172,12 @@ export async function executeAgentPrompt(
         const schema = sectionSchemas[section as ContentSection];
         const parsed = schema.safeParse(data);
         if (!parsed.success)
-          return { success: false, error: parsed.error.message };
+          return {
+            success: false,
+            section,
+            agentResultStatus: "failed" as const,
+            error: parsed.error.message,
+          };
 
         const { getContent, setContent } = await import("@/lib/storage");
         const current = (await getContent(
@@ -192,6 +197,8 @@ export async function executeAgentPrompt(
             if (oldLen > 0 && newLen < oldLen * 0.5) {
               return {
                 success: false,
+                section,
+                agentResultStatus: "blocked" as const,
                 error: `Would remove ${oldLen - newLen} of ${oldLen} ${key}. Confirm first.`,
               };
             }
@@ -206,6 +213,8 @@ export async function executeAgentPrompt(
           return {
             success: false,
             blocked: true,
+            section,
+            agentResultStatus: "blocked" as const,
             reason: governance.reason,
             message: "Structural site changes require manual admin work.",
           };
@@ -281,6 +290,8 @@ export async function executeAgentPrompt(
         return {
           success: true,
           section,
+          sectionIds: [section],
+          agentResultStatus: governance.action === "publish" ? "published" as const : "drafted" as const,
           governance,
           message:
             governance.action === "publish"
@@ -367,6 +378,7 @@ export async function executeAgentPrompt(
         return {
           success: true,
           status,
+          agentResultStatus: status === "published" ? "published" as const : "drafted" as const,
           post: { title: post.title, slug: post.slug, publishedAt: post.publishedAt },
         };
       },

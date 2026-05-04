@@ -3,98 +3,34 @@
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import {
+  DISCOVERABLE_INTEGRATIONS,
+  filterIntegrations,
+  normalizeIntegrationStatus,
+  type IntegrationStatus,
+  type RawConnectionStatus,
+  type RawTenantConnectionSettings,
+} from "@/lib/integration-registry";
+import { SourceHealthBadge } from "./SourceHealthBadge";
 
 export interface Connection {
   id: string;
   name: string;
+  providerId: string;
   description: string;
   icon: string;
   iconBg: string;
   iconColor: string;
   connected: boolean;
+  status: IntegrationStatus;
+  lastSyncedAt: string | null;
 }
 
-type ConnectionId = "google-analytics" | "newsletter" | "google-business" | "instagram" | "calendly" | "yelp";
-
-interface ConnectionStates {
-  googleAnalytics: boolean;
-  newsletter: boolean;
-  googleBusiness: boolean;
-  instagram: boolean;
-  calendly: boolean;
-  yelp: boolean;
-}
-
-const CONNECTION_KEY_MAP: Record<ConnectionId, keyof ConnectionStates> = {
-  "google-analytics": "googleAnalytics",
-  "newsletter": "newsletter",
-  "google-business": "googleBusiness",
-  "instagram": "instagram",
-  "calendly": "calendly",
-  "yelp": "yelp",
-};
-
-const CONNECTION_TEMPLATES: Omit<Connection, "connected">[] = [
-  {
-    id: "google-analytics",
-    name: "Google Analytics",
-    description: "Traffic data for reports & AI suggestions",
-    icon: "GA",
-    iconBg: "bg-accent-dim",
-    iconColor: "text-accent",
-  },
-  {
-    id: "newsletter",
-    name: "Newsletter",
-    description: "AI drafts & sends email to subscribers",
-    icon: "NL",
-    iconBg: "bg-[rgba(129,140,248,0.09)]",
-    iconColor: "text-[#818cf8]",
-  },
-  {
-    id: "google-business",
-    name: "Google Business",
-    description: "Sync reviews & keep your listing current",
-    icon: "GB",
-    iconBg: "bg-[rgba(255,255,255,0.03)]",
-    iconColor: "text-gray-fg",
-  },
-  {
-    id: "instagram",
-    name: "Instagram",
-    description: "Auto-post from your site's content",
-    icon: "IG",
-    iconBg: "bg-[rgba(255,255,255,0.03)]",
-    iconColor: "text-gray-fg",
-  },
-  {
-    id: "calendly",
-    name: "Calendly",
-    description: "Sync availability & track appointments",
-    icon: "CL",
-    iconBg: "bg-[rgba(255,255,255,0.03)]",
-    iconColor: "text-gray-fg",
-  },
-  {
-    id: "yelp",
-    name: "Yelp",
-    description: "Monitor & respond to Yelp reviews",
-    icon: "YP",
-    iconBg: "bg-[rgba(255,255,255,0.03)]",
-    iconColor: "text-gray-fg",
-  },
-];
-
-function ConnectionBadge() {
-  return (
-    <span className="flex items-center gap-1.5 rounded-[10px] bg-success-dim px-2.5 py-1 text-[11px] font-medium text-success">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-success status-dot-pulse" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-      </span>
-      Connected
-    </span>
-  );
+interface SourceState {
+  providerStatuses: Record<string, RawConnectionStatus>;
+  settings: RawTenantConnectionSettings;
+  connectionLoaded: boolean;
+  settingsLoaded: boolean;
 }
 
 function ConnectionRow({ connection, onClick }: { connection: Connection; onClick: () => void }) {
@@ -110,7 +46,7 @@ function ConnectionRow({ connection, onClick }: { connection: Connection; onClic
         <span className="text-[13px] font-medium text-warm-black block">{connection.name}</span>
         <span className="text-[12px] text-gray-muted block mt-0.5">{connection.description}</span>
       </div>
-      {connection.connected && <ConnectionBadge />}
+      <SourceHealthBadge status={connection.status} lastSync={connection.lastSyncedAt} compact />
       <ChevronRight className="w-3.5 h-3.5 text-gray-faint shrink-0" strokeWidth={1.5} />
     </button>
   );
@@ -121,62 +57,86 @@ type FilterTab = "All" | "Connected" | "Available";
 export function ConnectionsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
-  const [connectionStates, setConnectionStates] = useState<ConnectionStates>({
-    googleAnalytics: false,
-    newsletter: false,
-    googleBusiness: false,
-    instagram: false,
-    calendly: false,
-    yelp: false,
+  const [query, setQuery] = useState("");
+  const [sourceState, setSourceState] = useState<SourceState>({
+    providerStatuses: {},
+    settings: {},
+    connectionLoaded: false,
+    settingsLoaded: false,
   });
 
   useEffect(() => {
-    // Fetch from both tenant-settings (legacy) and connections API
-    Promise.all([
-      fetch("/api/tenant-settings", { credentials: "same-origin" }).then((r) => r.json()),
-      fetch("/api/connections", { credentials: "same-origin" }).then((r) => r.json()),
+    Promise.allSettled([
+      fetch("/api/tenant-settings", { credentials: "same-origin" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to load tenant settings");
+        return r.json();
+      }),
+      fetch("/api/connections", { credentials: "same-origin" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to load connections");
+        return r.json();
+      }),
     ])
-      .then(([settingsData, connectionsData]) => {
-        const states: ConnectionStates = {
-          googleAnalytics: settingsData.connections?.googleAnalytics || false,
-          newsletter: settingsData.connections?.newsletter || false,
-          googleBusiness: false,
-          instagram: settingsData.connections?.instagram || false,
-          calendly: settingsData.connections?.calendly || false,
-          yelp: false,
+      .then(([settingsResult, connectionsResult]) => {
+        const nextState: SourceState = {
+          providerStatuses: {},
+          settings:
+            settingsResult.status === "fulfilled"
+              ? settingsResult.value.connections ?? {}
+              : {},
+          connectionLoaded: connectionsResult.status === "fulfilled",
+          settingsLoaded: settingsResult.status === "fulfilled",
         };
 
-        // Override with actual connection status from Redis
-        if (connectionsData.connections) {
-          for (const conn of connectionsData.connections) {
-            if (conn.provider === "google") states.googleBusiness = conn.connected;
-            if (conn.provider === "yelp") states.yelp = conn.connected;
-            if (conn.provider === "calendly") states.calendly = conn.connected;
-            if (conn.provider === "instagram") states.instagram = conn.connected;
+        if (connectionsResult.status === "fulfilled") {
+          for (const conn of connectionsResult.value.connections ?? []) {
+            if (conn.provider) nextState.providerStatuses[conn.provider] = conn;
           }
         }
 
-        setConnectionStates(states);
-      })
-      .catch(() => {
-        // Keep defaults (all false) on error
+        setSourceState(nextState);
       });
   }, []);
 
   const allConnections: Connection[] = useMemo(
     () =>
-      CONNECTION_TEMPLATES.map((t) => ({
-        ...t,
-        connected: connectionStates[CONNECTION_KEY_MAP[t.id as ConnectionId]] ?? false,
-      })),
-    [connectionStates]
+      DISCOVERABLE_INTEGRATIONS.map((integration) => {
+        const rawConnection = integration.connectionProvider
+          ? sourceState.providerStatuses[integration.connectionProvider]
+          : null;
+        const status = normalizeIntegrationStatus(integration, {
+          connection: rawConnection,
+          settings: sourceState.settings,
+          connectionLoaded: sourceState.connectionLoaded,
+          settingsLoaded: sourceState.settingsLoaded,
+        });
+
+        return {
+          id: integration.id,
+          name: integration.displayName,
+          providerId: integration.providerId,
+          description: integration.shortDescription,
+          icon: integration.icon,
+          iconBg: integration.iconBg,
+          iconColor: integration.iconColor,
+          connected: status === "connected",
+          status,
+          lastSyncedAt: rawConnection?.lastSyncedAt ?? null,
+        };
+      }),
+    [sourceState]
+  );
+
+  const searchedConnectionIds = useMemo(
+    () => new Set(filterIntegrations(DISCOVERABLE_INTEGRATIONS, query).map((integration) => integration.id)),
+    [query]
   );
 
   const connections = useMemo(() => {
-    if (activeTab === "Connected") return allConnections.filter((c) => c.connected);
-    if (activeTab === "Available") return allConnections.filter((c) => !c.connected);
-    return allConnections;
-  }, [allConnections, activeTab]);
+    const searched = allConnections.filter((connection) => searchedConnectionIds.has(connection.id));
+    if (activeTab === "Connected") return searched.filter((c) => c.connected);
+    if (activeTab === "Available") return searched.filter((c) => !c.connected);
+    return searched;
+  }, [allConnections, searchedConnectionIds, activeTab]);
 
   const featured = allConnections[0]; // Google Analytics as featured
 
@@ -196,6 +156,8 @@ export function ConnectionsPage() {
         <div className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-xl px-3.5 py-2 w-full sm:w-fit">
           <Search className="w-4 h-4 text-gray-subtle" strokeWidth={1.5} />
           <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Search connections..."
             className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-full sm:w-[180px]"
           />
@@ -255,15 +217,24 @@ export function ConnectionsPage() {
       </div>
 
       {/* Grid — two columns */}
-      <div className="grid gap-1 md:grid-cols-2">
-        {connections.map((connection) => (
-          <ConnectionRow
-            key={connection.id}
-            connection={connection}
-            onClick={() => router.push(`/dashboard/sources/${connection.id}`)}
-          />
-        ))}
-      </div>
+      {connections.length > 0 ? (
+        <div className="grid gap-1 md:grid-cols-2">
+          {connections.map((connection) => (
+            <ConnectionRow
+              key={connection.id}
+              connection={connection}
+              onClick={() => router.push(`/dashboard/sources/${connection.id}`)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-glass-border bg-surface-raised px-6 py-10 text-center">
+          <p className="text-[14px] font-medium text-warm-black">No connections found</p>
+          <p className="mt-1 text-[13px] text-gray-muted">
+            Try a provider name, connection name, or description.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

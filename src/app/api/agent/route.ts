@@ -15,6 +15,11 @@ import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
+import {
+  agentResultFromToolOutput,
+  buildAgentResultContract,
+  type AgentActionResult,
+} from "@/lib/agent-results";
 
 type IncomingMessagePart = { type?: string; text?: string };
 
@@ -281,6 +286,12 @@ export async function POST(req: Request) {
   const signalSiteName = tenantConfig?.siteName || tenant;
   const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
+  const actionResults: AgentActionResult[] = [];
+  const recordActionResult = (result: AgentActionResult) => {
+    const key = JSON.stringify(result);
+    if (actionResults.some((existing) => JSON.stringify(existing) === key)) return;
+    actionResults.push(result);
+  };
 
   if (activeSection) {
     systemPrompt += `\n\nCONTEXT: The user is currently viewing the "${activeSection}" section in their dashboard editor. When they say "this", "it", "add one", "update this", etc., they are referring to ${activeSection}. Proactively reference this section in your responses.`;
@@ -342,7 +353,9 @@ export async function POST(req: Request) {
             const schema = sectionSchemas[section as ContentSection];
             const parsed = schema.safeParse(data);
             if (!parsed.success) {
-              return { success: false, error: parsed.error.message };
+              const toolResult = { success: false, error: parsed.error.message, section, agentResultStatus: "failed" as const };
+              recordActionResult({ status: "failed", sectionIds: [section], error: parsed.error.message });
+              return toolResult;
             }
 
             const { getContent, setContent } = await import("@/lib/storage");
@@ -359,9 +372,13 @@ export async function POST(req: Request) {
                 const oldLen = (current[key] as unknown[]).length;
                 const newLen = ((data as Record<string, unknown>)[key] as unknown[]).length;
                 if (oldLen > 0 && newLen < oldLen * 0.5) {
+                  const message = `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`;
+                  recordActionResult({ status: "blocked", sectionIds: [section], message });
                   return {
                     success: false,
-                    error: `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`,
+                    error: message,
+                    section,
+                    agentResultStatus: "blocked" as const,
                     risk,
                     diffs,
                   };
@@ -374,11 +391,15 @@ export async function POST(req: Request) {
             });
 
             if (governance.action === "block") {
+              const message = "I can't make that change directly. Jacob needs to handle structural site changes.";
+              recordActionResult({ status: "blocked", sectionIds: [section], message });
               return {
                 success: false,
                 blocked: true,
                 reason: governance.reason,
-                message: "I can't make that change directly. Jacob needs to handle structural site changes.",
+                message,
+                section,
+                agentResultStatus: "blocked" as const,
                 risk,
               };
             }
@@ -386,6 +407,7 @@ export async function POST(req: Request) {
             // Route high/medium risk operations to review queue
             const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
             const autoPublish = governance.action === "publish" && !shouldRouteToReview;
+            let queuedEventId: string | undefined;
 
             if (autoPublish) {
               await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
@@ -402,7 +424,7 @@ export async function POST(req: Request) {
               // For medium/high risk, also add to the event queue for explicit review
               if (shouldRouteToReview) {
                 const { addEvent } = await import("@/lib/events");
-                await addEvent({
+                const event = await addEvent({
                   tenantId: tenant,
                   source: "ai",
                   type: "content_update",
@@ -419,6 +441,7 @@ export async function POST(req: Request) {
                     currentData: current,
                   },
                 });
+                queuedEventId = event.id;
               }
             }
 
@@ -459,21 +482,40 @@ export async function POST(req: Request) {
               if (autoPublish) await recordSectionUpdate(section, tenant);
             } catch {}
 
+            const agentResultStatus = autoPublish
+              ? "published"
+              : shouldRouteToReview
+                ? "queued"
+                : "drafted";
+            const message = autoPublish
+              ? `Updated ${section} successfully`
+              : shouldRouteToReview
+                ? `I've queued these ${risk.level}-risk changes to ${section} for review. They'll go live after approval.`
+                : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`;
+            recordActionResult({
+              status: agentResultStatus,
+              sectionIds: [section],
+              eventIds: queuedEventId ? [queuedEventId] : undefined,
+              message,
+            });
+
             return {
               success: true,
               section,
+              sectionIds: [section],
+              eventId: queuedEventId,
+              eventIds: queuedEventId ? [queuedEventId] : undefined,
               governance,
               risk,
               diffs,
               applied: autoPublish,
-              message: autoPublish
-                ? `Updated ${section} successfully`
-                : shouldRouteToReview
-                  ? `I've queued these ${risk.level}-risk changes to ${section} for review. They'll go live after approval.`
-                  : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`,
+              agentResultStatus,
+              message,
             };
           } catch (err) {
-            return { success: false, error: `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
+            const error = `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
+            recordActionResult({ status: "failed", sectionIds: [section], error });
+            return { success: false, error, section, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -562,9 +604,12 @@ export async function POST(req: Request) {
             const { addEvent } = await import("@/lib/events");
             const subscribers = await getSubscribers(tenant);
             const active = subscribers.filter((s) => s.status === "active");
-            if (active.length === 0) return { success: false, error: "No active subscribers" };
+            if (active.length === 0) {
+              recordActionResult({ status: "blocked", message: "No active subscribers" });
+              return { success: false, error: "No active subscribers", agentResultStatus: "blocked" as const };
+            }
 
-            await addEvent({
+            const event = await addEvent({
               tenantId: tenant,
               source: "ai",
               type: "newsletter_draft",
@@ -578,6 +623,11 @@ export async function POST(req: Request) {
                 subscriberCount: active.length,
               },
             });
+            recordActionResult({
+              status: "queued",
+              eventIds: [event.id],
+              message: `Newsletter draft "${subject}" queued for review.`,
+            });
 
             await logActivity({
               text: `AI drafted newsletter: "${subject}" for ${active.length} subscribers (pending approval)`,
@@ -589,11 +639,16 @@ export async function POST(req: Request) {
             return {
               success: true,
               drafted: true,
+              eventId: event.id,
+              eventIds: [event.id],
+              agentResultStatus: "queued" as const,
               subscriberCount: active.length,
               message: `I've drafted the newsletter "${subject}" for ${active.length} subscribers. It's in the review queue for Jacob to approve before sending.`,
             };
           } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed to draft" };
+            const error = err instanceof Error ? err.message : "Failed to draft";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -640,9 +695,15 @@ export async function POST(req: Request) {
             const posts = await getSocialPosts(tenant);
             posts.unshift(post);
             await setSocialPosts(tenant, posts);
-            return { success: true, post };
+            recordActionResult({
+              status: "drafted",
+              message: `Social post draft saved for ${platform}.`,
+            });
+            return { success: true, post, agentResultStatus: "drafted" as const };
           } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed to create post" };
+            const error = err instanceof Error ? err.message : "Failed to create post";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -747,7 +808,7 @@ export async function POST(req: Request) {
             if (!config[pageSlug].sections.some((s) => s.type === section)) {
               return { success: false, error: `Section "${section}" not found on page "${pageSlug}"` };
             }
-            await addEvent({
+            const event = await addEvent({
               tenantId: tenant,
               source: "ai",
               type: "content_update",
@@ -762,13 +823,26 @@ export async function POST(req: Request) {
                 governanceReason: "Section visibility is a structural site change and requires manual admin review.",
               },
             });
+            recordActionResult({
+              status: "queued",
+              sectionIds: [section],
+              eventIds: [event.id],
+              message: "Section visibility change queued for review.",
+            });
             return {
               success: false,
               blocked: true,
+              section,
+              sectionIds: [section],
+              eventId: event.id,
+              eventIds: [event.id],
+              agentResultStatus: "queued" as const,
               message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
             };
           } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed" };
+            const error = err instanceof Error ? err.message : "Failed";
+            recordActionResult({ status: "failed", sectionIds: [section], error });
+            return { success: false, error, section, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -795,7 +869,7 @@ export async function POST(req: Request) {
             if (unknown.length > 0) {
               return { success: false, error: `Unknown section(s) for ${pageSlug}: ${unknown.join(", ")}` };
             }
-            await addEvent({
+            const event = await addEvent({
               tenantId: tenant,
               source: "ai",
               type: "content_update",
@@ -809,13 +883,25 @@ export async function POST(req: Request) {
                 governanceReason: "Section order is a structural site change and requires manual admin review.",
               },
             });
+            recordActionResult({
+              status: "queued",
+              sectionIds: order,
+              eventIds: [event.id],
+              message: "Section reorder queued for review.",
+            });
             return {
               success: false,
               blocked: true,
+              sectionIds: order,
+              eventId: event.id,
+              eventIds: [event.id],
+              agentResultStatus: "queued" as const,
               message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
             };
           } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed" };
+            const error = err instanceof Error ? err.message : "Failed";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -852,7 +938,9 @@ export async function POST(req: Request) {
               message: `Replied to ${updated.author}'s review`,
             };
           } catch (err) {
-            return { success: false, error: `Failed to reply: ${err instanceof Error ? err.message : "Unknown error"}` };
+            const error = `Failed to reply: ${err instanceof Error ? err.message : "Unknown error"}`;
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
           }
         },
       }),
@@ -1160,6 +1248,10 @@ export async function POST(req: Request) {
               toolName === "preview_site" ? "Loading site preview..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
+          } else if (part.type === "tool-result") {
+            const output = ("result" in part ? part.result : "output" in part ? part.output : undefined) as unknown;
+            const actionResult = agentResultFromToolOutput(output);
+            if (actionResult) recordActionResult(actionResult);
           } else if (part.type === "text-delta") {
             controller.enqueue(encoder.encode("text" in part ? part.text : ""));
           }
@@ -1167,7 +1259,14 @@ export async function POST(req: Request) {
       } catch {
         // Stream closed by client
       } finally {
-        controller.close();
+        try {
+          controller.enqueue(encoder.encode(`\n__RESULT__${JSON.stringify(buildAgentResultContract(actionResults))}\n`));
+        } catch {
+          // Client disconnected before the final result contract could be sent.
+        }
+        try {
+          controller.close();
+        } catch {}
       }
     },
   });

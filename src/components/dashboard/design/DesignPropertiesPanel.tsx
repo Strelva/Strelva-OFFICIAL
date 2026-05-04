@@ -611,6 +611,9 @@ function AITab({
             }
             const label = line.replace("__TOOL__", "");
             currentStepId = addTraceStep(label);
+          } else if (line.startsWith("__RESULT__")) {
+            // Final agent contract is consumed by ChatPanel; design trace only needs text/tool steps.
+            continue;
           } else {
             fullText += line;
           }

@@ -9,12 +9,14 @@ import {
   BarChart3,
   Loader2,
   CheckCircle2,
+  AlertCircle,
   MessageCircle,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
+import type { AgentResultContract, AgentResultStatus } from "@/lib/agent-results";
 
 const SUGGESTION_CHIPS = [
   { label: "Add my Saturday class", icon: Clock, description: "Turn a real schedule change into updated site copy" },
@@ -38,6 +40,11 @@ interface ChatMessage {
   toolCalls?: ToolCall[];
 }
 
+interface UpdateToast {
+  status: AgentResultStatus;
+  text: string;
+}
+
 interface ChatPanelProps {
   threadId?: string;
   ownerName: string;
@@ -55,7 +62,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [updateToast, setUpdateToast] = useState(false);
+  const [updateToast, setUpdateToast] = useState<UpdateToast | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [activeTools, setActiveTools] = useState<ToolCall[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -63,6 +70,24 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   const currentThreadRef = useRef<string | undefined>(threadId);
 
   const dashCtx = useDashboardOptional();
+
+  const showResultToast = useCallback((result: AgentResultContract) => {
+    const text =
+      result.status === "published" || result.status === "applied" ? "Site updated" :
+      result.status === "drafted" ? "Draft saved" :
+      result.status === "queued" ? "Queued for review" :
+      result.status === "blocked" ? "Change blocked" :
+      result.status === "failed" ? "Update failed" :
+      "No site changes made";
+
+    if (result.status === "no-op" && result.actions.length === 1) return;
+
+    setUpdateToast({ status: result.status, text });
+    if (result.status === "published" || result.status === "applied") {
+      dashCtx?.triggerRefresh();
+    }
+    setTimeout(() => setUpdateToast(null), 5000);
+  }, [dashCtx]);
 
   // Load thread messages when threadId changes
   useEffect(() => {
@@ -194,6 +219,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
         const decoder = new TextDecoder();
         let fullText = "";
         let buffer = "";
+        let agentResult: AgentResultContract | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -217,6 +243,14 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
               ]);
               continue;
             }
+            if (line.startsWith("__RESULT__")) {
+              try {
+                agentResult = JSON.parse(line.slice(10)) as AgentResultContract;
+              } catch {
+                agentResult = null;
+              }
+              continue;
+            }
             if (line.startsWith("__TOOL_DONE__")) {
               const toolName = line.slice(13);
               setActiveTools((prev) =>
@@ -231,7 +265,12 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
             fullText += line + "\n";
           }
 
-          if (buffer && !buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__")) {
+          if (
+            buffer &&
+            !buffer.startsWith("__TOOL__") &&
+            !buffer.startsWith("__TOOL_DONE__") &&
+            !buffer.startsWith("__RESULT__")
+          ) {
             fullText += buffer;
             buffer = "";
           }
@@ -248,7 +287,13 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
         }
 
         if (buffer) {
-          if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__")) {
+          if (buffer.startsWith("__RESULT__")) {
+            try {
+              agentResult = JSON.parse(buffer.slice(10)) as AgentResultContract;
+            } catch {
+              agentResult = null;
+            }
+          } else if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__")) {
             fullText += buffer;
             setMessages((prev) =>
               prev.map((m) =>
@@ -283,18 +328,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
           }).catch(() => {});
         }
 
-        // Check for site update
-        try {
-          const actRes = await fetch("/api/activity", { credentials: "same-origin" });
-          if (actRes.ok) {
-            const items = await actRes.json();
-            if (items.length > 0 && items[0].type === "ai") {
-              setUpdateToast(true);
-              dashCtx?.triggerRefresh();
-              setTimeout(() => setUpdateToast(false), 5000);
-            }
-          }
-        } catch {}
+        if (agentResult) showResultToast(agentResult);
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -310,7 +344,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
         setActiveTools([]);
       }
     },
-    [messages, isLoading, threadId, onThreadCreated, dashCtx]
+    [messages, isLoading, threadId, onThreadCreated, dashCtx, showResultToast]
   );
 
   const handleSubmit = (e?: FormEvent) => {
@@ -365,10 +399,26 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
           <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7 space-y-4">
             {/* Update toast */}
             {updateToast && (
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-success-dim border border-success/20 rounded-lg animate-fade-in-up">
-                <CheckCircle2 className="w-4 h-4 text-success shrink-0" strokeWidth={2} />
-                <span className="text-[12px] font-medium text-success">
-                  Done — your site is updated
+              <div
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg animate-fade-in-up ${
+                  updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
+                    ? "bg-success-dim border border-success/20"
+                    : "bg-red-500/10 border border-red-500/20"
+                }`}
+              >
+                {updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued" ? (
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0" strokeWidth={2} />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" strokeWidth={2} />
+                )}
+                <span
+                  className={`text-[12px] font-medium ${
+                    updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
+                      ? "text-success"
+                      : "text-red-400"
+                  }`}
+                >
+                  {updateToast.text}
                 </span>
               </div>
             )}

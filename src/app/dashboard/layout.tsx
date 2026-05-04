@@ -53,7 +53,13 @@ export default async function DashboardLayout({
     : `${aiUpdatesThisMonth} AI updates this month`;
 
   return (
-    <DashboardProvider siteUrl={siteUrl} template={tenantConfig?.template || "wellness"} autoPublish={tenantConfig?.autoPublish !== false}>
+    <DashboardProvider
+      siteUrl={siteUrl}
+      template={tenantConfig?.template || "wellness"}
+      autoPublish={tenantConfig?.autoPublish !== false}
+      subscriptionStatus={subscriptionStatus}
+      hasStripeCustomer={!!tenantConfig?.stripeCustomerId}
+    >
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationLayoutClient
