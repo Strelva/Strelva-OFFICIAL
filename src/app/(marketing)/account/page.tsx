@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { isSuperAdmin } from "@/lib/auth";
-import { getTenantConfig } from "@/lib/tenants";
+import { getAllTenants, getTenantConfig } from "@/lib/tenants";
+import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,8 @@ export default async function AccountPage() {
   }
 
   if (await isSuperAdmin()) {
-    redirect("/admin");
+    const tenants = await getAllTenants();
+    return <TenantPicker tenants={tenants.map((config) => ({ id: config.id, config }))} isSuperAdmin />;
   }
 
   const user = await currentUser();
@@ -28,14 +31,8 @@ export default async function AccountPage() {
     const tenantId = tenants[0];
     const config = await getTenantConfig(tenantId);
 
-    if (config?.customDomains?.[0]) {
-      redirect(`https://${config.customDomains[0]}/dashboard`);
-    }
-
-    const host = process.env.NODE_ENV === "production"
-      ? `${tenantId}.scaffoldweb.com`
-      : `${tenantId}.localhost:3000`;
-    redirect(`${process.env.NODE_ENV === "production" ? "https" : "http"}://${host}/dashboard`);
+    if (config) redirect(getTenantDashboardUrl(config));
+    redirect("/no-access");
   }
 
   const tenantConfigs = await Promise.all(
@@ -85,13 +82,12 @@ function NoAccessState() {
 interface TenantPickerProps {
   tenants: Array<{
     id: string;
-    config: { siteName?: string; customDomains?: string[] } | undefined;
+    config: TenantConfig | undefined;
   }>;
+  isSuperAdmin?: boolean;
 }
 
-function TenantPicker({ tenants }: TenantPickerProps) {
-  const isProd = process.env.NODE_ENV === "production";
-
+function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-6"
@@ -108,15 +104,29 @@ function TenantPicker({ tenants }: TenantPickerProps) {
           className="text-[15px] mb-8 text-center"
           style={{ color: "var(--m-text-2)" }}
         >
-          You have access to multiple sites.
+          {isSuperAdmin
+            ? "Super admin access lets you control every client dashboard."
+            : "You have access to multiple sites."}
         </p>
+
+        {isSuperAdmin && (
+          <Link
+            href="/admin"
+            className="mb-4 block rounded-xl p-4 text-center transition-colors hover:brightness-110"
+            style={{
+              background: "var(--m-text)",
+              color: "var(--m-bg)",
+            }}
+          >
+            Open admin overview
+          </Link>
+        )}
 
         <div className="space-y-3">
           {tenants.map(({ id, config }) => {
-            const domain = config?.customDomains?.[0];
-            const href = domain
-              ? `https://${domain}/dashboard`
-              : `${isProd ? "https" : "http"}://${id}.${isProd ? "scaffoldweb.com" : "localhost:3000"}/dashboard`;
+            if (!config) return null;
+            const href = getTenantDashboardUrl(config);
+            const domain = new URL(href).host;
 
             return (
               <a

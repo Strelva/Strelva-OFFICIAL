@@ -29,10 +29,10 @@ export default async function AdminLayout({
             </div>
           </div>
           <Link
-            href="/dashboard"
+            href="/account"
             className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
           >
-            Back to Dashboard
+            Client dashboards
           </Link>
         </div>
       </nav>

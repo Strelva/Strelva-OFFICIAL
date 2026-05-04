@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAllTenants } from "@/lib/tenants";
+import { getTenantDashboardUrl, getTenantPublicUrl } from "@/lib/tenant-urls";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { InviteButton } from "./InviteButton";
@@ -166,13 +167,13 @@ export default async function AdminPage() {
                         ownerEmail={t.ownerEmail}
                       />
                       <Link
-                        href={`/dashboard?tenant=${t.id}`}
+                        href={getTenantDashboardUrl(t)}
                         className="text-xs text-zinc-400 hover:text-white transition-colors"
                       >
                         Dashboard
                       </Link>
                       <a
-                        href={`https://${t.subdomain}.scaffoldweb.com`}
+                        href={getTenantPublicUrl(t)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-zinc-400 hover:text-white transition-colors"
