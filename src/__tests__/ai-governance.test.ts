@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 import { decideAiContentGovernance } from "../lib/ai-governance";
 
 describe("AI content governance", () => {
-  it("auto-publishes factual business detail changes", () => {
+  it("requires review for high-risk factual business detail changes", () => {
     const decision = decideAiContentGovernance("contact", {
       phone: "555-123-4567",
       hours: "Mon-Fri 9-5",
+    });
+
+    expect(decision.action).toBe("review");
+  });
+
+  it("auto-publishes low-risk factual section changes", () => {
+    const decision = decideAiContentGovernance("contact", {
+      introNote: "Plenty of parking near the entrance.",
     });
 
     expect(decision.action).toBe("publish");

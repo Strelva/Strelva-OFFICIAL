@@ -17,6 +17,7 @@ export interface ActivityEntry {
   eventStatus?: "pending" | "approved" | "dismissed" | "auto_approved";
   governanceReason?: string;
   riskLevel?: string;
+  suppressEvent?: boolean;
   /**
    * Full previous content blob captured at the time of the save.
    * Used by Phase 14 version history to restore earlier versions.
@@ -69,7 +70,7 @@ export async function logActivity(
   }
 
   // Emit UnifiedEvent for AI content changes
-  if (entry.actor === "ai" || entry.type === "ai") {
+  if (!entry.suppressEvent && (entry.actor === "ai" || entry.type === "ai")) {
     try {
       await emitEventFromActivity(entry, tenant);
     } catch {

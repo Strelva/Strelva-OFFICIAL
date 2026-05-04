@@ -13,6 +13,7 @@ import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
+import { queueAiContentReview } from "@/lib/ai-review-queue";
 import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
 import {
@@ -404,7 +405,7 @@ export async function POST(req: Request) {
               };
             }
 
-            // Route high/medium risk operations to review queue
+            // Route any non-publishable AI change to the durable review queue.
             const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
             const autoPublish = governance.action === "publish" && !shouldRouteToReview;
             let queuedEventId: string | undefined;
@@ -418,31 +419,19 @@ export async function POST(req: Request) {
               const { revalidatePath } = await import("next/cache");
               revalidatePath("/");
             } else {
+              const event = await queueAiContentReview({
+                tenantId: tenant,
+                section: section as ContentSection,
+                currentData: current,
+                proposedData: parsed.data as Record<string, unknown>,
+                diffs,
+                risk,
+                governance,
+              });
+              queuedEventId = event.id;
+
               const { setDraftContent } = await import("@/lib/storage");
               await setDraftContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
-
-              // For medium/high risk, also add to the event queue for explicit review
-              if (shouldRouteToReview) {
-                const { addEvent } = await import("@/lib/events");
-                const event = await addEvent({
-                  tenantId: tenant,
-                  source: "ai",
-                  type: "content_update",
-                  title: `AI proposed ${risk.level}-risk changes to ${section}`,
-                  body: diffs.slice(0, 5).map((d) => `${d.field}: ${d.type}`).join("\n"),
-                  status: "pending",
-                  metadata: {
-                    kind: "agent_preview",
-                    section,
-                    risk: risk.level,
-                    riskReason: risk.reason,
-                    diffs,
-                    proposedData: parsed.data,
-                    currentData: current,
-                  },
-                });
-                queuedEventId = event.id;
-              }
             }
 
             if (process.env.SLACK_WEBHOOK_URL) {
@@ -478,20 +467,17 @@ export async function POST(req: Request) {
                 eventStatus: autoPublish ? "auto_approved" : "pending",
                 governanceReason: governance.reason,
                 riskLevel: risk.level,
+                suppressEvent: !autoPublish,
               }, tenant);
               if (autoPublish) await recordSectionUpdate(section, tenant);
             } catch {}
 
             const agentResultStatus = autoPublish
               ? "published"
-              : shouldRouteToReview
-                ? "queued"
-                : "drafted";
+              : "queued";
             const message = autoPublish
               ? `Updated ${section} successfully`
-              : shouldRouteToReview
-                ? `I've queued these ${risk.level}-risk changes to ${section} for review. They'll go live after approval.`
-                : `I've drafted the changes to ${section}. Jacob will review and publish them shortly.`;
+              : `I've queued these changes to ${section} for review. They'll go live after approval.`;
             recordActionResult({
               status: agentResultStatus,
               sectionIds: [section],

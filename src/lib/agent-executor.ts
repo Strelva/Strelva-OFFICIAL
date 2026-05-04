@@ -8,6 +8,7 @@ import { capabilityPromptFragment } from "@/lib/capabilities";
 import { sendSlackNotification } from "@/lib/slack";
 import { detectStaleSections } from "@/lib/reports";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
+import { queueAiContentReview } from "@/lib/ai-review-queue";
 import type { ContentSection } from "@/lib/types";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 
@@ -220,6 +221,10 @@ export async function executeAgentPrompt(
           };
         }
 
+        const { diffFields } = await import("@/lib/utils");
+        const changes = diffFields(current, data as Record<string, unknown>);
+        let queuedEventId: string | undefined;
+
         if (governance.action === "publish") {
           await setContent(
             section as ContentSection,
@@ -227,13 +232,12 @@ export async function executeAgentPrompt(
             tenantId
           );
           const { appendVersion } = await import("@/lib/storage");
-          const { diffFields } = await import("@/lib/utils");
           await appendVersion(
             section as ContentSection,
             parsed.data,
             "ai",
             tenantId,
-            diffFields(current, data as Record<string, unknown>)
+            changes
           );
           const { revalidatePath } = await import("next/cache");
           revalidatePath("/");
@@ -243,6 +247,21 @@ export async function executeAgentPrompt(
             console.error("[agent] Failed to revalidate client site:", err);
           });
         } else {
+          const event = await queueAiContentReview({
+            tenantId,
+            section: section as ContentSection,
+            currentData: current,
+            proposedData: parsed.data as Record<string, unknown>,
+            diffs: changes.map((change) => ({
+              field: change.field,
+              before: change.before,
+              after: change.after,
+              type: "changed" as const,
+            })),
+            governance,
+          });
+          queuedEventId = event.id;
+
           const { setDraftContent } = await import("@/lib/storage");
           await setDraftContent(
             section as ContentSection,
@@ -254,8 +273,6 @@ export async function executeAgentPrompt(
         const { logActivity, recordSectionUpdate } = await import(
           "@/lib/storage"
         );
-        const { diffFields } = await import("@/lib/utils");
-        const changes = diffFields(current, data as Record<string, unknown>);
         await logActivity(
           {
             text:
@@ -269,6 +286,7 @@ export async function executeAgentPrompt(
             changes,
             eventStatus: governance.action === "publish" ? "auto_approved" : "pending",
             governanceReason: governance.reason,
+            suppressEvent: governance.action !== "publish",
           },
           tenantId
         );
@@ -291,12 +309,14 @@ export async function executeAgentPrompt(
           success: true,
           section,
           sectionIds: [section],
-          agentResultStatus: governance.action === "publish" ? "published" as const : "drafted" as const,
+          eventId: queuedEventId,
+          eventIds: queuedEventId ? [queuedEventId] : undefined,
+          agentResultStatus: governance.action === "publish" ? "published" as const : "queued" as const,
           governance,
           message:
             governance.action === "publish"
               ? `Updated ${section}`
-              : `Drafted ${section} for admin review`,
+              : `Queued ${section} for admin review`,
         };
       },
     }),

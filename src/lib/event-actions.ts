@@ -33,7 +33,14 @@ export async function resolveEventAction(
 
     if (section && event.metadata?.kind !== "manual_structural_change") {
       if (action === "approved") {
-        const draft = await getDraftContent(section, tenantId);
+        const metadataDraft =
+          event.metadata?.kind === "agent_preview" &&
+          event.metadata.proposedData &&
+          typeof event.metadata.proposedData === "object" &&
+          !Array.isArray(event.metadata.proposedData)
+            ? event.metadata.proposedData
+            : null;
+        const draft = await getDraftContent(section, tenantId) || metadataDraft;
         if (!draft) return { changed: true, reason: "draft_not_found" };
 
         const current = await getContent(section, tenantId) as unknown as Record<string, unknown>;

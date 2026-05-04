@@ -4,6 +4,13 @@ const mockGetEvent = vi.fn();
 const mockResolveEvent = vi.fn();
 const mockUpdateSuggestion = vi.fn();
 const mockExecuteAgentPrompt = vi.fn();
+const mockGetDraftContent = vi.fn();
+const mockGetContent = vi.fn();
+const mockSetContent = vi.fn();
+const mockAppendVersion = vi.fn();
+const mockClearDraft = vi.fn();
+const mockRecordSectionUpdate = vi.fn();
+const mockRevalidateClientSite = vi.fn();
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -18,11 +25,29 @@ vi.mock("../lib/agent-executor", () => ({
   executeAgentPrompt: (...args: unknown[]) => mockExecuteAgentPrompt(...args),
 }));
 
+vi.mock("../lib/storage", () => ({
+  getDraftContent: (...args: unknown[]) => mockGetDraftContent(...args),
+  getContent: (...args: unknown[]) => mockGetContent(...args),
+  setContent: (...args: unknown[]) => mockSetContent(...args),
+  appendVersion: (...args: unknown[]) => mockAppendVersion(...args),
+  clearDraft: (...args: unknown[]) => mockClearDraft(...args),
+  recordSectionUpdate: (...args: unknown[]) => mockRecordSectionUpdate(...args),
+}));
+
+vi.mock("../lib/revalidate-client", () => ({
+  revalidateClientSite: (...args: unknown[]) => mockRevalidateClientSite(...args),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import { resolveEventAction } from "../lib/event-actions";
 
 describe("resolveEventAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRevalidateClientSite.mockResolvedValue(undefined);
   });
 
   it("does not execute suggestion side effects for already resolved events", async () => {
@@ -77,5 +102,44 @@ describe("resolveEventAction", () => {
     expect(result).toEqual({ changed: true });
     expect(mockUpdateSuggestion).toHaveBeenCalledWith("tenant-a", "sug_1", "accepted");
     expect(mockExecuteAgentPrompt).toHaveBeenCalledWith("tenant-a", "Update Saturday class");
+  });
+
+  it("approves queued agent preview content from durable event metadata when draft cache is missing", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_1",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: {
+        kind: "agent_preview",
+        section: "contact",
+        proposedData: {
+          email: "new@example.com",
+          locationTitle: "Studio",
+          locationDescription: "Street parking nearby.",
+          instagramUrl: "",
+          facebookUrl: "",
+        },
+      },
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ email: "old@example.com" });
+
+    const result = await resolveEventAction("tenant-a", "evt_1", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockSetContent).toHaveBeenCalledWith(
+      "contact",
+      {
+        email: "new@example.com",
+        locationTitle: "Studio",
+        locationDescription: "Street parking nearby.",
+        instagramUrl: "",
+        facebookUrl: "",
+      },
+      "tenant-a"
+    );
+    expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
   });
 });

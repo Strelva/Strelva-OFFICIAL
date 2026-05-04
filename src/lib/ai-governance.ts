@@ -57,6 +57,26 @@ const FACTUAL_FIELD_HINTS = [
   "url",
 ];
 
+const HIGH_RISK_FACTUAL_FIELD_HINTS = [
+  "address",
+  "booking",
+  "bookinglink",
+  "bookingurl",
+  "businesshours",
+  "date",
+  "email",
+  "external_link",
+  "externallink",
+  "googlemaps",
+  "hours",
+  "location",
+  "phone",
+  "price",
+  "stripepaymentlink",
+  "time",
+  "url",
+];
+
 const MARKETING_FIELD_HINTS = [
   "answer",
   "badge",
@@ -117,10 +137,18 @@ export function decideAiContentGovernance(
 
   const keys = collectKeys(data);
   const touchesMarketingCopy = hasAnyHint(keys, MARKETING_FIELD_HINTS);
+  const touchesHighRiskFacts = hasAnyHint(keys, HIGH_RISK_FACTUAL_FIELD_HINTS);
   const touchesOnlyFactualFields =
     keys.length > 0 &&
     hasAnyHint(keys, FACTUAL_FIELD_HINTS) &&
     !touchesMarketingCopy;
+
+  if (touchesHighRiskFacts) {
+    return {
+      action: "review",
+      reason: "High-risk business details such as prices, booking links, hours, addresses, contact info, or dates require review.",
+    };
+  }
 
   if (REVIEW_SECTIONS.has(section) || touchesMarketingCopy) {
     return {

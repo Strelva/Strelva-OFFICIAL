@@ -10,6 +10,17 @@ import { DEFAULT_TENANT } from "./storage/core";
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
 
+export class EventPersistenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EventPersistenceError";
+  }
+}
+
+type AddEventOptions = {
+  requirePersistence?: boolean;
+};
+
 /**
  * Redis key for tenant event sorted set.
  * Score = timestamp (ms), Member = JSON-encoded event
@@ -29,21 +40,36 @@ function eventKey(eventId: string): string {
  * Add a new event to the queue.
  */
 export async function addEvent(
-  event: Omit<UnifiedEvent, "id" | "createdAt">
+  event: Omit<UnifiedEvent, "id" | "createdAt">,
+  opts: AddEventOptions = {}
 ): Promise<UnifiedEvent> {
   const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const createdAt = new Date().toISOString();
   const full: UnifiedEvent = { ...event, id, createdAt };
+  const requiresPersistence =
+    opts.requirePersistence ||
+    (process.env.NODE_ENV === "production" &&
+      event.status === "pending" &&
+      (event.source === "ai" ||
+        event.type === "newsletter_draft" ||
+        event.type === "review" ||
+        event.type === "content_update" ||
+        event.type === "suggestion"));
 
   const redis = getRedis();
-  if (redis) {
-    const score = Date.now();
-    await redis.zadd(eventsKey(event.tenantId), {
-      score,
-      member: JSON.stringify(full),
-    });
-    await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
+  if (!redis) {
+    if (requiresPersistence) {
+      throw new EventPersistenceError("Redis is required for durable event queue persistence.");
+    }
+    return full;
   }
+
+  const score = Date.now();
+  await redis.zadd(eventsKey(event.tenantId), {
+    score,
+    member: JSON.stringify(full),
+  });
+  await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
 
   return full;
 }
@@ -178,24 +204,28 @@ export async function emitEventFromActivity(
     eventStatus?: UnifiedEvent["status"];
     governanceReason?: string;
   },
-  tenant: string = DEFAULT_TENANT
+  tenant: string = DEFAULT_TENANT,
+  opts: AddEventOptions = {}
 ): Promise<UnifiedEvent | null> {
   // Only emit events for AI actions
   if (entry.actor !== "ai" && entry.type !== "ai") return null;
 
-  const event = await addEvent({
-    tenantId: tenant,
-    source: "ai",
-    type: "content_update",
-    title: entry.text,
-    body: entry.changes?.map((c) => `${c.field}: ${c.after}`).join("\n") ?? "",
-    status: entry.eventStatus ?? "auto_approved",
-    metadata: {
-      section: entry.section,
-      changes: entry.changes,
-      governanceReason: entry.governanceReason,
+  const event = await addEvent(
+    {
+      tenantId: tenant,
+      source: "ai",
+      type: "content_update",
+      title: entry.text,
+      body: entry.changes?.map((c) => `${c.field}: ${c.after}`).join("\n") ?? "",
+      status: entry.eventStatus ?? "auto_approved",
+      metadata: {
+        section: entry.section,
+        changes: entry.changes,
+        governanceReason: entry.governanceReason,
+      },
     },
-  });
+    opts
+  );
 
   return event;
 }
