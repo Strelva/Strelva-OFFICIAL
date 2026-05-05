@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateAllReports } from "@/lib/reports";
+import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 
 function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
@@ -49,9 +50,11 @@ export async function GET() {
         ? `${report.pageViews.thisWeek} people found you this week`
         : `Your weekly site update`;
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL
-        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://scaffoldweb.com");
-      const html = reportToHtml(report.summary, report.tenant.siteName, `${appUrl}/dashboard`);
+      const html = reportToHtml(
+        report.summary,
+        report.tenant.siteName,
+        getTenantDashboardUrl(report.tenant, "/dashboard"),
+      );
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {

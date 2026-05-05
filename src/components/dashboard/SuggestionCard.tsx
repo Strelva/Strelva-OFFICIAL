@@ -36,22 +36,24 @@ export function SuggestionCard({
           )}
         </div>
         {event.status === "pending" && (
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
             <button
               onClick={() => onApprove(event.id)}
               disabled={disabled}
-              className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-success-dim text-success hover:bg-success hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Accept suggestion"
+              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Use suggestion"
             >
-              <Check className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={2} />
+              <Check className="w-4 h-4" strokeWidth={2} />
+              Use
             </button>
             <button
               onClick={() => onDismiss(event.id)}
               disabled={disabled}
-              className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-gray-bg text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Dismiss suggestion"
+              className="h-9 rounded-lg bg-gray-bg px-2.5 text-[12px] font-medium text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Skip suggestion"
             >
-              <X className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={2} />
+              <X className="w-4 h-4" strokeWidth={2} />
+              Skip
             </button>
           </div>
         )}

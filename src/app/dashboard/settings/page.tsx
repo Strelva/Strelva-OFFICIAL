@@ -632,7 +632,7 @@ const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className
   none: {
     label: "Not set up",
     className: "bg-gray-border text-gray-muted",
-    note: "No subscription is connected to this tenant yet.",
+    note: "No subscription is connected yet.",
   },
 };
 
@@ -676,7 +676,7 @@ function BillingSection() {
               if (!res.ok) {
                 setBillingError(
                   res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "No Stripe billing account is connected yet. Ask Scaffold Web to connect billing before using the portal."
+                    ? "Billing is not connected yet. Ask Scaffold Web to turn on the billing portal."
                     : body?.error || "Couldn't open the billing portal. Try again.",
                 );
                 return;
@@ -772,7 +772,7 @@ function PublishingSection() {
         <p className="text-[13px] text-gray-muted leading-relaxed">
           {autoPublish
             ? "AI changes go live immediately when you confirm them in chat."
-            : "AI changes are saved as drafts for admin review before going live."}
+            : "AI changes are saved for Scaffold Web to check before going live."}
         </p>
         {error && <p className="mt-3 text-[12px] text-amber-300">{error}</p>}
         {saved && <p className="mt-3 text-[12px] text-emerald-300">Publishing mode saved.</p>}

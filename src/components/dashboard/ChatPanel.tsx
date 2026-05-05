@@ -1,16 +1,20 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback, type FormEvent } from "react";
+import Link from "next/link";
 import {
   ArrowUp,
   Clock,
   CalendarPlus,
   Mail,
   BarChart3,
+  ExternalLink,
+  Inbox,
   Loader2,
   CheckCircle2,
   AlertCircle,
   MessageCircle,
+  X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
@@ -43,6 +47,7 @@ interface ChatMessage {
 interface UpdateToast {
   status: AgentResultStatus;
   text: string;
+  detail: string;
 }
 
 interface ChatPanelProps {
@@ -74,19 +79,27 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   const showResultToast = useCallback((result: AgentResultContract) => {
     const text =
       result.status === "published" || result.status === "applied" ? "Site updated" :
-      result.status === "drafted" ? "Draft saved" :
-      result.status === "queued" ? "Queued for review" :
-      result.status === "blocked" ? "Change blocked" :
+      result.status === "drafted" || result.status === "queued" ? "Needs approval" :
+      result.status === "blocked" ? "Needs a closer look" :
       result.status === "failed" ? "Update failed" :
       "No site changes made";
+    const detail =
+      result.status === "published" || result.status === "applied"
+        ? "The live site has the change. Open it to confirm what visitors see."
+        : result.status === "drafted" || result.status === "queued"
+          ? "The change is saved for review before it goes live."
+          : result.status === "blocked"
+            ? (result.message || "This change needs a closer look before it can be made.")
+            : result.status === "failed"
+              ? (result.message || "The update did not go through. Try again or ask for a smaller change.")
+              : "Nothing changed on the site.";
 
     if (result.status === "no-op" && result.actions.length === 1) return;
 
-    setUpdateToast({ status: result.status, text });
+    setUpdateToast({ status: result.status, text, detail });
     if (result.status === "published" || result.status === "applied") {
       dashCtx?.triggerRefresh();
     }
-    setTimeout(() => setUpdateToast(null), 5000);
   }, [dashCtx]);
 
   // Load thread messages when threadId changes
@@ -400,26 +413,59 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
             {/* Update toast */}
             {updateToast && (
               <div
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg animate-fade-in-up ${
+                className={`flex items-start gap-3 px-3 py-3 rounded-lg animate-fade-in-up ${
                   updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
                     ? "bg-success-dim border border-success/20"
                     : "bg-red-500/10 border border-red-500/20"
                 }`}
               >
                 {updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued" ? (
-                  <CheckCircle2 className="w-4 h-4 text-success shrink-0" strokeWidth={2} />
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" strokeWidth={2} />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" strokeWidth={2} />
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" strokeWidth={2} />
                 )}
-                <span
-                  className={`text-[12px] font-medium ${
-                    updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
-                      ? "text-success"
-                      : "text-red-400"
-                  }`}
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-[12px] font-medium ${
+                      updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
+                        ? "text-success"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {updateToast.text}
+                  </p>
+                  <p className="mt-0.5 text-[12px] leading-relaxed text-gray-fg">
+                    {updateToast.detail}
+                  </p>
+                  {(updateToast.status === "published" || updateToast.status === "applied") && (
+                    <a
+                      href={dashCtx?.siteUrl || "/dashboard/site"}
+                      target={dashCtx?.siteUrl ? "_blank" : undefined}
+                      rel={dashCtx?.siteUrl ? "noopener noreferrer" : undefined}
+                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      View site
+                    </a>
+                  )}
+                  {(updateToast.status === "drafted" || updateToast.status === "queued") && (
+                    <Link
+                      href="/dashboard/review"
+                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
+                    >
+                      <Inbox className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      Open needs approval
+                    </Link>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUpdateToast(null)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-white/10 hover:text-warm-black"
+                  aria-label="Dismiss update message"
                 >
-                  {updateToast.text}
-                </span>
+                  <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
               </div>
             )}
 

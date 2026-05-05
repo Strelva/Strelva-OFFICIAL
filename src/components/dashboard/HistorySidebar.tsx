@@ -7,6 +7,7 @@ import {
   FileText,
   Image as ImageIcon,
   Link2,
+  MessageCircle,
   Settings,
   X,
   LogOut,
@@ -31,11 +32,12 @@ interface HistorySidebarProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Today", icon: FileText },
-  { href: "/dashboard/review", label: "Review", icon: Inbox },
-  { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
+  { href: "/dashboard", label: "What's working", icon: FileText },
+  { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
+  { href: "/dashboard/review", label: "Needs approval", icon: Inbox },
+  { href: "/dashboard/site", label: "My site", icon: LayoutPanelLeft },
   { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
-  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
+  { href: "/dashboard/sources", label: "Connected accounts", icon: Link2 },
 ];
 
 export function HistorySidebar({
@@ -51,7 +53,7 @@ export function HistorySidebar({
     <div className="flex flex-col h-full">
       {/* Mobile close button */}
       <div className="flex items-center justify-between p-3 lg:hidden border-b border-glass-border">
-        <span className="text-[13px] font-medium text-warm-black">Scaffold</span>
+        <span className="text-[13px] font-medium text-warm-black">Scaffold Web</span>
         <button
           onClick={onClose}
           className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"

@@ -6,14 +6,14 @@ import { timeAgo } from "@/lib/utils";
 import type { StoredWeeklyReport } from "@/lib/storage";
 
 const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
-  wellness: { metric: "Booking clicks", action: "clicked Book Now" },
-  "food-brand": { metric: "Shop clicks", action: "clicked Shop Now" },
-  restaurant: { metric: "Reservation clicks", action: "clicked Reserve" },
-  trades: { metric: "Quote requests", action: "requested a quote" },
-  professional: { metric: "Contact clicks", action: "clicked Contact" },
+  wellness: { metric: "Clicked Book Now", action: "clicked Book Now" },
+  "food-brand": { metric: "Clicked Shop Now", action: "clicked Shop Now" },
+  restaurant: { metric: "Clicked Reserve", action: "clicked Reserve" },
+  trades: { metric: "Requested a quote", action: "requested a quote" },
+  professional: { metric: "Clicked Contact", action: "clicked Contact" },
 };
 
-const DEFAULT_VOCAB = { metric: "CTA clicks", action: "clicked your call to action" };
+const DEFAULT_VOCAB = { metric: "Clicked your main button", action: "clicked your main button" };
 
 interface ReportsClientProps {
   siteName: string;
@@ -74,7 +74,7 @@ function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; voca
           </span>
         </div>
         <div className="flex items-center gap-4 text-[12px] text-gray-muted">
-          <span>{report.pageViews.thisWeek} visitors</span>
+          <span>{report.pageViews.thisWeek} people found you</span>
           <span>{report.bookingClicks.thisWeek} {vocab.action.toLowerCase()}</span>
         </div>
       </button>
@@ -89,7 +89,7 @@ function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; voca
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-1">
-                  Visitors
+                  People found you
                 </div>
                 <div className="text-[18px] font-medium text-warm-white">
                   {report.pageViews.thisWeek}
@@ -130,9 +130,9 @@ export function ReportsClient({
       <div className="max-w-4xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-[24px] font-medium text-warm-white">Weekly Reports</h1>
+          <h1 className="text-[24px] font-medium text-warm-white">Weekly reports</h1>
           <p className="text-[13px] text-gray-muted mt-1">
-            Performance summary for {siteName}
+            Plain-English proof of what Scaffold Web handled for {siteName}
           </p>
         </div>
 
@@ -156,7 +156,7 @@ export function ReportsClient({
         {/* Stats grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           <StatCard
-            label="Visitors this week"
+            label="People found you"
             value={pageViews.thisWeek}
             subvalue={`${pageViews.total.toLocaleString()} all time`}
           />
@@ -166,19 +166,28 @@ export function ReportsClient({
             subvalue={`${bookingClicks.total.toLocaleString()} all time`}
           />
           <StatCard
-            label="Today"
+            label="Found you today"
             value={pageViews.today}
             subvalue={bookingClicks.today > 0 ? `${bookingClicks.today} ${vocab.action.toLowerCase()}` : undefined}
           />
         </div>
 
+        <div className="rounded-xl border border-accent/20 bg-accent/5 p-5 mb-8">
+          <div className="text-[11px] font-mono tracking-wider uppercase text-accent mb-2">
+            Why this matters
+          </div>
+          <p className="text-[14px] leading-relaxed text-gray-fg">
+            This week Scaffold Web helped {pageViews.thisWeek.toLocaleString()} people find you, tracked {bookingClicks.thisWeek.toLocaleString()} high-intent action{bookingClicks.thisWeek === 1 ? "" : "s"}, and kept a record of what changed on your site.
+          </p>
+        </div>
+
         {/* Two column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Stale sections */}
+          {/* Content freshness */}
           <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-border/50">
               <span className="text-[11px] font-mono tracking-wider uppercase text-gray-faint">
-                Content to refresh
+                Site areas to refresh
               </span>
             </div>
             <div className="p-5">
@@ -200,7 +209,7 @@ export function ReportsClient({
                   <div className="w-8 h-8 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-3">
                     <Check className="w-4 h-4 text-emerald-400" strokeWidth={2} />
                   </div>
-                  <p className="text-[13px] text-gray-muted">All sections are up to date</p>
+                  <p className="text-[13px] text-gray-muted">Your main site areas look current</p>
                 </div>
               )}
             </div>

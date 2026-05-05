@@ -46,6 +46,7 @@ export function SitePreview() {
     setActiveSection,
     activeSection,
     editMode,
+    setHasDraft,
     triggerRefresh,
     siteUrl,
     template,
@@ -125,22 +126,28 @@ export function SitePreview() {
 
   // Handle inline edit saves from iframe
   const handleInlineEdit = useCallback(async (section: string, field: string, value: string) => {
+    const isDraft = editMode === "draft";
+    const contentUrl = `/api/content/${section}${isDraft ? "?draft=true" : ""}`;
+
     try {
-      const res = await fetch(`/api/content/${section}`, { credentials: "same-origin" });
+      const res = await fetch(contentUrl, { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
       data[field] = value;
-      const saveRes = await fetch(`/api/content/${section}`, {
+      const saveRes = await fetch(contentUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(data),
       });
       if (saveRes.ok) {
+        if (isDraft) {
+          setHasDraft((prev) => ({ ...prev, [section]: true }));
+        }
         triggerRefresh();
       }
     } catch {}
-  }, [triggerRefresh]);
+  }, [editMode, setHasDraft, triggerRefresh]);
 
   // Listen for messages from iframe
   useEffect(() => {

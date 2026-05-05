@@ -16,8 +16,13 @@ export default async function NoAccessPage() {
           No access to this site
         </h1>
         <p className="text-zinc-400 mb-6">
-          You&apos;re signed in, but you don&apos;t have permission to access this dashboard.
-          If you believe this is an error, contact the site owner.
+          You&apos;re signed in, but this account is not connected to a Scaffold Web
+          dashboard. If you were invited, sign in with the exact email address that
+          received the invite.
+        </p>
+        <p className="text-sm text-zinc-500 mb-6">
+          Still missing access? Contact Scaffold Web and we&apos;ll connect the right
+          account.
         </p>
         <div className="flex gap-3 justify-center">
           <Link
