@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDevAccessBypassEnabled } from "./dev-access";
 import { getTenantConfig } from "./tenants";
 
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
@@ -7,6 +8,8 @@ type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "no
 const PAST_DUE_GRACE_DAYS = 3;
 
 export async function getEffectiveSubscriptionStatus(tenant: string): Promise<SubscriptionStatus> {
+  if (isDevAccessBypassEnabled()) return "active";
+
   const config = await getTenantConfig(tenant);
   return config?.subscriptionStatus ?? "none";
 }
@@ -33,6 +36,8 @@ export async function isWithinPastDueGrace(tenant: string): Promise<boolean> {
 }
 
 export async function requireActiveSubscription(tenant: string): Promise<NextResponse | null> {
+  if (isDevAccessBypassEnabled()) return null;
+
   const status = await getEffectiveSubscriptionStatus(tenant);
 
   // Only active and trialing have full access

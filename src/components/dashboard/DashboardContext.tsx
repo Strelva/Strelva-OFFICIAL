@@ -54,6 +54,7 @@ interface DashboardContextValue {
   // Tenant site URL
   tenantId: string;
   siteUrl: string;
+  previewUrl: string;
 
   // Template identifier
   template: string;
@@ -92,6 +93,7 @@ export function DashboardProvider({
   children,
   tenantId = "",
   siteUrl = "",
+  previewUrl = "",
   template = "wellness",
   autoPublish = true,
   subscriptionStatus = "none",
@@ -100,6 +102,7 @@ export function DashboardProvider({
   children: ReactNode;
   tenantId?: string;
   siteUrl?: string;
+  previewUrl?: string;
   template?: string;
   autoPublish?: boolean;
   subscriptionStatus?: SubscriptionStatus;
@@ -204,6 +207,7 @@ export function DashboardProvider({
         setHasDraft,
         tenantId,
         siteUrl,
+        previewUrl,
         template,
         autoPublish,
         subscriptionStatus,

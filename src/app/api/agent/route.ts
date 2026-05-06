@@ -16,6 +16,7 @@ import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { queueAiContentReview } from "@/lib/ai-review-queue";
 import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
+import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import {
   agentResultFromToolOutput,
   buildAgentResultContract,
@@ -257,7 +258,8 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
 
   const tenantConfig = await getTenantConfig(tenant);
-  const { userId: clerkUserId } = await auth();
+  const { userId } = await auth();
+  const clerkUserId = userId || (isDevAccessBypassEnabled() ? "dev-access-bypass" : null);
   const { messages: rawMessages, activeSection, nodeContext } = await req.json() as {
     messages: unknown;
     activeSection?: string;

@@ -1,9 +1,12 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isDevAccessBypassEnabled } from "./dev-access";
 import { getTenantConfig } from "./tenants";
 
 /** Verify the current request is authenticated. Use in API routes. */
 export async function verifyAuth(): Promise<boolean> {
+  if (isDevAccessBypassEnabled()) return true;
+
   const { userId } = await auth();
   return !!userId;
 }
@@ -50,6 +53,8 @@ export async function assignUserToTenant(userId: string, tenant: string): Promis
  *  Uses Clerk publicMetadata.tenants (string[]) set per user.
  *  Tenants must be explicitly assigned via admin or onboarding flow. */
 export async function hasTenantAccess(tenant: string): Promise<boolean> {
+  if (isDevAccessBypassEnabled()) return true;
+
   if (await isSuperAdmin()) return true;
 
   const user = await currentUser();

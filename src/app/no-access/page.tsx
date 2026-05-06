@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 
 export default async function NoAccessPage() {
   const { userId } = await auth();
 
-  if (!userId) {
+  if (!userId && !isDevAccessBypassEnabled()) {
     redirect("/sign-in");
   }
 

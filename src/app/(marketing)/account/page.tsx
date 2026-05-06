@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { isSuperAdmin } from "@/lib/auth";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardHost, getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 
@@ -12,6 +13,12 @@ export default async function AccountPage() {
   const { userId } = await auth();
 
   if (!userId) {
+    const devTenant = getDevAccessTenant();
+    if (devTenant) {
+      const config = await getTenantConfig(devTenant);
+      if (config) redirect(getTenantDashboardUrl(config));
+      redirect(`/dashboard?tenant=${devTenant}`);
+    }
     redirect("/sign-in");
   }
 

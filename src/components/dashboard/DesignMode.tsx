@@ -98,7 +98,7 @@ function buildTreeFromPageConfig(pageConfig: PageConfig | null, pageName: string
 }
 
 export function DesignMode() {
-  const { tenantId, siteUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
+  const { tenantId, siteUrl, previewUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(["page"]));
   const [zoom, setZoom] = useState(100);
@@ -458,7 +458,7 @@ export function DesignMode() {
           isLoading={isLoading}
         />
         <DesignCanvas
-          siteUrl={siteUrl}
+          siteUrl={previewUrl || siteUrl}
           zoom={zoom}
           onZoomChange={setZoom}
           selectedId={selectedId}

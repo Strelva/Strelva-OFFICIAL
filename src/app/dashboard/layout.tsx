@@ -9,7 +9,8 @@ import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
-import { getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
+import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -17,8 +18,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const devAccessBypass = isDevAccessBypassEnabled();
   const { userId } = await auth();
-  if (!userId) {
+  if (!userId && !devAccessBypass) {
     redirect("/sign-in");
   }
 
@@ -29,7 +31,10 @@ export default async function DashboardLayout({
     redirect("/no-access");
   }
   const tenantConfig = await getTenantConfig(tenant);
-  const siteUrl = tenantConfig ? getTenantPublicUrl(tenantConfig) : "";
+  const siteUrl = tenantConfig
+    ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
+    : "";
+  const previewUrl = tenantConfig ? getTenantPublicUrl(tenantConfig) : "";
   let siteName = "Your Business";
   let ownerName = "";
   try {
@@ -57,6 +62,7 @@ export default async function DashboardLayout({
       tenantId={tenant}
       siteUrl={siteUrl}
       template={tenantConfig?.template || "wellness"}
+      previewUrl={previewUrl}
       autoPublish={tenantConfig?.autoPublish !== false}
       subscriptionStatus={subscriptionStatus}
       hasStripeCustomer={!!tenantConfig?.stripeCustomerId}

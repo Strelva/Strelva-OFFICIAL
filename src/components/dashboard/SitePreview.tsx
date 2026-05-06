@@ -49,6 +49,7 @@ export function SitePreview() {
     setHasDraft,
     triggerRefresh,
     siteUrl,
+    previewUrl,
     template,
     activePage,
     setChatPrompt,
@@ -77,7 +78,7 @@ export function SitePreview() {
   if (editMode === "draft") {
     params.set("edit", "true");
   }
-  const base = siteUrl || "";
+  const base = previewUrl || siteUrl || "";
   const iframeSrc = `${base}${pagePath}?${params.toString()}`;
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
@@ -157,6 +158,9 @@ export function SitePreview() {
       if (siteUrl) {
         try { allowedOrigins.push(new URL(siteUrl).origin); } catch {}
       }
+      if (previewUrl) {
+        try { allowedOrigins.push(new URL(previewUrl).origin); } catch {}
+      }
       if (!allowedOrigins.includes(event.origin)) return;
       if (!data?.type?.startsWith("reb-")) return;
 
@@ -185,7 +189,7 @@ export function SitePreview() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setActiveSection, handleInlineEdit, siteUrl]);
+  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl]);
 
   // Close context menu on click outside or Escape
   useEffect(() => {

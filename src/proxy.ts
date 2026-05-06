@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 
 const MARKETING_HOSTS = new Set([
   "scaffoldweb.com",
@@ -257,6 +258,8 @@ export async function resolveTenantFromCustomDomain(
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  const devAccessBypass = isDevAccessBypassEnabled();
+  const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
 
   // Bypass internal API routes immediately to prevent recursion.
   // The proxy fetches /api/internal/domain-map for custom domain resolution,
@@ -278,7 +281,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Rewrite marketing host root to /home to avoid route conflict with tenant pages
   const hostWithoutPort = host.split(":")[0];
-  if (shouldRewriteMarketingRoot(host, pathname)) {
+  if (!devPreviewRequest && shouldRewriteMarketingRoot(host, pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/home";
     return applySecurityHeaders(NextResponse.rewrite(url), req);
@@ -308,6 +311,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     }
   }
 
+  if (!tenantId && devAccessBypass && (pathname.startsWith("/dashboard") || pathname.startsWith("/api/") || devPreviewRequest)) {
+    tenantId = getDevAccessTenant();
+  }
+
   if (tenantId) {
     if (shouldRedirectAdminRoot(isAdminSubdomain, pathname)) {
       const url = req.nextUrl.clone();
@@ -327,7 +334,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     // Require auth for protected admin subdomain routes, while still allowing
     // Clerk's sign-in/sign-up routes to render on admin.<tenant-domain>.
     const routeIsPublic = isPublicRoute(req);
-    const needsAuth = (isAdminSubdomain && !routeIsPublic) || (tenantFromQueryParam && !routeIsPublic);
+    const needsAuth = !devAccessBypass && ((isAdminSubdomain && !routeIsPublic) || (tenantFromQueryParam && !routeIsPublic));
     if (needsAuth) {
       const signInUrl = new URL("/sign-in", req.url);
       await auth.protect({
@@ -342,7 +349,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return applySecurityHeaders(response, req);
   }
 
-  if (!isPublicRoute(req)) {
+  if (!devAccessBypass && !isPublicRoute(req)) {
     const signInUrl = new URL("/sign-in", req.url);
     await auth.protect({
       unauthenticatedUrl: signInUrl.toString(),
