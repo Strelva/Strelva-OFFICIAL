@@ -187,7 +187,35 @@ function applySecurityHeaders(response: NextResponse, req: NextRequest): NextRes
 const domainCache = new Map<string, { tenant: string | null; isAdmin: boolean; ts: number }>();
 const DOMAIN_CACHE_TTL_MS = 60_000; // 1 minute
 
-async function resolveTenantFromCustomDomain(
+export function clearDomainResolutionCacheForTests(): void {
+  if (process.env.NODE_ENV === "test") domainCache.clear();
+}
+
+async function fetchDomainMapResult(
+  domain: string,
+  req: NextRequest,
+  isAdminPrefix: boolean
+): Promise<{ tenant: string | null; isAdminSubdomain: boolean } | null> {
+  const baseUrl = req.nextUrl.origin;
+  const res = await fetch(`${baseUrl}/api/internal/domain-map?domain=${encodeURIComponent(domain)}`, {
+    headers: {
+      "x-internal-request": "1",
+      "x-internal-secret": process.env.INTERNAL_API_SECRET || "",
+    },
+  });
+
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  if (!data.tenant) return { tenant: null, isAdminSubdomain: false };
+
+  return {
+    tenant: data.tenant,
+    isAdminSubdomain: Boolean(data.isAdmin || isAdminPrefix),
+  };
+}
+
+export async function resolveTenantFromCustomDomain(
   domain: string,
   req: NextRequest
 ): Promise<{ tenant: string | null; isAdminSubdomain: boolean }> {
@@ -195,31 +223,26 @@ async function resolveTenantFromCustomDomain(
   const isAdminPrefix = normalized.startsWith("admin.");
   const bare = normalized.replace(/^(www|admin)\./, "");
 
-  // Check in-memory cache first
-  const cached = domainCache.get(bare) || domainCache.get(normalized);
+  // Cache per requested host. Public and admin hosts must not share an isAdmin value.
+  const cached = domainCache.get(normalized);
   if (cached && Date.now() - cached.ts < DOMAIN_CACHE_TTL_MS) {
     return { tenant: cached.tenant, isAdminSubdomain: cached.isAdmin };
   }
 
-  // Try internal API lookup (fetches from Sanity/Redis tenant config)
+  // Try exact host first so explicit adminDomain/customDomains entries win.
+  // For derived admin.<apex> hosts, fall back to the apex domain and mark it admin.
   try {
-    const baseUrl = req.nextUrl.origin;
-    const res = await fetch(`${baseUrl}/api/internal/domain-map?domain=${encodeURIComponent(bare)}`, {
-      headers: {
-        "x-internal-request": "1",
-        "x-internal-secret": process.env.INTERNAL_API_SECRET || "",
-      },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const result = {
-        tenant: data.tenant || null,
-        isAdmin: data.isAdmin || isAdminPrefix,
-        ts: Date.now(),
-      };
-      domainCache.set(bare, result);
-      if (data.tenant) {
-        return { tenant: data.tenant, isAdminSubdomain: result.isAdmin };
+    const exact = await fetchDomainMapResult(normalized, req, isAdminPrefix);
+    if (exact?.tenant) {
+      domainCache.set(normalized, { tenant: exact.tenant, isAdmin: exact.isAdminSubdomain, ts: Date.now() });
+      return exact;
+    }
+
+    if (bare !== normalized) {
+      const fallback = await fetchDomainMapResult(bare, req, isAdminPrefix);
+      if (fallback?.tenant) {
+        domainCache.set(normalized, { tenant: fallback.tenant, isAdmin: fallback.isAdminSubdomain, ts: Date.now() });
+        return fallback;
       }
     }
   } catch {
