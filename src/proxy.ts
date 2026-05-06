@@ -15,6 +15,10 @@ const MARKETING_HOSTS = new Set([
   "reb-studio.vercel.app",
 ]);
 
+const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
+  "gldf.scaffoldweb.com": "https://greatlakesdriedfruit.com",
+};
+
 const cspBaseDirectives = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com",
@@ -109,6 +113,11 @@ export function shouldRewriteMarketingRoot(host: string, pathname: string): bool
   const hostWithoutPort = normalizedHost.split(":")[0];
   const isMarketingHost = MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort);
   return isMarketingHost && pathname === "/";
+}
+
+export function getLegacyPublicSiteRedirect(host: string): string | null {
+  const normalizedHost = host.toLowerCase().split(":")[0];
+  return LEGACY_PUBLIC_SITE_REDIRECTS[normalizedHost] || null;
 }
 
 export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: string): boolean {
@@ -260,6 +269,12 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+
+  const legacyPublicSiteRedirect = getLegacyPublicSiteRedirect(host);
+  if (legacyPublicSiteRedirect) {
+    const url = new URL(req.nextUrl.pathname + req.nextUrl.search, legacyPublicSiteRedirect);
+    return applySecurityHeaders(NextResponse.redirect(url, 308), req);
+  }
 
   // Bypass internal API routes immediately to prevent recursion.
   // The proxy fetches /api/internal/domain-map for custom domain resolution,

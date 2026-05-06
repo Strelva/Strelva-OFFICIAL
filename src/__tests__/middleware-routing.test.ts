@@ -10,6 +10,7 @@ import {
   clearDomainResolutionCacheForTests,
   extractTenantFromHost,
   getEnvDomainMap,
+  getLegacyPublicSiteRedirect,
   resolveTenantFromCustomDomain,
   resolveTenantFromDomainMap,
   shouldRedirectAdminRoot,
@@ -100,6 +101,12 @@ describe("proxy host routing helpers", () => {
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/")).toBe(true);
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/onboard")).toBe(false);
     expect(shouldRewriteMarketingRoot("gldf.scaffoldweb.com", "/")).toBe(false);
+  });
+
+  it("redirects legacy customer-facing platform subdomains to the real customer domain", () => {
+    expect(getLegacyPublicSiteRedirect("gldf.scaffoldweb.com")).toBe("https://greatlakesdriedfruit.com");
+    expect(getLegacyPublicSiteRedirect("gldf.scaffoldweb.com:443")).toBe("https://greatlakesdriedfruit.com");
+    expect(getLegacyPublicSiteRedirect("rohlax.scaffoldweb.com")).toBeNull();
   });
 
   it("fails cron routes closed without the configured secret", () => {
