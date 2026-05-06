@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getTenantDashboardUrl, getTenantPublicUrl } from "../lib/tenant-urls";
+import {
+  getTenantDashboardHost,
+  getTenantDashboardUrl,
+  getTenantPrimaryDomain,
+  getTenantPublicUrl,
+} from "../lib/tenant-urls";
 import type { TenantConfig } from "../lib/types";
 
 function tenant(overrides: Partial<TenantConfig> = {}): TenantConfig {
@@ -36,7 +41,32 @@ describe("tenant URL helpers", () => {
     ).toBe("https://admin.example.com/dashboard");
   });
 
-  it("falls back to the platform tenant subdomain for public URLs", () => {
+  it("derives admin domains from apex custom domains when productionDomain is missing", () => {
+    const config = tenant({ customDomains: ["greatlakesdriedfruit.com"] });
+
+    expect(getTenantPrimaryDomain(config)).toBe("greatlakesdriedfruit.com");
+    expect(getTenantDashboardHost(config)).toBe("admin.greatlakesdriedfruit.com");
+    expect(getTenantDashboardUrl(config, "/dashboard", "production")).toBe(
+      "https://admin.greatlakesdriedfruit.com/dashboard"
+    );
+  });
+
+  it("uses apex custom domains for public URLs when productionDomain is missing", () => {
+    expect(
+      getTenantPublicUrl(tenant({ customDomains: ["greatlakesdriedfruit.com"] }), "production")
+    ).toBe("https://greatlakesdriedfruit.com");
+  });
+
+  it("normalizes protocols, paths, and www prefixes for primary domains", () => {
+    expect(
+      getTenantPublicUrl(tenant({ productionDomain: "https://www.Example.com/dashboard" }), "production")
+    ).toBe("https://example.com");
+    expect(getTenantDashboardHost(tenant({ customDomains: ["https://www.Example.com/path"] }))).toBe(
+      "admin.example.com"
+    );
+  });
+
+  it("falls back to the platform tenant subdomain only when no real domain exists", () => {
     expect(getTenantPublicUrl(tenant(), "production")).toBe("https://gldf.scaffoldweb.com");
   });
 });

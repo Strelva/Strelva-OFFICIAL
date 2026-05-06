@@ -19,6 +19,8 @@ export function CreateTenantForm() {
     ownerEmail: "",
     template: "wellness",
     industry: "wellness",
+    productionDomain: "",
+    adminDomain: "",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -45,6 +47,8 @@ export function CreateTenantForm() {
         ownerEmail: "",
         template: "wellness",
         industry: "wellness",
+        productionDomain: "",
+        adminDomain: "",
       });
       setOpen(false);
       router.refresh();
@@ -98,7 +102,7 @@ export function CreateTenantForm() {
         </div>
 
         <div>
-          <label className="block text-xs text-zinc-500 mb-1.5">Subdomain</label>
+          <label className="block text-xs text-zinc-500 mb-1.5">Internal ID</label>
           <div className="flex items-center gap-0">
             <input
               type="text"
@@ -109,7 +113,7 @@ export function CreateTenantForm() {
               className="w-full rounded-l-lg bg-zinc-800 border border-zinc-700 border-r-0 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
             />
             <span className="rounded-r-lg bg-zinc-800/50 border border-zinc-700 px-3 py-2 text-sm text-zinc-500">
-              .scaffoldweb.com
+              tenant
             </span>
           </div>
         </div>
@@ -161,6 +165,35 @@ export function CreateTenantForm() {
               <option key={i} value={i}>{i}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1.5">Website Domain</label>
+          <input
+            type="text"
+            value={form.productionDomain}
+            onChange={(e) => {
+              const productionDomain = e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+              setForm({
+                ...form,
+                productionDomain,
+                adminDomain: form.adminDomain || (productionDomain ? `admin.${productionDomain}` : ""),
+              });
+            }}
+            placeholder="greatlakesdriedfruit.com"
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1.5">Admin Domain</label>
+          <input
+            type="text"
+            value={form.adminDomain}
+            onChange={(e) => setForm({ ...form, adminDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") })}
+            placeholder={form.productionDomain ? `admin.${form.productionDomain}` : "admin.theirdomain.com"}
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+          />
         </div>
 
         <div className="sm:col-span-2 flex justify-end gap-3 pt-2">

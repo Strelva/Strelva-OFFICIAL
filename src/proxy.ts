@@ -236,7 +236,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
 
   // Bypass internal API routes immediately to prevent recursion.
-  // The middleware fetches /api/internal/domain-map for custom domain resolution,
+  // The proxy fetches /api/internal/domain-map for custom domain resolution,
   // so these routes must skip tenant resolution entirely.
   if (pathname.startsWith("/api/internal/")) {
     return applySecurityHeaders(NextResponse.next(), req);
@@ -245,7 +245,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (isCronRoute(req)) {
     const cron = validateCronRequest(process.env.CRON_SECRET, req.headers.get("authorization"));
     if (!cron.allowed && cron.status === 500) {
-      console.error("[middleware] CRON_SECRET env var not set - blocking cron route");
+      console.error("[proxy] CRON_SECRET env var not set - blocking cron route");
     }
     if (cron.allowed) {
       return applySecurityHeaders(NextResponse.next(), req);
@@ -301,8 +301,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       headers.set("x-preview-mode", "true");
     }
 
-    // Require auth for: admin subdomains, tenant from query param on protected routes
-    const needsAuth = isAdminSubdomain || (tenantFromQueryParam && !isPublicRoute(req));
+    // Require auth for protected admin subdomain routes, while still allowing
+    // Clerk's sign-in/sign-up routes to render on admin.<tenant-domain>.
+    const routeIsPublic = isPublicRoute(req);
+    const needsAuth = (isAdminSubdomain && !routeIsPublic) || (tenantFromQueryParam && !routeIsPublic);
     if (needsAuth) {
       const signInUrl = new URL("/sign-in", req.url);
       await auth.protect({

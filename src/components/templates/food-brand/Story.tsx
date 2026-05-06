@@ -29,16 +29,24 @@ export function Story({ story }: { story: StoryContent }) {
         <div className="container-wide">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-0 items-start">
             {/* Image */}
-            <div className="lg:col-span-7 lg:-ml-12">
+            <div className="min-w-0 lg:col-span-7 lg:-ml-12">
               <div>
-                <div className="relative aspect-[4/3] md:aspect-[3/2]">
-                  <Image
-                    src={story.imageUrl}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="(min-width: 1024px) 58vw, 100vw"
-                  />
+                <div className="relative aspect-[4/3] md:aspect-[3/2] overflow-hidden">
+                  {story.imageUrl ? (
+                    <Image
+                      src={story.imageUrl}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 58vw, 100vw"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center p-8 text-center" style={{ background: "var(--cream-dark)" }}>
+                      <span className="font-display text-4xl tracking-tight" style={{ color: "var(--sage)" }}>
+                        {story.accentText || "Small-batch snacks"}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <p
                   className="text-sm italic mt-4 ml-1"
@@ -50,7 +58,7 @@ export function Story({ story }: { story: StoryContent }) {
             </div>
 
             {/* Text */}
-            <div className="lg:col-span-5 lg:pl-16 lg:pt-8">
+            <div className="min-w-0 lg:col-span-5 lg:pl-16 lg:pt-8">
               <h2 className="font-display text-4xl md:text-5xl tracking-tight leading-[1.05] mb-6">
                 {story.headline.split("\n").map((line, i) => (
                   <span key={i}>
@@ -71,7 +79,7 @@ export function Story({ story }: { story: StoryContent }) {
 
               {/* Origin mark */}
               <div
-                className="inline-flex items-center gap-6 px-6 py-4"
+                className="flex flex-wrap items-center gap-4 md:gap-6 px-6 py-4"
                 style={{ border: "1px solid var(--cream-mid)" }}
               >
                 {story.stats.map((stat, i) => (

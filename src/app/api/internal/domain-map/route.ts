@@ -3,7 +3,7 @@ import { getTenantByDomain } from "@/lib/tenants";
 
 /**
  * Internal API for domain lookup.
- * Used by middleware to resolve custom domains to tenants.
+ * Used by proxy to resolve custom domains to tenants.
  *
  * GET /api/internal/domain-map?domain=example.com
  */

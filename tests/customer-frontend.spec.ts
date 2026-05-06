@@ -29,7 +29,7 @@ test("core customer pages fit mobile viewports", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
   for (const url of ["/", `http://${tenantHost}/`]) {
-    const response = await page.goto(url);
+    const response = await page.goto(url, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${url} should not fail`).toBeLessThan(400);
     await expect(page.locator("body")).toBeVisible();
 

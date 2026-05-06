@@ -20,7 +20,6 @@ const inter = Inter({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
   themeColor: "#faf9f7",
 };
@@ -30,6 +29,17 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://scaffoldweb.com")
   ),
+  applicationName: "Scaffold Web",
+  title: {
+    default: "Scaffold Web",
+    template: "%s | Scaffold Web",
+  },
+  description: "AI website management, reporting, and content operations for small businesses.",
+  category: "technology",
+  openGraph: {
+    siteName: "Scaffold Web",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

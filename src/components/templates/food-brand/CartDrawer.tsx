@@ -57,6 +57,8 @@ export function CartDrawer() {
 
   const shippingProgress = Math.min(100, ((freeShippingThreshold - amountToFreeShipping) / freeShippingThreshold) * 100);
 
+  if (!isOpen) return null;
+
   return (
     <>
       {/* Backdrop */}
@@ -71,9 +73,7 @@ export function CartDrawer() {
       {/* Drawer */}
       <div
         ref={drawerRef}
-        className={`fixed top-0 right-0 bottom-0 z-[61] w-full sm:w-[420px] flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className="fixed top-0 right-0 bottom-0 z-[61] w-full sm:w-[420px] flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] translate-x-0"
         style={{ background: "var(--cream)" }}
       >
         {/* Header */}
@@ -161,13 +161,21 @@ export function CartDrawer() {
                   >
                     {/* Image */}
                     <div className="relative w-20 h-20 flex-shrink-0" style={{ background: "var(--cream-dark)" }}>
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                      />
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
+                          <span className="font-display text-sm tracking-tight" style={{ color: "var(--sage)" }}>
+                            {item.name}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Details */}

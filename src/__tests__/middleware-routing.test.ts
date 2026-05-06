@@ -13,9 +13,9 @@ import {
   shouldRedirectAdminRoot,
   shouldRewriteMarketingRoot,
   validateCronRequest,
-} from "../middleware";
+} from "../proxy";
 
-describe("middleware host routing helpers", () => {
+describe("proxy host routing helpers", () => {
   it("routes tenant.scaffoldweb.com as a platform tenant subdomain", () => {
     expect(extractTenantFromHost("gldf.scaffoldweb.com")).toEqual({
       tenant: "gldf",
@@ -89,7 +89,7 @@ describe("middleware host routing helpers", () => {
   });
 });
 
-describe("middleware frame policy", () => {
+describe("proxy frame policy", () => {
   it("blocks framing for normal public pages", () => {
     const csp = buildContentSecurityPolicy({
       isPreview: false,

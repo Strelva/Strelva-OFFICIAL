@@ -9,6 +9,7 @@ import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
+import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -28,8 +29,7 @@ export default async function DashboardLayout({
     redirect("/no-access");
   }
   const tenantConfig = await getTenantConfig(tenant);
-  const siteUrl = tenantConfig?.siteUrl
-    || (tenantConfig?.customDomains?.[0] ? `https://${tenantConfig.customDomains[0]}` : "");
+  const siteUrl = tenantConfig ? getTenantPublicUrl(tenantConfig) : "";
   let siteName = "Your Business";
   let ownerName = "";
   try {
@@ -54,6 +54,7 @@ export default async function DashboardLayout({
 
   return (
     <DashboardProvider
+      tenantId={tenant}
       siteUrl={siteUrl}
       template={tenantConfig?.template || "wellness"}
       autoPublish={tenantConfig?.autoPublish !== false}

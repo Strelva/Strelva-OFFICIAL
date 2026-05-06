@@ -99,13 +99,21 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
           <div className="grid md:grid-cols-2">
             {/* Left — Image */}
             <div className="relative aspect-square" style={{ background: "var(--cream-dark)" }}>
-              <Image
-                src={product.imageUrl}
-                alt={product.name}
-                fill
-                className="object-cover"
-                sizes="(min-width: 768px) 430px, 92vw"
-              />
+              {product.imageUrl ? (
+                <Image
+                  src={product.imageUrl}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 768px) 430px, 92vw"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center p-8 text-center">
+                  <span className="font-display text-3xl tracking-tight" style={{ color: "var(--sage)" }}>
+                    {product.name}
+                  </span>
+                </div>
+              )}
               {product.badge && (
                 <span
                   className="absolute top-4 left-4 text-[0.5625rem] font-bold tracking-widest uppercase px-3 py-1.5"

@@ -9,8 +9,10 @@
     "lint": "eslint .",
     "test": "vitest run",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check:launch": "pnpm check && pnpm smoke",
     "smoke": "playwright test",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
+    "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "tsc --noEmit"
   },

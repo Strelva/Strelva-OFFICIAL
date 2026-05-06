@@ -52,6 +52,7 @@ interface DashboardContextValue {
   setHasDraft: Dispatch<SetStateAction<Record<string, boolean>>>;
 
   // Tenant site URL
+  tenantId: string;
   siteUrl: string;
 
   // Template identifier
@@ -89,6 +90,7 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
 
 export function DashboardProvider({
   children,
+  tenantId = "",
   siteUrl = "",
   template = "wellness",
   autoPublish = true,
@@ -96,6 +98,7 @@ export function DashboardProvider({
   hasStripeCustomer = false,
 }: {
   children: ReactNode;
+  tenantId?: string;
   siteUrl?: string;
   template?: string;
   autoPublish?: boolean;
@@ -199,6 +202,7 @@ export function DashboardProvider({
         setEditMode,
         hasDraft,
         setHasDraft,
+        tenantId,
         siteUrl,
         template,
         autoPublish,

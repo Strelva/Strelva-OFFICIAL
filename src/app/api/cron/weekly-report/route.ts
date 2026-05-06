@@ -33,7 +33,7 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
 }
 
 export async function GET() {
-  // Auth handled by middleware (CRON_SECRET check)
+  // Auth handled by proxy (CRON_SECRET check)
 
   const allReports = await generateAllReports();
   const reports = allReports.filter((r) => r.tenant.subscriptionStatus !== "cancelled");

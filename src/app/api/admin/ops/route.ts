@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/lib/auth";
 import { getRedis } from "@/lib/redis";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
+import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
 import { getRecentFailures } from "@/lib/revalidate-client";
 import { getEvents, getQueueCount } from "@/lib/events";
 
@@ -79,16 +80,17 @@ export async function GET() {
 
   for (const tenant of active) {
     const config = await getTenantConfig(tenant.id);
-    if (config?.productionDomain) {
-      const envTenant = envDomainMap[config.productionDomain];
+    const primaryDomain = config ? getTenantPrimaryDomain(config) : null;
+    if (primaryDomain) {
+      const envTenant = envDomainMap[primaryDomain];
       if (envTenant && envTenant !== tenant.id) {
         metrics.tenantDomainDrift.push(
-          `${config.productionDomain}: config=${tenant.id}, env=${envTenant}`
+          `${primaryDomain}: config=${tenant.id}, env=${envTenant}`
         );
       }
-      if (!envTenant && !config.productionDomain.includes("scaffoldweb.com")) {
+      if (!envTenant && !primaryDomain.includes("scaffoldweb.com")) {
         metrics.tenantDomainDrift.push(
-          `${config.productionDomain}: missing from CUSTOM_DOMAIN_MAP`
+          `${primaryDomain}: missing from CUSTOM_DOMAIN_MAP`
         );
       }
     }

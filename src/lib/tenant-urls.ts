@@ -1,17 +1,54 @@
 import type { TenantConfig } from "./types";
 
 function withoutProtocol(domain: string): string {
-  return domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  return domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 }
 
-function getProductionDashboardHost(tenant: TenantConfig): string {
-  if (tenant.adminDomain) return withoutProtocol(tenant.adminDomain);
-  if (tenant.productionDomain) return `admin.${withoutProtocol(tenant.productionDomain)}`;
+export function normalizeTenantDomain(domain: string | undefined): string | null {
+  const normalized = domain ? withoutProtocol(domain).toLowerCase() : "";
+  return normalized || null;
+}
+
+function withoutWww(domain: string): string {
+  return domain.replace(/^www\./, "");
+}
+
+function isPlatformDomain(domain: string): boolean {
+  return domain.endsWith(".scaffoldweb.com");
+}
+
+function isAdminDomain(domain: string): boolean {
+  return domain.startsWith("admin.");
+}
+
+export function getTenantPrimaryDomain(tenant: TenantConfig): string | null {
+  const productionDomain = normalizeTenantDomain(tenant.productionDomain);
+  if (productionDomain) return withoutWww(productionDomain);
+
+  const siteUrlDomain = normalizeTenantDomain(tenant.siteUrl);
+  if (siteUrlDomain && !siteUrlDomain.endsWith(".vercel.app") && !isPlatformDomain(siteUrlDomain)) {
+    return withoutWww(siteUrlDomain);
+  }
+
+  const customDomain = tenant.customDomains
+    ?.map((domain) => normalizeTenantDomain(domain))
+    .map((domain) => (domain ? withoutWww(domain) : null))
+    .find((domain): domain is string => !!domain && !isAdminDomain(domain) && !isPlatformDomain(domain));
+  return customDomain ?? null;
+}
+
+export function getTenantDashboardHost(tenant: TenantConfig): string {
+  const adminDomain = normalizeTenantDomain(tenant.adminDomain);
+  if (adminDomain) return adminDomain;
 
   const adminCustomDomain = tenant.customDomains?.find((domain) =>
-    withoutProtocol(domain).startsWith("admin.")
+    normalizeTenantDomain(domain)?.startsWith("admin.")
   );
-  if (adminCustomDomain) return withoutProtocol(adminCustomDomain);
+  const normalizedAdminCustomDomain = normalizeTenantDomain(adminCustomDomain);
+  if (normalizedAdminCustomDomain) return normalizedAdminCustomDomain;
+
+  const primaryDomain = getTenantPrimaryDomain(tenant);
+  if (primaryDomain) return `admin.${primaryDomain}`;
 
   const subdomain = tenant.subdomain || tenant.id;
   return `${subdomain}.scaffoldweb.com`;
@@ -25,7 +62,7 @@ export function getTenantDashboardUrl(
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   if (environment === "production") {
-    return `https://${getProductionDashboardHost(tenant)}${normalizedPath}`;
+    return `https://${getTenantDashboardHost(tenant)}${normalizedPath}`;
   }
 
   const subdomain = tenant.subdomain || tenant.id;
@@ -37,8 +74,8 @@ export function getTenantPublicUrl(
   environment = process.env.NODE_ENV
 ): string {
   if (environment === "production") {
-    if (tenant.productionDomain) return `https://${withoutProtocol(tenant.productionDomain)}`;
-    if (tenant.siteUrl) return tenant.siteUrl;
+    const primaryDomain = getTenantPrimaryDomain(tenant);
+    if (primaryDomain) return `https://${primaryDomain}`;
     const subdomain = tenant.subdomain || tenant.id;
     return `https://${subdomain}.scaffoldweb.com`;
   }

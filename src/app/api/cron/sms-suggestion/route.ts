@@ -37,7 +37,7 @@ function composeSmsBody(
 }
 
 export async function GET() {
-  // Auth handled by middleware (CRON_SECRET check)
+  // Auth handled by proxy (CRON_SECRET check)
 
   // Feature gate: skip if SMS suggestions are disabled
   if (process.env.SMS_SUGGESTIONS_ENABLED !== "true") {
