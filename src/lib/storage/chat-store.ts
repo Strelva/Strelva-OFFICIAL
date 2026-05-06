@@ -2,7 +2,6 @@
  * Chat message persistence - Redis-cached with Sanity backing store.
  */
 
-import { promises as fs } from "fs";
 import path from "path";
 import { getSanityClient } from "../sanity";
 import { getRedis } from "../redis";

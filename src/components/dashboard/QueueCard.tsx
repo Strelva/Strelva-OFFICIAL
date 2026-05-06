@@ -28,6 +28,13 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   instagram: <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />,
 };
 
+function formatEventStatus(status: UnifiedEvent["status"]): string {
+  if (status === "approved") return "Made live";
+  if (status === "auto_approved") return "Handled";
+  if (status === "dismissed") return "Skipped";
+  return "Needs you";
+}
+
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
@@ -187,7 +194,7 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
                     : "bg-gray-bg text-gray-muted"
                 }`}
               >
-                {event.status === "auto_approved" ? "auto" : event.status}
+                {formatEventStatus(event.status)}
               </span>
             )}
           </div>
@@ -201,35 +208,38 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
           )}
         </div>
 
-        {/* Actions - always visible on mobile, hover on desktop */}
+        {/* Actions */}
         {isPending && !disabled && (
-          <div className="flex items-center gap-1.5 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
             {/* Use as Testimonial button for reviews */}
             {isReview && reviewData && (
               <button
                 onClick={() => setTestimonialModalOpen(true)}
                 disabled={disabled}
-                className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-sage/10 text-sage hover:bg-sage hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                className="h-9 rounded-lg bg-sage/10 px-2.5 text-[12px] font-medium text-sage hover:bg-sage hover:text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 title="Use as Testimonial"
               >
-                <Quote className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={1.5} />
+                <Quote className="w-4 h-4" strokeWidth={1.5} />
+                Use review
               </button>
             )}
             <button
               onClick={() => onApprove(event.id)}
               disabled={disabled}
-              className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-success-dim text-success hover:bg-success hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Approve"
+              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Make live"
             >
-              <Check className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={2} />
+              <Check className="w-4 h-4" strokeWidth={2} />
+              Make live
             </button>
             <button
               onClick={() => onDismiss(event.id)}
               disabled={disabled}
-              className="w-11 h-11 lg:w-8 lg:h-8 rounded-lg bg-gray-bg text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Dismiss"
+              className="h-9 rounded-lg bg-gray-bg px-2.5 text-[12px] font-medium text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Skip"
             >
-              <X className="w-5 h-5 lg:w-4 lg:h-4" strokeWidth={2} />
+              <X className="w-4 h-4" strokeWidth={2} />
+              Skip
             </button>
           </div>
         )}
@@ -243,7 +253,7 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
           onClose={() => setTestimonialModalOpen(false)}
           review={reviewData}
           onSuccess={() => {
-            // Optionally auto-approve the review after converting
+            // Mark the source review as handled after converting it.
             onApprove(event.id);
           }}
         />

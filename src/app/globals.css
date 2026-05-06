@@ -204,6 +204,8 @@ body {
 
 /* ===== LAYOUT ===== */
 .container-main {
+  width: 100%;
+  box-sizing: border-box;
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
@@ -219,6 +221,8 @@ body {
 }
 
 .container-wide {
+  width: 100%;
+  box-sizing: border-box;
   max-width: 1440px;
   margin-left: auto;
   margin-right: auto;

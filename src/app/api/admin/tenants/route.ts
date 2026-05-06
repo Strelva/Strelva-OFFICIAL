@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/lib/auth";
 import { getAllTenants, createTenant, updateTenant } from "@/lib/tenants";
+import { normalizeTenantDomain } from "@/lib/tenant-urls";
 
 export async function GET() {
   const admin = await isSuperAdmin();
@@ -19,7 +20,17 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { siteName, ownerName, ownerEmail, industry, template, subdomain, features } = body;
+  const {
+    siteName,
+    ownerName,
+    ownerEmail,
+    industry,
+    template,
+    subdomain,
+    features,
+    productionDomain,
+    adminDomain,
+  } = body;
 
   if (!siteName || !ownerName || !industry || !template || !subdomain) {
     return NextResponse.json(
@@ -37,6 +48,8 @@ export async function POST(req: Request) {
       template,
       subdomain,
       features: features || [],
+      productionDomain: typeof productionDomain === "string" ? normalizeTenantDomain(productionDomain) || undefined : undefined,
+      adminDomain: typeof adminDomain === "string" ? normalizeTenantDomain(adminDomain) || undefined : undefined,
     });
     return NextResponse.json(tenant, { status: 201 });
   } catch (err) {

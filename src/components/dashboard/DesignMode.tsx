@@ -98,7 +98,7 @@ function buildTreeFromPageConfig(pageConfig: PageConfig | null, pageName: string
 }
 
 export function DesignMode() {
-  const { siteUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
+  const { tenantId, siteUrl, previewUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(["page"]));
   const [zoom, setZoom] = useState(100);
@@ -116,11 +116,7 @@ export function DesignMode() {
     async function fetchPageConfig() {
       setIsLoading(true);
       try {
-        // Extract tenant from siteUrl (e.g., "https://gldf.scaffoldweb.com" -> "gldf")
-        const url = new URL(siteUrl || window.location.origin);
-        const tenant = url.hostname.split(".")[0];
-
-        const res = await fetch(`/api/public/page-config/${tenant}`);
+        const res = await fetch(`/api/public/page-config/${tenantId}`);
         if (res.ok) {
           const config = await res.json();
           const currentPageConfig = config[activePage] || config.home;
@@ -147,10 +143,10 @@ export function DesignMode() {
       }
     }
 
-    if (siteUrl) {
+    if (tenantId) {
       fetchPageConfig();
     }
-  }, [siteUrl, activePage]);
+  }, [tenantId, activePage]);
 
   // Listen for iframe messages (node selection with rect)
   useEffect(() => {
@@ -272,10 +268,7 @@ export function DesignMode() {
     );
 
     try {
-      const url = new URL(siteUrl || window.location.origin);
-      const tenant = url.hostname.split(".")[0];
-
-      await fetch(`/api/v1/page-config/${tenant}`, {
+      await fetch(`/api/v1/page-config/${tenantId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -290,7 +283,7 @@ export function DesignMode() {
     } catch (err) {
       console.error("Failed to toggle visibility:", err);
     }
-  }, [pageConfig, siteUrl, activePage, triggerRefresh]);
+  }, [pageConfig, tenantId, activePage, triggerRefresh]);
 
   const handleReorder = useCallback(async (id: string, direction: 'up' | 'down') => {
     if (!pageConfig) return;
@@ -312,10 +305,7 @@ export function DesignMode() {
     });
 
     try {
-      const url = new URL(siteUrl || window.location.origin);
-      const tenant = url.hostname.split(".")[0];
-
-      await fetch(`/api/v1/page-config/${tenant}`, {
+      await fetch(`/api/v1/page-config/${tenantId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -329,7 +319,7 @@ export function DesignMode() {
     } catch (err) {
       console.error("Failed to reorder:", err);
     }
-  }, [pageConfig, siteUrl, activePage, triggerRefresh]);
+  }, [pageConfig, tenantId, activePage, triggerRefresh]);
 
   // Handle layout updates from properties panel
   const handleLayoutUpdate = useCallback(async (sectionType: string, layout: NonNullable<PageSectionConfig['layout']>) => {
@@ -340,10 +330,7 @@ export function DesignMode() {
     );
 
     try {
-      const url = new URL(siteUrl || window.location.origin);
-      const tenant = url.hostname.split(".")[0];
-
-      await fetch(`/api/v1/page-config/${tenant}`, {
+      await fetch(`/api/v1/page-config/${tenantId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -356,7 +343,7 @@ export function DesignMode() {
     } catch (err) {
       console.error("Failed to update layout:", err);
     }
-  }, [pageConfig, siteUrl, activePage, triggerRefresh]);
+  }, [pageConfig, tenantId, activePage, triggerRefresh]);
 
   // Get current section layout
   const currentSectionLayout = pageConfig?.sections.find(s => s.type === selectedNode?.sectionType)?.layout;
@@ -364,13 +351,11 @@ export function DesignMode() {
   // Handle content updates from properties panel
   const handleContentUpdate = useCallback(async (section: string, field: string, value: string) => {
     try {
-      const url = new URL(siteUrl || window.location.origin);
-      const tenant = url.hostname.split(".")[0];
       const isDraft = editMode === "draft";
 
       // Fetch current content
       const res = await fetch(`/api/content/${section}`, {
-        headers: { "X-Tenant": tenant },
+        headers: { "X-Tenant": tenantId },
       });
       if (!res.ok) throw new Error("Failed to fetch content");
       const current = await res.json();
@@ -389,7 +374,7 @@ export function DesignMode() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "X-Tenant": tenant,
+          "X-Tenant": tenantId,
         },
         body: JSON.stringify(updated),
       });
@@ -402,7 +387,7 @@ export function DesignMode() {
     } catch (err) {
       console.error("Failed to update content:", err);
     }
-  }, [siteUrl, editMode, setHasDraft, triggerRefresh]);
+  }, [tenantId, editMode, setHasDraft, triggerRefresh]);
 
   // Check if any section has a draft
   const hasAnyDraft = Object.values(hasDraft).some(Boolean);
@@ -413,14 +398,11 @@ export function DesignMode() {
       .filter(([, has]) => has)
       .map(([section]) => section);
 
-    const url = new URL(siteUrl || window.location.origin);
-    const tenant = url.hostname.split(".")[0];
-
     for (const section of sectionsWithDrafts) {
       try {
         // Fetch draft content
         const res = await fetch(`/api/content/${section}?draft=true`, {
-          headers: { "X-Tenant": tenant },
+          headers: { "X-Tenant": tenantId },
         });
         if (!res.ok) continue;
         const draftData = await res.json();
@@ -430,7 +412,7 @@ export function DesignMode() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            "X-Tenant": tenant,
+            "X-Tenant": tenantId,
           },
           body: JSON.stringify(draftData),
         });
@@ -442,7 +424,7 @@ export function DesignMode() {
     // Clear all draft flags
     setHasDraft({});
     triggerRefresh();
-  }, [hasDraft, siteUrl, setHasDraft, triggerRefresh]);
+  }, [hasDraft, tenantId, setHasDraft, triggerRefresh]);
 
   return (
     <div className="flex flex-col h-full bg-surface-base">
@@ -476,7 +458,7 @@ export function DesignMode() {
           isLoading={isLoading}
         />
         <DesignCanvas
-          siteUrl={siteUrl}
+          siteUrl={previewUrl || siteUrl}
           zoom={zoom}
           onZoomChange={setZoom}
           selectedId={selectedId}

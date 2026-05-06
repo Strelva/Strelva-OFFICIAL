@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, FileText, LayoutPanelLeft, Image as ImageIcon, Link2 } from "lucide-react";
+import { Inbox, FileText, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Today", icon: FileText },
-  { href: "/dashboard/review", label: "Review", icon: Inbox },
+  { href: "/dashboard", label: "Working", icon: FileText },
+  { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
+  { href: "/dashboard/review", label: "Approve", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
-  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
+  { href: "/dashboard/sources", label: "Accounts", icon: Link2 },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {

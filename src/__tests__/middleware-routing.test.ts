@@ -7,15 +7,17 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 import {
   buildContentSecurityPolicy,
+  clearDomainResolutionCacheForTests,
   extractTenantFromHost,
   getEnvDomainMap,
+  resolveTenantFromCustomDomain,
   resolveTenantFromDomainMap,
   shouldRedirectAdminRoot,
   shouldRewriteMarketingRoot,
   validateCronRequest,
-} from "../middleware";
+} from "../proxy";
 
-describe("middleware host routing helpers", () => {
+describe("proxy host routing helpers", () => {
   it("routes tenant.scaffoldweb.com as a platform tenant subdomain", () => {
     expect(extractTenantFromHost("gldf.scaffoldweb.com")).toEqual({
       tenant: "gldf",
@@ -59,6 +61,35 @@ describe("middleware host routing helpers", () => {
     });
   });
 
+  it("keeps public and admin custom-domain cache entries isolated", async () => {
+    clearDomainResolutionCacheForTests();
+    process.env.INTERNAL_API_SECRET = "secret";
+    const req = { nextUrl: { origin: "https://scaffoldweb.com" } } as never;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      const domain = url.searchParams.get("domain");
+      const payload = domain === "example.com"
+        ? { tenant: "tenantid", isAdmin: false }
+        : { tenant: null, isAdmin: false };
+
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    await expect(resolveTenantFromCustomDomain("admin.example.com", req)).resolves.toEqual({
+      tenant: "tenantid",
+      isAdminSubdomain: true,
+    });
+    await expect(resolveTenantFromCustomDomain("example.com", req)).resolves.toEqual({
+      tenant: "tenantid",
+      isAdminSubdomain: false,
+    });
+
+    fetchMock.mockRestore();
+  });
+
   it("redirects admin custom-domain root requests to the dashboard", () => {
     expect(shouldRedirectAdminRoot(true, "/")).toBe(true);
     expect(shouldRedirectAdminRoot(true, "/dashboard")).toBe(false);
@@ -89,7 +120,7 @@ describe("middleware host routing helpers", () => {
   });
 });
 
-describe("middleware frame policy", () => {
+describe("proxy frame policy", () => {
   it("blocks framing for normal public pages", () => {
     const csp = buildContentSecurityPolicy({
       isPreview: false,

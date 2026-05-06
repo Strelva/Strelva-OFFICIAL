@@ -5,7 +5,7 @@ import { setSearchData } from "@/lib/storage";
 import { generateSuggestionsForTenant } from "@/lib/suggestions";
 
 export async function GET() {
-  // Auth handled by middleware (CRON_SECRET check)
+  // Auth handled by proxy (CRON_SECRET check)
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active && t.siteUrl);

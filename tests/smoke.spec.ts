@@ -18,3 +18,11 @@ test("public v1 GLDF page config route is unauthenticated", async ({ request }) 
   expect(res.status()).not.toBe(302);
   expect(res.status()).not.toBe(401);
 });
+
+test("signup page explains invited email recovery", async ({ page }) => {
+  await page.goto("/sign-up");
+
+  await expect(page.getByText("Create your dashboard account")).toBeVisible();
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page.getByText("contact Scaffold Web")).toBeVisible();
+});

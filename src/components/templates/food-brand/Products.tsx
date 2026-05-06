@@ -55,13 +55,21 @@ export function Products({ products }: { products: ProductsContent }) {
             <div className="mb-8">
               <div className="grid md:grid-cols-5 gap-0 cursor-pointer group" onClick={() => setModalProduct(featured)}>
                 <div className="md:col-span-3 relative aspect-[4/3] md:aspect-auto md:min-h-[500px] overflow-hidden">
-                  <Image
-                    src={featured.imageUrl}
-                    alt={featured.name}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                    sizes="(min-width: 768px) 60vw, 100vw"
-                  />
+                  {featured.imageUrl ? (
+                    <Image
+                      src={featured.imageUrl}
+                      alt={featured.name}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                      sizes="(min-width: 768px) 60vw, 100vw"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center p-8 text-center" style={{ background: "var(--cream-mid)" }}>
+                      <span className="font-display text-4xl tracking-tight" style={{ color: "var(--sage)" }}>
+                        {featured.name}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div
                   className="md:col-span-2 p-8 md:p-12 lg:p-16 flex flex-col justify-center"
@@ -149,13 +157,21 @@ export function Products({ products }: { products: ProductsContent }) {
                     onClick={() => setModalProduct(product)}
                   >
                     <div className="relative aspect-square overflow-hidden">
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 280px"
-                      />
+                      {product.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={product.name}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 280px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center p-6 text-center" style={{ background: "var(--cream-mid)" }}>
+                          <span className="font-display text-2xl tracking-tight" style={{ color: "var(--sage)" }}>
+                            {product.name}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="p-6">
                       <div className="flex items-start justify-between gap-4 mb-2">

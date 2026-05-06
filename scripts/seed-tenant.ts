@@ -9,9 +9,21 @@
  *   2. Otherwise, read dev-content-{tenantId}.json from the project root.
  */
 
-import { setContent } from "../src/lib/storage";
+import { existsSync, readFileSync } from "node:fs";
 import type { ContentMap } from "../src/lib/types";
 import { defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";
+
+for (const path of [".env.local", ".env"]) {
+  if (!existsSync(path)) continue;
+  const lines = readFileSync(path, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [key, ...valueParts] = trimmed.split("=");
+    if (process.env[key]) continue;
+    process.env[key] = valueParts.join("=").replace(/^['"]|['"]$/g, "");
+  }
+}
 
 const caroleeDefaults: ContentMap = {
   hero: {
@@ -168,11 +180,190 @@ const caroleeDefaults: ContentMap = {
   footer: defaultFooter,
 };
 
+const gldfDefaults: ContentMap = {
+  hero: {
+    headline: "Apple Snaps,\nNothing Else.",
+    subheadline: "Small-batch dried fruit from the Great Lakes",
+    tagline:
+      "Crisp New York apples, slow-dried with cinnamon and no added sugar, preservatives, or filler.",
+    ctaText: "Shop Apple Snaps",
+    ctaLink: "#products",
+    backgroundImageUrl:
+      "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=2400&h=1600&fit=crop&q=90",
+    logoUrl: "",
+  },
+  services: {
+    sectionLabel: "Services",
+    headline: "Wholesale & Events",
+    description: "Retail-ready dried fruit for farm markets, cafes, gift boxes, and community events.",
+    services: [],
+  },
+  story: {
+    sectionLabel: "Our Story",
+    headline: "Orchard fruit,\nmade snackable.",
+    accentText: "Great Lakes grown. Small-batch dried.",
+    statement:
+      "A snack you can feel good about: real orchard fruit, simple ingredients, and a clean label.",
+    paragraphs: [
+      "Great Lakes Dried Fruit started with a simple idea: make fruit snacks that taste like the orchard, not a chemistry set.",
+      "We use New York apples, slice them thin, dust them with cinnamon, and dry them slowly so every bag keeps its natural sweetness and crunch.",
+      "No added sugar. No sulfites. No preservatives. Just a better everyday snack for lunchboxes, trail bags, pantry shelves, and gift baskets.",
+    ],
+    stats: [
+      { value: "2", label: "Ingredients" },
+      { value: "0g", label: "Added Sugar" },
+      { value: "NYS", label: "Grown Apples" },
+    ],
+    quote: "Just apples. Just cinnamon.",
+    quoteAttribution: "Great Lakes Dried Fruit",
+    imageUrl:
+      "https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?w=1600&h=1200&fit=crop&q=90",
+  },
+  testimonials: {
+    sectionLabel: "Testimonials",
+    headline: "Snackers Are Saying",
+    testimonials: [],
+  },
+  events: {
+    sectionLabel: "Events",
+    headline: "Find Us Around Western New York",
+    events: [],
+  },
+  providers: {
+    sectionLabel: "Partners",
+    headline: "Stockists & Partners",
+    description: "Local partners carrying or featuring Great Lakes Dried Fruit.",
+    providers: [],
+  },
+  contact: {
+    email: "hello@greatlakesdriedfruit.com",
+    phone: "",
+    address: "Western New York",
+    hours: "",
+    locationTitle: "Wholesale,\nevents & orders",
+    locationDescription:
+      "Reach out for wholesale, retail partnerships, local event availability, or customer questions.",
+    instagramUrl: "",
+    facebookUrl: "",
+    googleMapsUrl: "",
+  },
+  settings: {
+    siteName: "Great Lakes Dried Fruit",
+    siteTagline: "Orchard-dried apple snacks",
+    siteDescription:
+      "Small-batch New York dried apple snacks made with simple ingredients, no added sugar, and no preservatives.",
+    siteKeywords:
+      "dried apples, apple snacks, New York apples, no added sugar snacks, dried fruit, Great Lakes Dried Fruit",
+    ownerName: "Great Lakes Dried Fruit",
+    ownerTitle: "Small-batch snack maker",
+    footerTagline: "Orchard-dried. Ingredient-honest.",
+    copyrightText: "Great Lakes Dried Fruit",
+    bookingUrl: "#products",
+    instagramHandle: "",
+    vagaro_embed_id: "",
+    marqueeText: "Free Shipping on Orders $45+",
+  },
+  faq: {
+    ...defaultFaq,
+    headline: "Snack Questions",
+    description: "What to know about Apple Snaps.",
+    faqs: [
+      {
+        id: "ingredients",
+        question: "What is in Apple Snaps?",
+        answer: "Just apples and cinnamon. There is no added sugar, no sulfites, and no preservatives.",
+      },
+      {
+        id: "source",
+        question: "Where are the apples from?",
+        answer: "We use New York apples and keep sourcing focused on Great Lakes orchard country whenever possible.",
+      },
+      {
+        id: "wholesale",
+        question: "Do you offer wholesale?",
+        answer: "Yes. Contact us for retail, cafe, farm market, gift box, and event opportunities.",
+      },
+    ],
+  },
+  shop: defaultShop,
+  products: {
+    ...defaultProducts,
+    headline: "What We Make",
+    description:
+      "Clean-label fruit snacks with a short ingredient list and real orchard flavor.",
+    products: [
+      {
+        id: "apple-snaps-cinnamon",
+        name: "Cinnamon Apple Snaps",
+        description:
+          "Thin-sliced New York apples dried until crisp and finished with cinnamon.",
+        ingredients: "Apples, Cinnamon",
+        imageUrl:
+          "https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?w=1400&h=1400&fit=crop&q=90",
+        badge: "Signature",
+        featured: true,
+        price: "8",
+        stripePaymentLink: "",
+        comingSoon: true,
+      },
+      {
+        id: "apple-snaps-original",
+        name: "Original Apple Snaps",
+        description:
+          "Pure dried apple crunch with no added sugar and no preservatives.",
+        ingredients: "Apples",
+        imageUrl:
+          "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=1400&h=1400&fit=crop&q=90",
+        badge: "Coming Soon",
+        featured: false,
+        price: "8",
+        stripePaymentLink: "",
+        comingSoon: true,
+      },
+    ],
+    bottomNote: "Two ingredients. Zero added sugar. No preservatives.",
+  },
+  theme: defaultTheme,
+  rewardsConfig: defaultRewardsConfig,
+  navigation: {
+    ...defaultNavigation,
+    menuItems: [
+      { label: "Products", href: "#products" },
+      { label: "Why Us", href: "#comparison" },
+      { label: "Contact", href: "#contact" },
+    ],
+    ctaLabel: "Shop",
+    ctaHref: "#products",
+  },
+  footer: {
+    ...defaultFooter,
+    tagline: "Small-batch dried fruit snacks made with real ingredients in Western New York.",
+    columns: [
+      {
+        heading: "Navigate",
+        links: [
+          { label: "Products", href: "#products" },
+          { label: "Why Us", href: "#comparison" },
+          { label: "Contact", href: "#contact" },
+        ],
+      },
+      {
+        heading: "Connect",
+        links: [{ label: "Email", href: "mailto:hello@greatlakesdriedfruit.com" }],
+      },
+    ],
+    socialLinks: [],
+    copyrightText: "Great Lakes Dried Fruit",
+  },
+};
+
 const TENANT_DEFAULTS: Record<string, ContentMap> = {
   carolee: caroleeDefaults,
+  gldf: gldfDefaults,
 };
 
 async function seed(tenantId: string) {
+  const { setContent } = await import("../src/lib/storage");
   // Check if tenant is registered in the central config
   const { getTenantConfig, getAllTenants } = await import("../src/lib/tenants");
   const tenantConfig = await getTenantConfig(tenantId);
@@ -212,7 +403,12 @@ async function seed(tenantId: string) {
   console.log(`\nDone! ${sections.length} sections seeded for "${tenantId}".`);
   console.log(`\nOnboarding checklist:`);
   console.log(`  □ Set Clerk publicMetadata: { tenants: ["${tenantId}"] } on client's user`);
-  console.log(`  □ Add Vercel domain: ${tenantConfig.subdomain}.scaffoldweb.com`);
+  if (tenantConfig.productionDomain) {
+    console.log(`  □ Add Vercel domain: ${tenantConfig.productionDomain}`);
+    console.log(`  □ Add Vercel domain: ${tenantConfig.adminDomain || `admin.${tenantConfig.productionDomain}`}`);
+  } else {
+    console.log(`  □ Add productionDomain and adminDomain before launch`);
+  }
   if (tenantConfig.customDomains?.length) {
     console.log(`  □ Configure custom domains: ${tenantConfig.customDomains.join(", ")}`);
   }

@@ -10,12 +10,28 @@
 import { createClient } from "@sanity/client";
 import { Redis } from "@upstash/redis";
 import Stripe from "stripe";
+import { existsSync, readFileSync } from "node:fs";
+import {
+  getTenantLaunchReadinessResults,
+  validateProductionEnvValue,
+  type ReadinessStatus,
+} from "../src/lib/production-readiness-rules";
 
-type Status = "ok" | "warn" | "fail" | "skip";
+for (const path of [".env.local", ".env"]) {
+  if (!existsSync(path)) continue;
+  const lines = readFileSync(path, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [key, ...valueParts] = trimmed.split("=");
+    if (process.env[key]) continue;
+    process.env[key] = valueParts.join("=").replace(/^['"]|['"]$/g, "");
+  }
+}
 
 interface CheckResult {
   name: string;
-  status: Status;
+  status: ReadinessStatus;
   message: string;
 }
 
@@ -42,6 +58,11 @@ function checkEnvVar(name: string, required: boolean, secret = true): boolean {
     });
     return false;
   }
+  const validationError = validateProductionEnvValue(name, value);
+  if (validationError) {
+    log({ name: `ENV: ${name}`, status: required ? "fail" : "warn", message: validationError });
+    return false;
+  }
   const display = secret ? `${value.slice(0, 8)}...` : value;
   log({ name: `ENV: ${name}`, status: "ok", message: `Set (${display})` });
   return true;
@@ -56,6 +77,68 @@ checkEnvVar("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", true);
 checkEnvVar("CLERK_SECRET_KEY", true);
 checkEnvVar("CLERK_WEBHOOK_SECRET", true);
 checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
+
+console.log("\n─── Launch Governance ───────────────────────────────────────────");
+function checkFileContains(path: string, name: string, requiredTerms: string[]) {
+  if (!existsSync(path)) {
+    log({ name, status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8").toLowerCase();
+  const missing = requiredTerms.filter((term) => !content.includes(term.toLowerCase()));
+  if (missing.length) {
+    log({ name, status: "warn", message: `Missing guidance for: ${missing.join(", ")}` });
+    return;
+  }
+
+  log({ name, status: "ok", message: `${path} covers required launch guidance` });
+}
+
+checkFileContains("docs/design-kit.md", "Design kit", [
+  "WCAG 2.2 AA",
+  "Core Web Vitals",
+  "AI Surfaces",
+  "Template Expansion Rules",
+]);
+checkFileContains("docs/production-readiness.md", "Production readiness doc", [
+  "Tenant Deployment Checklist",
+  "Incident And Rollback Runbook",
+  "Content Schema Rollback Plan",
+]);
+checkFileContains(".env.production.example", "Production env template", [
+  "pk_live_",
+  "sk_live_",
+  "whsec_",
+  "NEXT_PUBLIC_SITE_URL",
+  "CRON_SECRET",
+]);
+
+function checkLaunchBlockers(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Launch blockers", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const hasUnwaivedBlocker =
+    /Status:\s*blocked/i.test(content) ||
+    /## Current Blockers\s+###/i.test(content) ||
+    /### Required Production Env Vars/i.test(content);
+
+  if (hasUnwaivedBlocker) {
+    log({
+      name: "Launch blockers",
+      status: "fail",
+      message: `${path} contains unresolved blockers; clear or explicitly waive them before release`,
+    });
+    return;
+  }
+
+  log({ name: "Launch blockers", status: "ok", message: `${path} has no unresolved blockers` });
+}
+
+checkLaunchBlockers("docs/launch-blockers.md");
 
 console.log("\n─── AI Agent ────────────────────────────────────────────────────");
 checkEnvVar("GOOGLE_GENERATIVE_AI_API_KEY", true);
@@ -343,32 +426,17 @@ async function checkTenantRevalidation() {
     const tenants = await client.fetch<Array<{
       id: string;
       name: string;
+      active?: boolean;
+      productionDomain?: string;
+      adminDomain?: string;
+      siteUrl?: string;
+      customDomains?: string[];
       revalidateUrl?: string;
       revalidationSecret?: string;
-    }>>(`*[_type == "tenant"] { id, name, revalidateUrl, revalidationSecret }`);
+    }>>(`*[_type == "tenant"] { id, name, active, productionDomain, adminDomain, siteUrl, customDomains, revalidateUrl, revalidationSecret }`);
 
     for (const tenant of tenants) {
-      if (tenant.revalidateUrl) {
-        if (tenant.revalidationSecret) {
-          log({
-            name: `Tenant ${tenant.id} revalidation`,
-            status: "ok",
-            message: `URL set, secret configured`,
-          });
-        } else {
-          log({
-            name: `Tenant ${tenant.id} revalidation`,
-            status: "warn",
-            message: `URL set but NO SECRET (generate with: openssl rand -hex 32)`,
-          });
-        }
-      } else {
-        log({
-          name: `Tenant ${tenant.id} revalidation`,
-          status: "skip",
-          message: "No revalidateUrl configured",
-        });
-      }
+      for (const result of getTenantLaunchReadinessResults(tenant)) log(result);
     }
   } catch (err) {
     console.log(`  Error fetching tenants: ${(err as Error).message}\n`);

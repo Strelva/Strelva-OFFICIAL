@@ -52,7 +52,9 @@ interface DashboardContextValue {
   setHasDraft: Dispatch<SetStateAction<Record<string, boolean>>>;
 
   // Tenant site URL
+  tenantId: string;
   siteUrl: string;
+  previewUrl: string;
 
   // Template identifier
   template: string;
@@ -89,14 +91,18 @@ function getStoredCollapse(): { left: boolean; right: boolean } {
 
 export function DashboardProvider({
   children,
+  tenantId = "",
   siteUrl = "",
+  previewUrl = "",
   template = "wellness",
   autoPublish = true,
   subscriptionStatus = "none",
   hasStripeCustomer = false,
 }: {
   children: ReactNode;
+  tenantId?: string;
   siteUrl?: string;
+  previewUrl?: string;
   template?: string;
   autoPublish?: boolean;
   subscriptionStatus?: SubscriptionStatus;
@@ -199,7 +205,9 @@ export function DashboardProvider({
         setEditMode,
         hasDraft,
         setHasDraft,
+        tenantId,
         siteUrl,
+        previewUrl,
         template,
         autoPublish,
         subscriptionStatus,

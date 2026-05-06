@@ -28,25 +28,27 @@ export function Contact({ contact }: { contact: ContactContent }) {
               </p>
 
               {/* Email */}
-              <a
-                href={`mailto:${contact.email}`}
-                className="group flex items-center gap-4 mb-6"
-              >
-                <div
-                  className="flex h-10 w-10 items-center justify-center transition-colors"
-                  style={{ background: "var(--cream-dark)" }}
+              {contact.email && (
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="group flex items-center gap-4 mb-6"
                 >
-                  <svg className="h-4 w-4" style={{ color: "var(--bark-faded)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <span
-                  className="text-sm font-medium group-hover:opacity-60 transition-opacity"
-                  style={{ color: "var(--bark)" }}
-                >
-                  {contact.email}
-                </span>
-              </a>
+                  <div
+                    className="flex h-10 w-10 items-center justify-center transition-colors"
+                    style={{ background: "var(--cream-dark)" }}
+                  >
+                    <svg className="h-4 w-4" style={{ color: "var(--bark-faded)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span
+                    className="text-sm font-medium group-hover:opacity-60 transition-opacity"
+                    style={{ color: "var(--bark)" }}
+                  >
+                    {contact.email}
+                  </span>
+                </a>
+              )}
 
               {/* Social */}
               <div className="flex gap-3">

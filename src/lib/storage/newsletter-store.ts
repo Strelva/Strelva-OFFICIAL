@@ -2,7 +2,6 @@
  * Newsletter subscriber storage.
  */
 
-import { promises as fs } from "fs";
 import path from "path";
 import { getSanityClient } from "../sanity";
 import { hasSanity, DEFAULT_TENANT, readDevFile, writeDevFile } from "./core";

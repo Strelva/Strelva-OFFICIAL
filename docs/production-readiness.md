@@ -21,9 +21,18 @@
 
 - Confirm required platform env vars are set in production:
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`,
-  `SANITY_PROJECT_ID`, `SANITY_DATASET`, `SANITY_API_TOKEN`, `INTERNAL_API_SECRET`,
-  `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, and
-  tenant-specific revalidation secrets.
+  `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`,
+  `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
+  `INTERNAL_API_SECRET`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
+  `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`,
+  `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets.
+- Use `.env.production.example` as the owner handoff template for Vercel
+  Production. `.env.example` is for local development and may show test-mode
+  placeholders.
+- Confirm production env vars are live production values. `pnpm check:prod`
+  rejects Clerk `pk_test_` / `sk_test_` keys, Stripe `sk_test_` keys,
+  non-`https://` service URLs, localhost site URLs, and webhook/API key values
+  that do not match the expected production key shape.
 - Keep `AI_AUTO_PUBLISH=false` for first production tenants unless the tenant has explicitly approved automatic publish.
 - Provision tenant with `pnpm provision-tenant` and store a unique `revalidationSecret`.
 - Set the storefront `REVALIDATE_SECRET` to the same value.
@@ -41,6 +50,9 @@
 - Run `pnpm build`.
 - Run `pnpm check:prod` against production env values.
 - Run `PLAYWRIGHT_BASE_URL=<deployment-url> pnpm smoke`.
+- Review `docs/launch-blockers.md`; it must be empty or every listed item must be intentionally waived in the release note.
+- Review `docs/design-kit.md` and confirm launch surfaces follow the documented token, accessibility, motion, AI transparency, and Core Web Vitals standards.
+- Confirm mobile zoom is not locked, focus states are visible, and key flows are keyboard reachable.
 - Verify `/dashboard/site` loads, the preview iframe renders with `?preview=true`, a content edit saves, and the preview refreshes. Confirm `/dashboard/content` redirects to `/dashboard/site`.
 - Verify public tenant pages cannot be framed without `?preview=true`.
 - Verify `admin.<custom-domain>` redirects root traffic to `/dashboard`.
@@ -60,7 +72,7 @@
 ## Incident And Rollback Runbook
 
 - Broken deploy: redeploy the previous known-good Vercel deployment, then run smoke tests against the restored URL.
-- Tenant fails to load: check `CUSTOM_DOMAIN_MAP`, Sanity tenant status, Redis/domain-map cache, and the `x-tenant` response path in middleware logs.
+- Tenant fails to load: check `CUSTOM_DOMAIN_MAP`, Sanity tenant status, Redis/domain-map cache, and the `x-tenant` response path in proxy logs.
 - DNS issue: verify apex and `www` records in the registrar, then re-check Vercel domain verification.
 - Dashboard preview fails: inspect the preview response CSP; preview pages should include dashboard frame ancestors and should not emit `X-Frame-Options: DENY`.
 - Revalidation fails: confirm tenant `revalidateUrl`, matching `REVALIDATE_SECRET`, `INTERNAL_API_SECRET`, and webhook delivery status.

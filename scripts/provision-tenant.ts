@@ -20,6 +20,8 @@
  *   --template           Template to use (defaults to industry)
  *   --features           Comma-separated features (e.g. "booking,newsletter")
  *   --customDomains      Comma-separated custom domains
+ *   --productionDomain   Customer-facing domain (e.g. yourbusiness.com)
+ *   --adminDomain        Dashboard domain (defaults to admin.<productionDomain>)
  *   --bookingProvider    Booking provider name
  *   --bookingUrl         Booking URL
  *   --ownerPhone         Owner's phone number
@@ -59,6 +61,8 @@ interface TenantConfig {
   template: string;
   features: string[];
   customDomains: string[];
+  productionDomain?: string;
+  adminDomain?: string;
   subscriptionStatus: string;
   bookingProvider?: string;
   bookingUrl?: string;
@@ -81,6 +85,11 @@ function generateSecret(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function normalizeDomain(domain: string | undefined): string | undefined {
+  const normalized = domain?.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  return normalized || undefined;
+}
+
 function parseArgs(): Partial<TenantConfig> {
   const args = process.argv.slice(2);
   const config: Record<string, string> = {};
@@ -101,7 +110,9 @@ function parseArgs(): Partial<TenantConfig> {
     industry: config.industry,
     template: config.template,
     features: config.features?.split(',').map(f => f.trim()),
-    customDomains: config.customDomains?.split(',').map(d => d.trim()),
+    customDomains: config.customDomains?.split(',').map(d => normalizeDomain(d)).filter(Boolean) as string[] | undefined,
+    productionDomain: normalizeDomain(config.productionDomain),
+    adminDomain: normalizeDomain(config.adminDomain),
     bookingProvider: config.bookingProvider,
     bookingUrl: config.bookingUrl,
     ownerEmail: config.ownerEmail,
@@ -139,6 +150,11 @@ async function getInteractiveConfig(): Promise<Partial<TenantConfig>> {
   const bookingProvider = await prompt('Booking Provider (optional)');
   const bookingUrl = await prompt('Booking URL (optional)');
   const ownerPhone = await prompt('Owner Phone (optional)');
+  const productionDomain = normalizeDomain(await prompt('Website Domain (optional, e.g. yourbusiness.com)'));
+  const adminDomain = normalizeDomain(await prompt(
+    'Admin Domain (optional)',
+    productionDomain ? `admin.${productionDomain}` : undefined
+  ));
 
   return {
     id,
@@ -152,6 +168,8 @@ async function getInteractiveConfig(): Promise<Partial<TenantConfig>> {
     bookingProvider: bookingProvider || undefined,
     bookingUrl: bookingUrl || undefined,
     ownerPhone: ownerPhone || undefined,
+    productionDomain,
+    adminDomain,
   };
 }
 
@@ -237,8 +255,10 @@ async function main() {
 
   // Generate secrets and URLs
   const revalidationSecret = generateSecret();
-  const siteUrl = `https://${config.subdomain}-site.vercel.app`;
-  const revalidateUrl = `${siteUrl}/api/revalidate`;
+  const productionDomain = normalizeDomain(config.productionDomain);
+  const adminDomain = normalizeDomain(config.adminDomain) || (productionDomain ? `admin.${productionDomain}` : undefined);
+  const siteUrl = productionDomain ? `https://${productionDomain}` : `https://${config.subdomain}.scaffoldweb.com`;
+  const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
 
   // Build full tenant config
   const tenant: TenantConfig = {
@@ -252,6 +272,8 @@ async function main() {
     template: config.template || config.industry!,
     features: config.features || ['newsletter'],
     customDomains: config.customDomains || [],
+    productionDomain,
+    adminDomain,
     subscriptionStatus: 'active',
     bookingProvider: config.bookingProvider,
     bookingUrl: config.bookingUrl,
@@ -288,6 +310,13 @@ async function main() {
   console.log(`# Set env vars:`);
   console.log(`vercel env add TENANT_ID production <<< "${tenant.id}"`);
   console.log(`vercel env add REVALIDATE_SECRET production <<< "${revalidationSecret}"`);
+  if (tenant.productionDomain) {
+    console.log(`vercel domains add ${tenant.productionDomain}`);
+    console.log(`vercel domains add www.${tenant.productionDomain}`);
+  }
+  if (tenant.adminDomain) {
+    console.log(`vercel domains add ${tenant.adminDomain}`);
+  }
 
   console.log('\n--- Done ---\n');
 }

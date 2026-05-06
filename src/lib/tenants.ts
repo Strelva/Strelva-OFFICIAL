@@ -4,7 +4,8 @@ import type { TenantConfig } from "./types";
 import { getRedis } from "./redis";
 import { assignUserToTenant } from "./auth";
 import { clerkClient } from "@clerk/nextjs/server";
-import { assertNotProductionFallback, isProductionEnv } from "./production-guard";
+import { isProductionEnv } from "./production-guard";
+import { getTenantPrimaryDomain, normalizeTenantDomain } from "./tenant-urls";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
@@ -108,7 +109,7 @@ export async function getAllTenants(): Promise<TenantConfig[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Domain-based tenant lookup (for middleware custom domain resolution)
+// Domain-based tenant lookup (for proxy custom domain resolution)
 // ---------------------------------------------------------------------------
 
 const DOMAIN_CACHE_KEY = "reb:domain-map";
@@ -127,21 +128,28 @@ async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAd
 
   for (const tenant of tenants) {
     // Production domain
-    if (tenant.productionDomain) {
-      const prod = tenant.productionDomain.toLowerCase();
+    const primaryDomain = getTenantPrimaryDomain(tenant);
+    if (primaryDomain) {
+      const prod = primaryDomain.toLowerCase();
       map[prod] = { tenantId: tenant.id, isAdmin: false };
       map[`www.${prod}`] = { tenantId: tenant.id, isAdmin: false };
     }
 
-    // Admin domain (explicit or derived)
-    const adminDomain = tenant.adminDomain || (tenant.productionDomain ? `admin.${tenant.productionDomain}` : null);
+    // Admin domain (explicit or derived from the tenant's real public domain)
+    const adminCustomDomain = tenant.customDomains
+      ?.map((domain) => normalizeTenantDomain(domain))
+      .find((domain): domain is string => !!domain && domain.startsWith("admin."));
+    const adminDomain = normalizeTenantDomain(tenant.adminDomain)
+      || adminCustomDomain
+      || (primaryDomain ? `admin.${primaryDomain}` : null);
     if (adminDomain) {
       map[adminDomain.toLowerCase()] = { tenantId: tenant.id, isAdmin: true };
     }
 
     // Legacy customDomains array (for backward compatibility)
     for (const domain of tenant.customDomains ?? []) {
-      const d = domain.toLowerCase();
+      const d = normalizeTenantDomain(domain);
+      if (!d) continue;
       if (!map[d]) {
         const isAdmin = d.startsWith("admin.");
         map[d] = { tenantId: tenant.id, isAdmin };

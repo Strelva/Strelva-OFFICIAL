@@ -7,14 +7,15 @@
    ```
    vercel domains add yourbusiness.com
    vercel domains add www.yourbusiness.com
+   vercel domains add admin.yourbusiness.com
    ```
-3. Configure DNS per Vercel instructions (A record + CNAME for www)
+3. Configure DNS per Vercel instructions (A record + CNAME for www/admin)
 4. Update env on `scaffold-web`:
    ```
-   CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid","www.yourbusiness.com":"tenantid"}
-   CORS_ORIGINS=https://yourbusiness.com,https://www.yourbusiness.com
+   CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid","www.yourbusiness.com":"tenantid","admin.yourbusiness.com":"tenantid"}
+   CORS_ORIGINS=https://yourbusiness.com,https://www.yourbusiness.com,https://admin.yourbusiness.com
    ```
-5. Update the tenant's `siteUrl` in Sanity to `https://yourbusiness.com`
+5. Update the tenant's `productionDomain` in Sanity to `yourbusiness.com`; set `adminDomain` only if it is not `admin.yourbusiness.com`
 6. Verify a Resend domain for `updates.yourbusiness.com` if using newsletter
 
 ## scaffoldweb.com (platform + wildcard subdomains)
@@ -30,12 +31,13 @@
    ```
    MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,scaffold-web.vercel.app,localhost
    ```
-5. Wildcard enables `{tenant}.scaffoldweb.com` routing via middleware subdomain extraction
+5. Wildcard enables `{tenant}.scaffoldweb.com` routing via proxy subdomain extraction
 
 ## Verification
 
 - [ ] `yourbusiness.com` shows the tenant's public site
-- [ ] `yourbusiness.com/dashboard` redirects to platform dashboard
+- [ ] `admin.yourbusiness.com` redirects root traffic to `/dashboard`
+- [ ] `admin.yourbusiness.com/sign-in` and `/sign-up` render the tenant auth flow
 - [ ] `scaffoldweb.com` shows marketing page
 - [ ] `scaffoldweb.com/onboard` shows chat onboarding
-- [ ] `tenantid.scaffoldweb.com` shows the tenant's public site (via subdomain routing)
+- [ ] `tenantid.scaffoldweb.com` is treated only as a fallback/platform route, not the customer-facing URL

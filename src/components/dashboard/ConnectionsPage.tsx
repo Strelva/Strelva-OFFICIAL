@@ -146,10 +146,10 @@ export function ConnectionsPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-            Integrations
+            Connected accounts
           </p>
           <div className="flex items-baseline gap-3">
-            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">Connections</h1>
+            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">Accounts that feed your site</h1>
             <span className="text-[13px] text-gray-muted">{connections.filter((c) => c.connected).length} active</span>
           </div>
         </div>
@@ -158,13 +158,13 @@ export function ConnectionsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search connections..."
+            placeholder="Search accounts..."
             className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-full sm:w-[180px]"
           />
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        Connect your tools to make your AI smarter. It pulls real data into your reports, drafts, and suggestions.
+        Connect the accounts your business already uses. Scaffold Web turns that activity into reports, updates, and better AI suggestions.
       </p>
 
       {/* Featured hero card */}
@@ -176,9 +176,9 @@ export function ConnectionsPage() {
           <div className="w-12 h-12 rounded-xl bg-glass border border-gray-border flex items-center justify-center">
             <span className="text-[16px] font-bold text-accent">{featured.icon}</span>
           </div>
-          <h2 className="text-[22px] font-semibold text-white">Make reports smarter with {featured.name}</h2>
+          <h2 className="text-[22px] font-semibold text-white">Show what is working with {featured.name}</h2>
           <p className="text-[13px] text-[#ffffffaa] leading-relaxed max-w-[340px]">
-            Your AI reads your traffic data and turns it into plain-English weekly reports. No dashboards to learn.
+            Scaffold Web reads traffic data and turns it into plain-English weekly reports. No extra dashboard to learn.
           </p>
           <button className="self-start rounded-xl bg-[rgba(255,255,255,0.09)] border border-[rgba(255,255,255,0.13)] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-[rgba(255,255,255,0.14)] transition-colors">
             View
@@ -231,7 +231,7 @@ export function ConnectionsPage() {
         <div className="rounded-2xl border border-glass-border bg-surface-raised px-6 py-10 text-center">
           <p className="text-[14px] font-medium text-warm-black">No connections found</p>
           <p className="mt-1 text-[13px] text-gray-muted">
-            Try a provider name, connection name, or description.
+            Try an account name, provider, or what it helps track.
           </p>
         </div>
       )}

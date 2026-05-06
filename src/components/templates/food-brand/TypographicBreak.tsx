@@ -43,7 +43,7 @@ export function TypographicBreak() {
     >
       <p
         ref={textRef}
-        className="font-display text-[clamp(3rem,8vw,7rem)] tracking-tight leading-[0.95] text-center whitespace-nowrap"
+        className="font-display text-[clamp(3rem,8vw,7rem)] tracking-tight leading-[0.95] text-center text-balance"
         style={{ color: "var(--sage)" }}
       >
         Just apples. Just cinnamon.

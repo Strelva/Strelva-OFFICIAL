@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TrendingUp, MousePointerClick, Star, FileText, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 import type { WeeklyBrief } from "@/lib/types";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface WeeklyBriefClientProps {
   brief: WeeklyBrief | null;
@@ -84,16 +86,73 @@ function formatWeekRange(start: string, end: string): string {
 }
 
 export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProps) {
+  const dashboard = useDashboardOptional();
+
   if (!brief) {
     return (
-      <div className="flex flex-col items-center justify-center h-full animate-route-enter">
-        <div className="w-16 h-16 rounded-2xl bg-surface-inset flex items-center justify-center mb-6">
-          <FileText className="w-7 h-7 text-gray-muted" strokeWidth={1.5} />
+      <div className="flex h-full overflow-y-auto animate-route-enter px-4 sm:px-8 py-6 sm:py-10">
+        <div className="mx-auto flex w-full max-w-5xl flex-col justify-center">
+          <div className="mb-8 max-w-2xl">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
+              What&apos;s working
+            </p>
+            <h1 className="text-[28px] sm:text-[36px] font-semibold text-warm-black tracking-[-0.03em]">
+              Your site is ready to manage
+            </h1>
+            <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
+              Scaffold Web watches how people find you, what they click, and what the AI changes. Your first weekly report appears here after a week of activity.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl dashboard-panel p-4">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-dim text-accent">
+                <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
+              </div>
+              <h2 className="text-[14px] font-medium text-warm-black">See what&apos;s working</h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
+                Weekly reports turn visits, clicks, reviews, and updates into plain English.
+              </p>
+            </div>
+            <div className="rounded-xl dashboard-panel p-4">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-dim text-accent">
+                <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
+              </div>
+              <h2 className="text-[14px] font-medium text-warm-black">Tell AI what to change</h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
+                Ask for a small update, like new hours, a service tweak, or a timely announcement.
+              </p>
+            </div>
+            <div className="rounded-xl dashboard-panel p-4">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-dim text-accent">
+                <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />
+              </div>
+              <h2 className="text-[14px] font-medium text-warm-black">Stay in control</h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
+                When something needs your review, it appears under Needs approval before it goes live.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/dashboard/chat"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+            >
+              <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
+              Ask AI for a small change
+            </Link>
+            <a
+              href={dashboard?.siteUrl || "/dashboard/site"}
+              target={dashboard?.siteUrl ? "_blank" : undefined}
+              rel={dashboard?.siteUrl ? "noopener noreferrer" : undefined}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-5 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
+            >
+              <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
+              View your live site
+            </a>
+          </div>
         </div>
-        <h1 className="text-[18px] font-semibold text-warm-black mb-2">Weekly Brief</h1>
-        <p className="text-[13px] text-gray-muted text-center max-w-xs">
-          Your first weekly brief will appear after a week of activity.
-        </p>
       </div>
     );
   }
@@ -140,7 +199,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
             style={{ animationDelay: "100ms" }}
           >
             <StatCard
-              label="Page Views"
+              label="People found you"
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
               icon={TrendingUp}
@@ -157,7 +216,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               icon={Star}
             />
             <StatCard
-              label="AI Updates"
+              label="Site updates"
               value={brief.stats.contentUpdates}
               icon={FileText}
             />
@@ -217,7 +276,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               {staleSections[0] && (
                 <div className="rounded-xl border border-glass-border bg-glass p-4">
                   <p className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
-                    Freshness
+                    Could use a refresh
                   </p>
                   <p className="text-[14px] font-medium text-warm-black mt-2 capitalize">
                     {staleSections[0].section}

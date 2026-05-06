@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
 import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/tenants";
+import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import type { BusinessHours } from "@/lib/types";
 
 /** Tenant-level settings: businessRules, personality, businessHours */
@@ -90,10 +91,10 @@ export async function PUT(req: Request) {
     }
     // Domain fields (lowercase, trim)
     if (typeof body.productionDomain === "string") {
-      updates.productionDomain = body.productionDomain.trim().toLowerCase() || undefined;
+      updates.productionDomain = normalizeTenantDomain(body.productionDomain) || undefined;
     }
     if (typeof body.adminDomain === "string") {
-      updates.adminDomain = body.adminDomain.trim().toLowerCase() || undefined;
+      updates.adminDomain = normalizeTenantDomain(body.adminDomain) || undefined;
     }
 
     const updated = await updateTenant(tenant, updates);

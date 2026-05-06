@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  * Because vitest doesn't resolve @/ path aliases for dynamic imports,
  * we test route logic by:
  * 1. Testing helper functions that routes depend on
- * 2. Testing the middleware/auth checks directly
+ * 2. Testing the proxy/auth checks directly
  * 3. Testing webhook validation logic
  */
 

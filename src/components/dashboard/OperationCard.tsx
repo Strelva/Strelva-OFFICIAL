@@ -25,7 +25,7 @@ const SOURCE_CONFIG: Record<OperationSource, { icon: React.ReactNode; label: str
   },
   agent: {
     icon: <Bot className="w-3.5 h-3.5" strokeWidth={1.5} />,
-    label: "AI Agent",
+    label: "AI",
     color: "bg-purple-500/15 text-purple-400",
   },
   integration: {
@@ -53,7 +53,7 @@ const RISK_CONFIG: Record<OperationRisk, { icon: React.ReactNode; label: string;
   },
   high: {
     icon: <AlertTriangle className="w-3 h-3" strokeWidth={2} />,
-    label: "Requires approval",
+    label: "Needs your okay",
     color: "text-orange-400",
   },
 };
@@ -61,8 +61,8 @@ const RISK_CONFIG: Record<OperationRisk, { icon: React.ReactNode; label: string;
 const SURFACE_LABELS: Record<OperationSurface, string> = {
   site: "Site",
   assets: "Assets",
-  sources: "Sources",
-  review: "Review",
+  sources: "Accounts",
+  review: "Needs approval",
   newsletter: "Newsletter",
   social: "Social",
 };

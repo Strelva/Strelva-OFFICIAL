@@ -193,7 +193,7 @@ async function pollTenant(tenantId: string): Promise<number> {
 }
 
 export async function GET() {
-  // Auth handled by middleware (CRON_SECRET check)
+  // Auth handled by proxy (CRON_SECRET check)
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);

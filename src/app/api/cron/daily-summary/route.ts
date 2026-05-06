@@ -6,7 +6,7 @@
  * This is the daily grade on whether owners are texting the agent
  * unprompted (the core bet).
  *
- * Auth: handled by middleware (CRON_SECRET check).
+ * Auth: handled by proxy (CRON_SECRET check).
  * Schedule: see vercel.json.
  */
 
@@ -21,7 +21,7 @@ function yesterdayKey(): string {
 }
 
 export async function GET() {
-  // Auth handled by middleware (CRON_SECRET check)
+  // Auth handled by proxy (CRON_SECRET check)
 
   const day = yesterdayKey();
   const tenants = await getAllTenants();

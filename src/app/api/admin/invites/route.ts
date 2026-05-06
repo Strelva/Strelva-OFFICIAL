@@ -3,6 +3,7 @@ import { isSuperAdmin, getCurrentUserEmail, assignUserToTenant } from "@/lib/aut
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { clerkClient } from "@clerk/nextjs/server";
+import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 
 export async function POST(req: Request) {
   const admin = await isSuperAdmin();
@@ -37,11 +38,17 @@ export async function POST(req: Request) {
   }
 
   const invitedBy = await getCurrentUserEmail();
-  await createInvite(email, tenant, invitedBy || undefined);
+  try {
+    await createInvite(email, tenant, invitedBy || undefined);
+  } catch (err) {
+    console.error("[invite] Redis invite storage failed:", err);
+    return NextResponse.json(
+      { error: "Invite could not be stored. No email was sent." },
+      { status: 500 }
+    );
+  }
 
-  const signUpUrl = tenantConfig.productionDomain
-    ? `https://${tenantConfig.productionDomain}/sign-up`
-    : `https://${tenant}.scaffoldweb.com/sign-up`;
+  const signUpUrl = getTenantDashboardUrl(tenantConfig, "/sign-up", "production");
 
   if (process.env.RESEND_API_KEY) {
     try {

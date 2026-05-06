@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { isSuperAdmin } from "@/lib/auth";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
-import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { getTenantDashboardHost, getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 
@@ -12,6 +13,12 @@ export default async function AccountPage() {
   const { userId } = await auth();
 
   if (!userId) {
+    const devTenant = getDevAccessTenant();
+    if (devTenant) {
+      const config = await getTenantConfig(devTenant);
+      if (config) redirect(getTenantDashboardUrl(config));
+      redirect(`/dashboard?tenant=${devTenant}`);
+    }
     redirect("/sign-in");
   }
 
@@ -126,7 +133,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
           {tenants.map(({ id, config }) => {
             if (!config) return null;
             const href = getTenantDashboardUrl(config);
-            const domain = new URL(href).host;
+            const domain = getTenantDashboardHost(config);
 
             return (
               <a
@@ -148,7 +155,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
                   className="text-[13px] mt-0.5"
                   style={{ color: "var(--m-text-3)" }}
                 >
-                  {domain || `${id}.scaffoldweb.com`}
+                  {domain}
                 </div>
               </a>
             );

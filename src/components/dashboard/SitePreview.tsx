@@ -46,8 +46,10 @@ export function SitePreview() {
     setActiveSection,
     activeSection,
     editMode,
+    setHasDraft,
     triggerRefresh,
     siteUrl,
+    previewUrl,
     template,
     activePage,
     setChatPrompt,
@@ -76,7 +78,7 @@ export function SitePreview() {
   if (editMode === "draft") {
     params.set("edit", "true");
   }
-  const base = siteUrl || "";
+  const base = previewUrl || siteUrl || "";
   const iframeSrc = `${base}${pagePath}?${params.toString()}`;
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
@@ -125,22 +127,28 @@ export function SitePreview() {
 
   // Handle inline edit saves from iframe
   const handleInlineEdit = useCallback(async (section: string, field: string, value: string) => {
+    const isDraft = editMode === "draft";
+    const contentUrl = `/api/content/${section}${isDraft ? "?draft=true" : ""}`;
+
     try {
-      const res = await fetch(`/api/content/${section}`, { credentials: "same-origin" });
+      const res = await fetch(contentUrl, { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
       data[field] = value;
-      const saveRes = await fetch(`/api/content/${section}`, {
+      const saveRes = await fetch(contentUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(data),
       });
       if (saveRes.ok) {
+        if (isDraft) {
+          setHasDraft((prev) => ({ ...prev, [section]: true }));
+        }
         triggerRefresh();
       }
     } catch {}
-  }, [triggerRefresh]);
+  }, [editMode, setHasDraft, triggerRefresh]);
 
   // Listen for messages from iframe
   useEffect(() => {
@@ -149,6 +157,9 @@ export function SitePreview() {
       const allowedOrigins = [window.location.origin];
       if (siteUrl) {
         try { allowedOrigins.push(new URL(siteUrl).origin); } catch {}
+      }
+      if (previewUrl) {
+        try { allowedOrigins.push(new URL(previewUrl).origin); } catch {}
       }
       if (!allowedOrigins.includes(event.origin)) return;
       if (!data?.type?.startsWith("reb-")) return;
@@ -178,7 +189,7 @@ export function SitePreview() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setActiveSection, handleInlineEdit, siteUrl]);
+  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl]);
 
   // Close context menu on click outside or Escape
   useEffect(() => {
