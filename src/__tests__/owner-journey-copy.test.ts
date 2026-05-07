@@ -16,10 +16,12 @@ describe("owner journey copy and links", () => {
     expect(desktopNav).toContain("Needs approval");
     expect(desktopNav).toContain("My site");
     expect(desktopNav).toContain("Connected accounts");
+    expect(desktopNav).toContain("Ownership Center");
 
     expect(mobileNav).toContain("Ask AI");
     expect(mobileNav).toContain("Working");
     expect(mobileNav).toContain("Approve");
+    expect(mobileNav).toContain("Own");
   });
 
   it("keeps the first-run dashboard focused on value and next action", () => {
@@ -55,10 +57,23 @@ describe("owner journey copy and links", () => {
       "src/components/dashboard/QueueCard.tsx",
       "src/components/dashboard/SuggestionCard.tsx",
       "src/app/dashboard/settings/page.tsx",
+      "src/app/dashboard/ownership/page.tsx",
     ].map(readRepoFile).join("\n");
 
     expect(ownerFiles).toContain("Make live");
     expect(ownerFiles).toContain("Skip");
     expect(ownerFiles).not.toMatch(/Approval queue|Queued for review|admin review|stale section/);
+  });
+
+  it("keeps the ownership center focused on client exports and handoff actions", () => {
+    const ownershipPage = readRepoFile("src/app/dashboard/ownership/page.tsx");
+
+    expect(ownershipPage).toContain("Your business owns");
+    expect(ownershipPage).toContain("Scaffold Web manages");
+    expect(ownershipPage).toContain("Export content");
+    expect(ownershipPage).toContain("Export assets");
+    expect(ownershipPage).toContain("DNS and domain handoff");
+    expect(ownershipPage).toContain("Billing cancellation");
+    expect(ownershipPage).toContain("Admin revocation");
   });
 });

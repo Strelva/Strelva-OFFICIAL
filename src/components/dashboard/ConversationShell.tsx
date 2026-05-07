@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Menu } from "lucide-react";
+import { ShieldAlert, Menu } from "lucide-react";
 import { HistorySidebar } from "./HistorySidebar";
 import { MobileNav } from "./MobileNav";
+import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
   children: ReactNode;
@@ -19,6 +20,7 @@ export function ConversationShell({
   valueProof,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { impersonation } = useDashboard();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
@@ -33,6 +35,18 @@ export function ConversationShell({
 
       {/* Main content area */}
       <main className="flex-1 flex flex-col min-w-0 dashboard-gradient">
+        {impersonation.isActive && (
+          <div className="shrink-0 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2 text-amber-100">
+            <div className="flex items-center gap-2 text-[12px]">
+              <ShieldAlert className="h-4 w-4 text-amber-200" strokeWidth={1.7} />
+              <span className="font-medium text-amber-50">Acting as Scaffold admin</span>
+              <span className="hidden sm:inline text-amber-100/80">
+                {impersonation.actorEmail || "Super admin"} is viewing tenant {impersonation.tenantId}. Admin saves are audit logged.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Mobile header with menu toggle */}
         <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-glass-border bg-surface-base/90 backdrop-blur-xl shrink-0">
           <button

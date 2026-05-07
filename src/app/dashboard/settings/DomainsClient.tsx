@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
 
+const DOMAINS_API = "/api/tenant/domains";
+
 export type DomainStatus = "connected" | "pending";
 
 export interface DomainEntry {
@@ -170,7 +172,7 @@ export function DomainsClient({ initialDomains }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/domains")
+    fetch(DOMAINS_API)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.domains) setDomains(data.domains);
@@ -183,7 +185,7 @@ export function DomainsClient({ initialDomains }: Props) {
   useEffect(() => {
     if (!domains.some((d) => d.status === "pending")) return;
     const id = setInterval(() => {
-      fetch("/api/admin/domains")
+      fetch(DOMAINS_API)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.domains) setDomains(data.domains);
@@ -200,7 +202,7 @@ export function DomainsClient({ initialDomains }: Props) {
     setAdding(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/domains", {
+      const res = await fetch(DOMAINS_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain }),
@@ -225,7 +227,7 @@ export function DomainsClient({ initialDomains }: Props) {
     setError(null);
     try {
       const res = await fetch(
-        `/api/admin/domains?domain=${encodeURIComponent(domain)}`,
+        `${DOMAINS_API}?domain=${encodeURIComponent(domain)}`,
         { method: "DELETE" }
       );
       const data = await res.json();

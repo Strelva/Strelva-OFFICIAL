@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, FileText, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
+import { Inbox, FileText, LayoutPanelLeft, KeyRound, MessageCircle, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/review", label: "Approve", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Accounts", icon: Link2 },
+  { href: "/dashboard/ownership", label: "Own", icon: KeyRound },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
@@ -82,7 +83,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[9px] font-medium">{item.label}</span>
             </Link>
           );
         })}

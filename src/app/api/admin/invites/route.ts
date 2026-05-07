@@ -1,19 +1,30 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getCurrentUserEmail, assignUserToTenant } from "@/lib/auth";
+import {
+  CLIENT_ROLES,
+  isSuperAdmin,
+  getCurrentUserEmail,
+  assignUserToTenant,
+  requireTenantPermission,
+  type ClientRole,
+} from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { clerkClient } from "@clerk/nextjs/server";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 
 export async function POST(req: Request) {
-  const admin = await isSuperAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { email, tenant } = await req.json();
+  const { email, tenant, role: requestedRole } = await req.json();
   if (!email || !tenant) {
     return NextResponse.json({ error: "Missing email or tenant" }, { status: 400 });
+  }
+  const role: ClientRole =
+    typeof requestedRole === "string" && CLIENT_ROLES.includes(requestedRole as ClientRole)
+      ? (requestedRole as ClientRole)
+      : "owner";
+
+  if (!(await isSuperAdmin())) {
+    const denied = await requireTenantPermission(tenant, "team:manage");
+    if (denied) return denied;
   }
 
   const tenantConfig = await getTenantConfig(tenant);
@@ -26,7 +37,7 @@ export async function POST(req: Request) {
 
   if (existingUsers.data.length > 0) {
     const userId = existingUsers.data[0].id;
-    const assigned = await assignUserToTenant(userId, tenant);
+    const assigned = await assignUserToTenant(userId, tenant, role);
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign existing user" }, { status: 500 });
     }
@@ -39,7 +50,7 @@ export async function POST(req: Request) {
 
   const invitedBy = await getCurrentUserEmail();
   try {
-    await createInvite(email, tenant, invitedBy || undefined);
+    await createInvite(email, tenant, invitedBy || undefined, role);
   } catch (err) {
     console.error("[invite] Redis invite storage failed:", err);
     return NextResponse.json(

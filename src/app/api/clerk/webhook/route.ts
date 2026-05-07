@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       const invite = await consumeInvite(email);
 
       if (invite) {
-        const assigned = await assignUserToTenant(userId, invite.tenant);
+        const assigned = await assignUserToTenant(userId, invite.tenant, invite.role);
         console.log(
           `[clerk-webhook] Auto-assigned ${email} to tenant ${invite.tenant}: ${assigned ? "success" : "failed"}`
         );

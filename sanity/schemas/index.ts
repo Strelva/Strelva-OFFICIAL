@@ -12,6 +12,7 @@ import { bookingConfig } from "./bookingConfig";
 import { booking } from "./booking";
 import { chatSession } from "./chatSession";
 import { activityLog } from "./activityLog";
+import { auditLog } from "./auditLog";
 import { tenant } from "./tenant";
 import { suggestion } from "./suggestion";
 import { blogPost } from "./blogPost";
@@ -32,6 +33,7 @@ export const schemaTypes = [
   booking,
   chatSession,
   activityLog,
+  auditLog,
   tenant,
   suggestion,
   blogPost,

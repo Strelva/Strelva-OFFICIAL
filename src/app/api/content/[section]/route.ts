@@ -6,6 +6,7 @@ import {
   setContent,
   recordSectionUpdate,
   logActivity,
+  logAuditEvent,
   getDraftContent,
   setDraftContent,
   clearDraft,
@@ -14,7 +15,7 @@ import {
 import { diffFields } from "@/lib/utils";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
-import { requireTenantAccess } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { sectionSchemas } from "@/lib/schemas";
@@ -64,6 +65,9 @@ export async function PUT(
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "content:write");
+    if (permissionDenied) return permissionDenied;
+    const actor = await getActorContext(tenant);
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
@@ -86,6 +90,16 @@ export async function PUT(
 
     if (isDraft) {
       await setDraftContent(s, parsed.data as ContentMap[typeof s], tenant);
+      if (actor.isImpersonating) {
+        await logAuditEvent({
+          tenant,
+          actor,
+          action: "content.draft_saved",
+          targetType: "content_section",
+          targetId: s,
+          metadata: { section: s },
+        });
+      }
       return NextResponse.json({ success: true, draft: true });
     }
 
@@ -93,17 +107,27 @@ export async function PUT(
     const changes = diffFields(current, parsed.data as Record<string, unknown>);
 
     await setContent(s, parsed.data as ContentMap[typeof s], tenant);
-    await appendVersion(s, parsed.data, "user", tenant, changes);
+    await appendVersion(s, parsed.data, actor.isImpersonating ? "admin" : "user", tenant, changes);
     await recordSectionUpdate(s, tenant);
     await logActivity({
-      text: `Updated ${s} via admin`,
+      text: actor.isImpersonating ? `Scaffold admin updated ${s}` : `Updated ${s} via admin`,
       time: new Date().toISOString(),
       type: "admin",
       section: s,
-      actor: "user",
+      actor: actor.isImpersonating ? "admin" : "user",
       changes,
       snapshot: current,
     }, tenant);
+    if (actor.isImpersonating) {
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "content.published",
+        targetType: "content_section",
+        targetId: s,
+        metadata: { section: s, changeCount: changes.length },
+      });
+    }
 
     await clearDraft(s, tenant).catch(() => {});
 
@@ -131,6 +155,9 @@ export async function DELETE(
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "content:write");
+    if (permissionDenied) return permissionDenied;
+    const actor = await getActorContext(tenant);
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
@@ -144,6 +171,16 @@ export async function DELETE(
 
     if (isDraft) {
       await clearDraft(s, tenant);
+      if (actor.isImpersonating) {
+        await logAuditEvent({
+          tenant,
+          actor,
+          action: "content.draft_deleted",
+          targetType: "content_section",
+          targetId: s,
+          metadata: { section: s },
+        });
+      }
       return NextResponse.json({ success: true });
     }
 

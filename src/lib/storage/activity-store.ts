@@ -12,7 +12,7 @@ export interface ActivityEntry {
   time: string;
   type: string;
   section?: string;
-  actor?: "user" | "ai";
+  actor?: "user" | "ai" | "admin";
   changes?: { field: string; before: string; after: string }[];
   eventStatus?: "pending" | "approved" | "dismissed" | "auto_approved";
   governanceReason?: string;

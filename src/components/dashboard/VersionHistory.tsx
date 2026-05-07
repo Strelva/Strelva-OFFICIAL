@@ -10,7 +10,7 @@ interface ContentVersion {
   id: string;
   section: string;
   data: unknown;
-  author: "user" | "ai";
+  author: "user" | "ai" | "admin";
   timestamp: string;
   status: "live" | "rolled-back";
   changes?: { field: string; before: string; after: string }[];
@@ -22,7 +22,7 @@ interface ActivityEntry {
   time: string;
   type: string;
   section?: string;
-  actor?: "user" | "ai";
+  actor?: "user" | "ai" | "admin";
   changes?: { field: string; before: string; after: string }[];
   snapshot?: unknown;
 }

@@ -24,6 +24,10 @@ export type { InboxItem } from "./inbox-store";
 export { logActivity, getActivity } from "./activity-store";
 export type { ActivityEntry } from "./activity-store";
 
+// Admin Audit
+export { logAuditEvent, getAuditLog } from "./audit-store";
+export type { AuditLogEntry } from "./audit-store";
+
 // Chat
 export { saveChatMessages, loadChatMessages } from "./chat-store";
 

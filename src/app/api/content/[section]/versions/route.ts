@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getVersions, restoreVersion } from "@/lib/storage";
+import { getVersions, logActivity, logAuditEvent, restoreVersion } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { getActorContext, requireTenantAccess } from "@/lib/auth";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import type { ContentSection } from "@/lib/types";
 
@@ -39,6 +39,7 @@ export async function POST(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const actor = await getActorContext(tenant);
 
     const template = await getTemplateForTenant(tenant);
     if (!template.contentSections.includes(section as ContentSection)) {
@@ -50,9 +51,34 @@ export async function POST(
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }
 
-    const restored = await restoreVersion(section as ContentSection, versionId, tenant);
+    const restored = await restoreVersion(
+      section as ContentSection,
+      versionId,
+      tenant,
+      actor.isImpersonating ? "admin" : "user"
+    );
     if (!restored) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
+    }
+    await logActivity({
+      text: actor.isImpersonating
+        ? `Scaffold admin restored ${section} from version history`
+        : `Restored ${section} from version history`,
+      time: new Date().toISOString(),
+      type: "admin",
+      section,
+      actor: actor.isImpersonating ? "admin" : "user",
+      changes: restored.changes,
+    }, tenant);
+    if (actor.isImpersonating) {
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "content.version_restored",
+        targetType: "content_section",
+        targetId: section,
+        metadata: { section, versionId },
+      });
     }
 
     return NextResponse.json({ success: true, version: restored });

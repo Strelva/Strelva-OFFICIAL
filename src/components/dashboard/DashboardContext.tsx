@@ -7,6 +7,12 @@ type RightTab = "properties" | "chat";
 type EditMode = "live" | "draft";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
+export interface ImpersonationContext {
+  isActive: boolean;
+  actorEmail: string | null;
+  tenantId: string;
+}
+
 interface DashboardContextValue {
   // Mobile tab
   activePanel: Panel;
@@ -65,6 +71,9 @@ interface DashboardContextValue {
   // Billing state from the tenant record
   subscriptionStatus: SubscriptionStatus;
   hasStripeCustomer: boolean;
+
+  // Super-admin visibility
+  impersonation: ImpersonationContext;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -98,6 +107,7 @@ export function DashboardProvider({
   autoPublish = true,
   subscriptionStatus = "none",
   hasStripeCustomer = false,
+  impersonation,
 }: {
   children: ReactNode;
   tenantId?: string;
@@ -107,6 +117,7 @@ export function DashboardProvider({
   autoPublish?: boolean;
   subscriptionStatus?: SubscriptionStatus;
   hasStripeCustomer?: boolean;
+  impersonation?: ImpersonationContext;
 }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
@@ -212,6 +223,7 @@ export function DashboardProvider({
         autoPublish,
         subscriptionStatus,
         hasStripeCustomer,
+        impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
       }}
     >
       {children}

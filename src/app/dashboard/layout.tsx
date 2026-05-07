@@ -7,7 +7,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
-import { hasTenantAccess } from "@/lib/auth";
+import { getActorContext, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
@@ -30,6 +30,7 @@ export default async function DashboardLayout({
   if (!hasAccess) {
     redirect("/no-access");
   }
+  const actor = await getActorContext(tenant);
   const tenantConfig = await getTenantConfig(tenant);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
@@ -66,6 +67,11 @@ export default async function DashboardLayout({
       autoPublish={tenantConfig?.autoPublish !== false}
       subscriptionStatus={subscriptionStatus}
       hasStripeCustomer={!!tenantConfig?.stripeCustomerId}
+      impersonation={{
+        isActive: actor.isImpersonating,
+        actorEmail: actor.email,
+        tenantId: tenant,
+      }}
     >
       <CapabilityProvider>
         <BillingBanner subscriptionStatus={subscriptionStatus} />

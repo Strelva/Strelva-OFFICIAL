@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardHost, getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { getDevAccessTenant } from "@/lib/dev-access";
@@ -28,7 +28,7 @@ export default async function AccountPage() {
   }
 
   const user = await currentUser();
-  const tenants = (user?.publicMetadata?.tenants as string[] | undefined) || [];
+  const tenants = parseTenantAccessMetadata(user?.publicMetadata).map((grant) => grant.tenant);
 
   if (tenants.length === 0) {
     return <NoAccessState />;

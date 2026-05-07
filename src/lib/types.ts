@@ -426,6 +426,7 @@ export interface TenantConfig {
   features?: TenantFeature[];
   integrations?: IntegrationProvider[];
   customDomains?: string[];
+  domainClaims?: DomainClaim[];
   /** Primary production domain (e.g., "yourbusiness.com") */
   productionDomain?: string;
   /** Admin dashboard domain (e.g., "admin.yourbusiness.com"). Derived from productionDomain if not set. */
@@ -478,6 +479,33 @@ export interface TenantConfig {
     accentColor?: string;
     fgColor?: string;
   };
+}
+
+export type DomainClaimRole = "production" | "admin" | "additional";
+
+export type DomainDnsStatus = "unknown" | "configured" | "misconfigured";
+
+export type DomainSslStatus = "unknown" | "pending" | "issued" | "error";
+
+export type DomainLifecycleStatus =
+  | "pending"
+  | "verified"
+  | "misconfigured"
+  | "conflict"
+  | "error";
+
+export interface DomainClaim {
+  domain: string;
+  tenantId: string;
+  role: DomainClaimRole;
+  status: DomainLifecycleStatus;
+  dnsStatus: DomainDnsStatus;
+  sslStatus: DomainSslStatus;
+  createdAt: string;
+  updatedAt: string;
+  verification?: string[];
+  vercelProjectId?: string;
+  error?: string;
 }
 
 export interface BusinessHoursDay {

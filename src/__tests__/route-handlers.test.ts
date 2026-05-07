@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockUpdateTenant = vi.fn();
+const mockLogActivity = vi.fn();
+const mockAddCustomDomain = vi.fn();
+const mockRemoveCustomDomain = vi.fn();
+const mockRefreshDomainClaim = vi.fn();
+const mockListTenantDomainClaims = vi.fn();
+const mockHeadersGet = vi.fn((key: string) => {
+  if (key === "x-tenant") return "test-tenant";
+  return null;
+});
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
@@ -17,10 +26,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>
     Promise.resolve({
-      get: (key: string) => {
-        if (key === "x-tenant") return "test-tenant";
-        return null;
-      },
+      get: mockHeadersGet,
     })
   ),
 }));
@@ -35,11 +41,30 @@ vi.mock("@/lib/tenants", () => ({
       id: "test-tenant",
       subscriptionStatus: "active",
       autoPublish: false,
+      customDomains: ["example.com"],
     })
   ),
   getAllTenants: vi.fn(() => Promise.resolve([])),
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
   invalidateDomainMapCache: vi.fn(),
+}));
+
+vi.mock("@/lib/domains", () => ({
+  addCustomDomain: (...args: unknown[]) => mockAddCustomDomain(...args),
+  removeCustomDomain: (...args: unknown[]) => mockRemoveCustomDomain(...args),
+  refreshDomainClaim: (...args: unknown[]) => mockRefreshDomainClaim(...args),
+  listTenantDomainClaims: (...args: unknown[]) => mockListTenantDomainClaims(...args),
+  serializeDomainClaim: (claim: Record<string, unknown>) => ({
+    domain: claim.domain,
+    status: claim.status,
+    dnsStatus: claim.dnsStatus,
+    sslStatus: claim.sslStatus,
+    role: claim.role,
+    isApex: true,
+    verification: [],
+    error: claim.error,
+    updatedAt: claim.updatedAt,
+  }),
 }));
 
 vi.mock("@/lib/storage", () => ({
@@ -52,7 +77,12 @@ vi.mock("@/lib/storage", () => ({
   createBookingAtomic: vi.fn(() =>
     Promise.resolve({ success: true, booking: { id: "b_123" } })
   ),
-  logActivity: vi.fn(() => Promise.resolve()),
+  logActivity: (...args: unknown[]) => mockLogActivity(...args),
+  SECTION_TO_TYPE: {
+    hero: "hero",
+    settings: "siteSettings",
+    theme: "theme",
+  },
 }));
 
 describe("Track API Route Handler", () => {
@@ -243,6 +273,10 @@ describe("Booking Route Handler", () => {
 describe("Tenant Settings Route Handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHeadersGet.mockImplementation((key: string) => {
+      if (key === "x-tenant") return "test-tenant";
+      return null;
+    });
     mockUpdateTenant.mockResolvedValue({ id: "test-tenant", autoPublish: true });
   });
 
@@ -269,5 +303,149 @@ describe("Tenant Settings Route Handler", () => {
 
     expect(response.status).toBe(200);
     expect(mockUpdateTenant).toHaveBeenCalledWith("test-tenant", { autoPublish: true });
+  });
+});
+
+describe("Ownership export and offboarding route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLogActivity.mockResolvedValue(undefined);
+  });
+
+  it("GET /api/tenant-export/content returns an attachment JSON export", async () => {
+    const { GET } = await import("@/app/api/tenant-export/content/route");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Disposition")).toContain("test-tenant-content-export.json");
+    const data = await response.json();
+    expect(data.tenant).toBe("test-tenant");
+    expect(data.content.hero).toEqual({ headline: "Fresh content" });
+    expect(data.pageConfig).toEqual({ home: { sections: [] } });
+  });
+
+  it("POST /api/offboarding/request records a handoff request without destructive changes", async () => {
+    const { POST } = await import("@/app/api/offboarding/request/route");
+
+    const request = new Request("http://localhost/api/offboarding/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "Need to move DNS next Friday" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Offboarding handoff requested from Ownership Center",
+        type: "handoff",
+        section: "ownership-center",
+      }),
+      "test-tenant",
+    );
+    const data = await response.json();
+    expect(data.nextSteps).toContain("Export content JSON and asset manifest.");
+  });
+});
+
+describe("Tenant Domains Route Handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHeadersGet.mockImplementation((key: string) => {
+      if (key === "x-tenant") return "test-tenant";
+      return null;
+    });
+    mockAddCustomDomain.mockResolvedValue({
+      ok: true,
+      tenant: { id: "test-tenant" },
+      claim: { domain: "new.example.com" },
+    });
+    mockRemoveCustomDomain.mockResolvedValue({
+      ok: true,
+      tenant: { id: "test-tenant", customDomains: [] },
+    });
+    mockRefreshDomainClaim.mockResolvedValue({
+      ok: true,
+      tenant: { id: "test-tenant" },
+      claim: { domain: "example.com" },
+    });
+    mockListTenantDomainClaims.mockResolvedValue([
+      {
+        domain: "example.com",
+        tenantId: "test-tenant",
+        role: "additional",
+        status: "verified",
+        dnsStatus: "configured",
+        sslStatus: "issued",
+        createdAt: "2026-05-07T00:00:00.000Z",
+        updatedAt: "2026-05-07T00:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("GET /api/tenant/domains returns domains for the tenant header", async () => {
+    const { GET } = await import("@/app/api/tenant/domains/route");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      domains: [
+        {
+          domain: "example.com",
+          status: "verified",
+          dnsStatus: "configured",
+          sslStatus: "issued",
+          role: "additional",
+          isApex: true,
+          verification: [],
+          error: undefined,
+          updatedAt: "2026-05-07T00:00:00.000Z",
+        },
+      ],
+    });
+  });
+
+  it("POST /api/tenant/domains mutates only the tenant from x-tenant", async () => {
+    const { POST } = await import("@/app/api/tenant/domains/route");
+
+    const request = new Request("http://localhost/api/tenant/domains", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: "new.example.com", tenant: "other-tenant" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mockAddCustomDomain).toHaveBeenCalledWith("test-tenant", "new.example.com", undefined);
+  });
+
+  it("POST /api/tenant/domains rejects missing tenant headers before mutation", async () => {
+    const { POST } = await import("@/app/api/tenant/domains/route");
+    mockHeadersGet.mockReturnValue(null);
+
+    const request = new Request("http://localhost/api/tenant/domains", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: "new.example.com" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(mockAddCustomDomain).not.toHaveBeenCalled();
+  });
+
+  it("keeps /api/admin/domains as a backward-compatible alias", async () => {
+    const adminRoute = await import("@/app/api/admin/domains/route");
+    const tenantRoute = await import("@/app/api/tenant/domains/route");
+
+    expect(adminRoute.GET).toBe(tenantRoute.GET);
+    expect(adminRoute.POST).toBe(tenantRoute.POST);
+    expect(adminRoute.PATCH).toBe(tenantRoute.PATCH);
+    expect(adminRoute.DELETE).toBe(tenantRoute.DELETE);
   });
 });

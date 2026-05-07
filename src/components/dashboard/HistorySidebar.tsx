@@ -6,6 +6,7 @@ import {
   Inbox,
   FileText,
   Image as ImageIcon,
+  KeyRound,
   Link2,
   MessageCircle,
   Settings,
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/site", label: "My site", icon: LayoutPanelLeft },
   { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
   { href: "/dashboard/sources", label: "Connected accounts", icon: Link2 },
+  { href: "/dashboard/ownership", label: "Ownership Center", icon: KeyRound },
 ];
 
 export function HistorySidebar({

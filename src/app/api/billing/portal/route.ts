@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 
@@ -22,6 +22,8 @@ export async function POST(req: Request) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const blocked = await requireTenantPermission(tenant, "billing:manage");
+  if (blocked) return blocked;
 
   const config = await getTenantConfig(tenant);
 

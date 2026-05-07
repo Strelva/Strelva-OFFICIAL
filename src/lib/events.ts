@@ -199,7 +199,7 @@ export async function emitEventFromActivity(
     text: string;
     type: string;
     section?: string;
-    actor?: "user" | "ai";
+    actor?: "user" | "ai" | "admin";
     changes?: { field: string; before: string; after: string }[];
     eventStatus?: UnifiedEvent["status"];
     governanceReason?: string;

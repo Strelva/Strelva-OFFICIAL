@@ -1,10 +1,12 @@
 import { getRedis } from "./redis";
+import type { ClientRole } from "./auth";
 
 const INVITE_PREFIX = "reb:invites:";
 const INVITE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 export interface PendingInvite {
   tenant: string;
+  role?: ClientRole;
   invitedAt: string;
   invitedBy?: string;
 }
@@ -19,7 +21,8 @@ export class InviteStorageError extends Error {
 export async function createInvite(
   email: string,
   tenant: string,
-  invitedBy?: string
+  invitedBy?: string,
+  role: ClientRole = "owner"
 ): Promise<boolean> {
   const redis = getRedis();
   if (!redis) {
@@ -29,6 +32,7 @@ export async function createInvite(
   const key = `${INVITE_PREFIX}${email.toLowerCase()}`;
   const invite: PendingInvite = {
     tenant,
+    role,
     invitedAt: new Date().toISOString(),
     invitedBy,
   };

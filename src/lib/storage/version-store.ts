@@ -11,7 +11,7 @@ export interface ContentVersion {
   id: string;
   section: string;
   data: unknown;
-  author: "user" | "ai";
+  author: "user" | "ai" | "admin";
   timestamp: string;
   status: "live" | "rolled-back";
   changes?: { field: string; before: string; after: string }[];
@@ -20,7 +20,7 @@ export interface ContentVersion {
 export async function appendVersion(
   section: ContentSection,
   data: unknown,
-  author: "user" | "ai",
+  author: "user" | "ai" | "admin",
   tenant: string = DEFAULT_TENANT,
   changes?: { field: string; before: string; after: string }[]
 ): Promise<ContentVersion> {
@@ -87,7 +87,7 @@ export async function getVersions(
       id: v.versionId,
       section: v.section,
       data: typeof v.data === "string" ? JSON.parse(v.data) : v.data,
-      author: v.author as "user" | "ai",
+      author: v.author as "user" | "ai" | "admin",
       timestamp: v.time,
       status: v.status as "live" | "rolled-back",
       changes: v.changes,
@@ -102,7 +102,8 @@ export async function getVersions(
 export async function restoreVersion(
   section: ContentSection,
   versionId: string,
-  tenant: string = DEFAULT_TENANT
+  tenant: string = DEFAULT_TENANT,
+  author: "user" | "ai" | "admin" = "user"
 ): Promise<ContentVersion | null> {
   const versions = await getVersions(section, tenant);
   const target = versions.find((v) => v.id === versionId);
@@ -112,7 +113,7 @@ export async function restoreVersion(
   await setContent(section, target.data as ContentMap[ContentSection], tenant);
 
   // Create a new version marking this as a restore
-  const restored = await appendVersion(section, target.data, "user", tenant, [
+  const restored = await appendVersion(section, target.data, author, tenant, [
     { field: "_restore", before: "", after: `Restored from ${versionId}` },
   ]);
 

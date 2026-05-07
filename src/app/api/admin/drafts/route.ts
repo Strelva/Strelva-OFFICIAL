@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/lib/auth";
 import { getAllTenants } from "@/lib/tenants";
 import {
   listDrafts,
@@ -11,6 +11,7 @@ import {
   appendVersion,
   recordSectionUpdate,
   logActivity,
+  logAuditEvent,
 } from "@/lib/storage";
 import type { ContentSection, ContentMap } from "@/lib/types";
 import { sectionSchemas } from "@/lib/schemas";
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const actor = await getActorContext();
 
   const body = await request.json();
   const { tenant, section, action } = body as {
@@ -100,22 +102,38 @@ export async function POST(request: Request) {
     const current = await getContent(typedSection, tenant) as unknown as Record<string, unknown>;
     const changes = diffFields(current, parsed.data as Record<string, unknown>);
     await setContent(typedSection, parsed.data as ContentMap[typeof typedSection], tenant);
-    await appendVersion(typedSection, parsed.data, "user", tenant, changes);
+    await appendVersion(typedSection, parsed.data, "admin", tenant, changes);
     await recordSectionUpdate(typedSection, tenant);
     await logActivity({
-      text: `Approved AI draft for ${typedSection}`,
+      text: `Scaffold admin approved AI draft for ${typedSection}`,
       time: new Date().toISOString(),
       type: "admin",
       section: typedSection,
-      actor: "user",
+      actor: "admin",
       changes,
       snapshot: current,
     }, tenant);
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "draft.approved",
+      targetType: "content_section",
+      targetId: typedSection,
+      metadata: { section: typedSection, changeCount: changes.length },
+    });
     await clearDraft(typedSection, tenant);
     revalidatePath("/");
     revalidateClientSite(tenant, ["/"]).catch(() => {});
   } else {
     await clearDraft(typedSection, tenant);
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "draft.rejected",
+      targetType: "content_section",
+      targetId: typedSection,
+      metadata: { section: typedSection },
+    });
   }
 
   return NextResponse.json({ ok: true, action, tenant, section });
