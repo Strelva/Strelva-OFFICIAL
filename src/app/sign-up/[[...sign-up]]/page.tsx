@@ -1,6 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
@@ -41,6 +42,7 @@ export default async function SignUpPage() {
       className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-10"
       style={{ background: "#08080a" }}
     >
+      <AuthDocumentTitle title={title} />
       <div className="max-w-md text-center">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#d4a052]">
           Scaffold Web
