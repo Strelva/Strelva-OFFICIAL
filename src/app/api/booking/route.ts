@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { readJsonObject } from "@/lib/request-body";
 
 function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -21,7 +22,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const { serviceId, date, startTime } = body;
     const clientName = cleanText(body.clientName, 160);
     const clientEmail = cleanText(body.clientEmail, 320).toLowerCase();

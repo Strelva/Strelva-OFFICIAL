@@ -996,6 +996,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain('rateLimitKey(req, "checkout")');
     expect(source).toContain("productById.get(item.productId)");
     expect(source).toContain("parseProductPrice(product.price)");
+    expect(source).toContain("readJsonObject(req)");
+    expect(source).toContain("Invalid request body");
     expect(checkoutItemInterface).not.toContain("price:");
     expect(checkoutItemInterface).not.toContain("name:");
     expect(source).not.toContain("item.price *");
@@ -1012,11 +1014,15 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(onboard).not.toContain("isRateLimitedWindowed(");
     expect(onboard).toContain("normalizedEmail");
     expect(onboard).toContain("safeDescription");
+    expect(onboard).toContain("readJsonObject(req)");
+    expect(onboard).toContain("Invalid request body");
 
     expect(booking).toContain("cleanText");
     expect(booking).toContain("isValidDate");
     expect(booking).toContain("isValidTime");
     expect(booking).toContain("serviceName: service.name");
+    expect(booking).toContain("readJsonObject(request)");
+    expect(booking).toContain("Invalid request body");
     expect(booking).not.toContain("serviceName,");
 
     expect(availability).toContain("isRateLimitedAsync");
@@ -1028,5 +1034,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(subscribe).toContain("isRateLimitedAsync");
     expect(subscribe).toContain('rateLimitKey(req, "subscribe")');
     expect(subscribe).toContain("cleanText(name, 160)");
+    expect(subscribe).toContain("readJsonObject(req)");
+    expect(subscribe).toContain("Invalid request body");
   });
 });
