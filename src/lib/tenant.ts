@@ -1,9 +1,33 @@
 import { headers } from "next/headers";
 import { DEFAULT_TENANT } from "./storage/core";
 
+export function getTenantFromHost(host: string): string | null {
+  const hostWithoutPort = host.toLowerCase().split(":")[0];
+
+  if (hostWithoutPort.endsWith(".localhost")) {
+    const subdomain = hostWithoutPort.replace(".localhost", "");
+    if (subdomain.startsWith("admin.")) {
+      return subdomain.replace(/^admin\./, "") || null;
+    }
+    return subdomain || null;
+  }
+
+  if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
+    const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
+    if (subdomain.startsWith("admin.")) {
+      return subdomain.replace(/^admin\./, "") || null;
+    }
+    if (subdomain && subdomain !== "www" && subdomain !== "admin") {
+      return subdomain;
+    }
+  }
+
+  return null;
+}
+
 export async function getTenantFromHeaders(): Promise<string> {
   const h = await headers();
-  return h.get("x-tenant") || DEFAULT_TENANT;
+  return h.get("x-tenant") || getTenantFromHost(h.get("host") || "") || DEFAULT_TENANT;
 }
 
 /**
