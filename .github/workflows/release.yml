@@ -6,13 +6,58 @@ on:
       version:
         description: "Release version, e.g. reb-v2026.05.02.1"
         required: true
+      launch_gate:
+        description: "Confirm pnpm check:release passed with production env, or blockers were owner-waived in the release note"
+        required: true
+        type: choice
+        options:
+          - "not-confirmed"
+          - "check-release-passed"
+          - "owner-waived-blockers"
+      release_note_ref:
+        description: "Release note, PR, or ticket reference documenting check:release success or waiver metadata"
+        required: true
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Create tag
+      - name: Validate release gate confirmation
+        env:
+          LAUNCH_GATE: ${{ inputs.launch_gate }}
+          RELEASE_NOTE_REF: ${{ inputs.release_note_ref }}
+          VERSION: ${{ inputs.version }}
         run: |
-          git tag ${{ inputs.version }}
-          git push origin ${{ inputs.version }}
+          if [ "$LAUNCH_GATE" = "not-confirmed" ]; then
+            echo "Refusing to tag release until pnpm check:release has passed or blockers are owner-waived."
+            exit 1
+          fi
+
+          if ! echo "$VERSION" | grep -Eq '^reb-v[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]+$'; then
+            echo "Version must match reb-vYYYY.MM.DD.N"
+            exit 1
+          fi
+
+          if [ -z "$RELEASE_NOTE_REF" ]; then
+            echo "release_note_ref is required for traceability."
+            exit 1
+          fi
+
+          if echo "$RELEASE_NOTE_REF" | grep -Eiq '^(none|n/a|na|todo|tbd|pending)$'; then
+            echo "release_note_ref must be a real release note, PR, or ticket reference."
+            exit 1
+          fi
+
+          if [ "$LAUNCH_GATE" = "owner-waived-blockers" ] && ! echo "$RELEASE_NOTE_REF" | grep -Eiq '(waiv|launch-blockers|blocker|pr|#[0-9]+|https?://|[A-Z]+-[0-9]+)'; then
+            echo "Owner-waived releases must reference waiver metadata in docs/launch-blockers.md, a release note, PR, URL, or ticket."
+            exit 1
+          fi
+      - name: Create tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git tag "$VERSION"
+          git push origin "$VERSION"

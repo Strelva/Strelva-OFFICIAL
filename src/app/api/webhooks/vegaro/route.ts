@@ -40,7 +40,7 @@ interface VegaroBookingPayload {
  * Placeholder implementation - adjust once signature scheme is documented.
  */
 function verifySignature(payload: string, signature: string, secret: string): boolean {
-  if (!signature || !secret) return true; // Skip if not configured
+  if (!signature || !secret) return false;
 
   // Common pattern: HMAC-SHA256
   const expectedSig = crypto
@@ -83,13 +83,18 @@ export async function POST(req: Request) {
   const signature = req.headers.get("X-Vegaro-Signature") ||
                     req.headers.get("X-Webhook-Signature") || "";
 
-  // Verify signature if secret is configured
-  if (webhookSecret && signature) {
-    const valid = verifySignature(body, signature, webhookSecret);
-    if (!valid) {
-      console.error("Vegaro webhook signature verification failed");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+  if (!webhookSecret) {
+    console.error("Vegaro webhook secret not configured");
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+  if (!signature) {
+    return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+  }
+
+  const valid = verifySignature(body, signature, webhookSecret);
+  if (!valid) {
+    console.error("Vegaro webhook signature verification failed");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   let payload: VegaroBookingPayload;

@@ -10,14 +10,18 @@
 import { createClient } from "@sanity/client";
 import { Redis } from "@upstash/redis";
 import Stripe from "stripe";
+import { execFileSync } from "node:child_process";
+import { resolve4, resolveNs } from "node:dns/promises";
 import { existsSync, readFileSync } from "node:fs";
 import {
+  getLaunchBlockerError,
   getTenantLaunchReadinessResults,
   validateProductionEnvValue,
   type ReadinessStatus,
 } from "../src/lib/production-readiness-rules";
+import { DEFAULT_MARKETING_HOSTS, parseMarketingDomains } from "../src/lib/marketing-hosts";
 
-for (const path of [".env.local", ".env"]) {
+for (const path of [".env.production.local", ".env.local", ".env"]) {
   if (!existsSync(path)) continue;
   const lines = readFileSync(path, "utf8").split(/\r?\n/);
   for (const line of lines) {
@@ -36,6 +40,52 @@ interface CheckResult {
 }
 
 const results: CheckResult[] = [];
+const failedEnvVars = new Set<string>();
+const warnedEnvVars = new Set<string>();
+
+const locallyGeneratedSecrets = new Set([
+  "CRON_SECRET",
+  "INTERNAL_API_SECRET",
+  "OAUTH_STATE_SECRET",
+]);
+
+const scaffoldWebDomainAction =
+  "Point scaffoldweb.com at Vercel project reb-studio with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
+const VERCEL_APP_URL = "https://reb-studio.vercel.app";
+const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
+const SCAFFOLD_MONTHLY_PRICE_CENTS = 14900;
+const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
+
+const envSourceHints: Record<string, string> = {
+  CALENDLY_CLIENT_ID: "Calendly OAuth app client ID",
+  CALENDLY_CLIENT_SECRET: "Calendly OAuth app client secret",
+  CALENDLY_WEBHOOK_SECRET: "Calendly webhook signing secret",
+  CLERK_SECRET_KEY: "Clerk dashboard live instance matching NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+  CLERK_WEBHOOK_SECRET: "Clerk webhook endpoint signing secret from the same live Clerk instance as the publishable/secret keys",
+  GOOGLE_GENERATIVE_AI_API_KEY: "Google AI Studio production API key",
+  GOOGLE_CLIENT_ID: "Google Cloud OAuth client ID",
+  GOOGLE_CLIENT_SECRET: "Google Cloud OAuth client secret",
+  INSTAGRAM_CLIENT_ID: "Meta app Instagram OAuth client ID",
+  INSTAGRAM_CLIENT_SECRET: "Meta app Instagram OAuth client secret",
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "Clerk dashboard live instance",
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: "Set to /sign-in",
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: "Set to /sign-up",
+  NEXT_PUBLIC_APP_URL: "https://scaffoldweb.com or the deployed control-plane URL used for OAuth callbacks",
+  NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
+  NEXT_PUBLIC_SITE_URL: "https://scaffoldweb.com",
+  RESEND_API_KEY: "Resend production API key",
+  RESEND_DOMAIN: "Verified Resend sending domain",
+  SANITY_API_TOKEN: "Sanity production API token with content read/write permissions",
+  SANITY_WEBHOOK_SECRET: "Sanity webhook secret you configure for /api/sanity/webhook",
+  SENTRY_DSN: "Sentry project DSN",
+  NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
+  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $149/month",
+  STRIPE_SECRET_KEY: "Stripe live secret key",
+  STRIPE_WEBHOOK_SECRET: "Stripe billing webhook signing secret",
+  SUPER_ADMIN_EMAILS: "Comma-separated owner/admin email addresses",
+  UPSTASH_REDIS_REST_TOKEN: "Upstash Redis REST token",
+  UPSTASH_REDIS_REST_URL: "Upstash Redis REST URL",
+};
 
 function log(result: CheckResult) {
   const icons = { ok: "✓", warn: "⚠", fail: "✗", skip: "○" };
@@ -56,16 +106,49 @@ function checkEnvVar(name: string, required: boolean, secret = true): boolean {
       status: required ? "fail" : "skip",
       message: required ? "Not set (REQUIRED)" : "Not set (optional)",
     });
+    if (required) failedEnvVars.add(name);
     return false;
   }
   const validationError = validateProductionEnvValue(name, value);
   if (validationError) {
     log({ name: `ENV: ${name}`, status: required ? "fail" : "warn", message: validationError });
+    if (required) failedEnvVars.add(name);
+    else warnedEnvVars.add(name);
     return false;
   }
   const display = secret ? `${value.slice(0, 8)}...` : value;
   log({ name: `ENV: ${name}`, status: "ok", message: `Set (${display})` });
   return true;
+}
+
+function checkRequiredWhen(condition: boolean, name: string, reason: string, secret = true): boolean {
+  if (!condition) return false;
+  const ok = checkEnvVar(name, true, secret);
+  if (!ok && process.env[name]) {
+    return false;
+  }
+  if (ok) {
+    log({ name: `Dependency: ${name}`, status: "ok", message: reason });
+  }
+  return ok;
+}
+
+function checkOptionalPair(idName: string, secretName: string, label: string): boolean {
+  const hasId = checkEnvVar(idName, false, false);
+  const hasSecret = checkEnvVar(secretName, false);
+  const partiallyConfigured = Boolean(process.env[idName]) !== Boolean(process.env[secretName]);
+
+  if (partiallyConfigured) {
+    if (!process.env[idName]) failedEnvVars.add(idName);
+    if (!process.env[secretName]) failedEnvVars.add(secretName);
+    log({
+      name: `${label} OAuth pair`,
+      status: "fail",
+      message: `${idName} and ${secretName} must either both be set or both be omitted`,
+    });
+  }
+
+  return hasId && hasSecret && !partiallyConfigured;
 }
 
 console.log("\n═══════════════════════════════════════════════════════════════");
@@ -76,6 +159,8 @@ console.log("─── Core Auth (Clerk) ─────────────
 checkEnvVar("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", true);
 checkEnvVar("CLERK_SECRET_KEY", true);
 checkEnvVar("CLERK_WEBHOOK_SECRET", true);
+checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_IN_URL", true, false);
+checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_UP_URL", true, false);
 checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
 
 console.log("\n─── Launch Governance ───────────────────────────────────────────");
@@ -101,10 +186,35 @@ checkFileContains("docs/design-kit.md", "Design kit", [
   "AI Surfaces",
   "Template Expansion Rules",
 ]);
+checkFileContains("docs/domain-setup.md", "Domain setup doc", [
+  "reb-studio",
+  "A     scaffoldweb.com    76.76.21.21",
+  "cname.vercel-dns.com",
+  "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,reb-studio.vercel.app,reb.studio,www.reb.studio",
+  "scaffoldweb-com.l.ink",
+  "pnpm check:prod",
+]);
 checkFileContains("docs/production-readiness.md", "Production readiness doc", [
   "Tenant Deployment Checklist",
   "Incident And Rollback Runbook",
   "Content Schema Rollback Plan",
+  "pnpm check:release",
+  "Waived Blockers",
+  "Status: waived",
+  "Customer Access Handoff",
+  "/api/admin/invites",
+  "exact invited email",
+  "vercel deploy --prod",
+  "git status --short",
+  "dirty local working tree",
+  "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
+  "https://scaffoldweb.com/api/health",
+  "curl -i https://scaffoldweb.com/api/cron/maintenance",
+  "root marketing hosts",
+  "/account",
+  "Use invited email",
+  "signed-out `/dashboard` and `/no-access` redirect to `/sign-in`",
+  "admin.greatlakesdriedfruit.com",
 ]);
 checkFileContains(".env.production.example", "Production env template", [
   "pk_live_",
@@ -114,6 +224,58 @@ checkFileContains(".env.production.example", "Production env template", [
   "CRON_SECRET",
 ]);
 
+function checkReleaseManifestEnv(manifestPath: string, checklistPath: string, readinessPath: string) {
+  const missingFiles = [manifestPath, checklistPath, readinessPath].filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Release manifest env", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      requiredEnv?: unknown;
+    };
+    const requiredEnv = Array.isArray(manifest.requiredEnv)
+      ? manifest.requiredEnv.filter((name): name is string => typeof name === "string")
+      : [];
+    const checklist = readFileSync(checklistPath, "utf8");
+    const productionReadiness = readFileSync(readinessPath, "utf8");
+    const checkedRequiredEnv = new Set(
+      [...checklist.matchAll(/checkEnvVar\("([^"]+)", true/g)].map((match) => match[1]),
+    );
+    const missing = requiredEnv.filter((name) => {
+      const checkedByControlPlane = checkedRequiredEnv.has(name);
+      const documentedAsStorefrontEnv =
+        productionReadiness.includes(`storefront \`${name}\``) ||
+        productionReadiness.includes(`client site ${name}`);
+      return !checkedByControlPlane && !documentedAsStorefrontEnv;
+    });
+
+    if (!requiredEnv.length || missing.length) {
+      log({
+        name: "Release manifest env",
+        status: "fail",
+        message: `${manifestPath} requiredEnv entries must be enforced by check:prod or documented as storefront-owned: ${missing.join(", ") || "none found"}`,
+      });
+      return;
+    }
+
+    log({
+      name: "Release manifest env",
+      status: "ok",
+      message: `${manifestPath} requiredEnv entries are covered by check:prod or storefront handoff docs`,
+    });
+  } catch (err) {
+    log({
+      name: "Release manifest env",
+      status: "fail",
+      message: `Could not parse ${manifestPath}: ${(err as Error).message}`,
+    });
+  }
+}
+
+checkReleaseManifestEnv("release-manifest.json", "scripts/production-checklist.ts", "docs/production-readiness.md");
+
 function checkLaunchBlockers(path: string) {
   if (!existsSync(path)) {
     log({ name: "Launch blockers", status: "fail", message: `${path} is missing` });
@@ -121,16 +283,12 @@ function checkLaunchBlockers(path: string) {
   }
 
   const content = readFileSync(path, "utf8");
-  const hasUnwaivedBlocker =
-    /Status:\s*blocked/i.test(content) ||
-    /## Current Blockers\s+###/i.test(content) ||
-    /### Required Production Env Vars/i.test(content);
-
-  if (hasUnwaivedBlocker) {
+  const blockerError = getLaunchBlockerError(content, path);
+  if (blockerError) {
     log({
       name: "Launch blockers",
       status: "fail",
-      message: `${path} contains unresolved blockers; clear or explicitly waive them before release`,
+      message: blockerError,
     });
     return;
   }
@@ -139,6 +297,573 @@ function checkLaunchBlockers(path: string) {
 }
 
 checkLaunchBlockers("docs/launch-blockers.md");
+
+function checkLaunchBlockerActionability(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Launch blocker actionability", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const requiredTerms = [
+    "Required owner action",
+    "Minimum production values to confirm in Vercel",
+    "Copyable Vercel env commands",
+    "vercel env add CLERK_WEBHOOK_SECRET production",
+    "vercel env add SANITY_WEBHOOK_SECRET production",
+    "vercel env add UPSTASH_REDIS_REST_URL production",
+    "vercel env add UPSTASH_REDIS_REST_TOKEN production",
+    "vercel env add SENTRY_DSN production",
+    "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
+    "vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes",
+    "vercel env add STRIPE_SCAFFOLD_PRICE_ID production",
+    "exactly $149/month",
+    "Provider value sources",
+    "Clerk Dashboard -> Webhooks",
+    "Sanity project webhook settings",
+    "Upstash Redis database -> REST API section",
+    "Sentry project settings -> Client Keys / DSN",
+    "Stripe live-mode Products",
+    "vercel env add NEXT_PUBLIC_APP_URL production",
+    "Do not overwrite the values already passing the checker",
+    "openssl rand -hex 32",
+    "vercel env pull .env.production.local --environment=production",
+    "pnpm check:prod",
+    "vercel deploy --prod",
+    "git status --short",
+    "dirty local working tree",
+    "PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app",
+    "signed-out dashboard customers",
+    "stale browser title `Scaffold Web`",
+    "Production Live Verification",
+    "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
+    "https://scaffoldweb.com/api/cron/maintenance",
+    "https://scaffoldweb.com/api/health",
+    "Clerk/Sanity/Stripe webhook deliveries",
+    "curl -i https://scaffoldweb.com/api/cron/maintenance",
+    'curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance',
+    "cron 401",
+    "Status: waived",
+    "Owner:",
+    "Release note:",
+    "Follow-up:",
+    "Reason:",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+
+  if (missing.length) {
+    log({
+      name: "Launch blocker actionability",
+      status: "fail",
+      message: `${path} must include owner actions, env pull/recheck steps, generated-secret guidance, production live-verification steps, and a waiver template`,
+    });
+    return;
+  }
+
+  log({ name: "Launch blocker actionability", status: "ok", message: `${path} has owner-ready blocker actions` });
+}
+
+checkLaunchBlockerActionability("docs/launch-blockers.md");
+
+function getResultCounts(extraOk = 0) {
+  return {
+    failed: results.filter((result) => result.status === "fail").length,
+    warned: results.filter((result) => result.status === "warn").length,
+    passed: results.filter((result) => result.status === "ok").length + extraOk,
+    skipped: results.filter((result) => result.status === "skip").length,
+  };
+}
+
+function checkCompletionAudit(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Completion audit", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const countsIfAuditPasses = getResultCounts(1);
+  const expectedSummary = `${countsIfAuditPasses.passed} passed, ${countsIfAuditPasses.warned} warned, ${countsIfAuditPasses.failed} failed, ${countsIfAuditPasses.skipped} skipped`;
+  const requiredTerms = [
+    "Current failures from the latest `pnpm check:prod` run",
+    "Required Production Env Vars And Stripe Price",
+    "Production Live Verification",
+    "Production Domain Routing",
+    "CLERK_WEBHOOK_SECRET",
+    "SANITY_WEBHOOK_SECRET",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "SENTRY_DSN",
+    "NEXT_PUBLIC_SENTRY_DSN",
+    "price_1TM7v0D99ZGeTugfpmyYup3V",
+    "prod_UKnWPSG3QOtOUz",
+    "$20/month USD",
+    "$149/month USD",
+    "https://reb-studio.vercel.app/sign-in",
+    "Sign in to Scaffold Web | Scaffold Web",
+    "https://scaffoldweb-com.l.ink/",
+    "openresty",
+    expectedSummary,
+    "Full `pnpm check:launch` was rerun",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+
+  if (missing.length) {
+    log({
+      name: "Completion audit",
+      status: "fail",
+      message: `${path} must mirror the current check:prod blockers and latest local launch evidence`,
+    });
+    return;
+  }
+
+  log({ name: "Completion audit", status: "ok", message: `${path} mirrors current production blocker evidence` });
+}
+
+function checkReleaseWorkflow(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Release workflow", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const requiredTerms = [
+    "launch_gate",
+    "check-release-passed",
+    "owner-waived-blockers",
+    "release_note_ref",
+    "release_note_ref must be a real release note, PR, or ticket reference",
+    "Owner-waived releases must reference waiver metadata",
+    "contents: write",
+    "git tag \"$VERSION\"",
+    "git push origin \"$VERSION\"",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+
+  if (missing.length) {
+    log({
+      name: "Release workflow",
+      status: "fail",
+      message: `${path} is missing launch gate controls: ${missing.join(", ")}`,
+    });
+    return;
+  }
+
+  log({ name: "Release workflow", status: "ok", message: `${path} enforces release gate confirmation` });
+}
+
+checkReleaseWorkflow(".github/workflows/release.yml");
+
+function checkPackageReleaseScripts(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Package release scripts", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  try {
+    const packageJson = JSON.parse(readFileSync(path, "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const expectedLaunch = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+    const expectedRelease = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+
+    if (packageJson.scripts?.["check:launch"] !== expectedLaunch || packageJson.scripts?.["check:release"] !== expectedRelease) {
+      log({
+        name: "Package release scripts",
+        status: "fail",
+        message: `${path} must keep check:launch/check:release aligned with lint, typecheck, test, audit, build, check:prod, and gated smoke`,
+      });
+      return;
+    }
+
+    log({ name: "Package release scripts", status: "ok", message: `${path} release gates are aligned` });
+  } catch (err) {
+    log({
+      name: "Package release scripts",
+      status: "fail",
+      message: `Could not parse ${path}: ${(err as Error).message}`,
+    });
+  }
+}
+
+checkPackageReleaseScripts("package.json");
+
+function checkCiWorkflow(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "CI workflow", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const requiredTerms = [
+    "pnpm lint",
+    "pnpm tsc --noEmit",
+    "pnpm test",
+    "pnpm audit",
+    "pnpm build",
+    "pnpm smoke",
+    "REB_DEV_UNGATED_ACCESS",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+
+  if (missing.length || content.includes("--audit-level")) {
+    log({
+      name: "CI workflow",
+      status: "fail",
+      message: `${path} must run lint, typecheck, tests, full audit, build, and gated smoke`,
+    });
+    return;
+  }
+
+  log({ name: "CI workflow", status: "ok", message: `${path} runs launch-aligned checks` });
+}
+
+checkCiWorkflow(".github/workflows/ci.yml");
+
+function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
+  const missingFiles = [customerPath, smokePath].filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Access smoke coverage", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const customerSmoke = readFileSync(customerPath, "utf8");
+  const smoke = readFileSync(smokePath, "utf8");
+  const content = `${customerSmoke}\n${smoke}`;
+  const requiredTerms = [
+    "signed-out dashboard customers get the sign-in flow",
+    "signed-out account handoff returns users to sign-in",
+    "admin tenant host starts at the dashboard sign-in flow",
+    "admin tenant host sign-up uses the tenant invite context",
+    "signed-out no-access recovery returns users to sign-in",
+    "signup page explains invited email recovery",
+    "toHaveTitle(/Sign in to Scaffold Web",
+    "toHaveTitle(/Sign in to Great Lakes Dried Fruit",
+    "toHaveTitle(/Create your dashboard account",
+    "toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account",
+    "Use the exact email address that received your invite",
+    "sign-in page allows Clerk JS to load",
+    "cron maintenance endpoint is not public",
+    "/api/cron/maintenance",
+    "process.env.PLAYWRIGHT_BASE_URL",
+    "https://clerk.scaffoldweb.com",
+    "not.toHaveURL(/\\/app/)",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+  const signupNoAppOk =
+    smoke.includes('test("signup page explains invited email recovery"') &&
+    smoke.indexOf('test("signup page explains invited email recovery"') <
+      smoke.indexOf("not.toHaveURL(/\\/app/)");
+
+  if (missing.length || !signupNoAppOk) {
+    log({
+      name: "Access smoke coverage",
+      status: "fail",
+      message: `${customerPath} and ${smokePath} must cover sign-in, sign-up, account handoff, no-access, admin-host, invited-email, Clerk JS CSP, cron protection, and no /app regressions, including public sign-up`,
+    });
+    return;
+  }
+
+  log({ name: "Access smoke coverage", status: "ok", message: `${customerPath} and ${smokePath} cover sign-in/sign-up recovery paths, account handoff, Clerk JS CSP, and cron protection` });
+}
+
+checkAccessSmokeCoverage("tests/customer-frontend.spec.ts", "tests/smoke.spec.ts");
+
+function checkAuthAccessPages(
+  signInClientPath: string,
+  signInPagePath: string,
+  signUpPath: string,
+  noAccessPath: string,
+  accountPath: string,
+  recoveryButtonPath: string,
+) {
+  const missingFiles = [signInClientPath, signInPagePath, signUpPath, noAccessPath, accountPath, recoveryButtonPath].filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Auth access pages", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const signIn = readFileSync(signInClientPath, "utf8");
+  const signInPage = readFileSync(signInPagePath, "utf8");
+  const signUp = readFileSync(signUpPath, "utf8");
+  const noAccess = readFileSync(noAccessPath, "utf8");
+  const account = readFileSync(accountPath, "utf8");
+  const recoveryButton = readFileSync(recoveryButtonPath, "utf8");
+  const authPagesOk =
+    signIn.includes("forceRedirectUrl={postSignInUrl}") &&
+    signIn.includes("fallbackRedirectUrl={postSignInUrl}") &&
+    signInPage.includes('"/account"') &&
+    signInPage.includes('"/dashboard"') &&
+    signUp.includes("forceRedirectUrl={postSignUpUrl}") &&
+    signUp.includes("fallbackRedirectUrl={postSignUpUrl}") &&
+    signUp.includes("getTenantFromHeaders") &&
+    signUp.includes("getTenantConfig") &&
+    signUp.includes("getSignUpTitle(siteName)") &&
+    signUp.includes('"/account"') &&
+    signUp.includes('"/dashboard"') &&
+    [signIn, signUp].every((content) =>
+      content.includes("mailto:jacob@scaffoldweb.com") &&
+      content.includes("form is not loading") &&
+      !content.includes('"/app"')
+    );
+  const metadataOk =
+    signInPage.includes("Sign in to ${siteName}") &&
+    signInPage.includes("email address from your invite") &&
+    signUp.includes("title: getSignUpTitle(siteName)") &&
+    signUp.includes("exact email address from your ${siteName} invite");
+  const noAccessOk =
+    noAccess.includes("UseInvitedEmailButton") &&
+    noAccess.includes("signs you out so you can choose that account") &&
+    noAccess.includes("mailto:jacob@scaffoldweb.com");
+  const accountRecoveryOk =
+    account.includes("No invited sites on this account") &&
+    account.includes("UseInvitedEmailButton") &&
+    account.includes("signs you out so you can choose that account") &&
+    account.includes("Start a new site") &&
+    account.includes("mailto:jacob@scaffoldweb.com") &&
+    account.includes("!tenantConfigs.some(({ config }) => config)") &&
+    account.includes("return <NoAccessState />");
+  const recoveryButtonOk =
+    recoveryButton.includes("SignOutButton") &&
+    recoveryButton.includes('redirectUrl="/sign-in"') &&
+    recoveryButton.includes("{button}</SignOutButton>") &&
+    recoveryButton.includes("Use invited email");
+
+  if (!authPagesOk || !metadataOk || !noAccessOk || !accountRecoveryOk || !recoveryButtonOk) {
+    log({
+      name: "Auth access pages",
+      status: "fail",
+      message: "Auth pages must route marketing-host auth through /account, route tenant/admin auth to /dashboard, avoid /app, include support email, provide tenant-aware invite-focused metadata, and keep no-access/account recovery paths focused on the invited email",
+    });
+    return;
+  }
+
+  log({ name: "Auth access pages", status: "ok", message: "Sign-in, sign-up, and no-access recovery are aligned with invite-focused metadata and host-aware redirects" });
+}
+
+checkAuthAccessPages(
+  "src/app/sign-in/[[...sign-in]]/SignInClient.tsx",
+  "src/app/sign-in/[[...sign-in]]/page.tsx",
+  "src/app/sign-up/[[...sign-up]]/page.tsx",
+  "src/app/no-access/page.tsx",
+  "src/app/(marketing)/account/page.tsx",
+  "src/components/auth/UseInvitedEmailButton.tsx",
+);
+
+function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, inviteRoutePath: string) {
+  const missingFiles = [adminPagePath, inviteButtonPath, inviteRoutePath].filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Admin invite flow", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const adminPage = readFileSync(adminPagePath, "utf8");
+  const inviteButton = readFileSync(inviteButtonPath, "utf8");
+  const inviteRoute = readFileSync(inviteRoutePath, "utf8");
+  const expectedTenantSignUpUrl = 'getTenantDashboardUrl(tenantConfig, "/sign-up", "production")';
+  const expectedInviteEmailHtml = "buildInviteEmailHtml({ siteName: tenantConfig.siteName, signUpUrl })";
+  const expectedInviteEmailText = "buildInviteEmailText({ siteName: tenantConfig.siteName, signUpUrl })";
+  const adminOk =
+    adminPage.includes("<InviteButton") &&
+    adminPage.includes("ownerEmail={t.ownerEmail}") &&
+    adminPage.includes("tenantId={t.id}");
+  const inviteOk =
+    inviteButton.includes('fetch("/api/admin/invites"') &&
+    inviteButton.includes("email.trim()") &&
+    inviteButton.includes("Access is assigned to this exact email on signup") &&
+    inviteButton.includes("signUpUrl?: string") &&
+    inviteButton.includes("data.signUpUrl") &&
+    inviteButton.includes("Open manual signup link") &&
+    inviteButton.includes("Share this link only with") &&
+    inviteButton.includes("Access is tied to that exact email") &&
+    inviteButton.includes("navigator.clipboard.writeText") &&
+    inviteButton.includes("Copy failed. Select the manual signup link above.") &&
+    inviteButton.includes("Copy signup link") &&
+    inviteButton.includes('role="dialog"') &&
+    inviteButton.includes('htmlFor="invite-email"') &&
+    inviteButton.includes('role="status"') &&
+    inviteButton.includes("Send Invite");
+  const routeOk =
+    inviteRoute.includes(expectedTenantSignUpUrl) &&
+    inviteRoute.includes(expectedInviteEmailHtml) &&
+    inviteRoute.includes(expectedInviteEmailText);
+
+  if (!adminOk || !inviteOk || !routeOk) {
+    log({
+      name: "Admin invite flow",
+      status: "fail",
+      message: `${adminPagePath}, ${inviteButtonPath}, and ${inviteRoutePath} must keep owner-email invites wired to /api/admin/invites with exact-email guidance and tenant/admin sign-up links`,
+    });
+    return;
+  }
+
+  log({
+    name: "Admin invite flow",
+    status: "ok",
+    message: "Admin tenant rows expose owner-email invites through /api/admin/invites",
+  });
+}
+
+checkAdminInviteFlow("src/app/admin/page.tsx", "src/app/admin/InviteButton.tsx", "src/app/api/admin/invites/route.ts");
+
+function checkClerkWebhookRoute(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Clerk webhook route", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const requiredTerms = [
+    "CLERK_WEBHOOK_SECRET",
+    "Webhook secret not configured",
+    "svix-id",
+    "svix-timestamp",
+    "svix-signature",
+    "wh.verify",
+    "Invalid signature",
+    "user.created",
+    "consumeInvite",
+    "assignUserToTenant",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+
+  if (missing.length) {
+    log({
+      name: "Clerk webhook route",
+      status: "fail",
+      message: `${path} must fail closed and auto-assign invited users from signed Clerk user.created events`,
+    });
+    return;
+  }
+
+  log({ name: "Clerk webhook route", status: "ok", message: `${path} verifies signed user.created events` });
+}
+
+checkClerkWebhookRoute("src/app/api/clerk/webhook/route.ts");
+
+function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
+  if (!existsSync(vercelPath) || !existsSync(proxyPath)) {
+    log({
+      name: "Cron auth coverage",
+      status: "fail",
+      message: `${vercelPath} and ${proxyPath} are required to verify cron auth coverage`,
+    });
+    return;
+  }
+
+  try {
+    const vercelConfig = JSON.parse(readFileSync(vercelPath, "utf8")) as {
+      crons?: Array<{ path?: string; schedule?: string }>;
+    };
+    const proxy = readFileSync(proxyPath, "utf8");
+    const crons = vercelConfig.crons || [];
+    const invalidCron = crons.find((cron) => !cron.path?.startsWith("/api/cron/") || !cron.schedule);
+    const missingRoute = crons.find((cron) => {
+      const routePath = `src/app${cron.path}/route.ts`;
+      return !existsSync(routePath);
+    });
+    const proxyCoversCron =
+      proxy.includes("const isCronRoute = createRouteMatcher([\"/api/cron/(.*)\"]);") &&
+      proxy.includes("validateCronRequest(process.env.CRON_SECRET") &&
+      proxy.includes("CRON_SECRET not configured") &&
+      proxy.includes("return { allowed: false, status: 401, message: \"Unauthorized\" }");
+
+    if (!crons.length || invalidCron || missingRoute || !proxyCoversCron) {
+      log({
+        name: "Cron auth coverage",
+        status: "fail",
+        message: `${vercelPath} cron paths must map to /api/cron route files and ${proxyPath} must fail closed with CRON_SECRET validation`,
+      });
+      return;
+    }
+
+    log({
+      name: "Cron auth coverage",
+      status: "ok",
+      message: `${crons.length} Vercel cron route(s) are covered by proxy CRON_SECRET validation`,
+    });
+  } catch (err) {
+    log({
+      name: "Cron auth coverage",
+      status: "fail",
+      message: `Could not verify cron auth coverage: ${(err as Error).message}`,
+    });
+  }
+}
+
+checkCronAuthCoverage("vercel.json", "src/proxy.ts");
+
+function checkDependencyAudit() {
+  try {
+    execFileSync("pnpm", ["audit"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    log({
+      name: "Dependency audit",
+      status: "ok",
+      message: "pnpm audit found no known vulnerabilities",
+    });
+  } catch (err) {
+    const output = `${(err as { stdout?: string }).stdout || ""}\n${(err as { stderr?: string }).stderr || ""}`
+      .replace(/\x1b\[[0-9;]*m/g, "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .join("; ");
+    log({
+      name: "Dependency audit",
+      status: "fail",
+      message: output
+        ? `pnpm audit reported vulnerabilities; resolve them before release: ${output}`
+        : "pnpm audit reported vulnerabilities; resolve them before release",
+    });
+  }
+}
+
+checkDependencyAudit();
+
+function checkVercelProjectLink(path: string) {
+  if (!existsSync(path)) {
+    log({
+      name: "Vercel project link",
+      status: "fail",
+      message: `${path} is missing; run vercel link before production verification`,
+    });
+    return;
+  }
+
+  try {
+    const link = JSON.parse(readFileSync(path, "utf8")) as {
+      projectId?: string;
+      orgId?: string;
+      projectName?: string;
+    };
+    if (!link.projectId || !link.orgId) {
+      log({
+        name: "Vercel project link",
+        status: "fail",
+        message: `${path} must include projectId and orgId`,
+      });
+      return;
+    }
+
+    log({
+      name: "Vercel project link",
+      status: "ok",
+      message: `${link.projectName || "project"} (${link.projectId}) in ${link.orgId}`,
+    });
+  } catch (err) {
+    log({
+      name: "Vercel project link",
+      status: "fail",
+      message: `Could not parse ${path}: ${(err as Error).message}`,
+    });
+  }
+}
+
+checkVercelProjectLink(".vercel/project.json");
 
 console.log("\n─── AI Agent ────────────────────────────────────────────────────");
 checkEnvVar("GOOGLE_GENERATIVE_AI_API_KEY", true);
@@ -168,9 +893,11 @@ checkEnvVar("BLOB_READ_WRITE_TOKEN", false);
 console.log("\n─── Cron & Internal API Security ────────────────────────────────");
 checkEnvVar("CRON_SECRET", true);
 checkEnvVar("INTERNAL_API_SECRET", true);
+checkEnvVar("OAUTH_STATE_SECRET", true);
 
 console.log("\n─── Monitoring & Notifications ──────────────────────────────────");
 checkEnvVar("SENTRY_DSN", true, false);
+checkEnvVar("NEXT_PUBLIC_SENTRY_DSN", true, false);
 checkEnvVar("SLACK_WEBHOOK_URL", false, false);
 checkEnvVar("FOUNDER_CLERK_USER_ID", false, false);
 
@@ -181,21 +908,53 @@ checkEnvVar("TWILIO_PHONE_NUMBER", false, false);
 checkEnvVar("SMS_SUGGESTIONS_ENABLED", false, false);
 
 console.log("\n─── OAuth Connections ───────────────────────────────────────────");
-checkEnvVar("GOOGLE_CLIENT_ID", false, false);
-checkEnvVar("GOOGLE_CLIENT_SECRET", false);
-checkEnvVar("INSTAGRAM_CLIENT_ID", false, false);
-checkEnvVar("INSTAGRAM_CLIENT_SECRET", false);
-checkEnvVar("CALENDLY_CLIENT_ID", false, false);
-checkEnvVar("CALENDLY_CLIENT_SECRET", false);
+const hasGoogleOAuth = checkOptionalPair("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "Google");
+const hasInstagramOAuth = checkOptionalPair("INSTAGRAM_CLIENT_ID", "INSTAGRAM_CLIENT_SECRET", "Instagram");
+const hasCalendlyOAuth = checkOptionalPair("CALENDLY_CLIENT_ID", "CALENDLY_CLIENT_SECRET", "Calendly");
+const hasAnyOAuth = hasGoogleOAuth || hasInstagramOAuth || hasCalendlyOAuth;
+checkRequiredWhen(hasAnyOAuth, "NEXT_PUBLIC_APP_URL", "OAuth redirects need the deployed app URL", false);
 
 console.log("\n─── External Webhook Secrets ────────────────────────────────────");
 checkEnvVar("VEGARO_WEBHOOK_SECRET", false);
-checkEnvVar("CALENDLY_WEBHOOK_SECRET", false);
+checkRequiredWhen(hasCalendlyOAuth, "CALENDLY_WEBHOOK_SECRET", "Calendly OAuth registers booking webhooks");
+if (!hasCalendlyOAuth) checkEnvVar("CALENDLY_WEBHOOK_SECRET", false);
 
 console.log("\n─── Site Configuration ──────────────────────────────────────────");
 checkEnvVar("NEXT_PUBLIC_SITE_URL", true, false);
+checkEnvVar("NEXT_PUBLIC_APP_URL", false, false);
 checkEnvVar("CUSTOM_DOMAIN_MAP", false, false);
 checkEnvVar("MARKETING_DOMAINS", false, false);
+
+function checkMarketingDomainCoverage() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!siteUrl || validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", siteUrl)) {
+    log({ name: "Marketing domain coverage", status: "skip", message: "NEXT_PUBLIC_SITE_URL is not ready" });
+    return;
+  }
+
+  const siteHost = new URL(siteUrl).host.toLowerCase();
+  const marketingHosts = new Set([
+    ...DEFAULT_MARKETING_HOSTS,
+    ...parseMarketingDomains(process.env.MARKETING_DOMAINS || ""),
+  ]);
+
+  if (!marketingHosts.has(siteHost)) {
+    log({
+      name: "Marketing domain coverage",
+      status: "fail",
+      message: `MARKETING_DOMAINS must include ${siteHost} so root-domain auth returns customers to /account`,
+    });
+    return;
+  }
+
+  log({
+    name: "Marketing domain coverage",
+    status: "ok",
+    message: `${siteHost} is treated as a marketing host for /account auth handoff`,
+  });
+}
+
+checkMarketingDomainCoverage();
 
 console.log("\n─── AI & Launch Flags ───────────────────────────────────────────");
 checkEnvVar("AI_AUTO_PUBLISH", false, false);
@@ -287,12 +1046,32 @@ async function checkStripe() {
     if (priceId) {
       try {
         const price = await stripe.prices.retrieve(priceId);
+        const amount = price.unit_amount || 0;
+        const interval = price.recurring?.interval;
+        const currency = price.currency;
+        const productId =
+          typeof price.product === "string" ? price.product : price.product?.id || "unknown_product";
+        const priceSummary = `price=${price.id}, product=${productId}, livemode=${price.livemode}, active=${price.active}, amount=${amount || "custom"}, currency=${currency}, interval=${interval || "one-time"}`;
+        if (
+          amount !== SCAFFOLD_MONTHLY_PRICE_CENTS ||
+          interval !== "month" ||
+          currency !== SCAFFOLD_MONTHLY_PRICE_CURRENCY
+        ) {
+          failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");
+          log({
+            name: "Stripe price ID",
+            status: "fail",
+            message: `Expected $149/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $149 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
+          });
+          return;
+        }
         log({
           name: "Stripe price ID",
           status: "ok",
-          message: `Valid (${price.unit_amount ? `$${price.unit_amount / 100}/${price.recurring?.interval}` : "custom"})`,
+          message: "Valid ($149/month USD)",
         });
       } catch {
+        failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");
         log({ name: "Stripe price ID", status: "fail", message: "Invalid price ID" });
       }
     }
@@ -325,6 +1104,93 @@ async function checkTwilio() {
   } catch (err) {
     log({ name: "Twilio connectivity", status: "fail", message: `Error: ${(err as Error).message}` });
   }
+}
+
+async function checkProductionSiteUrl() {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!baseUrl || validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", baseUrl)) {
+    log({ name: "Production site URL", status: "skip", message: "NEXT_PUBLIC_SITE_URL is not ready" });
+    return;
+  }
+
+  try {
+    const healthUrl = new URL("/api/health", baseUrl).toString();
+    const res = await fetch(healthUrl, { redirect: "follow" });
+    const finalUrl = new URL(res.url);
+    const expectedHost = new URL(baseUrl).host;
+    const server = res.headers.get("server") || "";
+    const vercelId = res.headers.get("x-vercel-id") || "";
+    const contentType = res.headers.get("content-type") || "";
+    const reachesExpectedHost = finalUrl.host === expectedHost;
+    const reachesVercel = server.toLowerCase().includes("vercel") || Boolean(vercelId);
+
+    if (!res.ok || !reachesExpectedHost || !reachesVercel || !contentType.includes("application/json")) {
+      const dnsContext = await getDnsContext(expectedHost);
+      log({
+        name: "Production site URL",
+        status: "fail",
+        message: `${healthUrl} must resolve to the Vercel Next.js app; got HTTP ${res.status} at ${res.url || healthUrl} via ${server || "unknown server"}. ${dnsContext} ${scaffoldWebDomainAction}`,
+      });
+      return;
+    }
+
+    log({
+      name: "Production site URL",
+      status: "ok",
+      message: `${healthUrl} resolves to the Vercel Next.js app`,
+    });
+  } catch (err) {
+    log({
+      name: "Production site URL",
+      status: "fail",
+      message: `Could not verify NEXT_PUBLIC_SITE_URL: ${(err as Error).message}`,
+    });
+  }
+}
+
+async function checkVercelAppFreshness() {
+  try {
+    const signInUrl = new URL("/sign-in", VERCEL_APP_URL).toString();
+    const res = await fetch(signInUrl, { redirect: "follow" });
+    const html = await res.text();
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    const title = titleMatch?.[1]?.trim() || "missing title";
+    const server = res.headers.get("server") || "";
+    const vercelId = res.headers.get("x-vercel-id") || "";
+    const reachesVercel = server.toLowerCase().includes("vercel") || Boolean(vercelId);
+
+    if (!res.ok || !reachesVercel || title !== EXPECTED_SIGN_IN_TITLE) {
+      log({
+        name: "Vercel app freshness",
+        status: "fail",
+        message: `${signInUrl} must serve the current invite-focused sign-in title "${EXPECTED_SIGN_IN_TITLE}"; got "${title}". Redeploy the Vercel Production app from a clean release branch or dashboard before live customer-access verification.`,
+      });
+      return;
+    }
+
+    log({
+      name: "Vercel app freshness",
+      status: "ok",
+      message: `${signInUrl} serves current sign-in title`,
+    });
+  } catch (err) {
+    log({
+      name: "Vercel app freshness",
+      status: "fail",
+      message: `Could not verify ${VERCEL_APP_URL} sign-in freshness: ${(err as Error).message}`,
+    });
+  }
+}
+
+async function getDnsContext(host: string): Promise<string> {
+  const bareHost = host.toLowerCase().split(":")[0];
+  const [aRecords, nsRecords] = await Promise.all([
+    resolve4(bareHost).catch(() => [] as string[]),
+    resolveNs(bareHost).catch(() => [] as string[]),
+  ]);
+  const a = aRecords.length ? aRecords.join(", ") : "none";
+  const ns = nsRecords.length ? nsRecords.join(", ") : "none";
+  return `Current DNS: A=${a}; NS=${ns}.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -475,6 +1341,122 @@ function printCronJobs() {
   console.log("Vercel automatically sends this header when CRON_SECRET is set.\n");
 }
 
+function printReleaseActions() {
+  const failedEnvs = [...failedEnvVars].sort();
+  const warnedEnvs = [...warnedEnvVars].sort();
+  if (!failedEnvs.length && !warnedEnvs.length && !results.some((result) => result.status === "fail")) return;
+  const launchBlockers = existsSync("docs/launch-blockers.md")
+    ? readFileSync("docs/launch-blockers.md", "utf8")
+    : "";
+
+  console.log("═══════════════════════════════════════════════════════════════");
+  console.log("  Required Release Actions");
+  console.log("═══════════════════════════════════════════════════════════════\n");
+
+  if (failedEnvs.length) {
+    const generated = failedEnvs.filter((name) => locallyGeneratedSecrets.has(name));
+    const external = failedEnvs.filter((name) => !locallyGeneratedSecrets.has(name));
+    const replacementEnvs = new Set<string>();
+    if (failedEnvs.includes("STRIPE_SCAFFOLD_PRICE_ID")) {
+      replacementEnvs.add("STRIPE_SCAFFOLD_PRICE_ID");
+    }
+
+    console.log("Set or fix these Vercel Production env vars:");
+    for (const name of failedEnvs) {
+      if (replacementEnvs.has(name)) continue;
+      console.log(`  vercel env add ${name} production`);
+    }
+    if (failedEnvs.includes("STRIPE_SCAFFOLD_PRICE_ID")) {
+      console.log("  # STRIPE_SCAFFOLD_PRICE_ID already exists but points at the wrong price; remove the old value first if Vercel will not overwrite it:");
+      console.log("  vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes");
+      console.log("  vercel env add STRIPE_SCAFFOLD_PRICE_ID production");
+    }
+    console.log();
+
+    if (generated.length) {
+      console.log("Generate strong local secrets before adding them:");
+      for (const name of generated) {
+        console.log(`  ${name}=$(openssl rand -hex 32)`);
+      }
+      console.log();
+    }
+
+    if (external.length) {
+      console.log("Fetch these from production vendor dashboards:");
+      for (const name of external) {
+        const hint = envSourceHints[name] || "Production provider dashboard";
+        console.log(`  ${name}: ${hint}`);
+      }
+      console.log();
+    }
+
+    console.log("After setting Vercel Production env vars, verify the same values locally:");
+    console.log("  vercel env pull .env.production.local --environment=production");
+    console.log("  pnpm check:prod");
+    console.log("  # When env checks pass, redeploy before live verification:");
+    console.log("  git status --short");
+    console.log("  vercel deploy --prod");
+    console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    console.log();
+  }
+
+  if (warnedEnvs.length) {
+    console.log("Review or clean up these warning Vercel Production env vars:");
+    for (const name of warnedEnvs) {
+      console.log(`  vercel env add ${name} production`);
+    }
+    console.log("  Remove copied quotes, literal \\n text, localhost-only domains, or other non-production formatting before re-adding.");
+    console.log();
+  }
+
+  if (failedEnvs.includes("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") || failedEnvs.includes("CLERK_SECRET_KEY")) {
+    console.log("- Clerk: switch to live keys, then verify signed-out /dashboard and /no-access reach /sign-in, root marketing-host auth finishes at /account, and admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow before finishing at /dashboard.");
+  }
+  if (
+    failedEnvs.includes("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ||
+    failedEnvs.includes("CLERK_SECRET_KEY") ||
+    failedEnvs.includes("CLERK_WEBHOOK_SECRET") ||
+    failedEnvs.includes("RESEND_API_KEY") ||
+    failedEnvs.includes("RESEND_DOMAIN")
+  ) {
+    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up with the exact invited email, reaches /account from scaffoldweb.com auth, and reaches /dashboard/site from admin.greatlakesdriedfruit.com auth.");
+  }
+  if (failedEnvs.includes("CLERK_WEBHOOK_SECRET")) {
+    console.log("- Clerk webhook: configure https://scaffoldweb.com/api/clerk/webhook for user.created.");
+  }
+  if (failedEnvs.includes("SANITY_WEBHOOK_SECRET")) {
+    console.log("- Sanity webhook: configure https://scaffoldweb.com/api/sanity/webhook for content create/update/delete events with the matching SANITY_WEBHOOK_SECRET.");
+  }
+  if (failedEnvs.includes("STRIPE_WEBHOOK_SECRET")) {
+    console.log("- Stripe webhook: configure https://scaffoldweb.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
+  }
+  if (failedEnvs.includes("UPSTASH_REDIS_REST_URL") || failedEnvs.includes("UPSTASH_REDIS_REST_TOKEN")) {
+    console.log("- Redis: provision Upstash REST credentials before enabling production queues, rate limits, and reports.");
+  }
+  if (results.some((result) => result.name === "Launch blockers" && result.status === "fail")) {
+    if (launchBlockers.includes("Vercel Project Access")) {
+      console.log("- Vercel access: grant access to project reb-studio (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
+    }
+    if (launchBlockers.includes("Production Live Verification")) {
+      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
+      console.log("  Cron auth commands:");
+      console.log("    curl -i https://scaffoldweb.com/api/cron/maintenance");
+      console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance');
+    }
+    console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
+  }
+  if (results.some((result) => result.name === "Production site URL" && result.status === "fail")) {
+    console.log(`- Production domain routing: ${scaffoldWebDomainAction} Wait for DNS/SSL propagation, then rerun \`pnpm check:prod\`.`);
+    console.log("  DNS verification commands:");
+    console.log("    vercel domains inspect scaffoldweb.com");
+    console.log("    dig +short scaffoldweb.com A");
+    console.log("    dig +short scaffoldweb.com NS");
+    console.log("    dig +short '*.scaffoldweb.com' CNAME");
+    console.log("    curl -I -L https://scaffoldweb.com/api/health");
+  }
+  console.log();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SUMMARY
 // ─────────────────────────────────────────────────────────────────────────────
@@ -484,11 +1466,14 @@ async function run() {
   await checkRedis();
   await checkStripe();
   await checkTwilio();
+  await checkProductionSiteUrl();
+  await checkVercelAppFreshness();
 
   printWebhookUrls();
   printDomainChecklist();
   await checkTenantRevalidation();
   printCronJobs();
+  checkCompletionAudit("docs/completion-audit.md");
 
   console.log("═══════════════════════════════════════════════════════════════");
   console.log("  Summary");
@@ -506,9 +1491,11 @@ async function run() {
   console.log();
 
   if (failed > 0) {
+    printReleaseActions();
     console.log("\x1b[31m  PRODUCTION NOT READY - Fix the failed checks above.\x1b[0m\n");
     process.exit(1);
   } else if (warned > 0) {
+    printReleaseActions();
     console.log("\x1b[33m  PRODUCTION READY (with warnings) - Review warnings above.\x1b[0m\n");
     process.exit(0);
   } else {

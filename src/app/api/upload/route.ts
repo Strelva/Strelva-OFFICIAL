@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { uploadFile } from "@/lib/storage";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function POST(request: Request) {
   const authed = await verifyAuth();
@@ -19,6 +20,10 @@ export async function POST(request: Request) {
 
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
+  const blocked = await requireActiveSubscription(tenant);
+  if (blocked) return blocked;
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;

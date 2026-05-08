@@ -1,18 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env.PLAYWRIGHT_PORT || "3100";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}`;
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000",
+    baseURL,
     trace: "retain-on-failure",
   },
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "pnpm dev",
-        url: "http://127.0.0.1:3000",
-        reuseExistingServer: true,
+        command: `pnpm exec next dev --port ${port}`,
+        url: `${baseURL}/api/health`,
+        reuseExistingServer: false,
         timeout: 120_000,
       },
   projects: [{ name: "desktop", use: { ...devices["Desktop Chrome"] } }],

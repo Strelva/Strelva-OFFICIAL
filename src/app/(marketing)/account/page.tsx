@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
 import { isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardHost, getTenantDashboardUrl } from "@/lib/tenant-urls";
@@ -49,6 +50,10 @@ export default async function AccountPage() {
     }))
   );
 
+  if (!tenantConfigs.some(({ config }) => config)) {
+    return <NoAccessState />;
+  }
+
   return <TenantPicker tenants={tenantConfigs} />;
 }
 
@@ -63,24 +68,43 @@ function NoAccessState() {
           className="text-[24px] font-medium tracking-[-0.02em] mb-3"
           style={{ color: "var(--m-text)" }}
         >
-          No sites yet
+          No invited sites on this account
         </h1>
         <p
-          className="text-[15px] leading-relaxed mb-8"
+          className="text-[15px] leading-relaxed mb-4"
           style={{ color: "var(--m-text-2)" }}
         >
-          You don&apos;t have access to any sites yet. Get started to have your business site built.
+          You&apos;re signed in, but this email is not connected to a Scaffold
+          Web dashboard yet. Most access issues happen when the invite was sent
+          to a different email address.
         </p>
-        <Link
-          href="/onboard"
-          className="inline-block text-[14px] font-medium px-8 py-3 transition-colors"
-          style={{
-            background: "var(--m-text)",
-            color: "var(--m-bg)",
-          }}
+        <p
+          className="text-[14px] leading-relaxed mb-8"
+          style={{ color: "var(--m-text-3)" }}
         >
-          Get started
-        </Link>
+          Use the exact email address that received your invite. The button
+          below signs you out so you can choose that account. You can also email{" "}
+          <a className="underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
+            jacob@scaffoldweb.com
+          </a>{" "}
+          and we&apos;ll connect the right account.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <UseInvitedEmailButton
+            className="text-[14px] font-medium px-8 py-3 transition-colors"
+            style={{ background: "var(--m-text)", color: "var(--m-bg)" }}
+          />
+          <Link
+            href="/onboard"
+            className="text-[14px] font-medium px-8 py-3 border transition-colors hover:bg-white/5"
+            style={{
+              borderColor: "var(--m-rule)",
+              color: "var(--m-text-2)",
+            }}
+          >
+            Start a new site
+          </Link>
+        </div>
       </div>
     </div>
   );

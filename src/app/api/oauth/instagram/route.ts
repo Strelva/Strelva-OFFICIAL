@@ -8,8 +8,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { createOAuthState } from "@/lib/oauth-state";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 const INSTAGRAM_AUTH_URL = "https://api.instagram.com/oauth/authorize";
 const SCOPES = ["user_profile", "user_media"];
@@ -23,6 +25,10 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "settings:write");
+  if (permissionDenied) return permissionDenied;
+  const blocked = await requireActiveSubscription(tenant);
+  if (blocked) return blocked;
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -36,10 +42,7 @@ export async function GET() {
 
   const redirectUri = `${appUrl}/api/oauth/instagram/callback`;
 
-  // Encode tenantId in state for callback
-  const state = Buffer.from(JSON.stringify({ tenantId: tenant })).toString(
-    "base64url"
-  );
+  const state = createOAuthState(tenant);
 
   const params = new URLSearchParams({
     client_id: clientId,

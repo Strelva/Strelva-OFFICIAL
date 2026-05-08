@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { updateBooking, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function PUT(
   request: Request,
@@ -18,6 +19,10 @@ export async function PUT(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "settings:write");
+    if (permissionDenied) return permissionDenied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
 
     const body = await request.json();
     const { status, notes } = body;

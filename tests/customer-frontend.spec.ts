@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-const tenantHost = "gldf.localhost:3000";
+const baseUrl = new URL(process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${process.env.PLAYWRIGHT_PORT || "3100"}`);
+const tenantOrigin = process.env.PLAYWRIGHT_TENANT_ORIGIN || `http://gldf.localhost:${baseUrl.port || "80"}`;
+const tenantUrl = new URL(tenantOrigin);
+const tenantHost = tenantUrl.host;
 
 test("marketing homepage gives a customer clear starting points", async ({ page }) => {
   const response = await page.goto("/");
@@ -16,7 +19,7 @@ test("tenant public pages render without server errors", async ({ page }) => {
   page.on("pageerror", (error) => pageErrors.push(error));
 
   for (const path of ["/", "/services", "/contact"]) {
-    const response = await page.goto(`http://${tenantHost}${path}`);
+    const response = await page.goto(`${tenantOrigin}${path}`);
     expect(response?.status(), `${path} should not fail`).toBeLessThan(400);
     await expect(page.locator("body")).toBeVisible();
     await expect(page.locator("main").first()).toBeVisible();
@@ -28,7 +31,7 @@ test("tenant public pages render without server errors", async ({ page }) => {
 test("core customer pages fit mobile viewports", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
-  for (const url of ["/", `http://${tenantHost}/`]) {
+  for (const url of ["/", `${tenantOrigin}/`]) {
     const response = await page.goto(url, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${url} should not fail`).toBeLessThan(400);
     await expect(page.locator("body")).toBeVisible();
@@ -42,7 +45,7 @@ test("core customer pages fit mobile viewports", async ({ page }) => {
 });
 
 test("tenant preview pages can be embedded by the dashboard", async ({ request }) => {
-  const response = await request.get("http://127.0.0.1:3000/?preview=true", {
+  const response = await request.get(`${baseUrl.origin}/?preview=true`, {
     headers: { Host: tenantHost },
   });
 
@@ -53,7 +56,7 @@ test("tenant preview pages can be embedded by the dashboard", async ({ request }
 });
 
 test("normal tenant pages keep anti-framing protections", async ({ request }) => {
-  const response = await request.get("http://127.0.0.1:3000/", {
+  const response = await request.get(`${baseUrl.origin}/`, {
     headers: { Host: tenantHost },
   });
 
@@ -66,6 +69,66 @@ test("signed-out dashboard customers get the sign-in flow instead of a broken pa
   const response = await page.goto("/dashboard");
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).not.toHaveURL(/\/app/);
+  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /sign in to scaffold web/i })).toBeVisible();
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page.getByText(/sign-in form is not loading/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
+    "href",
+    "mailto:jacob@scaffoldweb.com",
+  );
+});
+
+test("signed-out account handoff returns users to sign-in", async ({ page }) => {
+  const response = await page.goto("/account");
+
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).not.toHaveURL(/\/app/);
+  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+});
+
+test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) => {
+  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
+  const response = await page.goto(adminOrigin);
+
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).not.toHaveURL(/\/app/);
+  await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /sign in to great lakes dried fruit/i })).toBeVisible();
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+});
+
+test("admin tenant host sign-up uses the tenant invite context", async ({ page }) => {
+  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
+  const response = await page.goto(`${adminOrigin}/sign-up`);
+
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-up/);
+  await expect(page).not.toHaveURL(/\/app/);
+  await expect(page).toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account \| Scaffold Web/);
+  await expect(
+    page.getByRole("heading", { name: /create your great lakes dried fruit dashboard account/i }),
+  ).toBeVisible();
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page.getByText(/signup form is not loading/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
+    "href",
+    "mailto:jacob@scaffoldweb.com",
+  );
+});
+
+test("signed-out no-access recovery returns users to sign-in", async ({ page }) => {
+  const response = await page.goto("/no-access");
+
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).not.toHaveURL(/\/app/);
+  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
 });
 
 test("sign-in page allows Clerk JS to load", async ({ request }) => {

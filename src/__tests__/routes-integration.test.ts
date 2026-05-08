@@ -28,9 +28,13 @@ vi.mock("../lib/tenants", () => ({
 const mockCurrentUser = vi.fn();
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
+  clerkMiddleware: (handler: unknown) => handler,
   currentUser: () => mockCurrentUser(),
+  createRouteMatcher: () => () => false,
   clerkClient: vi.fn(),
 }));
+
+import { extractTenantFromHost } from "../proxy";
 
 function makeTenantConfig(overrides: Record<string, unknown> = {}) {
   return {
@@ -394,47 +398,6 @@ describe("Tenant Access Denial (403)", () => {
 // ============================================================================
 
 describe("Custom Domain Resolution", () => {
-  const MARKETING_HOSTS = new Set([
-    "scaffoldweb.com",
-    "www.scaffoldweb.com",
-    "localhost",
-    "localhost:3000",
-    "localhost:3001",
-    "reb-studio.vercel.app",
-  ]);
-
-  const extractTenantFromHost = (host: string): { tenant: string | null; isAdminSubdomain: boolean } => {
-    const hostWithoutPort = host.split(":")[0];
-
-    if (MARKETING_HOSTS.has(host) || MARKETING_HOSTS.has(hostWithoutPort)) {
-      return { tenant: null, isAdminSubdomain: false };
-    }
-
-    // Production: tenant.scaffoldweb.com
-    if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
-      const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
-      if (subdomain && subdomain !== "www" && subdomain !== "admin") {
-        return { tenant: subdomain, isAdminSubdomain: false };
-      }
-      return { tenant: null, isAdminSubdomain: false };
-    }
-
-    // Local dev: tenant.localhost
-    if (hostWithoutPort.endsWith(".localhost")) {
-      const subdomain = hostWithoutPort.replace(".localhost", "");
-      if (subdomain) {
-        return { tenant: subdomain, isAdminSubdomain: false };
-      }
-      return { tenant: null, isAdminSubdomain: false };
-    }
-
-    if (hostWithoutPort.endsWith(".vercel.app")) {
-      return { tenant: null, isAdminSubdomain: false };
-    }
-
-    return { tenant: null, isAdminSubdomain: false };
-  };
-
   it("extracts tenant from subdomain on scaffoldweb.com", () => {
     const result = extractTenantFromHost("gldf.scaffoldweb.com");
     expect(result.tenant).toBe("gldf");

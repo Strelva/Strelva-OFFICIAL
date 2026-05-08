@@ -8,19 +8,42 @@ import {
 } from "@/lib/auth";
 import { clerkClient } from "@clerk/nextjs/server";
 
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
 /** Assign a Clerk user (by email) to a tenant */
 export async function POST(req: Request) {
-  const { email, tenant, role: requestedRole } = await req.json();
-  if (!email || !tenant) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { email: rawEmail, tenant, role: requestedRole } = body as {
+    email?: unknown;
+    tenant?: unknown;
+    role?: unknown;
+  };
+  const email = normalizeEmail(rawEmail);
+  if (!email || typeof tenant !== "string" || !tenant.trim()) {
     return NextResponse.json({ error: "Missing email or tenant" }, { status: 400 });
   }
+  const tenantId = tenant.trim();
   const role: ClientRole =
     typeof requestedRole === "string" && CLIENT_ROLES.includes(requestedRole as ClientRole)
       ? (requestedRole as ClientRole)
       : "owner";
 
   if (!(await isSuperAdmin())) {
-    const denied = await requireTenantPermission(tenant, "team:manage");
+    const denied = await requireTenantPermission(tenantId, "team:manage");
     if (denied) return denied;
   }
 
@@ -33,13 +56,13 @@ export async function POST(req: Request) {
     }
 
     const userId = users.data[0].id;
-    const assigned = await assignUserToTenant(userId, tenant, role);
+    const assigned = await assignUserToTenant(userId, tenantId, role);
 
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign user - tenant may not exist" }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, userId, tenant, role });
+    return NextResponse.json({ success: true, userId, tenant: tenantId, role });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to assign user" },

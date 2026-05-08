@@ -3,6 +3,18 @@ import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 
+function isValidDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isValidTime(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
 export async function POST(request: Request) {
   try {
     if (await isRateLimitedAsync(rateLimitKey(request, "booking"), 10)) {
@@ -10,17 +22,23 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { serviceId, serviceName, date, startTime, clientName, clientEmail, clientPhone, notes } = body;
+    const { serviceId, date, startTime } = body;
+    const clientName = cleanText(body.clientName, 160);
+    const clientEmail = cleanText(body.clientEmail, 320).toLowerCase();
+    const clientPhone = cleanText(body.clientPhone, 80);
+    const notes = cleanText(body.notes, 1000);
 
-    if (!serviceId || !serviceName || !date || !startTime || !clientName || !clientEmail) {
+    if (!serviceId || !date || !startTime || !clientName || !clientEmail) {
       return NextResponse.json(
-        { error: "Missing required fields: serviceId, serviceName, date, startTime, clientName, clientEmail" },
+        { error: "Missing required fields: serviceId, date, startTime, clientName, clientEmail" },
         { status: 400 }
       );
     }
+    if (typeof serviceId !== "string" || !isValidDate(date) || !isValidTime(startTime)) {
+      return NextResponse.json({ error: "Invalid booking details" }, { status: 400 });
+    }
 
-    // Basic email validation
-    if (!clientEmail.includes("@") || !clientEmail.includes(".")) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
@@ -29,7 +47,10 @@ export async function POST(request: Request) {
     // Calculate end time (parse service duration or default 60)
     const services = await getContent("services", tenant);
     const service = services.services.find((s) => s.id === serviceId);
-    const duration = service ? parseInt(service.duration) || 60 : 60;
+    if (!service || service.comingSoon) {
+      return NextResponse.json({ error: "Invalid service" }, { status: 400 });
+    }
+    const duration = parseInt(service.duration, 10) || 60;
 
     const [startH, startM] = startTime.split(":").map(Number);
     const endMinutes = startH * 60 + startM + duration;
@@ -40,13 +61,13 @@ export async function POST(request: Request) {
     const result = await createBookingAtomic(
       {
         serviceId,
-        serviceName,
+        serviceName: service.name,
         date,
         startTime,
         endTime,
         clientName,
         clientEmail,
-        clientPhone: clientPhone || "",
+        clientPhone,
         notes: notes || undefined,
       },
       tenant
@@ -58,7 +79,7 @@ export async function POST(request: Request) {
 
     await logActivity(
       {
-        text: `New booking: ${serviceName} on ${date} at ${startTime} for ${clientName}`,
+        text: `New booking: ${service.name} on ${date} at ${startTime} for ${clientName}`,
         time: new Date().toISOString(),
         type: "booking",
       },

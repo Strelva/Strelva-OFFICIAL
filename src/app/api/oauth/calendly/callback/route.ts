@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
 import { getRedis } from "@/lib/redis";
+import { verifyOAuthState } from "@/lib/oauth-state";
 
 const TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const USER_URL = "https://api.calendly.com/users/me";
@@ -42,16 +43,13 @@ export async function GET(req: Request) {
     );
   }
 
-  let tenantId: string;
-  try {
-    const decoded = JSON.parse(Buffer.from(state, "base64url").toString());
-    tenantId = decoded.tenantId;
-    if (!tenantId) throw new Error("No tenantId in state");
-  } catch {
+  const verifiedState = verifyOAuthState(state);
+  if (!verifiedState) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Invalid OAuth state")}`
     );
   }
+  const tenantId = verifiedState.tenantId;
 
   const clientId = process.env.CALENDLY_CLIENT_ID;
   const clientSecret = process.env.CALENDLY_CLIENT_SECRET;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSuggestions, updateSuggestion } from "@/lib/suggestions";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -11,6 +11,8 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
 
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
@@ -26,6 +28,8 @@ export async function POST(req: Request) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
 
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;

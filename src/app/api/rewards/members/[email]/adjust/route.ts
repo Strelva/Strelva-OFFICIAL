@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireActiveSubscription } from "@/lib/subscription";
 import {
   getMember,
   logTransaction,
@@ -19,6 +20,10 @@ export async function POST(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "settings:write");
+    if (permissionDenied) return permissionDenied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
 
     const body = (await request.json()) as { delta?: unknown; note?: unknown };
     const delta = typeof body.delta === "number" ? body.delta : NaN;

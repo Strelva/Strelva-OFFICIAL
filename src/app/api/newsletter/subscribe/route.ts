@@ -3,6 +3,12 @@ import { addSubscriber } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 
+function cleanText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().slice(0, maxLength);
+  return trimmed || undefined;
+}
+
 export async function POST(req: Request) {
   try {
     if (await isRateLimitedAsync(rateLimitKey(req, "subscribe"), 5)) {
@@ -22,7 +28,11 @@ export async function POST(req: Request) {
     }
 
     const tenant = await getTenantFromHeaders();
-    const result = await addSubscriber(email.trim().toLowerCase(), name, tenant);
+    const result = await addSubscriber(
+      email.trim().toLowerCase(),
+      cleanText(name, 160),
+      tenant
+    );
 
     if (result.duplicate) {
       return NextResponse.json({ message: "You're already subscribed!" });

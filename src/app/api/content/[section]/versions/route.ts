@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getVersions, logActivity, logAuditEvent, restoreVersion } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, requireTenantAccess } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import type { ContentSection } from "@/lib/types";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function GET(
   _request: Request,
@@ -39,6 +40,10 @@ export async function POST(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "content:write");
+    if (permissionDenied) return permissionDenied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
     const actor = await getActorContext(tenant);
 
     const template = await getTemplateForTenant(tenant);

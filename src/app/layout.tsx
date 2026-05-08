@@ -52,7 +52,6 @@ export default function RootLayout({
       <html lang="en">
         <body
           className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
-          style={{ background: "var(--cream)", color: "var(--bark)" }}
         >
           {children}
         </body>

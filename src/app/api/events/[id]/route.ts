@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction } from "@/lib/event-actions";
@@ -16,6 +16,8 @@ export async function PATCH(
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "publishing:manage");
+  if (permissionDenied) return permissionDenied;
 
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;

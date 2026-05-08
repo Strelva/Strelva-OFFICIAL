@@ -3,7 +3,7 @@ import type { ModelMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
@@ -246,6 +246,8 @@ export async function POST(req: Request) {
 
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
 
   if (await isRateLimitedAsync(`agent:${tenant}`, 30)) {
     return new Response(

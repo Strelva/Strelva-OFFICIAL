@@ -1,19 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getContent } from "@/lib/storage";
+import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 
 interface CheckoutItem {
   productId: string;
-  name: string;
-  price: number;
   quantity: number;
   subscription: boolean;
   subscriptionInterval?: string;
 }
 
+function parseProductPrice(price: string): number | null {
+  const value = Number.parseFloat(price.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function parseQuantity(quantity: unknown): number | null {
+  if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    return null;
+  }
+  return quantity;
+}
+
+function parseSubscriptionWeeks(interval: string | undefined): number {
+  const weeks = Number.parseInt(interval || "4", 10);
+  return Number.isFinite(weeks) && weeks >= 1 && weeks <= 52 ? weeks : 4;
+}
+
+function getRequestOrigin(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const proto = req.headers.get("x-forwarded-proto") || req.nextUrl.protocol.replace(":", "") || "https";
+  return `${proto}://${host}`;
+}
+
 export async function POST(req: NextRequest) {
+  if (await isRateLimitedAsync(rateLimitKey(req, "checkout"), 10)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { items } = (await req.json()) as { items: CheckoutItem[] };
 
-  if (!items || items.length === 0) {
+  if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
 
@@ -25,12 +52,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Dynamic import to avoid build issues if stripe isn't installed yet
   const Stripe = (await import("stripe")).default;
   const stripe = new Stripe(stripeKey);
 
   const tenant = await getTenantFromHeaders();
-  const origin = req.headers.get("origin") || `https://${tenant}`;
+  const productsContent = await getContent("products", tenant);
+  const productById = new Map(productsContent.products.map((product) => [product.id, product]));
+  const origin = getRequestOrigin(req);
 
   // Separate one-time and subscription items
   const oneTimeItems = items.filter((i) => !i.subscription);
@@ -47,27 +75,41 @@ export async function POST(req: NextRequest) {
   }> = [];
 
   for (const item of oneTimeItems) {
+    const product = productById.get(item.productId);
+    const unitPrice = product ? parseProductPrice(product.price) : null;
+    const quantity = parseQuantity(item.quantity);
+    if (!product || unitPrice === null || quantity === null || product.comingSoon) {
+      return NextResponse.json({ error: "Invalid cart item" }, { status: 400 });
+    }
+
     lineItems.push({
       price_data: {
         currency: "usd",
-        product_data: { name: item.name },
-        unit_amount: Math.round(item.price * 100),
+        product_data: { name: product.name },
+        unit_amount: Math.round(unitPrice * 100),
       },
-      quantity: item.quantity,
+      quantity,
     });
   }
 
   for (const item of subItems) {
-    const weeks = parseInt(item.subscriptionInterval || "4") || 4;
-    const discountedPrice = Math.round(item.price * 0.85 * 100);
+    const product = productById.get(item.productId);
+    const unitPrice = product ? parseProductPrice(product.price) : null;
+    const quantity = parseQuantity(item.quantity);
+    if (!product || unitPrice === null || quantity === null || product.comingSoon) {
+      return NextResponse.json({ error: "Invalid cart item" }, { status: 400 });
+    }
+
+    const weeks = parseSubscriptionWeeks(item.subscriptionInterval);
+    const discountedPrice = Math.round(unitPrice * 0.85 * 100);
     lineItems.push({
       price_data: {
         currency: "usd",
-        product_data: { name: `${item.name} (Subscribe & Save)` },
+        product_data: { name: `${product.name} (Subscribe & Save)` },
         unit_amount: discountedPrice,
         recurring: { interval: "week", interval_count: weeks },
       },
-      quantity: item.quantity,
+      quantity,
     });
   }
 
@@ -88,11 +130,14 @@ export async function POST(req: NextRequest) {
             shipping_rate_data: {
               type: "fixed_amount",
               fixed_amount: {
-                amount: items.reduce((s, i) => s + i.price * i.quantity, 0) >= 45 ? 0 : 599,
+                amount:
+                  lineItems.reduce((sum, item) => sum + item.price_data.unit_amount * item.quantity, 0) >= 4500
+                    ? 0
+                    : 599,
                 currency: "usd",
               },
               display_name:
-                items.reduce((s, i) => s + i.price * i.quantity, 0) >= 45
+                lineItems.reduce((sum, item) => sum + item.price_data.unit_amount * item.quantity, 0) >= 4500
                   ? "Free Shipping"
                   : "Standard Shipping",
               delivery_estimate: {

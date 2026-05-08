@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getSanityClient, getSanityReadClient } from "@/lib/sanity";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { requireActiveSubscription } from "@/lib/subscription";
 import type { MediaAsset } from "@/lib/media";
 
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -64,6 +65,10 @@ export async function POST(request: Request) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
+  const blocked = await requireActiveSubscription(tenant);
+  if (blocked) return blocked;
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;

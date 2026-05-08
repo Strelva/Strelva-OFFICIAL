@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { getConnection, deleteConnection } from "@/lib/connections";
 
 export async function GET() {
@@ -37,6 +37,8 @@ export async function DELETE() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "settings:write");
+    if (permissionDenied) return permissionDenied;
 
     await deleteConnection(tenant, "instagram");
 

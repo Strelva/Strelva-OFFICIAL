@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSocialPosts, setSocialPosts } from "@/lib/storage";
+import { requireActiveSubscription } from "@/lib/subscription";
 import type { SocialPost } from "@/lib/types";
+
+async function requireSocialWriteAccess(tenant: string): Promise<NextResponse | null> {
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
+  return requireActiveSubscription(tenant);
+}
 
 // --- GET: list social posts for tenant ---
 
@@ -29,8 +38,8 @@ export async function POST(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
+  const blocked = await requireSocialWriteAccess(tenant);
+  if (blocked) return blocked;
 
   const body = await req.json();
 
@@ -71,8 +80,8 @@ export async function PATCH(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
+  const blocked = await requireSocialWriteAccess(tenant);
+  if (blocked) return blocked;
 
   const body = await req.json();
   const { id, status, scheduledFor } = body;
@@ -123,8 +132,8 @@ export async function DELETE(req: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
+  const blocked = await requireSocialWriteAccess(tenant);
+  if (blocked) return blocked;
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { logActivity } from "@/lib/storage";
 
 const OFFBOARDING_STEPS = [
@@ -20,6 +20,8 @@ export async function POST(request: Request) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "billing:manage");
+  if (permissionDenied) return permissionDenied;
 
   const body = await request.json().catch(() => ({}));
   const notes = typeof body?.notes === "string" ? body.notes.slice(0, 1000) : "";
