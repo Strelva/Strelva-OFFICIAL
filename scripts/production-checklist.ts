@@ -887,6 +887,47 @@ function checkClerkWebhookRoute(path: string) {
 
 checkClerkWebhookRoute("src/app/api/clerk/webhook/route.ts");
 
+function checkStripeBillingWebhookRoute(path: string) {
+  if (!existsSync(path)) {
+    log({ name: "Stripe billing webhook route", status: "fail", message: `${path} is missing` });
+    return;
+  }
+
+  const content = readFileSync(path, "utf8");
+  const requiredTerms = [
+    "STRIPE_WEBHOOK_SECRET",
+    "Webhook secret not configured",
+    "stripe-signature",
+    "stripe.webhooks.constructEvent",
+    "Invalid signature",
+    "checkout.session.completed",
+    "invoice.paid",
+    "invoice.payment_failed",
+    "customer.subscription.deleted",
+    "claimStripeEvent",
+  ];
+  const missing = requiredTerms.filter((term) => !content.includes(term));
+  const insecurePatterns = ["if (webhookSecret && signature)", "return true; // Skip if not configured"];
+  const insecureMatch = insecurePatterns.find((term) => content.includes(term));
+
+  if (missing.length || insecureMatch) {
+    log({
+      name: "Stripe billing webhook route",
+      status: "fail",
+      message: `${path} must fail closed, verify Stripe signatures, handle subscription events, and retain idempotency`,
+    });
+    return;
+  }
+
+  log({
+    name: "Stripe billing webhook route",
+    status: "ok",
+    message: `${path} verifies signed billing events and handles subscription status updates`,
+  });
+}
+
+checkStripeBillingWebhookRoute("src/app/api/billing/webhook/route.ts");
+
 function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
   if (!existsSync(vercelPath) || !existsSync(proxyPath)) {
     log({
