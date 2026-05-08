@@ -754,6 +754,63 @@ function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
 
 checkTenantDomainAccess("src/app/api/admin/domains/route.ts", "src/app/api/tenant/domains/route.ts");
 
+function checkPublicStorefrontApi(paths: {
+  publicContent: string;
+  publicPageConfig: string;
+  v1Content: string;
+  v1PageConfig: string;
+}) {
+  const missingFiles = Object.values(paths).filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Public storefront API", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const publicContent = readFileSync(paths.publicContent, "utf8");
+  const publicPageConfig = readFileSync(paths.publicPageConfig, "utf8");
+  const v1Content = readFileSync(paths.v1Content, "utf8");
+  const v1PageConfig = readFileSync(paths.v1PageConfig, "utf8");
+  const contentOk =
+    publicContent.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    publicContent.includes("getTenantConfig(tenant)") &&
+    publicContent.includes("config.active === false") &&
+    publicContent.includes("isValidSection(section, tenant)") &&
+    publicContent.includes("getTemplateForTenant(tenant)") &&
+    publicContent.includes("getContent(section as ContentSection, tenant)");
+  const pageConfigOk =
+    publicPageConfig.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    publicPageConfig.includes("getTenantConfig(tenant)") &&
+    publicPageConfig.includes("config.active === false") &&
+    publicPageConfig.includes("getPageConfig(tenant)");
+  const aliasesOk =
+    v1Content.includes('from "@/app/api/public/content/[tenant]/[section]/route"') &&
+    v1Content.includes("return publicContentGET(") &&
+    v1PageConfig.includes('from "@/app/api/public/page-config/[tenant]/route"') &&
+    v1PageConfig.includes("return publicPageConfigGET(");
+
+  if (!contentOk || !pageConfigOk || !aliasesOk) {
+    log({
+      name: "Public storefront API",
+      status: "fail",
+      message: "/api/v1 storefront APIs must stay thin aliases to public routes, and public routes must validate tenant slugs, active tenants, and allowed content sections before reading storage",
+    });
+    return;
+  }
+
+  log({
+    name: "Public storefront API",
+    status: "ok",
+    message: "/api/v1 storefront APIs remain public read-only aliases with tenant and section validation",
+  });
+}
+
+checkPublicStorefrontApi({
+  publicContent: "src/app/api/public/content/[tenant]/[section]/route.ts",
+  publicPageConfig: "src/app/api/public/page-config/[tenant]/route.ts",
+  v1Content: "src/app/api/v1/content/[tenant]/[section]/route.ts",
+  v1PageConfig: "src/app/api/v1/page-config/[tenant]/route.ts",
+});
+
 function checkClerkWebhookRoute(path: string) {
   if (!existsSync(path)) {
     log({ name: "Clerk webhook route", status: "fail", message: `${path} is missing` });
