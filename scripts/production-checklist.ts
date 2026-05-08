@@ -622,7 +622,10 @@ function checkAuthAccessPages(
   const noAccessOk =
     noAccess.includes("UseInvitedEmailButton") &&
     noAccess.includes("signs you out so you can choose that account") &&
-    noAccess.includes("mailto:jacob@scaffoldweb.com");
+    noAccess.includes("mailto:jacob@scaffoldweb.com") &&
+    noAccess.includes('href="/account"') &&
+    noAccess.includes("Choose another site") &&
+    !noAccess.includes('href="/"');
   const accountRecoveryOk =
     account.includes("No invited sites on this account") &&
     account.includes("UseInvitedEmailButton") &&

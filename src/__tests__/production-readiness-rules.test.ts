@@ -479,6 +479,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("No invited sites on this account");
     expect(source).toContain("UseInvitedEmailButton");
     expect(source).toContain("signs you out so you can choose that account");
+    expect(source).toContain('href="/account"');
+    expect(source).toContain("Choose another site");
     expect(source).toContain("Start a new site");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("{button}</SignOutButton>");
