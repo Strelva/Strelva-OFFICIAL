@@ -492,6 +492,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("src/app/api/tenant/domains/route.ts");
     expect(source).toContain('requireTenantPermission(tenant, "domains:manage")');
     expect(source).toContain("/api/admin/domains remains a compatibility alias");
+    expect(source).toContain("Public storefront API");
+    expect(source).toContain("src/app/api/public/content/[tenant]/[section]/route.ts");
+    expect(source).toContain("src/app/api/public/page-config/[tenant]/route.ts");
+    expect(source).toContain("src/app/api/v1/content/[tenant]/[section]/route.ts");
+    expect(source).toContain("src/app/api/v1/page-config/[tenant]/route.ts");
+    expect(source).toContain("config.active === false");
+    expect(source).toContain("isValidSection(section, tenant)");
+    expect(source).toContain("/api/v1 storefront APIs remain public read-only aliases");
     expect(source).toContain("verifies signed user.created events");
     expect(source).toContain("Vercel cron route(s) are covered by proxy CRON_SECRET validation");
     expect(source).toContain("Dependency audit");
@@ -569,7 +577,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
-    expect(audit).toContain("52 passed, 2 warned, 9 failed, 18 skipped");
+    expect(audit).toContain("53 passed, 2 warned, 9 failed, 18 skipped");
     expect(audit).toContain("use the exact email address that received the invite");
     expect(audit).toContain("using the exact invited email");
     expect(audit).toContain("Full `pnpm check:launch` was rerun");
