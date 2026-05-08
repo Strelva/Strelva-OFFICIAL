@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { trackClick } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { readJsonObject } from "@/lib/request-body";
 
 const ALLOWED_EVENTS = new Set([
   "page-view",
@@ -21,7 +22,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
-    const { event } = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { event } = body;
     if (typeof event !== "string" || !ALLOWED_EVENTS.has(event)) {
       return NextResponse.json({ error: "Invalid event" }, { status: 400 });
     }

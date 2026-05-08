@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getContent } from "@/lib/storage";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { readJsonObject } from "@/lib/request-body";
 
 interface CheckoutItem {
   productId: string;
@@ -38,7 +39,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const { items } = (await req.json()) as { items: CheckoutItem[] };
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const items = body.items as CheckoutItem[];
 
   if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });

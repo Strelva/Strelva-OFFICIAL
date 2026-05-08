@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { getRedis } from "@/lib/redis";
+import { readJsonObject } from "@/lib/request-body";
 import { getSanityClient } from "@/lib/sanity";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
@@ -10,7 +11,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many submissions" }, { status: 429 });
   }
 
-  const body = await req.json();
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   const { businessName, description, location, email, currentWebsite, referredBy } = body;
 
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";

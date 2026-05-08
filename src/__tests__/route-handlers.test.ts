@@ -122,6 +122,22 @@ describe("Track API Route Handler", () => {
     expect(data.error).toBe("Invalid event");
   });
 
+  it("POST /api/track rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/track/route");
+
+    const request = new Request("http://localhost/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
   it("POST /api/track rejects script injection attempts", async () => {
     const { POST } = await import("@/app/api/track/route");
 
@@ -274,6 +290,22 @@ describe("Newsletter Subscribe Route Handler", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
   });
+
+  it("POST /api/newsletter/subscribe rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/newsletter/subscribe/route");
+
+    const request = new Request("http://localhost/api/newsletter/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
 });
 
 describe("Booking Route Handler", () => {
@@ -321,6 +353,22 @@ describe("Booking Route Handler", () => {
 
     const data = await response.json();
     expect(data.error).toContain("Invalid email");
+  });
+
+  it("POST /api/booking rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/booking/route");
+
+    const request = new Request("http://localhost/api/booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
   });
 });
 

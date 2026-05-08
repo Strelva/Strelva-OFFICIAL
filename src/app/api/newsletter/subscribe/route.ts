@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addSubscriber } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { readJsonObject } from "@/lib/request-body";
 
 function cleanText(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -15,7 +16,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
-    const { email, name } = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { email, name } = body;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
