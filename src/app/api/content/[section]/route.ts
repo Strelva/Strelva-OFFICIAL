@@ -18,6 +18,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { revalidateClientSite } from "@/lib/revalidate-client";
+import { readJsonObject } from "@/lib/request-body";
 import { sectionSchemas } from "@/lib/schemas";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
@@ -76,7 +77,11 @@ export async function PUT(
     }
     const s = section as ContentSection;
 
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const parsed = sectionSchemas[s].safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
