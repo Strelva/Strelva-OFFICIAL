@@ -21,6 +21,7 @@ import {
 } from "../proxy";
 import { parseMarketingDomains } from "../lib/marketing-hosts";
 import { getTenantFromHost } from "../lib/tenant";
+import { getTenantSiteName } from "../lib/tenant-display";
 
 describe("proxy host routing helpers", () => {
   it("routes tenant.scaffoldweb.com as a platform tenant subdomain", () => {
@@ -54,6 +55,12 @@ describe("proxy host routing helpers", () => {
     expect(getTenantFromHost("gldf.localhost:3000")).toBe("gldf");
     expect(getTenantFromHost("scaffoldweb.com")).toBeNull();
     expect(getTenantFromHost("admin.scaffoldweb.com")).toBeNull();
+  });
+
+  it("keeps auth page tenant names useful when tenant storage is unavailable", () => {
+    expect(getTenantSiteName("gldf", undefined)).toBe("Great Lakes Dried Fruit");
+    expect(getTenantSiteName("new-client", undefined)).toBe("New Client");
+    expect(getTenantSiteName("demo", undefined)).toBe("Scaffold Web");
   });
 
   it("keeps platform marketing hosts out of tenant routing", () => {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantSiteName } from "@/lib/tenant-display";
 import { getTenantConfig } from "@/lib/tenants";
 import { SignInClient } from "./SignInClient";
 
@@ -13,7 +14,7 @@ async function getPostSignInUrl(): Promise<"/account" | "/dashboard"> {
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
-  const siteName = config?.siteName || "Scaffold Web";
+  const siteName = getTenantSiteName(tenant, config);
 
   return {
     title: `Sign in to ${siteName}`,
@@ -24,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SignInPage() {
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
-  const siteName = config?.siteName || "Scaffold Web";
+  const siteName = getTenantSiteName(tenant, config);
   const postSignInUrl = await getPostSignInUrl();
 
   return <SignInClient siteName={siteName} postSignInUrl={postSignInUrl} />;
