@@ -95,7 +95,7 @@ Minimum production values to confirm in Vercel:
 ### Production Live Verification
 
 - Status: blocked.
-- Evidence: local smoke and build gates pass, but authenticated production dashboard access, live webhook delivery, and live cron execution still require production credentials and provider access. A rendered Playwright probe against `https://reb-studio.vercel.app/dashboard` on May 8, 2026 redirected to `/sign-in` but still showed the stale browser title `Scaffold Web` instead of the current invite-focused `Sign in to Scaffold Web | Scaffold Web` title, confirming the live Vercel app needs a fresh production redeploy after env/DNS fixes before final customer-access verification.
+- Evidence: local smoke and build gates pass, and the Vercel app-host freshness check now confirms `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`. Authenticated production dashboard access, live webhook delivery, and live cron execution still require production credentials, provider access, the remaining env fixes, and the public `scaffoldweb.com` DNS fix before final customer-access verification.
 - Required owner action: after production env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release`, verify `/dashboard/site` loads for an invited owner, confirm a content edit saves and refreshes preview, confirm Clerk/Sanity/Stripe webhook deliveries in provider dashboards, and verify cron 401/success behavior: `/api/cron/*` returns `401` without `Authorization: Bearer <CRON_SECRET>` and succeeds with it.
 
 ### Production Domain Routing
