@@ -524,6 +524,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(domainSetup).toContain("pnpm check:prod");
     expect(launchBlockers).toContain("pnpm audit");
     expect(launchBlockers).toContain("pnpm check:release");
+    expect(launchBlockers).toContain("261 tests across 28 files");
+    expect(launchBlockers).toContain("261 unit tests across 28 files");
+    expect(launchBlockers).not.toContain("259 tests across 28 files");
+    expect(launchBlockers).not.toContain("259 unit tests across 28 files");
     expect(launchBlockers).toContain("forces `REB_DEV_UNGATED_ACCESS=0`");
     expect(launchBlockers).toContain("isolated Playwright server instead of an existing `localhost:3000` process");
     expect(launchBlockers).not.toContain("direct `curl` to `http://localhost:3000/sign-in` returned `200 OK`");
