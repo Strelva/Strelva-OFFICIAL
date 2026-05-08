@@ -336,6 +336,16 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("normalizeTenantDomain(adminDomain)");
   });
 
+  it("rejects malformed content and page-config write bodies", () => {
+    const content = readFileSync(path.join(process.cwd(), "src/app/api/content/[section]/route.ts"), "utf8");
+    const pageConfig = readFileSync(path.join(process.cwd(), "src/app/api/page-config/route.ts"), "utf8");
+
+    for (const source of [content, pageConfig]) {
+      expect(source).toContain("readJsonObject(request)");
+      expect(source).toContain("Invalid request body");
+    }
+  });
+
   it("does not trust browser Origin for Stripe return URLs", () => {
     const subscription = readFileSync(
       path.join(process.cwd(), "src/app/api/billing/create-subscription/route.ts"),

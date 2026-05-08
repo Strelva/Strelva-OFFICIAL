@@ -70,11 +70,25 @@ vi.mock("@/lib/domains", () => ({
   }),
 }));
 
+vi.mock("@/components/templates/registry", () => ({
+  getTemplateForTenant: vi.fn(() =>
+    Promise.resolve({
+      contentSections: ["hero", "services", "settings", "theme"],
+    })
+  ),
+}));
+
 vi.mock("@/lib/storage", () => ({
   trackClick: vi.fn(() => Promise.resolve()),
   getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
+  getDraftContent: vi.fn(() => Promise.resolve(null)),
   getPageConfig: vi.fn(() => Promise.resolve({ home: { sections: [] } })),
   setContent: vi.fn(() => Promise.resolve()),
+  setDraftContent: vi.fn(() => Promise.resolve()),
+  clearDraft: vi.fn(() => Promise.resolve()),
+  appendVersion: vi.fn(() => Promise.resolve()),
+  recordSectionUpdate: vi.fn(() => Promise.resolve()),
+  setPageConfig: vi.fn(() => Promise.resolve()),
   uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
   createBookingAtomic: vi.fn(() =>
@@ -311,6 +325,50 @@ describe("Public Content API Route Handlers", () => {
     });
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("Tenant content write route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHeadersGet.mockImplementation((key: string) => {
+      if (key === "x-tenant") return "test-tenant";
+      return null;
+    });
+  });
+
+  it("PUT /api/content/:section rejects malformed JSON with a client error", async () => {
+    const { PUT } = await import("@/app/api/content/[section]/route");
+
+    const request = new Request("http://localhost/api/content/hero", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ section: "hero" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("PUT /api/page-config rejects malformed JSON with a client error", async () => {
+    const { PUT } = await import("@/app/api/page-config/route");
+
+    const request = new Request("http://localhost/api/page-config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
   });
 });
 

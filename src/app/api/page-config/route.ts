@@ -4,6 +4,8 @@ import { getPageConfig, logAuditEvent, setPageConfig } from "@/lib/storage";
 import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
+import type { SitePageConfig } from "@/lib/types";
 
 export async function GET() {
   try {
@@ -29,8 +31,13 @@ export async function PUT(request: Request) {
     if (blocked) return blocked;
     const actor = await getActorContext(tenant);
 
-    const body = await request.json();
-    await setPageConfig(body, tenant);
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const pageConfig = body as SitePageConfig;
+    await setPageConfig(pageConfig, tenant);
     if (actor.isImpersonating) {
       await logAuditEvent({
         tenant,
@@ -38,7 +45,7 @@ export async function PUT(request: Request) {
         action: "page_config.updated",
         targetType: "page_config",
         targetId: tenant,
-        metadata: { pages: Object.keys(body || {}) },
+        metadata: { pages: Object.keys(pageConfig) },
       });
     }
     revalidatePath("/");
