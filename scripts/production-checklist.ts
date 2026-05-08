@@ -1430,7 +1430,7 @@ function printReleaseActions() {
     failedEnvs.includes("RESEND_API_KEY") ||
     failedEnvs.includes("RESEND_DOMAIN")
   ) {
-    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up with the exact invited email, reaches /account from scaffoldweb.com auth, and reaches /dashboard/site from admin.greatlakesdriedfruit.com auth.");
+    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email, the email stays prefilled when switching between sign-up and sign-in, scaffoldweb.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
   }
   if (failedEnvs.includes("CLERK_WEBHOOK_SECRET")) {
     console.log("- Clerk webhook: configure https://scaffoldweb.com/api/clerk/webhook for user.created.");
