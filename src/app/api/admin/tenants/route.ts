@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/lib/auth";
+import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
+import type { TenantConfig, TenantFeature } from "@/lib/types";
+
+const TENANT_FEATURES = new Set<TenantFeature>(["commerce", "booking", "newsletter"]);
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanFeatures(value: unknown): TenantFeature[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((feature): feature is TenantFeature => TENANT_FEATURES.has(feature as TenantFeature));
+}
 
 export async function GET() {
   const admin = await isSuperAdmin();
@@ -19,18 +32,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   const {
-    siteName,
-    ownerName,
-    ownerEmail,
-    industry,
-    template,
-    subdomain,
+    siteName: rawSiteName,
+    ownerName: rawOwnerName,
+    ownerEmail: rawOwnerEmail,
+    industry: rawIndustry,
+    template: rawTemplate,
+    subdomain: rawSubdomain,
     features,
     productionDomain,
     adminDomain,
   } = body;
+  const siteName = cleanString(rawSiteName);
+  const ownerName = cleanString(rawOwnerName);
+  const ownerEmail = cleanString(rawOwnerEmail);
+  const industry = cleanString(rawIndustry);
+  const template = cleanString(rawTemplate);
+  const subdomain = cleanString(rawSubdomain);
 
   if (!siteName || !ownerName || !industry || !template || !subdomain) {
     return NextResponse.json(
@@ -43,11 +66,11 @@ export async function POST(req: Request) {
     const tenant = await createTenant({
       siteName,
       ownerName,
-      ownerEmail,
+      ownerEmail: ownerEmail || undefined,
       industry,
       template,
       subdomain,
-      features: features || [],
+      features: cleanFeatures(features),
       productionDomain: typeof productionDomain === "string" ? normalizeTenantDomain(productionDomain) || undefined : undefined,
       adminDomain: typeof adminDomain === "string" ? normalizeTenantDomain(adminDomain) || undefined : undefined,
     });
@@ -66,12 +89,18 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id, ...updates } = await req.json();
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { id: rawId, ...updates } = body;
+  const id = cleanString(rawId);
   if (!id) {
     return NextResponse.json({ error: "Missing tenant id" }, { status: 400 });
   }
 
-  const updated = await updateTenant(id, updates);
+  const updated = await updateTenant(id, updates as Partial<TenantConfig>);
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
