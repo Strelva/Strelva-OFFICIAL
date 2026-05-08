@@ -321,6 +321,21 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteButton).toContain('role="status"');
   });
 
+  it("normalizes admin tenant setup request bodies", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/route.ts"), "utf8");
+
+    expect(source).toContain("readJsonObject(req)");
+    expect(source).toContain("Invalid request body");
+    expect(source).toContain("cleanString(rawSiteName)");
+    expect(source).toContain("cleanString(rawOwnerName)");
+    expect(source).toContain("cleanString(rawOwnerEmail)");
+    expect(source).toContain("cleanString(rawSubdomain)");
+    expect(source).toContain("cleanFeatures(features)");
+    expect(source).toContain("TENANT_FEATURES");
+    expect(source).toContain("normalizeTenantDomain(productionDomain)");
+    expect(source).toContain("normalizeTenantDomain(adminDomain)");
+  });
+
   it("does not trust browser Origin for Stripe return URLs", () => {
     const subscription = readFileSync(
       path.join(process.cwd(), "src/app/api/billing/create-subscription/route.ts"),

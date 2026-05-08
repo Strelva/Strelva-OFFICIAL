@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockUpdateTenant = vi.fn();
+const mockCreateTenant = vi.fn();
 const mockLogActivity = vi.fn();
+const mockLogAuditEvent = vi.fn();
 const mockAddCustomDomain = vi.fn();
 const mockRemoveCustomDomain = vi.fn();
 const mockRefreshDomainClaim = vi.fn();
@@ -45,6 +47,7 @@ vi.mock("@/lib/tenants", () => ({
     })
   ),
   getAllTenants: vi.fn(() => Promise.resolve([])),
+  createTenant: (...args: unknown[]) => mockCreateTenant(...args),
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
   invalidateDomainMapCache: vi.fn(),
 }));
@@ -78,6 +81,7 @@ vi.mock("@/lib/storage", () => ({
     Promise.resolve({ success: true, booking: { id: "b_123" } })
   ),
   logActivity: (...args: unknown[]) => mockLogActivity(...args),
+  logAuditEvent: (...args: unknown[]) => mockLogAuditEvent(...args),
   SECTION_TO_TYPE: {
     hero: "hero",
     settings: "siteSettings",
@@ -155,6 +159,7 @@ describe("Track API Route Handler", () => {
 describe("Admin access handoff route handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.SUPER_ADMIN_EMAILS = "test@example.com";
   });
 
   it("POST /api/admin/invites rejects malformed JSON with a client error", async () => {
@@ -203,6 +208,71 @@ describe("Admin access handoff route handlers", () => {
 
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/admin/tenants rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/admin/tenants/route");
+
+    const request = new Request("http://localhost/api/admin/tenants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("PATCH /api/admin/tenants rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/admin/tenants/route");
+
+    const request = new Request("http://localhost/api/admin/tenants", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/admin/tenants trims launch-critical tenant setup fields", async () => {
+    const { POST } = await import("@/app/api/admin/tenants/route");
+    mockCreateTenant.mockResolvedValue({ id: "gldf", siteName: "Great Lakes Dried Fruit" });
+
+    const request = new Request("http://localhost/api/admin/tenants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        siteName: " Great Lakes Dried Fruit ",
+        ownerName: " Owner Name ",
+        ownerEmail: " owner@example.com ",
+        industry: " food-brand ",
+        template: " food-brand ",
+        subdomain: " gldf ",
+        features: ["commerce", 1, "newsletter"],
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
+    expect(mockCreateTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        siteName: "Great Lakes Dried Fruit",
+        ownerName: "Owner Name",
+        ownerEmail: "owner@example.com",
+        industry: "food-brand",
+        template: "food-brand",
+        subdomain: "gldf",
+        features: ["commerce", "newsletter"],
+      }),
+    );
   });
 });
 
