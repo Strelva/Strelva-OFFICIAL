@@ -20,6 +20,7 @@ import {
   validateCronRequest,
 } from "../proxy";
 import { parseMarketingDomains } from "../lib/marketing-hosts";
+import { getTenantFromHost } from "../lib/tenant";
 
 describe("proxy host routing helpers", () => {
   it("routes tenant.scaffoldweb.com as a platform tenant subdomain", () => {
@@ -45,6 +46,14 @@ describe("proxy host routing helpers", () => {
       tenant: "rohlax",
       isAdminSubdomain: true,
     });
+  });
+
+  it("derives tenant context from auth page hosts when middleware headers are unavailable", () => {
+    expect(getTenantFromHost("admin.gldf.localhost:3000")).toBe("gldf");
+    expect(getTenantFromHost("admin.rohlax.scaffoldweb.com")).toBe("rohlax");
+    expect(getTenantFromHost("gldf.localhost:3000")).toBe("gldf");
+    expect(getTenantFromHost("scaffoldweb.com")).toBeNull();
+    expect(getTenantFromHost("admin.scaffoldweb.com")).toBeNull();
   });
 
   it("keeps platform marketing hosts out of tenant routing", () => {
