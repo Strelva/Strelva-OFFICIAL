@@ -811,6 +811,47 @@ checkPublicStorefrontApi({
   v1PageConfig: "src/app/api/v1/page-config/[tenant]/route.ts",
 });
 
+function checkOAuthCallbackState(callbackPaths: string[]) {
+  const missingFiles = callbackPaths.filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "OAuth callback state", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const insecureRoutes = callbackPaths.filter((path) => {
+    const source = readFileSync(path, "utf8");
+    return !(
+      source.includes("verifyOAuthState(state)") &&
+      source.includes("if (!verifiedState)") &&
+      source.includes("const tenantId = verifiedState.tenantId") &&
+      source.includes("saveConnection({") &&
+      !source.includes("Buffer.from(state") &&
+      !source.includes("JSON.parse(state")
+    );
+  });
+
+  if (insecureRoutes.length) {
+    log({
+      name: "OAuth callback state",
+      status: "fail",
+      message: `${insecureRoutes.join(", ")} must verify signed OAuth state and derive tenantId from verifiedState before saving connections`,
+    });
+    return;
+  }
+
+  log({
+    name: "OAuth callback state",
+    status: "ok",
+    message: "OAuth callbacks verify signed state before saving tenant connections",
+  });
+}
+
+checkOAuthCallbackState([
+  "src/app/api/oauth/calendly/callback/route.ts",
+  "src/app/api/oauth/google/callback/route.ts",
+  "src/app/api/oauth/instagram/callback/route.ts",
+]);
+
 function checkClerkWebhookRoute(path: string) {
   if (!existsSync(path)) {
     log({ name: "Clerk webhook route", status: "fail", message: `${path} is missing` });
