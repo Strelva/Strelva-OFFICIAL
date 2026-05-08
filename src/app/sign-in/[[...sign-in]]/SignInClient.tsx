@@ -1,6 +1,7 @@
 "use client";
 
 import { SignIn } from "@clerk/nextjs";
+import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 
 export function SignInClient({
   siteName,
@@ -9,11 +10,14 @@ export function SignInClient({
   siteName: string;
   postSignInUrl: string;
 }) {
+  const title = `Sign in to ${siteName}`;
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-10"
       style={{ background: "#08080a" }}
     >
+      <AuthDocumentTitle title={title} />
       <div className="max-w-md text-center">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#d4a052]">
           Scaffold Web
@@ -22,7 +26,7 @@ export function SignInClient({
           className="mt-3 text-2xl font-semibold"
           style={{ color: "#e8e8ec" }}
         >
-          Sign in to {siteName}
+          {title}
         </h1>
         <p className="mt-3 text-sm leading-6 text-[#8e8e96]">
           Use the exact email address that received your invite. After sign-in,
