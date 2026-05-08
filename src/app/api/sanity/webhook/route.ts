@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
+import { parseBody } from "next-sanity/webhook";
 import { getTenantConfig } from "@/lib/tenants";
 import { logActivity } from "@/lib/storage";
 import { revalidateClientSite } from "@/lib/revalidate-client";
@@ -45,44 +45,29 @@ const TYPE_TO_PATHS: Record<string, string[] | "all"> = {
   pageConfig: "all",
 };
 
-function verifySignature(body: string, signature: string | null): boolean {
-  if (!SANITY_WEBHOOK_SECRET) {
-    // If no secret configured, skip verification (dev mode)
-    console.warn("[Sanity Webhook] No SANITY_WEBHOOK_SECRET configured, skipping signature verification");
-    return true;
-  }
-
-  if (!signature) {
-    return false;
-  }
-
-  const hmac = createHmac("sha256", SANITY_WEBHOOK_SECRET);
-  hmac.update(body);
-  const expectedSignature = hmac.digest("hex");
-
-  // Sanity sends signature as "sha256=<hex>"
-  const providedSig = signature.replace(/^sha256=/, "");
-  return providedSig === expectedSignature;
-}
-
-
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
-    const signature = request.headers.get("x-sanity-signature");
+    if (!SANITY_WEBHOOK_SECRET) {
+      console.error("[Sanity Webhook] SANITY_WEBHOOK_SECRET is not configured");
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 500 }
+      );
+    }
 
-    // Verify webhook signature
-    if (!verifySignature(body, signature)) {
+    const { body: payload, isValidSignature } = await parseBody<SanityWebhookPayload>(
+      request,
+      SANITY_WEBHOOK_SECRET
+    );
+
+    if (!isValidSignature) {
       return NextResponse.json(
         { error: "Invalid signature" },
         { status: 401 }
       );
     }
 
-    let payload: SanityWebhookPayload;
-    try {
-      payload = JSON.parse(body);
-    } catch {
+    if (!payload) {
       return NextResponse.json(
         { error: "Invalid JSON payload" },
         { status: 400 }

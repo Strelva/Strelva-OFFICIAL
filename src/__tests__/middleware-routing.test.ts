@@ -11,12 +11,15 @@ import {
   extractTenantFromHost,
   getEnvDomainMap,
   getLegacyPublicSiteRedirect,
+  isMarketingHost,
   resolveTenantFromCustomDomain,
   resolveTenantFromDomainMap,
   shouldRedirectAdminRoot,
+  shouldResolveCustomDomain,
   shouldRewriteMarketingRoot,
   validateCronRequest,
 } from "../proxy";
+import { parseMarketingDomains } from "../lib/marketing-hosts";
 
 describe("proxy host routing helpers", () => {
   it("routes tenant.scaffoldweb.com as a platform tenant subdomain", () => {
@@ -33,11 +36,45 @@ describe("proxy host routing helpers", () => {
     });
   });
 
+  it("routes admin tenant hosts to the tenant dashboard surface", () => {
+    expect(extractTenantFromHost("admin.gldf.localhost:3000")).toEqual({
+      tenant: "gldf",
+      isAdminSubdomain: true,
+    });
+    expect(extractTenantFromHost("admin.rohlax.scaffoldweb.com")).toEqual({
+      tenant: "rohlax",
+      isAdminSubdomain: true,
+    });
+  });
+
   it("keeps platform marketing hosts out of tenant routing", () => {
+    expect(isMarketingHost("scaffoldweb.com")).toBe(true);
+    expect(isMarketingHost("localhost:3000")).toBe(true);
+    expect(isMarketingHost("127.0.0.1:3001")).toBe(true);
+    expect(isMarketingHost("gldf.localhost:3000")).toBe(false);
+
     expect(extractTenantFromHost("scaffoldweb.com")).toEqual({
       tenant: null,
       isAdminSubdomain: false,
     });
+  });
+
+  it("normalizes marketing domains from production env format", () => {
+    expect(parseMarketingDomains("https://reb.studio, www.reb.studio/, scaffoldweb.com")).toEqual([
+      "reb.studio",
+      "www.reb.studio",
+      "scaffoldweb.com",
+    ]);
+  });
+
+  it("skips custom-domain lookups for known platform and local hosts", () => {
+    expect(shouldResolveCustomDomain("scaffoldweb.com")).toBe(false);
+    expect(shouldResolveCustomDomain("localhost:3000")).toBe(false);
+    expect(shouldResolveCustomDomain("127.0.0.1:3000")).toBe(false);
+    expect(shouldResolveCustomDomain("gldf.localhost:3000")).toBe(false);
+    expect(shouldResolveCustomDomain("reb-studio.vercel.app")).toBe(false);
+    expect(shouldResolveCustomDomain("gldf.scaffoldweb.com")).toBe(false);
+    expect(shouldResolveCustomDomain("greatlakesdriedfruit.com")).toBe(true);
   });
 
   it("routes custom domains from the domain map", () => {

@@ -47,10 +47,14 @@ function verifySignature(payload: string, signature: string, secret: string): bo
     .update(signedPayload)
     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(sigValue, "hex"),
-    Buffer.from(expectedSig, "hex")
-  );
+  try {
+    const provided = Buffer.from(sigValue, "hex");
+    const expected = Buffer.from(expectedSig, "hex");
+    if (provided.length !== expected.length) return false;
+    return crypto.timingSafeEqual(provided, expected);
+  } catch {
+    return false;
+  }
 }
 
 async function findTenantByUserUri(userUri: string): Promise<string | null> {
@@ -73,17 +77,18 @@ export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get("Calendly-Webhook-Signature") || "";
 
-  if (webhookSecret && signature) {
-    try {
-      const valid = verifySignature(body, signature, webhookSecret);
-      if (!valid) {
-        console.error("Calendly webhook signature verification failed");
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
-    } catch (err) {
-      console.error("Calendly webhook signature error:", err);
-      return NextResponse.json({ error: "Signature verification failed" }, { status: 401 });
-    }
+  if (!webhookSecret) {
+    console.error("Calendly webhook secret not configured");
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+  if (!signature) {
+    return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+  }
+
+  const valid = verifySignature(body, signature, webhookSecret);
+  if (!valid) {
+    console.error("Calendly webhook signature verification failed");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   let payload: CalendlyWebhookPayload;

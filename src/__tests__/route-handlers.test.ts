@@ -136,6 +136,60 @@ describe("Track API Route Handler", () => {
   });
 });
 
+describe("Admin access handoff route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("POST /api/admin/invites rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/admin/invites/route");
+
+    const request = new Request("http://localhost/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/admin/invites rejects invalid email or tenant fields before provider work", async () => {
+    const { POST } = await import("@/app/api/admin/invites/route");
+
+    const request = new Request("http://localhost/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "not-an-email", tenant: "  " }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Missing email or tenant");
+  });
+
+  it("POST /api/admin/tenants/assign rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/admin/tenants/assign/route");
+
+    const request = new Request("http://localhost/api/admin/tenants/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+});
+
 describe("Public Content API Route Handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();

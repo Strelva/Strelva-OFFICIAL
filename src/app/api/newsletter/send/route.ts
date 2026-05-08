@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getSubscribers, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { isRateLimitedWindowed } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -15,6 +15,8 @@ export async function POST(req: Request) {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "content:write");
+    if (permissionDenied) return permissionDenied;
 
     const { subject, body, previewText } = await req.json();
 
@@ -25,7 +27,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (isRateLimitedWindowed(`newsletter-send:${tenant}`, 5, 3_600_000)) {
+    if (await isRateLimitedWindowedAsync(`newsletter-send:${tenant}`, 5, 3_600_000)) {
       return NextResponse.json(
         { error: "Newsletter send limit reached. Try again in an hour." },
         { status: 429 }

@@ -9,6 +9,19 @@ function getStripe() {
   });
 }
 
+function getRequestOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
+  return `${proto}://${host}`;
+}
+
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
 /** Super-admin creates a $149/mo subscription checkout for a client tenant. */
 export async function POST(req: Request) {
   if (!(await isSuperAdmin())) {
@@ -24,7 +37,8 @@ export async function POST(req: Request) {
   }
 
   const stripe = getStripe();
-  const { tenantId, customerEmail, customerName } = await req.json();
+  const { tenantId, customerEmail: rawCustomerEmail, customerName } = await req.json();
+  const customerEmail = normalizeEmail(rawCustomerEmail);
 
   if (!tenantId || !customerEmail) {
     return NextResponse.json(
@@ -51,7 +65,7 @@ export async function POST(req: Request) {
     await updateTenant(tenantId, { stripeCustomerId: customerId });
   }
 
-  const origin = req.headers.get("origin") || "https://scaffoldweb.com";
+  const origin = getRequestOrigin(req);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

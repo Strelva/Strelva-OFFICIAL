@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getPageConfig, logAuditEvent, setPageConfig } from "@/lib/storage";
 import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function GET() {
   try {
@@ -22,6 +23,10 @@ export async function PUT(request: Request) {
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    const permissionDenied = await requireTenantPermission(tenant, "content:write");
+    if (permissionDenied) return permissionDenied;
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
     const actor = await getActorContext(tenant);
 
     const body = await request.json();

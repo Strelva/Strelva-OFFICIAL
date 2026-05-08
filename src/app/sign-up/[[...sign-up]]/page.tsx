@@ -1,6 +1,41 @@
 import { SignUp } from "@clerk/nextjs";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { isMarketingHost } from "@/lib/marketing-hosts";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
 
-export default function SignUpPage() {
+async function getPostSignUpUrl(): Promise<"/account" | "/dashboard"> {
+  const host = (await headers()).get("host") || "";
+  return isMarketingHost(host) ? "/account" : "/dashboard";
+}
+
+async function getSignUpSiteName() {
+  const tenant = await getTenantFromHeaders();
+  const config = await getTenantConfig(tenant);
+  return config?.siteName || "Scaffold Web";
+}
+
+function getSignUpTitle(siteName: string) {
+  return siteName === "Scaffold Web"
+    ? "Create your dashboard account"
+    : `Create your ${siteName} dashboard account`;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const siteName = await getSignUpSiteName();
+
+  return {
+    title: getSignUpTitle(siteName),
+    description: `Create your account with the exact email address from your ${siteName} invite.`,
+  };
+}
+
+export default async function SignUpPage() {
+  const siteName = await getSignUpSiteName();
+  const postSignUpUrl = await getPostSignUpUrl();
+  const title = getSignUpTitle(siteName);
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-10"
@@ -11,7 +46,7 @@ export default function SignUpPage() {
           Scaffold Web
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-[#e8e8ec]">
-          Create your dashboard account
+          {title}
         </h1>
         <p className="mt-3 text-sm leading-6 text-[#8e8e96]">
           Use the exact email address that received your invite. That is how we
@@ -37,11 +72,16 @@ export default function SignUpPage() {
             dividerText: "!text-[#55555c]",
           },
         }}
-        fallbackRedirectUrl="/dashboard"
+        forceRedirectUrl={postSignUpUrl}
+        fallbackRedirectUrl={postSignUpUrl}
       />
       <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
-        If your invite email is missing or access does not appear after signup,
-        contact Scaffold Web and we&apos;ll get it connected.
+        If your invite email is missing, access does not appear after signup,
+        or the signup form is not loading, email{" "}
+        <a className="text-[#d4a052] underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
+          jacob@scaffoldweb.com
+        </a>{" "}
+        and we&apos;ll get it connected.
       </p>
     </div>
   );

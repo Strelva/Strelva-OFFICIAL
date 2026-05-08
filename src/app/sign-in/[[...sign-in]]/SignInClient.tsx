@@ -2,19 +2,32 @@
 
 import { SignIn } from "@clerk/nextjs";
 
-export function SignInClient({ siteName }: { siteName: string }) {
+export function SignInClient({
+  siteName,
+  postSignInUrl,
+}: {
+  siteName: string;
+  postSignInUrl: string;
+}) {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center gap-6"
+      className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-10"
       style={{ background: "#08080a" }}
     >
-      <div className="text-center">
+      <div className="max-w-md text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#d4a052]">
+          Scaffold Web
+        </p>
         <h1
-          className="text-[13px] font-medium tracking-[0.15em] uppercase"
+          className="mt-3 text-2xl font-semibold"
           style={{ color: "#e8e8ec" }}
         >
-          {siteName}
+          Sign in to {siteName}
         </h1>
+        <p className="mt-3 text-sm leading-6 text-[#8e8e96]">
+          Use the exact email address that received your invite. After sign-in,
+          we&apos;ll take you to the right website dashboard.
+        </p>
       </div>
       <SignIn
         appearance={{
@@ -35,8 +48,17 @@ export function SignInClient({ siteName }: { siteName: string }) {
             dividerText: "!text-[#55555c]",
           },
         }}
-        fallbackRedirectUrl="/dashboard"
+        forceRedirectUrl={postSignInUrl}
+        fallbackRedirectUrl={postSignInUrl}
       />
+      <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
+        Missing access or the sign-in form is not loading? Sign in with the
+        invited email or email{" "}
+        <a className="text-[#d4a052] underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
+          jacob@scaffoldweb.com
+        </a>{" "}
+        and we&apos;ll connect the right account.
+      </p>
     </div>
   );
 }

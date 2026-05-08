@@ -10,6 +10,13 @@ function getStripe() {
   });
 }
 
+function getRequestOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
+  return `${proto}://${host}`;
+}
+
 /** Generates a Stripe Customer Portal link so clients can manage their billing. */
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -35,7 +42,7 @@ export async function POST(req: Request) {
   }
 
   const stripe = getStripe();
-  const origin = req.headers.get("origin") || "https://scaffoldweb.com";
+  const origin = getRequestOrigin(req);
 
   const session = await stripe.billingPortal.sessions.create({
     customer: config.stripeCustomerId,

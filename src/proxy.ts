@@ -2,18 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
+import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 
-const MARKETING_HOSTS = new Set([
-  "scaffoldweb.com",
-  "www.scaffoldweb.com",
-  "localhost",
-  "localhost:3000",
-  "localhost:3001",
-  "127.0.0.1",
-  "127.0.0.1:3000",
-  "127.0.0.1:3001",
-  "reb-studio.vercel.app",
-]);
+export { isMarketingHost } from "./lib/marketing-hosts";
 
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   "gldf.scaffoldweb.com": "https://greatlakesdriedfruit.com",
@@ -54,17 +45,33 @@ const isPublicRoute = createRouteMatcher([
 
 const isCronRoute = createRouteMatcher(["/api/cron/(.*)"]);
 
+export function shouldResolveCustomDomain(host: string): boolean {
+  const hostWithoutPort = host.toLowerCase().split(":")[0];
+  return (
+    !isMarketingHost(host) &&
+    !hostWithoutPort.endsWith(".localhost") &&
+    !hostWithoutPort.endsWith(".scaffoldweb.com") &&
+    !hostWithoutPort.endsWith(".vercel.app")
+  );
+}
+
 export function extractTenantFromHost(host: string): { tenant: string | null; isAdminSubdomain: boolean } {
   const normalizedHost = host.toLowerCase();
   const hostWithoutPort = normalizedHost.split(":")[0];
 
-  if (MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort)) {
+  if (isMarketingHost(host)) {
     return { tenant: null, isAdminSubdomain: false };
   }
 
   // Production: tenant.scaffoldweb.com
   if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
     const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
+    if (subdomain.startsWith("admin.")) {
+      const tenant = subdomain.replace(/^admin\./, "");
+      return tenant
+        ? { tenant, isAdminSubdomain: true }
+        : { tenant: null, isAdminSubdomain: false };
+    }
     if (subdomain && subdomain !== "www" && subdomain !== "admin") {
       return { tenant: subdomain, isAdminSubdomain: false };
     }
@@ -74,6 +81,12 @@ export function extractTenantFromHost(host: string): { tenant: string | null; is
   // Local dev: tenant.localhost (e.g., gldf.localhost:3000)
   if (hostWithoutPort.endsWith(".localhost")) {
     const subdomain = hostWithoutPort.replace(".localhost", "");
+    if (subdomain.startsWith("admin.")) {
+      const tenant = subdomain.replace(/^admin\./, "");
+      return tenant
+        ? { tenant, isAdminSubdomain: true }
+        : { tenant: null, isAdminSubdomain: false };
+    }
     if (subdomain) {
       return { tenant: subdomain, isAdminSubdomain: false };
     }
@@ -109,10 +122,7 @@ export function resolveTenantFromDomainMap(
 }
 
 export function shouldRewriteMarketingRoot(host: string, pathname: string): boolean {
-  const normalizedHost = host.toLowerCase();
-  const hostWithoutPort = normalizedHost.split(":")[0];
-  const isMarketingHost = MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort);
-  return isMarketingHost && pathname === "/";
+  return isMarketingHost(host) && pathname === "/";
 }
 
 export function getLegacyPublicSiteRedirect(host: string): string | null {
@@ -309,7 +319,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   tenantId = extraction.tenant;
   isAdminSubdomain = extraction.isAdminSubdomain;
 
-  if (!tenantId) {
+  if (!tenantId && shouldResolveCustomDomain(host)) {
     const customDomainResult = await resolveTenantFromCustomDomain(hostWithoutPort, req);
     tenantId = customDomainResult.tenant;
     isAdminSubdomain = customDomainResult.isAdminSubdomain;

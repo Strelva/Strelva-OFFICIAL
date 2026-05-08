@@ -3,6 +3,8 @@ import { getAllTenants } from "@/lib/tenants";
 import { pruneOldEvents } from "@/lib/events";
 
 export async function GET() {
+  // Auth handled by proxy (CRON_SECRET check)
+
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);
 
