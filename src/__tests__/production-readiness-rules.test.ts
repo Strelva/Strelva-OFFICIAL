@@ -289,10 +289,17 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(invite).toContain("buildInviteEmailText");
     expect(invite).toContain("sanitizeEmailSubjectText");
     expect(invite).toContain("text: buildInviteEmailText");
+    expect(invite).toContain("getInviteSignUpUrl");
+    expect(invite).toContain("url.searchParams.set(\"email\", email)");
+    expect(invite).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
+    expect(invite).toContain("buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })");
+    expect(invite).toContain("buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })");
     expect(inviteEmail).toContain("function escapeHtml");
     expect(inviteEmail).toContain("buildInviteEmailText");
     expect(inviteEmail).toContain("safeSiteName");
     expect(inviteEmail).toContain("safeSignUpUrl");
+    expect(inviteEmail).toContain("safeEmail");
+    expect(inviteEmail).toContain("Use <strong>${safeEmail}</strong>");
     expect(inviteEmail).toContain("replace(/<[^>]*>/g");
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
     expect(inviteEmail).toContain("<strong>${safeSiteName}</strong>");

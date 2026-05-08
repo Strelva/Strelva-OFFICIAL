@@ -660,8 +660,8 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
   const inviteButton = readFileSync(inviteButtonPath, "utf8");
   const inviteRoute = readFileSync(inviteRoutePath, "utf8");
   const expectedTenantSignUpUrl = 'getTenantDashboardUrl(tenantConfig, "/sign-up", "production")';
-  const expectedInviteEmailHtml = "buildInviteEmailHtml({ siteName: tenantConfig.siteName, signUpUrl })";
-  const expectedInviteEmailText = "buildInviteEmailText({ siteName: tenantConfig.siteName, signUpUrl })";
+  const expectedInviteEmailHtml = "buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })";
+  const expectedInviteEmailText = "buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })";
   const adminOk =
     adminPage.includes("<InviteButton") &&
     adminPage.includes("ownerEmail={t.ownerEmail}") &&
@@ -684,6 +684,8 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
     inviteButton.includes("Send Invite");
   const routeOk =
     inviteRoute.includes(expectedTenantSignUpUrl) &&
+    inviteRoute.includes("getInviteSignUpUrl(") &&
+    inviteRoute.includes("url.searchParams.set(\"email\", email)") &&
     inviteRoute.includes(expectedInviteEmailHtml) &&
     inviteRoute.includes(expectedInviteEmailText);
 
