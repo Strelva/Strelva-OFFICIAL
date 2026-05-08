@@ -19,6 +19,17 @@ function normalizeEmail(value: unknown): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
+function getInviteSignUpUrl(baseSignUpUrl: string, email: string): string {
+  try {
+    const url = new URL(baseSignUpUrl);
+    url.searchParams.set("email", email);
+    return url.toString();
+  } catch {
+    const separator = baseSignUpUrl.includes("?") ? "&" : "?";
+    return `${baseSignUpUrl}${separator}email=${encodeURIComponent(email)}`;
+  }
+}
+
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -83,7 +94,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const signUpUrl = getTenantDashboardUrl(tenantConfig, "/sign-up", "production");
+  const signUpUrl = getInviteSignUpUrl(
+    getTenantDashboardUrl(tenantConfig, "/sign-up", "production"),
+    email,
+  );
   const siteNameText = sanitizeEmailSubjectText(tenantConfig.siteName);
 
   if (process.env.RESEND_API_KEY) {
@@ -95,8 +109,8 @@ export async function POST(req: Request) {
         from: `Scaffold Web <hello@${process.env.RESEND_DOMAIN || "scaffoldweb.com"}>`,
         to: email,
         subject: `You're invited to manage ${siteNameText}`,
-        html: buildInviteEmailHtml({ siteName: tenantConfig.siteName, signUpUrl }),
-        text: buildInviteEmailText({ siteName: tenantConfig.siteName, signUpUrl }),
+        html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
+        text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
       });
 
       return NextResponse.json({

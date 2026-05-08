@@ -7,6 +7,10 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { getTenantConfig } from "@/lib/tenants";
 
+type SignUpSearchParams = {
+  email?: string | string[];
+};
+
 async function getPostSignUpUrl(): Promise<"/account" | "/dashboard"> {
   const host = (await headers()).get("host") || "";
   return isMarketingHost(host) ? "/account" : "/dashboard";
@@ -24,6 +28,17 @@ function getSignUpTitle(siteName: string) {
     : `Create your ${siteName} dashboard account`;
 }
 
+function getInvitedEmail(searchParams: SignUpSearchParams): string | null {
+  const value = Array.isArray(searchParams.email)
+    ? searchParams.email[0]
+    : searchParams.email;
+
+  if (!value) return null;
+
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const siteName = await getSignUpSiteName();
 
@@ -33,10 +48,16 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<SignUpSearchParams>;
+}) {
+  const params = await searchParams;
   const siteName = await getSignUpSiteName();
   const postSignUpUrl = await getPostSignUpUrl();
   const title = getSignUpTitle(siteName);
+  const invitedEmail = getInvitedEmail(params);
 
   return (
     <div
@@ -55,6 +76,11 @@ export default async function SignUpPage() {
           Use the exact email address that received your invite. That is how we
           connect your account to the right website dashboard.
         </p>
+        {invitedEmail ? (
+          <p className="mt-4 rounded-md border border-[#2b2418] bg-[#15110b] px-3 py-2 text-sm text-[#d9c099]">
+            Invited email: <span className="font-medium text-[#f1d7a5]">{invitedEmail}</span>
+          </p>
+        ) : null}
       </div>
       <SignUp
         appearance={{
@@ -77,6 +103,7 @@ export default async function SignUpPage() {
         }}
         forceRedirectUrl={postSignUpUrl}
         fallbackRedirectUrl={postSignUpUrl}
+        initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
       />
       <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
         If your invite email is missing, access does not appear after signup,
