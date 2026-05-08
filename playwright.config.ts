@@ -6,6 +6,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}`;
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL,
     trace: "retain-on-failure",
