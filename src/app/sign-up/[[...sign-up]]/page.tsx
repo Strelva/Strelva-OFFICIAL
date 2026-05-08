@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantSiteName } from "@/lib/tenant-display";
 import { getTenantConfig } from "@/lib/tenants";
 
 async function getPostSignUpUrl(): Promise<"/account" | "/dashboard"> {
@@ -14,7 +15,7 @@ async function getPostSignUpUrl(): Promise<"/account" | "/dashboard"> {
 async function getSignUpSiteName() {
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
-  return config?.siteName || "Scaffold Web";
+  return getTenantSiteName(tenant, config);
 }
 
 function getSignUpTitle(siteName: string) {
