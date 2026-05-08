@@ -101,7 +101,15 @@ describe("admin invites route", () => {
       to: "owner@example.com",
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),
-      text: expect.stringContaining("Create your account: https://admin.example.com/sign-up"),
+      text: expect.stringContaining(
+        "Create your account: https://admin.example.com/sign-up?email=owner%40example.com",
+      ),
+    }));
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      html: expect.stringContaining("owner@example.com"),
+      text: expect.stringContaining(
+        "Use owner@example.com when signing up so your dashboard access connects automatically.",
+      ),
     }));
   });
 });
