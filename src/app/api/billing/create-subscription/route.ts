@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { isSuperAdmin } from "@/lib/auth";
+import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 
 function getStripe() {
@@ -37,19 +38,26 @@ export async function POST(req: Request) {
   }
 
   const stripe = getStripe();
-  const { tenantId, customerEmail: rawCustomerEmail, customerName } = await req.json();
-  const customerEmail = normalizeEmail(rawCustomerEmail);
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  if (!tenantId || !customerEmail) {
+  const { tenantId, customerEmail: rawCustomerEmail, customerName } = body;
+  const normalizedTenantId = typeof tenantId === "string" ? tenantId.trim() : "";
+  const customerEmail = normalizeEmail(rawCustomerEmail);
+  const normalizedCustomerName = typeof customerName === "string" ? customerName.trim() : "";
+
+  if (!normalizedTenantId || !customerEmail) {
     return NextResponse.json(
       { error: "tenantId and customerEmail are required" },
       { status: 400 }
     );
   }
 
-  const tenantConfig = await getTenantConfig(tenantId);
+  const tenantConfig = await getTenantConfig(normalizedTenantId);
   if (!tenantConfig) {
-    return NextResponse.json({ error: `Unknown tenant: ${tenantId}` }, { status: 400 });
+    return NextResponse.json({ error: `Unknown tenant: ${normalizedTenantId}` }, { status: 400 });
   }
 
   // Reuse existing Stripe customer or create one
@@ -57,12 +65,12 @@ export async function POST(req: Request) {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: customerEmail,
-      name: customerName || tenantConfig.ownerName,
-      metadata: { tenantId },
+      name: normalizedCustomerName || tenantConfig.ownerName,
+      metadata: { tenantId: normalizedTenantId },
     });
     customerId = customer.id;
     // Persist the new Stripe customer ID to tenant config
-    await updateTenant(tenantId, { stripeCustomerId: customerId });
+    await updateTenant(normalizedTenantId, { stripeCustomerId: customerId });
   }
 
   const origin = getRequestOrigin(req);
@@ -71,9 +79,9 @@ export async function POST(req: Request) {
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: SCAFFOLD_MONTHLY_PRICE, quantity: 1 }],
-    success_url: `${origin}/admin?subscription=success&tenant=${tenantId}`,
-    cancel_url: `${origin}/admin?subscription=cancelled&tenant=${tenantId}`,
-    metadata: { tenantId },
+    success_url: `${origin}/admin?subscription=success&tenant=${normalizedTenantId}`,
+    cancel_url: `${origin}/admin?subscription=cancelled&tenant=${normalizedTenantId}`,
+    metadata: { tenantId: normalizedTenantId },
   });
 
   return NextResponse.json({

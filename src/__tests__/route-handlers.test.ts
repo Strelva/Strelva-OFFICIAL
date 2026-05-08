@@ -408,6 +408,31 @@ describe("Tenant Settings Route Handler", () => {
   });
 });
 
+describe("Billing route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SUPER_ADMIN_EMAILS = "test@example.com";
+    process.env.STRIPE_SECRET_KEY = "sk_test_123";
+    process.env.STRIPE_SCAFFOLD_PRICE_ID = "price_test_123";
+  });
+
+  it("POST /api/billing/create-subscription rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/billing/create-subscription/route");
+
+    const request = new Request("http://localhost/api/billing/create-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+});
+
 describe("Ownership export and offboarding route handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
