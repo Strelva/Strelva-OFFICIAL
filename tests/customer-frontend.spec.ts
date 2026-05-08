@@ -102,6 +102,18 @@ test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) 
   await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
 });
 
+test("admin tenant host sign-in keeps the invited email context", async ({ page }) => {
+  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
+  const response = await page.goto(`${adminOrigin}/sign-in?email=owner%40example.com`);
+
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-in\?email=owner%40example\.com/);
+  await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
+  await expect(page.getByText("Invited email:")).toBeVisible();
+  await expect(page.getByText("owner@example.com")).toBeVisible();
+  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+});
+
 test("admin tenant host sign-up uses the tenant invite context", async ({ page }) => {
   const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
   const response = await page.goto(`${adminOrigin}/sign-up?email=owner%40example.com`);

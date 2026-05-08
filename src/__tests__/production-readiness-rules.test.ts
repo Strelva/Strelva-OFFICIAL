@@ -458,8 +458,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("toHaveTitle(/Sign in to Great Lakes Dried Fruit");
     expect(source).toContain("toHaveTitle(/Create your dashboard account");
     expect(source).toContain("toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account");
+    expect(source).toContain("admin tenant host sign-in keeps the invited email context");
     expect(source).toContain("cron maintenance endpoint is not public");
     expect(signInClient).toContain("Use the exact email address that received your invite");
+    expect(signInClient).toContain("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}");
+    expect(signInClient).toContain('signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}');
     expect(signInClient).not.toContain("Use the email address from your invite");
     expect(customerFrontendSmoke).toContain("Use the exact email address that received your invite");
     expect(customerFrontendSmoke).not.toContain("Use the email address from your invite");
@@ -526,8 +529,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("pnpm check:release");
     expect(launchBlockers).toContain("261 tests across 28 files");
     expect(launchBlockers).toContain("261 unit tests across 28 files");
+    expect(launchBlockers).toContain("20 Playwright tests");
+    expect(launchBlockers).toContain("20 smoke tests");
     expect(launchBlockers).not.toContain("259 tests across 28 files");
     expect(launchBlockers).not.toContain("259 unit tests across 28 files");
+    expect(launchBlockers).not.toContain("19 Playwright tests");
+    expect(launchBlockers).not.toContain("19 smoke tests");
     expect(launchBlockers).toContain("forces `REB_DEV_UNGATED_ACCESS=0`");
     expect(launchBlockers).toContain("isolated Playwright server instead of an existing `localhost:3000` process");
     expect(launchBlockers).not.toContain("direct `curl` to `http://localhost:3000/sign-in` returned `200 OK`");

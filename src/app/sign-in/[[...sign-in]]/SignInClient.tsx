@@ -2,11 +2,14 @@
 
 import { SignIn } from "@clerk/nextjs";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
+import { getAuthSwitchUrl } from "@/lib/invited-email";
 
 export function SignInClient({
+  invitedEmail,
   siteName,
   postSignInUrl,
 }: {
+  invitedEmail: string | null;
   siteName: string;
   postSignInUrl: string;
 }) {
@@ -32,6 +35,11 @@ export function SignInClient({
           Use the exact email address that received your invite. After sign-in,
           we&apos;ll take you to the right website dashboard.
         </p>
+        {invitedEmail ? (
+          <p className="mt-4 rounded-md border border-[#2b2418] bg-[#15110b] px-3 py-2 text-sm text-[#d9c099]">
+            Invited email: <span className="font-medium text-[#f1d7a5]">{invitedEmail}</span>
+          </p>
+        ) : null}
       </div>
       <SignIn
         appearance={{
@@ -54,6 +62,8 @@ export function SignInClient({
         }}
         forceRedirectUrl={postSignInUrl}
         fallbackRedirectUrl={postSignInUrl}
+        signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}
+        initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
       />
       <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
         Missing access or the sign-in form is not loading? Sign in with the
