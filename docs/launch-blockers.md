@@ -191,6 +191,7 @@ Move an item here only with owner approval in the release note. Each waiver must
 - Clerk webhooks fail closed without `CLERK_WEBHOOK_SECRET`, verify Svix signatures, and only auto-assign invited users from signed `user.created` events; `pnpm check:prod` verifies this route coverage.
 - Calendly and Vegaro booking webhooks now fail closed when their webhook secret is missing, the signature is missing, or signature verification fails.
 - Public storefront checkout now uses distributed rate limiting and prices Stripe sessions from server-side tenant product content instead of trusting browser-submitted names or prices.
+- Subscription checkout now rejects malformed JSON with `400 Invalid request body` and normalizes tenant/customer fields before Stripe metadata and admin return URLs.
 - Billing checkout and customer portal return URLs now derive from forwarded host/proto instead of trusting the browser `Origin` header; subscription checkout also normalizes customer emails.
 - Public onboarding and booking forms now use distributed rate limiting and sanitize/validate submitted fields; booking creation derives service name/duration from tenant content instead of browser-submitted service text, and availability checks reject unknown or coming-soon services.
 - Public tracking, onboarding, newsletter signup, booking, and checkout POST routes now reject malformed or non-object JSON with `400 Invalid request body` instead of surfacing generic server errors.

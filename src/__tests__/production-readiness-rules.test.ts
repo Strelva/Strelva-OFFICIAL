@@ -337,6 +337,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
     expect(subscription).toContain("normalizeEmail");
     expect(subscription).toContain("customerEmail = normalizeEmail");
+    expect(subscription).toContain("readJsonObject(req)");
+    expect(subscription).toContain("Invalid request body");
+    expect(subscription).toContain("normalizedTenantId");
   });
 
   it("uses distributed rate limiting for newsletter sends", () => {
