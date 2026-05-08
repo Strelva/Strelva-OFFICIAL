@@ -719,6 +719,41 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
 
 checkAdminInviteFlow("src/app/admin/page.tsx", "src/app/admin/InviteButton.tsx", "src/app/api/admin/invites/route.ts");
 
+function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
+  const missingFiles = [aliasPath, tenantRoutePath].filter((path) => !existsSync(path));
+  if (missingFiles.length) {
+    log({ name: "Tenant domain access", status: "fail", message: `${missingFiles.join(", ")} missing` });
+    return;
+  }
+
+  const aliasRoute = readFileSync(aliasPath, "utf8");
+  const tenantRoute = readFileSync(tenantRoutePath, "utf8");
+  const aliasOk = aliasRoute.trim() === 'export { DELETE, GET, PATCH, POST } from "@/app/api/tenant/domains/route";';
+  const tenantAccessOk =
+    tenantRoute.includes("requireTenantFromHeaders") &&
+    tenantRoute.includes("requireTenantAccess(tenant)") &&
+    tenantRoute.includes('requireTenantPermission(tenant, "domains:manage")') &&
+    tenantRoute.includes("addCustomDomain(tenant") &&
+    !tenantRoute.includes("body.tenant");
+
+  if (!aliasOk || !tenantAccessOk) {
+    log({
+      name: "Tenant domain access",
+      status: "fail",
+      message: `${aliasPath} must stay a thin alias to ${tenantRoutePath}, and tenant domain mutations must use x-tenant plus domains:manage permission instead of trusting request bodies`,
+    });
+    return;
+  }
+
+  log({
+    name: "Tenant domain access",
+    status: "ok",
+    message: "/api/admin/domains remains a compatibility alias for the tenant-scoped domains:manage route",
+  });
+}
+
+checkTenantDomainAccess("src/app/api/admin/domains/route.ts", "src/app/api/tenant/domains/route.ts");
+
 function checkClerkWebhookRoute(path: string) {
   if (!existsSync(path)) {
     log({ name: "Clerk webhook route", status: "fail", message: `${path} is missing` });

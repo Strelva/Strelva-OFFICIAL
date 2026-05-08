@@ -487,6 +487,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Sign-in, sign-up, and no-access recovery are aligned with invite-focused metadata");
     expect(source).toContain("getSignUpTitle(siteName)");
     expect(source).toContain("Admin tenant rows expose owner-email invites through /api/admin/invites");
+    expect(source).toContain("Tenant domain access");
+    expect(source).toContain("src/app/api/admin/domains/route.ts");
+    expect(source).toContain("src/app/api/tenant/domains/route.ts");
+    expect(source).toContain('requireTenantPermission(tenant, "domains:manage")');
+    expect(source).toContain("/api/admin/domains remains a compatibility alias");
     expect(source).toContain("verifies signed user.created events");
     expect(source).toContain("Vercel cron route(s) are covered by proxy CRON_SECRET validation");
     expect(source).toContain("Dependency audit");
@@ -564,7 +569,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
-    expect(audit).toContain("51 passed, 2 warned, 9 failed, 18 skipped");
+    expect(audit).toContain("52 passed, 2 warned, 9 failed, 18 skipped");
     expect(audit).toContain("use the exact email address that received the invite");
     expect(audit).toContain("using the exact invited email");
     expect(audit).toContain("Full `pnpm check:launch` was rerun");
