@@ -398,6 +398,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("checkAuthAccessPages");
     expect(source).toContain("checkAdminInviteFlow");
     expect(source).toContain("checkClerkWebhookRoute");
+    expect(source).toContain("checkStripeBillingWebhookRoute");
     expect(source).toContain("checkCronAuthCoverage");
     expect(source).toContain("Production readiness doc");
     expect(source).toContain("Domain setup doc");
@@ -428,6 +429,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Auth access pages");
     expect(source).toContain("Admin invite flow");
     expect(source).toContain("Clerk webhook route");
+    expect(source).toContain("Stripe billing webhook route");
     expect(source).toContain("Cron auth coverage");
     expect(source).toContain(".github/workflows/release.yml");
     expect(source).toContain(".github/workflows/ci.yml");
@@ -584,7 +586,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
-    expect(audit).toContain("54 passed, 2 warned, 9 failed, 18 skipped");
+    expect(audit).toContain("55 passed, 2 warned, 9 failed, 18 skipped");
     expect(audit).toContain("use the exact email address that received the invite");
     expect(audit).toContain("using the exact invited email");
     expect(audit).toContain("Full `pnpm check:launch` was rerun");
@@ -955,6 +957,23 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       expect(source, route).not.toContain("if (webhookSecret && signature)");
       expect(source, route).not.toContain("return true; // Skip if not configured");
     }
+  });
+
+  it("fails closed on Stripe billing webhooks without signature verification", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/app/api/billing/webhook/route.ts"), "utf8");
+
+    expect(source).toContain("STRIPE_WEBHOOK_SECRET");
+    expect(source).toContain("Webhook secret not configured");
+    expect(source).toContain("stripe-signature");
+    expect(source).toContain("stripe.webhooks.constructEvent");
+    expect(source).toContain("Invalid signature");
+    expect(source).toContain("checkout.session.completed");
+    expect(source).toContain("invoice.paid");
+    expect(source).toContain("invoice.payment_failed");
+    expect(source).toContain("customer.subscription.deleted");
+    expect(source).toContain("claimStripeEvent");
+    expect(source).not.toContain("if (webhookSecret && signature)");
+    expect(source).not.toContain("return true; // Skip if not configured");
   });
 
   it("fails closed on Sanity webhooks without a configured secret", () => {
