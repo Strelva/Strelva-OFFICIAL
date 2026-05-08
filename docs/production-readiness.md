@@ -74,8 +74,8 @@
 ## Customer Access Handoff
 
 1. Confirm `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`, live Clerk keys, `CLERK_WEBHOOK_SECRET`, `RESEND_API_KEY`, and `RESEND_DOMAIN` are set in Vercel Production.
-2. Open `/admin` as a super admin and use each tenant row's `Invite` action to invite the tenant `ownerEmail`. The invite calls `/api/admin/invites`, normalizes the email, stores a 30-day invite, emails the tenant sign-up link when Resend is configured, and immediately assigns an existing Clerk user if the email already has an account.
-3. Ask the customer to create or sign into their account with the exact invited email address. Clerk `user.created` webhooks consume the stored invite and assign the tenant role automatically.
+2. Open `/admin` as a super admin and use each tenant row's `Invite` action to invite the tenant `ownerEmail`. The invite calls `/api/admin/invites`, normalizes the email, stores a 30-day invite, emails the tenant sign-up link with the invited email prefilled when Resend is configured, and immediately assigns an existing Clerk user if the email already has an account.
+3. Ask the customer to create or sign into their account with the exact invited email address. The invite link preloads that address on sign-up, and the Clerk sign-in/sign-up links preserve it if they switch flows. Clerk `user.created` webhooks consume the stored invite and assign the tenant role automatically.
 4. If the customer starts from `scaffoldweb.com/sign-in`, confirm they land on `/account` after auth and can open the correct site. If the signed-in email has no tenant access, `/account` must explain that the account has no invited sites and offer `Use invited email` plus support contact.
 5. If the customer used the wrong account, send them to `/no-access`, then use `Use invited email` to sign out and return to `/sign-in`.
 6. Verify the customer can load `/dashboard/site` on `admin.greatlakesdriedfruit.com` and that `/dashboard/content` redirects to `/dashboard/site`.

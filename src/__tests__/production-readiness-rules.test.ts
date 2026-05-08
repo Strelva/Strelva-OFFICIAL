@@ -641,8 +641,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow");
     expect(source).toContain("after Clerk and Resend are live");
     expect(source).toContain("use Invite for each tenant ownerEmail");
-    expect(source).toContain("exact invited email, reaches /account from scaffoldweb.com auth");
-    expect(source).toContain("reaches /dashboard/site from admin.greatlakesdriedfruit.com auth");
+    expect(source).toContain("signs up or signs in with the exact invited email");
+    expect(source).toContain("email stays prefilled when switching between sign-up and sign-in");
+    expect(source).toContain("scaffoldweb.com auth reaches /account");
+    expect(source).toContain("admin.greatlakesdriedfruit.com auth reaches /dashboard/site");
     expect(source).toContain("content create/update/delete events");
     expect(source).toContain("checkout.session.completed");
     expect(source).toContain("invoice.paid");
@@ -805,6 +807,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Invite");
     expect(productionReadiness).toContain("/api/admin/invites");
     expect(productionReadiness).toContain("exact invited email address");
+    expect(productionReadiness).toContain("preloads that address on sign-up");
+    expect(productionReadiness).toContain("sign-in/sign-up links preserve it");
     expect(productionReadiness).toContain("same live Clerk instance");
     expect(productionReadiness).toContain("make `/sign-in` loop");
     expect(productionReadiness).toContain("root marketing hosts");
