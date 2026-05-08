@@ -410,7 +410,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("git status --short");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app");
     expect(source).toContain("signed-out dashboard customers");
-    expect(source).toContain("stale browser title `Scaffold Web`");
+    expect(source).toContain("https://reb-studio.vercel.app/sign-in");
+    expect(source).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
     expect(source).toContain("https://scaffoldweb.com/api/health");
     expect(source).toContain("curl -i https://scaffoldweb.com/api/cron/maintenance");
@@ -657,10 +658,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("vercel whoami");
     expect(launchBlockers).toContain("reb-studio");
     expect(launchBlockers).toContain("### Production Live Verification");
-    expect(launchBlockers).toContain("authenticated production dashboard access");
-    expect(launchBlockers).toContain("https://reb-studio.vercel.app/dashboard");
-    expect(launchBlockers).toContain("stale browser title `Scaffold Web`");
-    expect(launchBlockers).toContain("fresh production redeploy");
+    expect(launchBlockers).toContain("Authenticated production dashboard access");
+    expect(launchBlockers).toContain("https://reb-studio.vercel.app/sign-in");
+    expect(launchBlockers).toContain("Sign in to Scaffold Web | Scaffold Web");
+    expect(launchBlockers).toContain("Vercel app-host freshness check");
     expect(launchBlockers).toContain("after production env, redeploy, and DNS are resolved");
     expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
     expect(launchBlockers).toContain("Clerk/Sanity/Stripe webhook deliveries");
