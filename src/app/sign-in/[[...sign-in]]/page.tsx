@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { getInvitedEmail, type InvitedEmailSearchParams } from "@/lib/invited-email";
 import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantSiteName } from "@/lib/tenant-display";
@@ -22,11 +23,23 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<InvitedEmailSearchParams>;
+}) {
+  const params = await searchParams;
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
   const siteName = getTenantSiteName(tenant, config);
   const postSignInUrl = await getPostSignInUrl();
+  const invitedEmail = getInvitedEmail(params);
 
-  return <SignInClient siteName={siteName} postSignInUrl={postSignInUrl} />;
+  return (
+    <SignInClient
+      invitedEmail={invitedEmail}
+      siteName={siteName}
+      postSignInUrl={postSignInUrl}
+    />
+  );
 }

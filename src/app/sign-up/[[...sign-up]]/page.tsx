@@ -2,14 +2,15 @@ import { SignUp } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
+import {
+  getAuthSwitchUrl,
+  getInvitedEmail,
+  type InvitedEmailSearchParams,
+} from "@/lib/invited-email";
 import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { getTenantConfig } from "@/lib/tenants";
-
-type SignUpSearchParams = {
-  email?: string | string[];
-};
 
 async function getPostSignUpUrl(): Promise<"/account" | "/dashboard"> {
   const host = (await headers()).get("host") || "";
@@ -28,17 +29,6 @@ function getSignUpTitle(siteName: string) {
     : `Create your ${siteName} dashboard account`;
 }
 
-function getInvitedEmail(searchParams: SignUpSearchParams): string | null {
-  const value = Array.isArray(searchParams.email)
-    ? searchParams.email[0]
-    : searchParams.email;
-
-  if (!value) return null;
-
-  const email = value.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
-}
-
 export async function generateMetadata(): Promise<Metadata> {
   const siteName = await getSignUpSiteName();
 
@@ -51,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<SignUpSearchParams>;
+  searchParams: Promise<InvitedEmailSearchParams>;
 }) {
   const params = await searchParams;
   const siteName = await getSignUpSiteName();
@@ -103,6 +93,7 @@ export default async function SignUpPage({
         }}
         forceRedirectUrl={postSignUpUrl}
         fallbackRedirectUrl={postSignUpUrl}
+        signInUrl={getAuthSwitchUrl("/sign-in", invitedEmail)}
         initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
       />
       <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">

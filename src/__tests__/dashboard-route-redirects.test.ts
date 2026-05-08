@@ -72,6 +72,10 @@ describe("dashboard route redirects", () => {
 
     expect(signIn).toContain("forceRedirectUrl={postSignInUrl}");
     expect(signIn).toContain("fallbackRedirectUrl={postSignInUrl}");
+    expect(signIn).toContain("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}");
+    expect(signIn).toContain('signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}');
+    expect(signIn).toContain("Invited email:");
+    expect(signInPage).toContain("getInvitedEmail(params)");
     expect(signIn).toContain("Use the exact email address that received your invite");
     expect(signInPage).toContain("@/lib/marketing-hosts");
     expect(signInPage).toContain("isMarketingHost(host)");
@@ -79,6 +83,9 @@ describe("dashboard route redirects", () => {
     expect(signInPage).toContain('"/dashboard"');
     expect(signUp).toContain("forceRedirectUrl={postSignUpUrl}");
     expect(signUp).toContain("fallbackRedirectUrl={postSignUpUrl}");
+    expect(signUp).toContain("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}");
+    expect(signUp).toContain('signInUrl={getAuthSwitchUrl("/sign-in", invitedEmail)}');
+    expect(signUp).toContain("Invited email:");
     expect(signUp).toContain("getTenantFromHeaders");
     expect(signUp).toContain("getTenantConfig");
     expect(signUp).toContain("getSignUpTitle(siteName)");

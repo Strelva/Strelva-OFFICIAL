@@ -534,6 +534,7 @@ function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
     "signed-out dashboard customers get the sign-in flow",
     "signed-out account handoff returns users to sign-in",
     "admin tenant host starts at the dashboard sign-in flow",
+    "admin tenant host sign-in keeps the invited email context",
     "admin tenant host sign-up uses the tenant invite context",
     "signed-out no-access recovery returns users to sign-in",
     "signup page explains invited email recovery",
@@ -592,10 +593,17 @@ function checkAuthAccessPages(
   const authPagesOk =
     signIn.includes("forceRedirectUrl={postSignInUrl}") &&
     signIn.includes("fallbackRedirectUrl={postSignInUrl}") &&
+    signIn.includes('signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}') &&
+    signIn.includes("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}") &&
+    signIn.includes("Invited email:") &&
+    signInPage.includes("getInvitedEmail(params)") &&
     signInPage.includes('"/account"') &&
     signInPage.includes('"/dashboard"') &&
     signUp.includes("forceRedirectUrl={postSignUpUrl}") &&
     signUp.includes("fallbackRedirectUrl={postSignUpUrl}") &&
+    signUp.includes('signInUrl={getAuthSwitchUrl("/sign-in", invitedEmail)}') &&
+    signUp.includes("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}") &&
+    signUp.includes("Invited email:") &&
     signUp.includes("getTenantFromHeaders") &&
     signUp.includes("getTenantConfig") &&
     signUp.includes("getSignUpTitle(siteName)") &&
