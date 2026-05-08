@@ -117,7 +117,10 @@ describe("dashboard route redirects", () => {
     expect(source).toContain("Use the exact email address that received your invite");
     expect(source).toContain("signs you out so you can choose that account");
     expect(source).toContain("mailto:jacob@scaffoldweb.com");
-    expect(source.indexOf("UseInvitedEmailButton")).toBeLessThan(source.indexOf("Go home"));
+    expect(source).toContain('href="/account"');
+    expect(source).toContain("Choose another site");
+    expect(source).not.toContain('href="/"');
+    expect(source.indexOf("UseInvitedEmailButton")).toBeLessThan(source.indexOf("Choose another site"));
   });
 
   it("gives account users without tenant access an invited-email recovery path", () => {

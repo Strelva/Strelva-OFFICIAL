@@ -33,10 +33,10 @@ export default async function NoAccessPage() {
         <div className="flex flex-col gap-3 justify-center sm:flex-row">
           <UseInvitedEmailButton className="px-4 py-2 bg-white text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors" />
           <Link
-            href="/"
+            href="/account"
             className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
           >
-            Go home
+            Choose another site
           </Link>
         </div>
       </div>
