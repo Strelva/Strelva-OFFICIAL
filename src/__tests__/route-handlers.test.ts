@@ -10,6 +10,8 @@ const mockRefreshDomainClaim = vi.fn();
 const mockListTenantDomainClaims = vi.fn();
 const mockResolveEventAction = vi.fn();
 const mockGetRewardMember = vi.fn();
+const mockCreateThread = vi.fn();
+const mockUpdateThread = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -129,6 +131,14 @@ vi.mock("@/lib/rewards/memberRepositoryKv", () => ({
   getMember: (...args: unknown[]) => mockGetRewardMember(...args),
   saveMember: vi.fn(() => Promise.resolve()),
   logTransaction: vi.fn(() => Promise.resolve({ id: "txn_123" })),
+}));
+
+vi.mock("@/lib/threads", () => ({
+  listThreads: vi.fn(() => Promise.resolve([])),
+  createThread: (...args: unknown[]) => mockCreateThread(...args),
+  getThread: vi.fn(() => Promise.resolve({ id: "thread_123", title: "Saved", messages: [] })),
+  updateThread: (...args: unknown[]) => mockUpdateThread(...args),
+  deleteThread: vi.fn(() => Promise.resolve()),
 }));
 
 describe("Track API Route Handler", () => {
@@ -421,6 +431,20 @@ describe("Tenant content write route handlers", () => {
 describe("Dashboard action route handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateThread.mockResolvedValue({
+      id: "thread_123",
+      title: "New chat",
+      messages: [],
+      createdAt: "2026-05-08T00:00:00.000Z",
+      updatedAt: "2026-05-08T00:00:00.000Z",
+    });
+    mockUpdateThread.mockResolvedValue({
+      id: "thread_123",
+      title: "Updated",
+      messages: [],
+      createdAt: "2026-05-08T00:00:00.000Z",
+      updatedAt: "2026-05-08T00:00:00.000Z",
+    });
   });
 
   it("PATCH /api/queue/:id rejects malformed JSON with a client error", async () => {
@@ -475,6 +499,54 @@ describe("Dashboard action route handlers", () => {
 
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/threads accepts an empty body for a new thread", async () => {
+    const { POST } = await import("@/app/api/threads/route");
+
+    const request = new Request("http://localhost/api/threads", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
+    expect(mockCreateThread).toHaveBeenCalledWith("test-tenant", undefined);
+  });
+
+  it("POST /api/threads rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/threads/route");
+
+    const request = new Request("http://localhost/api/threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockCreateThread).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /api/threads/:threadId rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/threads/[threadId]/route");
+
+    const request = new Request("http://localhost/api/threads/thread_123", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ threadId: "thread_123" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockUpdateThread).not.toHaveBeenCalled();
   });
 });
 

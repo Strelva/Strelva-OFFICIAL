@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
 import { getThread, updateThread, deleteThread, ChatMessage } from "@/lib/threads";
+import { readJsonObject } from "@/lib/request-body";
 
 /**
  * GET /api/threads/[threadId] - Get a single thread
@@ -44,7 +45,11 @@ export async function PATCH(
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const updates: { title?: string; messages?: ChatMessage[] } = {};
 
     if (typeof body.title === "string") {
