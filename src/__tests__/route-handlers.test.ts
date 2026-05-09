@@ -82,12 +82,14 @@ vi.mock("@/lib/storage", () => ({
   trackClick: vi.fn(() => Promise.resolve()),
   getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
   getDraftContent: vi.fn(() => Promise.resolve(null)),
+  getVersions: vi.fn(() => Promise.resolve([])),
   getPageConfig: vi.fn(() => Promise.resolve({ home: { sections: [] } })),
   setContent: vi.fn(() => Promise.resolve()),
   setDraftContent: vi.fn(() => Promise.resolve()),
   clearDraft: vi.fn(() => Promise.resolve()),
   appendVersion: vi.fn(() => Promise.resolve()),
   recordSectionUpdate: vi.fn(() => Promise.resolve()),
+  restoreVersion: vi.fn(() => Promise.resolve(null)),
   setPageConfig: vi.fn(() => Promise.resolve()),
   uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
@@ -365,6 +367,24 @@ describe("Tenant content write route handlers", () => {
     });
 
     const response = await PUT(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/content/:section/versions rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/content/[section]/versions/route");
+
+    const request = new Request("http://localhost/api/content/hero/versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ section: "hero" }),
+    });
     expect(response.status).toBe(400);
 
     const data = await response.json();
