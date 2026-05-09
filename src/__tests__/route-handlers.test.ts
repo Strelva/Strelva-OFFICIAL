@@ -14,6 +14,8 @@ const mockCreateThread = vi.fn();
 const mockUpdateThread = vi.fn();
 const mockSaveChatMessages = vi.fn();
 const mockUpdateSuggestion = vi.fn();
+const mockAddReview = vi.fn();
+const mockReplyToReview = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -149,6 +151,12 @@ vi.mock("@/lib/threads", () => ({
 vi.mock("@/lib/suggestions", () => ({
   getSuggestions: vi.fn(() => Promise.resolve([])),
   updateSuggestion: (...args: unknown[]) => mockUpdateSuggestion(...args),
+}));
+
+vi.mock("@/lib/reviews", () => ({
+  getReviews: vi.fn(() => Promise.resolve([])),
+  addReview: (...args: unknown[]) => mockAddReview(...args),
+  replyToReview: (...args: unknown[]) => mockReplyToReview(...args),
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -630,6 +638,40 @@ describe("Dashboard action route handlers", () => {
 
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/reviews rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/reviews/route");
+
+    const request = new Request("http://localhost/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockAddReview).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /api/reviews rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/reviews/route");
+
+    const request = new Request("http://localhost/api/reviews", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockReplyToReview).not.toHaveBeenCalled();
   });
 });
 

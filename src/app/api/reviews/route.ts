@@ -3,6 +3,7 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getReviews, addReview, replyToReview } from "@/lib/reviews";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -37,9 +38,19 @@ export async function POST(req: Request) {
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const body = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { source, author, rating, text, date } = body;
+    const source =
+      body.source === "google" || body.source === "yelp" || body.source === "manual"
+        ? body.source
+        : "manual";
+    const author = typeof body.author === "string" ? body.author : "";
+    const rating = typeof body.rating === "number" ? body.rating : null;
+    const text = typeof body.text === "string" ? body.text : "";
+    const date = typeof body.date === "string" ? body.date : undefined;
     if (!author || !text || rating == null) {
       return NextResponse.json(
         { error: "author, text, and rating are required" },
@@ -48,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     const review = await addReview(tenant, {
-      source: source || "manual",
+      source,
       author,
       rating: Math.min(5, Math.max(1, Number(rating))),
       text,
@@ -76,9 +87,13 @@ export async function PATCH(req: Request) {
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const body = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { reviewId, replyText } = body;
+    const reviewId = typeof body.reviewId === "string" ? body.reviewId : "";
+    const replyText = typeof body.replyText === "string" ? body.replyText : "";
     if (!reviewId || !replyText) {
       return NextResponse.json(
         { error: "reviewId and replyText are required" },
