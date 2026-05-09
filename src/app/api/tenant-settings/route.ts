@@ -10,6 +10,7 @@ import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/t
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { validateTenantDomains } from "@/lib/domains";
 import { logAuditEvent } from "@/lib/storage";
+import { readJsonObject } from "@/lib/request-body";
 import type { BusinessHours } from "@/lib/types";
 
 /** Tenant-level settings: businessRules, personality, businessHours */
@@ -60,7 +61,11 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const updates: Record<string, unknown> = {};
     let domainsTouched = false;
 

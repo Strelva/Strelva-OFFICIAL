@@ -9,6 +9,7 @@ const mockRemoveCustomDomain = vi.fn();
 const mockRefreshDomainClaim = vi.fn();
 const mockListTenantDomainClaims = vi.fn();
 const mockResolveEventAction = vi.fn();
+const mockGetRewardMember = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -81,6 +82,7 @@ vi.mock("@/components/templates/registry", () => ({
 
 vi.mock("@/lib/storage", () => ({
   trackClick: vi.fn(() => Promise.resolve()),
+  listDrafts: vi.fn(() => Promise.resolve({})),
   getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
   getDraftContent: vi.fn(() => Promise.resolve(null)),
   getVersions: vi.fn(() => Promise.resolve([])),
@@ -121,6 +123,12 @@ vi.mock("@/lib/storage", () => ({
 
 vi.mock("@/lib/event-actions", () => ({
   resolveEventAction: (...args: unknown[]) => mockResolveEventAction(...args),
+}));
+
+vi.mock("@/lib/rewards/memberRepositoryKv", () => ({
+  getMember: (...args: unknown[]) => mockGetRewardMember(...args),
+  saveMember: vi.fn(() => Promise.resolve()),
+  logTransaction: vi.fn(() => Promise.resolve({ id: "txn_123" })),
 }));
 
 describe("Track API Route Handler", () => {
@@ -467,6 +475,65 @@ describe("Dashboard action route handlers", () => {
 
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
+  });
+});
+
+describe("Admin and settings write route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SUPER_ADMIN_EMAILS = "test@example.com";
+  });
+
+  it("PUT /api/tenant-settings rejects malformed JSON with a client error", async () => {
+    const { PUT } = await import("@/app/api/tenant-settings/route");
+
+    const request = new Request("http://localhost/api/tenant-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/admin/drafts rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/admin/drafts/route");
+
+    const request = new Request("http://localhost/api/admin/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("POST /api/rewards/members/:email/adjust rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/rewards/members/[email]/adjust/route");
+
+    const request = new Request("http://localhost/api/rewards/members/test%40example.com/adjust", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ email: "test%40example.com" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockGetRewardMember).not.toHaveBeenCalled();
   });
 });
 
