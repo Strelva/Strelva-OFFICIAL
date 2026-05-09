@@ -3,6 +3,7 @@ import { updateBooking, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function PUT(
   request: Request,
@@ -24,8 +25,13 @@ export async function PUT(
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const body = await request.json();
-    const { status, notes } = body;
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const status = typeof body.status === "string" ? body.status : undefined;
+    const notes = typeof body.notes === "string" ? body.notes : undefined;
 
     if (status && !["confirmed", "cancelled", "completed"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });

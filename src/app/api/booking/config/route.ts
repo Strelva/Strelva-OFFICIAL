@@ -3,6 +3,8 @@ import { getBookingConfig, setBookingConfig } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
+import type { BookingConfig } from "@/lib/types";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -37,8 +39,12 @@ export async function PUT(request: Request) {
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const body = await request.json();
-    await setBookingConfig(body, tenant);
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    await setBookingConfig(body as unknown as BookingConfig, tenant);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to update config" }, { status: 500 });

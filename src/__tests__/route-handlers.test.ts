@@ -93,8 +93,18 @@ vi.mock("@/lib/storage", () => ({
   setPageConfig: vi.fn(() => Promise.resolve()),
   uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
+  getBookingConfig: vi.fn(() => Promise.resolve({ enabled: true })),
+  setBookingConfig: vi.fn(() => Promise.resolve()),
   createBookingAtomic: vi.fn(() =>
     Promise.resolve({ success: true, booking: { id: "b_123" } })
+  ),
+  updateBooking: vi.fn(() =>
+    Promise.resolve({
+      id: "b_123",
+      serviceName: "Test Service",
+      date: "2026-05-15",
+      clientName: "Test Client",
+    })
   ),
   logActivity: (...args: unknown[]) => mockLogActivity(...args),
   logAuditEvent: (...args: unknown[]) => mockLogAuditEvent(...args),
@@ -513,6 +523,40 @@ describe("Booking Route Handler", () => {
     });
 
     const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("PUT /api/booking/:id rejects malformed JSON with a client error", async () => {
+    const { PUT } = await import("@/app/api/booking/[id]/route");
+
+    const request = new Request("http://localhost/api/booking/b_123", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: "b_123" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+
+  it("PUT /api/booking/config rejects malformed JSON with a client error", async () => {
+    const { PUT } = await import("@/app/api/booking/config/route");
+
+    const request = new Request("http://localhost/api/booking/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PUT(request);
     expect(response.status).toBe(400);
 
     const data = await response.json();
