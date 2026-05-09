@@ -347,6 +347,17 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     }
   });
 
+  it("rejects malformed dashboard action write bodies", () => {
+    const queue = readFileSync(path.join(process.cwd(), "src/app/api/queue/[id]/route.ts"), "utf8");
+    const events = readFileSync(path.join(process.cwd(), "src/app/api/events/[id]/route.ts"), "utf8");
+    const inbox = readFileSync(path.join(process.cwd(), "src/app/api/inbox/route.ts"), "utf8");
+
+    for (const source of [queue, events, inbox]) {
+      expect(source).toContain("readJsonObject(request)");
+      expect(source).toContain("Invalid request body");
+    }
+  });
+
   it("does not trust browser Origin for Stripe return URLs", () => {
     const subscription = readFileSync(
       path.join(process.cwd(), "src/app/api/billing/create-subscription/route.ts"),

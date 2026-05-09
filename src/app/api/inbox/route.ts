@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getInboxItems, markInboxRead, markAllInboxRead } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(request: Request) {
   try {
@@ -29,15 +30,21 @@ export async function PATCH(request: Request) {
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (body.action === "mark-all-read") {
+    const action = typeof body.action === "string" ? body.action : undefined;
+    const itemId = typeof body.itemId === "string" ? body.itemId : undefined;
+
+    if (action === "mark-all-read") {
       await markAllInboxRead(tenant);
       return NextResponse.json({ success: true });
     }
 
-    if (body.action === "mark-read" && typeof body.itemId === "string") {
-      const ok = await markInboxRead(body.itemId, tenant);
+    if (action === "mark-read" && itemId) {
+      const ok = await markInboxRead(itemId, tenant);
       return NextResponse.json({ success: ok });
     }
 

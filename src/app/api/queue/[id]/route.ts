@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction } from "@/lib/event-actions";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function PATCH(
-  request: NextRequest,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authed = await verifyAuth();
@@ -21,8 +22,12 @@ export async function PATCH(
   if (blocked) return blocked;
 
   const { id } = await params;
-  const body = await request.json();
-  const { action } = body;
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const action = typeof body.action === "string" ? body.action : undefined;
 
   if (action !== "approved" && action !== "dismissed") {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
