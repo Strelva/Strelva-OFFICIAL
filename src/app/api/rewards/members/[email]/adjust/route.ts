@@ -8,6 +8,7 @@ import {
   saveMember,
 } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function POST(
   request: Request,
@@ -25,7 +26,11 @@ export async function POST(
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const body = (await request.json()) as { delta?: unknown; note?: unknown };
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const delta = typeof body.delta === "number" ? body.delta : NaN;
     const note = typeof body.note === "string" ? body.note.trim() : "";
 

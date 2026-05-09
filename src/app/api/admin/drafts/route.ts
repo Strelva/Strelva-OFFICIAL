@@ -17,6 +17,7 @@ import type { ContentSection, ContentMap } from "@/lib/types";
 import { sectionSchemas } from "@/lib/schemas";
 import { diffFields } from "@/lib/utils";
 import { revalidateClientSite } from "@/lib/revalidate-client";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function GET() {
   if (!(await isSuperAdmin())) {
@@ -58,14 +59,16 @@ export async function POST(request: Request) {
   }
   const actor = await getActorContext();
 
-  const body = await request.json();
-  const { tenant, section, action } = body as {
-    tenant: string;
-    section: string;
-    action: "approve" | "reject";
-  };
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  if (!tenant || !section || !["approve", "reject"].includes(action)) {
+  const tenant = typeof body.tenant === "string" ? body.tenant : "";
+  const section = typeof body.section === "string" ? body.section : "";
+  const action = body.action === "approve" || body.action === "reject" ? body.action : undefined;
+
+  if (!tenant || !section || !action) {
     return NextResponse.json(
       { error: "Missing or invalid fields: tenant, section, action" },
       { status: 400 }
