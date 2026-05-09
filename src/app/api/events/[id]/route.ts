@@ -3,6 +3,7 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction } from "@/lib/event-actions";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function PATCH(
   request: Request,
@@ -23,10 +24,14 @@ export async function PATCH(
   if (blocked) return blocked;
 
   try {
-    const body = await request.json();
-    const { status } = body;
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!status || !["approved", "dismissed"].includes(status)) {
+    const status = typeof body.status === "string" ? body.status : undefined;
+
+    if (status !== "approved" && status !== "dismissed") {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 

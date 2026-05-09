@@ -8,6 +8,7 @@ const mockAddCustomDomain = vi.fn();
 const mockRemoveCustomDomain = vi.fn();
 const mockRefreshDomainClaim = vi.fn();
 const mockListTenantDomainClaims = vi.fn();
+const mockResolveEventAction = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -93,6 +94,9 @@ vi.mock("@/lib/storage", () => ({
   setPageConfig: vi.fn(() => Promise.resolve()),
   uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
+  getInboxItems: vi.fn(() => Promise.resolve([])),
+  markInboxRead: vi.fn(() => Promise.resolve(true)),
+  markAllInboxRead: vi.fn(() => Promise.resolve()),
   getBookingConfig: vi.fn(() => Promise.resolve({ enabled: true })),
   setBookingConfig: vi.fn(() => Promise.resolve()),
   createBookingAtomic: vi.fn(() =>
@@ -113,6 +117,10 @@ vi.mock("@/lib/storage", () => ({
     settings: "siteSettings",
     theme: "theme",
   },
+}));
+
+vi.mock("@/lib/event-actions", () => ({
+  resolveEventAction: (...args: unknown[]) => mockResolveEventAction(...args),
 }));
 
 describe("Track API Route Handler", () => {
@@ -395,6 +403,66 @@ describe("Tenant content write route handlers", () => {
     const response = await POST(request, {
       params: Promise.resolve({ section: "hero" }),
     });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+  });
+});
+
+describe("Dashboard action route handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("PATCH /api/queue/:id rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/queue/[id]/route");
+
+    const request = new Request("http://localhost/api/queue/event_123", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: "event_123" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /api/events/:id rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/events/[id]/route");
+
+    const request = new Request("http://localhost/api/events/event_123", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: "event_123" }),
+    });
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /api/inbox rejects malformed JSON with a client error", async () => {
+    const { PATCH } = await import("@/app/api/inbox/route");
+
+    const request = new Request("http://localhost/api/inbox", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await PATCH(request);
     expect(response.status).toBe(400);
 
     const data = await response.json();
