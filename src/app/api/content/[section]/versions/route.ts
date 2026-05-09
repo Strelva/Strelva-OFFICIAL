@@ -5,6 +5,7 @@ import { getActorContext, requireTenantAccess, requireTenantPermission } from "@
 import { getTemplateForTenant } from "@/components/templates/registry";
 import type { ContentSection } from "@/lib/types";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(
   _request: Request,
@@ -51,7 +52,12 @@ export async function POST(
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
 
-    const { versionId } = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { versionId } = body;
     if (typeof versionId !== "string") {
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }

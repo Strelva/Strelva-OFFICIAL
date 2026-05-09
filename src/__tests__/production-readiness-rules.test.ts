@@ -338,9 +338,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
   it("rejects malformed content and page-config write bodies", () => {
     const content = readFileSync(path.join(process.cwd(), "src/app/api/content/[section]/route.ts"), "utf8");
+    const versions = readFileSync(path.join(process.cwd(), "src/app/api/content/[section]/versions/route.ts"), "utf8");
     const pageConfig = readFileSync(path.join(process.cwd(), "src/app/api/page-config/route.ts"), "utf8");
 
-    for (const source of [content, pageConfig]) {
+    for (const source of [content, versions, pageConfig]) {
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }
