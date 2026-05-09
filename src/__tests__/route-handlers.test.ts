@@ -12,6 +12,7 @@ const mockResolveEventAction = vi.fn();
 const mockGetRewardMember = vi.fn();
 const mockCreateThread = vi.fn();
 const mockUpdateThread = vi.fn();
+const mockSaveChatMessages = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -84,6 +85,8 @@ vi.mock("@/components/templates/registry", () => ({
 
 vi.mock("@/lib/storage", () => ({
   trackClick: vi.fn(() => Promise.resolve()),
+  loadChatMessages: vi.fn(() => Promise.resolve([])),
+  saveChatMessages: (...args: unknown[]) => mockSaveChatMessages(...args),
   listDrafts: vi.fn(() => Promise.resolve({})),
   getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
   getDraftContent: vi.fn(() => Promise.resolve(null)),
@@ -547,6 +550,40 @@ describe("Dashboard action route handlers", () => {
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
     expect(mockUpdateThread).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/chat rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/chat/route");
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockSaveChatMessages).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/chat rejects non-array JSON before storage", async () => {
+    const { POST } = await import("@/app/api/chat/route");
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [] }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockSaveChatMessages).not.toHaveBeenCalled();
   });
 });
 
