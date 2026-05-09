@@ -3,6 +3,7 @@ import { requireTenantAccess } from "@/lib/auth";
 import { loadChatMessages, saveChatMessages } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonArray } from "@/lib/request-body";
 
 export async function GET() {
   try {
@@ -27,7 +28,11 @@ export async function POST(req: Request) {
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const messages = await req.json();
+    const messages = await readJsonArray(req);
+    if (!messages) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     await saveChatMessages("default", messages, tenant);
     return NextResponse.json({ success: true });
   } catch {

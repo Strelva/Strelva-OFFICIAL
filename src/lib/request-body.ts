@@ -22,3 +22,13 @@ export async function readOptionalJsonObject(
     return null;
   }
 }
+
+export async function readJsonArray(request: Request): Promise<unknown[] | null> {
+  try {
+    const body = await request.json();
+    if (!Array.isArray(body)) return null;
+    return body;
+  } catch {
+    return null;
+  }
+}

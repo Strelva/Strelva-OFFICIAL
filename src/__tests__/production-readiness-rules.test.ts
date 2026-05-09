@@ -352,6 +352,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const events = readFileSync(path.join(process.cwd(), "src/app/api/events/[id]/route.ts"), "utf8");
     const inbox = readFileSync(path.join(process.cwd(), "src/app/api/inbox/route.ts"), "utf8");
     const threads = readFileSync(path.join(process.cwd(), "src/app/api/threads/[threadId]/route.ts"), "utf8");
+    const chat = readFileSync(path.join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
 
     for (const source of [queue, events, inbox, threads]) {
       expect(source).toContain("readJsonObject(request)");
@@ -361,6 +362,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const threadCreate = readFileSync(path.join(process.cwd(), "src/app/api/threads/route.ts"), "utf8");
     expect(threadCreate).toContain("readOptionalJsonObject(request)");
     expect(threadCreate).toContain("Invalid request body");
+    expect(chat).toContain("readJsonArray(req)");
+    expect(chat).toContain("Invalid request body");
   });
 
   it("rejects malformed admin and settings write bodies", () => {
