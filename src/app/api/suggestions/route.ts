@@ -3,6 +3,7 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSuggestions, updateSuggestion } from "@/lib/suggestions";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -34,9 +35,16 @@ export async function POST(req: Request) {
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
 
-  const { suggestionId, status } = await req.json();
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  if (!suggestionId || !["accepted", "dismissed"].includes(status)) {
+  const suggestionId = typeof body.suggestionId === "string" ? body.suggestionId : "";
+  const status =
+    body.status === "accepted" || body.status === "dismissed" ? body.status : undefined;
+
+  if (!suggestionId || !status) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
