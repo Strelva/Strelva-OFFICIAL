@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
 import { listThreads, createThread } from "@/lib/threads";
+import { readOptionalJsonObject } from "@/lib/request-body";
 
 /**
  * GET /api/threads - List all threads for the tenant
@@ -30,13 +31,12 @@ export async function POST(request: Request) {
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    let title: string | undefined;
-    try {
-      const body = await request.json();
-      title = body?.title;
-    } catch {
-      // Empty body is fine, title is optional
+    const body = await readOptionalJsonObject(request);
+    if (body === null) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
+
+    const title = typeof body?.title === "string" ? body.title : undefined;
 
     const thread = await createThread(tenant, title);
     return NextResponse.json(thread, { status: 201 });
