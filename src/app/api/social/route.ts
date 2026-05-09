@@ -3,7 +3,10 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSocialPosts, setSocialPosts } from "@/lib/storage";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 import type { SocialPost } from "@/lib/types";
+
+const VALID_PLATFORMS = ["instagram", "facebook", "x"] as const;
 
 async function requireSocialWriteAccess(tenant: string): Promise<NextResponse | null> {
   const denied = await requireTenantAccess(tenant);
@@ -41,26 +44,28 @@ export async function POST(req: Request) {
   const blocked = await requireSocialWriteAccess(tenant);
   if (blocked) return blocked;
 
-  const body = await req.json();
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  const platform = body.platform;
-  const content = body.content;
+  const platform = typeof body.platform === "string" ? body.platform : "";
+  const content = typeof body.content === "string" ? body.content : "";
   if (!platform || !content) {
     return NextResponse.json({ error: "platform and content are required" }, { status: 400 });
   }
 
-  const validPlatforms = ["instagram", "facebook", "x"];
-  if (!validPlatforms.includes(platform)) {
-    return NextResponse.json({ error: `Invalid platform. Must be one of: ${validPlatforms.join(", ")}` }, { status: 400 });
+  if (!isSocialPlatform(platform)) {
+    return NextResponse.json({ error: `Invalid platform. Must be one of: ${VALID_PLATFORMS.join(", ")}` }, { status: 400 });
   }
 
   const post: SocialPost = {
     id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     platform,
     content,
-    imageUrl: body.imageUrl || undefined,
-    status: body.scheduledFor ? "scheduled" : "draft",
-    scheduledFor: body.scheduledFor || undefined,
+    imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
+    status: typeof body.scheduledFor === "string" ? "scheduled" : "draft",
+    scheduledFor: typeof body.scheduledFor === "string" ? body.scheduledFor : undefined,
     createdAt: new Date().toISOString(),
   };
 
@@ -83,8 +88,14 @@ export async function PATCH(req: Request) {
   const blocked = await requireSocialWriteAccess(tenant);
   if (blocked) return blocked;
 
-  const body = await req.json();
-  const { id, status, scheduledFor } = body;
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const id = typeof body.id === "string" ? body.id : "";
+  const status = typeof body.status === "string" ? body.status : "";
+  const scheduledFor = typeof body.scheduledFor === "string" ? body.scheduledFor : undefined;
 
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -110,7 +121,7 @@ export async function PATCH(req: Request) {
         { status: 400 }
       );
     }
-    post.status = status;
+    post.status = status as SocialPost["status"];
     if (status === "scheduled" && scheduledFor) {
       post.scheduledFor = scheduledFor;
     }
@@ -121,6 +132,10 @@ export async function PATCH(req: Request) {
 
   await setSocialPosts(tenant, posts);
   return NextResponse.json(post);
+}
+
+function isSocialPlatform(platform: string): platform is SocialPost["platform"] {
+  return VALID_PLATFORMS.some((validPlatform) => validPlatform === platform);
 }
 
 // --- DELETE: delete a draft post ---
