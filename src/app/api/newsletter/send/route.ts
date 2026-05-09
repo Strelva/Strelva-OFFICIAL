@@ -4,6 +4,7 @@ import { getSubscribers, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { readJsonObject } from "@/lib/request-body";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -18,7 +19,14 @@ export async function POST(req: Request) {
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
 
-    const { subject, body, previewText } = await req.json();
+    const requestBody = await readJsonObject(req);
+    if (!requestBody) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const subject = typeof requestBody.subject === "string" ? requestBody.subject : "";
+    const body = typeof requestBody.body === "string" ? requestBody.body : "";
+    const previewText = typeof requestBody.previewText === "string" ? requestBody.previewText : undefined;
 
     if (!subject || !body) {
       return NextResponse.json(

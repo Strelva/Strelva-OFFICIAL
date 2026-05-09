@@ -13,6 +13,7 @@ const mockGetRewardMember = vi.fn();
 const mockCreateThread = vi.fn();
 const mockUpdateThread = vi.fn();
 const mockSaveChatMessages = vi.fn();
+const mockUpdateSuggestion = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -89,6 +90,7 @@ vi.mock("@/lib/storage", () => ({
   saveChatMessages: (...args: unknown[]) => mockSaveChatMessages(...args),
   listDrafts: vi.fn(() => Promise.resolve({})),
   getContent: vi.fn(() => Promise.resolve({ headline: "Fresh content" })),
+  getSubscribers: vi.fn(() => Promise.resolve([])),
   getDraftContent: vi.fn(() => Promise.resolve(null)),
   getVersions: vi.fn(() => Promise.resolve([])),
   getPageConfig: vi.fn(() => Promise.resolve({ home: { sections: [] } })),
@@ -142,6 +144,17 @@ vi.mock("@/lib/threads", () => ({
   getThread: vi.fn(() => Promise.resolve({ id: "thread_123", title: "Saved", messages: [] })),
   updateThread: (...args: unknown[]) => mockUpdateThread(...args),
   deleteThread: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@/lib/suggestions", () => ({
+  getSuggestions: vi.fn(() => Promise.resolve([])),
+  updateSuggestion: (...args: unknown[]) => mockUpdateSuggestion(...args),
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  isRateLimitedAsync: vi.fn(() => Promise.resolve(false)),
+  isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
+  rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
 }));
 
 describe("Track API Route Handler", () => {
@@ -584,6 +597,39 @@ describe("Dashboard action route handlers", () => {
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
     expect(mockSaveChatMessages).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/suggestions rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/suggestions/route");
+
+    const request = new Request("http://localhost/api/suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockUpdateSuggestion).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/newsletter/send rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/newsletter/send/route");
+
+    const request = new Request("http://localhost/api/newsletter/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
   });
 });
 
