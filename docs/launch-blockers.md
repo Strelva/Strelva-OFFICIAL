@@ -196,6 +196,7 @@ Move an item here only with owner approval in the release note. Each waiver must
 - Subscription checkout now rejects malformed JSON with `400 Invalid request body` and normalizes tenant/customer fields before Stripe metadata and admin return URLs.
 - Billing checkout and customer portal return URLs now derive from forwarded host/proto instead of trusting the browser `Origin` header; subscription checkout also normalizes customer emails.
 - Public onboarding and booking forms now use distributed rate limiting and sanitize/validate submitted fields; booking creation derives service name/duration from tenant content instead of browser-submitted service text, and availability checks reject unknown or coming-soon services.
+- Booking update and booking-config writes now reject malformed or non-object JSON with `400 Invalid request body` before storage work.
 - Public tracking, onboarding, newsletter signup, booking, and checkout POST routes now reject malformed or non-object JSON with `400 Invalid request body` instead of surfacing generic server errors.
 - Newsletter subscribes and sends now use Redis-backed async rate limiting; subscriber names are trimmed/capped before storage.
 - Duplicate tenant `rohlax-wellness` is inactive in Sanity; launch tenant `rohlax` has client/admin domains and revalidation configured.

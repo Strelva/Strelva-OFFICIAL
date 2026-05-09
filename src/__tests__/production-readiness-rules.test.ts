@@ -1036,6 +1036,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("uses distributed limiting and sanitized fields for public intake forms", () => {
     const onboard = readFileSync(path.join(process.cwd(), "src/app/api/onboard/intake/route.ts"), "utf8");
     const booking = readFileSync(path.join(process.cwd(), "src/app/api/booking/route.ts"), "utf8");
+    const bookingUpdate = readFileSync(path.join(process.cwd(), "src/app/api/booking/[id]/route.ts"), "utf8");
+    const bookingConfig = readFileSync(path.join(process.cwd(), "src/app/api/booking/config/route.ts"), "utf8");
     const availability = readFileSync(path.join(process.cwd(), "src/app/api/booking/availability/route.ts"), "utf8");
     const subscribe = readFileSync(path.join(process.cwd(), "src/app/api/newsletter/subscribe/route.ts"), "utf8");
 
@@ -1053,6 +1055,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(booking).toContain("readJsonObject(request)");
     expect(booking).toContain("Invalid request body");
     expect(booking).not.toContain("serviceName,");
+
+    for (const source of [bookingUpdate, bookingConfig]) {
+      expect(source).toContain("readJsonObject(request)");
+      expect(source).toContain("Invalid request body");
+    }
 
     expect(availability).toContain("isRateLimitedAsync");
     expect(availability).toContain('rateLimitKey(request, "booking-availability")');
