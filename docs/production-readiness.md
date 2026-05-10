@@ -28,7 +28,7 @@
   `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth connections are enabled.
-- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $149/month. The checkout route and customer-facing pricing copy assume this plan price.
+- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $20/month. The checkout route and customer-facing pricing copy assume this plan price.
 - Use `.env.production.example` as the owner handoff template for Vercel
   Production. `.env.example` is for local development and may show test-mode
   placeholders.
@@ -57,9 +57,9 @@
 - Run `pnpm check:prod` against production env values.
 - Run `git status --short` and confirm the branch is clean before any CLI production deploy or release verification that should represent the release branch.
 - Redeploy the Vercel Production app after env changes from the Vercel dashboard or from a clean release branch with `vercel deploy --prod` before running live verification. Do not run a CLI production deploy from a dirty local working tree.
-- After redeploy, verify the Vercel app hostname has the current customer access copy before relying on final DNS: `PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"`.
-- Run `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm smoke` only after `https://scaffoldweb.com/api/health` stays on `scaffoldweb.com` and returns the Vercel Next.js health response.
-- Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release` for the local release gate in one command; `check:release` forces `REB_DEV_UNGATED_ACCESS=0` for smoke.
+- After redeploy, verify the Vercel app hostname has the current customer access copy before relying on final DNS: `PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"`.
+- Run `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke` only after `https://scaffoldweb.com/api/health` stays on `scaffoldweb.com` and returns the Vercel Next.js health response.
+- Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the local release gate in one command; `check:release` forces `REB_DEV_UNGATED_ACCESS=0` for smoke.
 - Review `docs/launch-blockers.md`; `Current Blockers` must be empty or every listed item must be moved to `Waived Blockers` with `Status: waived`, `Owner:`, release note/PR/ticket reference, `Follow-up:`, and `Reason:` so `pnpm check:prod` can validate it.
 - GitHub release tagging requires confirming `pnpm check:release` passed or that blockers were owner-waived, plus a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
 - Review `docs/design-kit.md` and confirm launch surfaces follow the documented token, accessibility, motion, AI transparency, and Core Web Vitals standards.

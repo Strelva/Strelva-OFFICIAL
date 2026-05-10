@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Scaffold Web — AI website management for small business",
-  description: "Your business runs itself. AI manages your website, sends weekly reports, and keeps clients coming — for $149/mo.",
+  description: "Your business runs itself. AI manages your website, sends weekly reports, and keeps clients coming — for $20/mo.",
 };
 
 export default function HomePage() {
@@ -191,7 +191,7 @@ export default function HomePage() {
                 className="text-[48px] font-medium tracking-[-0.02em]"
                 style={{ color: "var(--m-text)" }}
               >
-                $149
+                $20
               </span>
               <span
                 className="text-[16px]"

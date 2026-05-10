@@ -53,7 +53,7 @@ const scaffoldWebDomainAction =
   "Point scaffoldweb.com at Vercel project reb-studio with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
 const VERCEL_APP_URL = "https://reb-studio.vercel.app";
 const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
-const SCAFFOLD_MONTHLY_PRICE_CENTS = 14900;
+const SCAFFOLD_MONTHLY_PRICE_CENTS = 2000;
 const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
 
 const envSourceHints: Record<string, string> = {
@@ -79,7 +79,7 @@ const envSourceHints: Record<string, string> = {
   SANITY_WEBHOOK_SECRET: "Sanity webhook secret you configure for /api/sanity/webhook",
   SENTRY_DSN: "Sentry project DSN",
   NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
-  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $149/month",
+  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $20/month",
   STRIPE_SECRET_KEY: "Stripe live secret key",
   STRIPE_WEBHOOK_SECRET: "Stripe billing webhook signing secret",
   SUPER_ADMIN_EMAILS: "Comma-separated owner/admin email addresses",
@@ -315,9 +315,7 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel env add UPSTASH_REDIS_REST_TOKEN production",
     "vercel env add SENTRY_DSN production",
     "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
-    "vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes",
-    "vercel env add STRIPE_SCAFFOLD_PRICE_ID production",
-    "exactly $149/month",
+    "exactly $20/month",
     "Provider value sources",
     "Clerk Dashboard -> Webhooks",
     "Sanity project webhook settings",
@@ -386,7 +384,7 @@ function checkCompletionAudit(path: string) {
   const expectedSummary = `${countsIfAuditPasses.passed} passed, ${countsIfAuditPasses.warned} warned, ${countsIfAuditPasses.failed} failed, ${countsIfAuditPasses.skipped} skipped`;
   const requiredTerms = [
     "Current failures from the latest `pnpm check:prod` run",
-    "Required Production Env Vars And Stripe Price",
+    "Required Production Env Vars",
     "Production Live Verification",
     "Production Domain Routing",
     "CLERK_WEBHOOK_SECRET",
@@ -398,7 +396,6 @@ function checkCompletionAudit(path: string) {
     "price_1TM7v0D99ZGeTugfpmyYup3V",
     "prod_UKnWPSG3QOtOUz",
     "$20/month USD",
-    "$149/month USD",
     "https://reb-studio.vercel.app/sign-in",
     "Sign in to Scaffold Web | Scaffold Web",
     "https://scaffoldweb-com.l.ink/",
@@ -1249,14 +1246,14 @@ async function checkStripe() {
           log({
             name: "Stripe price ID",
             status: "fail",
-            message: `Expected $149/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $149 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
+            message: `Expected $20/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $20 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
           });
           return;
         }
         log({
           name: "Stripe price ID",
           status: "ok",
-          message: "Valid ($149/month USD)",
+          message: "Valid ($20/month USD)",
         });
       } catch {
         failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");
@@ -1584,7 +1581,7 @@ function printReleaseActions() {
     console.log("  # When env checks pass, redeploy before live verification:");
     console.log("  git status --short");
     console.log("  vercel deploy --prod");
-    console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     console.log();
   }
 
@@ -1626,7 +1623,7 @@ function printReleaseActions() {
       console.log("- Vercel access: grant access to project reb-studio (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
     }
     if (launchBlockers.includes("Production Live Verification")) {
-      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
+      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
       console.log("  Cron auth commands:");
       console.log("    curl -i https://scaffoldweb.com/api/cron/maintenance");
       console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance');

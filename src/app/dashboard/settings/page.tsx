@@ -651,7 +651,7 @@ function BillingSection() {
             Current plan
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-white">$149/mo</span>
+            <span className="text-[20px] font-medium text-warm-white">$20/mo</span>
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}
             </span>

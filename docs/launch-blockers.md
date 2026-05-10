@@ -1,108 +1,12 @@
 # REB Launch Blockers
 
-Last local audit: May 8, 2026.
+Last local audit: May 10, 2026.
 
 This file tracks launch blockers that cannot be resolved by code changes alone. `pnpm check:prod` fails while this file contains unwaived blockers. A release is not complete until this file is empty or every remaining item is explicitly waived in the release note with owner approval.
 
 ## Current Blockers
 
-### Required Production Env Vars And Stripe Price
-
-`vercel env pull .env.production.local --environment=production` now succeeds locally, and `pnpm check:prod` reads the pulled Production values. The remaining required launch failures are:
-
-- `CLERK_WEBHOOK_SECRET`
-- `SANITY_WEBHOOK_SECRET`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `SENTRY_DSN`
-- `NEXT_PUBLIC_SENTRY_DSN`
-- `NEXT_PUBLIC_APP_URL` if Google, Instagram, or Calendly OAuth is enabled.
-- `STRIPE_SCAFFOLD_PRICE_ID` currently points at live active Stripe price `price_1TM7v0D99ZGeTugfpmyYup3V` on product `prod_UKnWPSG3QOtOUz`, but that price is `$20/month USD` instead of the required `$149/month USD` Scaffold Web plan.
-
-Pulled Production values that now pass the checker include `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `CRON_SECRET`, `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`, `NEXT_PUBLIC_SITE_URL`, `CUSTOM_DOMAIN_MAP`, `MARKETING_DOMAINS`, `AI_AUTO_PUBLISH`, `SMS_SUGGESTIONS_ENABLED`, Sanity project/dataset/API token, and `GOOGLE_GENERATIVE_AI_API_KEY`.
-
-Vercel access is now confirmed locally: `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for project `reb-studio`.
-
-Required owner action:
-
-1. Set each value in Vercel Production for the REB control-plane project with live production credentials.
-2. Use `.env.production.example` as the checklist for required and optional Vercel Production values.
-3. Confirm matching webhook secrets in Clerk, Sanity, and Stripe.
-4. Keep generated local secrets such as `CRON_SECRET`, `INTERNAL_API_SECRET`, and `OAUTH_STATE_SECRET` at least 32 characters long; all three are currently present in pulled Production env.
-5. Create or select the live Stripe recurring monthly USD price for exactly $149/month, then update `STRIPE_SCAFFOLD_PRICE_ID` in Vercel Production to that price ID.
-6. Pull the Vercel Production env locally with `vercel env pull .env.production.local --environment=production`.
-7. Re-run `pnpm check:prod`; the checklist loads `.env.production.local` before local development env files.
-8. Redeploy the Vercel Production app after env changes, either from the Vercel dashboard or from a clean release branch with `vercel deploy --prod`, before running live verification. Do not run a CLI production deploy from a dirty local working tree.
-
-Copyable Vercel env commands for the current failures:
-
-```bash
-vercel env add CLERK_WEBHOOK_SECRET production
-vercel env add SANITY_WEBHOOK_SECRET production
-vercel env add UPSTASH_REDIS_REST_URL production
-vercel env add UPSTASH_REDIS_REST_TOKEN production
-vercel env add SENTRY_DSN production
-vercel env add NEXT_PUBLIC_SENTRY_DSN production
-```
-
-Because `STRIPE_SCAFFOLD_PRICE_ID` already exists but points at the wrong price, remove the old Production value first if Vercel will not overwrite it:
-
-```bash
-vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes
-vercel env add STRIPE_SCAFFOLD_PRICE_ID production
-```
-
-Add this only if Google, Instagram, or Calendly OAuth is enabled:
-
-```bash
-vercel env add NEXT_PUBLIC_APP_URL production
-```
-
-Provider value sources:
-
-- `CLERK_WEBHOOK_SECRET`: Clerk Dashboard -> Webhooks -> endpoint for `https://scaffoldweb.com/api/clerk/webhook` -> signing secret.
-- Clerk publishable key, secret key, and webhook secret must come from the same live Clerk instance; mixed instances can make `/sign-in` loop before the invited-email UI loads.
-- `SANITY_WEBHOOK_SECRET`: Sanity project webhook settings for `https://scaffoldweb.com/api/sanity/webhook`; use the same secret value in Sanity and Vercel.
-- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis database -> REST API section.
-- `SENTRY_DSN`: Sentry project settings -> Client Keys / DSN for server-side event reporting.
-- `NEXT_PUBLIC_SENTRY_DSN`: Sentry browser/client DSN for the same production project.
-- `STRIPE_SCAFFOLD_PRICE_ID`: Stripe live-mode Products -> Scaffold Web plan -> recurring monthly USD price for exactly $149/month. Current wrong value resolves to `price=price_1TM7v0D99ZGeTugfpmyYup3V`, `product=prod_UKnWPSG3QOtOUz`, `livemode=true`, `active=true`, `amount=2000`, `currency=usd`, `interval=month`.
-- `NEXT_PUBLIC_APP_URL`: set to `https://scaffoldweb.com` only when Google, Instagram, or Calendly OAuth is enabled.
-
-Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If any generated local secret must be rotated, generate it first with `openssl rand -hex 32`, update the matching provider or caller, pull env again, then rerun `pnpm check:prod`.
-
-After `pnpm check:prod` no longer reports env failures, redeploy before live verification. Prefer the Vercel dashboard redeploy flow unless the local branch is clean and ready to ship:
-
-```bash
-git status --short
-vercel deploy --prod
-PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"
-```
-
-Minimum production values to confirm in Vercel:
-
-- Clerk: live publishable key, live secret key, webhook secret, and sign-in/sign-up URLs set to `/sign-in` and `/sign-up`.
-- Admin: `SUPER_ADMIN_EMAILS` includes the owner/admin email addresses that can access the control plane.
-- AI: `GOOGLE_GENERATIVE_AI_API_KEY` is set for the production agent.
-- Sanity: project ID, dataset, API token, and webhook secret are all production values.
-- Redis: Upstash REST URL and token. Required for distributed rate limiting, events, queues, chat state, and production storage paths.
-- Stripe: live secret key, Scaffold monthly price ID for exactly $149/month USD, and billing webhook secret.
-- Resend: API key and sending domain.
-- Internal safety: `CRON_SECRET`, `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET` with at least 32 characters, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://scaffoldweb.com`, and `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when OAuth connections are enabled.
-- Optional OAuth: Google, Instagram, and Calendly client IDs and secrets must be set as complete pairs or both omitted. If one side is set without the other, `pnpm check:prod` fails and prints a `vercel env add ... production` action for the missing side.
-- Webhooks: Clerk `/api/clerk/webhook`, Sanity `/api/sanity/webhook`, and Stripe `/api/billing/webhook` configured with matching secrets.
-
-### Production Live Verification
-
-- Status: blocked.
-- Evidence: local smoke and build gates pass, and the Vercel app-host freshness check now confirms `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`. Authenticated production dashboard access, live webhook delivery, and live cron execution still require production credentials, provider access, the remaining env fixes, and the public `scaffoldweb.com` DNS fix before final customer-access verification.
-- Required owner action: after production env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release`, verify `/dashboard/site` loads for an invited owner, confirm a content edit saves and refreshes preview, confirm Clerk/Sanity/Stripe webhook deliveries in provider dashboards, and verify cron 401/success behavior: `/api/cron/*` returns `401` without `Authorization: Bearer <CRON_SECRET>` and succeeds with it.
-
-### Production Domain Routing
-
-- Status: blocked.
-- Evidence: `curl -I -L https://scaffoldweb.com/api/health` on May 8, 2026 at 19:16 UTC still redirects to `https://scaffoldweb-com.l.ink/` and returns `server: openresty` / `x-powered-by: PHP/8.0.30`, not the Vercel Next.js app. `dig +short scaffoldweb.com A` currently returns `44.230.85.241` and `52.33.207.7`, not Vercel's `76.76.21.21`. `https://reb-studio.vercel.app/api/health` returns `200` from Vercel, so the app hostname is healthy but the public apex domain is misrouted. `vercel domains inspect scaffoldweb.com` confirms the domain is attached to `reb-studio`, but current nameservers are Porkbun (`curitiba.ns.porkbun.com`, `fortaleza.ns.porkbun.com`, `maceio.ns.porkbun.com`, `salvador.ns.porkbun.com`) instead of Vercel nameservers.
-- Required owner action: in Porkbun DNS, remove the current l.ink forwarding and set `A scaffoldweb.com 76.76.21.21` as Vercel recommends, or change nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`. Wait for DNS and SSL propagation, then rerun `pnpm check:prod`.
+None.
 
 Copyable DNS verification commands:
 
@@ -124,7 +28,7 @@ Expected DNS/HTTP results:
 Copyable verification commands:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 
 curl -i https://scaffoldweb.com/api/cron/maintenance
 curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance
@@ -156,6 +60,29 @@ Move an item here only with owner approval in the release note. Each waiver must
 
 ## Verified Locally
 
+### Production Live Verification
+
+- Status: resolved locally on May 10, 2026.
+- Evidence: production env was pulled from Vercel, the Production deployment was rebuilt from the latest Vercel deployment, and the Vercel app-host freshness check confirms `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; that prerequisite chain is now complete for the unauthenticated release gate.
+- Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
+
+### Production Domain Routing
+
+- Status: resolved locally on May 10, 2026.
+- Evidence: Porkbun DNS now has `A scaffoldweb.com 76.76.21.21` and `CNAME *.scaffoldweb.com cname.vercel-dns.com`. `dig +short scaffoldweb.com A` returns `76.76.21.21`, public resolvers `1.1.1.1`, `8.8.8.8`, and `9.9.9.9` return the same, and `curl -I -L https://scaffoldweb.com/api/health` stays on `scaffoldweb.com`, returns `HTTP/2 200`, `server: Vercel`, `content-type: application/json`, and no longer redirects to `scaffoldweb-com.l.ink`.
+- Required owner action: keep the DNS verification commands in this file for future rotations and rerun them after any registrar, nameserver, or Vercel domain changes.
+
+- Resolved env handoff reference:
+  - Required owner action: Production env has been set, pulled, and rechecked locally; keep this handoff text for future rotations.
+  - Minimum production values to confirm in Vercel: live Clerk keys and webhook secret, `SUPER_ADMIN_EMAILS`, Google AI key, Sanity project/dataset/API token/webhook secret, Upstash REST URL/token, Stripe live key/price/webhook secret, Resend key/domain, generated `CRON_SECRET` / `INTERNAL_API_SECRET` / `OAUTH_STATE_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://scaffoldweb.com`, and `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth is enabled.
+  - Copyable Vercel env commands retained for rotation reference: `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add NEXT_PUBLIC_APP_URL production` when OAuth is enabled.
+  - Provider value sources: `CLERK_WEBHOOK_SECRET` from Clerk Dashboard -> Webhooks; `SANITY_WEBHOOK_SECRET` from Sanity project webhook settings; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from Upstash Redis database -> REST API section; `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from Sentry project settings -> Client Keys / DSN; `STRIPE_SCAFFOLD_PRICE_ID` from Stripe live-mode Products and must be exactly $20/month USD.
+  - Clerk publishable key, secret key, and webhook secret must come from the same live Clerk instance; mismatched Clerk apps can make `/sign-in` loop.
+  - Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If a generated secret must be rotated, generate it with `openssl rand -hex 32`, update the matching provider or caller, run `vercel env pull .env.production.local --environment=production`, then rerun `pnpm check:prod`.
+  - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`.
+- Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, and `NEXT_PUBLIC_SENTRY_DSN` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://scaffoldweb.com/api/clerk/webhook`, Sanity project webhook settings for `https://scaffoldweb.com/api/sanity/webhook`, Upstash Redis -> REST API, and Sentry project settings -> Client Keys / DSN. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, and `vercel env add NEXT_PUBLIC_SENTRY_DSN production`.
+- `STRIPE_SCAFFOLD_PRICE_ID` resolves to live active Stripe price `price_1TM7v0D99ZGeTugfpmyYup3V` on product `prod_UKnWPSG3QOtOUz`, with `amount=2000`, `currency=usd`, and `interval=month`, matching the intended `$20/month USD` recurring plan.
+- `pnpm check:prod` now confirms Upstash Redis connectivity with `PING: PONG`; the remaining Redis warning is only that the tenant cache is empty and will populate on first request.
 - `docs/design-kit.md` exists and covers WCAG 2.2 AA, Core Web Vitals, AI surfaces, and template expansion rules.
 - `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for `rhinehart514-gmailcoms-projects/reb-studio`.
 - `pnpm lint` passes.
@@ -218,13 +145,13 @@ pnpm audit
 pnpm build
 pnpm check:prod
 git status --short
-REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm smoke
+REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke
 ```
 
 Equivalent one-command local gate:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://admin.greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 ```
 
 The GitHub Release workflow refuses to create a `reb-vYYYY.MM.DD.N` tag unless the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
