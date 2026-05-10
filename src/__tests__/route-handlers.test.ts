@@ -18,6 +18,7 @@ const mockAddReview = vi.fn();
 const mockReplyToReview = vi.fn();
 const mockGetSocialPosts = vi.fn();
 const mockSetSocialPosts = vi.fn();
+const mockSaveConnection = vi.fn();
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
   return null;
@@ -161,6 +162,12 @@ vi.mock("@/lib/reviews", () => ({
   getReviews: vi.fn(() => Promise.resolve([])),
   addReview: (...args: unknown[]) => mockAddReview(...args),
   replyToReview: (...args: unknown[]) => mockReplyToReview(...args),
+}));
+
+vi.mock("@/lib/connections", () => ({
+  saveConnection: (...args: unknown[]) => mockSaveConnection(...args),
+  getConnection: vi.fn(() => Promise.resolve(null)),
+  deleteConnection: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -712,6 +719,23 @@ describe("Dashboard action route handlers", () => {
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
     expect(mockSetSocialPosts).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/connections/yelp rejects malformed JSON with a client error", async () => {
+    const { POST } = await import("@/app/api/connections/yelp/route");
+
+    const request = new Request("http://localhost/api/connections/yelp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toBe("Invalid request body");
+    expect(mockSaveConnection).not.toHaveBeenCalled();
   });
 });
 

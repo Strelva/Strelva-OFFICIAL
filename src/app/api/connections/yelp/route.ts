@@ -3,13 +3,9 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { saveConnection, getConnection } from "@/lib/connections";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { readJsonObject } from "@/lib/request-body";
 
 const YELP_API_BASE = "https://api.yelp.com/v3";
-
-interface YelpConnectRequest {
-  apiKey: string;
-  businessId: string;
-}
 
 async function validateYelpCredentials(apiKey: string, businessId: string): Promise<boolean> {
   const res = await fetch(`${YELP_API_BASE}/businesses/${businessId}/reviews`, {
@@ -32,14 +28,13 @@ export async function POST(req: Request) {
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
 
-  let body: YelpConnectRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = await readJsonObject(req);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { apiKey, businessId } = body;
+  const apiKey = typeof body.apiKey === "string" ? body.apiKey : "";
+  const businessId = typeof body.businessId === "string" ? body.businessId : "";
   if (!apiKey || !businessId) {
     return NextResponse.json({ error: "apiKey and businessId are required" }, { status: 400 });
   }
