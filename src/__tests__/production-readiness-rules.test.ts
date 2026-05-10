@@ -356,13 +356,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const newsletterSend = readFileSync(path.join(process.cwd(), "src/app/api/newsletter/send/route.ts"), "utf8");
     const reviews = readFileSync(path.join(process.cwd(), "src/app/api/reviews/route.ts"), "utf8");
     const social = readFileSync(path.join(process.cwd(), "src/app/api/social/route.ts"), "utf8");
+    const yelp = readFileSync(path.join(process.cwd(), "src/app/api/connections/yelp/route.ts"), "utf8");
     const chat = readFileSync(path.join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
 
     for (const source of [queue, events, inbox, threads]) {
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }
-    for (const source of [suggestions, newsletterSend, reviews, social]) {
+    for (const source of [suggestions, newsletterSend, reviews, social, yelp]) {
       expect(source).toContain("readJsonObject(req)");
       expect(source).toContain("Invalid request body");
     }
