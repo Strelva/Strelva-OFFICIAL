@@ -4,6 +4,7 @@ const baseUrl = new URL(process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${p
 const tenantOrigin = process.env.PLAYWRIGHT_TENANT_ORIGIN || `http://gldf.localhost:${baseUrl.port || "80"}`;
 const tenantUrl = new URL(tenantOrigin);
 const tenantHost = tenantUrl.host;
+const externalBaseUrl = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 
 test("marketing homepage gives a customer clear starting points", async ({ page }) => {
   const response = await page.goto("/");
@@ -18,7 +19,8 @@ test("tenant public pages render without server errors", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
 
-  for (const path of ["/", "/services", "/contact"]) {
+  const paths = externalBaseUrl ? ["/"] : ["/", "/services", "/contact"];
+  for (const path of paths) {
     const response = await page.goto(`${tenantOrigin}${path}`);
     expect(response?.status(), `${path} should not fail`).toBeLessThan(400);
     await expect(page.locator("body")).toBeVisible();
@@ -45,20 +47,28 @@ test("core customer pages fit mobile viewports", async ({ page }) => {
 });
 
 test("tenant preview pages can be embedded by the dashboard", async ({ request }) => {
-  const response = await request.get(`${baseUrl.origin}/?preview=true`, {
-    headers: { Host: tenantHost },
-  });
+  const response = externalBaseUrl
+    ? await request.get(`${baseUrl.origin}/?preview=true`)
+    : await request.get(`${baseUrl.origin}/?preview=true`, {
+        headers: { Host: tenantHost },
+      });
 
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");
-  expect(response.headers()["content-security-policy"]).toContain("http://admin.gldf.localhost");
+  if (externalBaseUrl) {
+    expect(response.headers()["content-security-policy"]).toContain("https://admin.scaffoldweb.com");
+  } else {
+    expect(response.headers()["content-security-policy"]).toContain("http://admin.gldf.localhost");
+  }
   expect(response.headers()["x-frame-options"]).toBeUndefined();
 });
 
 test("normal tenant pages keep anti-framing protections", async ({ request }) => {
-  const response = await request.get(`${baseUrl.origin}/`, {
-    headers: { Host: tenantHost },
-  });
+  const response = externalBaseUrl
+    ? await request.get(`${baseUrl.origin}/`)
+    : await request.get(`${baseUrl.origin}/`, {
+        headers: { Host: tenantHost },
+      });
 
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");

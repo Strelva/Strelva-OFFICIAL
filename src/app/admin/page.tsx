@@ -48,7 +48,7 @@ export default async function AdminPage() {
   const activeSubscriptions = TENANTS.filter(
     (t) => t.subscriptionStatus === "active"
   ).length;
-  const mrr = activeSubscriptions * 149;
+  const mrr = activeSubscriptions * 20;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
 
   return (
@@ -77,7 +77,7 @@ export default async function AdminPage() {
           </p>
           <p className="text-xs text-zinc-600 mt-1">
             {activeSubscriptions} active subscription
-            {activeSubscriptions !== 1 ? "s" : ""} x $149
+            {activeSubscriptions !== 1 ? "s" : ""} x $20
           </p>
         </div>
         <Link

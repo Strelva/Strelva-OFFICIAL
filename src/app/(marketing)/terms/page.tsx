@@ -43,7 +43,7 @@ export default function TermsPage() {
         </h2>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            The service costs $149 per month, billed monthly via Stripe.
+            The service costs $20 per month, billed monthly via Stripe.
           </li>
           <li>
             Custom website builds are quoted separately and billed as one-time
