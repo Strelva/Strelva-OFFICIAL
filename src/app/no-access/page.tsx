@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
+import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 
 export default async function NoAccessPage() {
+  const clientFallbackRoot = getClientFallbackRoot(await headers());
   const { userId } = await auth();
 
   if (!userId && !isDevAccessBypassEnabled()) {
-    redirect("/sign-in");
+    redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }
 
   return (
@@ -31,7 +34,10 @@ export default async function NoAccessPage() {
           and we&apos;ll connect the right account.
         </p>
         <div className="flex flex-col gap-3 justify-center sm:flex-row">
-          <UseInvitedEmailButton className="px-4 py-2 bg-white text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors" />
+          <UseInvitedEmailButton
+            className="px-4 py-2 bg-white text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors"
+            redirectUrl={withClientFallbackRoot(clientFallbackRoot, "/sign-in")}
+          />
           <Link
             href="/account"
             className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"

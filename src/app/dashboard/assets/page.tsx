@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
 import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
+import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -18,6 +19,8 @@ type UploadResult = {
 };
 
 export default function PhotosPage() {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -39,12 +42,12 @@ export default function PhotosPage() {
 
   // Fetch assets on mount
   useEffect(() => {
-    fetch("/api/media", { credentials: "same-origin" })
+    fetch(apiHref("/api/media"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : { assets: [] }))
       .then((data) => setAssets(data.assets || []))
       .catch(() => setAssets([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [apiHref]);
 
   // Upload handler
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
@@ -80,7 +83,7 @@ export default function PhotosPage() {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch("/api/media", {
+        const res = await fetch(apiHref("/api/media"), {
           method: "POST",
           credentials: "same-origin",
           body: formData,
@@ -116,7 +119,7 @@ export default function PhotosPage() {
       setSelected(newAssets[0]);
     }
     setUploading(false);
-  }, []);
+  }, [apiHref]);
 
   const uploadSummary = uploadResults.length
     ? {
@@ -258,7 +261,7 @@ export default function PhotosPage() {
               <EmptyState
                 icon={<ImageIcon className="w-5 h-5 text-gray-muted" strokeWidth={1.5} />}
                 title="No visual proof yet"
-                description="Start with your storefront, team, best-selling service, and one recent customer-facing moment."
+                description="Start with real photos that prove what customers can expect: your space, team, work, offers, and recent customer-facing moments."
                 action={
                   <Button
                     variant="primary"

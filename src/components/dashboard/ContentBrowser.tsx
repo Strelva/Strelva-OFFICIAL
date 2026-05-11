@@ -50,12 +50,13 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     setActiveSection,
     setScrollToSection,
     triggerRefresh,
-    template,
+    siteModel,
+    dashboardHref,
     activePage,
     setActivePage,
   } = useDashboard();
 
-  const DEFAULT_PAGE_CONFIG = useMemo(() => getDefaultPageConfig(template), [template]);
+  const DEFAULT_PAGE_CONFIG = useMemo(() => getDefaultPageConfig(siteModel), [siteModel]);
 
   const expandedRef = useRef<HTMLDivElement>(null);
   const [pageConfig, setPageConfig] = useState<SitePageConfig | null>(null);
@@ -64,7 +65,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   // Build page dropdown options from the live config (union of stored pages
-  // and template defaults). Falls back to defaults pre-fetch so the dropdown
+  // and site-model defaults). Falls back to defaults pre-fetch so the dropdown
   // is never empty. `home` is pinned first; remaining pages sort alphabetically.
   // User-created pages that don't have a human label fall back to their slug.
   const pageLabelMap = new Map(ALL_PAGE_OPTIONS.map((p) => [p.id, p.label]));
@@ -74,7 +75,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     .map((id) => ({ id, label: pageLabelMap.get(id) ?? id.charAt(0).toUpperCase() + id.slice(1) }));
 
   useEffect(() => {
-    fetch("/api/page-config", { credentials: "same-origin" })
+    fetch(dashboardHref("/api/page-config"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data) { setPageConfig(DEFAULT_PAGE_CONFIG); return; }
@@ -100,7 +101,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
         setPageConfig(merged);
       })
       .catch(() => { setPageConfig(DEFAULT_PAGE_CONFIG); });
-  }, [DEFAULT_PAGE_CONFIG]);
+  }, [DEFAULT_PAGE_CONFIG, dashboardHref]);
 
   useEffect(() => {
     if (activeSection && expandedRef.current) {
@@ -111,7 +112,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   const saveConfig = useCallback(async (config: SitePageConfig) => {
     setSaving(true);
     try {
-      await fetch("/api/page-config", {
+      await fetch(dashboardHref("/api/page-config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -123,7 +124,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
       setTimeout(() => setSaveError(false), 3000);
     }
     setSaving(false);
-  }, [triggerRefresh]);
+  }, [dashboardHref, triggerRefresh]);
 
   const pageSections = pageConfig?.[activePage]?.sections || [];
   const sortedSections = [...pageSections].sort((a, b) => a.order - b.order);

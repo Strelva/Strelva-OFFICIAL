@@ -1,6 +1,6 @@
 import { getRedis } from "./redis";
 import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
-import { getAllTenants, getTenantConfig, invalidateDomainMapCache, updateTenant } from "./tenants";
+import { getAllTenants, getTenantConfig, invalidateDomainMapCache, isActiveTenant, updateTenant } from "./tenants";
 import { normalizeTenantDomain } from "./tenant-urls";
 
 const CLAIMS_REDIS_KEY = "reb:domain-claims";
@@ -99,6 +99,7 @@ export async function findDomainCollision(
   const tenants = await getAllTenants();
 
   for (const tenant of tenants) {
+    if (!isActiveTenant(tenant)) continue;
     if (ownerTenantId === tenant.id) continue;
     for (const entry of domainsFromTenant(tenant)) {
       if (aliases.has(entry.domain) || aliases.has(claimKey(entry.domain))) {

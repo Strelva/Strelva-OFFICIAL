@@ -6,7 +6,7 @@ import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { StringArrayEditor } from "./StringArrayEditor";
 import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
-import { getTemplateSchema, type SimpleFieldDef, type SectionArrayConfig } from "./templateFieldConfigs";
+import { getSiteModelSchema, type SimpleFieldDef, type SectionArrayConfig } from "./templateFieldConfigs";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { Button } from "@/components/ui/Button";
@@ -114,14 +114,14 @@ function setNestedValue(
   return next;
 }
 
-// Generic/fallback (wellness-shaped) field definitions. Template-specific
-// schemas in templateFieldConfigs.ts override these per tenant.
+// Generic fallback field definitions. Site-model schemas can override these
+// so the editor only shows fields that are rendered for the current site.
 const SECTION_FIELDS: Record<string, FieldDef[]> = {
   hero: [
     { key: "headline", label: "Headline", type: "textarea", placeholder: "Main heading..." },
     { key: "subheadline", label: "Subheadline", type: "text", placeholder: "Supporting text..." },
     { key: "tagline", label: "Tagline", type: "textarea", placeholder: "Describe what you do..." },
-    { key: "ctaText", label: "Button text", type: "text", placeholder: "Book a Session" },
+    { key: "ctaText", label: "Button text", type: "text", placeholder: "Primary action" },
     { key: "ctaLink", label: "Button link", type: "url", placeholder: "https://..." },
   ],
   story: [
@@ -184,8 +184,8 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
 // Array sections use the inline editor from ARRAY_CONFIGS
 
 export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
-  const { triggerRefresh, editMode, hasDraft, setHasDraft, template } = useDashboard();
-  const templateSchema = getTemplateSchema(template);
+  const { triggerRefresh, editMode, hasDraft, setHasDraft, siteModel, dashboardHref } = useDashboard();
+  const siteModelSchema = getSiteModelSchema(siteModel);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -211,7 +211,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
     setLoading(true);
     setSaved(false);
-    fetch(`/api/content/${activeSection}`, { credentials: "same-origin" })
+    fetch(dashboardHref(`/api/content/${activeSection}`), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         setData(d);
@@ -219,7 +219,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [activeSection]);
+  }, [activeSection, dashboardHref]);
 
   const handleFieldChange = useCallback((key: string, value: unknown) => {
     setData((prev) => {
@@ -237,8 +237,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     const isDraft = editMode === "draft";
     try {
       const url = isDraft
-        ? `/api/content/${activeSection}?draft=true`
-        : `/api/content/${activeSection}`;
+        ? dashboardHref(`/api/content/${activeSection}?draft=true`)
+        : dashboardHref(`/api/content/${activeSection}`);
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -271,14 +271,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     } finally {
       setSaving(false);
     }
-  }, [activeSection, data, editMode, triggerRefresh, setHasDraft]);
+  }, [activeSection, dashboardHref, data, editMode, triggerRefresh, setHasDraft]);
 
   const handlePublish = useCallback(async () => {
     if (!activeSection || !data) return;
     setSaving(true);
     setSaveError(false);
     try {
-      const res = await fetch(`/api/content/${activeSection}`, {
+      const res = await fetch(dashboardHref(`/api/content/${activeSection}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -304,7 +304,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     } finally {
       setSaving(false);
     }
-  }, [activeSection, data, triggerRefresh, setHasDraft]);
+  }, [activeSection, dashboardHref, data, triggerRefresh, setHasDraft]);
 
   const handleReset = useCallback(() => {
     setData(original);
@@ -370,14 +370,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     );
   }
 
-  // Resolve fields: template-specific → generic fallback
+  // Resolve fields: site-model-specific → generic fallback
   const fields: FieldDef[] | undefined =
-    templateSchema?.sectionFields[activeSection] ?? SECTION_FIELDS[activeSection];
+    siteModelSchema?.sectionFields[activeSection] ?? SECTION_FIELDS[activeSection];
 
-  // Resolve array editors: prefer the template's declared arrays (may be multiple),
+  // Resolve array editors: prefer the site model's declared arrays (may be multiple),
   // fall back to the generic single ARRAY_CONFIGS entry.
-  const templateArrays: SectionArrayConfig[] | undefined =
-    templateSchema?.sectionArrays[activeSection];
+  const siteModelArrays: SectionArrayConfig[] | undefined =
+    siteModelSchema?.sectionArrays[activeSection];
   const legacyArrayConfig = ARRAY_CONFIGS[activeSection];
 
   return (
@@ -420,7 +420,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
           section={activeSection}
           onRestored={() => {
             // Re-fetch the section so the editor reflects the restored content
-            fetch(`/api/content/${activeSection}`, { credentials: "same-origin" })
+            fetch(dashboardHref(`/api/content/${activeSection}`), { credentials: "same-origin" })
               .then((res) => (res.ok ? res.json() : null))
               .then((d) => {
                 if (d) {
@@ -602,7 +602,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         ))}
 
         {/* Template-declared arrays (may be multiple per section) */}
-        {templateArrays && templateArrays.map((arr) => {
+        {siteModelArrays && siteModelArrays.map((arr) => {
           if (arr.kind === "strings") {
             return (
               <StringArrayEditor
@@ -641,7 +641,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         })}
 
         {/* Legacy fallback: single array config from ARRAY_CONFIGS */}
-        {!templateArrays && legacyArrayConfig && (
+        {!siteModelArrays && legacyArrayConfig && (
           <ArrayItemEditor
             section={activeSection}
             data={data}

@@ -16,6 +16,7 @@ const cspBaseDirectives = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.unsplash.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com",
   "font-src 'self' data:",
+  "frame-src 'self' https: http://localhost:* http://*.localhost:*",
   "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
   "worker-src 'self' blob:",
   "base-uri 'self'",
@@ -132,6 +133,36 @@ export function getLegacyPublicSiteRedirect(host: string): string | null {
 
 export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: string): boolean {
   return isAdminSubdomain && pathname === "/";
+}
+
+export function shouldUseFallbackAuthForAdminHost(host: string, isAdminSubdomain: boolean): boolean {
+  return isAdminSubdomain && shouldResolveCustomDomain(host);
+}
+
+function buildTenantFallbackUrl(req: NextRequest, tenantId: string, path: string): URL {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://scaffoldweb.com";
+  const url = new URL(`/client/${tenantId}${path}`, base);
+  url.search = req.nextUrl.search;
+  return url;
+}
+
+export function extractTenantFromClientPath(pathname: string): {
+  tenant: string | null;
+  targetPath: string;
+  shouldRedirectToDashboard: boolean;
+} {
+  const match = pathname.match(/^\/client\/([a-z0-9-]+)(\/.*)?$/);
+  if (!match) {
+    return { tenant: null, targetPath: pathname, shouldRedirectToDashboard: false };
+  }
+
+  const tenant = match[1];
+  const rest = match[2] || "";
+  if (!rest || rest === "/") {
+    return { tenant, targetPath: "/dashboard", shouldRedirectToDashboard: true };
+  }
+
+  return { tenant, targetPath: rest, shouldRedirectToDashboard: false };
 }
 
 export function validateCronRequest(expectedSecret: string | undefined, authorization: string | null) {
@@ -314,10 +345,27 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   let tenantId: string | null = null;
   let isAdminSubdomain = false;
+  let tenantFromClientPath = false;
+  let clientPathTarget = pathname;
 
   const extraction = extractTenantFromHost(host);
   tenantId = extraction.tenant;
   isAdminSubdomain = extraction.isAdminSubdomain;
+
+  if (!tenantId) {
+    const clientPath = extractTenantFromClientPath(pathname);
+    if (clientPath.tenant) {
+      tenantId = clientPath.tenant;
+      tenantFromClientPath = true;
+      clientPathTarget = clientPath.targetPath;
+
+      if (clientPath.shouldRedirectToDashboard) {
+        const url = req.nextUrl.clone();
+        url.pathname = `/client/${tenantId}/dashboard`;
+        return applySecurityHeaders(NextResponse.redirect(url), req);
+      }
+    }
+  }
 
   if (!tenantId && shouldResolveCustomDomain(host)) {
     const customDomainResult = await resolveTenantFromCustomDomain(hostWithoutPort, req);
@@ -342,13 +390,28 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   if (tenantId) {
     if (shouldRedirectAdminRoot(isAdminSubdomain, pathname)) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/dashboard";
+      const url = shouldUseFallbackAuthForAdminHost(host, isAdminSubdomain)
+        ? buildTenantFallbackUrl(req, tenantId, "/dashboard")
+        : req.nextUrl.clone();
+      if (!shouldUseFallbackAuthForAdminHost(host, isAdminSubdomain)) {
+        url.pathname = "/dashboard";
+      }
       return applySecurityHeaders(NextResponse.redirect(url), req);
+    }
+
+    const customAdminHostUsesFallbackAuth = shouldUseFallbackAuthForAdminHost(host, isAdminSubdomain);
+    if (
+      customAdminHostUsesFallbackAuth &&
+      (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up") || pathname === "/no-access")
+    ) {
+      return applySecurityHeaders(NextResponse.redirect(buildTenantFallbackUrl(req, tenantId, pathname)), req);
     }
 
     const headers = new Headers(req.headers);
     headers.set("x-tenant", tenantId);
+    if (tenantFromClientPath) {
+      headers.set("x-client-fallback-root", `/client/${tenantId}`);
+    }
 
     // Check for preview mode (dashboard iframe access)
     const isPreviewMode = req.nextUrl.searchParams.get("preview") === "true";
@@ -359,12 +422,31 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     // Require auth for protected admin subdomain routes, while still allowing
     // Clerk's sign-in/sign-up routes to render on admin.<tenant-domain>.
     const routeIsPublic = isPublicRoute(req);
-    const needsAuth = !devAccessBypass && ((isAdminSubdomain && !routeIsPublic) || (tenantFromQueryParam && !routeIsPublic));
+    const clientPathIsAuthPage =
+      tenantFromClientPath &&
+      (clientPathTarget.startsWith("/sign-in") ||
+        clientPathTarget.startsWith("/sign-up") ||
+        clientPathTarget === "/no-access");
+    const needsAuth = !devAccessBypass && (
+      (isAdminSubdomain && !routeIsPublic) ||
+      (tenantFromQueryParam && !routeIsPublic) ||
+      (tenantFromClientPath && !clientPathIsAuthPage)
+    );
     if (needsAuth) {
-      const signInUrl = new URL("/sign-in", req.url);
+      const signInUrl = tenantFromClientPath || customAdminHostUsesFallbackAuth
+        ? buildTenantFallbackUrl(req, tenantId, "/sign-in")
+        : new URL("/sign-in", req.url);
       await auth.protect({
         unauthenticatedUrl: signInUrl.toString(),
       });
+    }
+
+    if (tenantFromClientPath) {
+      const url = req.nextUrl.clone();
+      url.pathname = clientPathTarget;
+      return applySecurityHeaders(NextResponse.rewrite(url, {
+        request: { headers },
+      }), req);
     }
 
     const response = NextResponse.next({

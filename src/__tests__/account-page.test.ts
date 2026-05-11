@@ -43,13 +43,15 @@ vi.mock("@/lib/dev-access", () => ({
 }));
 
 vi.mock("@/lib/tenant-urls", () => ({
+  getTenantDashboardFallbackUrl: (tenant: { id: string }) =>
+    `https://scaffoldweb.com/client/${tenant.id}/dashboard`,
   getTenantDashboardHost: (tenant: { id: string }) => `admin.${tenant.id}.example.com`,
-  getTenantDashboardUrl: (tenant: { id: string }) => `https://admin.${tenant.id}.example.com/dashboard`,
 }));
 
 vi.mock("@/lib/tenants", () => ({
   getAllTenants: mockGetAllTenants,
   getTenantConfig: mockGetTenantConfig,
+  isActiveTenant: (tenant: { active?: boolean }) => tenant.active !== false,
 }));
 
 function textFrom(node: unknown): string {
@@ -95,5 +97,20 @@ describe("account page access handoff", () => {
     expect(text).toContain("signs you out so you can choose that account");
     expect(text).toContain("Use invited email");
     expect(text).toContain("jacob@scaffoldweb.com");
+  });
+
+  it("hides archived tenants from the super-admin account picker", async () => {
+    mockIsSuperAdmin.mockResolvedValue(true);
+    mockGetAllTenants.mockResolvedValue([
+      { id: "gldf", siteName: "Great Lakes Dried Fruit", active: true },
+      { id: "rohlax-wellness", siteName: "Old Rohlax Duplicate", active: false },
+    ]);
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+
+    const page = await AccountPage();
+    const text = textFrom(page);
+
+    expect(text).toContain("Great Lakes Dried Fruit");
+    expect(text).not.toContain("Old Rohlax Duplicate");
   });
 });

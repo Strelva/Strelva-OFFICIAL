@@ -1,3 +1,5 @@
+import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
+
 export default function TermsPage() {
   return (
     <div className="max-w-[720px] mx-auto px-6 py-16">
@@ -43,7 +45,7 @@ export default function TermsPage() {
         </h2>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            The service costs $20 per month, billed monthly via Stripe.
+            The service costs ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS} per month, billed monthly via Stripe.
           </li>
           <li>
             Custom website builds are quoted separately and billed as one-time

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import { X, Search, Upload, Clock, Loader2 } from "lucide-react";
 import type { MediaAsset } from "@/lib/media";
+import { useDashboardOptional } from "./DashboardContext";
 
 type FilterTab = "all" | "recent" | "proof";
 
@@ -14,6 +15,8 @@ interface AssetPickerModalProps {
 }
 
 export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -31,7 +34,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
     setSelectedId(null);
     setSearch("");
     setFilter("all");
-    fetch("/api/media", { credentials: "same-origin" })
+    fetch(dashboardHref("/api/media"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load media"))))
       .then((data: { assets: MediaAsset[] }) => {
         if (!cancelled) setAssets(data.assets ?? []);
@@ -45,7 +48,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [dashboardHref, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -104,7 +107,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/media", {
+      const res = await fetch(dashboardHref("/api/media"), {
         method: "POST",
         credentials: "same-origin",
         body: formData,

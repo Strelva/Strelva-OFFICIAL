@@ -6,6 +6,7 @@ import { QueueCard } from "./QueueCard";
 import { EmptyQueue } from "./EmptyQueue";
 import { SuggestionCard } from "./SuggestionCard";
 import type { UnifiedEvent } from "@/lib/types";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface QueuePageProps {
   initialPending: UnifiedEvent[];
@@ -15,6 +16,8 @@ interface QueuePageProps {
 }
 
 export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0 }: QueuePageProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [tab, setTab] = useState<"pending" | "resolved">("pending");
   const [pending, setPending] = useState(initialPending);
   const [resolved, setResolved] = useState(initialResolved);
@@ -35,7 +38,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/queue/${id}`, {
+        const res = await fetch(dashboardHref(`/api/queue/${id}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action }),
@@ -57,7 +60,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
         });
       }
     });
-  }, [pending]);
+  }, [dashboardHref, pending]);
 
   const handleApprove = useCallback((id: string) => handleResolve(id, "approved"), [handleResolve]);
   const handleDismiss = useCallback((id: string) => handleResolve(id, "dismissed"), [handleResolve]);
@@ -76,13 +79,15 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Site review
+              AI control center
             </p>
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-              Needs your eye
+              Approvals
             </h1>
             <p className="text-[13px] text-gray-muted mt-2">
-              {pendingCount > 0 ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for your okay` : "Everything that needed a look is handled"}
+              {pendingCount > 0
+                ? `${pendingCount} AI item${pendingCount === 1 ? "" : "s"} waiting for your okay before going live`
+                : "Risky AI changes, drafts, and review-needed updates appear here before going live"}
             </p>
           </div>
           {staleSectionCount > 0 && (
@@ -147,6 +152,30 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                       <p className="text-[12px] text-gray-fg mt-1">
                         Nothing needs your okay, but the AI is watching older site content.
                       </p>
+                    </div>
+                  </div>
+                </div>
+              ) : resolved.length > 0 ? (
+                <div className="space-y-4">
+                  <EmptyQueue />
+                  <div className="rounded-xl border border-glass-border bg-surface-raised p-4">
+                    <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+                      Recently handled
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {resolved.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-border/60 bg-surface px-3 py-2"
+                        >
+                          <span className="min-w-0 truncate text-[13px] text-warm-black">
+                            {event.title}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-success-dim px-2 py-0.5 text-[10px] font-medium text-success">
+                            {event.status === "approved" ? "Approved" : "Handled"}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

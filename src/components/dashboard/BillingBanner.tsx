@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface BillingBannerProps {
   subscriptionStatus: string;
 }
 
 export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [dismissed, setDismissed] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const [error, setError] = useState("");
@@ -20,7 +23,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
     setError("");
     setOpeningPortal(true);
     try {
-      const res = await fetch("/api/billing/portal", {
+      const res = await fetch(dashboardHref("/api/billing/portal"), {
         method: "POST",
         credentials: "same-origin",
       });

@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useCart, getItemPrice } from "@/lib/cart";
 
+function canRenderProductImage(src: string) {
+  return !!src && !src.startsWith("/images/");
+}
+
 export function CartDrawer() {
   const {
     items,
@@ -161,7 +165,7 @@ export function CartDrawer() {
                   >
                     {/* Image */}
                     <div className="relative w-20 h-20 flex-shrink-0" style={{ background: "var(--cream-dark)" }}>
-                      {item.imageUrl ? (
+                      {canRenderProductImage(item.imageUrl) ? (
                         <Image
                           src={item.imageUrl}
                           alt={item.name}
@@ -247,7 +251,7 @@ export function CartDrawer() {
         {/* Footer */}
         {items.length > 0 && (
           <div
-            className="px-6 py-5"
+            className="px-6 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
             style={{ borderTop: "1px solid var(--cream-mid)" }}
           >
             <div className="flex items-center justify-between mb-4">
@@ -264,6 +268,7 @@ export function CartDrawer() {
             <button
               onClick={handleCheckout}
               disabled={checkingOut}
+              aria-label="Checkout securely"
               className="w-full py-3.5 text-xs font-bold tracking-widest uppercase transition-all duration-300 disabled:opacity-50"
               style={{ background: "var(--bark)", color: "var(--cream)" }}
               onMouseEnter={(e) => { if (!checkingOut) e.currentTarget.style.background = "var(--bark-light)"; }}

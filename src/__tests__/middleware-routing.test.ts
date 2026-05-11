@@ -8,6 +8,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 import {
   buildContentSecurityPolicy,
   clearDomainResolutionCacheForTests,
+  extractTenantFromClientPath,
   extractTenantFromHost,
   getEnvDomainMap,
   getLegacyPublicSiteRedirect,
@@ -16,6 +17,7 @@ import {
   resolveTenantFromDomainMap,
   shouldRedirectAdminRoot,
   shouldResolveCustomDomain,
+  shouldUseFallbackAuthForAdminHost,
   shouldRewriteMarketingRoot,
   validateCronRequest,
 } from "../proxy";
@@ -46,6 +48,29 @@ describe("proxy host routing helpers", () => {
     expect(extractTenantFromHost("admin.rohlax.scaffoldweb.com")).toEqual({
       tenant: "rohlax",
       isAdminSubdomain: true,
+    });
+  });
+
+  it("routes /client tenant fallback paths to the dashboard surface", () => {
+    expect(extractTenantFromClientPath("/client/rohlax")).toEqual({
+      tenant: "rohlax",
+      targetPath: "/dashboard",
+      shouldRedirectToDashboard: true,
+    });
+    expect(extractTenantFromClientPath("/client/rohlax/")).toEqual({
+      tenant: "rohlax",
+      targetPath: "/dashboard",
+      shouldRedirectToDashboard: true,
+    });
+    expect(extractTenantFromClientPath("/client/rohlax/dashboard/site")).toEqual({
+      tenant: "rohlax",
+      targetPath: "/dashboard/site",
+      shouldRedirectToDashboard: false,
+    });
+    expect(extractTenantFromClientPath("/dashboard")).toEqual({
+      tenant: null,
+      targetPath: "/dashboard",
+      shouldRedirectToDashboard: false,
     });
   });
 
@@ -150,6 +175,14 @@ describe("proxy host routing helpers", () => {
     expect(shouldRedirectAdminRoot(false, "/")).toBe(false);
   });
 
+  it("uses scaffoldweb fallback auth for customer-owned admin domains", () => {
+    expect(shouldUseFallbackAuthForAdminHost("admin.greatlakesdriedfruit.com", true)).toBe(true);
+    expect(shouldUseFallbackAuthForAdminHost("admin.rohlaxwellness.com", true)).toBe(true);
+    expect(shouldUseFallbackAuthForAdminHost("admin.rohlax.scaffoldweb.com", true)).toBe(false);
+    expect(shouldUseFallbackAuthForAdminHost("admin.gldf.localhost:3000", true)).toBe(false);
+    expect(shouldUseFallbackAuthForAdminHost("greatlakesdriedfruit.com", false)).toBe(false);
+  });
+
   it("rewrites only marketing root requests to /home", () => {
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/")).toBe(true);
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/onboard")).toBe(false);
@@ -188,6 +221,7 @@ describe("proxy frame policy", () => {
       protocol: "https:",
     });
 
+    expect(csp).toContain("frame-src 'self' https: http://localhost:* http://*.localhost:*");
     expect(csp).toContain("frame-ancestors 'none'");
   });
 

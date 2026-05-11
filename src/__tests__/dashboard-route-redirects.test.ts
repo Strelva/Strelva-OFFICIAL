@@ -1,24 +1,18 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it, vi, beforeEach } from "vitest";
-
-const redirectMock = vi.hoisted(() => vi.fn());
-
-vi.mock("next/navigation", () => ({
-  redirect: redirectMock,
-}));
-
-import DashboardContentRedirect from "../app/dashboard/content/page";
+import { describe, expect, it } from "vitest";
+import { isClientFallbackRoot, withClientFallbackRoot } from "../lib/client-fallback";
 
 describe("dashboard route redirects", () => {
-  beforeEach(() => {
-    redirectMock.mockReset();
-  });
-
-  it("keeps the legacy content route pointed at the site workspace", () => {
-    DashboardContentRedirect();
-
-    expect(redirectMock).toHaveBeenCalledWith("/dashboard/site");
+  it("keeps dashboard redirects inside the tenant fallback route when present", () => {
+    expect(withClientFallbackRoot(null, "/dashboard/site")).toBe("/dashboard/site");
+    expect(withClientFallbackRoot("", "/dashboard/site")).toBe("/dashboard/site");
+    expect(withClientFallbackRoot("/client/gldf", "/dashboard/site")).toBe("/client/gldf/dashboard/site");
+    expect(withClientFallbackRoot("/client/rohlax", "/dashboard")).toBe("/client/rohlax/dashboard");
+    expect(withClientFallbackRoot("/client/rohlax", "sign-in")).toBe("/client/rohlax/sign-in");
+    expect(withClientFallbackRoot("/bad/rohlax", "/dashboard")).toBe("/dashboard");
+    expect(isClientFallbackRoot("/client/gldf")).toBe(true);
+    expect(isClientFallbackRoot("/client/GLDF")).toBe(false);
   });
 
   it("sends dashboard child access denials to the no-access page", () => {
@@ -33,7 +27,7 @@ describe("dashboard route redirects", () => {
       const source = readFileSync(path.join(process.cwd(), routeFile), "utf8");
 
       expect(source, routeFile).not.toMatch(/redirect\(\s*["']\/["']\s*\)/);
-      expect(source, routeFile).toContain('redirect("/no-access")');
+      expect(source, routeFile).toContain('withClientFallbackRoot(clientFallbackRoot, "/no-access")');
     }
   });
 
@@ -78,6 +72,9 @@ describe("dashboard route redirects", () => {
     expect(signInPage).toContain("getInvitedEmail(params)");
     expect(signIn).toContain("Use the exact email address that received your invite");
     expect(signInPage).toContain("@/lib/marketing-hosts");
+    expect(signInPage).toContain("@/lib/client-fallback");
+    expect(signInPage).toContain("getClientFallbackRoot(requestHeaders)");
+    expect(signInPage).toContain('withClientFallbackRoot(clientFallbackRoot, "/dashboard")');
     expect(signInPage).toContain("isMarketingHost(host)");
     expect(signInPage).toContain('"/account"');
     expect(signInPage).toContain('"/dashboard"');
@@ -90,6 +87,9 @@ describe("dashboard route redirects", () => {
     expect(signUp).toContain("getTenantConfig");
     expect(signUp).toContain("getSignUpTitle(siteName)");
     expect(signUp).toContain("@/lib/marketing-hosts");
+    expect(signUp).toContain("@/lib/client-fallback");
+    expect(signUp).toContain("getClientFallbackRoot(requestHeaders)");
+    expect(signUp).toContain('withClientFallbackRoot(clientFallbackRoot, "/dashboard")');
     expect(signUp).toContain("isMarketingHost(host)");
     expect(signUp).toContain('"/account"');
     expect(signUp).toContain('"/dashboard"');
@@ -110,10 +110,12 @@ describe("dashboard route redirects", () => {
 
     expect(source).toContain("UseInvitedEmailButton");
     expect(recoveryButton).toContain("SignOutButton");
-    expect(recoveryButton).toContain('redirectUrl="/sign-in"');
+    expect(recoveryButton).toContain('redirectUrl = "/sign-in"');
+    expect(recoveryButton).toContain("redirectUrl={redirectUrl}");
     expect(recoveryButton).toContain('type="button"');
     expect(recoveryButton).toContain("{button}</SignOutButton>");
     expect(recoveryButton).toContain("Use invited email");
+    expect(source).toContain('withClientFallbackRoot(clientFallbackRoot, "/sign-in")');
     expect(source).toContain("Use the exact email address that received your invite");
     expect(source).toContain("signs you out so you can choose that account");
     expect(source).toContain("mailto:jacob@scaffoldweb.com");

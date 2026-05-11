@@ -7,6 +7,10 @@ import { useCart } from "@/lib/cart";
 import { ProductModal } from "./ProductModal";
 import type { ProductsContent, ProductItem } from "@/lib/types";
 
+function canRenderProductImage(src: string) {
+  return !!src && !src.startsWith("/images/");
+}
+
 export function Products({ products }: { products: ProductsContent }) {
   const scrollRef = useReveal();
   const { addItem } = useCart();
@@ -55,7 +59,7 @@ export function Products({ products }: { products: ProductsContent }) {
             <div className="mb-8">
               <div className="grid md:grid-cols-5 gap-0 cursor-pointer group" onClick={() => setModalProduct(featured)}>
                 <div className="md:col-span-3 relative aspect-[4/3] md:aspect-auto md:min-h-[500px] overflow-hidden">
-                  {featured.imageUrl ? (
+                  {canRenderProductImage(featured.imageUrl) ? (
                     <Image
                       src={featured.imageUrl}
                       alt={featured.name}
@@ -125,12 +129,14 @@ export function Products({ products }: { products: ProductsContent }) {
                     ) : (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleQuickAdd(e, featured); }}
+                        aria-label={`Add ${featured.name} to cart`}
+                        data-testid={`add-to-cart-${featured.id}`}
                         className="text-xs font-bold tracking-widest uppercase px-5 py-2.5 transition-all duration-300 shrink-0"
                         style={{ background: "var(--bark)", color: "var(--cream)" }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bark-light)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bark)"; }}
                       >
-                        Buy Now
+                        Add to cart
                       </button>
                     )}
                   </div>
@@ -157,7 +163,7 @@ export function Products({ products }: { products: ProductsContent }) {
                     onClick={() => setModalProduct(product)}
                   >
                     <div className="relative aspect-square overflow-hidden">
-                      {product.imageUrl ? (
+                      {canRenderProductImage(product.imageUrl) ? (
                         <Image
                           src={product.imageUrl}
                           alt={product.name}
@@ -213,10 +219,12 @@ export function Products({ products }: { products: ProductsContent }) {
                           ) : (
                             <button
                               onClick={(e) => handleQuickAdd(e, product)}
+                              aria-label={`Add ${product.name} to cart`}
+                              data-testid={`add-to-cart-${product.id}`}
                               className="text-[0.5625rem] font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-60"
                               style={{ color: "var(--sage)" }}
                             >
-                              Add to Cart &rarr;
+                              Add to cart
                             </button>
                           )}
                         </div>

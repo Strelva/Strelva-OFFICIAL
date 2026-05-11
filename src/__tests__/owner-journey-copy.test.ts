@@ -11,27 +11,31 @@ describe("owner journey copy and links", () => {
     const desktopNav = readRepoFile("src/components/dashboard/HistorySidebar.tsx");
     const mobileNav = readRepoFile("src/components/dashboard/MobileNav.tsx");
 
-    expect(desktopNav).toContain("What's working");
     expect(desktopNav).toContain("Ask AI");
-    expect(desktopNav).toContain("Needs approval");
-    expect(desktopNav).toContain("My site");
-    expect(desktopNav).toContain("Connected accounts");
-    expect(desktopNav).toContain("Ownership Center");
+    expect(desktopNav).toContain("Approvals");
+    expect(desktopNav).toContain("Site");
+    expect(desktopNav).toContain("Connections");
+    expect(desktopNav).toContain("Ownership");
+    expect(desktopNav).not.toContain("Overview");
 
     expect(mobileNav).toContain("Ask AI");
-    expect(mobileNav).toContain("Working");
-    expect(mobileNav).toContain("Approve");
-    expect(mobileNav).toContain("Own");
+    expect(mobileNav).toContain("Approvals");
+    expect(mobileNav).toContain("Connections");
+    expect(mobileNav).toContain("Ownership");
+    expect(mobileNav).not.toContain("Overview");
   });
 
-  it("keeps the first-run dashboard focused on value and next action", () => {
-    const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");
+  it("keeps the first-run dashboard focused on AI action", () => {
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const chatPanel = readRepoFile("src/components/dashboard/ChatPanel.tsx");
+    const promptBox = readRepoFile("src/components/ui/ai-prompt-box.tsx");
 
-    expect(weeklyBrief).toContain("Your site is ready to manage");
-    expect(weeklyBrief).toContain("See what&apos;s working");
-    expect(weeklyBrief).toContain("Tell AI what to change");
-    expect(weeklyBrief).toContain("Ask AI for a small change");
-    expect(weeklyBrief).toContain("View your live site");
+    expect(dashboardPage).toContain('withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat")');
+    expect(chatPanel).toContain("What's working?");
+    expect(chatPanel).toContain("Suggest an update");
+    expect(chatPanel).toContain("Show recent changes");
+    expect(chatPanel).toContain("Check site health");
+    expect(promptBox).toContain("More ways to ask");
   });
 
   it("keeps AI result feedback actionable", () => {

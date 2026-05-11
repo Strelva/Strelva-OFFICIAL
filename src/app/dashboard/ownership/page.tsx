@@ -31,7 +31,7 @@ const MANAGED_ITEMS = [
   "Hosting, deployment pipeline, uptime monitoring, SSL, and production build configuration.",
   "Dashboard software, AI tools, review workflow, analytics presentation, and weekly report generation.",
   "Integration tokens, webhook plumbing, cache/revalidation setup, and platform maintenance.",
-  "Scaffold Web internal templates, source code, deployment credentials, and admin operations.",
+  "Scaffold Web platform source code, deployment credentials, and admin operations.",
 ];
 
 const HANDOFF_STEPS = [
@@ -97,21 +97,22 @@ export default function OwnershipPage() {
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const subscriptionStatus = dashboard?.subscriptionStatus ?? "none";
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
 
   useEffect(() => {
-    fetch("/api/admin/domains", { credentials: "same-origin" })
+    fetch(apiHref("/api/admin/domains"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : { domains: [] }))
       .then((data) => setDomains(data.domains || []))
       .catch(() => setDomains([]))
       .finally(() => setLoadingDomains(false));
-  }, []);
+  }, [apiHref]);
 
   async function downloadExport(kind: "content" | "assets") {
     setError("");
     setNotice("");
     setDownloading(kind);
     try {
-      const res = await fetch(`/api/tenant-export/${kind}`, { credentials: "same-origin" });
+      const res = await fetch(apiHref(`/api/tenant-export/${kind}`), { credentials: "same-origin" });
       if (!res.ok) throw new Error(`Export failed with ${res.status}`);
       const blob = await res.blob();
       downloadBlob(
@@ -131,7 +132,7 @@ export default function OwnershipPage() {
     setNotice("");
     setRequesting(true);
     try {
-      const res = await fetch("/api/offboarding/request", {
+      const res = await fetch(apiHref("/api/offboarding/request"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -150,7 +151,7 @@ export default function OwnershipPage() {
     setBillingError("");
     setOpeningPortal(true);
     try {
-      const res = await fetch("/api/billing/portal", {
+      const res = await fetch(apiHref("/api/billing/portal"), {
         method: "POST",
         credentials: "same-origin",
       });

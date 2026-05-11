@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
+import { Download, Image as ImageIcon } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
-import { DashSelect, FormRow, SavedToast } from "@/components/dashboard/ui";
+import { DashSelect, FormRow } from "@/components/dashboard/ui";
+import { SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL } from "@/lib/pricing";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,6 +17,14 @@ import { DashSelect, FormRow, SavedToast } from "@/components/dashboard/ui";
 type SettingsData = Record<string, string>;
 type ThemeData = Record<string, unknown>;
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
+
+function useDashboardApiPath() {
+  const dashboard = useDashboardOptional();
+  return useCallback(
+    (path: string) => dashboard?.dashboardHref(path) ?? path,
+    [dashboard],
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Identity field definitions
@@ -108,14 +119,32 @@ function setNestedValue(
 // ---------------------------------------------------------------------------
 
 const SETTINGS_SECTIONS = [
-  { id: "profile", label: "Profile" },
+  { id: "profile", label: "Business" },
   { id: "brand", label: "Brand" },
-  { id: "ai", label: "AI Agent" },
+  { id: "ai", label: "AI rules" },
+  { id: "utilities", label: "Utilities" },
   { id: "domains", label: "Domains" },
-  { id: "billing", label: "Plan & Billing" },
-  { id: "divider", label: "" },
+  { id: "billing", label: "Billing" },
   { id: "publishing", label: "Publishing" },
 ] as const;
+
+type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+
+function SaveStatusPill({ status }: { status: SaveStatus }) {
+  const copy: Record<SaveStatus, { label: string; className: string }> = {
+    idle: { label: "Saved", className: "border-gray-border text-gray-faint" },
+    dirty: { label: "Unsaved changes", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
+    saving: { label: "Saving...", className: "border-sky-400/30 bg-sky-400/10 text-sky-300" },
+    saved: { label: "Saved", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
+    error: { label: "Could not save", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  };
+  const item = copy[status];
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.className}`}>
+      {item.label}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Profile section
@@ -128,40 +157,39 @@ function ProfileSection({
   settings: SettingsData;
   setSettings: (s: SettingsData) => void;
 }) {
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const latestRef = useRef(settings);
+  const apiPath = useDashboardApiPath();
   useEffect(() => {
     latestRef.current = settings;
   });
 
   const saveSettings = useCallback(async (data: SettingsData) => {
-    setSaveError(false);
+    setSaveStatus("saving");
     try {
-      const res = await fetch("/api/content/settings", {
+      const res = await fetch(apiPath("/api/content/settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(data),
       });
       if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
       } else {
-        setSaveError(true);
-        setTimeout(() => setSaveError(false), 3000);
+        setSaveStatus("error");
       }
     } catch {
-      setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
+      setSaveStatus("error");
     }
-  }, []);
+  }, [apiPath]);
 
   const handleChange = useCallback(
     (key: string, value: string) => {
       const updated = { ...latestRef.current, [key]: value };
       setSettings(updated);
       latestRef.current = updated;
+      setSaveStatus("dirty");
     },
     [setSettings],
   );
@@ -172,11 +200,9 @@ function ProfileSection({
 
   return (
     <>
-      {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-          Couldn&apos;t save — try again
-        </div>
-      )}
+      <div className="mb-4 flex justify-end">
+        <SaveStatusPill status={saveStatus} />
+      </div>
 
       <div className="rounded-lg border border-gray-border overflow-hidden">
         {IDENTITY_FIELDS.map((field, i) => (
@@ -213,8 +239,6 @@ function ProfileSection({
           </FormRow>
         ))}
       </div>
-
-      <SavedToast visible={saved} />
     </>
   );
 }
@@ -226,12 +250,12 @@ function ProfileSection({
 function BrandSection() {
   const [theme, setTheme] = useState<ThemeData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const latestRef = useRef<ThemeData | null>(null);
+  const apiPath = useDashboardApiPath();
 
   useEffect(() => {
-    fetch("/api/content/theme", { credentials: "same-origin" })
+    fetch(apiPath("/api/content/theme"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setTheme(data);
@@ -239,29 +263,27 @@ function BrandSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [apiPath]);
 
   const saveTheme = useCallback(async (data: ThemeData) => {
-    setSaveError(false);
+    setSaveStatus("saving");
     try {
-      const res = await fetch("/api/content/theme", {
+      const res = await fetch(apiPath("/api/content/theme"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(data),
       });
       if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
       } else {
-        setSaveError(true);
-        setTimeout(() => setSaveError(false), 3000);
+        setSaveStatus("error");
       }
     } catch {
-      setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
+      setSaveStatus("error");
     }
-  }, []);
+  }, [apiPath]);
 
   const handleFieldChange = useCallback(
     (key: string, value: unknown) => {
@@ -271,6 +293,7 @@ function BrandSection() {
           ? setNestedValue(prev, key, value)
           : { ...prev, [key]: value };
         latestRef.current = updated;
+        setSaveStatus("dirty");
         return updated;
       });
     },
@@ -300,11 +323,9 @@ function BrandSection() {
 
   return (
     <>
-      {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-          Couldn&apos;t save — try again
-        </div>
-      )}
+      <div className="mb-4 flex justify-end">
+        <SaveStatusPill status={saveStatus} />
+      </div>
 
       {/* Fonts */}
       <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
@@ -373,7 +394,6 @@ function BrandSection() {
         })}
       </div>
 
-      <SavedToast visible={saved} />
     </>
   );
 }
@@ -404,12 +424,12 @@ interface AISettings {
 function AISection() {
   const [data, setData] = useState<AISettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const latestRef = useRef<AISettings | null>(null);
+  const apiPath = useDashboardApiPath();
 
   useEffect(() => {
-    fetch("/api/tenant-settings", { credentials: "same-origin" })
+    fetch(apiPath("/api/tenant-settings"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         const settings: AISettings = {
@@ -422,29 +442,27 @@ function AISection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [apiPath]);
 
   const save = useCallback(async (settings: AISettings) => {
-    setSaveError(false);
+    setSaveStatus("saving");
     try {
-      const res = await fetch("/api/tenant-settings", {
+      const res = await fetch(apiPath("/api/tenant-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(settings),
       });
       if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
       } else {
-        setSaveError(true);
-        setTimeout(() => setSaveError(false), 3000);
+        setSaveStatus("error");
       }
     } catch {
-      setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
+      setSaveStatus("error");
     }
-  }, []);
+  }, [apiPath]);
 
   const handleBlurSave = useCallback(() => {
     if (latestRef.current) save(latestRef.current);
@@ -471,11 +489,9 @@ function AISection() {
 
   return (
     <>
-      {saveError && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-          Couldn&apos;t save — try again
-        </div>
-      )}
+      <div className="mb-4 flex justify-end">
+        <SaveStatusPill status={saveStatus} />
+      </div>
 
       {/* Personality + Rules */}
       <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
@@ -487,6 +503,7 @@ function AISection() {
               const updated = { ...data, personality: e.target.value };
               setData(updated);
               latestRef.current = updated;
+              setSaveStatus("dirty");
             }}
             onBlur={handleBlurSave}
             onKeyDown={(e) => {
@@ -503,6 +520,7 @@ function AISection() {
               const updated = { ...data, businessRules: e.target.value };
               setData(updated);
               latestRef.current = updated;
+              setSaveStatus("dirty");
             }}
             onBlur={handleBlurSave}
             placeholder={"e.g.\n• Always mention we're woman-owned\n• Never discount below 15%\n• Don't change the hero without asking"}
@@ -542,6 +560,7 @@ function AISection() {
                   };
                   setData(updated);
                   latestRef.current = updated;
+                  setSaveStatus("dirty");
                   save(updated);
                 }}
                 className="w-3.5 h-3.5 rounded border-gray-border accent-accent"
@@ -562,6 +581,7 @@ function AISection() {
                     };
                     setData(updated);
                     latestRef.current = updated;
+                    setSaveStatus("dirty");
                   }}
                   onBlur={handleBlurSave}
                   className="w-[110px] bg-surface-base border border-gray-border rounded-md px-2 py-1.5 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
@@ -579,6 +599,7 @@ function AISection() {
                     };
                     setData(updated);
                     latestRef.current = updated;
+                    setSaveStatus("dirty");
                   }}
                   onBlur={handleBlurSave}
                   className="w-[110px] bg-surface-base border border-gray-border rounded-md px-2 py-1.5 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
@@ -591,7 +612,6 @@ function AISection() {
         ))}
       </div>
 
-      <SavedToast visible={saved} />
     </>
   );
 }
@@ -602,6 +622,57 @@ function AISection() {
 
 function DomainsSection() {
   return <DomainsClient initialDomains={[]} />;
+}
+
+// ---------------------------------------------------------------------------
+// Utilities section
+// ---------------------------------------------------------------------------
+
+function UtilitiesSection() {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+
+  const utilities = [
+    {
+      title: "Photo library",
+      description: "Manage reusable images that the site editor and AI can pull into customer-facing updates.",
+      href: "/dashboard/assets",
+      icon: ImageIcon,
+    },
+    {
+      title: "Export & handoff",
+      description: "Download content, assets, and offboarding notes when ownership or providers change.",
+      href: "/dashboard/ownership",
+      icon: Download,
+    },
+  ];
+
+  return (
+    <div className="grid gap-3">
+      {utilities.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={dashboardHref(item.href)}
+            className="group flex items-start gap-4 rounded-xl border border-gray-border bg-surface-raised px-4 py-4 transition-colors hover:border-accent/35"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
+              <Icon className="h-4 w-4" strokeWidth={1.5} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[14px] font-medium text-warm-white group-hover:text-white">
+                {item.title}
+              </span>
+              <span className="mt-1 block text-[12px] leading-relaxed text-gray-muted">
+                {item.description}
+              </span>
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -638,6 +709,7 @@ const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className
 
 function BillingSection() {
   const dashboard = useDashboardOptional();
+  const apiPath = useDashboardApiPath();
   const [billingError, setBillingError] = useState("");
   const [openingPortal, setOpeningPortal] = useState(false);
   const status = dashboard?.subscriptionStatus ?? "none";
@@ -651,7 +723,7 @@ function BillingSection() {
             Current plan
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-white">$20/mo</span>
+            <span className="text-[20px] font-medium text-warm-white">{SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}</span>
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}
             </span>
@@ -668,7 +740,7 @@ function BillingSection() {
             setBillingError("");
             setOpeningPortal(true);
             try {
-              const res = await fetch("/api/billing/portal", {
+              const res = await fetch(apiPath("/api/billing/portal"), {
                 method: "POST",
                 credentials: "same-origin",
               });
@@ -705,6 +777,7 @@ function BillingSection() {
 
 function PublishingSection() {
   const dashboard = useDashboardOptional();
+  const apiPath = useDashboardApiPath();
   const [autoPublish, setAutoPublish] = useState(dashboard?.autoPublish ?? true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -712,7 +785,7 @@ function PublishingSection() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/tenant-settings", { credentials: "same-origin" })
+    fetch(apiPath("/api/tenant-settings"), { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load publishing settings");
         return res.json();
@@ -724,7 +797,7 @@ function PublishingSection() {
       })
       .catch(() => setError("Couldn't load publishing mode. Showing the last known dashboard value."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [apiPath]);
 
   const saveAutoPublish = useCallback(async (next: boolean) => {
     setError("");
@@ -733,7 +806,7 @@ function PublishingSection() {
     const previous = autoPublish;
     setAutoPublish(next);
     try {
-      const res = await fetch("/api/tenant-settings", {
+      const res = await fetch(apiPath("/api/tenant-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -748,7 +821,7 @@ function PublishingSection() {
     } finally {
       setSaving(false);
     }
-  }, [autoPublish]);
+  }, [apiPath, autoPublish]);
 
   return (
     <div className="rounded-lg border border-gray-border overflow-hidden">
@@ -814,12 +887,16 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
     title: "AI guardrails",
     description: "Rules, hours, and tone the AI follows before it changes anything customer-facing.",
   },
+  utilities: {
+    title: "Utilities",
+    description: "Lower-frequency tools live here so the daily dashboard stays focused.",
+  },
   domains: {
     title: "Domains",
     description: "Where customers and owners access the live site and dashboard.",
   },
   billing: {
-    title: "Plan & Billing",
+    title: "Billing",
     description: "One plan, one operating cost, no maintenance upsells.",
   },
   publishing: {
@@ -836,16 +913,17 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const apiPath = useDashboardApiPath();
 
   useEffect(() => {
-    fetch("/api/content/settings", { credentials: "same-origin" })
+    fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
       })
       .then((data) => setSettings(data))
       .catch(() => setLoadError(true));
-  }, []);
+  }, [apiPath]);
 
   if (loadError) {
     return (
@@ -855,7 +933,7 @@ export default function SettingsPage() {
           <button
             onClick={() => {
               setLoadError(false);
-              fetch("/api/content/settings", { credentials: "same-origin" })
+              fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
                 .then((res) => {
                   if (!res.ok) throw new Error();
                   return res.json();
@@ -881,24 +959,19 @@ export default function SettingsPage() {
         <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-3 px-3">
           Settings
         </div>
-        {SETTINGS_SECTIONS.map((item) => {
-          if (item.id === "divider") {
-            return <div key="divider" className="border-t border-gray-border my-2" />;
-          }
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className={`w-full text-left text-[13px] px-3 py-1.5 rounded transition-colors ${
-                activeSection === item.id
-                  ? "bg-surface-raised text-warm-white"
-                  : "text-gray-muted hover:text-warm-white hover:bg-surface-raised/50"
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+        {SETTINGS_SECTIONS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveSection(item.id)}
+            className={`mb-1 w-full rounded-md border px-3 py-2 text-left text-[13px] transition-colors ${
+              activeSection === item.id
+                ? "border-gray-border bg-surface-raised text-warm-white"
+                : "border-transparent text-gray-muted hover:border-gray-border/60 hover:bg-surface-raised/50 hover:text-warm-white"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
       </nav>
 
       {/* Mobile section select */}
@@ -906,7 +979,7 @@ export default function SettingsPage() {
         <DashSelect
           value={activeSection}
           onChange={(e) => setActiveSection(e.target.value)}
-          options={SETTINGS_SECTIONS.filter((s) => s.id !== "divider").map((item) => ({
+          options={SETTINGS_SECTIONS.map((item) => ({
             value: item.id,
             label: item.label,
           }))}
@@ -949,6 +1022,7 @@ export default function SettingsPage() {
           )}
           {activeSection === "brand" && <BrandSection />}
           {activeSection === "ai" && <AISection />}
+          {activeSection === "utilities" && <UtilitiesSection />}
           {activeSection === "domains" && <DomainsSection />}
           {activeSection === "billing" && <BillingSection />}
           {activeSection === "publishing" && <PublishingSection />}

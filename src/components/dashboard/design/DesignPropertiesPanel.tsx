@@ -15,6 +15,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { AgentTrace, type TraceStep } from "../AgentTrace";
 import { AgentPreview } from "../AgentPreview";
 import { AssetPickerModal } from "../AssetPickerModal";
+import { useDashboardOptional } from "../DashboardContext";
 import type { PreviewDiff, RiskAssessment } from "@/lib/agent-risk";
 import type { SelectedNode } from "../DesignMode";
 
@@ -50,6 +51,8 @@ export function DesignPropertiesPanel({
   hasDraft = false,
   sectionAnalytics,
 }: DesignPropertiesPanelProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const analytics = selectedNode?.sectionType
     ? sectionAnalytics?.[selectedNode.sectionType]
     : undefined;
@@ -528,6 +531,8 @@ function AITab({
   node: SelectedNode;
   onContentUpdate?: (section: string, field: string, value: string) => void;
 }) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -573,7 +578,7 @@ function AITab({
         currentValue: node.content || node.label,
       };
 
-      const res = await fetch("/api/agent", {
+      const res = await fetch(dashboardHref("/api/agent"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -640,7 +645,7 @@ function AITab({
       setIsApplying(false);
       setPrompt("");
     }
-  }, [node.sectionType, node.label, node.field, node.content, onContentUpdate, addTraceStep, updateTraceStep]);
+  }, [dashboardHref, node.sectionType, node.label, node.field, node.content, onContentUpdate, addTraceStep, updateTraceStep]);
 
   const handleApply = useCallback(() => {
     executeAgentPrompt(prompt);

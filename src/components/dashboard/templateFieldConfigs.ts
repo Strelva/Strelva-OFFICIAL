@@ -1,13 +1,12 @@
 /**
- * Per-template field schemas for the dashboard content editor.
+ * Section field schemas for the dashboard content editor.
  *
  * Why this exists: SECTION_FIELDS/ARRAY_CONFIGS were originally generic
- * (wellness-shaped). But each template renders a different content shape —
- * food-brand doesn't have phone/hours, it has locationTitle/locationDescription
- * and story paragraphs and stats. Gating fields on template here keeps the
- * editor honest: Amy only ever sees fields her template actually renders.
+ * and some rendered sites expose different content shapes. Gating fields on
+ * the active site model keeps the editor honest: owners only see fields their
+ * site renders.
  *
- * Merge order in PropertiesEditor: template-specific → generic fallback.
+ * Merge order in PropertiesEditor: site-model-specific → generic fallback.
  */
 
 export type SimpleFieldType = "text" | "textarea" | "url" | "email" | "tel" | "image" | "color" | "number" | "select";
@@ -22,9 +21,9 @@ export interface SimpleFieldDef {
 }
 
 // Curated font picker shared by fontDisplay and fontBody. Must stay in sync
-// with the next/font imports in GLDF's src/app/layout.tsx — those load the
-// corresponding --font-* CSS variables at build time. Dynamic font loading
-// is intentionally not supported.
+// with the rendered site's next/font imports, which load the corresponding
+// --font-* CSS variables at build time. Dynamic font loading is intentionally
+// not supported.
 const FONT_OPTIONS: { value: string; label: string }[] = [
   { value: "Fraunces", label: "Fraunces" },
   { value: "Instrument_Serif", label: "Instrument Serif" },
@@ -75,7 +74,7 @@ export type SectionArrayConfig =
       multiline?: boolean;
     };
 
-export interface TemplateEditorSchema {
+export interface SiteModelEditorSchema {
   /** Scalar fields rendered above any array editors for the section. */
   sectionFields: Record<string, SimpleFieldDef[]>;
   /** One or more array editors per section (string arrays or object arrays). */
@@ -86,9 +85,9 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-// --- food-brand (GLDF) ---
-// Matches GLDF/src/lib/types.ts exactly — no dead fields.
-export const FOOD_BRAND_SCHEMA: TemplateEditorSchema = {
+// --- commerce/catalog schema ---
+// Matches the rendered section shape exactly so owners only see fields that appear on the site.
+export const FOOD_BRAND_SCHEMA: SiteModelEditorSchema = {
   sectionFields: {
     hero: [
       { key: "headline", label: "Headline", type: "textarea", placeholder: "Main heading (use \\n for line breaks)" },
@@ -117,16 +116,16 @@ export const FOOD_BRAND_SCHEMA: TemplateEditorSchema = {
     contact: [
       { key: "email", label: "Email", type: "email", placeholder: "hello@example.com" },
       { key: "locationTitle", label: "Location title", type: "textarea", placeholder: "Western\\nNew York" },
-      { key: "locationDescription", label: "Location description", type: "textarea", placeholder: "Small-batch apple snacks..." },
+      { key: "locationDescription", label: "Location description", type: "textarea", placeholder: "What customers should know about this location..." },
       { key: "instagramUrl", label: "Instagram URL", type: "url", placeholder: "https://instagram.com/..." },
       { key: "facebookUrl", label: "Facebook URL", type: "url", placeholder: "https://facebook.com/..." },
     ],
     settings: [
-      { key: "siteName", label: "Site name", type: "text", placeholder: "Great Lakes Dried Fruit" },
-      { key: "siteTagline", label: "Tagline", type: "text", placeholder: "Orchard-Dried Apple Snacks" },
+      { key: "siteName", label: "Site name", type: "text", placeholder: "Your Business" },
+      { key: "siteTagline", label: "Tagline", type: "text", placeholder: "Clear one-line promise" },
       { key: "siteDescription", label: "Meta description", type: "textarea", placeholder: "How you appear in search results..." },
-      { key: "footerTagline", label: "Footer tagline", type: "text", placeholder: "Orchard-dried. Ingredient-honest." },
-      { key: "copyrightText", label: "Copyright line", type: "text", placeholder: "Great Lakes Dried Fruit" },
+      { key: "footerTagline", label: "Footer tagline", type: "text", placeholder: "Short trust-building line" },
+      { key: "copyrightText", label: "Copyright line", type: "text", placeholder: "Your Business" },
     ],
     // Theme: stored shape is nested (colors.*, fontDisplay, fontBody).
     // Color fields use dot-notation keys; PropertiesEditor resolves them
@@ -161,8 +160,8 @@ export const FOOD_BRAND_SCHEMA: TemplateEditorSchema = {
       { key: "ctaHref", label: "CTA button link", type: "url", placeholder: "#products or https://..." },
     ],
     footer: [
-      { key: "tagline", label: "Footer tagline", type: "text", placeholder: "Orchard-dried. Ingredient-honest." },
-      { key: "copyrightText", label: "Copyright line", type: "text", placeholder: "Great Lakes Dried Fruit" },
+      { key: "tagline", label: "Footer tagline", type: "text", placeholder: "Short trust-building line" },
+      { key: "copyrightText", label: "Copyright line", type: "text", placeholder: "Your Business" },
     ],
   },
   sectionArrays: {
@@ -303,11 +302,11 @@ export const FOOD_BRAND_SCHEMA: TemplateEditorSchema = {
   },
 };
 
-const REGISTRY: Record<string, TemplateEditorSchema> = {
+const REGISTRY: Record<string, SiteModelEditorSchema> = {
   "food-brand": FOOD_BRAND_SCHEMA,
 };
 
-export function getTemplateSchema(template: string | undefined): TemplateEditorSchema | null {
-  if (!template) return null;
-  return REGISTRY[template] ?? null;
+export function getSiteModelSchema(siteModel: string | undefined): SiteModelEditorSchema | null {
+  if (!siteModel) return null;
+  return REGISTRY[siteModel] ?? null;
 }

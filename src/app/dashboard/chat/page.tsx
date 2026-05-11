@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
 import { getContent } from "@/lib/storage";
+import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { ChatPageClient } from "./ChatPageClient";
 
 export default async function ChatPage({
@@ -13,7 +15,10 @@ export default async function ChatPage({
   const tenant = await getTenantFromHeaders();
 
   const allowed = await hasTenantAccess(tenant);
-  if (!allowed) redirect("/no-access");
+  if (!allowed) {
+    const clientFallbackRoot = getClientFallbackRoot(await headers());
+    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
+  }
 
   let ownerName = "there";
   try {

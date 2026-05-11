@@ -5,15 +5,7 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import type { StoredWeeklyReport } from "@/lib/storage";
 
-const CTA_VOCAB: Record<string, { metric: string; action: string }> = {
-  wellness: { metric: "Clicked Book Now", action: "clicked Book Now" },
-  "food-brand": { metric: "Clicked Shop Now", action: "clicked Shop Now" },
-  restaurant: { metric: "Clicked Reserve", action: "clicked Reserve" },
-  trades: { metric: "Requested a quote", action: "requested a quote" },
-  professional: { metric: "Clicked Contact", action: "clicked Contact" },
-};
-
-const DEFAULT_VOCAB = { metric: "Clicked your main button", action: "clicked your main button" };
+const ACTION_VOCAB = { metric: "Took a high-intent action", action: "took a high-intent action" };
 
 interface ReportsClientProps {
   siteName: string;
@@ -21,7 +13,6 @@ interface ReportsClientProps {
   bookingClicks: { total: number; thisWeek: number; today: number };
   staleSections: { section: string; daysSinceUpdate: number }[];
   recentActivity: { text: string; time: string; type?: string }[];
-  template: string;
   reportHistory: StoredWeeklyReport[];
 }
 
@@ -54,7 +45,7 @@ function formatWeekLabel(weekStart: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; vocab: { metric: string; action: string } }) {
+function ReportHistoryItem({ report }: { report: StoredWeeklyReport }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -75,7 +66,7 @@ function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; voca
         </div>
         <div className="flex items-center gap-4 text-[12px] text-gray-muted">
           <span>{report.pageViews.thisWeek} people found you</span>
-          <span>{report.bookingClicks.thisWeek} {vocab.action.toLowerCase()}</span>
+          <span>{report.bookingClicks.thisWeek} {ACTION_VOCAB.action}</span>
         </div>
       </button>
 
@@ -97,7 +88,7 @@ function ReportHistoryItem({ report, vocab }: { report: StoredWeeklyReport; voca
               </div>
               <div>
                 <div className="text-[11px] font-mono tracking-wider uppercase text-gray-faint mb-1">
-                  {vocab.metric}
+                  {ACTION_VOCAB.metric}
                 </div>
                 <div className="text-[18px] font-medium text-warm-white">
                   {report.bookingClicks.thisWeek}
@@ -117,10 +108,8 @@ export function ReportsClient({
   bookingClicks,
   staleSections,
   recentActivity,
-  template,
   reportHistory,
 }: ReportsClientProps) {
-  const vocab = CTA_VOCAB[template] || DEFAULT_VOCAB;
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const weekLabel = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -148,7 +137,7 @@ export function ReportsClient({
           </p>
           {bookingClicks.thisWeek > 0 && (
             <p className="text-[13px] text-gray-muted mt-1">
-              {bookingClicks.thisWeek} {vocab.action.toLowerCase()}
+              {bookingClicks.thisWeek} {ACTION_VOCAB.action}
             </p>
           )}
         </div>
@@ -161,14 +150,14 @@ export function ReportsClient({
             subvalue={`${pageViews.total.toLocaleString()} all time`}
           />
           <StatCard
-            label={vocab.metric}
+            label={ACTION_VOCAB.metric}
             value={bookingClicks.thisWeek}
             subvalue={`${bookingClicks.total.toLocaleString()} all time`}
           />
           <StatCard
             label="Found you today"
             value={pageViews.today}
-            subvalue={bookingClicks.today > 0 ? `${bookingClicks.today} ${vocab.action.toLowerCase()}` : undefined}
+            subvalue={bookingClicks.today > 0 ? `${bookingClicks.today} ${ACTION_VOCAB.action}` : undefined}
           />
         </div>
 
@@ -258,7 +247,7 @@ export function ReportsClient({
           {reportHistory.length > 0 ? (
             <div>
               {reportHistory.map((report) => (
-                <ReportHistoryItem key={report.id} report={report} vocab={vocab} />
+                <ReportHistoryItem key={report.id} report={report} />
               ))}
             </div>
           ) : (

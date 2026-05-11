@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
@@ -11,6 +12,7 @@ import { getActorContext, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
+import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -19,23 +21,26 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const devAccessBypass = isDevAccessBypassEnabled();
+  const requestHeaders = await headers();
+  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   const { userId } = await auth();
   if (!userId && !devAccessBypass) {
-    redirect("/sign-in");
+    redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }
 
   const tenant = await getTenantFromHeaders();
+  const dashboardBasePath = clientFallbackRoot;
 
   const hasAccess = await hasTenantAccess(tenant);
   if (!hasAccess) {
-    redirect("/no-access");
+    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
   const actor = await getActorContext(tenant);
   const tenantConfig = await getTenantConfig(tenant);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : "";
-  const previewUrl = tenantConfig ? getTenantPublicUrl(tenantConfig) : "";
+  const previewUrl = siteUrl;
   let siteName = "Your Business";
   let ownerName = "";
   try {
@@ -62,8 +67,9 @@ export default async function DashboardLayout({
     <DashboardProvider
       tenantId={tenant}
       siteUrl={siteUrl}
-      template={tenantConfig?.template || "wellness"}
+      siteModel={tenantConfig?.template || "wellness"}
       previewUrl={previewUrl}
+      dashboardBasePath={dashboardBasePath}
       autoPublish={tenantConfig?.autoPublish !== false}
       subscriptionStatus={subscriptionStatus}
       hasStripeCustomer={!!tenantConfig?.stripeCustomerId}

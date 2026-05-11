@@ -651,14 +651,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("UPSTASH_REDIS_REST_TOKEN");
     expect(audit).toContain("SENTRY_DSN");
     expect(audit).toContain("NEXT_PUBLIC_SENTRY_DSN");
-    expect(audit).toContain("price_1TM7v0D99ZGeTugfpmyYup3V");
+    expect(audit).toContain("price_1TVgq0D99ZGeTugfVuSggW3o");
     expect(audit).toContain("prod_UKnWPSG3QOtOUz");
-    expect(audit).toContain("$20/month USD");
+    expect(audit).toContain("$149/month USD");
     expect(audit).toContain("https://reb-studio.vercel.app/sign-in");
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
-    expect(audit).toContain("65 passed, 3 warned, 0 failed, 17 skipped");
+    expect(audit).toContain("65 passed, 1 warned, 0 failed, 16 skipped");
     expect(audit).toContain("use the exact email address that received the invite");
     expect(audit).toContain("using the exact invited email");
     expect(audit).toContain("Full `pnpm check:launch` was rerun");
@@ -698,11 +698,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const sourceHintsBlock = source.match(/const envSourceHints: Record<string, string> = \{([\s\S]*?)\};/)?.[1] || "";
 
     expect(source).toContain("Required Release Actions");
-    expect(source).toContain("SCAFFOLD_MONTHLY_PRICE_CENTS = 2000");
-    expect(source).toContain("Expected $20/month USD for Scaffold Web");
-    expect(source).toContain("Create or select the live $20 monthly Stripe price");
+    expect(source).toContain("SCAFFOLD_MONTHLY_PRICE_CENTS = 14900");
+    expect(source).toContain("Expected $149/month USD for Scaffold Web");
+    expect(source).toContain("Create or select the live $149 monthly Stripe price");
     expect(source).toContain('failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID")');
-    expect(source).toContain("exactly $20/month");
+    expect(source).toContain("exactly $149/month");
     expect(source).toContain("Current Stripe price details");
     expect(source).toContain("livemode=");
     expect(source).toContain("active=");
@@ -779,13 +779,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("vercel env add UPSTASH_REDIS_REST_TOKEN production");
     expect(launchBlockers).toContain("vercel env add SENTRY_DSN production");
     expect(launchBlockers).toContain("vercel env add NEXT_PUBLIC_SENTRY_DSN production");
-    expect(launchBlockers).toContain("price_1TM7v0D99ZGeTugfpmyYup3V");
+    expect(launchBlockers).toContain("price_1TVgq0D99ZGeTugfVuSggW3o");
     expect(launchBlockers).toContain("prod_UKnWPSG3QOtOUz");
-    expect(launchBlockers).toContain("amount=2000");
+    expect(launchBlockers).toContain("amount=14900");
     expect(launchBlockers).toContain("interval=month");
     expect(launchBlockers).not.toContain("vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes");
     expect(launchBlockers).toContain("vercel env add NEXT_PUBLIC_APP_URL production");
-    expect(launchBlockers).toContain("exactly $20/month USD");
+    expect(launchBlockers).toContain("exactly $149/month USD");
     expect(launchBlockers).toContain("Provider value sources");
     expect(launchBlockers).toContain("Clerk Dashboard -> Webhooks");
     expect(launchBlockers).toContain("Sanity project webhook settings");
@@ -862,14 +862,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       );
     }
 
-    expect(template).toContain("exactly $20/month");
+    expect(template).toContain("exactly $149/month");
     expect(template).toContain("same live Clerk instance");
     expect(template).toContain("Mixed Clerk instances can make /sign-in loop");
     expect(template).toContain("server/project DSN");
     expect(template).toContain("browser/client DSN");
     expect(localTemplate).toContain("same Clerk instance");
     expect(localTemplate).toContain("Mixed Clerk instances can make /sign-in loop");
-    expect(localTemplate).toContain("exactly $20/month");
+    expect(localTemplate).toContain("exactly $149/month");
     expect(localTemplate).toContain("server/project and browser/client DSNs");
   });
 

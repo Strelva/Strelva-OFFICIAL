@@ -5,10 +5,17 @@ import { isMarketingHost } from "@/lib/marketing-hosts";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { getTenantConfig } from "@/lib/tenants";
+import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { SignInClient } from "./SignInClient";
 
-async function getPostSignInUrl(): Promise<"/account" | "/dashboard"> {
-  const host = (await headers()).get("host") || "";
+async function getPostSignInUrl(): Promise<string> {
+  const requestHeaders = await headers();
+  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
+  if (clientFallbackRoot) {
+    return withClientFallbackRoot(clientFallbackRoot, "/dashboard");
+  }
+
+  const host = requestHeaders.get("host") || "";
   return isMarketingHost(host) ? "/account" : "/dashboard";
 }
 

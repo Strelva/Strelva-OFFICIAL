@@ -5,6 +5,7 @@ import { History, RotateCcw, Check, AlertCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonLine } from "@/components/ui/Skeleton";
+import { useDashboard } from "./DashboardContext";
 
 interface ContentVersion {
   id: string;
@@ -76,6 +77,7 @@ function flatten(obj: unknown, prefix = ""): Array<{ key: string; value: string 
 }
 
 export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
+  const { dashboardHref } = useDashboard();
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ActivityEntry | null>(null);
@@ -85,7 +87,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
   const load = useCallback(() => {
     setLoading(true);
     // Try new versioning API first, fall back to legacy activity snapshots
-    fetch(`/api/content/${section}/versions`, { credentials: "same-origin" })
+    fetch(dashboardHref(`/api/content/${section}/versions`), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((versions: ContentVersion[] | null) => {
         if (versions && versions.length > 0) {
@@ -106,7 +108,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
           return;
         }
         // Fallback: legacy activity-based versions
-        return fetch(`/api/activity?section=${encodeURIComponent(section)}`, {
+        return fetch(dashboardHref(`/api/activity?section=${encodeURIComponent(section)}`), {
           credentials: "same-origin",
         })
           .then((res) => (res.ok ? res.json() : []))
@@ -119,7 +121,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
       })
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
-  }, [section]);
+  }, [dashboardHref, section]);
 
   useEffect(() => {
     load();
@@ -136,7 +138,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
       const versionId = (selected as ActivityEntry & { _versionId?: string })._versionId;
       let res: Response;
       if (versionId) {
-        res = await fetch(`/api/content/${section}/versions`, {
+        res = await fetch(dashboardHref(`/api/content/${section}/versions`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
@@ -144,7 +146,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
         });
       } else {
         // Legacy: PUT snapshot directly
-        res = await fetch(`/api/content/${section}`, {
+        res = await fetch(dashboardHref(`/api/content/${section}`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
@@ -164,7 +166,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
     } finally {
       setRestoring(false);
     }
-  }, [section, selected, onRestored, load]);
+  }, [dashboardHref, section, selected, onRestored, load]);
 
   if (loading && !entries) {
     return (

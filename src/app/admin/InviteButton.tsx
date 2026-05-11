@@ -57,7 +57,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+        className="rounded-md px-2 py-1 text-xs text-amber-300 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
       >
         Invite
       </button>
@@ -75,15 +75,18 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
         {result && (
           <div
             role="status"
-            className={`mb-4 p-3 rounded-lg text-sm ${
+            className={`mb-4 rounded-lg border p-4 text-sm ${
               result.success
-                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-                : "bg-red-500/10 border border-red-500/20 text-red-400"
+                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                : "border-red-500/25 bg-red-500/10 text-red-300"
             }`}
           >
-            {result.message}
+            <p className="font-medium">
+              {result.success ? "Invite ready" : "Invite failed"}
+            </p>
+            <p className="mt-1 text-xs opacity-90">{result.message}</p>
             {result.signUpUrl && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-3 space-y-2">
                 <p className="text-xs text-emerald-200">
                   Share this link only with {email.trim().toLowerCase()}.{" "}
                   Access is tied to that exact email.
@@ -92,9 +95,10 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                   href={result.signUpUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block break-all text-emerald-300 underline underline-offset-2"
+                  className="block rounded-md border border-emerald-500/20 bg-black/20 px-3 py-2 break-all font-mono text-[11px] text-emerald-100 hover:text-white"
                 >
-                  Open manual signup link
+                  <span className="sr-only">Open manual signup link: </span>
+                  {result.signUpUrl}
                 </a>
                 <button
                   type="button"
@@ -108,7 +112,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                       setCopyFailed(true);
                     }
                   }}
-                  className="text-xs font-medium text-emerald-200 underline underline-offset-2"
+                  className="rounded-md bg-emerald-300 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-emerald-200"
                 >
                   {copied ? "Copied signup link" : "Copy signup link"}
                 </button>

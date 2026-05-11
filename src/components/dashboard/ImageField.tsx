@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Upload, X, Images } from "lucide-react";
 import Image from "next/image";
 import { AssetPickerModal } from "./AssetPickerModal";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface ImageFieldProps {
   value: unknown;
@@ -13,6 +14,8 @@ interface ImageFieldProps {
 }
 
 export function ImageField({ value, onChange, label, size = "md" }: ImageFieldProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [uploading, setUploading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +29,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/upload", {
+      const res = await fetch(dashboardHref("/api/upload"), {
         method: "POST",
         body: formData,
         credentials: "same-origin",

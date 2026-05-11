@@ -53,7 +53,7 @@ const scaffoldWebDomainAction =
   "Point scaffoldweb.com at Vercel project reb-studio with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
 const VERCEL_APP_URL = "https://reb-studio.vercel.app";
 const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
-const SCAFFOLD_MONTHLY_PRICE_CENTS = 2000;
+const SCAFFOLD_MONTHLY_PRICE_CENTS = 14900;
 const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
 
 const envSourceHints: Record<string, string> = {
@@ -79,7 +79,7 @@ const envSourceHints: Record<string, string> = {
   SANITY_WEBHOOK_SECRET: "Sanity webhook secret you configure for /api/sanity/webhook",
   SENTRY_DSN: "Sentry project DSN",
   NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
-  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $20/month",
+  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $149/month",
   STRIPE_SECRET_KEY: "Stripe live secret key",
   STRIPE_WEBHOOK_SECRET: "Stripe billing webhook signing secret",
   SUPER_ADMIN_EMAILS: "Comma-separated owner/admin email addresses",
@@ -315,7 +315,7 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel env add UPSTASH_REDIS_REST_TOKEN production",
     "vercel env add SENTRY_DSN production",
     "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
-    "exactly $20/month",
+    "exactly $149/month",
     "Provider value sources",
     "Clerk Dashboard -> Webhooks",
     "Sanity project webhook settings",
@@ -393,9 +393,9 @@ function checkCompletionAudit(path: string) {
     "UPSTASH_REDIS_REST_TOKEN",
     "SENTRY_DSN",
     "NEXT_PUBLIC_SENTRY_DSN",
-    "price_1TM7v0D99ZGeTugfpmyYup3V",
+    "price_1TVgq0D99ZGeTugfVuSggW3o",
     "prod_UKnWPSG3QOtOUz",
-    "$20/month USD",
+    "$149/month USD",
     "https://reb-studio.vercel.app/sign-in",
     "Sign in to Scaffold Web | Scaffold Web",
     "https://scaffoldweb-com.l.ink/",
@@ -594,6 +594,8 @@ function checkAuthAccessPages(
     signIn.includes("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}") &&
     signIn.includes("Invited email:") &&
     signInPage.includes("getInvitedEmail(params)") &&
+    signInPage.includes("getClientFallbackRoot(requestHeaders)") &&
+    signInPage.includes('withClientFallbackRoot(clientFallbackRoot, "/dashboard")') &&
     signInPage.includes('"/account"') &&
     signInPage.includes('"/dashboard"') &&
     signUp.includes("forceRedirectUrl={postSignUpUrl}") &&
@@ -604,6 +606,8 @@ function checkAuthAccessPages(
     signUp.includes("getTenantFromHeaders") &&
     signUp.includes("getTenantConfig") &&
     signUp.includes("getSignUpTitle(siteName)") &&
+    signUp.includes("getClientFallbackRoot(requestHeaders)") &&
+    signUp.includes('withClientFallbackRoot(clientFallbackRoot, "/dashboard")') &&
     signUp.includes('"/account"') &&
     signUp.includes('"/dashboard"') &&
     [signIn, signUp].every((content) =>
@@ -619,6 +623,7 @@ function checkAuthAccessPages(
   const noAccessOk =
     noAccess.includes("UseInvitedEmailButton") &&
     noAccess.includes("signs you out so you can choose that account") &&
+    noAccess.includes('withClientFallbackRoot(clientFallbackRoot, "/sign-in")') &&
     noAccess.includes("mailto:jacob@scaffoldweb.com") &&
     noAccess.includes('href="/account"') &&
     noAccess.includes("Choose another site") &&
@@ -633,7 +638,8 @@ function checkAuthAccessPages(
     account.includes("return <NoAccessState />");
   const recoveryButtonOk =
     recoveryButton.includes("SignOutButton") &&
-    recoveryButton.includes('redirectUrl="/sign-in"') &&
+    recoveryButton.includes('redirectUrl = "/sign-in"') &&
+    recoveryButton.includes("redirectUrl={redirectUrl}") &&
     recoveryButton.includes("{button}</SignOutButton>") &&
     recoveryButton.includes("Use invited email");
 
@@ -1246,14 +1252,14 @@ async function checkStripe() {
           log({
             name: "Stripe price ID",
             status: "fail",
-            message: `Expected $20/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $20 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
+            message: `Expected $149/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $149 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
           });
           return;
         }
         log({
           name: "Stripe price ID",
           status: "ok",
-          message: "Valid ($20/month USD)",
+          message: "Valid ($149/month USD)",
         });
       } catch {
         failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");

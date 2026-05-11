@@ -160,9 +160,9 @@ vercel env add NEXT_PUBLIC_SENTRY_DSN production
 
 `SENTRY_DSN` is server-side. `NEXT_PUBLIC_SENTRY_DSN` is browser/client-side.
 
-## 5. Stripe $20 Monthly Price
+## 5. Stripe $149 Monthly Price
 
-The current production `STRIPE_SCAFFOLD_PRICE_ID` already points to the intended live `$20/mo` price. You do not need to replace it unless `pnpm check:prod` says the price is invalid.
+The current production `STRIPE_SCAFFOLD_PRICE_ID` already points to the intended live `$149/mo` price. You do not need to replace it unless `pnpm check:prod` says the price is invalid.
 
 If you ever need to recreate it in Stripe live mode:
 
@@ -171,7 +171,7 @@ If you ever need to recreate it in Stripe live mode:
 3. Create a recurring monthly price:
 
 ```text
-Amount: $20.00
+Amount: $149.00
 Currency: USD
 Billing period: Monthly
 Mode: Live
@@ -185,7 +185,7 @@ vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes
 vercel env add STRIPE_SCAFFOLD_PRICE_ID production
 ```
 
-Paste the new `$20/mo` live `price_...` value.
+Paste the new `$149/mo` live `price_...` value.
 
 Stripe webhook should also be configured:
 
@@ -305,7 +305,7 @@ pnpm check:prod
 ## Do Not Skip
 
 - Do not use test-mode Clerk or Stripe keys.
-- Do not use a Stripe price unless it is live, monthly, USD, and exactly `$20`.
+- Do not use a Stripe price unless it is live, monthly, USD, and exactly `$149`.
 - Do not leave `scaffoldweb.com` forwarding through l.ink.
 - Do not mark launch blockers as waived unless there is an explicit owner-approved reason and follow-up date.
 - Do not consider launch complete until `pnpm check:release` passes against `https://scaffoldweb.com`.

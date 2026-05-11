@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
@@ -6,18 +7,22 @@ import { hasTenantAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
+import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
 import type { ContentSection } from "@/lib/types";
 
 export default async function SitePage() {
   const tenant = await getTenantFromHeaders();
   const allowed = await hasTenantAccess(tenant);
-  if (!allowed) redirect("/no-access");
+  if (!allowed) {
+    const clientFallbackRoot = getClientFallbackRoot(await headers());
+    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
+  }
 
-  const template = await getTemplateForTenant(tenant);
+  const siteModel = await getTemplateForTenant(tenant);
 
   const sectionEntries = await Promise.all(
-    template.contentSections.map(async (section) => {
+    siteModel.contentSections.map(async (section) => {
       const data = await safeFetch(
         () => getContent(section as ContentSection, tenant),
         (defaults as Record<string, unknown>)[section] || {},

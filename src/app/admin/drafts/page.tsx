@@ -1,4 +1,4 @@
-import { getAllTenants } from "@/lib/tenants";
+import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { listDrafts, getDraftContent } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
 import { DraftActions } from "./DraftActions";
@@ -13,7 +13,7 @@ interface DraftItem {
 }
 
 export default async function AdminDraftsPage() {
-  const TENANTS = await getAllTenants();
+  const TENANTS = (await getAllTenants()).filter(isActiveTenant);
   const allDrafts: DraftItem[] = [];
 
   await Promise.all(

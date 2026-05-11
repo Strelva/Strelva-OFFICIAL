@@ -44,20 +44,25 @@ export function getItemPrice(item: CartItem) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem("reb-cart");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [hasLoadedCart, setHasLoadedCart] = useState(false);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("reb-cart");
+      setItems(saved ? JSON.parse(saved) : []);
+    } catch {
+      setItems([]);
+    } finally {
+      setHasLoadedCart(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCart) return;
     localStorage.setItem("reb-cart", JSON.stringify(items));
-  }, [items]);
+  }, [hasLoadedCart, items]);
 
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);

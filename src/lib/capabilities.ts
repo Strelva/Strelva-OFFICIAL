@@ -45,7 +45,7 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
   },
 };
 
-// --- Single plan: all capabilities included at $20/mo ---
+// --- Single plan: all capabilities included ---
 
 export function getAllCapabilities(): Capability[] {
   return Object.entries(CAPABILITY_DEFS).map(([id, def]) => ({

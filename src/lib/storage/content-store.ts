@@ -36,7 +36,7 @@ export const SECTION_TO_TYPE: Record<ContentSection, string> = {
  * This keeps the rest of the codebase unchanged - components still receive
  * `backgroundImageUrl: string`, `image_url: string`, etc.
  */
-function transformSanityImages<K extends ContentSection>(
+export function transformSanityImages<K extends ContentSection>(
   section: K,
   doc: Record<string, unknown>
 ): ContentMap[K] {
@@ -69,10 +69,11 @@ function transformSanityImages<K extends ContentSection>(
     if (items) {
       data[arrayKey] = items.map((item) => {
         const { _key, [mapping.sanityField]: img, ...rest } = item;
+        const existingUrl = typeof rest[mapping.urlField] === "string" ? rest[mapping.urlField] : "";
         return {
           ...rest,
           id: rest.id || _key || "",
-          [mapping.urlField]: img ? sanityImageUrl(img) : "",
+          [mapping.urlField]: img ? sanityImageUrl(img) : existingUrl,
         };
       });
     }

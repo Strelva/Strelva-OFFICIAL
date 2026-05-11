@@ -11,6 +11,7 @@ import {
   type RawTenantConnectionSettings,
 } from "@/lib/integration-registry";
 import { SourceHealthBadge } from "./SourceHealthBadge";
+import { useDashboardOptional } from "./DashboardContext";
 
 function formatRelativeTime(isoDate: string): string {
   const date = new Date(isoDate);
@@ -30,6 +31,8 @@ function formatRelativeTime(isoDate: string): string {
 export function ConnectionDetailPage({ connectionId }: { connectionId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const detail = getIntegrationDefinition(connectionId);
 
   const [credentialsValue, setCredentialsValue] = useState("");
@@ -62,11 +65,11 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     if (!detail) return;
 
     Promise.allSettled([
-      fetch("/api/tenant-settings", { credentials: "same-origin" }).then((res) => {
+      fetch(dashboardHref("/api/tenant-settings"), { credentials: "same-origin" }).then((res) => {
         if (!res.ok) throw new Error("Failed to load tenant settings");
         return res.json();
       }),
-      fetch("/api/connections", { credentials: "same-origin" }).then((res) => {
+      fetch(dashboardHref("/api/connections"), { credentials: "same-origin" }).then((res) => {
         if (!res.ok) throw new Error("Failed to load connections");
         return res.json();
       }),
@@ -89,7 +92,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       );
       setLastSyncedAt(conn?.lastSyncedAt ?? null);
     });
-  }, [detail, searchParams]);
+  }, [dashboardHref, detail, searchParams]);
 
   const handleSaveCredentials = async () => {
     if (!detail?.configField || !credentialsValue.trim()) return;
@@ -99,7 +102,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     setSaved(false);
 
     try {
-      const res = await fetch("/api/tenant-settings", {
+      const res = await fetch(dashboardHref("/api/tenant-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [detail.configField]: credentialsValue }),
@@ -128,7 +131,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     setSaved(false);
 
     try {
-      const res = await fetch("/api/connections/yelp", {
+      const res = await fetch(dashboardHref("/api/connections/yelp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: yelpApiKey, businessId: yelpBusinessId }),
@@ -166,7 +169,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         vegaro: "/api/connections/vegaro",
       };
       const endpoint = endpointMap[detail.connectionProvider] || "/api/connections/google";
-      const res = await fetch(endpoint, { method: "DELETE" });
+      const res = await fetch(dashboardHref(endpoint), { method: "DELETE" });
 
       if (!res.ok) {
         const data = await res.json();
@@ -194,7 +197,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     <div className="flex-1 overflow-y-auto px-14 py-10 animate-route-enter">
       {/* Back link */}
       <button
-        onClick={() => router.push("/dashboard/sources")}
+        onClick={() => router.push(dashboardHref("/dashboard/sources"))}
         className="flex items-center gap-1.5 text-gray-faint hover:text-gray-muted transition-colors mb-8"
       >
         <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -216,7 +219,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <SourceHealthBadge status={status} lastSync={lastSyncedAt} compact />
           {!isConnected && detail.connectionProvider === "google" && (
             <a
-              href="/api/oauth/google"
+              href={dashboardHref("/api/oauth/google")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Google
@@ -224,7 +227,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           )}
           {!isConnected && detail.connectionProvider === "calendly" && (
             <a
-              href="/api/oauth/calendly"
+              href={dashboardHref("/api/oauth/calendly")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Calendly
@@ -232,7 +235,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           )}
           {!isConnected && detail.connectionProvider === "instagram" && (
             <a
-              href="/api/oauth/instagram"
+              href={dashboardHref("/api/oauth/instagram")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Instagram

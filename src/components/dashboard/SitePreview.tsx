@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Monitor, Tablet, Smartphone, Maximize2, ExternalLink, Loader2, Pencil, MessageCircle, Eye } from "lucide-react";
+import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Tablet } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 
 type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
+type PreviewStatus = "loading" | "ready" | "error";
 
 const BREAKPOINTS: readonly Breakpoint[] = [
   { label: "Mobile", icon: Smartphone, width: 375 },
@@ -26,6 +27,8 @@ const PAGE_PATHS: Record<string, string> = {
   shop: "/shop",
 };
 
+const PREVIEW_TIMEOUT_MS = 12000;
+
 interface ContextMenu {
   section: string;
   label: string;
@@ -37,7 +40,8 @@ export function SitePreview() {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
     BREAKPOINTS[BREAKPOINTS.length - 1]
   );
-  const [iframeLoading, setIframeLoading] = useState(true);
+  const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
+  const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const {
     refreshKey,
@@ -50,7 +54,7 @@ export function SitePreview() {
     triggerRefresh,
     siteUrl,
     previewUrl,
-    template,
+    siteModel,
     activePage,
     setChatPrompt,
     setRightTab,
@@ -59,11 +63,11 @@ export function SitePreview() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Build section→page mapping from the template's page config so
+  // Build section→page mapping from the active site model's page config so
   // clicking a section jumps the preview to the right page.
-  const templatePages = getDefaultPageConfig(template);
+  const siteModelPages = getDefaultPageConfig(siteModel);
   const sectionToPage: Record<string, string> = {};
-  for (const [page, config] of Object.entries(templatePages)) {
+  for (const [page, config] of Object.entries(siteModelPages)) {
     for (const s of config.sections) {
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
@@ -80,6 +84,18 @@ export function SitePreview() {
   }
   const base = previewUrl || siteUrl || "";
   const iframeSrc = `${base}${pagePath}?${params.toString()}`;
+  const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
+  const isExternalPreview = (() => {
+    if (typeof window === "undefined" || !base) return false;
+    try {
+      return new URL(base).origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  })();
+  const activeSectionLabel = activeSection
+    ? SECTION_LABELS[activeSection] || activeSection
+    : null;
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath });
@@ -88,8 +104,17 @@ export function SitePreview() {
     prevIframeKey.pagePath !== pagePath
   ) {
     setPrevIframeKey({ refreshKey, pagePath });
-    setIframeLoading(true);
+    setPreviewStatus("loading");
+    setPreviewErrorDismissed(false);
   }
+
+  useEffect(() => {
+    if (previewStatus !== "loading") return;
+    const timeout = window.setTimeout(() => {
+      setPreviewStatus("error");
+    }, PREVIEW_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [iframeSrc, previewStatus]);
 
   // Clear active section when the user switches pages via the Pages tab
   const prevPageRef = useRef(activePage);
@@ -236,6 +261,24 @@ export function SitePreview() {
     setContextMenu(null);
   }, [contextMenu]);
 
+  const retryPreview = useCallback(() => {
+    setPreviewErrorDismissed(false);
+    setPreviewStatus("loading");
+    triggerRefresh();
+  }, [triggerRefresh]);
+
+  const focusSelectedSection = useCallback(() => {
+    if (!activeSection) return;
+    setRightTab("properties");
+    setScrollToSection(activeSection);
+  }, [activeSection, setRightTab, setScrollToSection]);
+
+  const askAIForSelectedSection = useCallback(() => {
+    const label = activeSectionLabel || "selected section";
+    setChatPrompt(`Update my ${label.toLowerCase()}`);
+    setRightTab("chat");
+  }, [activeSectionLabel, setChatPrompt, setRightTab]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -243,7 +286,7 @@ export function SitePreview() {
         <div className="flex items-center gap-2">
           <div className="w-[5px] h-[5px] rounded-full bg-emerald-500" />
           <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Preview</span>
-          <span className="text-[10px] text-gray-subtle ml-1">Click to select · Right-click for options</span>
+          <span className="text-[10px] text-gray-subtle ml-1">Click the preview to select sections</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -283,6 +326,50 @@ export function SitePreview() {
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-3 border-b border-gray-border bg-surface px-4 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium text-warm-white">
+            {activeSectionLabel ? `Selected: ${activeSectionLabel}` : "Choose a section above or ask AI to make an update."}
+          </p>
+          <p className="truncate text-[10px] text-gray-faint">
+            Loading {liveTargetUrl || pagePath}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={focusSelectedSection}
+            disabled={!activeSection}
+            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Edit selected section
+          </button>
+          <button
+            type="button"
+            onClick={askAIForSelectedSection}
+            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+          >
+            Ask AI to update
+          </button>
+          <a
+            href={siteUrl || "/"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+          >
+            Open live site
+          </a>
+          <button
+            type="button"
+            onClick={retryPreview}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+          >
+            <RefreshCw className="h-3 w-3" strokeWidth={1.5} />
+            Refresh preview
+          </button>
+        </div>
+      </div>
+
       {/* Canvas */}
       <div ref={canvasRef} className="flex-1 flex justify-center p-4 overflow-hidden bg-surface-base relative">
         <div
@@ -299,13 +386,90 @@ export function SitePreview() {
             src={iframeSrc}
             className="w-full h-full border-0"
             title="Live site preview"
-            onLoad={() => setIframeLoading(false)}
+            onLoad={() => setPreviewStatus("ready")}
           />
-          {iframeLoading && (
+          {previewStatus === "loading" && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt">
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center">
                 <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
-                <span className="text-[11px] text-gray-muted">Loading preview...</span>
+                <span className="text-[11px] text-gray-muted">Loading preview for {pagePath === "/" ? "home" : pagePath}</span>
+                <span className="max-w-full truncate text-[10px] text-gray-faint">{iframeSrc}</span>
+              </div>
+            </div>
+          )}
+          {previewStatus === "error" && !previewErrorDismissed && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
+              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
+                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
+                <p className="text-sm font-medium text-warm-white">Live preview is taking longer than expected</p>
+                <p className="mt-2 text-xs leading-5 text-gray-muted">
+                  This is usually a DNS, auth, or network delay. You can still edit the selected section on the right or open the live site directly.
+                </p>
+                <p className="mt-3 truncate rounded-md bg-surface-base px-3 py-2 font-mono text-[10px] text-gray-faint">
+                  {iframeSrc}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={retryPreview}
+                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-warm-black hover:bg-warm-white/90"
+                  >
+                    Retry preview
+                  </button>
+                  <a
+                    href={siteUrl || "/"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                  >
+                    Open live site
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewErrorDismissed(true)}
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                  >
+                    Continue editing
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {previewStatus === "ready" && isExternalPreview && !previewErrorDismissed && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt/95 p-6">
+              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
+                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
+                <p className="text-sm font-medium text-warm-white">Live site preview opens separately</p>
+                <p className="mt-2 text-xs leading-5 text-gray-muted">
+                  This tenant uses the public site as the source of truth, and the browser may block embedding it here. Keep editing the selected section on the right or open the live site in a new tab.
+                </p>
+                <p className="mt-3 truncate rounded-md bg-surface-base px-3 py-2 font-mono text-[10px] text-gray-faint">
+                  {liveTargetUrl}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <a
+                    href={liveTargetUrl || siteUrl || "/"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-warm-black hover:bg-warm-white/90"
+                  >
+                    Open live site
+                  </a>
+                  <button
+                    type="button"
+                    onClick={retryPreview}
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                  >
+                    Retry preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewErrorDismissed(true)}
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                  >
+                    Continue editing
+                  </button>
+                </div>
               </div>
             </div>
           )}

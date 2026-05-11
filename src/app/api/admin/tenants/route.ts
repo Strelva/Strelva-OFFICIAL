@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/lib/auth";
 import { readJsonObject } from "@/lib/request-body";
-import { getAllTenants, createTenant, updateTenant } from "@/lib/tenants";
+import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import type { TenantConfig, TenantFeature } from "@/lib/types";
 
@@ -16,14 +16,15 @@ function cleanFeatures(value: unknown): TenantFeature[] {
   return value.filter((feature): feature is TenantFeature => TENANT_FEATURES.has(feature as TenantFeature));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const admin = await isSuperAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "true";
   const tenants = await getAllTenants();
-  return NextResponse.json(tenants);
+  return NextResponse.json(includeArchived ? tenants : tenants.filter(isActiveTenant));
 }
 
 export async function POST(req: Request) {

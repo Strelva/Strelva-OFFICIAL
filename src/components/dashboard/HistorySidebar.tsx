@@ -4,18 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Inbox,
-  FileText,
-  Image as ImageIcon,
-  KeyRound,
   Link2,
   MessageCircle,
   Settings,
+  Search,
   X,
   LogOut,
   Sparkles,
   LayoutPanelLeft,
 } from "lucide-react";
-import { SignOutButton } from "@clerk/nextjs";
+import { useDashboard } from "./DashboardContext";
 
 export interface Thread {
   id: string;
@@ -33,13 +31,21 @@ interface HistorySidebarProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "What's working", icon: FileText },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Needs approval", icon: Inbox },
-  { href: "/dashboard/site", label: "My site", icon: LayoutPanelLeft },
-  { href: "/dashboard/assets", label: "Assets", icon: ImageIcon },
-  { href: "/dashboard/sources", label: "Connected accounts", icon: Link2 },
-  { href: "/dashboard/ownership", label: "Ownership Center", icon: KeyRound },
+  { href: "/dashboard/review", label: "Approvals", icon: Inbox },
+  { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
+  { href: "/dashboard/sources", label: "Connections", icon: Link2 },
+];
+
+const NAV_GROUPS = [
+  {
+    label: "Manage",
+    items: NAV_ITEMS.slice(0, 2),
+  },
+  {
+    label: "Site",
+    items: NAV_ITEMS.slice(2, 4),
+  },
 ];
 
 export function HistorySidebar({
@@ -50,9 +56,20 @@ export function HistorySidebar({
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
+  const { dashboardBasePath, dashboardHref } = useDashboard();
+  const effectivePathname =
+    dashboardBasePath && pathname?.startsWith(dashboardBasePath)
+      ? pathname.slice(dashboardBasePath.length) || "/dashboard"
+      : pathname;
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full">
+  const sidebarContent = (variant: "desktop" | "mobile") => (
+    <aside
+      className={`flex h-full w-full max-w-full flex-col justify-between overflow-auto bg-surface-base ${
+        variant === "desktop"
+          ? "rounded-xl border border-glass-border shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
+          : ""
+      }`}
+    >
       {/* Mobile close button */}
       <div className="flex items-center justify-between p-3 lg:hidden border-b border-glass-border">
         <span className="text-[13px] font-medium text-warm-black">Scaffold Web</span>
@@ -65,50 +82,72 @@ export function HistorySidebar({
         </button>
       </div>
 
-      <div className="hidden lg:block px-3 pt-4 pb-3">
-        <div className="rounded-xl border border-glass-border bg-glass px-3 py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent-dim text-accent flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5" strokeWidth={1.6} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[12px] font-medium text-warm-black truncate">{ownerName}</p>
-              <p className="text-[10px] text-gray-muted truncate">{valueProof || "AI site management"}</p>
-            </div>
+      <div className="flex items-center justify-between gap-5 px-4 pt-4 lg:pl-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
+            <Sparkles className="h-4 w-4" strokeWidth={1.6} />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium leading-tight text-warm-black">{ownerName}</p>
+            <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "AI site management"}</p>
           </div>
         </div>
+        <Link
+          href={dashboardHref("/dashboard/chat")}
+          prefetch={false}
+          onClick={onClose}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
+          title="Search"
+          aria-label="Search"
+        >
+          <Search className="h-4 w-4" strokeWidth={1.5} />
+        </Link>
       </div>
 
       {/* Main navigation */}
-      <nav className="px-2 py-2 space-y-0.5" aria-label="Dashboard">
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.href === "/dashboard"
-            ? pathname === "/dashboard"
-            : pathname?.startsWith(item.href);
-          const Icon = item.icon;
-          const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
+      <nav className="mt-6" aria-label="Dashboard">
+        <ul>
+          {NAV_GROUPS.map((group) => (
+            <li key={group.label}>
+              <div className="px-5 pb-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-muted">{group.label}</p>
+              </div>
+              <ul className="px-3 pb-5">
+                {group.items.map((item) => {
+                  const isActive = item.href === "/dashboard"
+                    ? effectivePathname === "/dashboard"
+                    : effectivePathname?.startsWith(item.href);
+                  const Icon = item.icon;
+                  const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 min-h-[42px] text-[13px] font-medium transition-all ${
-                isActive
-                  ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
-                  : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
-              }`}
-            >
-              <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-              <span className="flex-1">{item.label}</span>
-              {showBadge && (
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent-dim text-accent rounded-full">
-                  {pendingCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+                  return (
+                    <li key={item.href} className="py-0.5">
+                      <Link
+                        href={dashboardHref(item.href)}
+                        prefetch={false}
+                        onClick={onClose}
+                        className={`group flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                          isActive
+                            ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
+                            : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
+                        }`}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {showBadge && (
+                          <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                            {pendingCount > 9 ? "9+" : pendingCount}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
+        </ul>
       </nav>
 
       {/* Spacer */}
@@ -133,10 +172,11 @@ export function HistorySidebar({
             {ownerName}
           </span>
           <Link
-            href="/dashboard/settings"
+            href={dashboardHref("/dashboard/settings")}
+            prefetch={false}
             onClick={onClose}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
-              pathname?.startsWith("/dashboard/settings")
+              effectivePathname?.startsWith("/dashboard/settings")
                 ? "text-warm-black bg-gray-bg"
                 : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
             }`}
@@ -144,25 +184,37 @@ export function HistorySidebar({
           >
             <Settings className="w-4 h-4" strokeWidth={1.5} />
           </Link>
-          <SignOutButton>
-            <button
-              className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4" strokeWidth={1.5} />
-            </button>
-          </SignOutButton>
+          <button
+            type="button"
+            onClick={() => {
+              const clerk = (window as typeof window & {
+                Clerk?: { signOut?: (options?: { redirectUrl?: string }) => Promise<void> };
+              }).Clerk;
+              if (clerk?.signOut) {
+                clerk.signOut({ redirectUrl: "/sign-in" }).catch(() => {
+                  window.location.href = "/sign-in";
+                });
+              } else {
+                window.location.href = "/sign-in";
+              }
+            }}
+            className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOut className="w-4 h-4" strokeWidth={1.5} />
+          </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[260px] h-full bg-surface-base/95 shrink-0 border-r border-glass-border">
-        {sidebarContent}
-      </aside>
+      <div className="hidden h-full w-[276px] shrink-0 p-1 lg:block">
+        {sidebarContent("desktop")}
+      </div>
 
       {/* Mobile overlay */}
       {isOpen && (
@@ -174,7 +226,7 @@ export function HistorySidebar({
           />
           {/* Sidebar panel */}
           <aside className="absolute left-0 top-0 bottom-0 w-[296px] bg-surface-base animate-panel-left border-r border-glass-border">
-            {sidebarContent}
+            {sidebarContent("mobile")}
           </aside>
         </div>
       )}

@@ -14,6 +14,13 @@ interface Entry {
   resetAt: number;
 }
 
+export interface RateLimitStatus {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetAt: string;
+}
+
 const memStore = new Map<string, Entry>();
 
 function memCheck(key: string, max: number, windowMs: number): boolean {
@@ -27,6 +34,27 @@ function memCheck(key: string, max: number, windowMs: number): boolean {
 
   entry.count++;
   return entry.count > max;
+}
+
+function memStatus(key: string, max: number, windowMs: number): RateLimitStatus {
+  const now = Date.now();
+  const entry = memStore.get(key);
+  if (!entry || now > entry.resetAt) {
+    return {
+      limit: max,
+      used: 0,
+      remaining: max,
+      resetAt: new Date(now + windowMs).toISOString(),
+    };
+  }
+
+  const used = Math.max(0, entry.count);
+  return {
+    limit: max,
+    used,
+    remaining: Math.max(0, max - used),
+    resetAt: new Date(entry.resetAt).toISOString(),
+  };
 }
 
 // --- Redis-backed check ---
@@ -56,6 +84,37 @@ async function redisCheck(key: string, max: number, windowSeconds: number): Prom
   }
 }
 
+async function redisStatus(key: string, max: number, windowSeconds: number): Promise<RateLimitStatus> {
+  const redis = getRedis();
+  if (!redis) {
+    if (isProductionEnv()) {
+      throw new Error("[PRODUCTION] Redis required for rate limiting but not configured");
+    }
+    return memStatus(key, max, windowSeconds * 1000);
+  }
+
+  const redisKey = `reb:ratelimit:${key}`;
+  try {
+    const [rawCount, ttl] = await Promise.all([
+      redis.get<number>(redisKey),
+      redis.ttl(redisKey),
+    ]);
+    const used = typeof rawCount === "number" ? rawCount : Number(rawCount || 0);
+    const ttlSeconds = typeof ttl === "number" && ttl > 0 ? ttl : windowSeconds;
+    return {
+      limit: max,
+      used,
+      remaining: Math.max(0, max - used),
+      resetAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+    };
+  } catch (err) {
+    if (isProductionEnv()) {
+      throw new Error(`[PRODUCTION] Redis rate limit status failed: ${err}`);
+    }
+    return memStatus(key, max, windowSeconds * 1000);
+  }
+}
+
 /**
  * @deprecated Use isRateLimitedAsync() for proper Redis-backed distributed rate limiting.
  * This sync version only uses in-memory checks and resets on cold start.
@@ -69,6 +128,14 @@ export function isRateLimited(key: string, maxPerMinute: number): boolean {
  *  Preferred over isRateLimited for API routes that can await. */
 export async function isRateLimitedAsync(key: string, maxPerMinute: number): Promise<boolean> {
   return redisCheck(key, maxPerMinute, 60);
+}
+
+/** Read the current one-minute rate-limit status without consuming a request. */
+export async function getRateLimitStatusAsync(
+  key: string,
+  maxPerMinute: number
+): Promise<RateLimitStatus> {
+  return redisStatus(key, maxPerMinute, 60);
 }
 
 /** Like isRateLimited but accepts a custom window (in ms) instead of the default 60s.

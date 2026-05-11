@@ -136,14 +136,14 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/dashboard/chat"
+              href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
               Ask AI for a small change
             </Link>
             <a
-              href={dashboard?.siteUrl || "/dashboard/site"}
+              href={dashboard?.siteUrl || dashboard?.dashboardHref("/dashboard/site") || "/dashboard/site"}
               target={dashboard?.siteUrl ? "_blank" : undefined}
               rel={dashboard?.siteUrl ? "noopener noreferrer" : undefined}
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-5 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"

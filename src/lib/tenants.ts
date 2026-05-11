@@ -108,6 +108,15 @@ export async function getAllTenants(): Promise<TenantConfig[]> {
   return loadTenants();
 }
 
+export function isActiveTenant(tenant: Pick<TenantConfig, "active">): boolean {
+  return tenant.active !== false;
+}
+
+export async function getActiveTenants(): Promise<TenantConfig[]> {
+  const tenants = await loadTenants();
+  return tenants.filter(isActiveTenant);
+}
+
 // ---------------------------------------------------------------------------
 // Domain-based tenant lookup (for proxy custom domain resolution)
 // ---------------------------------------------------------------------------
@@ -127,6 +136,8 @@ async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAd
   const map: Record<string, { tenantId: string; isAdmin: boolean }> = {};
 
   for (const tenant of tenants) {
+    if (!isActiveTenant(tenant)) continue;
+
     // Production domain
     const primaryDomain = getTenantPrimaryDomain(tenant);
     if (primaryDomain) {

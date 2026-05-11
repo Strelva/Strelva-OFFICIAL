@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
+import { useDashboardOptional } from "./DashboardContext";
 
 /* ─────────────────────────────────────────────────────────────
    TYPES — structured data returned by inline tools
@@ -349,6 +350,7 @@ function ContentOutput({ data }: { data: ContentData }) {
    ───────────────────────────────────────────────────────────── */
 
 function PhotosOutput({ data }: { data: PhotoData }) {
+  const dashboard = useDashboardOptional();
   const [expanded, setExpanded] = useState(true);
   const displayPhotos = data.photos.slice(0, 6);
   const remaining = data.total - displayPhotos.length;
@@ -395,7 +397,7 @@ function PhotosOutput({ data }: { data: PhotoData }) {
               </div>
               {remaining > 0 && (
                 <a
-                  href="/dashboard/assets"
+                  href={dashboard?.dashboardHref("/dashboard/assets") || "/dashboard/assets"}
                   className="flex items-center justify-center gap-1.5 mt-3 py-2 text-[12px] text-accent hover:text-accent/80 transition-colors"
                 >
                   View all {data.total} photos

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface CapabilityInfo {
   id: string;
@@ -24,20 +25,22 @@ export function useCapabilities() {
 }
 
 export function CapabilityProvider({ children }: { children: ReactNode }) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [state, setState] = useState<CapabilityContextValue>({
     capabilities: [],
     loading: true,
   });
 
   useEffect(() => {
-    fetch("/api/capabilities")
+    fetch(dashboardHref("/api/capabilities"))
       .then((r) => r.json())
       .then((data) => setState({
         capabilities: data.capabilities || [],
         loading: false,
       }))
       .catch(() => setState((prev) => ({ ...prev, loading: false })));
-  }, []);
+  }, [dashboardHref]);
 
   return (
     <CapabilityContext.Provider value={state}>

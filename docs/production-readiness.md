@@ -28,7 +28,7 @@
   `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth connections are enabled.
-- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $20/month. The checkout route and customer-facing pricing copy assume this plan price.
+- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $149/month. The checkout route and customer-facing pricing copy assume this plan price.
 - Use `.env.production.example` as the owner handoff template for Vercel
   Production. `.env.example` is for local development and may show test-mode
   placeholders.

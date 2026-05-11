@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS,
+  SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL,
+} from "@/lib/pricing";
 
 export const metadata: Metadata = {
   title: "Scaffold Web — AI website management for small business",
-  description: "Your business runs itself. AI manages your website, sends weekly reports, and keeps clients coming — for $20/mo.",
+  description: `Your business runs itself. AI manages your website, sends weekly reports, and keeps clients coming — for ${SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}.`,
 };
 
 export default function HomePage() {
@@ -16,7 +20,15 @@ export default function HomePage() {
       >
         <div className="max-w-[720px] mx-auto text-center">
           <div
-            className="text-[12px] font-medium tracking-[0.2em] uppercase mb-6"
+            className="mb-6 inline-flex items-center gap-3 border px-3 py-2 text-[12px] font-medium uppercase tracking-[0.2em]"
+            style={{ color: "var(--m-text-2)", borderColor: "var(--m-rule)" }}
+          >
+            <span>Website management</span>
+            <span aria-hidden="true" style={{ color: "var(--m-rule)" }}>·</span>
+            <span style={{ color: "var(--m-text)" }}>{SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}</span>
+          </div>
+          <div
+            className="sr-only"
             style={{ color: "var(--m-text-2)" }}
           >
             Website management for small business
@@ -33,8 +45,7 @@ export default function HomePage() {
             className="text-[17px] leading-[1.6] max-w-[480px] mx-auto mb-10"
             style={{ color: "var(--m-text-2)" }}
           >
-            AI manages your website, sends weekly reports, and keeps clients coming.
-            You focus on running your business.
+            AI manages your website, sends weekly reports, and keeps clients coming for {SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -132,7 +143,7 @@ export default function HomePage() {
             className="text-[24px] font-medium tracking-[-0.02em] text-center mb-12"
             style={{ color: "var(--m-text)" }}
           >
-            One plan. No upsells. No surprises.
+            One plan at {SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}. No upsells. No surprises.
           </p>
           <div className="grid sm:grid-cols-2 gap-x-12 gap-y-6">
             {[
@@ -191,7 +202,7 @@ export default function HomePage() {
                 className="text-[48px] font-medium tracking-[-0.02em]"
                 style={{ color: "var(--m-text)" }}
               >
-                $20
+                ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS}
               </span>
               <span
                 className="text-[16px]"

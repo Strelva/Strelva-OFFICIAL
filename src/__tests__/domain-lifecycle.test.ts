@@ -10,6 +10,7 @@ vi.mock("../lib/redis", () => ({
 vi.mock("../lib/tenants", () => ({
   getAllTenants: vi.fn(() => Promise.resolve(tenants)),
   getTenantConfig: vi.fn((tenantId: string) => Promise.resolve(tenants.find((tenant) => tenant.id === tenantId))),
+  isActiveTenant: (tenant: Pick<TenantConfig, "active">) => tenant.active !== false,
   invalidateDomainMapCache: vi.fn(),
   updateTenant: vi.fn((tenantId: string, updates: Partial<TenantConfig>) => {
     const index = tenants.findIndex((tenant) => tenant.id === tenantId);

@@ -8,7 +8,7 @@ import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
 import type { HeroContent } from "@/lib/types";
 
-export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerName?: string; siteName?: string }) {
+export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string; siteName?: string }) {
   const sectionRef = useRef<HTMLElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -62,7 +62,7 @@ export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerNa
   }, []);
 
   return (
-    <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-end pb-20 md:pb-28 overflow-hidden">
+    <section id="hero" ref={sectionRef} className="relative flex min-h-[84svh] items-end overflow-hidden pb-12 md:min-h-screen md:pb-28">
       <div ref={imageRef} className="absolute inset-0" style={{ willChange: "transform" }}>
         {hero.backgroundImageUrl ? (
           <Image
@@ -136,8 +136,17 @@ export function Hero({ hero, ownerName, siteName }: { hero: HeroContent; ownerNa
               >
                 {hero.ctaText}
               </TrackedLink>
-              <Link href="/about" className="btn-ghost" data-reb-field="ctaLink">
-                About {ownerName || "Us"}
+              <Link
+                href="#services"
+                className="btn-ghost"
+                style={{
+                  background: "rgba(250,249,247,0.92)",
+                  borderColor: "rgba(250,249,247,0.92)",
+                  color: "var(--bark)",
+                }}
+                data-reb-field="ctaLink"
+              >
+                View services
               </Link>
             </div>
           </div>

@@ -61,9 +61,11 @@ interface DashboardContextValue {
   tenantId: string;
   siteUrl: string;
   previewUrl: string;
+  dashboardBasePath: string;
+  dashboardHref: (path: string) => string;
 
-  // Template identifier
-  template: string;
+  // Site model identifier
+  siteModel: string;
 
   // Whether AI agent auto-publishes or creates drafts
   autoPublish: boolean;
@@ -103,7 +105,8 @@ export function DashboardProvider({
   tenantId = "",
   siteUrl = "",
   previewUrl = "",
-  template = "wellness",
+  dashboardBasePath = "",
+  siteModel = "wellness",
   autoPublish = true,
   subscriptionStatus = "none",
   hasStripeCustomer = false,
@@ -113,7 +116,8 @@ export function DashboardProvider({
   tenantId?: string;
   siteUrl?: string;
   previewUrl?: string;
-  template?: string;
+  dashboardBasePath?: string;
+  siteModel?: string;
   autoPublish?: boolean;
   subscriptionStatus?: SubscriptionStatus;
   hasStripeCustomer?: boolean;
@@ -132,6 +136,10 @@ export function DashboardProvider({
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
+  const dashboardHref = useCallback(
+    (path: string) => `${dashboardBasePath}${path.startsWith("/") ? path : `/${path}`}`,
+    [dashboardBasePath]
+  );
 
   // Apply localStorage collapse state after hydration completes.
   // First render always uses server default (false) so the client
@@ -219,7 +227,9 @@ export function DashboardProvider({
         tenantId,
         siteUrl,
         previewUrl,
-        template,
+        dashboardBasePath,
+        dashboardHref,
+        siteModel,
         autoPublish,
         subscriptionStatus,
         hasStripeCustomer,

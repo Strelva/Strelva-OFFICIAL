@@ -23,7 +23,7 @@ function normalizeEmail(value: unknown): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
-/** Super-admin creates a $20/mo subscription checkout for a client tenant. */
+/** Super-admin creates the monthly Scaffold Web subscription checkout for a client tenant. */
 export async function POST(req: Request) {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

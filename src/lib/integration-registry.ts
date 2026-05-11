@@ -66,13 +66,13 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
         title: "@Analytics: how did my site do this week?",
         prompt: "@Analytics: how did my site do this week?",
         response:
-          "Your site had 47 visitors this week, up 12% from last week. Your Services page got the most views (28). 3 people clicked Book Now - all on Tuesday after you posted about the new class.",
+          "Your site had 47 visitors this week, up 12% from last week. Your main offer got the most views (28). 3 people clicked your primary call-to-action after your latest update.",
       },
       {
         title: "@Analytics: which page gets the most traffic?",
         prompt: "@Analytics: which page gets the most traffic?",
         response:
-          "Your Services page is your top performer with 28 views this week. Want me to add a stronger call-to-action on Services?",
+          "Your main offer is your top performer with 28 views this week. Want me to test a clearer call-to-action there?",
       },
     ],
   },
@@ -82,7 +82,7 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     providerId: "newsletter",
     shortDescription: "AI drafts & sends email to subscribers",
     description:
-      "Your AI drafts and sends email newsletters to your subscriber list. Tell it what to write about and it'll create a professional email, preview it for your approval, and send it when you say go. Great for monthly updates, new service announcements, or seasonal promotions.",
+      "Your AI drafts and sends email newsletters to your subscriber list. Tell it what to write about and it'll create a professional email, preview it for your approval, and send it when you say go. Great for timely updates, announcements, and seasonal promotions.",
     icon: "NL",
     iconBg: "bg-[rgba(129,140,248,0.09)]",
     iconColor: "text-[#818cf8]",
@@ -91,10 +91,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     settingsKey: "newsletter",
     usageExamples: [
       {
-        title: "Send an update about my new class",
-        prompt: "Send an update to subscribers about my new Saturday yoga class",
+        title: "Send an update",
+        prompt: "Send an update to subscribers about what changed this week",
         response:
-          "I've drafted a newsletter about your Saturday Morning Yoga class. It highlights the 8AM start time, the 75-minute grounding practice, and includes a Book Now button. Want me to send it?",
+          "I've drafted a newsletter about this week's update. It highlights what changed, why customers should care, and includes your primary call-to-action. Want me to send it?",
       },
       {
         title: "How many subscribers do I have?",
@@ -123,13 +123,13 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
         title: "What are people searching to find me?",
         prompt: "What search terms bring people to my site?",
         response:
-          "Your top searches this week: 'yoga studio downtown' (23 clicks), 'morning yoga class' (15 clicks), 'beginner yoga near me' (8 clicks). Your 'Services' page ranks #3 for 'yoga studio downtown.'",
+          "Your top searches this week: 'local business near me' (23 clicks), 'services near me' (15 clicks), 'best provider nearby' (8 clicks). Your main offer page ranks #3 for the highest-intent search.",
       },
       {
         title: "How can I rank higher?",
         prompt: "How can I improve my Google ranking?",
         response:
-          "You're showing up for 'beginner yoga' but not getting clicks - your title might be too generic. Want me to update it to 'Beginner-Friendly Yoga Classes | [Your Studio]'?",
+          "You're showing up for a high-intent search but not getting clicks - your title might be too generic. Want me to test a title that leads with your strongest customer outcome?",
       },
     ],
   },
@@ -151,7 +151,7 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
         title: "Respond to my latest review",
         prompt: "Respond to my latest Google review",
         response:
-          "You got a 5-star review from Sarah M: \"Best yoga studio in town!\" I've drafted a reply thanking her and mentioning your new Saturday class. Want me to post it?",
+          "You got a 5-star review from Sarah M. I've drafted a reply thanking her, reinforcing what customers value most, and keeping the tone personal. Want me to post it?",
       },
       {
         title: "Are my Google hours up to date?",
@@ -167,7 +167,7 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     providerId: "instagram",
     shortDescription: "Auto-post from your site's content",
     description:
-      "Let your AI auto-post to Instagram from your site's content. When you add a new blog post, service, or event, it can create and schedule an Instagram post with the right hashtags and a compelling caption.",
+      "Let your AI auto-post to Instagram from your site's content. When you add a new update, offer, event, or seasonal note, it can create and schedule an Instagram post with the right hashtags and a compelling caption.",
     icon: "IG",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
@@ -177,16 +177,16 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     settingsKey: "instagram",
     usageExamples: [
       {
-        title: "Post about my new class",
-        prompt: "Create an Instagram post about my Saturday yoga class",
+        title: "Post about this week's update",
+        prompt: "Create an Instagram post about what changed this week",
         response:
-          "I've created a post with your class photo, a caption about the grounding practice, and relevant hashtags. Scheduled for Thursday at 10am when your followers are most active.",
+          "I've created a post with your selected photo, a caption that explains the update clearly, and relevant local hashtags. Scheduled for Thursday at 10am when your followers are most active.",
       },
       {
         title: "What should I post this week?",
         prompt: "Suggest Instagram content for this week",
         response:
-          "Based on your upcoming schedule: Monday - behind-the-scenes studio prep. Wednesday - client testimonial. Friday - Saturday class reminder with early-bird CTA.",
+          "Based on your current site: Monday - behind-the-scenes proof. Wednesday - customer story. Friday - timely reminder with your primary call-to-action.",
       },
     ],
   },

@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
 import { isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
-import { getAllTenants, getTenantConfig } from "@/lib/tenants";
-import { getTenantDashboardHost, getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
+import {
+  getTenantDashboardFallbackUrl,
+  getTenantDashboardHost,
+} from "@/lib/tenant-urls";
 import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
@@ -17,14 +20,14 @@ export default async function AccountPage() {
     const devTenant = getDevAccessTenant();
     if (devTenant) {
       const config = await getTenantConfig(devTenant);
-      if (config) redirect(getTenantDashboardUrl(config));
+      if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
       redirect(`/dashboard?tenant=${devTenant}`);
     }
     redirect("/sign-in");
   }
 
   if (await isSuperAdmin()) {
-    const tenants = await getAllTenants();
+    const tenants = (await getAllTenants()).filter(isActiveTenant);
     return <TenantPicker tenants={tenants.map((config) => ({ id: config.id, config }))} isSuperAdmin />;
   }
 
@@ -39,14 +42,14 @@ export default async function AccountPage() {
     const tenantId = tenants[0];
     const config = await getTenantConfig(tenantId);
 
-    if (config) redirect(getTenantDashboardUrl(config));
+    if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
     redirect("/no-access");
   }
 
   const tenantConfigs = await Promise.all(
     tenants.map(async (id) => ({
       id,
-      config: await getTenantConfig(id),
+      config: await getTenantConfig(id).then((config) => config && isActiveTenant(config) ? config : undefined),
     }))
   );
 
@@ -156,7 +159,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
         <div className="space-y-3">
           {tenants.map(({ id, config }) => {
             if (!config) return null;
-            const href = getTenantDashboardUrl(config);
+            const href = getTenantDashboardFallbackUrl(config);
             const domain = getTenantDashboardHost(config);
 
             return (
@@ -179,7 +182,8 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
                   className="text-[13px] mt-0.5"
                   style={{ color: "var(--m-text-3)" }}
                 >
-                  {domain}
+                  Fallback via scaffoldweb.com
+                  <span className="block">{domain}</span>
                 </div>
               </a>
             );

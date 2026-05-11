@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
 const DOMAINS_API = "/api/tenant/domains";
 
@@ -19,6 +20,8 @@ interface Props {
 
 // Primary domain fields component
 function PrimaryDomainFields() {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [productionDomain, setProductionDomain] = useState("");
   const [adminDomain, setAdminDomain] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,7 +31,7 @@ function PrimaryDomainFields() {
   const latestRef = useRef({ productionDomain: "", adminDomain: "" });
 
   useEffect(() => {
-    fetch("/api/tenant-settings", { credentials: "same-origin" })
+    fetch(apiHref("/api/tenant-settings"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
@@ -42,13 +45,13 @@ function PrimaryDomainFields() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [apiHref]);
 
   const save = useCallback(async () => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/tenant-settings", {
+      const res = await fetch(apiHref("/api/tenant-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -70,7 +73,7 @@ function PrimaryDomainFields() {
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [apiHref]);
 
   const derivedAdmin = productionDomain ? `admin.${productionDomain}` : "";
 
@@ -164,6 +167,9 @@ function PrimaryDomainFields() {
 }
 
 export function DomainsClient({ initialDomains }: Props) {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const domainsApi = apiHref(DOMAINS_API);
   const [domains, setDomains] = useState<DomainEntry[]>(initialDomains);
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
@@ -172,20 +178,20 @@ export function DomainsClient({ initialDomains }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch(DOMAINS_API)
+    fetch(domainsApi)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.domains) setDomains(data.domains);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
-  }, []);
+  }, [domainsApi]);
 
   // Refresh every 30s so "pending" domains flip to "connected" after DNS propagates.
   useEffect(() => {
     if (!domains.some((d) => d.status === "pending")) return;
     const id = setInterval(() => {
-      fetch(DOMAINS_API)
+      fetch(domainsApi)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.domains) setDomains(data.domains);
@@ -193,7 +199,7 @@ export function DomainsClient({ initialDomains }: Props) {
         .catch(() => {});
     }, 30_000);
     return () => clearInterval(id);
-  }, [domains]);
+  }, [domains, domainsApi]);
 
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
@@ -202,7 +208,7 @@ export function DomainsClient({ initialDomains }: Props) {
     setAdding(true);
     setError(null);
     try {
-      const res = await fetch(DOMAINS_API, {
+      const res = await fetch(domainsApi, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain }),
@@ -227,7 +233,7 @@ export function DomainsClient({ initialDomains }: Props) {
     setError(null);
     try {
       const res = await fetch(
-        `${DOMAINS_API}?domain=${encodeURIComponent(domain)}`,
+        `${domainsApi}?domain=${encodeURIComponent(domain)}`,
         { method: "DELETE" }
       );
       const data = await res.json();

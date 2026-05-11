@@ -1,13 +1,15 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
-import { ContentBrowser } from "./ContentBrowser";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { Tabs } from "@/components/ui/Tabs";
 import type { SectionData } from "./ContentBrowser";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
 
 interface ContentWorkspaceProps {
   siteName: string;
@@ -24,11 +26,59 @@ export function ContentWorkspace({
 }: ContentWorkspaceProps) {
   const {
     activeSection,
+    setActiveSection,
     rightTab,
     setRightTab,
     rightCollapsed,
     siteUrl,
+    dashboardHref,
   } = useDashboard();
+  void timestamps;
+
+  const sectionOptions = useMemo(
+    () =>
+      Object.keys(sectionData).map((section) => ({
+        value: section,
+        label: SECTION_LABELS[section] || sectionData[section]?.preview || section,
+      })),
+    [sectionData],
+  );
+
+  useEffect(() => {
+    setRightTab("properties");
+  }, [setRightTab]);
+
+  useEffect(() => {
+    if (activeSection || sectionOptions.length === 0) return;
+    setActiveSection(sectionOptions[0].value);
+  }, [activeSection, sectionOptions, setActiveSection]);
+
+  const sectionSelector = (
+    <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-border bg-surface px-4 py-2">
+      <div className="min-w-0">
+        <p className="text-[11px] font-mono uppercase tracking-[0.08em] text-gray-muted">
+          Site
+        </p>
+        <p className="truncate text-[12px] text-gray-faint">
+          Pick a section, edit on the right, or ask AI from the secondary tab.
+        </p>
+      </div>
+      <label className="flex shrink-0 items-center gap-2 text-[11px] text-gray-muted">
+        Section
+        <select
+          value={activeSection || ""}
+          onChange={(event) => setActiveSection(event.target.value || null)}
+          className="h-8 min-w-[190px] rounded-lg border border-gray-border bg-surface-raised px-3 text-[12px] text-warm-white outline-none transition-colors focus:border-accent/45"
+        >
+          {sectionOptions.map((section) => (
+            <option key={section.value} value={section.value}>
+              {section.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
 
   const rightPanelContent = (
     <>
@@ -61,12 +111,8 @@ export function ContentWorkspace({
     <div className="flex flex-col h-full bg-surface-base">
       {/* Desktop (lg+): preview + right panel */}
       <div className="hidden lg:flex flex-1 min-h-0">
-        <aside className="w-[300px] shrink-0 border-r border-gray-border">
-          <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
-        </aside>
-
-        {/* Center: Site Preview — right-click to edit */}
         <main className="flex-1 flex flex-col min-w-0">
+          {sectionSelector}
           <SitePreview />
         </main>
 
@@ -86,11 +132,11 @@ export function ContentWorkspace({
 
       {/* Tablet (md to lg): vertical split -- preview top, editor bottom */}
       <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0">
-        <div className="h-[45%] border-b border-gray-border shrink-0 flex min-h-0">
-          <aside className="w-[280px] shrink-0 border-r border-gray-border">
-            <ContentBrowser sectionData={sectionData} timestamps={timestamps} />
-          </aside>
-          <SitePreview />
+        <div className="h-[52%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
+          {sectionSelector}
+          <div className="min-h-0 flex-1">
+            <SitePreview />
+          </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {rightPanelContent}
@@ -99,19 +145,33 @@ export function ContentWorkspace({
 
       {/* Mobile: fallback message — editor isn't usable at this size */}
       <div className="flex md:hidden flex-1 min-h-0 items-center justify-center px-6">
-        <div className="text-center max-w-xs">
+        <div className="max-w-sm text-center">
           <p className="text-lg font-medium text-warm-white mb-2">
-            Manage {siteName} on a larger screen
+            Site editing works best on desktop
           </p>
           <p className="text-sm text-gray-muted mb-6">
-            Review sections, edit copy, and ask the AI to make changes with the live preview open.
+            Use a larger screen to review {siteName} with the live preview and editing panel side by side.
           </p>
-          <a
-            href={siteUrl || "/dashboard"}
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-warm-white text-warm-black text-sm font-medium hover:bg-warm-white/90 transition-colors"
-          >
-            View your live site
-          </a>
+          <div className="grid gap-2">
+            <a
+              href={siteUrl || "/"}
+              className="inline-flex items-center justify-center rounded-lg bg-warm-white px-5 py-2.5 text-sm font-medium text-warm-black transition-colors hover:bg-warm-white/90"
+            >
+              View live site
+            </a>
+            <Link
+              href={dashboardHref("/dashboard/chat")}
+              className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+            >
+              Ask AI
+            </Link>
+            <Link
+              href={dashboardHref("/dashboard")}
+              className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+            >
+              Overview
+            </Link>
+          </div>
         </div>
       </div>
 

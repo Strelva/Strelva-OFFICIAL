@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getTenantDashboardHost,
+  getTenantDashboardFallbackUrl,
   getTenantDashboardUrl,
   getTenantPrimaryDomain,
   getTenantPublicUrl,
@@ -26,6 +27,15 @@ describe("tenant URL helpers", () => {
   it("uses tenant localhost hosts in development so dashboard context persists", () => {
     expect(getTenantDashboardUrl(tenant(), "/dashboard/site", "development")).toBe(
       "http://gldf.localhost:3000/dashboard/site"
+    );
+  });
+
+  it("builds stable scaffoldweb.com fallback dashboard URLs", () => {
+    expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard/site", "development")).toBe(
+      "http://localhost:3000/client/gldf/dashboard/site"
+    );
+    expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard", "production")).toBe(
+      "https://scaffoldweb.com/client/gldf/dashboard"
     );
   });
 
@@ -57,13 +67,45 @@ describe("tenant URL helpers", () => {
     ).toBe("https://greatlakesdriedfruit.com");
   });
 
-  it("normalizes protocols, paths, and www prefixes for primary domains", () => {
+  it("preserves www public domains while deriving admin hosts from the apex", () => {
     expect(
       getTenantPublicUrl(tenant({ productionDomain: "https://www.Example.com/dashboard" }), "production")
-    ).toBe("https://example.com");
+    ).toBe("https://www.example.com");
     expect(getTenantDashboardHost(tenant({ customDomains: ["https://www.Example.com/path"] }))).toBe(
       "admin.example.com"
     );
+  });
+
+  it("uses the www site URL when it matches an apex production domain", () => {
+    expect(
+      getTenantPublicUrl(
+        tenant({
+          productionDomain: "greatlakesdriedfruit.com",
+          siteUrl: "https://www.greatlakesdriedfruit.com",
+        }),
+        "production",
+      )
+    ).toBe("https://www.greatlakesdriedfruit.com");
+    expect(
+      getTenantDashboardHost(
+        tenant({
+          productionDomain: "greatlakesdriedfruit.com",
+          siteUrl: "https://www.greatlakesdriedfruit.com",
+        }),
+      )
+    ).toBe("admin.greatlakesdriedfruit.com");
+  });
+
+  it("prefers a matching www custom domain for the public URL", () => {
+    expect(
+      getTenantPublicUrl(
+        tenant({
+          productionDomain: "greatlakesdriedfruit.com",
+          customDomains: ["greatlakesdriedfruit.com", "www.greatlakesdriedfruit.com"],
+        }),
+        "production",
+      )
+    ).toBe("https://www.greatlakesdriedfruit.com");
   });
 
   it("falls back to the platform tenant subdomain only when no real domain exists", () => {

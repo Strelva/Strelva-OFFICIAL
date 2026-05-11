@@ -7,6 +7,10 @@ import type { ProductItem } from "@/lib/types";
 
 const SUBSCRIPTION_INTERVALS = ["2 weeks", "4 weeks", "6 weeks", "8 weeks"];
 
+function canRenderProductImage(src: string) {
+  return !!src && !src.startsWith("/images/");
+}
+
 interface ProductModalProps {
   product: ProductItem | null;
   onClose: () => void;
@@ -99,7 +103,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
           <div className="grid md:grid-cols-2">
             {/* Left — Image */}
             <div className="relative aspect-square" style={{ background: "var(--cream-dark)" }}>
-              {product.imageUrl ? (
+              {canRenderProductImage(product.imageUrl) ? (
                 <Image
                   src={product.imageUrl}
                   alt={product.name}
@@ -154,6 +158,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                 >
                   <button
                     onClick={() => setIsSubscription(false)}
+                    aria-pressed={!isSubscription}
                     className="flex-1 py-3 text-[0.625rem] font-bold tracking-[0.15em] uppercase transition-all duration-200"
                     style={{
                       background: !isSubscription ? "var(--bark)" : "transparent",
@@ -164,6 +169,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                   </button>
                   <button
                     onClick={() => setIsSubscription(true)}
+                    aria-pressed={isSubscription}
                     className="flex-1 py-3 text-[0.625rem] font-bold tracking-[0.15em] uppercase transition-all duration-200"
                     style={{
                       background: isSubscription ? "var(--bark)" : "transparent",
@@ -237,6 +243,8 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
               <button
                 onClick={handleAdd}
                 disabled={product.comingSoon || !product.price}
+                aria-label={`Add ${quantity} ${product.name} to cart`}
+                data-testid={`modal-add-to-cart-${product.id}`}
                 className="w-full py-3.5 text-xs font-bold tracking-widest uppercase transition-all duration-300 disabled:opacity-40 mt-auto"
                 style={{
                   background: added ? "var(--sage)" : "var(--bark)",

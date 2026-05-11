@@ -1,9 +1,15 @@
 import Link from "next/link";
-import { getAllTenants } from "@/lib/tenants";
-import { getTenantDashboardUrl, getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getAllTenants, isActiveTenant } from "@/lib/tenants";
+import {
+  getTenantDashboardFallbackUrl,
+  getTenantDashboardUrl,
+  getTenantPublicUrl,
+} from "@/lib/tenant-urls";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { InviteButton } from "./InviteButton";
+import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
+import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +18,13 @@ const STATUS_COLORS: Record<string, string> = {
   past_due: "bg-yellow-500/20 text-yellow-400",
   cancelled: "bg-red-500/20 text-red-400",
   none: "bg-zinc-700/40 text-zinc-400",
+};
+
+const READINESS_COLORS: Record<string, string> = {
+  ok: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
+  warn: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+  fail: "bg-red-500/15 text-red-300 border-red-500/20",
+  skip: "bg-zinc-700/40 text-zinc-400 border-zinc-700",
 };
 
 function formatTime(iso: string): string {
@@ -28,7 +41,9 @@ function formatTime(iso: string): string {
 }
 
 export default async function AdminPage() {
-  const TENANTS = await getAllTenants();
+  const ALL_TENANTS = await getAllTenants();
+  const TENANTS = ALL_TENANTS.filter(isActiveTenant);
+  const archivedTenantCount = ALL_TENANTS.length - TENANTS.length;
 
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
@@ -40,6 +55,7 @@ export default async function AdminPage() {
         tenant: t,
         lastActivity: activity[0]?.time ?? null,
         draftCount: Object.keys(drafts).length,
+        readiness: getTenantLaunchReadinessResults(t),
       };
     })
   );
@@ -48,7 +64,7 @@ export default async function AdminPage() {
   const activeSubscriptions = TENANTS.filter(
     (t) => t.subscriptionStatus === "active"
   ).length;
-  const mrr = activeSubscriptions * 20;
+  const mrr = activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
 
   return (
@@ -57,8 +73,8 @@ export default async function AdminPage() {
       <div>
         <h1 className="text-2xl font-semibold text-white">Client Overview</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          {TENANTS.length} client{TENANTS.length !== 1 ? "s" : ""} across your
-          portfolio
+          {TENANTS.length} active client{TENANTS.length !== 1 ? "s" : ""} across your
+          portfolio{archivedTenantCount ? ` · ${archivedTenantCount} archived hidden` : ""}
         </p>
       </div>
 
@@ -77,7 +93,7 @@ export default async function AdminPage() {
           </p>
           <p className="text-xs text-zinc-600 mt-1">
             {activeSubscriptions} active subscription
-            {activeSubscriptions !== 1 ? "s" : ""} x $20
+            {activeSubscriptions !== 1 ? "s" : ""} x ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS}
           </p>
         </div>
         <Link
@@ -97,6 +113,13 @@ export default async function AdminPage() {
       {/* Create tenant form */}
       <CreateTenantForm />
 
+      <div className="lg:hidden rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+        <p className="text-sm font-medium text-amber-200">Admin works best on desktop</p>
+        <p className="mt-1 text-xs leading-5 text-amber-100/70">
+          Client dashboards stay available from their fallback URLs, but tenant triage, invite handling, and domain checks need the full-width admin table.
+        </p>
+      </div>
+
       {/* Tenant table */}
       <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
         <div className="overflow-x-auto">
@@ -104,86 +127,133 @@ export default async function AdminPage() {
             <thead>
               <tr className="border-b border-zinc-800 text-zinc-500 text-left">
                 <th className="px-6 py-3 font-medium">Client</th>
-                <th className="px-6 py-3 font-medium">Industry</th>
-                <th className="px-6 py-3 font-medium">Template</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Subscription</th>
-                <th className="px-6 py-3 font-medium">Last Activity</th>
-                <th className="px-6 py-3 font-medium">Drafts</th>
+                <th className="px-6 py-3 font-medium">Access</th>
+                <th className="px-6 py-3 font-medium">Operations</th>
+                <th className="px-6 py-3 font-medium">Activity</th>
                 <th className="px-6 py-3 font-medium sr-only">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {tenantData.map(({ tenant: t, lastActivity, draftCount }) => (
-                <tr
-                  key={t.id}
-                  className="hover:bg-zinc-800/30 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-white">{t.siteName}</p>
-                      <p className="text-xs text-zinc-500">{t.ownerName}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-400">{t.industry}</td>
-                  <td className="px-6 py-4 text-zinc-400">{t.template}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        t.active
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-zinc-700/40 text-zinc-500"
-                      }`}
-                    >
-                      {t.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        STATUS_COLORS[t.subscriptionStatus ?? "none"]
-                      }`}
-                    >
-                      {t.subscriptionStatus ?? "none"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-500">
-                    {lastActivity ? formatTime(lastActivity) : "No activity"}
-                  </td>
-                  <td className="px-6 py-4">
-                    {draftCount > 0 ? (
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
-                        {draftCount}
-                      </span>
-                    ) : (
-                      <span className="text-zinc-600">0</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <InviteButton
-                        tenantId={t.id}
-                        siteName={t.siteName}
-                        ownerEmail={t.ownerEmail}
-                      />
-                      <Link
-                        href={getTenantDashboardUrl(t)}
-                        className="text-xs text-zinc-400 hover:text-white transition-colors"
-                      >
-                        Dashboard
-                      </Link>
-                      <a
-                        href={getTenantPublicUrl(t)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-zinc-400 hover:text-white transition-colors"
-                      >
-                        Site
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness }) => {
+                const fallbackUrl = getTenantDashboardFallbackUrl(t);
+                const customAdminUrl = getTenantDashboardUrl(t);
+                const publicUrl = getTenantPublicUrl(t);
+                const adminReadiness = readiness.find((r) => r.name.endsWith("admin domain"));
+                const clientReadiness = readiness.find((r) => r.name.endsWith("client domain"));
+                const revalidationReadiness = readiness.find((r) => r.name.endsWith("revalidation"));
+
+                return (
+                  <tr
+                    key={t.id}
+                    className="hover:bg-zinc-800/30 transition-colors align-top"
+                  >
+                    <td className="px-6 py-5">
+                      <div>
+                        <p className="font-medium text-white">{t.siteName}</p>
+                        <p className="mt-1 text-xs text-zinc-500">{t.ownerName}</p>
+                        <p className="mt-2 text-xs text-zinc-600">
+                          {t.industry} · {t.template}
+                        </p>
+                        <span
+                          className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            t.active
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "bg-zinc-700/40 text-zinc-500"
+                          }`}
+                        >
+                          {t.active ? "Active tenant" : "Inactive tenant"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-zinc-300">
+                            {t.ownerEmail ? t.ownerEmail : "No owner email"}
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-600">
+                            Invite state: {t.ownerEmail ? "ready to invite" : "needs owner email"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-600">Fallback dashboard</p>
+                          <Link href={fallbackUrl} className="mt-1 block max-w-[260px] truncate font-mono text-xs text-amber-300 hover:text-amber-200">
+                            {fallbackUrl.replace(/^https?:\/\//, "")}
+                          </Link>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-600">Custom admin</p>
+                          <a href={customAdminUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block max-w-[260px] truncate font-mono text-xs text-zinc-400 hover:text-white">
+                            {customAdminUrl.replace(/^https?:\/\//, "")}
+                          </a>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex max-w-md flex-wrap gap-2">
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[clientReadiness?.status ?? "skip"]}`}>
+                          Site DNS: {clientReadiness?.status ?? "skip"}
+                        </span>
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[adminReadiness?.status ?? "skip"]}`}>
+                          Admin DNS: {adminReadiness?.status ?? "skip"}
+                        </span>
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[revalidationReadiness?.status ?? "skip"]}`}>
+                          Revalidation: {revalidationReadiness?.status ?? "skip"}
+                        </span>
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[t.subscriptionStatus ?? "none"]}`}>
+                          Subscription: {t.subscriptionStatus ?? "none"}
+                        </span>
+                        {draftCount > 0 ? (
+                          <span className="inline-flex rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-400">
+                            {draftCount} pending draft{draftCount === 1 ? "" : "s"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-zinc-700/40 px-2 py-1 text-xs font-medium text-zinc-500">
+                            No drafts
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-zinc-500">
+                      <p>{lastActivity ? formatTime(lastActivity) : "No activity"}</p>
+                      <p className="mt-2 max-w-[220px] truncate text-xs text-zinc-600">
+                        Public: {publicUrl.replace(/^https?:\/\//, "")}
+                      </p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex min-w-[280px] flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
+                        <InviteButton
+                          tenantId={t.id}
+                          siteName={t.siteName}
+                          ownerEmail={t.ownerEmail}
+                        />
+                        <Link
+                          href={fallbackUrl}
+                          className="rounded-md px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                        >
+                          Dashboard
+                        </Link>
+                        <a
+                          href={customAdminUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                        >
+                          Custom admin
+                        </a>
+                        <a
+                          href={publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                        >
+                          Site
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

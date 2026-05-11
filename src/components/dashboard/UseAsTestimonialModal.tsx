@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { X, Quote, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface ReviewData {
   id: string;
@@ -25,6 +26,8 @@ export function UseAsTestimonialModal({
   review,
   onSuccess,
 }: UseAsTestimonialModalProps) {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [quote, setQuote] = useState(review?.text || "");
   const [author, setAuthor] = useState(review?.author || "");
   const [location, setLocation] = useState("");
@@ -52,7 +55,7 @@ export function UseAsTestimonialModal({
 
     try {
       // Fetch current testimonials
-      const res = await fetch("/api/content/testimonials", {
+      const res = await fetch(dashboardHref("/api/content/testimonials"), {
         credentials: "same-origin",
       });
       if (!res.ok) throw new Error("Failed to fetch testimonials");
@@ -72,7 +75,7 @@ export function UseAsTestimonialModal({
       };
 
       // Save
-      const saveRes = await fetch("/api/content/testimonials", {
+      const saveRes = await fetch(dashboardHref("/api/content/testimonials"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -92,7 +95,7 @@ export function UseAsTestimonialModal({
     } finally {
       setSaving(false);
     }
-  }, [quote, author, location, review, onClose, onSuccess]);
+  }, [dashboardHref, quote, author, location, review, onClose, onSuccess]);
 
   if (!open || !review) return null;
 

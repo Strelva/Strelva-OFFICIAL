@@ -5,10 +5,15 @@ import Image from "next/image";
 import gsap from "gsap";
 import type { HeroContent } from "@/lib/types";
 
+function canRenderHeroImage(src: string | undefined) {
+  return !!src && !src.startsWith("/images/");
+}
+
 export function Hero({ hero }: { hero: HeroContent }) {
   const sectionRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const productRef = useRef<HTMLDivElement>(null);
+  const heroLogoUrl = canRenderHeroImage(hero.logoUrl) ? hero.logoUrl : "";
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -112,6 +117,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
                 <a
                   href="#products"
                   className="btn-primary"
+                  aria-label="See Great Lakes Dried Fruit products"
                   style={{ background: "var(--cream)", color: "var(--sage)" }}
                   onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
                     e.currentTarget.style.background = "var(--wheat-light)";
@@ -123,17 +129,18 @@ export function Hero({ hero }: { hero: HeroContent }) {
                   {hero.ctaText}
                 </a>
                 <a
-                  href="#story"
+                  href="#comparison"
                   className="btn-ghost"
+                  aria-label="Jump to what makes these products different"
                   style={{ borderColor: "rgba(250,248,245,0.5)", color: "var(--cream)" }}
                 >
-                  Our Story
+                  Why We&apos;re Different
                 </a>
               </div>
             </div>
 
             {/* Right — Product bag (only show if logoUrl is set as product image) */}
-            {hero.logoUrl && (
+            {heroLogoUrl && (
               <div ref={productRef} className="hidden lg:flex items-center justify-end">
                 <div
                   data-product-img
@@ -141,7 +148,7 @@ export function Hero({ hero }: { hero: HeroContent }) {
                   style={{ width: "min(280px, 40vw)" }}
                 >
                   <Image
-                    src={hero.logoUrl}
+                    src={heroLogoUrl}
                     alt={`${hero.headline} — Product`}
                     width={1200}
                     height={1703}

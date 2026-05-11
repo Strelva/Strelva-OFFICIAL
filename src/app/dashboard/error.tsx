@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
 export default function DashboardError({
   error,
@@ -11,6 +12,8 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const dashboard = useDashboardOptional();
+
   useEffect(() => {
     void error;
   }, [error]);
@@ -36,7 +39,7 @@ export default function DashboardError({
             Try again
           </button>
           <Link
-            href="/dashboard"
+            href={dashboard?.dashboardHref("/dashboard") || "/dashboard"}
             className="px-4 py-2 rounded-md bg-surface border border-gray-border text-sm text-gray-fg hover:text-warm-black transition-colors"
           >
             Go to overview

@@ -1,6 +1,6 @@
 "use client";
 
-import { SignIn } from "@clerk/nextjs";
+import { ClerkLoaded, ClerkLoading, SignIn } from "@clerk/nextjs";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { getAuthSwitchUrl } from "@/lib/invited-email";
 
@@ -41,30 +41,41 @@ export function SignInClient({
           </p>
         ) : null}
       </div>
-      <SignIn
-        appearance={{
-          elements: {
-            rootBox: "mx-auto",
-            card: "shadow-none !bg-[#0f0f12] border border-[#1c1c20]",
-            headerTitle: "font-display !text-[#e8e8ec]",
-            headerSubtitle: "!text-[#8e8e96]",
-            socialButtonsBlockButton:
-              "!bg-[#1c1c20] !border-[#26262b] !text-[#e8e8ec] hover:!bg-[#26262b]",
-            formFieldLabel: "!text-[#8e8e96]",
-            formFieldInput:
-              "!bg-[#08080a] !border-[#26262b] !text-[#e8e8ec] focus:!border-[#d4a052]",
-            formButtonPrimary: "!bg-[#d4a052] hover:!bg-[#c4903e] !text-[#08080a]",
-            footerActionLink: "!text-[#d4a052] hover:!text-[#c4903e]",
-            footerActionText: "!text-[#55555c]",
-            dividerLine: "!bg-[#1c1c20]",
-            dividerText: "!text-[#55555c]",
-          },
-        }}
-        forceRedirectUrl={postSignInUrl}
-        fallbackRedirectUrl={postSignInUrl}
-        signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}
-        initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
-      />
+      <ClerkLoading>
+        <div className="w-full max-w-md rounded-xl border border-[#1c1c20] bg-[#0f0f12] p-6 text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border border-[#2b2418] border-t-[#d4a052]" />
+          <p className="text-sm font-medium text-[#e8e8ec]">Loading secure sign-in...</p>
+          <p className="mt-2 text-xs leading-5 text-[#8e8e96]">
+            If this takes more than a few seconds, check your connection or email jacob@scaffoldweb.com.
+          </p>
+        </div>
+      </ClerkLoading>
+      <ClerkLoaded>
+        <SignIn
+          appearance={{
+            elements: {
+              rootBox: "mx-auto",
+              card: "shadow-none !bg-[#0f0f12] border border-[#1c1c20]",
+              headerTitle: "font-display !text-[#e8e8ec]",
+              headerSubtitle: "!text-[#8e8e96]",
+              socialButtonsBlockButton:
+                "!bg-[#1c1c20] !border-[#26262b] !text-[#e8e8ec] hover:!bg-[#26262b]",
+              formFieldLabel: "!text-[#8e8e96]",
+              formFieldInput:
+                "!bg-[#08080a] !border-[#26262b] !text-[#e8e8ec] focus:!border-[#d4a052]",
+              formButtonPrimary: "!bg-[#d4a052] hover:!bg-[#c4903e] !text-[#08080a]",
+              footerActionLink: "!text-[#d4a052] hover:!text-[#c4903e]",
+              footerActionText: "!text-[#55555c]",
+              dividerLine: "!bg-[#1c1c20]",
+              dividerText: "!text-[#55555c]",
+            },
+          }}
+          forceRedirectUrl={postSignInUrl}
+          fallbackRedirectUrl={postSignInUrl}
+          signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}
+          initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
+        />
+      </ClerkLoaded>
       <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
         Missing access or the sign-in form is not loading? Sign in with the
         invited email or email{" "}

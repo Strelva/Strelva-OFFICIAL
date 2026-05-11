@@ -5,11 +5,13 @@ import { SignOutButton } from "@clerk/nextjs";
 
 interface UseInvitedEmailButtonProps {
   className?: string;
+  redirectUrl?: string;
   style?: CSSProperties;
 }
 
 export function UseInvitedEmailButton({
   className,
+  redirectUrl = "/sign-in",
   style,
 }: UseInvitedEmailButtonProps) {
   const button = (
@@ -18,5 +20,5 @@ export function UseInvitedEmailButton({
     </button>
   );
 
-  return <SignOutButton redirectUrl="/sign-in">{button}</SignOutButton>;
+  return <SignOutButton redirectUrl={redirectUrl}>{button}</SignOutButton>;
 }

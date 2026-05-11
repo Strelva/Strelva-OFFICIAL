@@ -2,30 +2,34 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, FileText, LayoutPanelLeft, KeyRound, MessageCircle, Link2 } from "lucide-react";
+import { Inbox, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
+import { useDashboard } from "./DashboardContext";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Working", icon: FileText },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Approve", icon: Inbox },
+  { href: "/dashboard/review", label: "Approvals", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/sources", label: "Accounts", icon: Link2 },
-  { href: "/dashboard/ownership", label: "Own", icon: KeyRound },
+  { href: "/dashboard/sources", label: "Connections", icon: Link2 },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const pathname = usePathname();
+  const { dashboardBasePath, dashboardHref } = useDashboard();
+  const effectivePathname =
+    dashboardBasePath && pathname?.startsWith(dashboardBasePath)
+      ? pathname.slice(dashboardBasePath.length) || "/dashboard"
+      : pathname;
   const navRef = useRef<HTMLDivElement>(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const getActiveIndex = useCallback(() => {
     return NAV_ITEMS.findIndex((item) =>
       item.href === "/dashboard"
-        ? pathname === "/dashboard"
-        : pathname?.startsWith(item.href)
+        ? effectivePathname === "/dashboard"
+        : effectivePathname?.startsWith(item.href)
     );
-  }, [pathname]);
+  }, [effectivePathname]);
 
   useEffect(() => {
     const activeIndex = getActiveIndex();
@@ -61,15 +65,16 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
         />
         {NAV_ITEMS.map((item) => {
           const isActive = item.href === "/dashboard"
-            ? pathname === "/dashboard"
-            : pathname?.startsWith(item.href);
+            ? effectivePathname === "/dashboard"
+            : effectivePathname?.startsWith(item.href);
           const Icon = item.icon;
           const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={dashboardHref(item.href)}
+              prefetch={false}
               className={`relative flex flex-col items-center justify-center gap-1 w-16 h-14 rounded-xl transition-colors ${
                 isActive ? "text-warm-black" : "text-gray-muted"
               }`}
@@ -83,7 +88,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
                   </span>
                 )}
               </div>
-              <span className="text-[9px] font-medium">{item.label}</span>
+              <span className="max-w-[58px] truncate text-[9px] font-medium">{item.label}</span>
             </Link>
           );
         })}

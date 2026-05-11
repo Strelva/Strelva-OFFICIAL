@@ -22,6 +22,7 @@ import {
   buildAgentResultContract,
   type AgentActionResult,
 } from "@/lib/agent-results";
+import { readJsonObject } from "@/lib/request-body";
 
 type IncomingMessagePart = { type?: string; text?: string };
 
@@ -56,6 +57,16 @@ function textFromMessage(message: IncomingMessage): string | undefined {
     .join(" ")
     .trim();
   return text || undefined;
+}
+
+function logisticsGuardrail(sectionNames: string): string {
+  return `OPERATING BOUNDARIES:
+- You are a website/content operations assistant, not the business's order desk, fulfillment team, inventory system, payment processor, booking agent, or customer support inbox.
+- Stay inside what this platform can actually do: read current website content, draft copy, update approved content sections, queue risky changes for review, summarize available metrics/activity/reviews, draft newsletters/social posts, and point users to their configured external systems.
+- Do not invent logistics facts such as shipping timelines, delivery areas, pickup windows, stock levels, wholesale terms, refund policies, certifications, nutrition claims, event availability, booking availability, or operational commitments unless they are explicitly present in the current site content, tenant rules, or connected tool output.
+- If the user asks for something outside the platform's control, explain the boundary briefly and offer the closest supported action, such as drafting website copy, adding a FAQ, updating contact details, or creating an approval-ready draft.
+- When recommending changes, prioritize high-value website work: clearer contact/ordering path, trust proof, product/service clarity, fresh updates, conversion copy, and weekly-report-worthy proof.
+- Before changing content, read the relevant section first and preserve existing data. Available editable sections are: ${sectionNames}.`;
 }
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -199,6 +210,8 @@ You can read and update any section of the website. Always read the current cont
 
 Available sections: ${sectionNames}.`;
 
+  prompt += `\n\n${logisticsGuardrail(sectionNames)}`;
+
   if (settings.bookingUrl) {
     const tenantConfig = await getTenantConfig(tenant);
     const provider = tenantConfig?.bookingProvider || "their booking platform";
@@ -262,7 +275,18 @@ export async function POST(req: Request) {
   const tenantConfig = await getTenantConfig(tenant);
   const { userId } = await auth();
   const clerkUserId = userId || (isDevAccessBypassEnabled() ? "dev-access-bypass" : null);
-  const { messages: rawMessages, activeSection, nodeContext } = await req.json() as {
+  const body = await readJsonObject(req);
+  if (!body) {
+    return new Response(
+      JSON.stringify({ error: "Invalid request body." }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const {
+    messages: rawMessages,
+    activeSection,
+    nodeContext,
+  } = body as {
     messages: unknown;
     activeSection?: string;
     nodeContext?: NodeContext;

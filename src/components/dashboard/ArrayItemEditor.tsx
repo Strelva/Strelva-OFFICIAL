@@ -10,8 +10,8 @@ interface ArrayItemEditorProps {
   data: Record<string, unknown>;
   onDataChange: (updated: Record<string, unknown>) => void;
   /**
-   * Override the lookup in ARRAY_CONFIGS. Used when a template declares
-   * multiple arrays per section (see templateFieldConfigs.ts).
+   * Override the lookup in ARRAY_CONFIGS. Used when the active site model
+   * declares multiple arrays for a section.
    */
   configOverride?: ArraySectionConfig;
 }

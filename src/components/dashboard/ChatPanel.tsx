@@ -1,16 +1,14 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback, type FormEvent } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  ArrowUp,
   Clock,
   CalendarPlus,
   Mail,
   BarChart3,
   ExternalLink,
   Inbox,
-  Loader2,
   CheckCircle2,
   AlertCircle,
   MessageCircle,
@@ -18,15 +16,40 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
+import { PromptInputBox } from "@/components/ui/ai-prompt-box";
+import { ShiningText } from "@/components/ui/shining-text";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
 import type { AgentResultContract, AgentResultStatus } from "@/lib/agent-results";
 
 const SUGGESTION_CHIPS = [
-  { label: "Add my Saturday class", icon: Clock, description: "Turn a real schedule change into updated site copy" },
+  { label: "Update this week's offer", icon: Clock, description: "Turn a real business change into updated site copy" },
   { label: "Write this week's update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
   { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note" },
   { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, clicks, and freshness to pick the next move" },
+];
+
+const INPUT_QUICK_ACTIONS = [
+  {
+    label: "What's working?",
+    description: "Summarize visits, clicks, updates, and what you are watching.",
+    message: "Give me a plain-English overview of what's working on my site right now. Include recent site changes, traffic or click signals if available, approvals waiting, and what you're watching for the next weekly report.",
+  },
+  {
+    label: "Suggest an update",
+    description: "Pick the most useful small change for the site today.",
+    message: "Suggest the most useful small website update I should make today. Explain why it matters and ask for any missing details before changing anything.",
+  },
+  {
+    label: "Show recent changes",
+    description: "Review what the AI or team changed lately.",
+    message: "Show me the recent changes made to my site and call out anything that still needs approval or a closer look.",
+  },
+  {
+    label: "Check site health",
+    description: "Look for stale content, weak CTAs, missing info, and issues.",
+    message: "Check my site health. Look for stale content, missing business details, weak calls to action, broken or risky areas, and the next practical fix.",
+  },
 ];
 
 interface ToolCall {
@@ -63,6 +86,19 @@ function getGreeting(): string {
   return "Good evening";
 }
 
+const TRANSIENT_CONNECT_FAILURE = "Sorry, I couldn't connect. Please try again.";
+
+function makeClientId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isTransientFailureMessage(message: ChatMessage) {
+  return message.role === "assistant" && message.content.trim() === TRANSIENT_CONNECT_FAILURE;
+}
+
 export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -71,10 +107,16 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [activeTools, setActiveTools] = useState<ToolCall[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentThreadRef = useRef<string | undefined>(threadId);
+  const optimisticThreadRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const toolIdCounterRef = useRef(0);
+  const previousMessageCountRef = useRef(0);
+  const shouldStickToBottomRef = useRef(true);
 
   const dashCtx = useDashboardOptional();
+  const dashboardHref = dashCtx?.dashboardHref ?? ((path: string) => path);
 
   const showResultToast = useCallback((result: AgentResultContract) => {
     const text =
@@ -110,24 +152,31 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       return;
     }
 
+    if (optimisticThreadRef.current === threadId) {
+      currentThreadRef.current = threadId;
+      return;
+    }
+
     currentThreadRef.current = threadId;
 
-    fetch(`/api/threads/${threadId}`, { credentials: "same-origin" })
+    fetch(dashboardHref(`/api/threads/${threadId}`), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((thread) => {
         if (thread && thread.messages && currentThreadRef.current === threadId) {
           setMessages(
-            thread.messages.map((m: { id: string; role: string; content: string; timestamp: string }) => ({
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              timestamp: new Date(m.timestamp).getTime(),
-            }))
+            thread.messages
+              .map((m: { id: string; role: string; content: string; timestamp: string }) => ({
+                id: m.id,
+                role: m.role as "user" | "assistant",
+                content: m.content,
+                timestamp: new Date(m.timestamp).getTime(),
+              }))
+              .filter((message: ChatMessage) => !isTransientFailureMessage(message))
           );
         }
       })
       .catch(() => {});
-  }, [threadId]);
+  }, [dashboardHref, threadId]);
 
   // Watch for chatPrompt changes from content card clicks
   useEffect(() => {
@@ -138,48 +187,94 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
     }
   }, [dashCtx?.chatPrompt, dashCtx]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  const updateShouldStickToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 120;
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const previousCount = previousMessageCountRef.current;
+    const messageCountChanged = messages.length !== previousCount;
+    previousMessageCountRef.current = messages.length;
+
+    if (messageCountChanged) {
+      shouldStickToBottomRef.current = true;
+      requestAnimationFrame(() => {
+        const target = scrollRef.current;
+        if (!target) return;
+        target.scrollTo({
+          top: target.scrollHeight,
+          behavior: previousCount === 0 ? "auto" : "smooth",
+        });
+      });
+      return;
     }
+
+    if (!shouldStickToBottomRef.current) return;
+
+    requestAnimationFrame(() => {
+      const target = scrollRef.current;
+      if (!target) return;
+      target.scrollTop = target.scrollHeight;
+    });
   }, [messages]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
     inputRef.current?.focus();
   }, []);
 
   const sendChat = useCallback(
     async (text: string) => {
       if (!text.trim() || isLoading) return;
+      const abortController = new AbortController();
+      abortRef.current = abortController;
 
       const userMsg: ChatMessage = {
-        id: Date.now().toString(),
+        id: makeClientId("user"),
         role: "user",
         content: text,
         timestamp: Date.now(),
       };
 
-      const allMessages = [...messages, userMsg];
+      const allMessages = messages.filter((message) => !isTransientFailureMessage(message)).concat(userMsg);
       setMessages(allMessages);
       setInput("");
       setIsLoading(true);
+      setToolStatus("Contacting AI...");
       setActiveTools([]);
+
+      const slowStatusTimer = window.setTimeout(() => {
+        if (!abortController.signal.aborted) setToolStatus("Still working...");
+      }, 2500);
+      const longStatusTimer = window.setTimeout(() => {
+        if (!abortController.signal.aborted) setToolStatus("This is taking longer than usual...");
+      }, 6500);
 
       // If no threadId, create a new thread first
       let activeThreadId = threadId;
+      let createdThreadId: string | null = null;
+      let revealTimer: number | null = null;
       if (!activeThreadId) {
         try {
-          const createRes = await fetch("/api/threads", {
+          const createRes = await fetch(dashboardHref("/api/threads"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
+            signal: abortController.signal,
             body: JSON.stringify({ title: text.slice(0, 50) }),
           });
           if (createRes.ok) {
             const newThread = await createRes.json();
             activeThreadId = newThread.id as string;
+            createdThreadId = activeThreadId;
             currentThreadRef.current = activeThreadId;
-            onThreadCreated?.(activeThreadId);
+            optimisticThreadRef.current = activeThreadId;
           }
         } catch {
           // Continue without thread persistence
@@ -187,10 +282,11 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       }
 
       try {
-        const res = await fetch("/api/agent", {
+        const res = await fetch(dashboardHref("/api/agent"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
+          signal: abortController.signal,
           body: JSON.stringify({
             messages: allMessages.map((m) => ({
               role: m.role,
@@ -222,7 +318,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
           return;
         }
 
-        const assistantId = (Date.now() + 1).toString();
+        const assistantId = makeClientId("assistant");
         const assistantTs = Date.now();
         setMessages((prev) => [
           ...prev,
@@ -231,8 +327,40 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
 
         const decoder = new TextDecoder();
         let fullText = "";
+        let visibleText = "";
         let buffer = "";
         let agentResult: AgentResultContract | null = null;
+        let streamFinished = false;
+        let finishReveal: (() => void) | null = null;
+        const revealComplete = new Promise<void>((resolve) => {
+          finishReveal = resolve;
+        });
+        revealTimer = window.setInterval(() => {
+          if (abortController.signal.aborted) {
+            if (revealTimer !== null) window.clearInterval(revealTimer);
+            revealTimer = null;
+            finishReveal?.();
+            return;
+          }
+
+          if (visibleText.length < fullText.length) {
+            const remaining = fullText.length - visibleText.length;
+            const step = remaining > 600 ? 4 : 2;
+            visibleText = fullText.slice(0, visibleText.length + step);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: visibleText.trimEnd() } : m
+              )
+            );
+            return;
+          }
+
+          if (streamFinished) {
+            if (revealTimer !== null) window.clearInterval(revealTimer);
+            revealTimer = null;
+            finishReveal?.();
+          }
+        }, 28);
 
         while (true) {
           const { done, value } = await reader.read();
@@ -249,7 +377,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
               const toolInfo = line.slice(8);
               setToolStatus(toolInfo);
               // Track tool calls
-              const toolId = `tool_${Date.now()}`;
+              const toolId = makeClientId(`tool_${toolIdCounterRef.current++}`);
               setActiveTools((prev) => [
                 ...prev,
                 { id: toolId, name: toolInfo, status: "running" as const },
@@ -292,11 +420,6 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
             setToolStatus(null);
           }
 
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m
-            )
-          );
         }
 
         if (buffer) {
@@ -308,13 +431,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
             }
           } else if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__")) {
             fullText += buffer;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: fullText.trimEnd() } : m
-              )
-            );
           }
         }
+        streamFinished = true;
+        await revealComplete;
         setToolStatus(null);
         setActiveTools((prev) => prev.map((t) => ({ ...t, status: "complete" as const })));
 
@@ -326,7 +446,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
             content: fullText.trimEnd(),
             timestamp: assistantTs,
           });
-          fetch(`/api/threads/${activeThreadId}`, {
+          fetch(dashboardHref(`/api/threads/${activeThreadId}`), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
@@ -339,41 +459,77 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
               })),
             }),
           }).catch(() => {});
+          optimisticThreadRef.current = null;
+          if (createdThreadId) onThreadCreated?.(createdThreadId);
         }
 
         if (agentResult) showResultToast(agentResult);
-      } catch {
+      } catch (error) {
+        if (abortRef.current) {
+          // The interval may still be active if the stream was aborted before
+          // it naturally drained.
+          setToolStatus(null);
+        }
+        if (error instanceof DOMException && error.name === "AbortError") return;
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: makeClientId("assistant_error"),
             role: "assistant",
-            content: "Sorry, I couldn't connect. Please try again.",
+            content: TRANSIENT_CONNECT_FAILURE,
             timestamp: Date.now(),
           },
         ]);
       } finally {
-        setIsLoading(false);
-        setActiveTools([]);
+        window.clearTimeout(slowStatusTimer);
+        window.clearTimeout(longStatusTimer);
+        if (abortRef.current === abortController) {
+          if (revealTimer !== null) {
+            window.clearInterval(revealTimer);
+            revealTimer = null;
+          }
+          abortRef.current = null;
+          setIsLoading(false);
+          setToolStatus(null);
+          setActiveTools([]);
+        }
       }
     },
-    [messages, isLoading, threadId, onThreadCreated, dashCtx, showResultToast]
+    [dashboardHref, messages, isLoading, threadId, onThreadCreated, dashCtx, showResultToast]
   );
 
-  const handleSubmit = (e?: FormEvent) => {
-    e?.preventDefault();
-    sendChat(input);
-  };
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
+    setToolStatus(null);
+    setActiveTools([]);
+  }, []);
 
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && !isLoading;
+  const lastMessage = messages[messages.length - 1];
+  const showThinkingBubble =
+    isLoading &&
+    lastMessage?.role === "user";
+
+  useLayoutEffect(() => {
+    if (!isEmpty) return;
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    });
+  }, [isEmpty]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable content area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto"
+        onScroll={updateShouldStickToBottom}
+      >
         {isEmpty ? (
           /* Empty state: greeting + chips */
-          <div className="flex flex-col items-center justify-center min-h-full px-4 sm:px-8 py-8 sm:py-12">
+          <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Site agent online
@@ -405,6 +561,12 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+        ) : messages.length === 0 && isLoading ? (
+          <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
+            <div className="ai-thinking-pop rounded-2xl border border-glass-border bg-glass px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+              <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
             </div>
           </div>
         ) : (
@@ -450,7 +612,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                   )}
                   {(updateToast.status === "drafted" || updateToast.status === "queued") && (
                     <Link
-                      href="/dashboard/review"
+                      href={dashCtx?.dashboardHref("/dashboard/review") || "/dashboard/review"}
                       className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
                     >
                       <Inbox className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -487,7 +649,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                     className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
                       message.role === "user"
                         ? "bg-accent/15 text-warm-black border border-accent/20"
-                        : "bg-glass text-warm-black border border-glass-border"
+                        : `bg-glass text-warm-black border border-glass-border ${message.content ? "ai-output-pop" : ""}`
                     }`}
                   >
                     {message.content ? (
@@ -499,28 +661,8 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       )
                     ) : (
-                      <span className="flex items-center gap-1.5 py-1">
-                        {toolStatus ? (
-                          <>
-                            <Loader2
-                              className="w-3 h-3 text-accent animate-spin"
-                              strokeWidth={1.5}
-                            />
-                            <span className="text-[11px] text-accent">{toolStatus}</span>
-                          </>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot" />
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot"
-                              style={{ animationDelay: "0.2s" }}
-                            />
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-accent animate-typing-dot"
-                              style={{ animationDelay: "0.4s" }}
-                            />
-                          </span>
-                        )}
+                      <span className="flex items-center py-1">
+                        <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
                       </span>
                     )}
                   </div>
@@ -531,8 +673,24 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
               </div>
             ))}
 
+            {showThinkingBubble && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%]">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
+                      <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[11px] text-gray-muted">AI</span>
+                  </div>
+                  <div className="ai-thinking-pop px-4 py-3 rounded-2xl bg-glass border border-glass-border shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+                    <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Active tool calls */}
-            {activeTools.length > 0 && (
+            {activeTools.some((tool) => tool.result) && (
               <div className="flex justify-start">
                 <div className="max-w-[80%] space-y-2">
                   {activeTools.map((tool) => (
@@ -553,30 +711,16 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       {/* Chat input - always at bottom, with safe area for notched devices */}
       <div className="shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe">
         <div className="max-w-3xl mx-auto">
-          <form
-            onSubmit={handleSubmit}
-            className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-2xl px-4 py-2 focus-within:border-accent/40 focus-within:bg-surface-raised transition-all"
-          >
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Tell me what you need..."
-              className="flex-1 bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none h-[40px]"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="w-[34px] h-[34px] rounded-xl bg-accent hover:bg-accent/80 disabled:bg-gray-border flex items-center justify-center transition-all shrink-0"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" strokeWidth={1.5} />
-              ) : (
-                <ArrowUp className="w-4 h-4 text-white" strokeWidth={2} />
-              )}
-            </button>
-          </form>
+          <PromptInputBox
+            ref={inputRef}
+            value={input}
+            onValueChange={setInput}
+            onSend={sendChat}
+            onStop={handleStop}
+            isLoading={isLoading}
+            placeholder="Tell me what you need..."
+            quickActions={INPUT_QUICK_ACTIONS}
+          />
           <p className="text-[11px] text-gray-subtle text-center mt-2">
             Update your site, write content, check analytics
           </p>

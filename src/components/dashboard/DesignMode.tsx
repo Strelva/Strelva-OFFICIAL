@@ -98,7 +98,7 @@ function buildTreeFromPageConfig(pageConfig: PageConfig | null, pageName: string
 }
 
 export function DesignMode() {
-  const { tenantId, siteUrl, previewUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft } = useDashboard();
+  const { tenantId, siteUrl, previewUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft, dashboardHref } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(["page"]));
   const [zoom, setZoom] = useState(100);
@@ -128,7 +128,7 @@ export function DesignMode() {
 
         // Fetch section analytics
         try {
-          const analyticsRes = await fetch("/api/section-analytics", { credentials: "same-origin" });
+          const analyticsRes = await fetch(dashboardHref("/api/section-analytics"), { credentials: "same-origin" });
           if (analyticsRes.ok) {
             const analytics = await analyticsRes.json();
             setSectionAnalytics(analytics);
@@ -146,7 +146,7 @@ export function DesignMode() {
     if (tenantId) {
       fetchPageConfig();
     }
-  }, [tenantId, activePage]);
+  }, [activePage, dashboardHref, tenantId]);
 
   // Listen for iframe messages (node selection with rect)
   useEffect(() => {
@@ -354,7 +354,7 @@ export function DesignMode() {
       const isDraft = editMode === "draft";
 
       // Fetch current content
-      const res = await fetch(`/api/content/${section}`, {
+      const res = await fetch(dashboardHref(`/api/content/${section}`), {
         headers: { "X-Tenant": tenantId },
       });
       if (!res.ok) throw new Error("Failed to fetch content");
@@ -370,7 +370,7 @@ export function DesignMode() {
       obj[parts[parts.length - 1]] = value;
 
       // Save
-      await fetch(`/api/content/${section}${isDraft ? "?draft=true" : ""}`, {
+      await fetch(dashboardHref(`/api/content/${section}${isDraft ? "?draft=true" : ""}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -387,7 +387,7 @@ export function DesignMode() {
     } catch (err) {
       console.error("Failed to update content:", err);
     }
-  }, [tenantId, editMode, setHasDraft, triggerRefresh]);
+  }, [dashboardHref, tenantId, editMode, setHasDraft, triggerRefresh]);
 
   // Check if any section has a draft
   const hasAnyDraft = Object.values(hasDraft).some(Boolean);
@@ -401,14 +401,14 @@ export function DesignMode() {
     for (const section of sectionsWithDrafts) {
       try {
         // Fetch draft content
-        const res = await fetch(`/api/content/${section}?draft=true`, {
+        const res = await fetch(dashboardHref(`/api/content/${section}?draft=true`), {
           headers: { "X-Tenant": tenantId },
         });
         if (!res.ok) continue;
         const draftData = await res.json();
 
         // Publish it (write without draft flag)
-        await fetch(`/api/content/${section}`, {
+        await fetch(dashboardHref(`/api/content/${section}`), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -424,7 +424,7 @@ export function DesignMode() {
     // Clear all draft flags
     setHasDraft({});
     triggerRefresh();
-  }, [hasDraft, tenantId, setHasDraft, triggerRefresh]);
+  }, [dashboardHref, hasDraft, tenantId, setHasDraft, triggerRefresh]);
 
   return (
     <div className="flex flex-col h-full bg-surface-base">

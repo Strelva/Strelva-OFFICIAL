@@ -21,8 +21,42 @@ function isAdminDomain(domain: string): boolean {
   return domain.startsWith("admin.");
 }
 
-export function getTenantPrimaryDomain(tenant: TenantConfig): string | null {
+function getTenantPublicDomain(tenant: TenantConfig): string | null {
   const productionDomain = normalizeTenantDomain(tenant.productionDomain);
+  const siteUrlDomain = normalizeTenantDomain(tenant.siteUrl);
+  const normalizedCustomDomains = tenant.customDomains
+    ?.map((domain) => normalizeTenantDomain(domain))
+    .filter((domain): domain is string => !!domain && !isAdminDomain(domain) && !isPlatformDomain(domain));
+
+  if (
+    productionDomain &&
+    siteUrlDomain?.startsWith("www.") &&
+    withoutWww(siteUrlDomain) === withoutWww(productionDomain) &&
+    !siteUrlDomain.endsWith(".vercel.app") &&
+    !isPlatformDomain(siteUrlDomain)
+  ) {
+    return siteUrlDomain;
+  }
+  const matchingWwwCustomDomain = productionDomain
+    ? normalizedCustomDomains?.find(
+        (domain) => domain.startsWith("www.") && withoutWww(domain) === withoutWww(productionDomain)
+      )
+    : null;
+  if (matchingWwwCustomDomain) return matchingWwwCustomDomain;
+  if (productionDomain) return productionDomain;
+
+  if (siteUrlDomain && !siteUrlDomain.endsWith(".vercel.app") && !isPlatformDomain(siteUrlDomain)) {
+    return siteUrlDomain;
+  }
+
+  const customDomain =
+    normalizedCustomDomains?.find((domain) => domain.startsWith("www.")) ??
+    normalizedCustomDomains?.[0];
+  return customDomain ?? null;
+}
+
+export function getTenantPrimaryDomain(tenant: TenantConfig): string | null {
+  const productionDomain = getTenantPublicDomain(tenant);
   if (productionDomain) return withoutWww(productionDomain);
 
   const siteUrlDomain = normalizeTenantDomain(tenant.siteUrl);
@@ -69,13 +103,28 @@ export function getTenantDashboardUrl(
   return `http://${subdomain}.localhost:3000${normalizedPath}`;
 }
 
+export function getTenantDashboardFallbackUrl(
+  tenant: TenantConfig,
+  path = "/dashboard",
+  environment = process.env.NODE_ENV
+): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const tenantId = tenant.subdomain || tenant.id;
+
+  if (environment === "production") {
+    return `https://scaffoldweb.com/client/${tenantId}${normalizedPath}`;
+  }
+
+  return `http://localhost:3000/client/${tenantId}${normalizedPath}`;
+}
+
 export function getTenantPublicUrl(
   tenant: TenantConfig,
   environment = process.env.NODE_ENV
 ): string {
   if (environment === "production") {
-    const primaryDomain = getTenantPrimaryDomain(tenant);
-    if (primaryDomain) return `https://${primaryDomain}`;
+    const publicDomain = getTenantPublicDomain(tenant);
+    if (publicDomain) return `https://${publicDomain}`;
     const subdomain = tenant.subdomain || tenant.id;
     return `https://${subdomain}.scaffoldweb.com`;
   }

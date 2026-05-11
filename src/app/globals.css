@@ -565,6 +565,54 @@ body {
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
 
+/* Chat thinking state */
+@keyframes ai-text-shine {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes ai-thinking-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.ai-shining-text {
+  display: inline-block;
+  background: linear-gradient(110deg, var(--gray-muted), 35%, #ffffff, 50%, var(--gray-muted), 75%, var(--gray-muted));
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: ai-text-shine 3.8s linear infinite;
+}
+.ai-thinking-pop {
+  transform-origin: left center;
+  animation: ai-thinking-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ai-output-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.ai-output-pop {
+  transform-origin: left top;
+  animation: ai-output-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ===== CONNECTION STATUS ANIMATIONS ===== */
 @keyframes status-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
@@ -593,6 +641,8 @@ body {
   .animate-card-enter,
   .animate-check-bounce,
   .animate-queue-card-enter,
+  .ai-thinking-pop,
+  .ai-output-pop,
   .queue-tab-content,
   .section-expand,
   .msg-user,
@@ -602,8 +652,22 @@ body {
     transform: none;
   }
   .skeleton-shimmer,
-  .status-dot-pulse {
+  .status-dot-pulse,
+  .ai-shining-text {
     animation: none;
+  }
+  .ai-thinking-pop {
+    opacity: 1;
+    transform: none;
+  }
+  .ai-output-pop {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .ai-shining-text {
+    color: var(--accent);
+    background: none;
   }
   .section-row:hover,
   .section-row:active {
