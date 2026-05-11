@@ -658,7 +658,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
-    expect(audit).toContain("65 passed, 1 warned, 0 failed, 16 skipped");
+    expect(audit).toContain("66 passed, 1 warned, 0 failed, 16 skipped");
+    expect(audit).toContain("67 passed, 0 warned, 0 failed, 16 skipped");
     expect(audit).toContain("use the exact email address that received the invite");
     expect(audit).toContain("using the exact invited email");
     expect(audit).toContain("Full `pnpm check:launch` was rerun");

@@ -70,7 +70,7 @@ export async function buildDefaultCapabilityManifest(
   const customRepo = getCustomRepoMetadata(tenantConfig);
   const contentSections = new Set<string>(template.contentSections);
 
-  for (const section of Object.keys(template.components)) {
+  for (const section of Object.keys(template.components ?? {})) {
     contentSections.add(section);
   }
 

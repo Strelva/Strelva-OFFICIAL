@@ -762,8 +762,10 @@ checkTenantDomainAccess("src/app/api/admin/domains/route.ts", "src/app/api/tenan
 function checkPublicStorefrontApi(paths: {
   publicContent: string;
   publicPageConfig: string;
+  publicSiteCapabilities: string;
   v1Content: string;
   v1PageConfig: string;
+  v1SiteCapabilities: string;
 }) {
   const missingFiles = Object.values(paths).filter((path) => !existsSync(path));
   if (missingFiles.length) {
@@ -773,27 +775,37 @@ function checkPublicStorefrontApi(paths: {
 
   const publicContent = readFileSync(paths.publicContent, "utf8");
   const publicPageConfig = readFileSync(paths.publicPageConfig, "utf8");
+  const publicSiteCapabilities = readFileSync(paths.publicSiteCapabilities, "utf8");
   const v1Content = readFileSync(paths.v1Content, "utf8");
   const v1PageConfig = readFileSync(paths.v1PageConfig, "utf8");
+  const v1SiteCapabilities = readFileSync(paths.v1SiteCapabilities, "utf8");
   const contentOk =
     publicContent.includes("/^[a-z0-9-]+$/.test(tenant)") &&
     publicContent.includes("getTenantConfig(tenant)") &&
     publicContent.includes("config.active === false") &&
     publicContent.includes("isValidSection(section, tenant)") &&
-    publicContent.includes("getTemplateForTenant(tenant)") &&
-    publicContent.includes("getContent(section as ContentSection, tenant)");
+    publicContent.includes("getSiteCapabilityManifest(tenant)") &&
+    publicContent.includes("getContent(section as ContentSection, tenant");
   const pageConfigOk =
     publicPageConfig.includes("/^[a-z0-9-]+$/.test(tenant)") &&
     publicPageConfig.includes("getTenantConfig(tenant)") &&
     publicPageConfig.includes("config.active === false") &&
+    publicPageConfig.includes("getSiteCapabilityManifest(tenant)") &&
     publicPageConfig.includes("getPageConfig(tenant)");
+  const siteCapabilitiesOk =
+    publicSiteCapabilities.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    publicSiteCapabilities.includes("getTenantConfig(tenant)") &&
+    publicSiteCapabilities.includes("config.active === false") &&
+    publicSiteCapabilities.includes("getSiteCapabilityManifest(tenant)");
   const aliasesOk =
     v1Content.includes('from "@/app/api/public/content/[tenant]/[section]/route"') &&
     v1Content.includes("return publicContentGET(") &&
     v1PageConfig.includes('from "@/app/api/public/page-config/[tenant]/route"') &&
-    v1PageConfig.includes("return publicPageConfigGET(");
+    v1PageConfig.includes("return publicPageConfigGET(") &&
+    v1SiteCapabilities.includes('from "@/app/api/public/site-capabilities/[tenant]/route"') &&
+    v1SiteCapabilities.includes("return publicSiteCapabilitiesGET(");
 
-  if (!contentOk || !pageConfigOk || !aliasesOk) {
+  if (!contentOk || !pageConfigOk || !siteCapabilitiesOk || !aliasesOk) {
     log({
       name: "Public storefront API",
       status: "fail",
@@ -812,8 +824,10 @@ function checkPublicStorefrontApi(paths: {
 checkPublicStorefrontApi({
   publicContent: "src/app/api/public/content/[tenant]/[section]/route.ts",
   publicPageConfig: "src/app/api/public/page-config/[tenant]/route.ts",
+  publicSiteCapabilities: "src/app/api/public/site-capabilities/[tenant]/route.ts",
   v1Content: "src/app/api/v1/content/[tenant]/[section]/route.ts",
   v1PageConfig: "src/app/api/v1/page-config/[tenant]/route.ts",
+  v1SiteCapabilities: "src/app/api/v1/site-capabilities/[tenant]/route.ts",
 });
 
 function checkOAuthCallbackState(callbackPaths: string[]) {

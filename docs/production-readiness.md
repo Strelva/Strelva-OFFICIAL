@@ -25,7 +25,7 @@
   `SUPER_ADMIN_EMAILS`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`,
   `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
-  `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
+  `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `REB_CUSTOM_REQUEST_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth connections are enabled.
 - Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $149/month. The checkout route and customer-facing pricing copy assume this plan price.
@@ -42,6 +42,7 @@
 - Provision tenant with `pnpm provision-tenant` and store a unique `revalidationSecret`.
 - Set the storefront `REVALIDATE_SECRET` to the same value.
 - Set tenant `revalidateUrl` to the storefront `/api/v1/revalidate` endpoint.
+- Set `REB_CUSTOM_REQUEST_SECRET` in REB and in any custom storefront that exposes `/api/reb-custom-request`; the values must match exactly and must not include copied newline text.
 - Confirm custom domain mapping resolves tenant from host or use `/api/v1/*` public routes.
 - Add production domains in Vercel, including `www` and `admin` variants where used.
 - Configure DNS and wait for Vercel domain verification before sending traffic.
