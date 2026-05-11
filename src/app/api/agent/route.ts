@@ -599,11 +599,13 @@ Only use tools for manifest-supported sections and actions. If the user requests
             const message = autoPublish
               ? `Updated ${section} successfully`
               : `I've queued these changes to ${section} for review. They'll go live after approval.`;
+            const sourceProof = "Source: Current site content, capability manifest, and AI governance rules";
             recordActionResult({
               status: agentResultStatus,
               sectionIds: [section],
               eventIds: queuedEventId ? [queuedEventId] : undefined,
               message,
+              sourceProof,
             });
 
             return {
@@ -618,6 +620,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               applied: autoPublish,
               agentResultStatus,
               message,
+              sourceProof,
             };
           } catch (err) {
             const error = `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
@@ -808,6 +811,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               status: "queued",
               eventIds: [event.id],
               message: `Newsletter draft "${subject}" queued for review.`,
+              sourceProof: "Source: Subscriber list stored in dashboard",
             });
 
             await logActivity({
@@ -825,6 +829,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               agentResultStatus: "queued" as const,
               subscriberCount: active.length,
               message: `I've drafted the newsletter "${subject}" for ${active.length} subscribers. It's in the review queue for Jacob to approve before sending.`,
+              sourceProof: "Source: Subscriber list stored in dashboard",
             };
           } catch (err) {
             const error = err instanceof Error ? err.message : "Failed to draft";
@@ -879,8 +884,14 @@ Only use tools for manifest-supported sections and actions. If the user requests
             recordActionResult({
               status: "drafted",
               message: `Social post draft saved for ${platform}.`,
+              sourceProof: "Source: Social drafts stored in dashboard",
             });
-            return { success: true, post, agentResultStatus: "drafted" as const };
+            return {
+              success: true,
+              post,
+              agentResultStatus: "drafted" as const,
+              sourceProof: "Source: Social drafts stored in dashboard",
+            };
           } catch (err) {
             const error = err instanceof Error ? err.message : "Failed to create post";
             recordActionResult({ status: "failed", error });
@@ -1010,6 +1021,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               sectionIds: [section],
               eventIds: [event.id],
               message: "Section visibility change queued for review.",
+              sourceProof: "Source: Page layout config and AI governance rules",
             });
             return {
               success: false,
@@ -1020,6 +1032,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               eventIds: [event.id],
               agentResultStatus: "queued" as const,
               message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
+              sourceProof: "Source: Page layout config and AI governance rules",
             };
           } catch (err) {
             const error = err instanceof Error ? err.message : "Failed";
@@ -1070,6 +1083,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               sectionIds: order,
               eventIds: [event.id],
               message: "Section reorder queued for review.",
+              sourceProof: "Source: Page layout config and AI governance rules",
             });
             return {
               success: false,
@@ -1079,6 +1093,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               eventIds: [event.id],
               agentResultStatus: "queued" as const,
               message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
+              sourceProof: "Source: Page layout config and AI governance rules",
             };
           } catch (err) {
             const error = err instanceof Error ? err.message : "Failed";

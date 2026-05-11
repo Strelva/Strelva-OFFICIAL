@@ -13,6 +13,7 @@ import {
   AlertCircle,
   MessageCircle,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
@@ -21,7 +22,7 @@ import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
-import type { AgentResultContract, AgentResultStatus } from "@/lib/agent-results";
+import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from "@/lib/agent-results";
 
 const SUGGESTION_CHIPS = [
   { label: "Update this week's offer", icon: Clock, description: "Turn a real business change into updated site copy" },
@@ -76,6 +77,8 @@ interface UpdateToast {
   status: AgentResultStatus;
   text: string;
   detail: string;
+  proof: string;
+  nextAction: AgentResultReceipt["nextAction"];
 }
 
 interface ChatPanelProps {
@@ -126,26 +129,15 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const dashboardHref = dashCtx?.dashboardHref ?? ((path: string) => path);
 
   const showResultToast = useCallback((result: AgentResultContract) => {
-    const text =
-      result.status === "published" || result.status === "applied" ? "Site updated" :
-      result.status === "drafted" || result.status === "queued" ? "Needs approval" :
-      result.status === "blocked" ? "Needs a closer look" :
-      result.status === "failed" ? "Update failed" :
-      "No site changes made";
-    const detail =
-      result.status === "published" || result.status === "applied"
-        ? "The live site has the change. Open it to confirm what visitors see."
-        : result.status === "drafted" || result.status === "queued"
-          ? "The change is saved for review before it goes live."
-          : result.status === "blocked"
-            ? (result.message || "This change needs a closer look before it can be made.")
-            : result.status === "failed"
-              ? (result.message || "The update did not go through. Try again or ask for a smaller change.")
-              : "Nothing changed on the site.";
-
     if (result.status === "no-op" && result.actions.length === 1) return;
 
-    setUpdateToast({ status: result.status, text, detail });
+    setUpdateToast({
+      status: result.status,
+      text: result.receipt.title,
+      detail: result.receipt.detail,
+      proof: result.receipt.proof,
+      nextAction: result.receipt.nextAction,
+    });
     if (result.status === "published" || result.status === "applied") {
       dashCtx?.triggerRefresh();
     }
@@ -574,6 +566,38 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               Make the site match the business today. The AI can update copy, draft customer-facing content, and flag what is worth improving next.
             </p>
 
+            {variant !== "compact" && (
+              <div className="mt-6 grid w-full max-w-3xl gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
+                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
+                    <MessageCircle className="h-4 w-4 text-accent" strokeWidth={1.5} />
+                    Ask for one change
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-gray-muted">
+                    Start with hours, an offer, a service, or a weekly update.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
+                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
+                    <ShieldCheck className="h-4 w-4 text-accent" strokeWidth={1.5} />
+                    Review the receipt
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-gray-muted">
+                    Every AI action shows what happened, its source, and whether approval is needed.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
+                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
+                    <BarChart3 className="h-4 w-4 text-accent" strokeWidth={1.5} />
+                    Watch the weekly proof
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-gray-muted">
+                    Your report turns visits, clicks, and AI updates into plain English.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}
             <div className={`grid grid-cols-1 gap-3 w-full max-w-3xl ${variant === "compact" ? "mt-6" : "sm:grid-cols-2 mt-8 sm:mt-10"}`}>
               {SUGGESTION_CHIPS.slice(0, variant === "compact" ? 2 : SUGGESTION_CHIPS.length).map((chip) => (
@@ -629,7 +653,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                   <p className="mt-0.5 text-[12px] leading-relaxed text-gray-fg">
                     {updateToast.detail}
                   </p>
-                  {(updateToast.status === "published" || updateToast.status === "applied") && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-muted">
+                    {updateToast.proof}
+                  </p>
+                  {updateToast.nextAction === "view_site" && (
                     <a
                       href={dashCtx?.siteUrl || "/dashboard/site"}
                       target={dashCtx?.siteUrl ? "_blank" : undefined}
@@ -640,7 +667,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                       View site
                     </a>
                   )}
-                  {(updateToast.status === "drafted" || updateToast.status === "queued") && (
+                  {updateToast.nextAction === "review_queue" && (
                     <Link
                       href={dashCtx?.dashboardHref("/dashboard/review") || "/dashboard/review"}
                       className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"

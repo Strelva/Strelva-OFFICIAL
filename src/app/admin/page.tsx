@@ -11,11 +11,20 @@ import { InviteButton } from "./InviteButton";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getCustomRepoMetadata, getTenantDeliveryModel, summarizeCustomRepo } from "@/lib/custom-repos";
+import { getWeeklyBrief } from "@/lib/weekly-brief";
+import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
+import {
+  buildTenantLaunchReadiness,
+  tenantHasOwnerMessage,
+  type LaunchReadinessStatus,
+} from "@/lib/launch-readiness";
+import { listThreads } from "@/lib/threads";
 
 export const dynamic = "force-dynamic";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400",
+  trialing: "bg-emerald-500/20 text-emerald-400",
   past_due: "bg-yellow-500/20 text-yellow-400",
   cancelled: "bg-red-500/20 text-red-400",
   none: "bg-zinc-700/40 text-zinc-400",
@@ -26,6 +35,12 @@ const READINESS_COLORS: Record<string, string> = {
   warn: "bg-amber-500/15 text-amber-300 border-amber-500/20",
   fail: "bg-red-500/15 text-red-300 border-red-500/20",
   skip: "bg-zinc-700/40 text-zinc-400 border-zinc-700",
+};
+
+const LAUNCH_STATUS_COLORS: Record<LaunchReadinessStatus, string> = {
+  ready: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
+  watch: "border-amber-500/25 bg-amber-500/10 text-amber-200",
+  blocked: "border-red-500/25 bg-red-500/10 text-red-200",
 };
 
 function formatTime(iso: string): string {
@@ -48,15 +63,36 @@ export default async function AdminPage() {
 
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
-      const [activity, drafts] = await Promise.all([
+      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus] = await Promise.all([
         getActivity(t.id).catch(() => []),
         listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
+        listThreads(t.id).catch(() => []),
+        getWeeklyBrief(t.id).catch(() => null),
+        getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
       ]);
+      const readiness = getTenantLaunchReadinessResults(t);
+      const launchReadiness = buildTenantLaunchReadiness({
+        tenant: {
+          ...t,
+          subscriptionStatus: effectiveSubscriptionStatus,
+        },
+        infrastructure: readiness,
+        activity,
+        threadCount: threads.length,
+        hasOwnerMessage: tenantHasOwnerMessage(threads),
+        draftCount: Object.keys(drafts).length,
+        hasWeeklyBrief: Boolean(weeklyBrief),
+      });
       return {
         tenant: t,
         lastActivity: activity[0]?.time ?? null,
         draftCount: Object.keys(drafts).length,
-        readiness: getTenantLaunchReadinessResults(t),
+        threadCount: threads.length,
+        hasOwnerMessage: tenantHasOwnerMessage(threads),
+        hasWeeklyBrief: Boolean(weeklyBrief),
+        effectiveSubscriptionStatus,
+        readiness,
+        launchReadiness,
       };
     })
   );
@@ -68,6 +104,8 @@ export default async function AdminPage() {
   const mrr = activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
   const customRepoCount = TENANTS.filter((t) => getTenantDeliveryModel(t) === "custom_repo").length;
+  const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;
+  const launchBlockedCount = tenantData.filter((d) => d.launchReadiness.status === "blocked").length;
 
   return (
     <div className="space-y-8">
@@ -121,6 +159,39 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-300">
+              Launch command center
+            </p>
+            <h2 className="mt-2 text-lg font-semibold text-white">
+              Controlled platform launch proof loop
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">
+              Launch readiness now tracks the three things that matter before a wider push:
+              custom-repo delivery, trustworthy AI action receipts, and first-week owner activation.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+              <p className="text-lg font-semibold text-emerald-200">{launchReadyCount}</p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-emerald-300/70">Ready</p>
+            </div>
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+              <p className="text-lg font-semibold text-amber-200">
+                {tenantData.length - launchReadyCount - launchBlockedCount}
+              </p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-300/70">Watch</p>
+            </div>
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
+              <p className="text-lg font-semibold text-red-200">{launchBlockedCount}</p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-red-300/70">Blocked</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Create tenant form */}
       <CreateTenantForm />
 
@@ -145,7 +216,7 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness }) => {
+              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness }) => {
                 const fallbackUrl = getTenantDashboardFallbackUrl(t);
                 const customAdminUrl = getTenantDashboardUrl(t);
                 const publicUrl = getTenantPublicUrl(t);
@@ -182,6 +253,9 @@ export default async function AdminPage() {
                             : "bg-zinc-700/40 text-zinc-400"
                         }`}>
                           {deliveryModel === "custom_repo" ? "Custom repo" : "Platform template"}
+                        </span>
+                        <span className={`mt-3 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${LAUNCH_STATUS_COLORS[launchReadiness.status]}`}>
+                          Launch: {launchReadiness.status} · {launchReadiness.score}%
                         </span>
                       </div>
                     </td>
@@ -220,8 +294,14 @@ export default async function AdminPage() {
                         <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[revalidationReadiness?.status ?? "skip"]}`}>
                           Revalidation: {revalidationReadiness?.status ?? "skip"}
                         </span>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[t.subscriptionStatus ?? "none"]}`}>
-                          Subscription: {t.subscriptionStatus ?? "none"}
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[effectiveSubscriptionStatus ?? "none"]}`}>
+                          Subscription: {effectiveSubscriptionStatus ?? "none"}
+                        </span>
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${hasOwnerMessage ? READINESS_COLORS.ok : READINESS_COLORS.fail}`}>
+                          Owner AI: {hasOwnerMessage ? "used" : "missing"}
+                        </span>
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${hasWeeklyBrief ? READINESS_COLORS.ok : READINESS_COLORS.warn}`}>
+                          Weekly proof: {hasWeeklyBrief ? "ready" : "pending"}
                         </span>
                         {deliveryModel === "custom_repo" && (
                           <span className="inline-flex rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
@@ -241,6 +321,9 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-6 py-5 text-zinc-500">
                       <p>{lastActivity ? formatTime(lastActivity) : "No activity"}</p>
+                      <p className="mt-2 text-xs text-zinc-600">
+                        {threadCount} chat thread{threadCount === 1 ? "" : "s"} · {launchReadiness.completed}/{launchReadiness.total} launch checks
+                      </p>
                       <p className="mt-2 max-w-[220px] truncate text-xs text-zinc-600">
                         Public: {publicUrl.replace(/^https?:\/\//, "")}
                       </p>

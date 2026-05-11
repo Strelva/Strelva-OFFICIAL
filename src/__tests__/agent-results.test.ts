@@ -11,6 +11,8 @@ describe("agent result contract", () => {
     expect(result.status).toBe("published");
     expect(result.sectionIds).toEqual(["hero", "contact"]);
     expect(result.eventIds).toEqual(["evt_1"]);
+    expect(result.receipt.title).toBe("Site updated");
+    expect(result.receipt.nextAction).toBe("view_site");
   });
 
   it("keeps blocked and failed outcomes non-successful", () => {
@@ -25,6 +27,7 @@ describe("agent result contract", () => {
         agentResultStatus: "queued",
         section: "hero",
         eventId: "evt_2",
+        sourceProof: "Source: Site content",
       })
     ).toEqual({
       status: "queued",
@@ -32,6 +35,20 @@ describe("agent result contract", () => {
       eventIds: ["evt_2"],
       message: undefined,
       error: undefined,
+      sourceProof: "Source: Site content",
+    });
+  });
+
+  it("builds approval receipts for queued AI changes", () => {
+    const result = buildAgentResultContract([
+      { status: "queued", sectionIds: ["services"], eventIds: ["evt_3"] },
+    ]);
+
+    expect(result.receipt).toEqual({
+      title: "Ready for approval",
+      detail: "The AI saved services as a controlled change in the approval queue.",
+      proof: "Source: Site content and services section data",
+      nextAction: "review_queue",
     });
   });
 });
