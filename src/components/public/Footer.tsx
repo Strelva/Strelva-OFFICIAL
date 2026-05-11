@@ -1,12 +1,25 @@
 import Link from "next/link";
-import type { SiteSettings, ContactContent } from "@/lib/types";
+import type { ContactContent, FooterContent, NavigationContent, SiteSettings } from "@/lib/types";
 
 interface FooterProps {
   settings: SiteSettings;
   contact: ContactContent;
+  navigation?: NavigationContent;
+  footer?: FooterContent;
 }
 
-export function Footer({ settings, contact }: FooterProps) {
+export function Footer({ settings, contact, navigation, footer }: FooterProps) {
+  const navLinks = navigation?.menuItems?.length
+    ? navigation.menuItems
+    : [
+        { label: "About", href: "/about" },
+        { label: "Contact", href: "/contact" },
+      ];
+  const ctaLabel = navigation?.ctaLabel || "Book Now";
+  const ctaHref = navigation?.ctaHref || settings.bookingUrl || "#";
+  const tagline = footer?.tagline || settings.siteDescription;
+  const copyrightText = footer?.copyrightText || settings.copyrightText;
+
   return (
     <footer id="footer" style={{ background: "var(--bark)", color: "var(--cream)" }}>
       <div className="container-main py-16 md:py-20">
@@ -16,8 +29,8 @@ export function Footer({ settings, contact }: FooterProps) {
             <p className="font-display text-lg tracking-tight mb-4 opacity-80" data-reb-field="siteName">
               {settings.siteName}
             </p>
-            <p className="text-sm leading-relaxed opacity-50 max-w-xs" data-reb-field="siteDescription">
-              {settings.siteDescription}
+            <p className="text-sm leading-relaxed opacity-50 max-w-xs" data-reb-field="footer.tagline">
+              {tagline}
             </p>
           </div>
 
@@ -27,9 +40,17 @@ export function Footer({ settings, contact }: FooterProps) {
               Navigate
             </p>
             <ul className="space-y-3 text-sm opacity-60">
-              <li><Link href="/about" className="hover:opacity-100 transition-opacity">About</Link></li>
-              <li><Link href="/contact" className="hover:opacity-100 transition-opacity">Contact</Link></li>
-              <li><a href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">Book Now</a></li>
+              {navLinks.map((link) => (
+                <li key={`${link.label}-${link.href}`}>
+                  <Link href={link.href} className="hover:opacity-100 transition-opacity">{link.label}</Link>
+                </li>
+              ))}
+              <li><a href={ctaHref} target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">{ctaLabel}</a></li>
+              {footer?.columns?.flatMap((column) => column.links).map((link) => (
+                <li key={`${link.label}-${link.href}`}>
+                  <Link href={link.href} className="hover:opacity-100 transition-opacity">{link.label}</Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -48,6 +69,11 @@ export function Footer({ settings, contact }: FooterProps) {
               {contact.instagramUrl && contact.instagramUrl !== "#" && (
                 <li><a href={contact.instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">Instagram</a></li>
               )}
+              {footer?.socialLinks?.map((link) => (
+                <li key={`${link.label}-${link.href}`}>
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">{link.label}</a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -56,7 +82,7 @@ export function Footer({ settings, contact }: FooterProps) {
       {/* Bottom bar */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="container-main py-5 flex flex-wrap justify-between items-center gap-4 text-[0.625rem] tracking-wider uppercase opacity-40">
-          <p suppressHydrationWarning data-reb-field="copyrightText">&copy; {new Date().getFullYear()} {settings.copyrightText}</p>
+          <p suppressHydrationWarning data-reb-field="copyrightText">&copy; {new Date().getFullYear()} {copyrightText}</p>
           <p data-reb-field="footerTagline">{settings.footerTagline}</p>
         </div>
       </div>

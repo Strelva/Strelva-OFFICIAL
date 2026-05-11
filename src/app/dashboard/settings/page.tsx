@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Download, Image as ImageIcon, Link2 } from "lucide-react";
+import { Code2, Download, Image as ImageIcon, Link2, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
@@ -17,6 +17,27 @@ import { SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL } from "@/lib/pricing";
 
 type SettingsData = Record<string, string>;
 type ThemeData = Record<string, unknown>;
+type NavigationData = {
+  menuItems: { label: string; href: string }[];
+  ctaLabel: string;
+  ctaHref: string;
+};
+type FooterData = {
+  tagline: string;
+  columns: { heading: string; links: { label: string; href: string }[] }[];
+  socialLinks: { label: string; href: string }[];
+  copyrightText: string;
+};
+type SiteCapabilitiesData = {
+  supportsPageConfig?: boolean;
+  supportsNavigationConfig?: boolean;
+  supportsFooterConfig?: boolean;
+  supportsDraftPreview?: boolean;
+  supportsInlineEditing?: boolean;
+  designTokens?: string[];
+  customOnlyFeatures?: string[];
+  customComponents?: { id: string; label: string; description?: string; adminOnly: boolean; supportedProps?: string[] }[];
+};
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 function useDashboardApiPath() {
@@ -121,6 +142,7 @@ function setNestedValue(
 
 const SETTINGS_SECTIONS = [
   { id: "profile", label: "Business" },
+  { id: "site-config", label: "Site config" },
   { id: "utilities", label: "Utilities" },
   { id: "ownership", label: "Ownership" },
   { id: "domains", label: "Domains" },
@@ -246,8 +268,6 @@ function ProfileSection({
 // Brand section
 // ---------------------------------------------------------------------------
 
-// Kept temporarily for rollback while brand controls move into Ask AI.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function BrandSection() {
   const [theme, setTheme] = useState<ThemeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -685,6 +705,371 @@ function UtilitiesSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Site config section
+// ---------------------------------------------------------------------------
+
+const SITE_CONFIG_TABS = ["design", "navigation", "capabilities", "components"] as const;
+
+function SiteConfigSection() {
+  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("design");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2">
+        {SITE_CONFIG_TABS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => setTab(item)}
+            className={`h-8 rounded-md border px-3 text-[12px] capitalize transition-colors ${
+              tab === item
+                ? "border-accent/40 bg-accent/15 text-warm-white"
+                : "border-gray-border text-gray-muted hover:text-warm-white"
+            }`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      {tab === "design" && <BrandSection />}
+      {tab === "navigation" && <NavigationFooterSection />}
+      {tab === "capabilities" && <CapabilitiesSection />}
+      {tab === "components" && <CustomComponentsSection />}
+    </div>
+  );
+}
+
+function NavigationFooterSection() {
+  const apiPath = useDashboardApiPath();
+  const [navigation, setNavigation] = useState<NavigationData | null>(null);
+  const [footer, setFooter] = useState<FooterData | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  useEffect(() => {
+    Promise.all([
+      fetch(apiPath("/api/content/navigation"), { credentials: "same-origin" }).then((res) => res.ok ? res.json() : null),
+      fetch(apiPath("/api/content/footer"), { credentials: "same-origin" }).then((res) => res.ok ? res.json() : null),
+    ]).then(([nav, foot]) => {
+      setNavigation(nav);
+      setFooter(foot);
+    }).catch(() => setSaveStatus("error"));
+  }, [apiPath]);
+
+  const saveContent = useCallback(async (section: "navigation" | "footer", data: NavigationData | FooterData) => {
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(apiPath(`/api/content/${section}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(data),
+      });
+      setSaveStatus(res.ok ? "saved" : "error");
+      if (res.ok) setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [apiPath]);
+
+  if (!navigation || !footer) {
+    return <SkeletonLine width="w-full" height="h-20" />;
+  }
+
+  const updateNavItem = (index: number, key: "label" | "href", value: string) => {
+    const next = {
+      ...navigation,
+      menuItems: navigation.menuItems.map((item, i) => i === index ? { ...item, [key]: value } : item),
+    };
+    setNavigation(next);
+    setSaveStatus("dirty");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <SaveStatusPill status={saveStatus} />
+      </div>
+      <div className="rounded-lg border border-gray-border overflow-hidden">
+        <div className="border-b border-gray-border px-5 py-3">
+          <p className="text-[11px] font-mono uppercase tracking-wider text-gray-faint">Navigation</p>
+        </div>
+        {navigation.menuItems.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 border-b border-gray-border/50 px-5 py-3">
+            <input
+              value={item.label}
+              onChange={(event) => updateNavItem(index, "label", event.target.value)}
+              onBlur={() => saveContent("navigation", navigation)}
+              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            />
+            <input
+              value={item.href}
+              onChange={(event) => updateNavItem(index, "href", event.target.value)}
+              onBlur={() => saveContent("navigation", navigation)}
+              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const next = { ...navigation, menuItems: navigation.menuItems.filter((_, i) => i !== index) };
+                setNavigation(next);
+                saveContent("navigation", next);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-border text-gray-muted hover:text-red-300"
+              aria-label="Remove navigation item"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-3 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => {
+              const next = { ...navigation, menuItems: [...navigation.menuItems, { label: "New link", href: "/" }] };
+              setNavigation(next);
+              saveContent("navigation", next);
+            }}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Add link
+          </button>
+          <div className="grid flex-1 grid-cols-2 gap-2">
+            <input
+              value={navigation.ctaLabel}
+              onChange={(event) => {
+                const next = { ...navigation, ctaLabel: event.target.value };
+                setNavigation(next);
+                setSaveStatus("dirty");
+              }}
+              onBlur={() => saveContent("navigation", navigation)}
+              placeholder="CTA label"
+              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            />
+            <input
+              value={navigation.ctaHref}
+              onChange={(event) => {
+                const next = { ...navigation, ctaHref: event.target.value };
+                setNavigation(next);
+                setSaveStatus("dirty");
+              }}
+              onBlur={() => saveContent("navigation", navigation)}
+              placeholder="CTA href"
+              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-border overflow-hidden">
+        <FormRow label="Footer tagline" description="Short footer copy">
+          <textarea
+            value={footer.tagline}
+            onChange={(event) => {
+              setFooter({ ...footer, tagline: event.target.value });
+              setSaveStatus("dirty");
+            }}
+            onBlur={() => saveContent("footer", footer)}
+            rows={2}
+            className="w-full resize-none rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+          />
+        </FormRow>
+        <FormRow label="Copyright" description="Bottom legal line" last>
+          <input
+            value={footer.copyrightText}
+            onChange={(event) => {
+              setFooter({ ...footer, copyrightText: event.target.value });
+              setSaveStatus("dirty");
+            }}
+            onBlur={() => saveContent("footer", footer)}
+            className="w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+          />
+        </FormRow>
+      </div>
+    </div>
+  );
+}
+
+function CapabilitiesSection() {
+  const apiPath = useDashboardApiPath();
+  const [capabilities, setCapabilities] = useState<SiteCapabilitiesData | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  useEffect(() => {
+    fetch(apiPath("/api/tenant-settings"), { credentials: "same-origin" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setCapabilities({
+        supportsPageConfig: data?.siteCapabilities?.supportsPageConfig ?? true,
+        supportsNavigationConfig: data?.siteCapabilities?.supportsNavigationConfig ?? true,
+        supportsFooterConfig: data?.siteCapabilities?.supportsFooterConfig ?? true,
+        supportsDraftPreview: data?.siteCapabilities?.supportsDraftPreview ?? data?.customRepo?.supportsDraftPreview ?? true,
+        supportsInlineEditing: data?.siteCapabilities?.supportsInlineEditing ?? data?.customRepo?.supportsInlineEditing ?? true,
+        designTokens: data?.siteCapabilities?.designTokens || data?.customRepo?.supportedDesignTokens || ["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"],
+        customOnlyFeatures: data?.siteCapabilities?.customOnlyFeatures || data?.customRepo?.customFeatures || [],
+      }))
+      .catch(() => setSaveStatus("error"));
+  }, [apiPath]);
+
+  const saveCapabilities = useCallback(async (next: SiteCapabilitiesData) => {
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(apiPath("/api/tenant-settings"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ siteCapabilities: next }),
+      });
+      setSaveStatus(res.ok ? "saved" : "error");
+      if (res.ok) setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [apiPath]);
+
+  if (!capabilities) return <SkeletonLine width="w-full" height="h-20" />;
+
+  const toggles: Array<[keyof SiteCapabilitiesData, string]> = [
+    ["supportsPageConfig", "Page structure"],
+    ["supportsNavigationConfig", "Navigation"],
+    ["supportsFooterConfig", "Footer"],
+    ["supportsDraftPreview", "Draft preview"],
+    ["supportsInlineEditing", "Inline editing"],
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end"><SaveStatusPill status={saveStatus} /></div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {toggles.map(([key, label]) => (
+          <label key={key} className="flex items-center justify-between rounded-lg border border-gray-border bg-surface-raised px-4 py-3">
+            <span className="text-[13px] text-warm-white">{label}</span>
+            <input
+              type="checkbox"
+              checked={Boolean(capabilities[key])}
+              onChange={(event) => {
+                const next = { ...capabilities, [key]: event.target.checked };
+                setCapabilities(next);
+                saveCapabilities(next);
+              }}
+              className="h-4 w-4 accent-accent"
+            />
+          </label>
+        ))}
+      </div>
+      <div className="rounded-lg border border-gray-border p-4">
+        <label className="text-[11px] uppercase tracking-wider text-gray-faint">Custom-only features</label>
+        <input
+          value={(capabilities.customOnlyFeatures || []).join(", ")}
+          onChange={(event) => {
+            const next = {
+              ...capabilities,
+              customOnlyFeatures: event.target.value.split(",").map((item) => item.trim()).filter(Boolean),
+            };
+            setCapabilities(next);
+            setSaveStatus("dirty");
+          }}
+          onBlur={() => saveCapabilities(capabilities)}
+          placeholder="cart, rewards, booking-flow"
+          className="mt-2 w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+        />
+      </div>
+    </div>
+  );
+}
+
+function CustomComponentsSection() {
+  const dashboard = useDashboardOptional();
+  const apiPath = useDashboardApiPath();
+  const tenantId = dashboard?.tenantId || "";
+  const [components, setComponents] = useState<NonNullable<SiteCapabilitiesData["customComponents"]>>([]);
+  const [error, setError] = useState("");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(apiPath(`/api/admin/component-registry?tenant=${tenantId}`), { credentials: "same-origin" })
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error("Admin access required")))
+      .then((data) => setComponents(data.components || []))
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load custom components"));
+  }, [apiPath, tenantId]);
+
+  const saveComponents = useCallback(async (next: NonNullable<SiteCapabilitiesData["customComponents"]>) => {
+    setSaveStatus("saving");
+    setError("");
+    try {
+      const res = await fetch(apiPath("/api/admin/component-registry"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ tenant: tenantId, components: next }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save components");
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (err) {
+      setSaveStatus("error");
+      setError(err instanceof Error ? err.message : "Could not save components");
+    }
+  }, [apiPath, tenantId]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[12px] text-gray-muted">Admin-only custom components exposed to this site manifest.</p>
+        <SaveStatusPill status={saveStatus} />
+      </div>
+      {error && <p className="rounded-md border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">{error}</p>}
+      <div className="space-y-3">
+        {components.map((component, index) => (
+          <div key={`${component.id}-${index}`} className="rounded-lg border border-gray-border bg-surface-raised p-4">
+            <div className="mb-3 flex items-center gap-2 text-[11px] text-gray-faint">
+              <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Admin component
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                value={component.id}
+                onChange={(event) => {
+                  const next = components.map((item, i) => i === index ? { ...item, id: event.target.value } : item);
+                  setComponents(next);
+                  setSaveStatus("dirty");
+                }}
+                onBlur={() => saveComponents(components)}
+                placeholder="component-id"
+                className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+              />
+              <input
+                value={component.label}
+                onChange={(event) => {
+                  const next = components.map((item, i) => i === index ? { ...item, label: event.target.value } : item);
+                  setComponents(next);
+                  setSaveStatus("dirty");
+                }}
+                onBlur={() => saveComponents(components)}
+                placeholder="Display label"
+                className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          const next = [...components, { id: "custom-component", label: "Custom component", adminOnly: true }];
+          setComponents(next);
+          saveComponents(next);
+        }}
+        className="inline-flex items-center gap-2 rounded-md border border-gray-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+      >
+        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+        Add component
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Billing section
 // ---------------------------------------------------------------------------
 
@@ -899,6 +1284,10 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
     title: "Business profile",
     description: "Core identity and booking details. Brand, hours, and AI rules now live in Ask AI.",
   },
+  "site-config": {
+    title: "Site configurability",
+    description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
+  },
   utilities: {
     title: "Operations utilities",
     description: "Useful tools that support the AI, exports, and connection setup.",
@@ -1053,6 +1442,7 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+          {activeSection === "site-config" && <SiteConfigSection />}
           {activeSection === "utilities" && <UtilitiesSection />}
           {activeSection === "ownership" && <OwnershipSection />}
           {activeSection === "domains" && <DomainsSection />}

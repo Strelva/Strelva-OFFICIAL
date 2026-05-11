@@ -118,12 +118,12 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
               AI control center
             </p>
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-              Approvals
+              Needs You
             </h1>
             <p className="text-[13px] text-gray-muted mt-2">
               {pendingCount > 0
-                ? `${pendingCount} AI item${pendingCount === 1 ? "" : "s"} waiting for your okay before going live`
-                : "Risky AI changes, drafts, and review-needed updates appear here before going live"}
+                ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for your okay before going live`
+                : "Nothing needs you right now. When a draft, reply, or larger change needs approval, it appears here first."}
             </p>
           </div>
           {staleSectionCount > 0 && (

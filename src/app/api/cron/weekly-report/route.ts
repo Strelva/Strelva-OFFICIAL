@@ -19,7 +19,7 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
       ${paragraphs}
       <p style="margin: 24px 0 0;">
         <a href="${dashboardUrl}" style="display: inline-block; color: #5d7f70; font-size: 14px; font-weight: 600; text-decoration: none;">
-          View in dashboard &rarr;
+          View your weekly report &rarr;
         </a>
       </p>
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
@@ -30,6 +30,10 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
   </div>
 </body>
 </html>`;
+}
+
+function reportToText(summary: string, dashboardUrl: string): string {
+  return `${summary}\n\nView your weekly report: ${dashboardUrl}`;
 }
 
 export async function GET() {
@@ -53,7 +57,11 @@ export async function GET() {
       const html = reportToHtml(
         report.summary,
         report.tenant.siteName,
-        getTenantDashboardUrl(report.tenant, "/dashboard"),
+        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+      );
+      const text = reportToText(
+        report.summary,
+        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
       );
       await generateWeeklyBrief(report.tenant.id);
 
@@ -67,7 +75,7 @@ export async function GET() {
           to: email,
           subject,
           html,
-          text: report.summary,
+          text,
         });
         sent.push(report.tenant.id);
       } else {

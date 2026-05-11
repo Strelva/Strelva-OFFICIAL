@@ -362,7 +362,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               {SECTION_LABELS[activeSection] || activeSection}
             </h3>
             <p className="mt-0.5 truncate text-[10px] text-gray-faint">
-              Input changes here, then save draft and Push when ready.
+              Click text in the preview or update fields here. Save draft, then Push when ready.
             </p>
           </div>
           <div className="flex items-center gap-1 rounded border border-gray-border bg-gray-bg-alt p-0.5">
@@ -415,8 +415,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.05] shrink-0 animate-fade-in-up">
           <div>
-            <p className="text-[11px] font-medium text-amber-300">Output pending</p>
-            <p className="text-[10px] text-gray-faint">Save these inputs as a draft before Push.</p>
+            <p className="text-[11px] font-medium text-amber-300">Unsaved draft changes</p>
+            <p className="text-[10px] text-gray-faint">Save this section before using the bottom Push button.</p>
           </div>
           <div className="flex items-center gap-1.5">
             <Button
@@ -444,8 +444,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {editMode === "draft" && activeSection && hasDraft[activeSection] && !hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
           <div>
-            <p className="text-[11px] font-medium text-amber-300">Draft output saved</p>
-            <p className="text-[10px] text-gray-faint">Use the bottom Push button to publish this with all pending site changes.</p>
+            <p className="text-[11px] font-medium text-amber-300">Draft saved</p>
+            <p className="text-[10px] text-gray-faint">Review the preview, then use the bottom Push button to publish.</p>
           </div>
         </div>
       )}

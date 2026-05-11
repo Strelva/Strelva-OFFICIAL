@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Scaffold Web — AI website management for small business",
-  description: "Your business runs itself. AI manages your website, sends weekly reports, and keeps clients coming.",
+  description: "See what is working. Tell the AI what to change.",
 };
 
 export default function MarketingLayout({
@@ -15,63 +15,101 @@ export default function MarketingLayout({
     <div
       className="marketing-root antialiased"
       style={{
-        ["--m-bg" as string]: "#0e0e0e",
-        ["--m-surface" as string]: "#141414",
-        ["--m-raised" as string]: "#1a1a1a",
-        ["--m-rule" as string]: "rgba(255,255,255,0.08)",
-        ["--m-text" as string]: "#e8e8e8",
-        ["--m-text-2" as string]: "#888888",
-        ["--m-text-3" as string]: "#555555",
-        ["--m-accent" as string]: "#5B8DEF",
-        background: "#0e0e0e",
-        color: "#e8e8e8",
+        ["--m-bg" as string]: "#030508",
+        ["--m-surface" as string]: "rgba(255,255,255,0.035)",
+        ["--m-raised" as string]: "rgba(255,255,255,0.055)",
+        ["--m-rule" as string]: "rgba(238,245,255,0.16)",
+        ["--m-rule-soft" as string]: "rgba(238,245,255,0.1)",
+        ["--m-text" as string]: "#f7f8fb",
+        ["--m-text-2" as string]: "#a8acb5",
+        ["--m-text-3" as string]: "#6f7480",
+        ["--m-accent" as string]: "#2f7bff",
+        ["--m-accent-2" as string]: "#70a5ff",
+        background: "#030508",
+        color: "#f7f8fb",
         minHeight: "100vh",
       }}
     >
       <header
-        className="px-6 h-14 flex items-center justify-between border-b"
-        style={{ borderColor: "var(--m-rule)" }}
+        className="sticky top-0 z-50 border-b px-5 backdrop-blur-xl md:px-8"
+        style={{
+          borderColor: "var(--m-rule-soft)",
+          background: "rgba(3, 5, 8, 0.78)",
+        }}
       >
-        <Link
-          href="/"
-          className="text-[13px] font-medium tracking-[0.1em] uppercase"
-          style={{ color: "var(--m-text)" }}
-        >
-          Scaffold Web
-        </Link>
-        <nav className="flex items-center gap-6">
+        <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-6">
           <Link
-            href="/sign-in"
-            className="text-[13px] transition-colors hover:opacity-80"
-            style={{ color: "var(--m-text-2)" }}
+            href="/"
+            className="group flex items-center gap-3 text-[18px] font-semibold tracking-[-0.035em]"
+            style={{ color: "var(--m-text)" }}
           >
-            Sign in
+            <span
+              aria-hidden="true"
+              className="grid size-7 place-items-center rounded-[5px]"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+            >
+              <span className="h-3.5 w-3.5 rounded-[3px] border border-current" />
+            </span>
+            Scaffold Web
           </Link>
-          <Link
-            href="/onboard"
-            className="text-[13px] font-medium px-4 py-1.5 transition-colors"
-            style={{
-              background: "var(--m-text)",
-              color: "var(--m-bg)",
-            }}
-          >
-            Get started
-          </Link>
-        </nav>
+          <nav className="hidden items-center gap-12 md:flex">
+            <Link
+              href="/#how-it-works"
+              className="text-[13px] transition-colors hover:text-white"
+              style={{ color: "var(--m-text-2)" }}
+            >
+              How it works
+            </Link>
+            <Link
+              href="/#included"
+              className="text-[13px] transition-colors hover:text-white"
+              style={{ color: "var(--m-text-2)" }}
+            >
+              Included
+            </Link>
+            <Link
+              href="/#pricing"
+              className="text-[13px] transition-colors hover:text-white"
+              style={{ color: "var(--m-text-2)" }}
+            >
+              Pricing
+            </Link>
+          </nav>
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/sign-in"
+              className="hidden text-[13px] transition-colors hover:text-white sm:inline"
+              style={{ color: "var(--m-text-2)" }}
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/onboard"
+              className="inline-flex h-10 items-center justify-center rounded-[8px] px-5 text-[13px] font-medium transition-transform hover:-translate-y-0.5"
+              style={{
+                background: "var(--m-accent)",
+                color: "white",
+                boxShadow: "0 14px 34px rgba(47, 123, 255, 0.25)",
+              }}
+            >
+              Get started
+            </Link>
+          </nav>
+        </div>
       </header>
 
       <main>{children}</main>
 
       <footer
         className="border-t px-6"
-        style={{ borderColor: "var(--m-rule)" }}
+        style={{ borderColor: "var(--m-rule-soft)" }}
       >
-        <div className="max-w-[1040px] mx-auto py-8 flex flex-col md:flex-row justify-between gap-4">
-          <div className="text-[12px]" style={{ color: "var(--m-text-3)" }}>
-            &copy; {new Date().getFullYear()} Scaffold Web
+        <div className="mx-auto flex max-w-[1400px] flex-col justify-between gap-4 py-8 md:flex-row">
+          <div className="text-[13px] font-medium" style={{ color: "var(--m-text)" }}>
+            Scaffold Web
           </div>
           <div
-            className="flex gap-6 text-[12px]"
+            className="flex gap-8 text-[13px]"
             style={{ color: "var(--m-text-3)" }}
           >
             <Link href="/privacy" className="hover:underline">

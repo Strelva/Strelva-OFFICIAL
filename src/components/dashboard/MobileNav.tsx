@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
+import { House, Inbox, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useDashboard } from "./DashboardContext";
 
 const NAV_ITEMS = [
+  { href: "/dashboard", label: "Today", icon: House },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Approvals", icon: Inbox },
+  { href: "/dashboard/review", label: "Needs You", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/sources", label: "Connections", icon: Link2 },
+  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
 ];
 
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
@@ -75,7 +76,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
               key={item.href}
               href={dashboardHref(item.href)}
               prefetch={false}
-              className={`relative flex flex-col items-center justify-center gap-1 w-16 h-14 rounded-xl transition-colors ${
+              className={`relative flex flex-col items-center justify-center gap-1 w-[60px] h-14 rounded-xl transition-colors ${
                 isActive ? "text-warm-black" : "text-gray-muted"
               }`}
               aria-current={isActive ? "page" : undefined}
@@ -88,7 +89,7 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
                   </span>
                 )}
               </div>
-              <span className="max-w-[58px] truncate text-[9px] font-medium">{item.label}</span>
+              <span className="max-w-[54px] truncate text-[9px] font-medium">{item.label}</span>
             </Link>
           );
         })}

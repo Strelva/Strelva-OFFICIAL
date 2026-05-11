@@ -8,6 +8,7 @@ import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
+import { themeContentToCssVars } from "@/lib/design-tokens";
 
 async function isAdminDomain(): Promise<boolean> {
   const h = await headers();
@@ -179,9 +180,12 @@ export default async function TenantPublicLayout({
   const template = await getTemplateForTenant(tenant);
 
   const fetchOptions = isPreview ? { preview: true } : undefined;
-  const [settings, contact] = await Promise.all([
+  const [settings, contact, navigation, footer, theme] = await Promise.all([
     getContent("settings", tenant, fetchOptions),
     getContent("contact", tenant, fetchOptions),
+    getContent("navigation", tenant, fetchOptions),
+    getContent("footer", tenant, fetchOptions),
+    getContent("theme", tenant, fetchOptions),
   ]);
 
   const HeaderComponent = template.Header;
@@ -190,14 +194,14 @@ export default async function TenantPublicLayout({
 
   const content = (
     <>
-      <HeaderComponent settings={settings} />
+      <HeaderComponent settings={settings} navigation={navigation} />
       {children}
-      <FooterComponent settings={settings} contact={contact} />
+      <FooterComponent settings={settings} contact={contact} navigation={navigation} footer={footer} />
     </>
   );
 
   return (
-    <div style={template.themeVars as React.CSSProperties}>
+    <div style={{ ...template.themeVars, ...themeContentToCssVars(theme) } as React.CSSProperties}>
       <SmoothScrollProvider>
         <LocalBusinessSchema />
         <IframeScrollListener />

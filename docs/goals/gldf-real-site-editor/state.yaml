@@ -1,0 +1,194 @@
+version: 2
+
+goal:
+  title: "Make GLDF Site Editing Real"
+  slug: "gldf-real-site-editor"
+  kind: specific
+  tranche: "Fill the REB-to-GLDF editing gap so the owner dashboard edits the real GLDF storefront path."
+  status: done
+  intake:
+    original_request: "/goal lets fully get this gap filled and fully working"
+    interpreted_outcome: "The GLDF dashboard site editor must preview, edit, publish, and revalidate the same custom GLDF storefront that customers see without waiting on a GLDF production deploy."
+    input_shape: specific
+    audience: "GLDF owner and Scaffold operator"
+    authority: requested
+    proof_type: demo
+    completion_proof: "Browser shows live preview via REB proxy by default and Edit mode iframe pointed at REB's authenticated edit-preview proxy for the GLDF storefront; tests pass on REB and GLDF contracts."
+    likely_misfire: "REB could make its generic template preview editable while still not editing the real GLDF custom storefront."
+    blind_spots_considered:
+      - "GLDF is a separate repo and must speak the REB iframe edit protocol."
+      - "REB should inject the edit bridge itself so owner editing works before GLDF is redeployed."
+      - "Publishing must still revalidate GLDF after REB content writes."
+      - "The owner-facing Edit button must actually enter editable preview mode."
+    existing_plan_facts: []
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+
+agents:
+  scout: unknown
+  worker: unknown
+  judge: unknown
+
+visual_board:
+  selected: none
+  local:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy board docs/goals/gldf-real-site-editor"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: default
+    objective: "Trace the REB-to-GLDF preview and publish contract."
+    inputs:
+      - "/Users/laneyfraass/websites/reb"
+      - "/Users/laneyfraass/websites/gldf"
+    constraints:
+      - "Preserve existing dirty work."
+      - "Do not revert unrelated changes."
+    expected_output:
+      - "Concrete implementation targets."
+    receipt:
+      result: done
+      summary: "Mapped the cross-repo contract and identified the wrong editable preview origin."
+      evidence:
+        - "GLDF reads REB content via `/api/v1/content/gldf/[section]` and page config via `/api/v1/page-config/gldf`."
+        - "GLDF draft preview is controlled by `?preview=true` -> `x-reb-preview`."
+        - "REB editable iframe URLs were derived from the dashboard request origin, which could point Edit mode at REB's local preview instead of GLDF."
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Point REB Edit mode at the custom GLDF storefront."
+    allowed_files:
+      - "src/app/api/edit-preview/route.ts"
+      - "src/app/api/live-preview/route.ts"
+      - "src/app/dashboard/layout.tsx"
+      - "src/components/dashboard/SitePreview.tsx"
+      - "src/lib/custom-repos.ts"
+      - "src/lib/preview-html.ts"
+      - "src/__tests__/custom-repos.test.ts"
+    verify:
+      - "pnpm test src/__tests__/custom-repos.test.ts src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+    stop_if:
+      - "Tenant preview URL cannot be derived from local repo truth."
+    receipt:
+      result: done
+      summary: "Custom-repo tenants now use their real storefront URL as the edit source, and REB serves an authenticated managed edit preview proxy."
+      changed_files:
+        - "src/app/api/edit-preview/route.ts"
+        - "src/app/dashboard/layout.tsx"
+        - "src/app/api/live-preview/route.ts"
+        - "src/components/dashboard/SitePreview.tsx"
+        - "src/lib/custom-repos.ts"
+        - "src/lib/preview-html.ts"
+        - "src/__tests__/custom-repos.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/custom-repos.test.ts src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+      evidence:
+        - "`getTenantEditablePreviewUrl` keeps platform templates local but chooses custom repo production/storefront URLs for custom-repo draft preview."
+        - "`Edit mode` now switches `previewSource` to `editable` immediately."
+        - "`/api/edit-preview` fetches the real storefront with `preview=true&edit=true`, strips executable storefront scripts, and injects the REB edit bridge into the returned HTML."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Add REB edit-mode iframe hooks to GLDF."
+    allowed_files:
+      - "/Users/laneyfraass/websites/gldf/src/app/(public)/layout.tsx"
+      - "/Users/laneyfraass/websites/gldf/src/components/public/EditModeOverlay.tsx"
+      - "/Users/laneyfraass/websites/gldf/src/components/public/IframeScrollListener.tsx"
+    verify:
+      - "pnpm typecheck"
+      - "pnpm lint"
+      - "pnpm test src/__tests__/revalidate-contract.test.ts src/lib/reb-contracts.test.ts"
+    stop_if:
+      - "GLDF lacks data-reb-field/data-reb-section markers."
+    receipt:
+      result: done
+      summary: "The GLDF storefront now implements the REB iframe edit protocol."
+      changed_files:
+        - "/Users/laneyfraass/websites/gldf/src/app/(public)/layout.tsx"
+        - "/Users/laneyfraass/websites/gldf/src/components/public/EditModeOverlay.tsx"
+        - "/Users/laneyfraass/websites/gldf/src/components/public/IframeScrollListener.tsx"
+      commands:
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "pnpm lint"
+          status: pass
+        - cmd: "pnpm test src/__tests__/revalidate-contract.test.ts src/lib/reb-contracts.test.ts"
+          status: pass
+      evidence:
+        - "Mounted GLDF `EditModeOverlay` and `IframeScrollListener` in the public layout."
+        - "Overlay supports section selection, field selection, inline text edits, highlight, rect, and scroll messages."
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: default
+    objective: "Audit browser and contract evidence for the real GLDF editor loop."
+    inputs:
+      - "Task receipts"
+      - "Browser verification"
+      - "Test output"
+    constraints:
+      - "Reject completion if Edit mode still points at REB's generic local preview."
+    expected_output:
+      - "complete | not_complete"
+      - "remaining risks"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      evidence:
+        - "Browser verified `/client/gldf/dashboard/site`: default iframe source is `/client/gldf/api/live-preview?path=%2F&refresh=0`."
+        - "After clicking `Edit mode`, the editable iframe source becomes `/client/gldf/api/edit-preview?path=%2F&refresh=0`, so REB owns the inline edit bridge and no GLDF production deploy is required for dashboard editing."
+        - "REB typecheck, lint, custom-repo/owner-journey tests, publish/revalidation/site-capabilities tests, and `git diff --check` passed."
+        - "GLDF typecheck, lint, contract tests, and `git diff --check` passed."
+      remaining_risks:
+        - "REB lint still reports 11 pre-existing warnings unrelated to this change."
+        - "Both repos had pre-existing dirty work; unrelated changes were preserved."
+
+checks:
+  dirty_fingerprint: "existing dirty work in both repos preserved"
+  last_verification:
+    result: passed
+    task: T004
+    commands:
+      - "pnpm test src/__tests__/custom-repos.test.ts src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+      - "pnpm test src/__tests__/revalidate-client.test.ts src/__tests__/contracts.test.ts src/__tests__/site-capabilities.test.ts"
+      - "pnpm lint"
+      - "git diff --check"
+      - "(gldf) pnpm typecheck"
+      - "(gldf) pnpm lint"
+      - "(gldf) pnpm test src/__tests__/revalidate-contract.test.ts src/lib/reb-contracts.test.ts"
+      - "(gldf) git diff --check"
+      - "Browser URL check on /client/gldf/dashboard/site"

@@ -30,6 +30,22 @@ export function getCustomRepoMetadata(
   };
 }
 
+export function getTenantEditablePreviewUrl(
+  tenant: Pick<TenantConfig, "id" | "subdomain" | "productionDomain" | "siteUrl" | "deliveryModel" | "customRepo"> | undefined,
+  fallback: { requestOrigin?: string; siteUrl?: string } = {}
+): string {
+  if (getTenantDeliveryModel(tenant) !== "custom_repo") {
+    return fallback.requestOrigin || fallback.siteUrl || "";
+  }
+
+  const repo = getCustomRepoMetadata(tenant);
+  if (repo.supportsDraftPreview === false) {
+    return fallback.siteUrl || repo.productionUrl || fallback.requestOrigin || "";
+  }
+
+  return repo.productionUrl || fallback.siteUrl || fallback.requestOrigin || "";
+}
+
 export function getTriageDueAt(requestedAt = new Date()): string {
   const due = new Date(requestedAt);
   due.setDate(due.getDate() + (due.getDay() === 5 ? 3 : due.getDay() === 6 ? 2 : 1));

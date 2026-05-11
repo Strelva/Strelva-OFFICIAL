@@ -178,12 +178,20 @@ export function SitePreview() {
     editableParams.set("edit", "true");
   }
   const base = previewUrl || siteUrl || "";
-  const editableIframeSrc = `${base}${pagePath}?${editableParams.toString()}`;
+  const directEditableIframeSrc = `${base}${pagePath}?${editableParams.toString()}`;
   const livePreviewParams = new URLSearchParams({
     path: pagePath,
     refresh: String(refreshKey),
   });
+  const editPreviewParams = new URLSearchParams({
+    path: pagePath,
+    refresh: String(refreshKey),
+  });
   const liveIframeSrc = dashboardHref(`/api/live-preview?${livePreviewParams.toString()}`);
+  const usesManagedEditPreview = Boolean(siteUrl && previewUrl && siteUrl === previewUrl);
+  const editableIframeSrc = usesManagedEditPreview
+    ? dashboardHref(`/api/edit-preview?${editPreviewParams.toString()}`)
+    : directEditableIframeSrc;
   const iframeSrc = previewSource === "live" && siteUrl ? liveIframeSrc : editableIframeSrc;
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
   const isLivePreview = previewSource === "live" && !!siteUrl;
@@ -427,11 +435,14 @@ export function SitePreview() {
         {!scaffoldMode && (
           <button
             type="button"
-            onClick={() => setScaffoldMode(true)}
+            onClick={() => {
+              setPreviewSource("editable");
+              setScaffoldMode(true);
+            }}
             className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 text-[12px] font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-black/90"
           >
             <Wand2 className="h-3.5 w-3.5" strokeWidth={1.6} />
-            Scaffold mode
+            Edit mode
           </button>
         )}
 
@@ -440,7 +451,7 @@ export function SitePreview() {
             <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/78 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-overlay-enter">
               <div className="flex items-center gap-1.5 px-2">
                 <Wand2 className="h-3.5 w-3.5 text-white" strokeWidth={1.6} />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">Scaffold</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">Site editor</span>
               </div>
               <span className="mx-1 h-6 w-px bg-white/10" />
               <select
@@ -473,8 +484,8 @@ export function SitePreview() {
               </select>
               <span className="mx-1 h-6 w-px bg-white/10" />
             {[
+              { value: "editable", label: "Edit" },
               { value: "live", label: "Live" },
-              { value: "editable", label: "Editable" },
             ].map((source) => {
               const active = previewSource === source.value;
               return (
@@ -517,7 +528,7 @@ export function SitePreview() {
               disabled={!activeSection || isLivePreview}
               className="h-7 rounded-full px-3 text-[11px] font-medium text-white/65 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
             >
-              Edit
+              Edit fields
             </button>
             <button
               type="button"

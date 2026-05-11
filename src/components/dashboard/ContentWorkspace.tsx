@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
-import { LayoutList, MessageCircle, PanelRightOpen, SlidersHorizontal } from "lucide-react";
+import { LayoutList, PanelRightOpen, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
-import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { LayoutPanel } from "./LayoutPanel";
 import { PublishBar } from "./design/PublishBar";
@@ -21,7 +20,6 @@ interface ContentWorkspaceProps {
 
 export function ContentWorkspace({
   siteName,
-  ownerName,
   sectionData,
   timestamps,
 }: ContentWorkspaceProps) {
@@ -93,11 +91,10 @@ export function ContentWorkspace({
   const rightPanelContent = (
     <>
       <div className="border-b border-gray-border bg-surface p-2 shrink-0">
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-2 gap-1">
           {[
             { value: "properties", label: "Content", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
             { value: "layout", label: "Layout", icon: <LayoutList className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-            { value: "chat", label: "AI Chat", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
           ].map((item) => (
             <button
               key={item.value}
@@ -123,7 +120,7 @@ export function ContentWorkspace({
         ) : rightTab === "layout" ? (
           <LayoutPanel />
         ) : (
-          <ChatPanel ownerName={ownerName} variant="compact" />
+          <PropertiesEditor activeSection={activeSection} />
         )}
       </div>
     </>

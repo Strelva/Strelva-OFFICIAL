@@ -7,7 +7,7 @@ import { DesignCanvas } from "./design/DesignCanvas";
 import { DesignPropertiesPanel } from "./design/DesignPropertiesPanel";
 import { PageSelector } from "./design/PageSelector";
 import { PublishBar } from "./design/PublishBar";
-import type { PageConfig, PageSectionConfig } from "@/lib/types";
+import type { PageConfig, PageSectionConfig, SiteCapabilityManifest } from "@/lib/types";
 
 export type DesignNode = {
   id: string;
@@ -107,6 +107,8 @@ export function DesignMode() {
   const [nodeRect, setNodeRect] = useState<NodeRect | null>(null);
   const [tree, setTree] = useState<DesignNode[]>([]);
   const [pageConfig, setPageConfig] = useState<PageConfig | null>(null);
+  const [sitePageConfig, setSitePageConfig] = useState<Record<string, PageConfig> | null>(null);
+  const [capabilityManifest, setCapabilityManifest] = useState<SiteCapabilityManifest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sectionAnalytics, setSectionAnalytics] = useState<Record<string, { clicks?: number; views?: number; trend?: "up" | "down" | "flat" }>>({});
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -116,14 +118,21 @@ export function DesignMode() {
     async function fetchPageConfig() {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/public/page-config/${tenantId}`);
+        const [res, manifestRes] = await Promise.all([
+          fetch(dashboardHref("/api/page-config?draft=true"), { credentials: "same-origin" }),
+          fetch(`/api/v1/site-capabilities/${tenantId}`),
+        ]);
         if (res.ok) {
           const config = await res.json();
           const currentPageConfig = config[activePage] || config.home;
+          setSitePageConfig(config);
           setPageConfig(currentPageConfig);
           setTree(buildTreeFromPageConfig(currentPageConfig, activePage));
           // Auto-expand page node
           setExpandedIds(new Set(["page"]));
+        }
+        if (manifestRes.ok) {
+          setCapabilityManifest(await manifestRes.json());
         }
 
         // Fetch section analytics
@@ -147,6 +156,28 @@ export function DesignMode() {
       fetchPageConfig();
     }
   }, [activePage, dashboardHref, tenantId]);
+
+  const saveCurrentPageConfig = useCallback(async (nextPageConfig: PageConfig) => {
+    const nextSiteConfig = {
+      ...(sitePageConfig || {}),
+      [activePage]: nextPageConfig,
+    };
+    const res = await fetch(dashboardHref("/api/page-config?draft=true"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(nextSiteConfig),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || "Failed to save page config");
+    }
+    setSitePageConfig(nextSiteConfig);
+    setPageConfig(nextPageConfig);
+    setTree(buildTreeFromPageConfig(nextPageConfig, activePage));
+    setHasDraft((prev) => ({ ...prev, __pageConfig: true }));
+    triggerRefresh();
+  }, [activePage, dashboardHref, setHasDraft, sitePageConfig, triggerRefresh]);
 
   // Listen for iframe messages (node selection with rect)
   useEffect(() => {
@@ -268,22 +299,11 @@ export function DesignMode() {
     );
 
     try {
-      await fetch(`/api/v1/page-config/${tenantId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          [activePage]: { ...pageConfig, sections: updatedSections }
-        }),
-      });
-
-      // Update local state
-      setPageConfig({ ...pageConfig, sections: updatedSections });
-      setTree(buildTreeFromPageConfig({ ...pageConfig, sections: updatedSections }, activePage));
-      triggerRefresh();
+      await saveCurrentPageConfig({ ...pageConfig, sections: updatedSections });
     } catch (err) {
       console.error("Failed to toggle visibility:", err);
     }
-  }, [pageConfig, tenantId, activePage, triggerRefresh]);
+  }, [pageConfig, saveCurrentPageConfig]);
 
   const handleReorder = useCallback(async (id: string, direction: 'up' | 'down') => {
     if (!pageConfig) return;
@@ -305,21 +325,11 @@ export function DesignMode() {
     });
 
     try {
-      await fetch(`/api/v1/page-config/${tenantId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          [activePage]: { ...pageConfig, sections: updatedSections }
-        }),
-      });
-
-      setPageConfig({ ...pageConfig, sections: updatedSections });
-      setTree(buildTreeFromPageConfig({ ...pageConfig, sections: updatedSections }, activePage));
-      triggerRefresh();
+      await saveCurrentPageConfig({ ...pageConfig, sections: updatedSections });
     } catch (err) {
       console.error("Failed to reorder:", err);
     }
-  }, [pageConfig, tenantId, activePage, triggerRefresh]);
+  }, [pageConfig, saveCurrentPageConfig]);
 
   // Handle layout updates from properties panel
   const handleLayoutUpdate = useCallback(async (sectionType: string, layout: NonNullable<PageSectionConfig['layout']>) => {
@@ -330,23 +340,32 @@ export function DesignMode() {
     );
 
     try {
-      await fetch(`/api/v1/page-config/${tenantId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          [activePage]: { ...pageConfig, sections: updatedSections }
-        }),
-      });
-
-      setPageConfig({ ...pageConfig, sections: updatedSections });
-      triggerRefresh();
+      await saveCurrentPageConfig({ ...pageConfig, sections: updatedSections });
     } catch (err) {
       console.error("Failed to update layout:", err);
     }
-  }, [pageConfig, tenantId, activePage, triggerRefresh]);
+  }, [pageConfig, saveCurrentPageConfig]);
+
+  const handleVariantUpdate = useCallback(async (sectionType: string, variant: string) => {
+    if (!pageConfig) return;
+
+    const updatedSections = pageConfig.sections.map(s =>
+      s.type === sectionType ? { ...s, variant } : s
+    );
+
+    try {
+      await saveCurrentPageConfig({ ...pageConfig, sections: updatedSections });
+    } catch (err) {
+      console.error("Failed to update variant:", err);
+    }
+  }, [pageConfig, saveCurrentPageConfig]);
 
   // Get current section layout
   const currentSectionLayout = pageConfig?.sections.find(s => s.type === selectedNode?.sectionType)?.layout;
+  const currentSectionVariant = pageConfig?.sections.find(s => s.type === selectedNode?.sectionType)?.variant || "default";
+  const currentSectionCapability = selectedNode?.sectionType
+    ? capabilityManifest?.sections[selectedNode.sectionType]
+    : undefined;
 
   // Handle content updates from properties panel
   const handleContentUpdate = useCallback(async (section: string, field: string, value: string) => {
@@ -471,7 +490,10 @@ export function DesignMode() {
           onTabChange={setRightTab}
           onContentUpdate={handleContentUpdate}
           onLayoutUpdate={handleLayoutUpdate}
+          onVariantUpdate={handleVariantUpdate}
           sectionLayout={currentSectionLayout}
+          sectionVariant={currentSectionVariant}
+          sectionCapability={currentSectionCapability}
           editMode={editMode}
           hasDraft={hasDraft[selectedNode?.sectionType || ""] || false}
           sectionAnalytics={sectionAnalytics}

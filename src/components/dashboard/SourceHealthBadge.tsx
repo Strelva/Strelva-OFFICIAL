@@ -66,21 +66,21 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   no_signal: {
     icon: RefreshCw,
-    label: "No signal",
+    label: "Not usable yet",
     bg: "bg-gray-bg",
     text: "text-gray-muted",
     dot: "bg-gray-muted",
   },
   signal_available: {
     icon: Clock,
-    label: "Signal available",
+    label: "Available signal",
     bg: "bg-[rgba(255,255,255,0.05)]",
     text: "text-gray-fg",
     dot: "bg-gray-fg",
   },
   ai_using_it: {
     icon: CheckCircle2,
-    label: "AI using it",
+    label: "AI can use",
     bg: "bg-accent-dim",
     text: "text-accent",
     dot: "bg-accent",
@@ -94,7 +94,7 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   can_act_here: {
     icon: CheckCircle2,
-    label: "Can act here",
+    label: "Can act",
     bg: "bg-success-dim",
     text: "text-success",
     dot: "bg-success",

@@ -90,17 +90,17 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
   if (!brief) {
     return (
-      <div className="flex h-full overflow-y-auto animate-route-enter px-4 sm:px-8 py-6 sm:py-10">
-        <div className="mx-auto flex w-full max-w-5xl flex-col justify-center">
-          <div className="mb-8 max-w-2xl">
+      <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="mb-5 max-w-2xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              What&apos;s working
+              Reports
             </p>
-            <h1 className="text-[28px] sm:text-[36px] font-semibold text-warm-black tracking-[-0.03em]">
-              Your site is ready to manage
+            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+              Your first weekly report is still warming up
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
-              Scaffold Web watches how people find you, what they click, and what the AI changes. Your first weekly report appears here after a week of activity.
+              The Today view already shows the short version. This page becomes the report archive once there is enough visitor, click, and site-change activity for a real weekly summary.
             </p>
           </div>
 
@@ -136,8 +136,15 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link
-              href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}
+              href={dashboard?.dashboardHref("/dashboard") || "/dashboard"}
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+            >
+              <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
+              Open Today
+            </Link>
+            <Link
+              href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-5 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
               Ask AI for a small change

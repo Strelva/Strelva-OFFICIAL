@@ -139,6 +139,8 @@ export async function getCurrentUserEmail(): Promise<string | null> {
 
 /** Check if current user is a super admin */
 export async function isSuperAdmin(): Promise<boolean> {
+  if (isDevAccessBypassEnabled()) return true;
+
   const email = await getCurrentUserEmail();
   if (!email) return false;
   const adminEmails = (process.env.SUPER_ADMIN_EMAILS || "")

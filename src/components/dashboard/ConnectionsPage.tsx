@@ -59,13 +59,23 @@ function ConnectionRow({
   onRunAction: () => void;
 }) {
   const needsSetup = connection.status === "not_configured" || connection.status === "needs_reauth" || connection.status === "sync_failed";
+  const canUseNow = connection.intelligenceStatus === "ai_using_it" ||
+    connection.intelligenceStatus === "can_act_here" ||
+    connection.intelligenceStatus === "signal_available";
   const setupCopy = connection.status === "connected"
-    ? "Connected and available to AI"
+    ? "Connected account"
     : connection.status === "coming_soon"
-      ? "Visible roadmap source"
-      : needsSetup
-        ? "Setup required"
-        : "Manual source";
+      ? "Planned source"
+      : connection.providerId === "google-business"
+        ? "OAuth ready"
+        : connection.providerId === "google-search-console"
+          ? "Manual Search Console setup"
+          : connection.connected
+            ? "Available"
+            : needsSetup
+              ? "Setup required"
+              : "Built-in signal";
+  const actionCopy = canUseNow ? "Ask AI with source" : "Connect first";
 
   return (
     <div className="flex h-full flex-col gap-4 rounded-xl border border-gray-border bg-surface-raised p-4 transition-colors hover:border-accent/25">
@@ -102,7 +112,9 @@ function ConnectionRow({
         <span className="text-[12px] leading-relaxed text-gray-muted">{connection.usedIn}</span>
       </div>
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">AI can use this to</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
+          {canUseNow ? "AI can use this to" : "Once connected, AI can"}
+        </p>
         <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">
           {connection.aiCanUseThisTo.slice(0, 2).join("; ")}
         </p>
@@ -118,9 +130,14 @@ function ConnectionRow({
         <button
           type="button"
           onClick={onRunAction}
-          className="rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-black"
+          disabled={!canUseNow}
+          className={`rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium transition-colors ${
+            canUseNow
+              ? "text-gray-muted hover:border-accent/35 hover:text-warm-black"
+              : "cursor-not-allowed text-gray-faint opacity-60"
+          }`}
         >
-          Use in AI chat
+          {actionCopy}
         </button>
       </div>
     </div>
@@ -244,7 +261,18 @@ export function ConnectionsPage() {
     [connections]
   );
 
-  const featured = allConnections.find((connection) => connection.id === "website-activity") ?? allConnections[0];
+  const usableNowCount = allConnections.filter((c) =>
+    c.intelligenceStatus === "ai_using_it" ||
+    c.intelligenceStatus === "can_act_here" ||
+    c.intelligenceStatus === "signal_available"
+  ).length;
+  const needsSetupCount = allConnections.filter((c) =>
+    c.status === "not_configured" || c.status === "needs_reauth" || c.status === "sync_failed"
+  ).length;
+  const featured =
+    allConnections.find((connection) => connection.id === "google-business" && connection.status !== "connected") ??
+    allConnections.find((connection) => connection.id === "website-activity") ??
+    allConnections[0];
   const runConnectionPrompt = (connection: Connection) => {
     const prompt =
       connection.sourcePrompt ||
@@ -262,14 +290,14 @@ export function ConnectionsPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-            Connection infrastructure
+            Business sources
           </p>
           <div className="flex items-baseline gap-3">
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-              Sources the AI can actually use
+              What the AI can really use
             </h1>
             <span className="text-[13px] text-gray-muted">
-              {allConnections.filter((c) => c.intelligenceStatus === "ai_using_it" || c.intelligenceStatus === "can_act_here").length} usable now
+              {usableNowCount} usable now
             </span>
           </div>
         </div>
@@ -284,7 +312,7 @@ export function ConnectionsPage() {
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        Set up the accounts, files, signals, and action paths that give the AI real context. Every source should have a status, a setup path, and a clear job.
+        Built-in site signals work now. Connected accounts add outside context. Sources that still need OAuth, credentials, or manual setup stay clearly marked until they are actually available.
       </p>
 
       {!query.trim() && (
@@ -292,23 +320,23 @@ export function ConnectionsPage() {
           <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
             <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Usable now</p>
             <p className="mt-2 text-[24px] font-semibold text-warm-white">
-              {allConnections.filter((c) => c.status === "connected" || c.status === "unknown").length}
+              {usableNowCount}
             </p>
-            <p className="mt-1 text-[12px] text-gray-muted">Built-in or connected sources the AI can reference.</p>
+            <p className="mt-1 text-[12px] text-gray-muted">Built-in or connected sources the AI can reference today.</p>
           </div>
           <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
             <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Needs setup</p>
             <p className="mt-2 text-[24px] font-semibold text-warm-white">
-              {allConnections.filter((c) => c.status === "not_configured" || c.status === "needs_reauth" || c.status === "sync_failed").length}
+              {needsSetupCount}
             </p>
-            <p className="mt-1 text-[12px] text-gray-muted">OAuth, API key, manual setup, or sync repair required.</p>
+            <p className="mt-1 text-[12px] text-gray-muted">OAuth, credentials, manual setup, or sync repair required.</p>
           </div>
           <button
             type="button"
             onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
             className="rounded-xl border border-accent/25 bg-accent-dim p-4 text-left transition-colors hover:border-accent/45"
           >
-            <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Next setup</p>
+            <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Best next source</p>
             <p className="mt-2 text-[15px] font-medium text-warm-white">{featured.name}</p>
             <p className="mt-1 text-[12px] text-gray-muted">{featured.description}</p>
           </button>

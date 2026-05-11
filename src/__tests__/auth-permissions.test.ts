@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCurrentUser = vi.fn();
 const mockGetUser = vi.fn();
@@ -23,6 +23,10 @@ vi.mock("../lib/tenants", () => ({
 }));
 
 describe("auth permission helpers", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.SUPER_ADMIN_EMAILS;
@@ -97,6 +101,16 @@ describe("auth permission helpers", () => {
 
     expect(await hasTenantPermission("any-tenant", "billing:manage")).toBe(true);
     expect(await hasTenantPermission("any-tenant", "team:manage")).toBe(true);
+  });
+
+  it("treats local dev access as super admin outside production", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("REB_DEV_UNGATED_ACCESS", "1");
+    mockCurrentUser.mockResolvedValue(null);
+
+    const { isSuperAdmin } = await import("../lib/auth");
+
+    expect(await isSuperAdmin()).toBe(true);
   });
 
   it("assigns Clerk metadata with tenantRoles", async () => {

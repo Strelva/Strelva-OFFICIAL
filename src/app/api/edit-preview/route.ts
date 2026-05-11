@@ -3,7 +3,7 @@ import { requireTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, verifyAuth } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
-import { normalizePreviewPath, prepareLivePreviewHtml } from "@/lib/preview-html";
+import { normalizePreviewPath, prepareEditablePreviewHtml } from "@/lib/preview-html";
 
 export async function GET(request: Request) {
   const authed = await verifyAuth();
@@ -26,6 +26,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const previewPath = normalizePreviewPath(url.searchParams.get("path"));
     const target = new URL(previewPath, siteUrl);
+    target.searchParams.set("preview", "true");
+    target.searchParams.set("edit", "true");
 
     if (target.origin !== new URL(siteUrl).origin) {
       return NextResponse.json({ error: "Invalid preview path" }, { status: 400 });
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     const upstream = await fetch(target, {
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "ScaffoldWebLivePreview/1.0",
+        "User-Agent": "ScaffoldWebEditPreview/1.0",
       },
       cache: "no-store",
     });
@@ -42,12 +44,12 @@ export async function GET(request: Request) {
     const contentType = upstream.headers.get("content-type") || "";
     if (!upstream.ok || !contentType.includes("text/html")) {
       return NextResponse.json(
-        { error: "Live site preview unavailable" },
+        { error: "Edit preview unavailable" },
         { status: upstream.ok ? 502 : upstream.status }
       );
     }
 
-    const html = prepareLivePreviewHtml(await upstream.text(), `${target.origin}/`);
+    const html = prepareEditablePreviewHtml(await upstream.text(), `${target.origin}/`);
     return new NextResponse(html, {
       status: 200,
       headers: {
@@ -57,7 +59,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (err) {
-    console.error("[live-preview GET]", err);
-    return NextResponse.json({ error: "Failed to load live preview" }, { status: 500 });
+    console.error("[edit-preview GET]", err);
+    return NextResponse.json({ error: "Failed to load edit preview" }, { status: 500 });
   }
 }

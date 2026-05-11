@@ -11,39 +11,84 @@ describe("owner journey copy and links", () => {
     const desktopNav = readRepoFile("src/components/dashboard/HistorySidebar.tsx");
     const mobileNav = readRepoFile("src/components/dashboard/MobileNav.tsx");
 
+    expect(desktopNav).toContain("Today");
     expect(desktopNav).toContain("Ask AI");
-    expect(desktopNav).toContain("Approvals");
+    expect(desktopNav).toContain("Needs You");
     expect(desktopNav).toContain("Site");
-    expect(desktopNav).toContain("Connections");
+    expect(desktopNav).toContain("Sources");
+    expect(desktopNav).not.toContain("Approvals");
+    expect(desktopNav).not.toContain("Connections");
     expect(desktopNav).not.toContain("Ownership");
     expect(desktopNav).not.toContain("Overview");
 
+    expect(mobileNav).toContain("Today");
     expect(mobileNav).toContain("Ask AI");
-    expect(mobileNav).toContain("Approvals");
-    expect(mobileNav).toContain("Connections");
+    expect(mobileNav).toContain("Needs You");
+    expect(mobileNav).toContain("Sources");
+    expect(mobileNav).not.toContain("Approvals");
+    expect(mobileNav).not.toContain("Connections");
     expect(mobileNav).not.toContain("Ownership");
     expect(mobileNav).not.toContain("Overview");
   });
 
-  it("keeps the first-run dashboard focused on AI action", () => {
+  it("keeps the dashboard root focused on proof and next action", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
-    const chatPanel = readRepoFile("src/components/dashboard/ChatPanel.tsx");
-    const promptBox = readRepoFile("src/components/ui/ai-prompt-box.tsx");
 
-    expect(dashboardPage).toContain('withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat")');
-    expect(chatPanel).toContain("What's working?");
-    expect(chatPanel).toContain("Suggest an update");
-    expect(chatPanel).toContain("Show recent changes");
-    expect(chatPanel).toContain("Check site health");
-    expect(promptBox).toContain("More ways to ask");
+    expect(dashboardPage).toContain("See what is working. Change what is next.");
+    expect(dashboardPage).toContain("People found you");
+    expect(dashboardPage).toContain("Booking clicks");
+    expect(dashboardPage).toContain("Needs you");
+    expect(dashboardPage).toContain("Edit site");
+    expect(dashboardPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat"))');
+  });
+
+  it("keeps weekly reports reachable as the proof surface", () => {
+    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
+    const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");
+
+    expect(reportsPage).toContain("getWeeklyBrief(tenant)");
+    expect(reportsPage).toContain("getWeeklyBriefs(tenant)");
+    expect(reportsPage).toContain("<WeeklyBriefClient brief={brief} history={history} />");
+    expect(reportsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
+    expect(weeklyBrief).toContain("Your weekly report");
+    expect(weeklyBrief).toContain("Your first weekly report is still warming up");
+    expect(weeklyBrief).toContain("Open Today");
+  });
+
+  it("keeps the site editor focused on direct editing instead of embedded chat", () => {
+    const workspace = readRepoFile("src/components/dashboard/ContentWorkspace.tsx");
+    const preview = readRepoFile("src/components/dashboard/SitePreview.tsx");
+    const properties = readRepoFile("src/components/dashboard/PropertiesEditor.tsx");
+
+    expect(workspace).toContain('label: "Content"');
+    expect(workspace).toContain('label: "Layout"');
+    expect(workspace).not.toContain('label: "AI Chat"');
+    expect(preview).toContain('useState<PreviewSource>("live")');
+    expect(preview).toContain("Site editor");
+    expect(properties).toContain("Click text in the preview");
+  });
+
+  it("keeps Sources honest about setup and availability", () => {
+    const sources = readRepoFile("src/components/dashboard/ConnectionsPage.tsx");
+    const detail = readRepoFile("src/components/dashboard/ConnectionDetailPage.tsx");
+    const badges = readRepoFile("src/components/dashboard/SourceHealthBadge.tsx");
+
+    expect(sources).toContain("What the AI can really use");
+    expect(sources).toContain("Built-in site signals work now");
+    expect(sources).toContain("OAuth ready");
+    expect(sources).toContain("Manual Search Console setup");
+    expect(sources).not.toContain("Sources the AI can actually use");
+    expect(detail).toContain("not OAuth");
+    expect(badges).toContain("Not usable yet");
   });
 
   it("keeps AI result feedback actionable", () => {
     const chatPanel = readRepoFile("src/components/dashboard/ChatPanel.tsx");
+    const agentResults = readRepoFile("src/lib/agent-results.ts");
 
     expect(chatPanel).toContain("View site");
     expect(chatPanel).toContain("Open needs approval");
-    expect(chatPanel).toContain("The live site has the change");
+    expect(agentResults).toContain("The live site has the change");
     expect(chatPanel).not.toContain("Queued for review");
   });
 
@@ -51,7 +96,11 @@ describe("owner journey copy and links", () => {
     const weeklyReportRoute = readRepoFile("src/app/api/cron/weekly-report/route.ts");
 
     expect(weeklyReportRoute).toContain("getTenantDashboardUrl");
-    expect(weeklyReportRoute).toContain('getTenantDashboardUrl(report.tenant, "/dashboard")');
+    expect(weeklyReportRoute).toContain('getTenantDashboardUrl(report.tenant, "/dashboard/reports")');
+    expect(weeklyReportRoute).toContain("View your weekly report");
+    expect(weeklyReportRoute).toContain("function reportToText");
+    expect(weeklyReportRoute).toContain("View your weekly report:");
+    expect(weeklyReportRoute).toContain("text,");
     expect(weeklyReportRoute).not.toContain("NEXT_PUBLIC_APP_URL");
   });
 
@@ -66,6 +115,8 @@ describe("owner journey copy and links", () => {
 
     expect(ownerFiles).toContain("Make live");
     expect(ownerFiles).toContain("Skip");
+    expect(ownerFiles).toContain("Needs You");
+    expect(ownerFiles).toContain("Nothing needs you right now");
     expect(ownerFiles).not.toMatch(/Approval queue|Queued for review|admin review|stale section/);
   });
 

@@ -13,6 +13,7 @@ import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { getTenantEditablePreviewUrl } from "@/lib/custom-repos";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -43,7 +44,8 @@ export default async function DashboardLayout({
   const requestHost = requestHeaders.get("host") || "";
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
-  const previewUrl = requestHost ? `${requestProto}://${requestHost}` : siteUrl;
+  const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : "";
+  const previewUrl = getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
   let siteName = "Your Business";
   let ownerName = "";
   try {

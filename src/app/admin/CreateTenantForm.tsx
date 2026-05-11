@@ -26,6 +26,11 @@ export function CreateTenantForm() {
       repoName: "",
       repoUrl: "",
       localPath: "",
+      capabilityManifestUrl: "",
+      supportedDesignTokens: ["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"],
+      supportsPageConfig: true,
+      supportsDraftPreview: true,
+      supportsInlineEditing: true,
     },
   });
 
@@ -60,6 +65,11 @@ export function CreateTenantForm() {
           repoName: "",
           repoUrl: "",
           localPath: "",
+          capabilityManifestUrl: "",
+          supportedDesignTokens: ["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"],
+          supportsPageConfig: true,
+          supportsDraftPreview: true,
+          supportsInlineEditing: true,
         },
       });
       setOpen(false);
@@ -253,6 +263,37 @@ export function CreateTenantForm() {
                 placeholder={`/Users/laneyfraass/websites/${form.subdomain || "client-site"}`}
                 className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
               />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-zinc-500 mb-1.5">Capability Manifest URL</label>
+              <input
+                type="url"
+                value={form.customRepo.capabilityManifestUrl}
+                onChange={(e) => setForm({ ...form, customRepo: { ...form.customRepo, capabilityManifestUrl: e.target.value } })}
+                placeholder="https://client-site.com/api/reb-capabilities"
+                className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                ["supportsPageConfig", "Page config"],
+                ["supportsDraftPreview", "Draft preview"],
+                ["supportsInlineEditing", "Inline editing"],
+              ].map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.customRepo[key as keyof typeof form.customRepo])}
+                    onChange={(e) => setForm({
+                      ...form,
+                      customRepo: { ...form.customRepo, [key]: e.target.checked },
+                    })}
+                  />
+                  {label}
+                </label>
+              ))}
             </div>
           </>
         )}

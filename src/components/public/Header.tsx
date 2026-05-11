@@ -3,14 +3,20 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import type { SiteSettings } from "@/lib/types";
+import type { NavigationContent, SiteSettings } from "@/lib/types";
 
 const navLinks = [
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
 
-export function Header({ settings }: { settings: SiteSettings }) {
+export function Header({
+  settings,
+  navigation,
+}: {
+  settings: SiteSettings;
+  navigation?: NavigationContent;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -34,6 +40,9 @@ export function Header({ settings }: { settings: SiteSettings }) {
   const linkHover = useTransparent ? "#fff" : "var(--bark)";
   const wordmarkColor = useTransparent ? "#fff" : "var(--bark)";
 
+  const configuredLinks = navigation?.menuItems?.length ? navigation.menuItems : navLinks;
+  const ctaLabel = navigation?.ctaLabel || "Book Now";
+  const ctaHref = navigation?.ctaHref || settings.bookingUrl || "#";
   const isActive = (href: string) => pathname === href;
 
   return (
@@ -65,7 +74,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
 
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => (
+              {configuredLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -78,7 +87,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                 </Link>
               ))}
               <Link
-                href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
+                href={ctaHref} target="_blank" rel="noopener noreferrer"
                 className="text-xs font-semibold tracking-wider uppercase px-5 py-2.5 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)",
@@ -93,14 +102,14 @@ export function Header({ settings }: { settings: SiteSettings }) {
                   e.currentTarget.style.background = useTransparent ? "rgba(255,255,255,0.25)" : "var(--sage)";
                 }}
               >
-                Book Now
+                {ctaLabel}
               </Link>
             </nav>
 
             {/* Mobile: CTA + hamburger */}
             <div className="flex md:hidden items-center gap-4">
               <Link
-                href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
+                href={ctaHref} target="_blank" rel="noopener noreferrer"
                 className="text-[0.625rem] font-semibold tracking-wider uppercase px-4 py-2 transition-all duration-300"
                 style={{
                   background: useTransparent ? "rgba(255,255,255,0.2)" : "var(--sage)",
@@ -108,7 +117,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
                   border: useTransparent ? "1px solid rgba(255,255,255,0.7)" : "1px solid transparent",
                 }}
               >
-                Book Now
+                {ctaLabel}
               </Link>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -143,7 +152,7 @@ export function Header({ settings }: { settings: SiteSettings }) {
           style={{ background: "rgba(250,249,247,0.98)", backdropFilter: "blur(12px)" }}
         >
           <nav className="flex flex-col items-center justify-center h-full gap-8">
-            {navLinks.map((link) => (
+            {configuredLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -157,12 +166,12 @@ export function Header({ settings }: { settings: SiteSettings }) {
               </Link>
             ))}
             <Link
-              href={settings.bookingUrl || "#"} target="_blank" rel="noopener noreferrer"
+              href={ctaHref} target="_blank" rel="noopener noreferrer"
               onClick={closeMenu}
               className="mt-4 px-8 py-3.5 text-xs font-bold tracking-widest uppercase transition-all"
               style={{ background: "var(--sage)", color: "var(--pure-white)" }}
             >
-              Book Now
+              {ctaLabel}
             </Link>
           </nav>
         </div>

@@ -8,7 +8,16 @@ import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
 import type { HeroContent } from "@/lib/types";
 
-export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string; siteName?: string }) {
+export function Hero({
+  hero,
+  siteName,
+  variant = "default",
+}: {
+  hero: HeroContent;
+  ownerName?: string;
+  siteName?: string;
+  variant?: string;
+}) {
   const sectionRef = useRef<HTMLElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -61,8 +70,17 @@ export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string
     return () => ctx.revert();
   }, []);
 
+  const isEditorial = variant === "editorial";
+  const isImageLed = variant === "image-led";
+  const contentAlignment = isEditorial ? "mx-auto text-center" : "";
+  const sectionHeight = isEditorial
+    ? "min-h-[76svh] md:min-h-[86svh]"
+    : isImageLed
+      ? "min-h-[92svh] md:min-h-screen"
+      : "min-h-[84svh] md:min-h-screen";
+
   return (
-    <section id="hero" ref={sectionRef} className="relative flex min-h-[84svh] items-end overflow-hidden pb-12 md:min-h-screen md:pb-28">
+    <section id="hero" ref={sectionRef} className={`relative flex ${sectionHeight} items-end overflow-hidden pb-12 md:pb-28`}>
       <div ref={imageRef} className="absolute inset-0" style={{ willChange: "transform" }}>
         {hero.backgroundImageUrl ? (
           <Image
@@ -88,7 +106,7 @@ export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string
 
       <div ref={contentRef} className="relative z-10 w-full">
         <div className="container-main">
-          <div className="max-w-2xl">
+          <div className={`max-w-2xl ${contentAlignment}`}>
             {hero.subheadline && (
               <p
                 data-hero-animate
@@ -102,7 +120,11 @@ export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string
             <h1
               data-hero-animate
               data-reb-field="headline"
-              className="font-display text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight leading-[0.92] mb-6"
+              className={`font-display tracking-tight mb-6 ${
+                isEditorial
+                  ? "text-4xl md:text-6xl lg:text-7xl leading-[0.98]"
+                  : "text-5xl md:text-7xl lg:text-[5.5rem] leading-[0.92]"
+              }`}
               style={{ color: "var(--cream)" }}
             >
               {(hero.headline || "").split("\n").map((line, i) => (
@@ -115,12 +137,12 @@ export function Hero({ hero, siteName }: { hero: HeroContent; ownerName?: string
             <p
               data-hero-animate
               data-reb-field="tagline"
-              className="text-base md:text-lg max-w-md mb-8 leading-relaxed"
+              className={`text-base md:text-lg mb-8 leading-relaxed ${isEditorial ? "mx-auto max-w-xl" : "max-w-md"}`}
               style={{ color: "rgba(250,249,247,0.7)" }}
             >
               {hero.tagline}
             </p>
-            <div data-hero-animate className="flex flex-wrap items-center gap-4">
+            <div data-hero-animate className={`flex flex-wrap items-center gap-4 ${isEditorial ? "justify-center" : ""}`}>
               <TrackedLink
                 event="booking-click"
                 href={hero.ctaLink || "/services#booking"}

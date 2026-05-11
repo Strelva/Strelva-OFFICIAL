@@ -1,0 +1,202 @@
+version: 2
+
+goal:
+  title: "Make the Owner Dashboard Honest, Editable, and Useful"
+  slug: "owner-dashboard-command-center"
+  kind: existing_plan
+  tranche: "Complete the annotated dashboard cleanup as a coherent owner command center product arc."
+  status: done
+  intake:
+    original_request: "considering my annotations please create a goal with this and do all of the PRs"
+    interpreted_outcome: "Make the owner dashboard honestly show what can be edited, what data the AI can use, what changed, and what needs attention."
+    input_shape: existing_plan
+    audience: "Local business owners using Scaffold Web, plus Jacob as operator."
+    authority: requested
+    proof_type: test
+    completion_proof: "Annotated dashboard pages are implemented, tested, and browser-verified."
+    likely_misfire: "Shipping scattered UI tweaks while leaving the core owner workflow feeling fake or read-only."
+    blind_spots_considered:
+      - "Connections must not overclaim data access."
+      - "Reports and approvals are weak when empty and should be compressed or reframed."
+      - "Site editing already exists but is not obvious enough in the current surface."
+    existing_plan_facts:
+      - "Board choice is file board only."
+      - "Do not build OAuth for every integration."
+      - "Google Search Console was the initial default, but repo discovery may choose the first real supported OAuth path instead."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  preserve_and_validate_existing_plan: true
+
+agents:
+  scout: bundled_not_installed
+  worker: bundled_not_installed
+  judge: bundled_not_installed
+
+visual_board:
+  selected: none
+  local:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy board docs/goals/owner-dashboard-command-center"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Make the Site editor the primary clear owner workflow."
+    inputs:
+      - "Browser annotation comments 1, 2, and 3."
+      - "Current `/dashboard/site` implementation."
+    constraints:
+      - "Do not remove the standalone Ask AI page."
+      - "Preserve draft and publish behavior."
+    allowed_files:
+      - "src/components/dashboard/ContentWorkspace.tsx"
+      - "src/components/dashboard/SitePreview.tsx"
+      - "src/components/dashboard/PropertiesEditor.tsx"
+      - "src/components/dashboard/LayoutPanel.tsx"
+      - "src/components/dashboard/design/PublishBar.tsx"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+    stop_if:
+      - "Inline editing requires a new content schema or API contract."
+      - "Preview edit mode cannot be enabled without cross-origin behavior changes."
+    receipt:
+      result: done
+      changed_files:
+        - "src/components/dashboard/ContentWorkspace.tsx"
+        - "src/components/dashboard/SitePreview.tsx"
+        - "src/components/dashboard/PropertiesEditor.tsx"
+        - "src/components/dashboard/design/PublishBar.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+      summary: "Site now defaults to editable preview, removes the visible Site AI Chat tab, clarifies draft save and Push states, and keeps Content/Layout as the primary right-rail workflow."
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Make Sources honest about what is built in, connected, manual, OAuth-ready, or coming soon."
+    allowed_files:
+      - "src/components/dashboard/ConnectionsPage.tsx"
+      - "src/components/dashboard/ConnectionDetailPage.tsx"
+      - "src/components/dashboard/SourceHealthBadge.tsx"
+      - "src/lib/integration-registry.ts"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm test src/__tests__/site-capabilities.test.ts"
+    stop_if:
+      - "A new OAuth provider must be built from scratch."
+    receipt:
+      result: done
+      changed_files:
+        - "src/components/dashboard/ConnectionsPage.tsx"
+        - "src/components/dashboard/ConnectionDetailPage.tsx"
+        - "src/components/dashboard/SourceHealthBadge.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm test src/__tests__/site-capabilities.test.ts"
+          status: pass
+      summary: "Sources now distinguish built-in signals, OAuth-ready Google Business, manual Search Console setup, connected accounts, and planned/unusable sources without overclaiming AI access."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Compress Reports into a dashboard proof surface and keep report history only when it has substance."
+    allowed_files:
+      - "src/app/dashboard/page.tsx"
+      - "src/components/dashboard/WeeklyBriefClient.tsx"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+    stop_if:
+      - "Dashboard proof needs new analytics primitives."
+    receipt:
+      result: done
+      changed_files:
+        - "src/app/dashboard/page.tsx"
+        - "src/components/dashboard/WeeklyBriefClient.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+      summary: "Dashboard root is now a Today command center with people-found-you, booking-click, needs-you, next-action, and recent-activity proof. Reports empty state is smaller and points back to Today until real weekly reports exist."
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Reframe Approvals as a Needs You queue and improve empty-state value."
+    allowed_files:
+      - "src/components/dashboard/HistorySidebar.tsx"
+      - "src/components/dashboard/MobileNav.tsx"
+      - "src/components/dashboard/QueuePage.tsx"
+      - "src/components/dashboard/EmptyQueue.tsx"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+    stop_if:
+      - "Queue semantics require a storage migration."
+    receipt:
+      result: done
+      changed_files:
+        - "src/components/dashboard/HistorySidebar.tsx"
+        - "src/components/dashboard/MobileNav.tsx"
+        - "src/components/dashboard/QueuePage.tsx"
+        - "src/components/dashboard/EmptyQueue.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+      summary: "Approvals is reframed as Needs You across desktop/mobile navigation and the review page. Empty state now points to useful next actions instead of feeling like a dead approval queue."
+  - id: T005
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Final IA, product taste, and browser-verification audit for the annotation bundle."
+    inputs:
+      - "Receipts from T001-T004."
+      - "Browser checks for dashboard, site, sources, reports, and review."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "remaining risks"
+    receipt:
+      result: done
+      decision: "complete"
+      full_outcome_complete: true
+      evidence:
+        - "Browser DOM verification passed for /client/gldf/dashboard, /site, /sources, /reports, and /review."
+        - "Browser console errors: none on final review-page check."
+        - "pnpm test src/__tests__/owner-journey-copy.test.ts passed."
+        - "pnpm test src/__tests__/site-editor-publish.test.ts src/__tests__/site-capabilities.test.ts src/__tests__/dashboard-route-redirects.test.ts passed."
+        - "pnpm typecheck passed."
+        - "pnpm lint passed with existing warnings only."
+      remaining_risks:
+        - "The repo still has unrelated dirty files from prior work; these were preserved and not reverted."

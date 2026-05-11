@@ -5,12 +5,23 @@ import { useReveal } from "@/hooks/useReveal";
 import { TrackedLink } from "./TrackedLink";
 import type { ServicesContent } from "@/lib/types";
 
-export function Services({ services, bookingUrl }: { services: ServicesContent; bookingUrl?: string }) {
+export function Services({
+  services,
+  bookingUrl,
+  variant = "default",
+}: {
+  services: ServicesContent;
+  bookingUrl?: string;
+  variant?: string;
+}) {
   const headerRef = useReveal();
   const gridRef = useReveal();
 
   const featured = services.services.find((s) => s.featured) ?? services.services[0];
   const others = services.services.filter((s) => s.id !== featured?.id);
+  const showCompact = variant === "compact";
+  const showCards = variant === "cards";
+  const gridItems = showCompact || showCards ? services.services : others;
 
   return (
     <section
@@ -36,7 +47,7 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
         </div>
 
         {/* Featured service */}
-        {featured && (
+        {featured && !showCompact && !showCards && (
           <div className="mb-8">
             <div className="grid md:grid-cols-5 gap-0">
               <div
@@ -152,18 +163,18 @@ export function Services({ services, bookingUrl }: { services: ServicesContent; 
         )}
 
         {/* Other services */}
-        {others.length > 0 && (
+        {gridItems.length > 0 && (
           <div ref={gridRef} className="reveal">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {others.map((service, i) => {
+              {gridItems.map((service, i) => {
                 const serviceIndex = services.services.indexOf(service);
                 return (
                 <div
                   key={service.id}
-                  className={`reveal-delay-${Math.min(i + 1, 3)} overflow-hidden`}
+                  className={`reveal-delay-${Math.min(i + 1, 3)} overflow-hidden ${showCompact ? "border border-black/5" : ""}`}
                   style={{ background: "var(--cream-dark)" }}
                 >
-                  {service.image_url && (
+                  {service.image_url && !showCompact && (
                     <div className="relative aspect-[3/2]">
                       <Image
                         src={service.image_url}

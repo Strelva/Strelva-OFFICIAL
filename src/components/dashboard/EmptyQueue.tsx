@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, MessageCircle, Pencil, ShieldCheck } from "lucide-react";
 
 export function EmptyQueue() {
   return (
@@ -9,18 +9,23 @@ export function EmptyQueue() {
         <CheckCircle className="w-5 h-5 text-success" />
       </div>
       <p className="text-[14px] font-medium text-white">
-        Nothing is waiting on approval
+        Nothing needs you right now
       </p>
       <p className="text-[13px] text-gray-muted mt-1">
-        Risky AI changes, drafts, and review-needed updates appear here before going live.
+        Drafts and bigger AI changes appear here before they go live. Small safe edits can still be made from the site editor.
       </p>
       <div className="mt-5 grid w-full max-w-xl gap-2 sm:grid-cols-3">
-        {["New offer copy", "Review replies", "Large section rewrites"].map((item) => (
+        {[
+          { label: "Edit site copy", icon: Pencil },
+          { label: "Ask AI for an update", icon: MessageCircle },
+          { label: "Review larger changes", icon: ShieldCheck },
+        ].map((item) => (
           <div
-            key={item}
-            className="rounded-lg border border-glass-border bg-surface-raised px-3 py-2 text-[11px] text-gray-muted"
+            key={item.label}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-glass-border bg-surface-raised px-3 py-2 text-[11px] text-gray-muted"
           >
-            {item}
+            <item.icon className="h-3.5 w-3.5" strokeWidth={1.5} />
+            {item.label}
           </div>
         ))}
       </div>

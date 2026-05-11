@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import type { PageSectionConfig, SitePageConfig } from "@/lib/types";
+import type { PageSectionConfig, SiteCapabilityManifest, SitePageConfig } from "@/lib/types";
 
 const PAGE_LABELS: Record<string, string> = {
   home: "Home",
@@ -65,21 +65,26 @@ export function LayoutPanel() {
     setActiveSection,
     setRightTab,
     dashboardHref,
+    tenantId,
     siteModel,
     setHasPageConfigDraft,
     triggerRefresh,
   } = useDashboard();
   const fallbackConfig = useMemo(() => getDefaultPageConfig(siteModel), [siteModel]);
   const [pageConfig, setPageConfig] = useState<SitePageConfig | null>(null);
+  const [capabilityManifest, setCapabilityManifest] = useState<SiteCapabilityManifest | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(dashboardHref("/api/page-config?draft=true"), { credentials: "same-origin" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+    Promise.all([
+      fetch(dashboardHref("/api/page-config?draft=true"), { credentials: "same-origin" }).then((res) => (res.ok ? res.json() : null)),
+      fetch(`/api/v1/site-capabilities/${tenantId}`).then((res) => (res.ok ? res.json() : null)).catch(() => null),
+    ])
+      .then(([data, manifest]) => {
         if (!cancelled) setPageConfig(mergePageConfig(data, fallbackConfig));
+        if (!cancelled && manifest) setCapabilityManifest(manifest);
       })
       .catch(() => {
         if (!cancelled) setPageConfig(fallbackConfig);
@@ -87,7 +92,7 @@ export function LayoutPanel() {
     return () => {
       cancelled = true;
     };
-  }, [dashboardHref, fallbackConfig]);
+  }, [dashboardHref, fallbackConfig, tenantId]);
 
   const pageOptions = useMemo(() => {
     const source = pageConfig || fallbackConfig;
@@ -165,6 +170,14 @@ export function LayoutPanel() {
         section.type === type
           ? { ...section, layout: { ...section.layout, ...patch } }
           : section
+      )
+    );
+  }, [pageSections, updateActivePageSections]);
+
+  const updateVariant = useCallback((type: string, variant: string) => {
+    updateActivePageSections(
+      pageSections.map((section) =>
+        section.type === type ? { ...section, variant } : section
       )
     );
   }, [pageSections, updateActivePageSections]);
@@ -274,9 +287,23 @@ export function LayoutPanel() {
         {selectedSection && (
           <div className="border-t border-gray-border px-4 py-4">
             <p className="text-[11px] font-medium text-warm-white">
-              {SECTION_LABELS[selectedSection.type] || selectedSection.type} spacing
+              {SECTION_LABELS[selectedSection.type] || selectedSection.type} layout
             </p>
             <div className="mt-3 space-y-3">
+              <div>
+                <span className="mb-1.5 block text-[10px] text-gray-faint">Variant</span>
+                <select
+                  value={selectedSection.variant || "default"}
+                  onChange={(event) => updateVariant(selectedSection.type, event.target.value)}
+                  className="h-8 w-full rounded-md border border-gray-border bg-surface-raised px-2 text-[11px] text-warm-white outline-none focus:border-accent/45"
+                >
+                  {(capabilityManifest?.sections[selectedSection.type]?.variants || ["default"]).map((variant) => (
+                    <option key={variant} value={variant}>
+                      {variant.charAt(0).toUpperCase() + variant.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <span className="mb-1.5 block text-[10px] text-gray-faint">Gap</span>
                 <div className="grid grid-cols-3 gap-1">

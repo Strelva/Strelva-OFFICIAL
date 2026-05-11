@@ -71,7 +71,7 @@ export function PublishBar({
         {hasDrafts ? (
           <div className="flex items-center gap-1.5 text-amber-400">
             <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Showing unpublished draft</span>
+            <span className="text-[11px] font-medium">Draft preview active</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-emerald-400">

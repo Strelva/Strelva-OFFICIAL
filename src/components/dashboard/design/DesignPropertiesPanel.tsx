@@ -17,6 +17,7 @@ import { AgentPreview } from "../AgentPreview";
 import { AssetPickerModal } from "../AssetPickerModal";
 import { useDashboardOptional } from "../DashboardContext";
 import type { PreviewDiff, RiskAssessment } from "@/lib/agent-risk";
+import type { SectionCapability } from "@/lib/types";
 import type { SelectedNode } from "../DesignMode";
 
 type LayoutGap = 'tight' | 'normal' | 'loose';
@@ -34,7 +35,10 @@ interface DesignPropertiesPanelProps {
   onTabChange: (tab: "design" | "content" | "ai") => void;
   onContentUpdate?: (section: string, field: string, value: string) => void;
   onLayoutUpdate?: (section: string, layout: { gap?: LayoutGap; padding?: LayoutPadding }) => void;
+  onVariantUpdate?: (section: string, variant: string) => void;
   sectionLayout?: { gap?: LayoutGap; padding?: LayoutPadding };
+  sectionVariant?: string;
+  sectionCapability?: SectionCapability;
   editMode?: "live" | "draft";
   hasDraft?: boolean;
   sectionAnalytics?: Record<string, SectionAnalytics>;
@@ -46,13 +50,14 @@ export function DesignPropertiesPanel({
   onTabChange,
   onContentUpdate,
   onLayoutUpdate,
+  onVariantUpdate,
   sectionLayout,
+  sectionVariant,
+  sectionCapability,
   editMode = "draft",
   hasDraft = false,
   sectionAnalytics,
 }: DesignPropertiesPanelProps) {
-  const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const analytics = selectedNode?.sectionType
     ? sectionAnalytics?.[selectedNode.sectionType]
     : undefined;
@@ -103,7 +108,14 @@ export function DesignPropertiesPanel({
             <p className="text-[12px] text-gray-faint">Select a layer to edit</p>
           </div>
         ) : activeTab === "design" ? (
-          <DesignTab node={selectedNode} onLayoutUpdate={onLayoutUpdate} sectionLayout={sectionLayout} />
+          <DesignTab
+            node={selectedNode}
+            onLayoutUpdate={onLayoutUpdate}
+            onVariantUpdate={onVariantUpdate}
+            sectionLayout={sectionLayout}
+            sectionVariant={sectionVariant}
+            sectionCapability={sectionCapability}
+          />
         ) : activeTab === "content" ? (
           <ContentTab
             node={selectedNode}
@@ -198,14 +210,22 @@ function ColorSwatch({ color }: { color: string }) {
 function DesignTab({
   node,
   onLayoutUpdate,
+  onVariantUpdate,
   sectionLayout,
+  sectionVariant,
+  sectionCapability,
 }: {
   node: SelectedNode;
   onLayoutUpdate?: (section: string, layout: { gap?: LayoutGap; padding?: LayoutPadding }) => void;
+  onVariantUpdate?: (section: string, variant: string) => void;
   sectionLayout?: { gap?: LayoutGap; padding?: LayoutPadding };
+  sectionVariant?: string;
+  sectionCapability?: SectionCapability;
 }) {
   const currentGap = sectionLayout?.gap || 'normal';
   const currentPadding = sectionLayout?.padding || 'normal';
+  const variants = sectionCapability?.variants?.length ? sectionCapability.variants : ["default"];
+  const currentVariant = sectionVariant || "default";
 
   const handleGapChange = (gap: LayoutGap) => {
     if (onLayoutUpdate && node.sectionType) {
@@ -223,6 +243,28 @@ function DesignTab({
     <div className="py-2">
       {node.type === "section" && (
         <>
+          <SectionLabel>Section Variant</SectionLabel>
+          <div className="px-4 py-3">
+            <select
+              value={currentVariant}
+              onChange={(event) => {
+                if (node.sectionType && onVariantUpdate) {
+                  onVariantUpdate(node.sectionType, event.target.value);
+                }
+              }}
+              className="h-8 w-full rounded-md border border-gray-border bg-surface-base px-2 text-[11px] text-warm-black outline-none focus:border-accent/50"
+            >
+              {variants.map((variant) => (
+                <option key={variant} value={variant}>
+                  {variant.charAt(0).toUpperCase() + variant.slice(1)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-[10px] leading-4 text-gray-faint">
+              Variants come from this site&apos;s capability manifest.
+            </p>
+          </div>
+
           <SectionLabel>Section Layout</SectionLabel>
           <div className="px-4 py-3 space-y-3">
             <div>
@@ -532,7 +574,10 @@ function AITab({
   onContentUpdate?: (section: string, field: string, value: string) => void;
 }) {
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useCallback(
+    (path: string) => dashboard?.dashboardHref(path) ?? path,
+    [dashboard],
+  );
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);

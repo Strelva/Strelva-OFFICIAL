@@ -198,6 +198,22 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
 
   const intelligenceStatus = deriveIntelligenceStatus(detail, status);
   const categories = getIntegrationCategories(detail);
+  const canUseNow = intelligenceStatus === "ai_using_it" ||
+    intelligenceStatus === "can_act_here" ||
+    intelligenceStatus === "signal_available";
+  const setupPath = status === "connected"
+    ? "Connected and available according to the current sync status."
+    : status === "coming_soon"
+      ? "This source is planned. It is not available for setup yet."
+      : detail.connectionProvider === "google"
+        ? "OAuth is available for this Google Business source."
+        : detail.id === "google-search-console"
+          ? "This source uses manual Search Console credential setup today, not OAuth."
+          : detail.connectionProvider
+            ? "This source needs its provider connection before the AI can use it."
+            : detail.builtIn
+              ? "This is a built-in Scaffold Web signal."
+              : "This source needs setup before the AI can use it.";
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
@@ -254,16 +270,21 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         <div>
           <p className="text-[11px] uppercase tracking-[0.14em] text-gray-faint">Setup path</p>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.description}</p>
+          <p className="mt-3 text-[12px] leading-relaxed text-gray-fg">{setupPath}</p>
         </div>
         <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-8">
         <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Data this provides</span>
+          <span className="text-[11px] text-gray-faint uppercase tracking-wider">
+            {canUseNow ? "Data this provides" : "Data this would provide"}
+          </span>
           <p className="mt-2 text-[15px] font-medium text-warm-black">{detail.addsIntelligence}</p>
           <div className="mt-5">
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">AI can use this to</span>
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">
+              {canUseNow ? "AI can use this to" : "Once connected, AI can"}
+            </span>
             <ul className="mt-2 space-y-2">
               {detail.aiCanUseThisTo.map((item) => (
                 <li key={item} className="text-[13px] leading-relaxed text-gray-muted">

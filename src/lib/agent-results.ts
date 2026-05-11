@@ -100,7 +100,7 @@ export function buildAgentResultReceipt(
   if (status === "published" || status === "applied") {
     return {
       title: "Site updated",
-      detail: message || `The AI applied the change to ${sectionLabel}. Open the live site to confirm what visitors see.`,
+      detail: message || `The live site has the change to ${sectionLabel}. Open it to confirm what visitors see.`,
       proof,
       nextAction: "view_site",
     };

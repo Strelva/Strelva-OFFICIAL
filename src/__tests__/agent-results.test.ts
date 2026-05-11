@@ -12,6 +12,7 @@ describe("agent result contract", () => {
     expect(result.sectionIds).toEqual(["hero", "contact"]);
     expect(result.eventIds).toEqual(["evt_1"]);
     expect(result.receipt.title).toBe("Site updated");
+    expect(result.receipt.detail).toContain("The live site has the change");
     expect(result.receipt.nextAction).toBe("view_site");
   });
 

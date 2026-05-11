@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  House,
   Inbox,
   Link2,
   MessageCircle,
@@ -32,20 +33,21 @@ interface HistorySidebarProps {
 }
 
 const NAV_ITEMS = [
+  { href: "/dashboard", label: "Today", icon: House },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Approvals", icon: Inbox },
+  { href: "/dashboard/review", label: "Needs You", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/sources", label: "Connections", icon: Link2 },
+  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
 ];
 
 const NAV_GROUPS = [
   {
     label: "Manage",
-    items: NAV_ITEMS.slice(0, 2),
+    items: NAV_ITEMS.slice(0, 3),
   },
   {
     label: "Site",
-    items: NAV_ITEMS.slice(2, 4),
+    items: NAV_ITEMS.slice(3, 5),
   },
 ];
 

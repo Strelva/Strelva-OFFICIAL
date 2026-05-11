@@ -12,6 +12,8 @@
     "check:launch": "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
     "check:release": "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
     "smoke": "playwright test",
+    "smoke:admin": "REB_DEV_UNGATED_ACCESS=1 playwright test tests/admin-operator.spec.ts",
+    "smoke:dashboard": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/dashboard-owner.spec.ts",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
