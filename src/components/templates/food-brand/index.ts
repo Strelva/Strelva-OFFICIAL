@@ -73,7 +73,7 @@ function buildSectionProps(
 ): Record<string, unknown> | null {
   switch (sectionConfig.type) {
     case "hero":
-      return { hero: content.hero };
+      return { hero: content.hero, variant: sectionConfig.variant };
     case "products":
       return { products: content.products };
     case "story":

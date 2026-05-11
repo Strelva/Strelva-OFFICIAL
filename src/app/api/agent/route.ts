@@ -18,6 +18,7 @@ import {
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment } from "@/lib/capabilities";
+import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
@@ -93,6 +94,15 @@ function logisticsGuardrail(sectionNames: string): string {
 - If the user asks for something outside the platform's control, explain the boundary briefly and offer the closest supported action, such as drafting website copy, adding a FAQ, updating contact details, or creating an approval-ready draft.
 - When recommending changes, prioritize high-value website work: clearer contact/ordering path, trust proof, product/service clarity, fresh updates, conversion copy, and weekly-report-worthy proof.
 - Before changing content, read the relevant section first and preserve existing data. Available editable sections are: ${sectionNames}.`;
+}
+
+function getCustomRequestUrl(productionUrl: string | undefined, endpoint: string | undefined): string | null {
+  if (!productionUrl || !endpoint) return null;
+  try {
+    return new URL(endpoint, productionUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
@@ -354,6 +364,7 @@ export async function POST(req: Request) {
   }
   const messages = rawMessages;
   const template = await getTemplateForTenant(tenant);
+  const siteManifest = await getSiteCapabilityManifest(tenant);
 
   // Capture the latest user message for proof-signal logging (Workstream E).
   // Vercel AI SDK messages can have parts or plain string content — handle both.
@@ -398,9 +409,25 @@ export async function POST(req: Request) {
     systemPrompt += contextBlock;
   }
 
-  // Build dynamic section enum from template
+  const agentEditableSections = template.contentSections.filter((section) =>
+    siteManifest.sections[section]?.allowedActions?.includes("draft") !== false
+  );
+
+  systemPrompt += `\n\nSITE CONFIGURABILITY MANIFEST:
+- Page config: ${siteManifest.supportsPageConfig ? "supported" : "not supported"}
+- Navigation config: ${siteManifest.supportsNavigationConfig ? "supported" : "not supported"}
+- Footer config: ${siteManifest.supportsFooterConfig ? "supported" : "not supported"}
+- Draft preview: ${siteManifest.supportsDraftPreview ? "supported" : "not supported"}
+- Inline editing: ${siteManifest.supportsInlineEditing ? "supported" : "not supported"}
+- Supported design tokens: ${siteManifest.designTokens.join(", ") || "(none)"}
+- Editable sections: ${agentEditableSections.join(", ") || "(none)"}
+- Custom-only features: ${siteManifest.customOnlyFeatures.join(", ") || "(none)"}
+- Custom request endpoint: ${siteManifest.customRequestEndpoint || "(none)"}
+Only use tools for manifest-supported sections and actions. If the user requests cart, rewards, checkout, product-modal, email-popup, chat, or another custom-only feature, use request_custom_change instead of claiming it can be changed directly.`;
+
+  // Build dynamic section enum from the capability-filtered template sections.
   const sectionEnum = z.enum(
-    template.contentSections as [string, ...string[]]
+    (agentEditableSections.length > 0 ? agentEditableSections : template.contentSections) as [string, ...string[]]
   );
 
   // All tools are always available — single plan includes everything.
@@ -415,6 +442,9 @@ export async function POST(req: Request) {
         inputSchema: z.object({ section: sectionEnum }),
         execute: async ({ section }) => {
           try {
+            if (!manifestAllowsAction(siteManifest, section, "read")) {
+              return { error: `${section} is not readable for this site's capability manifest` };
+            }
             const { getContent } = await import("@/lib/storage");
             return await getContent(section as ContentSection, tenant);
           } catch (err) {
@@ -433,6 +463,11 @@ export async function POST(req: Request) {
         }),
         execute: async ({ section, data }) => {
           try {
+            if (!manifestAllowsAction(siteManifest, section, "draft")) {
+              const message = `${section} is not editable for this site's capability manifest. Send a custom request for this change.`;
+              recordActionResult({ status: "blocked", sectionIds: [section], message });
+              return { success: false, blocked: true, section, message, agentResultStatus: "blocked" as const };
+            }
             const { sectionSchemas } = await import("@/lib/schemas");
             const schema = sectionSchemas[section as ContentSection];
             const parsed = schema.safeParse(data);
@@ -490,7 +525,10 @@ export async function POST(req: Request) {
 
             // Route any non-publishable AI change to the durable review queue.
             const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
-            const autoPublish = governance.action === "publish" && !shouldRouteToReview;
+            const autoPublish =
+              governance.action === "publish" &&
+              !shouldRouteToReview &&
+              manifestAllowsAction(siteManifest, section, "publish");
             let queuedEventId: string | undefined;
 
             if (autoPublish) {
@@ -585,6 +623,76 @@ export async function POST(req: Request) {
             const error = `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
             recordActionResult({ status: "failed", sectionIds: [section], error });
             return { success: false, error, section, agentResultStatus: "failed" as const };
+          }
+        },
+      }),
+    },
+    request_custom_change: {
+      capability: "request_custom_change",
+      def: tool({
+        description: "Queue a custom-code or custom-design request for a manifest custom-only feature such as cart, rewards, checkout, product-modal, email-popup, or chat.",
+        inputSchema: z.object({
+          feature: z.string().describe("The custom-only feature id from the site capability manifest"),
+          summary: z.string().describe("Plain-English summary of the requested custom behavior or design change"),
+        }),
+        execute: async ({ feature, summary }) => {
+          const normalizedFeature = feature.trim();
+          const cleanSummary = summary.trim();
+          if (!siteManifest.customOnlyFeatures.includes(normalizedFeature)) {
+            const message = `${normalizedFeature} is not listed as a custom-only feature for this site's capability manifest.`;
+            recordActionResult({ status: "blocked", message });
+            return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
+          }
+          if (!cleanSummary) {
+            const message = "A custom request summary is required.";
+            recordActionResult({ status: "blocked", message });
+            return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
+          }
+
+          const requestUrl = getCustomRequestUrl(
+            tenantConfig?.customRepo?.productionUrl || tenantConfig?.siteUrl,
+            siteManifest.customRequestEndpoint
+          );
+          const secret = process.env.REB_CUSTOM_REQUEST_SECRET;
+          if (!requestUrl || !secret) {
+            const message = "Custom requests are not fully configured for this site yet.";
+            recordActionResult({ status: "blocked", message });
+            return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
+          }
+
+          try {
+            const response = await fetch(requestUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${secret}`,
+              },
+              body: JSON.stringify({
+                feature: normalizedFeature,
+                summary: cleanSummary,
+                requestedBy: "REB AI agent",
+              }),
+            });
+
+            if (!response.ok) {
+              const message = `Custom request failed with ${response.status}.`;
+              recordActionResult({ status: "failed", message });
+              return { success: false, error: message, agentResultStatus: "failed" as const };
+            }
+
+            const message = `Custom ${normalizedFeature} request sent for review.`;
+            recordActionResult({ status: "queued", message });
+            return {
+              success: true,
+              feature: normalizedFeature,
+              requestUrl,
+              agentResultStatus: "queued" as const,
+              message,
+            };
+          } catch (err) {
+            const error = `Failed to send custom request: ${err instanceof Error ? err.message : "Unknown error"}`;
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
           }
         },
       }),

@@ -263,7 +263,7 @@ export const seoMetaSchema = z.object({
   ogImage: z.string().optional(),
 });
 
-export const pageSectionConfigSchema = z.object({
+export const pageSectionConfigBaseSchema = z.object({
   type: z.string(),
   visible: z.boolean(),
   order: z.number(),
@@ -275,12 +275,60 @@ export const pageSectionConfigSchema = z.object({
   }).optional(),
 });
 
+export const pageSectionConfigSchema = pageSectionConfigBaseSchema.extend({
+  responsive: z.object({
+    mobile: pageSectionConfigBaseSchema.partial().optional(),
+    tablet: pageSectionConfigBaseSchema.partial().optional(),
+  }).optional(),
+});
+
 export const pageConfigSchema = z.object({
   sections: z.array(pageSectionConfigSchema),
   seo: seoMetaSchema.optional(),
 });
 
 export const sitePageConfigSchema = z.record(z.string(), pageConfigSchema);
+
+export const designTokenScopeSchema = z.enum([
+  "colors",
+  "fonts",
+  "buttons",
+  "spacing",
+  "radius",
+  "motion",
+  "imagery",
+]);
+
+export const sectionCapabilitySchema = z.object({
+  variants: z.array(z.string()),
+  editableFields: z.array(z.string()),
+  styleProps: z.array(z.string()),
+  allowedActions: z.array(z.enum(["read", "draft", "publish", "request_custom"])).optional(),
+});
+
+export const customComponentCapabilitySchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  adminOnly: z.boolean(),
+  exposure: z.enum(["inline", "custom_request"]).optional(),
+  supportedProps: z.array(z.string()).optional(),
+  requestableChanges: z.array(z.string()).optional(),
+});
+
+export const siteCapabilityManifestSchema = z.object({
+  contractVersion: z.string(),
+  sections: z.record(z.string(), sectionCapabilitySchema),
+  designTokens: z.array(designTokenScopeSchema),
+  supportsPageConfig: z.boolean(),
+  supportsNavigationConfig: z.boolean(),
+  supportsFooterConfig: z.boolean(),
+  supportsDraftPreview: z.boolean(),
+  supportsInlineEditing: z.boolean(),
+  customOnlyFeatures: z.array(z.string()),
+  customRequestEndpoint: z.string().optional(),
+  customComponents: z.array(customComponentCapabilitySchema),
+});
 
 export const sectionSchemas: Record<ContentSection, z.ZodType> = {
   hero: heroSchema,

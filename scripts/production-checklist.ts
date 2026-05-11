@@ -47,6 +47,7 @@ const locallyGeneratedSecrets = new Set([
   "CRON_SECRET",
   "INTERNAL_API_SECRET",
   "OAUTH_STATE_SECRET",
+  "REB_CUSTOM_REQUEST_SECRET",
 ]);
 
 const scaffoldWebDomainAction =
@@ -73,6 +74,7 @@ const envSourceHints: Record<string, string> = {
   NEXT_PUBLIC_APP_URL: "https://scaffoldweb.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
   NEXT_PUBLIC_SITE_URL: "https://scaffoldweb.com",
+  REB_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints",
   RESEND_API_KEY: "Resend production API key",
   RESEND_DOMAIN: "Verified Resend sending domain",
   SANITY_API_TOKEN: "Sanity production API token with content read/write permissions",
@@ -1085,6 +1087,7 @@ console.log("\n─── Cron & Internal API Security ────────�
 checkEnvVar("CRON_SECRET", true);
 checkEnvVar("INTERNAL_API_SECRET", true);
 checkEnvVar("OAUTH_STATE_SECRET", true);
+checkEnvVar("REB_CUSTOM_REQUEST_SECRET", true);
 
 console.log("\n─── Monitoring & Notifications ──────────────────────────────────");
 checkEnvVar("SENTRY_DSN", true, false);

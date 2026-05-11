@@ -18,6 +18,44 @@ export interface PageConfig {
 
 export type SitePageConfig = Record<string, PageConfig>;
 
+export type DesignTokenScope =
+  | "colors"
+  | "fonts"
+  | "buttons"
+  | "spacing"
+  | "radius"
+  | "motion"
+  | "imagery";
+
+export interface SectionCapability {
+  variants: string[];
+  editableFields: string[];
+  styleProps: string[];
+  allowedActions?: Array<"read" | "draft" | "publish" | "request_custom">;
+}
+
+export interface SiteCapabilityManifest {
+  contractVersion: string;
+  sections: Record<string, SectionCapability>;
+  designTokens: DesignTokenScope[];
+  supportsPageConfig: boolean;
+  supportsNavigationConfig: boolean;
+  supportsFooterConfig: boolean;
+  supportsDraftPreview: boolean;
+  supportsInlineEditing: boolean;
+  customOnlyFeatures: string[];
+  customComponents: Array<{
+    id: string;
+    label: string;
+    description?: string;
+    adminOnly: boolean;
+    exposure?: "inline" | "custom_request";
+    supportedProps?: string[];
+    requestableChanges?: string[];
+  }>;
+  customRequestEndpoint?: string;
+}
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
@@ -37,6 +75,8 @@ export const rebRoutes = {
     `/api/${REB_CONTRACT_VERSION}/content/${tenant}/${section}`,
   publicPageConfig: (tenant: string) =>
     `/api/${REB_CONTRACT_VERSION}/page-config/${tenant}`,
+  publicSiteCapabilities: (tenant: string) =>
+    `/api/${REB_CONTRACT_VERSION}/site-capabilities/${tenant}`,
 } as const;
 
 export async function fetchRebContent<T>(
@@ -61,16 +101,39 @@ export async function fetchRebContent<T>(
   }
 }
 
-export async function fetchRebPageConfig(fallback: SitePageConfig): Promise<SitePageConfig> {
+export async function fetchRebPageConfig(
+  fallback: SitePageConfig,
+  opts: { preview?: boolean } = {}
+): Promise<SitePageConfig> {
   const baseUrl = getRebBaseUrl();
   if (!baseUrl) return fallback;
 
   try {
-    const res = await fetch(`${baseUrl}${rebRoutes.publicPageConfig(getTenantId())}`, {
-      next: { revalidate: 60, tags: ["page-config"] },
+    const url = new URL(`${baseUrl}${rebRoutes.publicPageConfig(getTenantId())}`);
+    if (opts.preview) url.searchParams.set("preview", "true");
+    const res = await fetch(url, {
+      next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["page-config"] },
+      cache: opts.preview ? "no-store" : undefined,
     });
     if (!res.ok) return fallback;
     return await res.json() as SitePageConfig;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function fetchRebSiteCapabilities(
+  fallback: SiteCapabilityManifest
+): Promise<SiteCapabilityManifest> {
+  const baseUrl = getRebBaseUrl();
+  if (!baseUrl) return fallback;
+
+  try {
+    const res = await fetch(`${baseUrl}${rebRoutes.publicSiteCapabilities(getTenantId())}`, {
+      next: { revalidate: 60, tags: ["site-capabilities"] },
+    });
+    if (!res.ok) return fallback;
+    return await res.json() as SiteCapabilityManifest;
   } catch {
     return fallback;
   }

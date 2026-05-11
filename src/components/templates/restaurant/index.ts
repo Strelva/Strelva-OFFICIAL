@@ -113,9 +113,9 @@ function buildSectionProps(
 
   switch (type) {
     case "hero":
-      return { hero: content.hero, ownerName: settings?.ownerName };
+      return { hero: content.hero, ownerName: settings?.ownerName, variant: sectionConfig.variant };
     case "services":
-      return { services: content.services, bookingUrl: settings?.bookingUrl };
+      return { services: content.services, bookingUrl: settings?.bookingUrl, variant: sectionConfig.variant };
     case "story":
       return { story: content.story, ownerName: settings?.ownerName };
     case "testimonials":

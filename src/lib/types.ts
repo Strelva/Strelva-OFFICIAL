@@ -293,6 +293,48 @@ export interface PageConfig {
 
 export type SitePageConfig = Record<string, PageConfig>;
 
+// --- Site Capability Manifest Types ---
+
+export type DesignTokenScope =
+  | "colors"
+  | "fonts"
+  | "buttons"
+  | "spacing"
+  | "radius"
+  | "motion"
+  | "imagery";
+
+export interface SectionCapability {
+  variants: string[];
+  editableFields: string[];
+  styleProps: string[];
+  allowedActions?: Array<"read" | "draft" | "publish" | "request_custom">;
+}
+
+export interface CustomComponentCapability {
+  id: string;
+  label: string;
+  description?: string;
+  adminOnly: boolean;
+  exposure?: "inline" | "custom_request";
+  supportedProps?: string[];
+  requestableChanges?: string[];
+}
+
+export interface SiteCapabilityManifest {
+  contractVersion: string;
+  sections: Record<string, SectionCapability>;
+  designTokens: DesignTokenScope[];
+  supportsPageConfig: boolean;
+  supportsNavigationConfig: boolean;
+  supportsFooterConfig: boolean;
+  supportsDraftPreview: boolean;
+  supportsInlineEditing: boolean;
+  customOnlyFeatures: string[];
+  customRequestEndpoint?: string;
+  customComponents: CustomComponentCapability[];
+}
+
 // --- Review Types ---
 
 export interface ReviewItem {
@@ -405,6 +447,11 @@ export interface CustomRepoMetadata {
   lastDeploymentUrl?: string;
   lastDeploymentAt?: string;
   supportedSections?: ContentSection[];
+  capabilityManifestUrl?: string;
+  supportedDesignTokens?: DesignTokenScope[];
+  supportsPageConfig?: boolean;
+  supportsDraftPreview?: boolean;
+  supportsInlineEditing?: boolean;
   customFeatures?: string[];
   contractVersion?: string;
   revalidationHealth?: CustomRepoRevalidationHealth;
@@ -453,6 +500,7 @@ export interface TenantConfig {
   /** Custom repos are the default delivery model for paid clients. */
   deliveryModel?: TenantDeliveryModel;
   customRepo?: CustomRepoMetadata;
+  siteCapabilities?: Partial<SiteCapabilityManifest>;
   features?: TenantFeature[];
   integrations?: IntegrationProvider[];
   customDomains?: string[];

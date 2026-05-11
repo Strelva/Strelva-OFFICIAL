@@ -1,5 +1,6 @@
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { sitePageConfigSchema } from "@/lib/schemas";
+import { getSiteCapabilityManifest, manifestSupportsSection } from "@/lib/site-capabilities";
 import type { SitePageConfig } from "@/lib/types";
 
 export async function parseAndValidatePageConfig(
@@ -15,14 +16,27 @@ export async function parseAndValidatePageConfig(
 
   const pageConfig = parsed.data as SitePageConfig;
   const template = await getTemplateForTenant(tenant);
+  const manifest = await getSiteCapabilityManifest(tenant);
   const allowedSections = new Set(Object.keys(template.components));
+
+  if (!manifest.supportsPageConfig) {
+    return {
+      error: "This site does not support page-level configuration",
+    };
+  }
 
   for (const [page, config] of Object.entries(pageConfig)) {
     const seen = new Set<string>();
     for (const section of config.sections) {
-      if (!allowedSections.has(section.type)) {
+      if (!allowedSections.has(section.type) || !manifestSupportsSection(manifest, section.type)) {
         return {
-          error: `${section.type} is not available for the ${template.id} template`,
+          error: `${section.type} is not available for this site's capability manifest`,
+        };
+      }
+      const capability = manifest.sections[section.type];
+      if (section.variant && !capability.variants.includes(section.variant)) {
+        return {
+          error: `${section.variant} is not an available variant for ${section.type}`,
         };
       }
       if (seen.has(section.type)) {

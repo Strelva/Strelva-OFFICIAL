@@ -4,10 +4,11 @@ import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
-import type { TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
+import type { DesignTokenScope, TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
 
 const TENANT_FEATURES = new Set<TenantFeature>(["commerce", "booking", "newsletter"]);
 const DELIVERY_MODELS = new Set<TenantDeliveryModel>(["custom_repo", "platform_template"]);
+const DESIGN_TOKENS = new Set<DesignTokenScope>(["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"]);
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -16,6 +17,11 @@ function cleanString(value: unknown): string {
 function cleanFeatures(value: unknown): TenantFeature[] {
   if (!Array.isArray(value)) return [];
   return value.filter((feature): feature is TenantFeature => TENANT_FEATURES.has(feature as TenantFeature));
+}
+
+function cleanDesignTokens(value: unknown): DesignTokenScope[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((token): token is DesignTokenScope => DESIGN_TOKENS.has(token as DesignTokenScope));
 }
 
 export async function GET(req: Request) {
@@ -89,6 +95,11 @@ export async function POST(req: Request) {
         repoName: cleanString(cleanCustomRepo.repoName) || subdomain,
         repoUrl: cleanString(cleanCustomRepo.repoUrl) || undefined,
         localPath: cleanString(cleanCustomRepo.localPath) || undefined,
+        capabilityManifestUrl: cleanString(cleanCustomRepo.capabilityManifestUrl) || undefined,
+        supportedDesignTokens: cleanDesignTokens(cleanCustomRepo.supportedDesignTokens),
+        supportsPageConfig: typeof cleanCustomRepo.supportsPageConfig === "boolean" ? cleanCustomRepo.supportsPageConfig : true,
+        supportsDraftPreview: typeof cleanCustomRepo.supportsDraftPreview === "boolean" ? cleanCustomRepo.supportsDraftPreview : true,
+        supportsInlineEditing: typeof cleanCustomRepo.supportsInlineEditing === "boolean" ? cleanCustomRepo.supportsInlineEditing : true,
         contractVersion: cleanString(cleanCustomRepo.contractVersion) || CUSTOM_REPO_CONTRACT_VERSION,
         productionUrl: typeof productionDomain === "string" && normalizeTenantDomain(productionDomain)
           ? `https://${normalizeTenantDomain(productionDomain)}`

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { getDraftPageConfig, getPageConfig } from "@/lib/storage";
 import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
 import { getTenantConfig } from "@/lib/tenants";
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ tenant: string }> }
 ) {
   const { tenant } = await params;
@@ -19,14 +18,9 @@ export async function GET(
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
-    const manifest = await getSiteCapabilityManifest(tenant);
-    const preview = new URL(request.url).searchParams.get("preview") === "true";
-    const pageConfig = preview && manifest.supportsDraftPreview
-      ? (await getDraftPageConfig(tenant)) || await getPageConfig(tenant)
-      : await getPageConfig(tenant);
-    return NextResponse.json(pageConfig);
+    return NextResponse.json(await getSiteCapabilityManifest(tenant));
   } catch (err) {
-    console.error("[public page-config GET]", tenant, err);
-    return NextResponse.json({ error: "Failed to load page config" }, { status: 500 });
+    console.error("[public site-capabilities GET]", tenant, err);
+    return NextResponse.json({ error: "Failed to load site capabilities" }, { status: 500 });
   }
 }

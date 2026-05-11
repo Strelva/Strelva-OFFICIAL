@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import type { ContentMap, ContentSection } from "@/lib/types";
-import { getContent } from "@/lib/storage";
+import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import {
+  getSiteCapabilityManifest,
+  manifestSupportsContentSection,
+} from "@/lib/site-capabilities";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
-  const template = await getTemplateForTenant(tenant);
-  return template.contentSections.includes(section as ContentSection);
+  if (!(section in SECTION_TO_TYPE)) return false;
+  const manifest = await getSiteCapabilityManifest(tenant);
+  return manifestSupportsContentSection(manifest, section as ContentSection);
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ tenant: string; section: string }> }
 ) {
   const { tenant, section } = await params;
@@ -29,7 +33,8 @@ export async function GET(
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
 
-    const data = await getContent(section as ContentSection, tenant);
+    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    const data = await getContent(section as ContentSection, tenant, preview ? { preview: true } : undefined);
     return NextResponse.json(data as ContentMap[ContentSection]);
   } catch (err) {
     console.error("[public content GET]", tenant, section, err);

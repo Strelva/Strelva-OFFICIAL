@@ -11,7 +11,8 @@ import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { validateTenantDomains } from "@/lib/domains";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
-import type { BusinessHours } from "@/lib/types";
+import { siteCapabilityManifestSchema } from "@/lib/schemas";
+import type { BusinessHours, SiteCapabilityManifest } from "@/lib/types";
 
 /** Tenant-level settings: businessRules, personality, businessHours */
 
@@ -33,6 +34,8 @@ export async function GET() {
       autoPublish: config.autoPublish !== false,
       productionDomain: config.productionDomain || "",
       adminDomain: config.adminDomain || "",
+      customRepo: config.customRepo || null,
+      siteCapabilities: config.siteCapabilities || null,
       // Connection status flags (presence of config = connected)
       connections: {
         googleSearchConsole: !!config.googleSearchConsoleKey,
@@ -115,6 +118,19 @@ export async function PUT(req: Request) {
     }
     if (typeof body.autoPublish === "boolean") {
       updates.autoPublish = body.autoPublish;
+    }
+    if (body.siteCapabilities !== undefined) {
+      const parsed = siteCapabilityManifestSchema.partial().safeParse(body.siteCapabilities);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid site capabilities" },
+          { status: 400 }
+        );
+      }
+      updates.siteCapabilities = {
+        ...(currentConfig.siteCapabilities || {}),
+        ...(parsed.data as Partial<SiteCapabilityManifest>),
+      };
     }
     // Google Search Console key (JSON string)
     if (typeof body.googleSearchConsoleKey === "string") {

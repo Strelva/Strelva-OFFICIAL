@@ -113,11 +113,13 @@ function buildSectionProps(
         hero: content.hero,
         ownerName: (content.settings as Record<string, unknown>)?.ownerName,
         siteName: (content.settings as Record<string, unknown>)?.siteName,
+        variant: sectionConfig.variant,
       };
     case "services":
       return {
         services: content.services,
         bookingUrl: (content.settings as Record<string, unknown>)?.bookingUrl,
+        variant: sectionConfig.variant,
       };
     case "story":
       return {
