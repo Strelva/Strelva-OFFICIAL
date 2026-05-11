@@ -5,15 +5,10 @@ import Image from "next/image";
 import gsap from "gsap";
 import type { HeroContent } from "@/lib/types";
 
-function canRenderHeroImage(src: string | undefined) {
-  return !!src && !src.startsWith("/images/");
-}
-
 export function Hero({ hero }: { hero: HeroContent }) {
   const sectionRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const productRef = useRef<HTMLDivElement>(null);
-  const heroLogoUrl = canRenderHeroImage(hero.logoUrl) ? hero.logoUrl : "";
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -24,29 +19,26 @@ export function Hero({ hero }: { hero: HeroContent }) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const ctx = gsap.context(() => {
-      // Text entrance stagger
       const elements = content.querySelectorAll("[data-hero-animate]");
-      gsap.set(elements, { opacity: 0, y: 40 });
+      gsap.set(elements, { opacity: 0, y: 36 });
       gsap.to(elements, {
         opacity: 1,
         y: 0,
         duration: 1,
         ease: "power3.out",
-        stagger: 0.15,
-        delay: 0.2,
+        stagger: 0.14,
+        delay: 0.15,
       });
 
-      // Product bag entrance — slides up + fades in
-      gsap.set(product, { opacity: 0, y: 60 });
+      gsap.set(product, { opacity: 0, y: 48 });
       gsap.to(product, {
         opacity: 1,
         y: 0,
-        duration: 1.2,
+        duration: 1.1,
         ease: "power3.out",
-        delay: 0.5,
+        delay: 0.35,
       });
 
-      // Subtle float on product
       gsap.to(product.querySelector("[data-product-img]"), {
         y: -8,
         duration: 3,
@@ -62,106 +54,120 @@ export function Hero({ hero }: { hero: HeroContent }) {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full overflow-hidden"
-      style={{ paddingBottom: "33.333%" /* 3:1 aspect ratio like TopSeedz */ }}
+      className="relative min-h-[760px] overflow-hidden pt-24 md:pt-28 lg:pt-32"
+      style={{ background: "var(--cream)", color: "var(--bark)" }}
     >
-      {/* Full-bleed background image */}
-      {hero.backgroundImageUrl && (
-        <Image
-          src={hero.backgroundImageUrl}
-          alt=""
-          fill
-          className="object-cover object-center"
-          sizes="100vw"
-          priority
-        />
-      )}
-      {/* Dark overlay for text legibility */}
-      <div className="absolute inset-0 bg-black/40" />
-
-      {/* Content positioned absolutely within the aspect-ratio box */}
-      <div className="absolute inset-0 z-10 flex items-center">
-        <div className="container-main w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            {/* Left — Text */}
-            <div ref={contentRef} className="max-w-xl text-center lg:text-left mx-auto lg:mx-0">
-              {hero.subheadline && (
-                <p
-                  data-hero-animate
-                  className="text-xs md:text-sm font-medium tracking-wider uppercase mb-3"
-                  style={{ color: "var(--wheat-light)" }}
-                >
-                  {hero.subheadline}
-                </p>
-              )}
-              <h1
-                data-hero-animate
-                className="font-display text-3xl md:text-5xl lg:text-6xl tracking-tight leading-[0.92] mb-4"
-                style={{ color: "var(--cream)" }}
-              >
-                {hero.headline.split("\n").map((line, i) => (
-                  <span key={i}>
-                    {i > 0 && <br />}
-                    {line}
-                  </span>
-                ))}
-              </h1>
+      <div className="container-main relative z-10">
+        <div className="grid min-h-[610px] items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(360px,430px)]">
+          <div ref={contentRef} className="max-w-4xl">
+            {hero.subheadline && (
               <p
                 data-hero-animate
-                className="text-sm md:text-base max-w-md mx-auto lg:mx-0 mb-5 leading-relaxed"
-                style={{ color: "rgba(250, 248, 245, 0.8)" }}
+                data-reb-field="subheadline"
+                className="mb-5 text-[0.68rem] font-bold uppercase tracking-[0.2em]"
+                style={{ color: "var(--sage)" }}
               >
-                {hero.tagline}
+                {hero.subheadline}
               </p>
-              <div data-hero-animate className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                <a
-                  href="#products"
-                  className="btn-primary"
-                  aria-label="See Great Lakes Dried Fruit products"
-                  style={{ background: "var(--cream)", color: "var(--sage)" }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    e.currentTarget.style.background = "var(--wheat-light)";
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    e.currentTarget.style.background = "var(--cream)";
-                  }}
-                >
-                  {hero.ctaText}
-                </a>
-                <a
-                  href="#comparison"
-                  className="btn-ghost"
-                  aria-label="Jump to what makes these products different"
-                  style={{ borderColor: "rgba(250,248,245,0.5)", color: "var(--cream)" }}
-                >
-                  Why We&apos;re Different
-                </a>
-              </div>
-            </div>
-
-            {/* Right — Product bag (only show if logoUrl is set as product image) */}
-            {heroLogoUrl && (
-              <div ref={productRef} className="hidden lg:flex items-center justify-end">
-                <div
-                  data-product-img
-                  className="relative z-10"
-                  style={{ width: "min(280px, 40vw)" }}
-                >
-                  <Image
-                    src={heroLogoUrl}
-                    alt={`${hero.headline} — Product`}
-                    width={1200}
-                    height={1703}
-                    className="w-full h-auto drop-shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
-                    sizes="280px"
-                    priority
-                  />
-                </div>
-              </div>
             )}
+            <h1
+              data-hero-animate
+              data-reb-field="headline"
+              className="font-display text-[clamp(3.25rem,8vw,7.5rem)] leading-[0.9] tracking-tight"
+              style={{ color: "var(--bark)" }}
+            >
+              {hero.headline.split("\n").map((line, i) => (
+                <span key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </span>
+              ))}
+            </h1>
+            <p
+              data-hero-animate
+              data-reb-field="tagline"
+              className="mt-7 max-w-2xl text-lg leading-relaxed md:text-xl"
+              style={{ color: "var(--bark-light)" }}
+            >
+              {hero.tagline}
+            </p>
+            <div data-hero-animate className="mt-9 flex flex-wrap items-center gap-4">
+              <a
+                href={hero.ctaLink || "#products"}
+                className="px-7 py-3.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] transition-opacity hover:opacity-80"
+                aria-label="See Great Lakes Dried Fruit products"
+                data-reb-field="ctaText"
+                style={{ background: "var(--bark)", color: "var(--cream)" }}
+              >
+                {hero.ctaText}
+              </a>
+              <a
+                href="#comparison"
+                className="px-7 py-3.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] transition-opacity hover:opacity-70"
+                aria-label="Jump to what makes these products different"
+                style={{ border: "1px solid var(--cream-mid)", color: "var(--bark)" }}
+              >
+                Why Us
+              </a>
+            </div>
+          </div>
+
+          <div ref={productRef} className="relative hidden min-h-[560px] lg:block">
+            <div
+              data-product-img
+              className="absolute right-0 top-0 h-[520px] w-[430px] overflow-hidden"
+              style={{ background: "var(--cream-dark)" }}
+            >
+              <Image
+                src="/images/product-bag-lifestyle.jpg"
+                alt="Great Lakes Dried Fruit apple snaps bag"
+                fill
+                className="object-cover"
+                sizes="(min-width: 1024px) 430px, 72vw"
+                priority
+              />
+            </div>
+            <div
+              className="absolute -bottom-1 left-0 h-[260px] w-[260px] overflow-hidden shadow-[0_24px_80px_rgba(44,36,24,0.18)]"
+              style={{ background: "var(--cream-mid)" }}
+            >
+              <Image
+                src="/images/product-bag.jpg"
+                alt="Great Lakes Dried Fruit apple snaps bag"
+                fill
+                className="object-cover"
+                sizes="260px"
+              />
+            </div>
           </div>
         </div>
+
+        <div
+          data-hero-animate
+          className="absolute bottom-8 left-4 hidden items-center gap-3 text-[0.62rem] font-bold uppercase tracking-[0.18em] md:flex"
+          style={{ color: "var(--bark-faded)" }}
+        >
+          <span>Scroll to explore</span>
+          <span className="h-px w-16" style={{ background: "var(--cream-mid)" }} />
+        </div>
       </div>
+
+      <div
+        className="pointer-events-none absolute bottom-0 left-0 right-0 h-32"
+        style={{ background: "linear-gradient(to bottom, transparent, var(--cream-dark))" }}
+      />
+
+      {hero.backgroundImageUrl && (
+        <div className="sr-only">
+          <Image
+            src={hero.backgroundImageUrl}
+            alt=""
+            width={1}
+            height={1}
+            data-reb-field="backgroundImageUrl"
+          />
+        </div>
+      )}
     </section>
   );
 }

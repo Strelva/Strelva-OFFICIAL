@@ -1,11 +1,13 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import type { EditableNode } from "@/lib/editor-types";
 
 type Panel = "content" | "preview" | "chat";
-type RightTab = "properties" | "chat";
+type RightTab = "properties" | "layout" | "chat";
 type EditMode = "live" | "draft";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
+type PlanOverride = "founder_comp" | null;
 
 export interface ImpersonationContext {
   isActive: boolean;
@@ -25,6 +27,8 @@ interface DashboardContextValue {
   // Active section (expanded card in left panel)
   activeSection: string | null;
   setActiveSection: (section: string | null) => void;
+  selectedNode: EditableNode | null;
+  setSelectedNode: (node: EditableNode | null) => void;
 
   // Active page (selected in ContentBrowser Pages tab). Shared so
   // SitePreview's iframe src and PageStructurePanel can react to it.
@@ -56,6 +60,9 @@ interface DashboardContextValue {
   setEditMode: (mode: EditMode) => void;
   hasDraft: Record<string, boolean>;
   setHasDraft: Dispatch<SetStateAction<Record<string, boolean>>>;
+  hasPageConfigDraft: boolean;
+  setHasPageConfigDraft: Dispatch<SetStateAction<boolean>>;
+  reloadDraftState: () => Promise<void>;
 
   // Tenant site URL
   tenantId: string;
@@ -73,6 +80,7 @@ interface DashboardContextValue {
   // Billing state from the tenant record
   subscriptionStatus: SubscriptionStatus;
   hasStripeCustomer: boolean;
+  planOverride: PlanOverride;
 
   // Super-admin visibility
   impersonation: ImpersonationContext;
@@ -110,6 +118,7 @@ export function DashboardProvider({
   autoPublish = true,
   subscriptionStatus = "none",
   hasStripeCustomer = false,
+  planOverride = null,
   impersonation,
 }: {
   children: ReactNode;
@@ -121,6 +130,7 @@ export function DashboardProvider({
   autoPublish?: boolean;
   subscriptionStatus?: SubscriptionStatus;
   hasStripeCustomer?: boolean;
+  planOverride?: PlanOverride;
   impersonation?: ImpersonationContext;
 }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
@@ -131,15 +141,31 @@ export function DashboardProvider({
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<string>("home");
   const [rightTab, setRightTab] = useState<RightTab>("chat");
+  const [selectedNode, setSelectedNodeState] = useState<EditableNode | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
+  const [hasPageConfigDraft, setHasPageConfigDraft] = useState(false);
   const dashboardHref = useCallback(
     (path: string) => `${dashboardBasePath}${path.startsWith("/") ? path : `/${path}`}`,
     [dashboardBasePath]
   );
+
+  const reloadDraftState = useCallback(async () => {
+    try {
+      const res = await fetch(dashboardHref("/api/publish"), { credentials: "same-origin" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setHasDraft(
+        data.contentDrafts && typeof data.contentDrafts === "object"
+          ? data.contentDrafts
+          : {}
+      );
+      setHasPageConfigDraft(Boolean(data.pageConfigDraft));
+    } catch {}
+  }, [dashboardHref]);
 
   // Apply localStorage collapse state after hydration completes.
   // First render always uses server default (false) so the client
@@ -153,6 +179,13 @@ export function DashboardProvider({
     setRightCollapsed(stored.right);
     setHasMounted(true);
   }, []);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void reloadDraftState();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [reloadDraftState]);
 
   const persistCollapse = (left: boolean, right: boolean) => {
     try {
@@ -182,7 +215,15 @@ export function DashboardProvider({
 
   const setActiveSection = useCallback((section: string | null) => {
     setActiveSectionState(section);
+    if (!section) setSelectedNodeState(null);
     if (section) setRightTab("properties"); // Auto-switch to properties when selecting a section
+  }, []);
+
+  const setSelectedNode = useCallback((node: EditableNode | null) => {
+    setSelectedNodeState(node);
+    if (node?.section) {
+      setActiveSectionState(node.section);
+    }
   }, []);
 
   const setChatPrompt = useCallback((prompt: string) => {
@@ -206,6 +247,8 @@ export function DashboardProvider({
         setChatPrompt,
         activeSection,
         setActiveSection,
+        selectedNode,
+        setSelectedNode,
         activePage,
         setActivePage,
         rightTab,
@@ -224,6 +267,9 @@ export function DashboardProvider({
         setEditMode,
         hasDraft,
         setHasDraft,
+        hasPageConfigDraft,
+        setHasPageConfigDraft,
+        reloadDraftState,
         tenantId,
         siteUrl,
         previewUrl,
@@ -233,6 +279,7 @@ export function DashboardProvider({
         autoPublish,
         subscriptionStatus,
         hasStripeCustomer,
+        planOverride,
         impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
       }}
     >

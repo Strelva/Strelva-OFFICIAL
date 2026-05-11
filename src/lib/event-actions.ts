@@ -1,6 +1,7 @@
 import { executeAgentPrompt } from "./agent-executor";
-import { getEvent, resolveEvent } from "./events";
+import { getEvent, resolveEvent, updateEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
+import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
   appendVersion,
   clearDraft,
@@ -11,15 +12,74 @@ import {
 } from "./storage";
 import { diffFields } from "./utils";
 import type { ContentMap, ContentSection } from "./types";
+import type { CustomChangeRequestStatus } from "./types";
+
+export type EventWorkflowAction =
+  | "approved"
+  | "dismissed"
+  | "triaged"
+  | "quoted"
+  | "accepted"
+  | "in_progress"
+  | "shipped"
+  | "declined";
+
+const CUSTOM_WORKFLOW_ACTIONS = new Set<EventWorkflowAction>([
+  "triaged",
+  "quoted",
+  "accepted",
+  "in_progress",
+  "shipped",
+  "declined",
+]);
+
+function workflowStatusFromAction(action: EventWorkflowAction): CustomChangeRequestStatus | null {
+  if (action === "approved" || action === "dismissed") return null;
+  return action;
+}
 
 export async function resolveEventAction(
   tenantId: string,
   eventId: string,
-  action: "approved" | "dismissed"
+  action: EventWorkflowAction
 ): Promise<{ changed: boolean; reason?: string }> {
   const event = await getEvent(eventId);
   if (!event) return { changed: false, reason: "not_found" };
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
+
+  if (event.type === "change_request" && CUSTOM_WORKFLOW_ACTIONS.has(action)) {
+    if (!isCustomChangeRequestMetadata(event.metadata)) {
+      return { changed: false, reason: "not_custom_change_request" };
+    }
+
+    const workflowStatus = workflowStatusFromAction(action);
+    if (!workflowStatus) return { changed: false, reason: "invalid_action" };
+
+    const terminalStatus = workflowStatus === "shipped"
+      ? "approved"
+      : workflowStatus === "declined"
+        ? "dismissed"
+        : event.status;
+    const result = await updateEvent(eventId, (existing) => ({
+      ...existing,
+      status: terminalStatus,
+      resolvedAt: terminalStatus === "approved" || terminalStatus === "dismissed"
+        ? new Date().toISOString()
+        : existing.resolvedAt,
+      metadata: {
+        ...existing.metadata,
+        workflowStatus,
+        quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
+        shippedAt: workflowStatus === "shipped" ? new Date().toISOString() : existing.metadata?.shippedAt,
+        workflowUpdatedAt: new Date().toISOString(),
+      },
+    }));
+    return { changed: result.changed };
+  }
+
+  if (action !== "approved" && action !== "dismissed") {
+    return { changed: false, reason: "invalid_action" };
+  }
 
   const resolved = await resolveEvent(eventId, action, { actor: "user" });
   if (!resolved.changed) {

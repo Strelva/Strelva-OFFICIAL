@@ -1,16 +1,27 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getPageConfig, logAuditEvent, setPageConfig } from "@/lib/storage";
+import {
+  clearDraftPageConfig,
+  getDraftPageConfig,
+  getPageConfig,
+  logAuditEvent,
+  setDraftPageConfig,
+  setPageConfig,
+} from "@/lib/storage";
 import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
-import type { SitePageConfig } from "@/lib/types";
+import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const tenant = await getTenantFromHeaders();
-    const config = await getPageConfig(tenant);
+    const url = new URL(request.url);
+    const isDraft = url.searchParams.get("draft") === "true";
+    const config = isDraft
+      ? (await getDraftPageConfig(tenant)) || (await getPageConfig(tenant))
+      : await getPageConfig(tenant);
     return NextResponse.json(config);
   } catch {
     return NextResponse.json({ error: "Failed to load page config" }, { status: 500 });
@@ -36,8 +47,32 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const pageConfig = body as SitePageConfig;
+    const validated = await parseAndValidatePageConfig(tenant, body);
+    if ("error" in validated) {
+      return NextResponse.json({ error: validated.error }, { status: 422 });
+    }
+    const { pageConfig } = validated;
+
+    const url = new URL(request.url);
+    const isDraft = url.searchParams.get("draft") === "true";
+
+    if (isDraft) {
+      await setDraftPageConfig(pageConfig, tenant);
+      if (actor.isImpersonating) {
+        await logAuditEvent({
+          tenant,
+          actor,
+          action: "page_config.draft_saved",
+          targetType: "page_config",
+          targetId: tenant,
+          metadata: { pages: Object.keys(pageConfig) },
+        });
+      }
+      return NextResponse.json({ success: true, draft: true });
+    }
+
     await setPageConfig(pageConfig, tenant);
+    await clearDraftPageConfig(tenant).catch(() => {});
     if (actor.isImpersonating) {
       await logAuditEvent({
         tenant,

@@ -387,6 +387,33 @@ export type TenantFeature = "commerce" | "booking" | "newsletter";
 
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 
+export type TenantDeliveryModel = "custom_repo" | "platform_template";
+
+export type CustomRepoRevalidationHealth =
+  | "unknown"
+  | "healthy"
+  | "failing"
+  | "not_configured";
+
+export interface CustomRepoMetadata {
+  repoName?: string;
+  repoUrl?: string;
+  localPath?: string;
+  productionUrl?: string;
+  deploymentProvider?: "vercel" | "other";
+  deploymentProjectId?: string;
+  lastDeploymentUrl?: string;
+  lastDeploymentAt?: string;
+  supportedSections?: ContentSection[];
+  customFeatures?: string[];
+  contractVersion?: string;
+  revalidationHealth?: CustomRepoRevalidationHealth;
+  buildCommand?: string;
+  testCommand?: string;
+  rollbackPlan?: string;
+  notes?: string;
+}
+
 export interface Connection {
   provider: IntegrationProvider;
   tenantId: string;
@@ -423,6 +450,9 @@ export interface TenantConfig {
   active: boolean;
   createdAt: string;
   template: TemplateId;
+  /** Custom repos are the default delivery model for paid clients. */
+  deliveryModel?: TenantDeliveryModel;
+  customRepo?: CustomRepoMetadata;
   features?: TenantFeature[];
   integrations?: IntegrationProvider[];
   customDomains?: string[];
@@ -433,6 +463,8 @@ export interface TenantConfig {
   adminDomain?: string;
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "trialing" | "past_due" | "cancelled" | "none";
+  /** Special billing presentation/access override for early customers or internal accounts. */
+  planOverride?: "founder_comp";
   /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation. */
   subscriptionPastDueSince?: string;
   bookingProvider?: string;
@@ -532,13 +564,47 @@ export interface UnifiedEvent {
   id: string;
   tenantId: string;
   source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai';
-  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft';
+  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request';
   title: string;
   body: string;
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';
   metadata?: Record<string, unknown>;
   createdAt: string;
   resolvedAt?: string;
+}
+
+export type CustomChangeRequestStatus =
+  | "requested"
+  | "triaged"
+  | "quoted"
+  | "accepted"
+  | "in_progress"
+  | "shipped"
+  | "declined";
+
+export type CustomChangeRequestComplexity = "small" | "structural" | "integration" | "unclear";
+
+export interface CustomChangeRequestMetadata {
+  kind: "custom_code_or_design_request";
+  workflowStatus: CustomChangeRequestStatus;
+  requestedAt: string;
+  triageDueAt: string;
+  deliveryModel: TenantDeliveryModel;
+  customRepo?: Pick<
+    CustomRepoMetadata,
+    "repoName" | "repoUrl" | "localPath" | "productionUrl" | "contractVersion"
+  >;
+  page?: string;
+  section?: string;
+  field?: string;
+  label?: string;
+  nodeType?: string;
+  rect?: unknown;
+  complexity?: CustomChangeRequestComplexity;
+  quoteRequired?: boolean;
+  adminOwner?: string;
+  shippedAt?: string;
+  notes?: string;
 }
 
 // --- Site Operation Types ---

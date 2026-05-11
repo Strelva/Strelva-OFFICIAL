@@ -15,13 +15,13 @@ describe("owner journey copy and links", () => {
     expect(desktopNav).toContain("Approvals");
     expect(desktopNav).toContain("Site");
     expect(desktopNav).toContain("Connections");
-    expect(desktopNav).toContain("Ownership");
+    expect(desktopNav).not.toContain("Ownership");
     expect(desktopNav).not.toContain("Overview");
 
     expect(mobileNav).toContain("Ask AI");
     expect(mobileNav).toContain("Approvals");
     expect(mobileNav).toContain("Connections");
-    expect(mobileNav).toContain("Ownership");
+    expect(mobileNav).not.toContain("Ownership");
     expect(mobileNav).not.toContain("Overview");
   });
 
@@ -61,7 +61,7 @@ describe("owner journey copy and links", () => {
       "src/components/dashboard/QueueCard.tsx",
       "src/components/dashboard/SuggestionCard.tsx",
       "src/app/dashboard/settings/page.tsx",
-      "src/app/dashboard/ownership/page.tsx",
+      "src/components/dashboard/OwnershipSection.tsx",
     ].map(readRepoFile).join("\n");
 
     expect(ownerFiles).toContain("Make live");
@@ -70,8 +70,11 @@ describe("owner journey copy and links", () => {
   });
 
   it("keeps the ownership center focused on client exports and handoff actions", () => {
-    const ownershipPage = readRepoFile("src/app/dashboard/ownership/page.tsx");
+    const ownershipPage = readRepoFile("src/components/dashboard/OwnershipSection.tsx");
+    const settingsPage = readRepoFile("src/app/dashboard/settings/page.tsx");
 
+    expect(settingsPage).toContain('{ id: "ownership", label: "Ownership" }');
+    expect(settingsPage).toContain("/dashboard/settings#ownership");
     expect(ownershipPage).toContain("Your business owns");
     expect(ownershipPage).toContain("Scaffold Web manages");
     expect(ownershipPage).toContain("Export content");

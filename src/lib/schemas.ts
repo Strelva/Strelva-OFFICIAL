@@ -268,6 +268,11 @@ export const pageSectionConfigSchema = z.object({
   visible: z.boolean(),
   order: z.number(),
   props: z.record(z.string(), z.unknown()).optional(),
+  variant: z.string().optional(),
+  layout: z.object({
+    gap: z.enum(["tight", "normal", "loose"]).optional(),
+    padding: z.enum(["none", "normal", "spacious"]).optional(),
+  }).optional(),
 });
 
 export const pageConfigSchema = z.object({

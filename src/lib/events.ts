@@ -54,6 +54,7 @@ export async function addEvent(
         event.type === "newsletter_draft" ||
         event.type === "review" ||
         event.type === "content_update" ||
+        event.type === "change_request" ||
         event.type === "suggestion"));
 
   const redis = getRedis();
@@ -110,6 +111,29 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   const redis = getRedis();
   if (!redis) return null;
   return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+}
+
+export async function updateEvent(
+  id: string,
+  updater: (event: UnifiedEvent) => UnifiedEvent
+): Promise<{ event: UnifiedEvent | null; changed: boolean }> {
+  const redis = getRedis();
+  if (!redis) return { event: null, changed: false };
+
+  const existing = await redis.get<UnifiedEvent>(eventKey(id));
+  if (!existing) return { event: null, changed: false };
+
+  const updated = updater(existing);
+  await redis.set(eventKey(id), updated);
+
+  const key = eventsKey(existing.tenantId);
+  await redis.zrem(key, JSON.stringify(existing));
+  await redis.zadd(key, {
+    score: new Date(existing.createdAt).getTime(),
+    member: JSON.stringify(updated),
+  });
+
+  return { event: updated, changed: true };
 }
 
 /**

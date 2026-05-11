@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DISCOVERABLE_INTEGRATIONS,
+  deriveIntelligenceStatus,
   filterIntegrations,
   getIntegrationDefinition,
   normalizeIntegrationStatus,
@@ -27,10 +28,11 @@ describe("integration registry", () => {
     );
   });
 
-  it("does not mark Google Analytics connected without a real source of truth", () => {
-    const analytics = getIntegrationDefinition("google-analytics");
-    expect(analytics).toBeDefined();
-    expect(normalizeIntegrationStatus(analytics!)).toBe("not_configured");
+  it("does not mark external sources connected without a real source of truth", () => {
+    const searchConsole = getIntegrationDefinition("google-search-console");
+    expect(searchConsole).toBeDefined();
+    expect(normalizeIntegrationStatus(searchConsole!)).toBe("not_configured");
+    expect(deriveIntelligenceStatus(searchConsole!, "not_configured")).toBe("no_signal");
   });
 
   it("derives newsletter status from tenant settings instead of static metadata", () => {

@@ -8,6 +8,16 @@ import { SuggestionCard } from "./SuggestionCard";
 import type { UnifiedEvent } from "@/lib/types";
 import { useDashboardOptional } from "./DashboardContext";
 
+type QueueAction =
+  | "approved"
+  | "dismissed"
+  | "triaged"
+  | "quoted"
+  | "accepted"
+  | "in_progress"
+  | "shipped"
+  | "declined";
+
 interface QueuePageProps {
   initialPending: UnifiedEvent[];
   initialResolved: UnifiedEvent[];
@@ -25,16 +35,35 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const [, startTransition] = useTransition();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
-  const handleResolve = useCallback(async (id: string, action: "approved" | "dismissed") => {
+  const handleResolve = useCallback(async (id: string, action: QueueAction) => {
     setProcessingIds((prev) => new Set(prev).add(id));
     const event = pending.find((e) => e.id === id);
     if (!event) return;
 
-    const updatedEvent = { ...event, status: action, resolvedAt: new Date().toISOString() } as UnifiedEvent;
+    const terminal = action === "approved" || action === "dismissed" || action === "shipped" || action === "declined";
+    const resolvedStatus = action === "shipped"
+      ? "approved"
+      : action === "declined"
+        ? "dismissed"
+        : action;
+    const updatedEvent = {
+      ...event,
+      status: terminal ? resolvedStatus : event.status,
+      resolvedAt: terminal ? new Date().toISOString() : event.resolvedAt,
+      metadata: {
+        ...event.metadata,
+        workflowStatus: action === "approved" || action === "dismissed" ? event.metadata?.workflowStatus : action,
+        workflowUpdatedAt: new Date().toISOString(),
+      },
+    } as UnifiedEvent;
 
-    setPending((prev) => prev.filter((e) => e.id !== id));
-    setResolved((prev) => [updatedEvent, ...prev]);
-    setPendingCount((prev) => Math.max(0, prev - 1));
+    if (terminal) {
+      setPending((prev) => prev.filter((e) => e.id !== id));
+      setResolved((prev) => [updatedEvent, ...prev]);
+      setPendingCount((prev) => Math.max(0, prev - 1));
+    } else {
+      setPending((prev) => prev.map((e) => e.id === id ? updatedEvent : e));
+    }
 
     startTransition(async () => {
       try {
@@ -44,14 +73,18 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           body: JSON.stringify({ action }),
         });
         if (!res.ok) {
-          setPending((prev) => [event, ...prev]);
+          setPending((prev) => terminal ? [event, ...prev] : prev.map((e) => e.id === id ? event : e));
+          if (terminal) {
+            setResolved((prev) => prev.filter((e) => e.id !== id));
+            setPendingCount((prev) => prev + 1);
+          }
+        }
+      } catch {
+        setPending((prev) => terminal ? [event, ...prev] : prev.map((e) => e.id === id ? event : e));
+        if (terminal) {
           setResolved((prev) => prev.filter((e) => e.id !== id));
           setPendingCount((prev) => prev + 1);
         }
-      } catch {
-        setPending((prev) => [event, ...prev]);
-        setResolved((prev) => prev.filter((e) => e.id !== id));
-        setPendingCount((prev) => prev + 1);
       } finally {
         setProcessingIds((prev) => {
           const next = new Set(prev);
@@ -64,6 +97,9 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
 
   const handleApprove = useCallback((id: string) => handleResolve(id, "approved"), [handleResolve]);
   const handleDismiss = useCallback((id: string) => handleResolve(id, "dismissed"), [handleResolve]);
+  const handleWorkflowAction = useCallback((id: string, action: Exclude<QueueAction, "approved" | "dismissed">) => {
+    handleResolve(id, action);
+  }, [handleResolve]);
 
   const currentEvents = tab === "pending" ? pending : resolved;
   const monthAgo = Date.now() - 30 * 86_400_000;
@@ -207,6 +243,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                       event={event}
                       onApprove={handleApprove}
                       onDismiss={handleDismiss}
+                      onWorkflowAction={handleWorkflowAction}
                       disabled={processingIds.has(event.id)}
                     />
                   )}

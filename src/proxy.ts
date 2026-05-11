@@ -135,6 +135,19 @@ export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: str
   return isAdminSubdomain && pathname === "/";
 }
 
+export function getOwnershipSettingsRedirectPath(pathname: string): string | null {
+  if (/^\/dashboard\/ownership\/?$/.test(pathname)) {
+    return "/dashboard/settings#ownership";
+  }
+
+  const clientMatch = pathname.match(/^\/client\/([a-z0-9-]+)\/dashboard\/ownership\/?$/);
+  if (clientMatch) {
+    return `/client/${clientMatch[1]}/dashboard/settings#ownership`;
+  }
+
+  return null;
+}
+
 export function shouldUseFallbackAuthForAdminHost(host: string, isAdminSubdomain: boolean): boolean {
   return isAdminSubdomain && shouldResolveCustomDomain(host);
 }
@@ -182,6 +195,11 @@ function isPreviewRequest(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("preview") === "true";
 }
 
+function isLivePreviewRequest(req: NextRequest): boolean {
+  const pathname = req.nextUrl.pathname;
+  return pathname === "/api/live-preview" || /^\/client\/[a-z0-9-]+\/api\/live-preview$/.test(pathname);
+}
+
 function getPreviewFrameAncestors(host: string, protocol: string): string[] {
   const ancestors = new Set([
     "'self'",
@@ -205,9 +223,25 @@ function getPreviewFrameAncestors(host: string, protocol: string): string[] {
 
 export function buildContentSecurityPolicy(params: {
   isPreview: boolean;
+  isLivePreview?: boolean;
   host: string;
   protocol: string;
 }): string {
+  if (params.isLivePreview) {
+    return [
+      "default-src 'self' https: data: blob:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*",
+      "style-src 'self' 'unsafe-inline' https:",
+      "img-src 'self' data: blob: https: http://localhost:*",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https: http://localhost:*",
+      "frame-src 'self' https: http://localhost:* http://*.localhost:*",
+      "base-uri 'self' https:",
+      "form-action 'self'",
+      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://scaffoldweb.com https://admin.scaffoldweb.com https://reb-studio.vercel.app",
+    ].join("; ");
+  }
+
   const host = params.host.split(":")[0].toLowerCase();
   const frameAncestors = params.isPreview
     ? getPreviewFrameAncestors(host, params.protocol).join(" ")
@@ -217,15 +251,17 @@ export function buildContentSecurityPolicy(params: {
 }
 
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
+  const livePreviewRequest = isLivePreviewRequest(req);
   response.headers.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
       isPreview: isPreviewRequest(req),
+      isLivePreview: livePreviewRequest,
       host: req.headers.get("host") || "",
       protocol: req.nextUrl.protocol,
     })
   );
-  if (isPreviewRequest(req)) {
+  if (isPreviewRequest(req) || livePreviewRequest) {
     response.headers.delete("X-Frame-Options");
   } else {
     response.headers.set("X-Frame-Options", "DENY");
@@ -310,6 +346,15 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+  const ownershipSettingsRedirectPath = getOwnershipSettingsRedirectPath(pathname);
+
+  if (ownershipSettingsRedirectPath) {
+    const url = req.nextUrl.clone();
+    const [nextPathname, hash] = ownershipSettingsRedirectPath.split("#");
+    url.pathname = nextPathname;
+    url.hash = hash || "";
+    return applySecurityHeaders(NextResponse.redirect(url), req);
+  }
 
   const legacyPublicSiteRedirect = getLegacyPublicSiteRedirect(host);
   if (legacyPublicSiteRedirect) {

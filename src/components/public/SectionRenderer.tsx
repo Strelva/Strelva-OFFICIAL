@@ -1,5 +1,5 @@
 import type { ContentSection, SitePageConfig, PageSectionConfig } from "@/lib/types";
-import { getContent, getPageConfig } from "@/lib/storage";
+import { getContent, getDraftPageConfig, getPageConfig } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 
@@ -42,7 +42,9 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
   // Load page config — fall back to template defaults
   let pageConfig: SitePageConfig;
   try {
-    pageConfig = await getPageConfig(tenant) || template.defaultPageConfig;
+    pageConfig = (preview ? await getDraftPageConfig(tenant) : null)
+      || await getPageConfig(tenant)
+      || template.defaultPageConfig;
   } catch {
     pageConfig = template.defaultPageConfig;
   }

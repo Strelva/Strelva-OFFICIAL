@@ -40,7 +40,10 @@ export default async function DashboardLayout({
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : "";
-  const previewUrl = siteUrl;
+  const requestHost = requestHeaders.get("host") || "";
+  const requestProto = requestHeaders.get("x-forwarded-proto")
+    || (requestHost.includes("localhost") ? "http" : "https");
+  const previewUrl = requestHost ? `${requestProto}://${requestHost}` : siteUrl;
   let siteName = "Your Business";
   let ownerName = "";
   try {
@@ -73,6 +76,7 @@ export default async function DashboardLayout({
       autoPublish={tenantConfig?.autoPublish !== false}
       subscriptionStatus={subscriptionStatus}
       hasStripeCustomer={!!tenantConfig?.stripeCustomerId}
+      planOverride={tenantConfig?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax" ? "founder_comp" : null}
       impersonation={{
         isActive: actor.isImpersonating,
         actorEmail: actor.email,

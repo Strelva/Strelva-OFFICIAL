@@ -73,4 +73,10 @@ export { saveWeeklyReport, getWeeklyReports } from "./report-store";
 export type { StoredWeeklyReport } from "./report-store";
 
 // Page Config
-export { getPageConfig, setPageConfig } from "./page-config-store";
+export {
+  clearDraftPageConfig,
+  getDraftPageConfig,
+  getPageConfig,
+  setDraftPageConfig,
+  setPageConfig,
+} from "./page-config-store";

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Clock, History, Loader2, Check, AlertCircle } from "lucide-react";
+import { Upload, Clock, History, Loader2, Check, AlertCircle, RotateCcw } from "lucide-react";
 
 interface PublishBarProps {
   hasDrafts: boolean;
   onPublish: () => Promise<void>;
+  onDiscard?: () => Promise<void>;
   onViewHistory?: () => void;
   lastPublished?: string;
 }
@@ -13,10 +14,12 @@ interface PublishBarProps {
 export function PublishBar({
   hasDrafts,
   onPublish,
+  onDiscard,
   onViewHistory,
   lastPublished,
 }: PublishBarProps) {
   const [publishing, setPublishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [published, setPublished] = useState(false);
   const [error, setError] = useState(false);
 
@@ -32,6 +35,20 @@ export function PublishBar({
       setTimeout(() => setError(false), 3000);
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleDiscard = async () => {
+    if (!onDiscard) return;
+    setDiscarding(true);
+    setError(false);
+    try {
+      await onDiscard();
+    } catch {
+      setError(true);
+      setTimeout(() => setError(false), 3000);
+    } finally {
+      setDiscarding(false);
     }
   };
 
@@ -54,7 +71,7 @@ export function PublishBar({
         {hasDrafts ? (
           <div className="flex items-center gap-1.5 text-amber-400">
             <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Unpublished changes</span>
+            <span className="text-[11px] font-medium">Showing unpublished draft</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-emerald-400">
@@ -79,6 +96,24 @@ export function PublishBar({
             History
           </button>
         )}
+        {onDiscard && (
+          <button
+            onClick={handleDiscard}
+            disabled={!hasDrafts || publishing || discarding}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+              hasDrafts && !publishing && !discarding
+                ? "text-gray-muted hover:text-warm-white hover:bg-surface-raised"
+                : "text-gray-faint cursor-not-allowed"
+            }`}
+          >
+            {discarding ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
+            )}
+            {discarding ? "Discarding..." : "Discard draft"}
+          </button>
+        )}
         <button
           onClick={handlePublish}
           disabled={!hasDrafts || publishing}
@@ -97,7 +132,7 @@ export function PublishBar({
           ) : (
             <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
           )}
-          {publishing ? "Publishing..." : published ? "Published!" : error ? "Failed" : "Publish"}
+          {publishing ? "Pushing..." : published ? "Pushed!" : error ? "Failed" : "Push"}
         </button>
       </div>
     </div>

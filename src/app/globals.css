@@ -172,6 +172,14 @@ body {
   border-radius: 6px;
 }
 
+[data-dashboard] .ai-prompt-box textarea:focus,
+[data-dashboard] .ai-prompt-box textarea:focus-visible {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-offset: 0;
+}
+
 [data-dashboard] {
   color-scheme: dark;
 }

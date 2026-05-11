@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { resolveEventAction } from "@/lib/event-actions";
+import { resolveEventAction, type EventWorkflowAction } from "@/lib/event-actions";
 import { readJsonObject } from "@/lib/request-body";
+
+const ALLOWED_ACTIONS = new Set<EventWorkflowAction>([
+  "approved",
+  "dismissed",
+  "triaged",
+  "quoted",
+  "accepted",
+  "in_progress",
+  "shipped",
+  "declined",
+]);
 
 export async function PATCH(
   request: Request,
@@ -29,11 +40,11 @@ export async function PATCH(
 
   const action = typeof body.action === "string" ? body.action : undefined;
 
-  if (action !== "approved" && action !== "dismissed") {
+  if (!ALLOWED_ACTIONS.has(action as EventWorkflowAction)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  const result = await resolveEventAction(tenant, id, action);
+  const result = await resolveEventAction(tenant, id, action as EventWorkflowAction);
   if (result.reason === "not_found") {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }

@@ -184,7 +184,7 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
 // Array sections use the inline editor from ARRAY_CONFIGS
 
 export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
-  const { triggerRefresh, editMode, hasDraft, setHasDraft, siteModel, dashboardHref } = useDashboard();
+  const { triggerRefresh, editMode, hasDraft, setHasDraft, siteModel, dashboardHref, selectedNode } = useDashboard();
   const siteModelSchema = getSiteModelSchema(siteModel);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
@@ -211,7 +211,10 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
     setLoading(true);
     setSaved(false);
-    fetch(dashboardHref(`/api/content/${activeSection}`), { credentials: "same-origin" })
+    const url = editMode === "draft"
+      ? dashboardHref(`/api/content/${activeSection}?draft=true`)
+      : dashboardHref(`/api/content/${activeSection}`);
+    fetch(url, { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         setData(d);
@@ -219,7 +222,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [activeSection, dashboardHref]);
+  }, [activeSection, dashboardHref, editMode]);
 
   const handleFieldChange = useCallback((key: string, value: unknown) => {
     setData((prev) => {
@@ -248,7 +251,9 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       if (res.ok) {
         if (isDraft) {
           setHasDraft((prev) => ({ ...prev, [activeSection]: true }));
+          setOriginal(data);
           setSaved(true);
+          triggerRefresh();
           setTimeout(() => setSaved(false), 2000);
         } else {
           setOriginal(data);
@@ -272,39 +277,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       setSaving(false);
     }
   }, [activeSection, dashboardHref, data, editMode, triggerRefresh, setHasDraft]);
-
-  const handlePublish = useCallback(async () => {
-    if (!activeSection || !data) return;
-    setSaving(true);
-    setSaveError(false);
-    try {
-      const res = await fetch(dashboardHref(`/api/content/${activeSection}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        setOriginal(data);
-        setSaved(true);
-        setHasDraft((prev) => {
-          const next = { ...prev };
-          delete next[activeSection];
-          return next;
-        });
-        triggerRefresh();
-        setTimeout(() => setSaved(false), 2000);
-      } else {
-        setSaveError(true);
-        setTimeout(() => setSaveError(false), 4000);
-      }
-    } catch {
-      setSaveError(true);
-      setTimeout(() => setSaveError(false), 4000);
-    } finally {
-      setSaving(false);
-    }
-  }, [activeSection, dashboardHref, data, triggerRefresh, setHasDraft]);
 
   const handleReset = useCallback(() => {
     setData(original);
@@ -385,9 +357,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Section header */}
       <div className="px-4 py-3 border-b border-gray-border bg-surface shrink-0">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[16px] font-semibold text-warm-black">
-            {SECTION_LABELS[activeSection] || activeSection}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-[15px] font-semibold text-warm-white">
+              {SECTION_LABELS[activeSection] || activeSection}
+            </h3>
+            <p className="mt-0.5 truncate text-[10px] text-gray-faint">
+              Input changes here, then save draft and Push when ready.
+            </p>
+          </div>
           <div className="flex items-center gap-1 rounded border border-gray-border bg-gray-bg-alt p-0.5">
             <button
               onClick={() => setTab("edit")}
@@ -436,8 +413,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <>
       {/* Save bar */}
       {hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0 animate-fade-in-up">
-          <span className="text-[11px] text-gray-muted">Unsaved changes</span>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.05] shrink-0 animate-fade-in-up">
+          <div>
+            <p className="text-[11px] font-medium text-amber-300">Output pending</p>
+            <p className="text-[10px] text-gray-faint">Save these inputs as a draft before Push.</p>
+          </div>
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
@@ -463,15 +443,10 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Publish bar — shown in draft mode when a draft exists */}
       {editMode === "draft" && activeSection && hasDraft[activeSection] && !hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
-          <span className="text-[11px] text-amber-400">Draft saved — not yet live</span>
-          <Button
-            variant="primary"
-            size="sm"
-            loading={saving}
-            onClick={handlePublish}
-          >
-            Publish
-          </Button>
+          <div>
+            <p className="text-[11px] font-medium text-amber-300">Draft output saved</p>
+            <p className="text-[10px] text-gray-faint">Use the bottom Push button to publish this with all pending site changes.</p>
+          </div>
         </div>
       )}
 
@@ -501,6 +476,20 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
       {/* Fields */}
       <div className="flex-1 overflow-y-auto pb-20">
+        <div className="px-4 pb-1 pt-3">
+          <p className="text-[10px] font-mono uppercase tracking-[0.08em] text-gray-muted">Inputs</p>
+        </div>
+        {selectedNode?.section === activeSection && selectedNode.field && (
+          <div className="mx-4 mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2">
+            <p className="text-[11px] font-medium text-accent">
+              Selected {selectedNode.nodeType === "image" ? "image" : selectedNode.nodeType === "link" ? "link" : "field"}
+            </p>
+            <p className="mt-0.5 break-all text-[11px] text-gray-muted">
+              {selectedNode.label || selectedNode.field}
+            </p>
+          </div>
+        )}
+
         {/* Simple fields */}
         {fields && fields.map((field) => (
           <div key={field.key} className="px-4 py-2">

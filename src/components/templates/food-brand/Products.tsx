@@ -18,6 +18,9 @@ export function Products({ products }: { products: ProductsContent }) {
 
   const featured = products.products.find((p) => p.featured) ?? products.products[0];
   const others = products.products.filter((p) => p.id !== featured?.id);
+  const featuredIndex = featured
+    ? products.products.findIndex((p) => p.id === featured.id)
+    : -1;
 
   const handleQuickAdd = (e: React.MouseEvent, product: ProductItem) => {
     e.stopPropagation();
@@ -42,10 +45,11 @@ export function Products({ products }: { products: ProductsContent }) {
           {/* Header */}
           <div className="mb-10 md:mb-14">
             <div className="grid md:grid-cols-2 gap-6 md:gap-20 items-end">
-              <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+              <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]" data-reb-field="headline">
                 {products.headline}
               </h2>
               <p
+                data-reb-field="description"
                 className="text-base md:text-lg leading-relaxed max-w-md"
                 style={{ color: "var(--bark-light)" }}
               >
@@ -64,6 +68,7 @@ export function Products({ products }: { products: ProductsContent }) {
                       src={featured.imageUrl}
                       alt={featured.name}
                       fill
+                      data-reb-field={`products[${featuredIndex}].imageUrl`}
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                       sizes="(min-width: 768px) 60vw, 100vw"
                     />
@@ -82,15 +87,17 @@ export function Products({ products }: { products: ProductsContent }) {
                   {featured.badge && (
                     <span
                       className="text-[0.625rem] font-bold tracking-widest uppercase mb-4 inline-block"
+                      data-reb-field={`products[${featuredIndex}].badge`}
                       style={{ color: "var(--sage)" }}
                     >
                       {featured.badge}
                     </span>
                   )}
-                  <h3 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4">
+                  <h3 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4" data-reb-field={`products[${featuredIndex}].name`}>
                     {featured.name}
                   </h3>
                   <p
+                    data-reb-field={`products[${featuredIndex}].description`}
                     className="text-base leading-relaxed mb-6"
                     style={{ color: "var(--bark-light)" }}
                   >
@@ -99,6 +106,7 @@ export function Products({ products }: { products: ProductsContent }) {
                   {featured.price && (
                     <p
                       className="font-display text-2xl md:text-3xl tracking-tight mb-4"
+                      data-reb-field={`products[${featuredIndex}].price`}
                       style={{ color: "var(--bark)" }}
                     >
                       ${featured.price}
@@ -116,7 +124,9 @@ export function Products({ products }: { products: ProductsContent }) {
                         Ingredients
                       </span>
                       <p className="text-sm mt-1" style={{ color: "var(--bark-light)" }}>
+                        <span data-reb-field={`products[${featuredIndex}].ingredients`}>
                         {featured.ingredients}
+                        </span>
                       </p>
                     </div>
                     {featured.comingSoon ? (
@@ -156,7 +166,9 @@ export function Products({ products }: { products: ProductsContent }) {
                 Scroll &rarr;
               </p>
               <div className="horizontal-scroll md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6">
-                {others.map((product, i) => (
+                {others.map((product, i) => {
+                  const productIndex = products.products.findIndex((p) => p.id === product.id);
+                  return (
                   <div
                     key={product.id}
                     className={`w-[280px] md:w-auto reveal-delay-${Math.min(i + 1, 3)} cursor-pointer group`}
@@ -168,13 +180,16 @@ export function Products({ products }: { products: ProductsContent }) {
                           src={product.imageUrl}
                           alt={product.name}
                           fill
+                          data-reb-field={`products[${productIndex}].imageUrl`}
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                           sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 280px"
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center p-6 text-center" style={{ background: "var(--cream-mid)" }}>
                           <span className="font-display text-2xl tracking-tight" style={{ color: "var(--sage)" }}>
+                            <span data-reb-field={`products[${productIndex}].name`}>
                             {product.name}
+                            </span>
                           </span>
                         </div>
                       )}
@@ -183,12 +198,13 @@ export function Products({ products }: { products: ProductsContent }) {
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div>
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-display text-xl tracking-tight">
+                            <h3 className="font-display text-xl tracking-tight" data-reb-field={`products[${productIndex}].name`}>
                               {product.name}
                             </h3>
                             {product.badge && (
                               <span
                                 className="text-[0.5625rem] font-bold tracking-widest uppercase"
+                                data-reb-field={`products[${productIndex}].badge`}
                                 style={{ color: "var(--sage)" }}
                               >
                                 {product.badge}
@@ -197,6 +213,7 @@ export function Products({ products }: { products: ProductsContent }) {
                           </div>
                           <p
                             className="text-sm leading-relaxed mb-3"
+                            data-reb-field={`products[${productIndex}].description`}
                             style={{ color: "var(--bark-light)" }}
                           >
                             {product.description}
@@ -204,6 +221,7 @@ export function Products({ products }: { products: ProductsContent }) {
                           {product.price && (
                             <p
                               className="font-display text-xl tracking-tight mb-3"
+                              data-reb-field={`products[${productIndex}].price`}
                               style={{ color: "var(--bark)" }}
                             >
                               ${product.price}
@@ -246,7 +264,8 @@ export function Products({ products }: { products: ProductsContent }) {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -258,6 +277,7 @@ export function Products({ products }: { products: ProductsContent }) {
             >
               <p
                 className="text-xs font-medium tracking-[0.15em] uppercase"
+                data-reb-field="bottomNote"
                 style={{ color: "var(--bark-faded)" }}
               >
                 {products.bottomNote}

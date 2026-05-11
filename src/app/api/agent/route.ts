@@ -8,6 +8,14 @@ import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
+import { getConnections } from "@/lib/connections";
+import {
+  DISCOVERABLE_INTEGRATIONS,
+  deriveIntelligenceStatus,
+  getIntegrationCategories,
+  normalizeIntegrationStatus,
+  type RawTenantConnectionSettings,
+} from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment } from "@/lib/capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
@@ -57,6 +65,24 @@ function textFromMessage(message: IncomingMessage): string | undefined {
     .join(" ")
     .trim();
   return text || undefined;
+}
+
+function tenantConnectionSettings(config: Awaited<ReturnType<typeof getTenantConfig>>): RawTenantConnectionSettings {
+  return {
+    googleSearchConsole: !!config?.googleSearchConsoleKey,
+    newsletter: !!config?.resendDomain,
+    googleBusiness: !!config?.reviewsConfig?.googlePlaceId,
+    instagram: !!(config?.instagramAccessToken || config?.beholdFeedId),
+    calendly: !!config?.bookingUrl,
+    yelp: !!config?.reviewsConfig?.yelpBusinessId,
+  };
+}
+
+function formatSourceDate(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function logisticsGuardrail(sectionNames: string): string {
@@ -158,6 +184,29 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
 
   sectionSummaries.push(`SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`);
 
+  try {
+    const { getSearchData } = await import("@/lib/storage");
+    const searchData = await getSearchData(tenant);
+    if (searchData?.queries?.length) {
+      const topQueries = searchData.queries
+        .slice(0, 5)
+        .map((query) => `- ${query.query}: ${query.clicks} clicks, ${query.impressions} impressions, avg position ${query.position.toFixed(1)}`)
+        .join("\n");
+      const sourceDate = formatSourceDate(searchData.fetchedAt);
+      sectionSummaries.push(
+        `SEARCH CONSOLE:\n${topQueries}\nSource: Search Console${sourceDate ? `, last updated ${sourceDate}` : ""}`
+      );
+    } else {
+      sectionSummaries.push(
+        "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
+      );
+    }
+  } catch {
+    sectionSummaries.push(
+      "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
+    );
+  }
+
   // Add reviews/sources context for agent knowledge
   try {
     const { getReviews } = await import("@/lib/reviews");
@@ -181,6 +230,7 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
       if (unreplied > 0) reviewSummary += `\n- ${unreplied} awaiting reply`;
       if (themes.length > 0) reviewSummary += `\n- Customers mention: ${themes.join(", ")}`;
       reviewSummary += `\n\nRecent reviews:\n${recentReviews.map((r) => `- "${r.text.slice(0, 80)}..." — ${r.author} (${r.rating} stars, ${r.source})`).join("\n")}`;
+      reviewSummary += "\nSource: Reviews stored in dashboard";
 
       sectionSummaries.push(reviewSummary);
     }
@@ -217,6 +267,11 @@ Available sections: ${sectionNames}.`;
     const provider = tenantConfig?.bookingProvider || "their booking platform";
     prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
   }
+
+  prompt += `\n\nSOURCE-PROOF RULES:
+- When you use a connected or built-in source, include one compact proof line such as "Source: Search Console, last updated May 9", "Source: Site activity, 14-day window", or "Source: Reviews stored in dashboard".
+- If the user asks for an @Source that is not connected or has no data, say that plainly before giving a fallback recommendation.
+- Never imply live posting, calendar sync, Google listing updates, or newsletter sending unless a tool result shows that exact approval-gated action is available. Use "draft", "suggest", or "queue for review" for incomplete action paths.`;
 
   prompt += `\n\n${capFragment}`;
 
@@ -586,6 +641,7 @@ export async function POST(req: Request) {
               viewsChangePercent: viewsTrend,
               direction: viewsTrend > 0 ? "up" : viewsTrend < 0 ? "down" : "flat",
             },
+            sourceProof: "Source: Site activity, 14-day window",
           };
         },
       }),
@@ -600,7 +656,10 @@ export async function POST(req: Request) {
         execute: async ({ section }) => {
           const { getActivity } = await import("@/lib/storage");
           const activity = await getActivity(tenant, section ? { section } : undefined);
-          return { activity: activity.slice(0, 20) };
+          return {
+            activity: activity.slice(0, 20),
+            sourceProof: "Source: Site history stored in dashboard",
+          };
         },
       }),
     },
@@ -794,6 +853,7 @@ export async function POST(req: Request) {
               total: reviews.length,
               averageRating: Math.round(avg * 10) / 10,
               unreplied: reviews.filter((r) => !r.reply).length,
+              sourceProof: "Source: Reviews stored in dashboard",
             };
           } catch (err) {
             return { error: `Failed to get reviews: ${err instanceof Error ? err.message : "Unknown error"}` };
@@ -1128,55 +1188,52 @@ export async function POST(req: Request) {
         inputSchema: z.object({}),
         execute: async () => {
           const config = await getTenantConfig(tenant);
+          const savedConnections = await getConnections(tenant);
+          const settings = tenantConnectionSettings(config);
+          const providerStatuses = new Map(savedConnections.map((connection) => [connection.provider, connection]));
 
-          const connections = [
-            {
-              id: "google-analytics",
-              name: "Google Analytics",
-              icon: "GA",
-              connected: !!config?.googleSearchConsoleKey,
-              description: "Traffic data for reports",
-            },
-            {
-              id: "newsletter",
-              name: "Newsletter",
-              icon: "NL",
-              connected: !!config?.resendDomain,
-              description: "Email subscribers",
-            },
-            {
-              id: "google-business",
-              name: "Google Business",
-              icon: "GB",
-              connected: !!config?.reviewsConfig?.googlePlaceId,
-              description: "Reviews sync",
-            },
-            {
-              id: "instagram",
-              name: "Instagram",
-              icon: "IG",
-              connected: !!(config?.instagramAccessToken || config?.beholdFeedId),
-              description: "Social feed",
-            },
-            {
-              id: "calendly",
-              name: "Calendly",
-              icon: "CL",
-              connected: !!config?.bookingUrl,
-              description: "Booking integration",
-            },
-            {
-              id: "yelp",
-              name: "Yelp",
-              icon: "YP",
-              connected: !!config?.reviewsConfig?.yelpBusinessId,
-              description: "Yelp reviews",
-            },
-          ];
+          const connections = DISCOVERABLE_INTEGRATIONS.map((integration) => {
+            const rawConnection = integration.connectionProvider
+              ? providerStatuses.get(integration.connectionProvider) ?? null
+              : null;
+            const technicalStatus = normalizeIntegrationStatus(integration, {
+              connection: rawConnection,
+              settings,
+              connectionLoaded: true,
+              settingsLoaded: true,
+            });
+            const intelligenceStatus = deriveIntelligenceStatus(integration, technicalStatus);
+            const lastUpdated = rawConnection?.lastSyncedAt ?? null;
+
+            return {
+              id: integration.id,
+              name: integration.displayName,
+              icon: integration.icon,
+              connected: technicalStatus === "connected" || integration.builtIn === true,
+              status: intelligenceStatus,
+              technicalStatus,
+              category: integration.intelligenceCategory,
+              categories: getIntegrationCategories(integration),
+              description: integration.addsIntelligence,
+              addsIntelligence: integration.addsIntelligence,
+              aiCanUseThisTo: integration.aiCanUseThisTo,
+              exampleInsight: integration.exampleInsight,
+              actionPaths: integration.actionPaths ?? [],
+              appearsIn: integration.appearsIn,
+              lastSyncedAt: lastUpdated,
+              sourceProof: lastUpdated
+                ? `Source: ${integration.displayName}, last updated ${formatSourceDate(lastUpdated) ?? "recently"}`
+                : integration.builtIn
+                  ? `Source: ${integration.displayName} stored in dashboard`
+                  : undefined,
+            };
+          });
 
           return {
             __inlineTool: "show_connections",
             connections,
+            summary:
+              "Connections are the AI intelligence layer: each source adds context, signal, or an approval-gated action path.",
           };
         },
       }),

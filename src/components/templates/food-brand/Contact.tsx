@@ -32,6 +32,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 <a
                   href={`mailto:${contact.email}`}
                   className="group flex items-center gap-4 mb-6"
+                  data-reb-field="email"
                 >
                   <div
                     className="flex h-10 w-10 items-center justify-center transition-colors"
@@ -60,6 +61,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                     key={social.label}
                     href={social.href}
                     className="flex h-10 w-10 items-center justify-center transition-all hover:opacity-60"
+                    data-reb-field={social.label === "Instagram" ? "instagramUrl" : "facebookUrl"}
                     style={{ background: "var(--cream-dark)", color: "var(--bark-faded)" }}
                     aria-label={social.label}
                   >
@@ -77,7 +79,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 className="p-10 md:p-14 max-w-sm w-full"
                 style={{ background: "var(--cream-dark)" }}
               >
-                <h3 className="font-display text-3xl md:text-4xl tracking-tight mb-4">
+                <h3 className="font-display text-3xl md:text-4xl tracking-tight mb-4" data-reb-field="locationTitle">
                   {contact.locationTitle.split("\n").map((line, i) => (
                     <span key={i}>
                       {i > 0 && <br />}
@@ -87,6 +89,7 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 </h3>
                 <p
                   className="text-sm leading-relaxed"
+                  data-reb-field="locationDescription"
                   style={{ color: "var(--bark-light)" }}
                 >
                   {contact.locationDescription}

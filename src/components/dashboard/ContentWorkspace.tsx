@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { MessageCircle, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo } from "react";
+import { LayoutList, MessageCircle, PanelRightOpen, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
 import { ChatPanel } from "./ChatPanel";
 import { PropertiesEditor } from "./PropertiesEditor";
-import { Tabs } from "@/components/ui/Tabs";
+import { LayoutPanel } from "./LayoutPanel";
+import { PublishBar } from "./design/PublishBar";
 import type { SectionData } from "./ContentBrowser";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 
@@ -32,6 +33,12 @@ export function ContentWorkspace({
     rightCollapsed,
     siteUrl,
     dashboardHref,
+    hasDraft,
+    hasPageConfigDraft,
+    setHasDraft,
+    setHasPageConfigDraft,
+    reloadDraftState,
+    triggerRefresh,
   } = useDashboard();
   void timestamps;
 
@@ -44,6 +51,36 @@ export function ContentWorkspace({
     [sectionData],
   );
 
+  const hasAnyDraft = Object.values(hasDraft).some(Boolean) || hasPageConfigDraft;
+
+  const handlePublishAll = useCallback(async () => {
+    const res = await fetch(dashboardHref("/api/publish"), {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      throw new Error("Publish failed");
+    }
+    setHasDraft({});
+    setHasPageConfigDraft(false);
+    triggerRefresh();
+    await reloadDraftState();
+  }, [dashboardHref, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
+
+  const handleDiscardDrafts = useCallback(async () => {
+    const res = await fetch(dashboardHref("/api/publish"), {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      throw new Error("Discard failed");
+    }
+    setHasDraft({});
+    setHasPageConfigDraft(false);
+    triggerRefresh();
+    await reloadDraftState();
+  }, [dashboardHref, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
+
   useEffect(() => {
     setRightTab("properties");
   }, [setRightTab]);
@@ -53,55 +90,40 @@ export function ContentWorkspace({
     setActiveSection(sectionOptions[0].value);
   }, [activeSection, sectionOptions, setActiveSection]);
 
-  const sectionSelector = (
-    <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-border bg-surface px-4 py-2">
-      <div className="min-w-0">
-        <p className="text-[11px] font-mono uppercase tracking-[0.08em] text-gray-muted">
-          Site
-        </p>
-        <p className="truncate text-[12px] text-gray-faint">
-          Pick a section, edit on the right, or ask AI from the secondary tab.
-        </p>
-      </div>
-      <label className="flex shrink-0 items-center gap-2 text-[11px] text-gray-muted">
-        Section
-        <select
-          value={activeSection || ""}
-          onChange={(event) => setActiveSection(event.target.value || null)}
-          className="h-8 min-w-[190px] rounded-lg border border-gray-border bg-surface-raised px-3 text-[12px] text-warm-white outline-none transition-colors focus:border-accent/45"
-        >
-          {sectionOptions.map((section) => (
-            <option key={section.value} value={section.value}>
-              {section.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
-  );
-
   const rightPanelContent = (
     <>
-      {/* Tab switcher */}
-      <div className="h-10 border-b border-gray-border shrink-0 bg-surface flex items-center">
-        <Tabs
-          variant="underline"
-          items={[
-            { value: "properties", label: "Edit", icon: <SlidersHorizontal className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
-            { value: "chat", label: "AI Chat", icon: <MessageCircle className="w-[13px] h-[13px]" strokeWidth={1.5} /> },
-          ]}
-          value={rightTab}
-          onChange={(v) => setRightTab(v as "properties" | "chat")}
-          className="h-full"
-        />
+      <div className="border-b border-gray-border bg-surface p-2 shrink-0">
+        <div className="grid grid-cols-3 gap-1">
+          {[
+            { value: "properties", label: "Content", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "layout", label: "Layout", icon: <LayoutList className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "chat", label: "AI Chat", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setRightTab(item.value as "properties" | "layout" | "chat")}
+              className={`flex h-8 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                rightTab === item.value
+                  ? "bg-surface-raised text-warm-white shadow-sm"
+                  : "text-gray-muted hover:bg-surface-raised/60 hover:text-warm-white"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col">
         {rightTab === "properties" ? (
           <PropertiesEditor activeSection={activeSection} />
+        ) : rightTab === "layout" ? (
+          <LayoutPanel />
         ) : (
-          <ChatPanel ownerName={ownerName} />
+          <ChatPanel ownerName={ownerName} variant="compact" />
         )}
       </div>
     </>
@@ -109,17 +131,17 @@ export function ContentWorkspace({
 
   return (
     <div className="flex flex-col h-full bg-surface-base">
-      {/* Desktop (lg+): preview + right panel */}
+      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Desktop: preview + right panel */}
       <div className="hidden lg:flex flex-1 min-h-0">
         <main className="flex-1 flex flex-col min-w-0">
-          {sectionSelector}
           <SitePreview />
         </main>
 
         {/* Right: Properties + Chat */}
         <aside
           className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
-            rightCollapsed ? "w-[44px]" : "w-[360px]"
+            rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
           }`}
         >
           {rightCollapsed ? (
@@ -130,10 +152,9 @@ export function ContentWorkspace({
         </aside>
       </div>
 
-      {/* Tablet (md to lg): vertical split -- preview top, editor bottom */}
+      {/* Tablet: vertical split. */}
       <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0">
-        <div className="h-[52%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
-          {sectionSelector}
+        <div className="h-[60%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
           <div className="min-h-0 flex-1">
             <SitePreview />
           </div>
@@ -147,10 +168,10 @@ export function ContentWorkspace({
       <div className="flex md:hidden flex-1 min-h-0 items-center justify-center px-6">
         <div className="max-w-sm text-center">
           <p className="text-lg font-medium text-warm-white mb-2">
-            Site editing works best on desktop
+            Site editor is not available on mobile
           </p>
           <p className="text-sm text-gray-muted mb-6">
-            Use a larger screen to review {siteName} with the live preview and editing panel side by side.
+            Use a tablet, laptop, or desktop to review {siteName} with the live preview and editing panel. The live site itself still works for visitors on mobile.
           </p>
           <div className="grid gap-2">
             <a
@@ -175,6 +196,12 @@ export function ContentWorkspace({
         </div>
       </div>
 
+      </div>
+      <PublishBar
+        hasDrafts={hasAnyDraft}
+        onPublish={handlePublishAll}
+        onDiscard={handleDiscardDrafts}
+      />
     </div>
   );
 }
@@ -189,11 +216,7 @@ function CollapsedRight() {
         className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
         title="Expand panel"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect width="18" height="18" x="3" y="3" rx="2" />
-          <path d="M15 3v18" />
-          <path d="m8 9 3 3-3 3" />
-        </svg>
+        <PanelRightOpen className="h-4 w-4" strokeWidth={1.5} />
       </button>
     </div>
   );

@@ -19,8 +19,14 @@ export function CreateTenantForm() {
     ownerEmail: "",
     template: "wellness",
     industry: "wellness",
+    deliveryModel: "custom_repo",
     productionDomain: "",
     adminDomain: "",
+    customRepo: {
+      repoName: "",
+      repoUrl: "",
+      localPath: "",
+    },
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -47,8 +53,14 @@ export function CreateTenantForm() {
         ownerEmail: "",
         template: "wellness",
         industry: "wellness",
+        deliveryModel: "custom_repo",
         productionDomain: "",
         adminDomain: "",
+        customRepo: {
+          repoName: "",
+          repoUrl: "",
+          localPath: "",
+        },
       });
       setOpen(false);
       router.refresh();
@@ -168,6 +180,18 @@ export function CreateTenantForm() {
         </div>
 
         <div>
+          <label className="block text-xs text-zinc-500 mb-1.5">Delivery Model</label>
+          <select
+            value={form.deliveryModel}
+            onChange={(e) => setForm({ ...form, deliveryModel: e.target.value })}
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600"
+          >
+            <option value="custom_repo">Custom repo</option>
+            <option value="platform_template">Platform template</option>
+          </select>
+        </div>
+
+        <div>
           <label className="block text-xs text-zinc-500 mb-1.5">Website Domain</label>
           <input
             type="text"
@@ -195,6 +219,43 @@ export function CreateTenantForm() {
             className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
           />
         </div>
+
+        {form.deliveryModel === "custom_repo" && (
+          <>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5">Repo Name</label>
+              <input
+                type="text"
+                value={form.customRepo.repoName}
+                onChange={(e) => setForm({ ...form, customRepo: { ...form.customRepo, repoName: e.target.value } })}
+                placeholder={form.subdomain || "client-site"}
+                className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5">Repo URL</label>
+              <input
+                type="url"
+                value={form.customRepo.repoUrl}
+                onChange={(e) => setForm({ ...form, customRepo: { ...form.customRepo, repoUrl: e.target.value } })}
+                placeholder="https://github.com/scaffold-web/client-site"
+                className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-zinc-500 mb-1.5">Local Repo Path</label>
+              <input
+                type="text"
+                value={form.customRepo.localPath}
+                onChange={(e) => setForm({ ...form, customRepo: { ...form.customRepo, localPath: e.target.value } })}
+                placeholder={`/Users/laneyfraass/websites/${form.subdomain || "client-site"}`}
+                className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+          </>
+        )}
 
         <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
           <button

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Tablet } from "lucide-react";
+import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Minimize2, Monitor, Pencil, RefreshCw, Smartphone, Tablet, Wand2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
+import type { EditableNode, EditableNodeType } from "@/lib/editor-types";
 
 type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
 type PreviewStatus = "loading" | "ready" | "error";
+type PreviewSource = "live" | "editable";
 
 const BREAKPOINTS: readonly Breakpoint[] = [
   { label: "Mobile", icon: Smartphone, width: 375 },
@@ -28,6 +30,14 @@ const PAGE_PATHS: Record<string, string> = {
 };
 
 const PREVIEW_TIMEOUT_MS = 12000;
+const EDITABLE_NODE_TYPES = new Set<EditableNodeType>([
+  "section",
+  "text",
+  "image",
+  "button",
+  "link",
+  "content",
+]);
 
 interface ContextMenu {
   section: string;
@@ -36,11 +46,84 @@ interface ContextMenu {
   y: number;
 }
 
+function parsePathPart(part: string): { key: string; index?: string } {
+  const match = part.match(/^([^\[]+)(?:\[([^\]]+)\])?$/);
+  if (!match) return { key: part };
+  return { key: match[1], index: match[2] };
+}
+
+function resolveArrayIndex(array: unknown[], index: string | undefined): number {
+  if (!index) return -1;
+  if (index === "featured") {
+    const found = array.findIndex(
+      (item) => item && typeof item === "object" && (item as Record<string, unknown>).featured === true
+    );
+    return found >= 0 ? found : 0;
+  }
+  const parsed = Number(index);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function setEditableValue(
+  source: Record<string, unknown>,
+  path: string,
+  value: string
+): Record<string, unknown> {
+  const parts = path.split(".").filter(Boolean);
+  if (parts.length === 0) return source;
+
+  function apply(current: unknown, index: number): unknown {
+    const { key, index: arrayIndex } = parsePathPart(parts[index]);
+    const isLast = index === parts.length - 1;
+    const nextObject =
+      current && typeof current === "object" && !Array.isArray(current)
+        ? { ...(current as Record<string, unknown>) }
+        : {};
+
+    if (arrayIndex !== undefined) {
+      const existing = nextObject[key];
+      const array = Array.isArray(existing) ? [...existing] : [];
+      const itemIndex = resolveArrayIndex(array, arrayIndex);
+      array[itemIndex] = isLast
+        ? value
+        : apply(array[itemIndex] ?? {}, index + 1);
+      nextObject[key] = array;
+      return nextObject;
+    }
+
+    nextObject[key] = isLast ? value : apply(nextObject[key] ?? {}, index + 1);
+    return nextObject;
+  }
+
+  return apply(source, 0) as Record<string, unknown>;
+}
+
+function toEditableNode(data: Record<string, unknown>): EditableNode | null {
+  const section = typeof data.section === "string" ? data.section : null;
+  if (!section) return null;
+  const nodeType = typeof data.nodeType === "string" && EDITABLE_NODE_TYPES.has(data.nodeType as EditableNodeType)
+    ? data.nodeType as EditableNodeType
+    : "section";
+  const rect = data.rect && typeof data.rect === "object" && !Array.isArray(data.rect)
+    ? data.rect as EditableNode["rect"]
+    : undefined;
+
+  return {
+    section,
+    field: typeof data.field === "string" ? data.field : undefined,
+    label: typeof data.label === "string" ? data.label : undefined,
+    nodeType,
+    rect,
+  };
+}
+
 export function SitePreview() {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
     BREAKPOINTS[BREAKPOINTS.length - 1]
   );
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("live");
+  const [scaffoldMode, setScaffoldMode] = useState(false);
   const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const {
@@ -52,12 +135,16 @@ export function SitePreview() {
     editMode,
     setHasDraft,
     triggerRefresh,
+    tenantId,
     siteUrl,
     previewUrl,
+    dashboardHref,
     siteModel,
     activePage,
+    setActivePage,
     setChatPrompt,
     setRightTab,
+    setSelectedNode,
   } = useDashboard();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -72,38 +159,55 @@ export function SitePreview() {
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
   }
+  const pageOptions = Object.keys(siteModelPages)
+    .sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b)))
+    .map((page) => ({
+      value: page,
+      label: page === "home" ? "Home" : page.charAt(0).toUpperCase() + page.slice(1),
+    }));
   const currentPage = activeSection
     ? (sectionToPage[activeSection] || activePage || "home")
     : (activePage || "home");
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
-  // Build query params: always include preview=true, optionally edit=true
-  const params = new URLSearchParams();
-  params.set("preview", "true");
+  const editableParams = new URLSearchParams();
+  if (tenantId) {
+    editableParams.set("tenant", tenantId);
+  }
+  editableParams.set("preview", "true");
   if (editMode === "draft") {
-    params.set("edit", "true");
+    editableParams.set("edit", "true");
   }
   const base = previewUrl || siteUrl || "";
-  const iframeSrc = `${base}${pagePath}?${params.toString()}`;
+  const editableIframeSrc = `${base}${pagePath}?${editableParams.toString()}`;
+  const livePreviewParams = new URLSearchParams({
+    path: pagePath,
+    refresh: String(refreshKey),
+  });
+  const liveIframeSrc = dashboardHref(`/api/live-preview?${livePreviewParams.toString()}`);
+  const iframeSrc = previewSource === "live" && siteUrl ? liveIframeSrc : editableIframeSrc;
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
-  const isExternalPreview = (() => {
-    if (typeof window === "undefined" || !base) return false;
-    try {
-      return new URL(base).origin !== window.location.origin;
-    } catch {
-      return false;
-    }
-  })();
+  const isLivePreview = previewSource === "live" && !!siteUrl;
+  // Cross-origin tenant preview hosts are expected: they still communicate
+  // selection events to the dashboard through postMessage.
+  const showExternalPreviewNotice = false;
   const activeSectionLabel = activeSection
     ? SECTION_LABELS[activeSection] || activeSection
     : null;
+  const scaffoldSections = [...(siteModelPages[activePage]?.sections || [])]
+    .sort((a, b) => a.order - b.order)
+    .map((section) => ({
+      value: section.type,
+      label: SECTION_LABELS[section.type] || section.type,
+    }));
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
-  const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath });
+  const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource });
   if (
     prevIframeKey.refreshKey !== refreshKey ||
-    prevIframeKey.pagePath !== pagePath
+    prevIframeKey.pagePath !== pagePath ||
+    prevIframeKey.previewSource !== previewSource
   ) {
-    setPrevIframeKey({ refreshKey, pagePath });
+    setPrevIframeKey({ refreshKey, pagePath, previewSource });
     setPreviewStatus("loading");
     setPreviewErrorDismissed(false);
   }
@@ -124,6 +228,15 @@ export function SitePreview() {
       setActiveSection(null);
     }
   }, [activePage, setActiveSection]);
+
+  useEffect(() => {
+    if (!scaffoldMode) return;
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setScaffoldMode(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [scaffoldMode]);
 
   // Handle scroll-to-section requests from ContentBrowser
   useEffect(() => {
@@ -153,18 +266,18 @@ export function SitePreview() {
   // Handle inline edit saves from iframe
   const handleInlineEdit = useCallback(async (section: string, field: string, value: string) => {
     const isDraft = editMode === "draft";
-    const contentUrl = `/api/content/${section}${isDraft ? "?draft=true" : ""}`;
+    const contentUrl = dashboardHref(`/api/content/${section}${isDraft ? "?draft=true" : ""}`);
 
     try {
       const res = await fetch(contentUrl, { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
-      data[field] = value;
+      const nextData = setEditableValue(data, field, value);
       const saveRes = await fetch(contentUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify(data),
+        body: JSON.stringify(nextData),
       });
       if (saveRes.ok) {
         if (isDraft) {
@@ -173,7 +286,7 @@ export function SitePreview() {
         triggerRefresh();
       }
     } catch {}
-  }, [editMode, setHasDraft, triggerRefresh]);
+  }, [dashboardHref, editMode, setHasDraft, triggerRefresh]);
 
   // Listen for messages from iframe
   useEffect(() => {
@@ -189,8 +302,25 @@ export function SitePreview() {
       if (!allowedOrigins.includes(event.origin)) return;
       if (!data?.type?.startsWith("reb-")) return;
 
+      if (data.type === "reb-node-selected") {
+        const node = toEditableNode(data);
+        if (node) {
+          setSelectedNode(node);
+          setRightTab(node.nodeType === "section" ? "layout" : "properties");
+          setContextMenu(null);
+        }
+      }
       if (data.type === "reb-section-clicked") {
-        setActiveSection(data.section);
+        if (typeof data.section === "string") {
+          setSelectedNode({
+            section: data.section,
+            nodeType: "section",
+            label: SECTION_LABELS[data.section] || data.section,
+          });
+          setRightTab("layout");
+        } else {
+          setActiveSection(data.section);
+        }
         setContextMenu(null);
       }
       if (data.type === "reb-inline-edit") {
@@ -214,7 +344,7 @@ export function SitePreview() {
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl]);
+  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl, setRightTab, setSelectedNode]);
 
   // Close context menu on click outside or Escape
   useEffect(() => {
@@ -280,18 +410,88 @@ export function SitePreview() {
   }, [activeSectionLabel, setChatPrompt, setRightTab]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 h-10 border-b border-gray-border shrink-0 bg-surface">
-        <div className="flex items-center gap-2">
-          <div className="w-[5px] h-[5px] rounded-full bg-emerald-500" />
-          <span className="text-[11px] font-mono uppercase tracking-[0.06em] text-gray-muted">Preview</span>
-          <span className="text-[10px] text-gray-subtle ml-1">Click the preview to select sections</span>
-        </div>
+    <div
+      className={
+        scaffoldMode
+          ? "fixed inset-0 z-[80] flex h-screen flex-col bg-black animate-overlay-enter"
+          : "flex h-full flex-col"
+      }
+    >
+      {/* Canvas */}
+      <div
+        ref={canvasRef}
+        className={`relative flex flex-1 justify-center overflow-hidden ${
+          scaffoldMode ? "bg-black p-0" : "bg-surface-base p-3 xl:p-4"
+        }`}
+      >
+        {!scaffoldMode && (
+          <button
+            type="button"
+            onClick={() => setScaffoldMode(true)}
+            className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 text-[12px] font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-black/90"
+          >
+            <Wand2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+            Scaffold mode
+          </button>
+        )}
 
-        <div className="flex items-center gap-2">
-          {/* Breakpoint switcher */}
-          <div className="flex items-center gap-0.5 bg-gray-bg rounded-full p-0.5">
+        {scaffoldMode && (
+          <div className="pointer-events-none absolute inset-x-4 bottom-5 z-20 flex items-end justify-center">
+            <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/78 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-overlay-enter">
+              <div className="flex items-center gap-1.5 px-2">
+                <Wand2 className="h-3.5 w-3.5 text-white" strokeWidth={1.6} />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">Scaffold</span>
+              </div>
+              <span className="mx-1 h-6 w-px bg-white/10" />
+              <select
+                value={activePage}
+                onChange={(event) => {
+                  setActiveSection(null);
+                  setActivePage(event.target.value);
+                }}
+                className="h-8 min-w-[112px] rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-medium text-white outline-none transition-colors focus:border-white/30"
+                aria-label="Page"
+              >
+                {pageOptions.map((page) => (
+                  <option key={page.value} value={page.value}>
+                    {page.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={activeSection || ""}
+                onChange={(event) => setActiveSection(event.target.value || null)}
+                className="h-8 min-w-[172px] rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-medium text-white outline-none transition-colors focus:border-white/30"
+                aria-label="Section"
+              >
+                <option value="">Select section</option>
+                {scaffoldSections.map((section) => (
+                  <option key={section.value} value={section.value}>
+                    {section.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mx-1 h-6 w-px bg-white/10" />
+            {[
+              { value: "live", label: "Live" },
+              { value: "editable", label: "Editable" },
+            ].map((source) => {
+              const active = previewSource === source.value;
+              return (
+                <button
+                  key={source.value}
+                  type="button"
+                  onClick={() => setPreviewSource(source.value as PreviewSource)}
+                  aria-pressed={active}
+                  className={`h-7 rounded-full px-3 text-[11px] font-medium transition-colors ${
+                    active ? "bg-white text-black" : "text-white/65 hover:text-white"
+                  }`}
+                >
+                  {source.label}
+                </button>
+              );
+            })}
+            <span className="mx-1 h-6 w-px bg-white/10" />
             {BREAKPOINTS.map((bp) => {
               const active = breakpoint.label === bp.label;
               return (
@@ -301,80 +501,68 @@ export function SitePreview() {
                   aria-pressed={active}
                   aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
                   title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
-                  className={`flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium tracking-[-0.01em] transition-all duration-150 ${
-                    active
-                      ? "bg-surface-raised text-white shadow-sm"
-                      : "text-gray-muted hover:text-white"
+                  className={`flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors ${
+                    active ? "bg-white/12 text-white" : "text-white/55 hover:text-white"
                   }`}
                 >
-                  <bp.icon className="w-[13px] h-[13px]" strokeWidth={1.5} />
-                  <span>{bp.label}</span>
+                  <bp.icon className="h-[13px] w-[13px]" strokeWidth={1.5} />
+                  <span className="hidden xl:inline">{bp.label}</span>
                 </button>
               );
             })}
+            <span className="mx-1 h-6 w-px bg-white/10" />
+            <button
+              type="button"
+              onClick={focusSelectedSection}
+              disabled={!activeSection || isLivePreview}
+              className="h-7 rounded-full px-3 text-[11px] font-medium text-white/65 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={askAIForSelectedSection}
+              className="h-7 rounded-full px-3 text-[11px] font-medium text-white/65 transition-colors hover:text-white"
+            >
+              Ask AI
+            </button>
+            <a
+              href={siteUrl || "/"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+              title="Open live site"
+            >
+              <ExternalLink className="h-[14px] w-[14px]" strokeWidth={1.5} />
+            </a>
+            <button
+              type="button"
+              onClick={retryPreview}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+              title="Refresh preview"
+            >
+              <RefreshCw className="h-[14px] w-[14px]" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setScaffoldMode(false)}
+              className="flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-medium text-black transition-colors hover:bg-white/90"
+              title="Exit Scaffold mode"
+              aria-label="Exit Scaffold mode"
+            >
+              <Minimize2 className="h-[13px] w-[13px]" strokeWidth={1.5} />
+              Exit
+            </button>
           </div>
-
-          <a
-            href={siteUrl || "/"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center w-7 h-7 rounded-full text-gray-muted hover:text-white hover:bg-gray-bg transition-colors duration-150"
-            title="Open in new tab"
-          >
-            <ExternalLink className="w-[14px] h-[14px]" strokeWidth={1.5} />
-          </a>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 border-b border-gray-border bg-surface px-4 py-2">
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-warm-white">
-            {activeSectionLabel ? `Selected: ${activeSectionLabel}` : "Choose a section above or ask AI to make an update."}
-          </p>
-          <p className="truncate text-[10px] text-gray-faint">
-            Loading {liveTargetUrl || pagePath}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={focusSelectedSection}
-            disabled={!activeSection}
-            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Edit selected section
-          </button>
-          <button
-            type="button"
-            onClick={askAIForSelectedSection}
-            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-          >
-            Ask AI to update
-          </button>
-          <a
-            href={siteUrl || "/"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-          >
-            Open live site
-          </a>
-          <button
-            type="button"
-            onClick={retryPreview}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-border px-2.5 py-1.5 text-[11px] text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-          >
-            <RefreshCw className="h-3 w-3" strokeWidth={1.5} />
-            Refresh preview
-          </button>
-        </div>
-      </div>
-
-      {/* Canvas */}
-      <div ref={canvasRef} className="flex-1 flex justify-center p-4 overflow-hidden bg-surface-base relative">
+        )}
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full rounded-xl overflow-hidden transition-[max-width] duration-200 ease-out bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] ${refreshKey > 0 ? "preview-flash" : ""}`}
+          className={`relative h-full w-full overflow-hidden bg-surface transition-[max-width] duration-200 ease-out ${
+            scaffoldMode
+              ? "rounded-none"
+              : `rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] xl:rounded-xl ${refreshKey > 0 ? "preview-flash" : ""}`
+          }`}
           style={{
             maxWidth: breakpoint.width ? `${breakpoint.width}px` : "100%",
             marginInline: "auto",
@@ -382,7 +570,7 @@ export function SitePreview() {
         >
           <iframe
             ref={iframeRef}
-            key={`${refreshKey}-${pagePath}`}
+            key={`${previewSource}-${refreshKey}-${pagePath}`}
             src={iframeSrc}
             className="w-full h-full border-0"
             title="Live site preview"
@@ -435,7 +623,7 @@ export function SitePreview() {
               </div>
             </div>
           )}
-          {previewStatus === "ready" && isExternalPreview && !previewErrorDismissed && (
+          {previewStatus === "ready" && showExternalPreviewNotice && !previewErrorDismissed && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt/95 p-6">
               <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
                 <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />

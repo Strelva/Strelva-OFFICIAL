@@ -10,6 +10,7 @@ import { CreateTenantForm } from "./CreateTenantForm";
 import { InviteButton } from "./InviteButton";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
+import { getCustomRepoMetadata, getTenantDeliveryModel, summarizeCustomRepo } from "@/lib/custom-repos";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export default async function AdminPage() {
   ).length;
   const mrr = activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
+  const customRepoCount = TENANTS.filter((t) => getTenantDeliveryModel(t) === "custom_repo").length;
 
   return (
     <div className="space-y-8">
@@ -79,7 +81,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-6">
           <p className="text-sm text-zinc-500">Active Tenants</p>
           <p className="text-3xl font-semibold text-white mt-1">
@@ -108,6 +110,15 @@ export default async function AdminPage() {
             <p className="text-xs text-amber-400 mt-1">Review needed</p>
           )}
         </Link>
+        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-6">
+          <p className="text-sm text-zinc-500">Custom Repos</p>
+          <p className="text-3xl font-semibold text-white mt-1">
+            {customRepoCount}
+          </p>
+          <p className="text-xs text-zinc-600 mt-1">
+            Default paid-client delivery path
+          </p>
+        </div>
       </div>
 
       {/* Create tenant form */}
@@ -141,6 +152,8 @@ export default async function AdminPage() {
                 const adminReadiness = readiness.find((r) => r.name.endsWith("admin domain"));
                 const clientReadiness = readiness.find((r) => r.name.endsWith("client domain"));
                 const revalidationReadiness = readiness.find((r) => r.name.endsWith("revalidation"));
+                const deliveryModel = getTenantDeliveryModel(t);
+                const customRepo = getCustomRepoMetadata(t);
 
                 return (
                   <tr
@@ -162,6 +175,13 @@ export default async function AdminPage() {
                           }`}
                         >
                           {t.active ? "Active tenant" : "Inactive tenant"}
+                        </span>
+                        <span className={`ml-2 mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          deliveryModel === "custom_repo"
+                            ? "bg-amber-500/15 text-amber-300"
+                            : "bg-zinc-700/40 text-zinc-400"
+                        }`}>
+                          {deliveryModel === "custom_repo" ? "Custom repo" : "Platform template"}
                         </span>
                       </div>
                     </td>
@@ -203,6 +223,11 @@ export default async function AdminPage() {
                         <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[t.subscriptionStatus ?? "none"]}`}>
                           Subscription: {t.subscriptionStatus ?? "none"}
                         </span>
+                        {deliveryModel === "custom_repo" && (
+                          <span className="inline-flex rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
+                            Repo: {customRepo.revalidationHealth ?? "unknown"}
+                          </span>
+                        )}
                         {draftCount > 0 ? (
                           <span className="inline-flex rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-400">
                             {draftCount} pending draft{draftCount === 1 ? "" : "s"}
@@ -219,6 +244,11 @@ export default async function AdminPage() {
                       <p className="mt-2 max-w-[220px] truncate text-xs text-zinc-600">
                         Public: {publicUrl.replace(/^https?:\/\//, "")}
                       </p>
+                      {deliveryModel === "custom_repo" && (
+                        <p className="mt-2 max-w-[220px] truncate text-xs text-amber-200/70">
+                          {summarizeCustomRepo(customRepo)}
+                        </p>
+                      )}
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex min-w-[280px] flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">

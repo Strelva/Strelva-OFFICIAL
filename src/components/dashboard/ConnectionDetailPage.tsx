@@ -4,7 +4,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ArrowLeft, CircleCheck, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import {
+  INTELLIGENCE_CATEGORY_LABELS,
+  deriveIntelligenceStatus,
   getIntegrationDefinition,
+  getIntegrationCategories,
   normalizeIntegrationStatus,
   type IntegrationStatus,
   type RawConnectionStatus,
@@ -193,15 +196,18 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     );
   }
 
+  const intelligenceStatus = deriveIntelligenceStatus(detail, status);
+  const categories = getIntegrationCategories(detail);
+
   return (
-    <div className="flex-1 overflow-y-auto px-14 py-10 animate-route-enter">
+    <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
       {/* Back link */}
       <button
         onClick={() => router.push(dashboardHref("/dashboard/sources"))}
         className="flex items-center gap-1.5 text-gray-faint hover:text-gray-muted transition-colors mb-8"
       >
         <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span className="text-[13px]">Connections</span>
+        <span className="text-[13px]">Sources</span>
       </button>
 
       {/* Header */}
@@ -216,7 +222,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <SourceHealthBadge status={status} lastSync={lastSyncedAt} compact />
+          <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} compact />
           {!isConnected && detail.connectionProvider === "google" && (
             <a
               href={dashboardHref("/api/oauth/google")}
@@ -244,33 +250,76 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         </div>
       </div>
 
-      {/* Usage examples */}
-      <div className="flex gap-4 mb-8">
-        {detail.usageExamples.map((example, i) => (
-          <div
-            key={i}
-            className="flex-1 rounded-[20px] bg-surface-raised border border-gray-border p-6 flex flex-col justify-center gap-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
-          >
-            <div className="flex items-center gap-1.5 text-[12px]">
-              <span className="font-medium text-accent">@{detail.displayName.split(" ")[0]}</span>
-              <span className="text-[#ffffffcc]">{example.title.replace(`@${detail.displayName.split(" ")[0]}: `, "")}</span>
-            </div>
-            <p className="text-[12px] text-[#ffffffcc] leading-relaxed">
-              {example.response}
-            </p>
-          </div>
-        ))}
+      <div className="mb-8 grid gap-3 rounded-2xl border border-gray-border bg-surface-raised p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-gray-faint">Setup path</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.description}</p>
+        </div>
+        <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} />
       </div>
 
-      {/* Description */}
-      <p className="text-[13px] text-gray-muted leading-[1.6] max-w-[700px] mb-8">
-        {detail.description}
-      </p>
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-8">
+        <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
+          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Data this provides</span>
+          <p className="mt-2 text-[15px] font-medium text-warm-black">{detail.addsIntelligence}</p>
+          <div className="mt-5">
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">AI can use this to</span>
+            <ul className="mt-2 space-y-2">
+              {detail.aiCanUseThisTo.map((item) => (
+                <li key={item} className="text-[13px] leading-relaxed text-gray-muted">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3">
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Example</span>
+            <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.exampleInsight}</p>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
+          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Connection state</span>
+          <div className="mt-3">
+            <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} />
+          </div>
+          <div className="mt-5">
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Where this appears</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {detail.appearsIn.map((item) => (
+                <span key={item} className="rounded-full border border-gray-border bg-surface-inset px-2.5 py-1 text-[11px] text-gray-muted">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Intelligence group</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <span key={category} className="rounded-full border border-gray-border bg-surface-inset px-2.5 py-1 text-[11px] text-gray-muted">
+                  {INTELLIGENCE_CATEGORY_LABELS[category]}
+                </span>
+              ))}
+            </div>
+          </div>
+          {detail.actionPaths?.length ? (
+            <div className="mt-5">
+              <span className="text-[11px] text-gray-faint uppercase tracking-wider">Action paths</span>
+              <ul className="mt-2 space-y-1.5">
+                {detail.actionPaths.map((path) => (
+                  <li key={path} className="text-[12px] leading-relaxed text-gray-muted">
+                    {path}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
-      {/* Metadata */}
       <div className="flex gap-8 mb-8">
         <div>
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Sync frequency</span>
+          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Refresh behavior</span>
           <p className="text-[13px] text-warm-black mt-1">{detail.syncFrequency}</p>
         </div>
         {lastSyncedAt && (

@@ -184,7 +184,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
       <EmptyState
         icon={<History className="w-[18px] h-[18px] text-gray-muted" strokeWidth={1.5} />}
         title="No previous versions"
-        description="Versions appear here after you save changes"
+        description="Versions appear after changes are pushed live. Draft-only saves stay pending until Push."
         className="h-full"
       />
     );

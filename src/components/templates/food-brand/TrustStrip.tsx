@@ -1,20 +1,23 @@
 "use client";
 
 export function TrustStrip() {
+  const items = ["NYS grown", "No preservatives", "No sulfates", "0g added sugar", "12 allergen free"];
+
   return (
     <div
-      className="py-5 md:py-6"
-      style={{ background: "var(--cream-dark)", borderBottom: "1px solid var(--cream-mid)" }}
+      className="py-4 md:py-5"
+      style={{ background: "var(--bark)", color: "var(--cream)" }}
     >
       <div className="container-main">
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-2 text-[0.625rem] font-medium tracking-[0.15em] uppercase" style={{ color: "var(--bark-faded)" }}>
-          <span>2 Ingredients</span>
-          <span style={{ color: "var(--cream-mid)" }}>|</span>
-          <span>0g Added Sugar</span>
-          <span style={{ color: "var(--cream-mid)" }}>|</span>
-          <span>NYS Orchard-Grown</span>
-          <span style={{ color: "var(--cream-mid)" }}>|</span>
-          <span>No Preservatives</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[0.62rem] font-bold uppercase tracking-[0.16em]">
+          {items.map((item, index) => (
+            <span key={item} className="inline-flex items-center gap-5">
+              <span style={{ opacity: 0.78 }}>{item}</span>
+              {index < items.length - 1 && (
+                <span className="h-1 w-1 rounded-full" style={{ background: "var(--wheat)" }} />
+              )}
+            </span>
+          ))}
         </div>
       </div>
     </div>

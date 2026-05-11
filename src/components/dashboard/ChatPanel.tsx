@@ -17,6 +17,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
+import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
@@ -32,21 +33,25 @@ const SUGGESTION_CHIPS = [
 const INPUT_QUICK_ACTIONS = [
   {
     label: "What's working?",
+    icon: BarChart3,
     description: "Summarize visits, clicks, updates, and what you are watching.",
     message: "Give me a plain-English overview of what's working on my site right now. Include recent site changes, traffic or click signals if available, approvals waiting, and what you're watching for the next weekly report.",
   },
   {
     label: "Suggest an update",
+    icon: Clock,
     description: "Pick the most useful small change for the site today.",
     message: "Suggest the most useful small website update I should make today. Explain why it matters and ask for any missing details before changing anything.",
   },
   {
     label: "Show recent changes",
+    icon: CalendarPlus,
     description: "Review what the AI or team changed lately.",
     message: "Show me the recent changes made to my site and call out anything that still needs approval or a closer look.",
   },
   {
     label: "Check site health",
+    icon: AlertCircle,
     description: "Look for stale content, weak CTAs, missing info, and issues.",
     message: "Check my site health. Look for stale content, missing business details, weak calls to action, broken or risky areas, and the next practical fix.",
   },
@@ -77,6 +82,7 @@ interface ChatPanelProps {
   threadId?: string;
   ownerName: string;
   onThreadCreated?: (id: string) => void;
+  variant?: "full" | "compact";
 }
 
 function getGreeting(): string {
@@ -99,9 +105,10 @@ function isTransientFailureMessage(message: ChatMessage) {
   return message.role === "assistant" && message.content.trim() === TRANSIENT_CONNECT_FAILURE;
 }
 
-export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelProps) {
+export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "full" }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [updateToast, setUpdateToast] = useState<UpdateToast | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
@@ -235,26 +242,32 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       const abortController = new AbortController();
       abortRef.current = abortController;
 
+      const attachmentContext = attachments.length
+        ? `\n\nAttached files:\n${attachments.map((file) => `- ${file.name}: ${file.url}`).join("\n")}`
+        : "";
+      const outboundText = `${text}${attachmentContext}`;
+
       const userMsg: ChatMessage = {
         id: makeClientId("user"),
         role: "user",
-        content: text,
+        content: outboundText,
         timestamp: Date.now(),
       };
 
       const allMessages = messages.filter((message) => !isTransientFailureMessage(message)).concat(userMsg);
       setMessages(allMessages);
       setInput("");
+      setAttachments([]);
       setIsLoading(true);
       setToolStatus("Contacting AI...");
       setActiveTools([]);
 
       const slowStatusTimer = window.setTimeout(() => {
-        if (!abortController.signal.aborted) setToolStatus("Still working...");
+        if (!abortController.signal.aborted) setToolStatus("Checking the site context...");
       }, 2500);
       const longStatusTimer = window.setTimeout(() => {
-        if (!abortController.signal.aborted) setToolStatus("This is taking longer than usual...");
-      }, 6500);
+        if (!abortController.signal.aborted) setToolStatus("Still working. You can stop this if you want to revise the ask.");
+      }, 12000);
 
       // If no threadId, create a new thread first
       let activeThreadId = threadId;
@@ -279,6 +292,23 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
         } catch {
           // Continue without thread persistence
         }
+      }
+
+      if (/custom (site|design|code)|scaffold web request|beyond normal content/i.test(text)) {
+        fetch(dashboardHref("/api/change-requests"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            prompt: text,
+            page: dashCtx?.activePage,
+            section: dashCtx?.selectedNode?.section || dashCtx?.activeSection,
+            field: dashCtx?.selectedNode?.field,
+            label: dashCtx?.selectedNode?.label || dashCtx?.activeSection || "AI chat request",
+            nodeType: dashCtx?.selectedNode?.nodeType,
+            rect: dashCtx?.selectedNode?.rect,
+          }),
+        }).catch(() => {});
       }
 
       try {
@@ -495,7 +525,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
         }
       }
     },
-    [dashboardHref, messages, isLoading, threadId, onThreadCreated, dashCtx, showResultToast]
+    [attachments, dashboardHref, messages, isLoading, threadId, onThreadCreated, dashCtx, showResultToast]
   );
 
   const handleStop = useCallback(() => {
@@ -520,7 +550,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
   }, [isEmpty]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex h-full flex-col ${variant === "compact" ? "bg-surface" : ""}`}>
       {/* Scrollable content area */}
       <div
         ref={scrollRef}
@@ -529,28 +559,28 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       >
         {isEmpty ? (
           /* Empty state: greeting + chips */
-          <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
+          <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-20 sm:justify-center sm:px-8 sm:py-12"}`}>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Site agent online
             </div>
             <h1
-              className="text-[28px] sm:text-[38px] font-semibold text-warm-black tracking-[-0.03em] text-center"
+              className={`${variant === "compact" ? "text-[22px]" : "text-[28px] sm:text-[38px]"} font-semibold text-warm-black tracking-[-0.03em] text-center`}
               suppressHydrationWarning
             >
               {getGreeting()}, {ownerName}
             </h1>
-            <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 text-center max-w-xl">
+            <p className={`${variant === "compact" ? "text-[12px]" : "text-[14px] sm:text-[15px]"} text-gray-muted mt-3 text-center max-w-xl`}>
               Make the site match the business today. The AI can update copy, draft customer-facing content, and flag what is worth improving next.
             </p>
 
             {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 sm:mt-10 w-full max-w-3xl">
-              {SUGGESTION_CHIPS.map((chip) => (
+            <div className={`grid grid-cols-1 gap-3 w-full max-w-3xl ${variant === "compact" ? "mt-6" : "sm:grid-cols-2 mt-8 sm:mt-10"}`}>
+              {SUGGESTION_CHIPS.slice(0, variant === "compact" ? 2 : SUGGESTION_CHIPS.length).map((chip) => (
                 <button
                   key={chip.label}
                   onClick={() => sendChat(chip.label)}
-                  className="rounded-xl bg-glass border border-glass-border px-4 py-3.5 min-h-[72px] hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left"
+                  className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} rounded-xl bg-glass border border-glass-border hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
@@ -571,7 +601,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
           </div>
         ) : (
           /* Active conversation */
-          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7 space-y-4">
+          <div className={`${variant === "compact" ? "px-3 py-4" : "max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7"} space-y-4`}>
             {/* Update toast */}
             {updateToast && (
               <div
@@ -636,7 +666,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                 key={message.id}
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div className={`max-w-[88%] sm:max-w-[80%] ${message.role === "user" ? "order-2" : ""}`}>
+                <div className={`${variant === "compact" ? "max-w-[94%]" : "max-w-[88%] sm:max-w-[80%]"} ${message.role === "user" ? "order-2" : ""}`}>
                   {message.role === "assistant" && (
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
@@ -646,7 +676,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
                     </div>
                   )}
                   <div
-                    className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
+                    className={`${variant === "compact" ? "px-3 py-2.5 text-[12px]" : "px-4 py-3 text-[13px]"} rounded-2xl leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
                       message.role === "user"
                         ? "bg-accent/15 text-warm-black border border-accent/20"
                         : `bg-glass text-warm-black border border-glass-border ${message.content ? "ai-output-pop" : ""}`
@@ -709,19 +739,30 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated }: ChatPanelPro
       </div>
 
       {/* Chat input - always at bottom, with safe area for notched devices */}
-      <div className="shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe">
+      <div className={`${variant === "compact" ? "px-3 pb-3 pt-2" : "px-4 sm:px-6 pb-4 sm:pb-6 pt-3"} shrink-0 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe`}>
         <div className="max-w-3xl mx-auto">
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {attachments.map((file) => (
+                <span key={file.url} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] text-amber-200">
+                  {file.name}
+                </span>
+              ))}
+            </div>
+          )}
           <PromptInputBox
             ref={inputRef}
             value={input}
             onValueChange={setInput}
             onSend={sendChat}
+            onFilesUploaded={(files) => setAttachments((current) => [...current, ...files])}
             onStop={handleStop}
             isLoading={isLoading}
             placeholder="Tell me what you need..."
             quickActions={INPUT_QUICK_ACTIONS}
+            className={variant === "compact" ? "rounded-2xl" : undefined}
           />
-          <p className="text-[11px] text-gray-subtle text-center mt-2">
+          <p className={`${variant === "compact" ? "hidden" : ""} text-[11px] text-gray-subtle text-center mt-2`}>
             Update your site, write content, check analytics
           </p>
         </div>

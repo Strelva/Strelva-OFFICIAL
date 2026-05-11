@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Download, Image as ImageIcon } from "lucide-react";
+import { Download, Image as ImageIcon, Link2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
+import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
@@ -120,12 +121,10 @@ function setNestedValue(
 
 const SETTINGS_SECTIONS = [
   { id: "profile", label: "Business" },
-  { id: "brand", label: "Brand" },
-  { id: "ai", label: "AI rules" },
   { id: "utilities", label: "Utilities" },
+  { id: "ownership", label: "Ownership" },
   { id: "domains", label: "Domains" },
   { id: "billing", label: "Billing" },
-  { id: "publishing", label: "Publishing" },
 ] as const;
 
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -247,6 +246,8 @@ function ProfileSection({
 // Brand section
 // ---------------------------------------------------------------------------
 
+// Kept temporarily for rollback while brand controls move into Ask AI.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function BrandSection() {
   const [theme, setTheme] = useState<ThemeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -421,6 +422,8 @@ interface AISettings {
   } | null;
 }
 
+// Kept temporarily for rollback while AI rules move into Ask AI.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AISection() {
   const [data, setData] = useState<AISettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -635,15 +638,21 @@ function UtilitiesSection() {
   const utilities = [
     {
       title: "Photo library",
-      description: "Manage reusable images that the site editor and AI can pull into customer-facing updates.",
+      description: "Upload and reuse real photos, logos, and files the AI can reference in chat.",
       href: "/dashboard/assets",
       icon: ImageIcon,
     },
     {
       title: "Export & handoff",
-      description: "Download content, assets, and offboarding notes when ownership or providers change.",
-      href: "/dashboard/ownership",
+      description: "Download content and asset manifests or start a provider handoff.",
+      href: "/dashboard/settings#ownership",
       icon: Download,
+    },
+    {
+      title: "Connection setup",
+      description: "Repair source health, OAuth, API keys, and manual setup paths.",
+      href: "/dashboard/sources",
+      icon: Link2,
     },
   ];
 
@@ -707,13 +716,20 @@ const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className
   },
 };
 
+const FOUNDER_COMP_COPY = {
+  label: "Founder comp",
+  className: "bg-amber-300/12 text-amber-200",
+  note: "Full access is comped for this founder account. No customer billing is due.",
+};
+
 function BillingSection() {
   const dashboard = useDashboardOptional();
   const apiPath = useDashboardApiPath();
   const [billingError, setBillingError] = useState("");
   const [openingPortal, setOpeningPortal] = useState(false);
   const status = dashboard?.subscriptionStatus ?? "none";
-  const copy = BILLING_STATUS_COPY[status];
+  const isFounderComp = dashboard?.planOverride === "founder_comp";
+  const copy = isFounderComp ? FOUNDER_COMP_COPY : BILLING_STATUS_COPY[status];
 
   return (
     <div className="rounded-lg border border-gray-border overflow-hidden">
@@ -723,7 +739,9 @@ function BillingSection() {
             Current plan
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-white">{SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}</span>
+            <span className="text-[20px] font-medium text-warm-white">
+              {isFounderComp ? "Founder comp" : SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}
+            </span>
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}
             </span>
@@ -761,10 +779,10 @@ function BillingSection() {
               setOpeningPortal(false);
             }
           }}
-          disabled={openingPortal}
+          disabled={openingPortal || isFounderComp}
           className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors disabled:opacity-60"
         >
-          {openingPortal ? "Opening..." : "Manage billing"}
+          {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
         </button>
       </div>
     </div>
@@ -775,6 +793,8 @@ function BillingSection() {
 // Publishing section
 // ---------------------------------------------------------------------------
 
+// Kept temporarily for rollback while publishing mode moves out of client settings.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PublishingSection() {
   const dashboard = useDashboardOptional();
   const apiPath = useDashboardApiPath();
@@ -877,31 +897,23 @@ function PublishingSection() {
 const SECTION_META: Record<string, { title: string; description: string }> = {
   profile: {
     title: "Business profile",
-    description: "The source of truth for how customers find, understand, and book with you.",
-  },
-  brand: {
-    title: "Brand system",
-    description: "The visual rules your site uses when the AI adds or refreshes content.",
-  },
-  ai: {
-    title: "AI guardrails",
-    description: "Rules, hours, and tone the AI follows before it changes anything customer-facing.",
+    description: "Core identity and booking details. Brand, hours, and AI rules now live in Ask AI.",
   },
   utilities: {
-    title: "Utilities",
-    description: "Lower-frequency tools live here so the daily dashboard stays focused.",
+    title: "Operations utilities",
+    description: "Useful tools that support the AI, exports, and connection setup.",
+  },
+  ownership: {
+    title: "Ownership and handoff",
+    description: "Know what the business owns, what Scaffold Web manages, and how to leave cleanly.",
   },
   domains: {
-    title: "Domains",
-    description: "Where customers and owners access the live site and dashboard.",
+    title: "Domain health",
+    description: "Production and admin domains, DNS records, SSL state, and repair steps.",
   },
   billing: {
     title: "Billing",
     description: "One plan, one operating cost, no maintenance upsells.",
-  },
-  publishing: {
-    title: "Publishing control",
-    description: "Decide whether confirmed AI work ships immediately or waits for review.",
   },
 };
 
@@ -915,6 +927,13 @@ export default function SettingsPage() {
   const [loadError, setLoadError] = useState(false);
   const apiPath = useDashboardApiPath();
 
+  const setSection = useCallback((section: string) => {
+    setActiveSection(section);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${section}`);
+    }
+  }, []);
+
   useEffect(() => {
     fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
       .then((res) => {
@@ -924,6 +943,20 @@ export default function SettingsPage() {
       .then((data) => setSettings(data))
       .catch(() => setLoadError(true));
   }, [apiPath]);
+
+  useEffect(() => {
+    const applyHashSection = () => {
+      const section = window.location.hash.replace("#", "");
+      if (SETTINGS_SECTIONS.some((item) => item.id === section)) {
+        setActiveSection(section);
+      } else if (section) {
+        setActiveSection("profile");
+      }
+    };
+    applyHashSection();
+    window.addEventListener("hashchange", applyHashSection);
+    return () => window.removeEventListener("hashchange", applyHashSection);
+  }, []);
 
   if (loadError) {
     return (
@@ -962,7 +995,7 @@ export default function SettingsPage() {
         {SETTINGS_SECTIONS.map((item) => (
           <button
             key={item.id}
-            onClick={() => setActiveSection(item.id)}
+            onClick={() => setSection(item.id)}
             className={`mb-1 w-full rounded-md border px-3 py-2 text-left text-[13px] transition-colors ${
               activeSection === item.id
                 ? "border-gray-border bg-surface-raised text-warm-white"
@@ -978,7 +1011,7 @@ export default function SettingsPage() {
       <div className="md:hidden border-b border-gray-border px-4 py-3">
         <DashSelect
           value={activeSection}
-          onChange={(e) => setActiveSection(e.target.value)}
+          onChange={(e) => setSection(e.target.value)}
           options={SETTINGS_SECTIONS.map((item) => ({
             value: item.id,
             label: item.label,
@@ -988,16 +1021,16 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
-        <div className="max-w-2xl">
+        <div className={activeSection === "ownership" ? "max-w-5xl" : "max-w-2xl"}>
           <div className="mb-8 rounded-2xl border border-glass-border bg-glass p-5">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-              Operating rules
+              Operations
             </p>
             <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-warm-white">
-              Keep the AI aligned with the business
+              Settings with real ownership impact
             </h1>
             <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-              Settings should reduce owner review time: accurate identity, reliable booking links, clear brand rules, and explicit boundaries for what the AI can publish.
+              Use this area for domains, billing, exports, and handoff. Day-to-day business instructions now happen in Ask AI.
             </p>
           </div>
 
@@ -1020,12 +1053,10 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
-          {activeSection === "brand" && <BrandSection />}
-          {activeSection === "ai" && <AISection />}
           {activeSection === "utilities" && <UtilitiesSection />}
+          {activeSection === "ownership" && <OwnershipSection />}
           {activeSection === "domains" && <DomainsSection />}
           {activeSection === "billing" && <BillingSection />}
-          {activeSection === "publishing" && <PublishingSection />}
         </div>
       </div>
     </div>

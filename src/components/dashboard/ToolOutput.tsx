@@ -66,8 +66,15 @@ export interface ConnectionData {
     name: string;
     icon: string;
     connected: boolean;
+    status?: "no_signal" | "signal_available" | "ai_using_it" | "needs_attention" | "can_act_here";
     description?: string;
+    addsIntelligence?: string;
+    aiCanUseThisTo?: string[];
+    exampleInsight?: string;
+    actionPaths?: string[];
+    sourceProof?: string;
   }>;
+  summary?: string;
 }
 
 export interface PreviewData {
@@ -423,7 +430,15 @@ function PhotosOutput({ data }: { data: PhotoData }) {
 
 function ConnectionsOutput({ data }: { data: ConnectionData }) {
   const [expanded, setExpanded] = useState(true);
-  const connectedCount = data.connections.filter((c) => c.connected).length;
+  const usefulCount = data.connections.filter((c) => c.status === "ai_using_it" || c.status === "can_act_here").length;
+
+  const statusLabel: Record<NonNullable<ConnectionData["connections"][number]["status"]>, string> = {
+    no_signal: "No signal",
+    signal_available: "Signal available",
+    ai_using_it: "AI using it",
+    needs_attention: "Needs attention",
+    can_act_here: "Can act here",
+  };
 
   return (
     <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
@@ -434,8 +449,8 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
       >
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Connections</span>
-          <span className="text-[11px] text-gray-muted">{connectedCount} active</span>
+          <span className="text-[12px] font-medium text-warm-black">AI intelligence sources</span>
+          <span className="text-[11px] text-gray-muted">{usefulCount} usable now</span>
         </div>
         {expanded ? (
           <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
@@ -447,22 +462,42 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
       {/* Content */}
       {expanded && (
         <div className="p-3 animate-fade-in-up space-y-1.5">
+          {data.summary && (
+            <p className="px-1 pb-2 text-[12px] leading-relaxed text-gray-muted">{data.summary}</p>
+          )}
           {data.connections.map((conn) => (
             <div
               key={conn.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-glass border border-glass-border"
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-glass border border-glass-border"
             >
               <div className="w-8 h-8 rounded-lg bg-gray-bg flex items-center justify-center shrink-0">
                 <span className="text-[11px] font-bold text-gray-fg">{conn.icon}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-[12px] font-medium text-warm-black block">{conn.name}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-medium text-warm-black block">{conn.name}</span>
+                  {conn.status && (
+                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                      {statusLabel[conn.status]}
+                    </span>
+                  )}
+                </div>
                 {conn.description && (
-                  <span className="text-[11px] text-gray-muted truncate block">{conn.description}</span>
+                  <span className="text-[11px] text-gray-muted block leading-relaxed">{conn.description}</span>
+                )}
+                {conn.aiCanUseThisTo?.length ? (
+                  <span className="mt-1 text-[11px] text-gray-faint block leading-relaxed">
+                    AI can: {conn.aiCanUseThisTo.slice(0, 2).join("; ")}
+                  </span>
+                ) : null}
+                {conn.sourceProof && (
+                  <span className="mt-1 text-[10px] text-gray-faint block">{conn.sourceProof}</span>
                 )}
               </div>
-              {conn.connected ? (
+              {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (
                 <CircleCheck className="w-4 h-4 text-success shrink-0" strokeWidth={1.5} />
+              ) : conn.status === "needs_attention" ? (
+                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" strokeWidth={1.5} />
               ) : (
                 <Circle className="w-4 h-4 text-gray-subtle shrink-0" strokeWidth={1.5} />
               )}
@@ -599,6 +634,7 @@ function parseResult(toolName: string, result: unknown): ToolResult {
           type: "connections",
           data: {
             connections: (data.connections as ConnectionData["connections"]) || [],
+            summary: data.summary as string | undefined,
           },
         };
 

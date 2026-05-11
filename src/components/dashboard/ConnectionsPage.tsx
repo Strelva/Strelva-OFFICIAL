@@ -5,10 +5,15 @@ import { Search, ChevronRight } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
   DISCOVERABLE_INTEGRATIONS,
+  INTELLIGENCE_CATEGORY_LABELS,
+  deriveIntelligenceStatus,
   filterIntegrations,
+  getIntegrationCategories,
   normalizeIntegrationStatus,
   type IntegrationUsageExample,
   type IntegrationStatus,
+  type IntelligenceCategory,
+  type IntelligenceStatus,
   type RawConnectionStatus,
   type RawTenantConnectionSettings,
 } from "@/lib/integration-registry";
@@ -25,9 +30,16 @@ export interface Connection {
   iconColor: string;
   connected: boolean;
   status: IntegrationStatus;
+  intelligenceStatus: IntelligenceStatus;
+  intelligenceCategories: IntelligenceCategory[];
   lastSyncedAt: string | null;
   usedIn: string;
   usageExamples: IntegrationUsageExample[];
+  addsIntelligence: string;
+  aiCanUseThisTo: string[];
+  exampleInsight: string;
+  actionPaths: string[];
+  sourcePrompt: string | null;
 }
 
 interface SourceState {
@@ -46,10 +58,18 @@ function ConnectionRow({
   onClick: () => void;
   onRunAction: () => void;
 }) {
-  const action = connection.usageExamples[0];
+  const needsSetup = connection.status === "not_configured" || connection.status === "needs_reauth" || connection.status === "sync_failed";
+  const setupCopy = connection.status === "connected"
+    ? "Connected and available to AI"
+    : connection.status === "coming_soon"
+      ? "Visible roadmap source"
+      : needsSetup
+        ? "Setup required"
+        : "Manual source";
 
   return (
-    <div className="flex items-start gap-3.5 w-full rounded-xl p-3.5 hover:bg-gray-bg transition-colors">
+    <div className="flex h-full flex-col gap-4 rounded-xl border border-gray-border bg-surface-raised p-4 transition-colors hover:border-accent/25">
+      <div className="flex items-start gap-3.5">
       <div className={`w-[42px] h-[42px] rounded-xl ${connection.iconBg} flex items-center justify-center shrink-0`}>
         <span className={`text-[14px] font-bold ${connection.iconColor}`}>{connection.icon}</span>
       </div>
@@ -61,19 +81,7 @@ function ConnectionRow({
         >
           {connection.name}
         </button>
-        <span className="text-[12px] text-gray-muted block mt-0.5">{connection.description}</span>
-        <span className="mt-2 block text-[11px] leading-relaxed text-gray-faint">
-          {connection.connected ? "Powers now" : "Connect to unlock"}: {connection.usedIn}
-        </span>
-        {action && (
-          <button
-            type="button"
-            onClick={onRunAction}
-            className="mt-3 rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-white"
-          >
-            Ask AI: {action.title}
-          </button>
-        )}
+        <span className="text-[12px] text-gray-muted block mt-0.5">{connection.addsIntelligence}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SourceHealthBadge status={connection.status} lastSync={connection.lastSyncedAt} compact />
@@ -86,11 +94,47 @@ function ConnectionRow({
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
       </div>
+      </div>
+      <div className="grid grid-cols-[88px_1fr] gap-3 rounded-lg border border-gray-border bg-surface-inset px-3 py-2.5">
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">Setup</span>
+        <span className="text-[12px] text-warm-white">{setupCopy}</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">Feeds</span>
+        <span className="text-[12px] leading-relaxed text-gray-muted">{connection.usedIn}</span>
+      </div>
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">AI can use this to</p>
+        <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">
+          {connection.aiCanUseThisTo.slice(0, 2).join("; ")}
+        </p>
+      </div>
+      <div className="mt-auto flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onClick}
+          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent/85"
+        >
+          {needsSetup ? "Set up source" : "Manage source"}
+        </button>
+        <button
+          type="button"
+          onClick={onRunAction}
+          className="rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-black"
+        >
+          Use in AI chat
+        </button>
+      </div>
     </div>
   );
 }
 
-type FilterTab = "All" | "Connected" | "Available";
+const CATEGORY_ORDER: IntelligenceCategory[] = [
+  "understands_customers",
+  "understands_demand",
+  "understands_content",
+  "can_take_action",
+];
+
+type FilterTab = "All" | "AI using it" | "Needs attention";
 
 export function ConnectionsPage() {
   const router = useRouter();
@@ -162,9 +206,16 @@ export function ConnectionsPage() {
           iconColor: integration.iconColor,
           connected: status === "connected",
           status,
+          intelligenceStatus: deriveIntelligenceStatus(integration, status),
+          intelligenceCategories: getIntegrationCategories(integration),
           lastSyncedAt: rawConnection?.lastSyncedAt ?? null,
           usedIn: integration.usedIn,
           usageExamples: integration.usageExamples,
+          addsIntelligence: integration.addsIntelligence,
+          aiCanUseThisTo: integration.aiCanUseThisTo,
+          exampleInsight: integration.exampleInsight,
+          actionPaths: integration.actionPaths ?? [],
+          sourcePrompt: integration.sourcePrompt ?? null,
         };
       }),
     [sourceState]
@@ -177,14 +228,28 @@ export function ConnectionsPage() {
 
   const connections = useMemo(() => {
     const searched = allConnections.filter((connection) => searchedConnectionIds.has(connection.id));
-    if (activeTab === "Connected") return searched.filter((c) => c.connected);
-    if (activeTab === "Available") return searched.filter((c) => !c.connected);
+    if (activeTab === "AI using it") {
+      return searched.filter((c) => c.intelligenceStatus === "ai_using_it" || c.intelligenceStatus === "can_act_here");
+    }
+    if (activeTab === "Needs attention") return searched.filter((c) => c.intelligenceStatus === "needs_attention");
     return searched;
   }, [allConnections, searchedConnectionIds, activeTab]);
 
-  const featured = allConnections[0]; // Google Analytics as featured
+  const groupedConnections = useMemo(
+    () =>
+      CATEGORY_ORDER.map((category) => ({
+        category,
+        connections: connections.filter((connection) => connection.intelligenceCategories.includes(category)),
+      })).filter((group) => group.connections.length > 0),
+    [connections]
+  );
+
+  const featured = allConnections.find((connection) => connection.id === "website-activity") ?? allConnections[0];
   const runConnectionPrompt = (connection: Connection) => {
-    const prompt = connection.usageExamples[0]?.prompt || `Use ${connection.name} to suggest my next site update`;
+    const prompt =
+      connection.sourcePrompt ||
+      connection.usageExamples[0]?.prompt ||
+      `@${connection.name} Suggest my next site update from this source`;
     if (setChatPrompt) {
       setChatPrompt(prompt);
       router.push(dashboardHref("/dashboard/chat"));
@@ -192,16 +257,20 @@ export function ConnectionsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 animate-route-enter">
+    <div className="h-full min-h-0 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 animate-route-enter">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-            Connected accounts
+            Connection infrastructure
           </p>
           <div className="flex items-baseline gap-3">
-            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">Connections that unlock AI work</h1>
-            <span className="text-[13px] text-gray-muted">{connections.filter((c) => c.connected).length} active</span>
+            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+              Sources the AI can actually use
+            </h1>
+            <span className="text-[13px] text-gray-muted">
+              {allConnections.filter((c) => c.intelligenceStatus === "ai_using_it" || c.intelligenceStatus === "can_act_here").length} usable now
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-xl px-3.5 py-2 w-full sm:w-fit">
@@ -209,57 +278,46 @@ export function ConnectionsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search accounts..."
+            placeholder="Search sources..."
             className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-full sm:w-[180px]"
           />
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        Each connection should make the AI more useful: better weekly reports, review replies, SEO suggestions, email updates, social posts, or booking insights.
+        Set up the accounts, files, signals, and action paths that give the AI real context. Every source should have a status, a setup path, and a clear job.
       </p>
 
-      {/* Featured hero card */}
-      {!query.trim() && <div
-        onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
-        className="flex flex-col lg:flex-row rounded-2xl dashboard-panel overflow-hidden mb-8 cursor-pointer hover:border-gray-border transition-colors"
-      >
-        <div className="flex-1 flex flex-col justify-center gap-4 p-5 sm:p-7 lg:p-8">
-          <div className="w-12 h-12 rounded-xl bg-glass border border-gray-border flex items-center justify-center">
-            <span className="text-[16px] font-bold text-accent">{featured.icon}</span>
+      {!query.trim() && (
+        <div className="mb-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Usable now</p>
+            <p className="mt-2 text-[24px] font-semibold text-warm-white">
+              {allConnections.filter((c) => c.status === "connected" || c.status === "unknown").length}
+            </p>
+            <p className="mt-1 text-[12px] text-gray-muted">Built-in or connected sources the AI can reference.</p>
           </div>
-          <h2 className="text-[22px] font-semibold text-white">Turn {featured.name} into weekly proof</h2>
-          <p className="text-[13px] text-[#ffffffaa] leading-relaxed max-w-[340px]">
-            Connected sources feed the reports and AI prompts owners actually use. The goal is fewer dashboards and clearer next moves.
-          </p>
+          <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Needs setup</p>
+            <p className="mt-2 text-[24px] font-semibold text-warm-white">
+              {allConnections.filter((c) => c.status === "not_configured" || c.status === "needs_reauth" || c.status === "sync_failed").length}
+            </p>
+            <p className="mt-1 text-[12px] text-gray-muted">OAuth, API key, manual setup, or sync repair required.</p>
+          </div>
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              runConnectionPrompt(featured);
-            }}
-            className="self-start rounded-xl bg-[rgba(255,255,255,0.09)] border border-[rgba(255,255,255,0.13)] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-[rgba(255,255,255,0.14)] transition-colors"
+            onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
+            className="rounded-xl border border-accent/25 bg-accent-dim p-4 text-left transition-colors hover:border-accent/45"
           >
-            Ask AI with this
+            <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Next setup</p>
+            <p className="mt-2 text-[15px] font-medium text-warm-white">{featured.name}</p>
+            <p className="mt-1 text-[12px] text-gray-muted">{featured.description}</p>
           </button>
         </div>
-        <div className="lg:w-[390px] flex items-center justify-center p-5 sm:p-6 pt-0 lg:pt-6">
-          <div className="w-full rounded-2xl bg-glass border border-gray-border overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-gray-border">
-              <span className="text-[11px] font-medium text-accent">@Analytics</span>
-              <span className="text-[11px] text-[#ffffffcc]">how did my site do this week?</span>
-            </div>
-            <div className="px-4 py-3.5">
-              <p className="text-[12px] text-[#ffffffcc] leading-relaxed">
-                Your site had 47 visitors this week, up 12% from last week. Your main offer got the most views (28). 3 people clicked your primary call-to-action after your latest update.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>}
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-glass-border mb-4 pb-0">
-        {(["All", "Connected", "Available"] as const).map((tab) => (
+        {(["All", "AI using it", "Needs attention"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -274,16 +332,25 @@ export function ConnectionsPage() {
         ))}
       </div>
 
-      {/* Grid — two columns */}
-      {connections.length > 0 ? (
-        <div className="grid gap-1 md:grid-cols-2">
-          {connections.map((connection) => (
-            <ConnectionRow
-              key={connection.id}
-              connection={connection}
-              onClick={() => router.push(dashboardHref(`/dashboard/sources/${connection.id}`))}
-              onRunAction={() => runConnectionPrompt(connection)}
-            />
+      {groupedConnections.length > 0 ? (
+        <div className="space-y-8">
+          {groupedConnections.map((group) => (
+            <section key={group.category}>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-[14px] font-medium text-warm-black">{INTELLIGENCE_CATEGORY_LABELS[group.category]}</h2>
+                <span className="text-[11px] text-gray-faint">{group.connections.length} sources</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {group.connections.map((connection) => (
+                  <ConnectionRow
+                    key={`${group.category}-${connection.id}`}
+                    connection={connection}
+                    onClick={() => router.push(dashboardHref(`/dashboard/sources/${connection.id}`))}
+                    onRunAction={() => runConnectionPrompt(connection)}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       ) : (

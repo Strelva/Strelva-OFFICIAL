@@ -11,6 +11,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
           <div className="mb-8 md:mb-10">
             <blockquote
               className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.15] max-w-3xl"
+              data-reb-field="testimonials[0].quote"
               style={{ color: "var(--bark)" }}
             >
               &ldquo;{items[0].quote}&rdquo;
@@ -22,6 +23,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
               />
               <span
                 className="text-sm font-medium tracking-wide"
+                data-reb-field="testimonials[0].author"
                 style={{ color: "var(--bark)" }}
               >
                 {items[0].author}
@@ -29,6 +31,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
               {items[0].location && (
                 <span
                   className="text-sm"
+                  data-reb-field="testimonials[0].location"
                   style={{ color: "var(--bark-faded)" }}
                 >
                   {items[0].location}
@@ -44,10 +47,13 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
             className="grid md:grid-cols-3 gap-8 md:gap-12 pt-8 md:pt-10"
             style={{ borderTop: "1px solid var(--cream-mid)" }}
           >
-            {items.slice(1, 4).map((item) => (
+            {items.slice(1, 4).map((item) => {
+              const itemIndex = items.findIndex((candidate) => candidate.id === item.id);
+              return (
               <div key={item.id}>
                 <blockquote
                   className="text-base md:text-lg leading-relaxed"
+                  data-reb-field={`testimonials[${itemIndex}].quote`}
                   style={{ color: "var(--bark-light)" }}
                 >
                   &ldquo;{item.quote}&rdquo;
@@ -55,6 +61,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                 <div className="mt-4 flex items-center gap-2">
                   <span
                     className="text-xs font-medium tracking-wider uppercase"
+                    data-reb-field={`testimonials[${itemIndex}].author`}
                     style={{ color: "var(--bark-faded)" }}
                   >
                     {item.author}
@@ -62,6 +69,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                   {item.location && (
                     <span
                       className="text-xs"
+                      data-reb-field={`testimonials[${itemIndex}].location`}
                       style={{ color: "var(--bark-faded)", opacity: 0.5 }}
                     >
                       · {item.location}
@@ -69,7 +77,8 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

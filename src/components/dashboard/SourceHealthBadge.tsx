@@ -3,9 +3,9 @@
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, AlertCircle, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
-import type { IntegrationStatus } from "@/lib/integration-registry";
+import type { IntegrationStatus, IntelligenceStatus } from "@/lib/integration-registry";
 
-type ConnectionStatus = IntegrationStatus | "stale" | "error" | "disconnected";
+type ConnectionStatus = IntegrationStatus | IntelligenceStatus | "stale" | "error" | "disconnected";
 
 interface SourceHealthBadgeProps {
   status: ConnectionStatus;
@@ -63,6 +63,41 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
     bg: "bg-gray-bg",
     text: "text-gray-muted",
     dot: "bg-gray-muted",
+  },
+  no_signal: {
+    icon: RefreshCw,
+    label: "No signal",
+    bg: "bg-gray-bg",
+    text: "text-gray-muted",
+    dot: "bg-gray-muted",
+  },
+  signal_available: {
+    icon: Clock,
+    label: "Signal available",
+    bg: "bg-[rgba(255,255,255,0.05)]",
+    text: "text-gray-fg",
+    dot: "bg-gray-fg",
+  },
+  ai_using_it: {
+    icon: CheckCircle2,
+    label: "AI using it",
+    bg: "bg-accent-dim",
+    text: "text-accent",
+    dot: "bg-accent",
+  },
+  needs_attention: {
+    icon: AlertCircle,
+    label: "Needs attention",
+    bg: "bg-amber-500/10",
+    text: "text-amber-500",
+    dot: "bg-amber-500",
+  },
+  can_act_here: {
+    icon: CheckCircle2,
+    label: "Can act here",
+    bg: "bg-success-dim",
+    text: "text-success",
+    dot: "bg-success",
   },
   stale: {
     icon: Clock,

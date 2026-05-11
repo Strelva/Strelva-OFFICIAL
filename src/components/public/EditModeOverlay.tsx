@@ -90,6 +90,9 @@ export function EditModeOverlay() {
     }
 
     function handleClick(e: Event) {
+      if ((e.target as HTMLElement).closest("[data-reb-field]")) {
+        return;
+      }
       const el = (e.currentTarget as HTMLElement);
       const sectionType = el.getAttribute("data-reb-section");
       const editable = el.getAttribute("data-reb-editable");
@@ -167,6 +170,20 @@ export function EditModeOverlay() {
 
     const fields = document.querySelectorAll("[data-reb-section] [data-reb-field]");
 
+    function getNodeType(el: HTMLElement) {
+      const tag = el.tagName.toLowerCase();
+      const field = el.getAttribute("data-reb-field") || "";
+      if (tag === "img" || field.toLowerCase().includes("image")) return "image";
+      if (tag === "a") return "link";
+      if (tag === "button") return "button";
+      return "text";
+    }
+
+    function canInlineEdit(el: HTMLElement) {
+      const type = getNodeType(el);
+      return type === "text" && !el.closest("a, button");
+    }
+
     function handleFocus(e: Event) {
       const el = e.target as HTMLElement;
       el.style.outline = "2px solid var(--sage)";
@@ -183,6 +200,7 @@ export function EditModeOverlay() {
       const sectionEl = el.closest("[data-reb-section]");
       const section = sectionEl?.getAttribute("data-reb-editable") || sectionEl?.getAttribute("data-reb-section");
       const field = el.getAttribute("data-reb-field");
+      if (!field || !canInlineEdit(el)) return;
       const value = el.textContent || "";
 
       if (section && field) {
@@ -204,13 +222,17 @@ export function EditModeOverlay() {
 
     // Handle field clicks to send node-selected with field info
     function handleFieldClick(e: Event) {
-      const el = e.target as HTMLElement;
+      const el = e.currentTarget as HTMLElement;
       const field = el.getAttribute("data-reb-field");
       const sectionEl = el.closest("[data-reb-section]");
       const section = sectionEl?.getAttribute("data-reb-editable") || sectionEl?.getAttribute("data-reb-section");
       const label = el.getAttribute("data-reb-label") || field;
+      const nodeType = getNodeType(el);
 
       if (section && field) {
+        if (nodeType !== "text") {
+          e.preventDefault();
+        }
         e.stopPropagation();
 
         const rect = el.getBoundingClientRect();
@@ -220,7 +242,7 @@ export function EditModeOverlay() {
           section,
           field,
           label,
-          nodeType: "text",
+          nodeType,
           rect: {
             top: rect.top + window.scrollY,
             left: rect.left,
@@ -233,12 +255,16 @@ export function EditModeOverlay() {
 
     fields.forEach((field) => {
       const el = field as HTMLElement;
-      el.setAttribute("contenteditable", "true");
-      el.setAttribute("spellcheck", "false");
-      el.style.cursor = "text";
-      el.addEventListener("focus", handleFocus);
-      el.addEventListener("blur", handleBlur);
-      el.addEventListener("keydown", handleKeyDown as EventListener);
+      if (canInlineEdit(el)) {
+        el.setAttribute("contenteditable", "true");
+        el.setAttribute("spellcheck", "false");
+        el.style.cursor = "text";
+        el.addEventListener("focus", handleFocus);
+        el.addEventListener("blur", handleBlur);
+        el.addEventListener("keydown", handleKeyDown as EventListener);
+      } else {
+        el.style.cursor = "pointer";
+      }
       el.addEventListener("click", handleFieldClick, true);
     });
 

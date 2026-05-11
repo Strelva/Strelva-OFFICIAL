@@ -12,6 +12,7 @@ import {
   extractTenantFromHost,
   getEnvDomainMap,
   getLegacyPublicSiteRedirect,
+  getOwnershipSettingsRedirectPath,
   isMarketingHost,
   resolveTenantFromCustomDomain,
   resolveTenantFromDomainMap,
@@ -175,6 +176,15 @@ describe("proxy host routing helpers", () => {
     expect(shouldRedirectAdminRoot(false, "/")).toBe(false);
   });
 
+  it("moves legacy ownership routes into settings", () => {
+    expect(getOwnershipSettingsRedirectPath("/dashboard/ownership")).toBe("/dashboard/settings#ownership");
+    expect(getOwnershipSettingsRedirectPath("/dashboard/ownership/")).toBe("/dashboard/settings#ownership");
+    expect(getOwnershipSettingsRedirectPath("/client/gldf/dashboard/ownership")).toBe(
+      "/client/gldf/dashboard/settings#ownership",
+    );
+    expect(getOwnershipSettingsRedirectPath("/dashboard/settings")).toBeNull();
+  });
+
   it("uses scaffoldweb fallback auth for customer-owned admin domains", () => {
     expect(shouldUseFallbackAuthForAdminHost("admin.greatlakesdriedfruit.com", true)).toBe(true);
     expect(shouldUseFallbackAuthForAdminHost("admin.rohlaxwellness.com", true)).toBe(true);
@@ -235,6 +245,20 @@ describe("proxy frame policy", () => {
     expect(csp).toContain("frame-ancestors 'self'");
     expect(csp).toContain("https://scaffoldweb.com");
     expect(csp).toContain("https://admin.yourbusiness.com");
+    expect(csp).not.toContain("frame-ancestors 'none'");
+  });
+
+  it("allows the dashboard to frame the live preview proxy", () => {
+    const csp = buildContentSecurityPolicy({
+      isPreview: false,
+      isLivePreview: true,
+      host: "localhost:3000",
+      protocol: "http:",
+    });
+
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*");
+    expect(csp).toContain("base-uri 'self' https:");
+    expect(csp).toContain("frame-ancestors 'self' http://localhost:3000");
     expect(csp).not.toContain("frame-ancestors 'none'");
   });
 });

@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Inbox,
   Link2,
@@ -10,8 +11,8 @@ import {
   Search,
   X,
   LogOut,
-  Sparkles,
   LayoutPanelLeft,
+  Plus,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -19,7 +20,7 @@ export interface Thread {
   id: string;
   title: string;
   preview: string;
-  updatedAt: number;
+  updatedAt: number | string;
 }
 
 interface HistorySidebarProps {
@@ -56,11 +57,29 @@ export function HistorySidebar({
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { dashboardBasePath, dashboardHref } = useDashboard();
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const activeThread = searchParams.get("thread");
   const effectivePathname =
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"
       : pathname;
+
+  useEffect(() => {
+    fetch(dashboardHref("/api/threads"), { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setThreads(
+          list.slice(0, 6).map((thread: Thread & { messages?: Array<{ content?: string }> }) => ({
+            ...thread,
+            preview: thread.preview || thread.messages?.at(-1)?.content || "No messages yet",
+          })),
+        );
+      })
+      .catch(() => setThreads([]));
+  }, [dashboardHref, pathname]);
 
   const sidebarContent = (variant: "desktop" | "mobile") => (
     <aside
@@ -84,8 +103,8 @@ export function HistorySidebar({
 
       <div className="flex items-center justify-between gap-5 px-4 pt-4 lg:pl-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
-            <Sparkles className="h-4 w-4" strokeWidth={1.6} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised text-[11px] font-semibold text-warm-black">
+            {(ownerName || "S").slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-medium leading-tight text-warm-black">{ownerName}</p>
@@ -144,6 +163,56 @@ export function HistorySidebar({
                     </li>
                   );
                 })}
+                {group.label === "Manage" && (
+                  <li className="mt-2 rounded-lg border border-gray-border bg-surface-raised/45 p-2">
+                    <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+                      <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-faint">
+                        AI history
+                      </span>
+                      <Link
+                        href={dashboardHref("/dashboard/chat")}
+                        prefetch={false}
+                        onClick={onClose}
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
+                        aria-label="Start a new AI chat"
+                        title="New chat"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={1.6} />
+                      </Link>
+                    </div>
+                    {threads.length ? (
+                      <div className="space-y-0.5">
+                        {threads.map((thread) => {
+                          const isThreadActive = activeThread === thread.id;
+                          return (
+                            <Link
+                              key={thread.id}
+                              href={dashboardHref(`/dashboard/chat?thread=${thread.id}`)}
+                              prefetch={false}
+                              onClick={onClose}
+                              className={`block rounded-md px-2 py-1.5 transition-colors ${
+                                isThreadActive
+                                  ? "bg-gray-bg-hover text-warm-black"
+                                  : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
+                              }`}
+                            >
+                              <span className="block truncate text-[12px] font-medium">
+                                {thread.title || "New chat"}
+                              </span>
+                              <span className="block truncate text-[10px] text-gray-faint">
+                                {thread.preview}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="px-2 py-1.5 text-[11px] leading-relaxed text-gray-faint">
+                        Recent AI chats appear here after the first message.
+                      </p>
+                    )}
+                  </li>
+                )}
               </ul>
             </li>
           ))}

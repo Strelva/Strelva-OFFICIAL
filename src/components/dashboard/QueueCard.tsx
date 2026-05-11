@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Check, X, Star, Calendar, MessageSquare, Bot, Zap, Quote } from "lucide-react";
+import { Check, X, Star, Calendar, MessageSquare, Bot, Zap, Quote, GitBranch, ClipboardCheck, PackageCheck } from "lucide-react";
 import type { UnifiedEvent } from "@/lib/types";
 import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
 
@@ -54,13 +54,36 @@ interface QueueCardProps {
   event: UnifiedEvent;
   onApprove: (id: string) => void;
   onDismiss: (id: string) => void;
+  onWorkflowAction?: (id: string, action: "triaged" | "quoted" | "accepted" | "in_progress" | "shipped" | "declined") => void;
   disabled?: boolean;
 }
 
-export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardProps) {
+function metadataString(event: UnifiedEvent, key: string): string | null {
+  const value = event.metadata?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function formatWorkflowStatus(status: string | null): string {
+  if (status === "in_progress") return "In progress";
+  if (status === "shipped") return "Shipped";
+  if (status === "declined") return "Declined";
+  if (status === "quoted") return "Quoted";
+  if (status === "accepted") return "Accepted";
+  if (status === "triaged") return "Triaged";
+  return "Requested";
+}
+
+export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled }: QueueCardProps) {
   const colors = SOURCE_COLORS[event.source] || SOURCE_COLORS.default;
   const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
   const isPending = event.status === "pending";
+  const isCustomRequest = event.type === "change_request" && event.metadata?.kind === "custom_code_or_design_request";
+  const workflowStatus = isCustomRequest ? metadataString(event, "workflowStatus") || "requested" : null;
+  const repo = isCustomRequest && event.metadata?.customRepo && typeof event.metadata.customRepo === "object"
+    ? event.metadata.customRepo as Record<string, unknown>
+    : null;
+  const repoName = typeof repo?.repoName === "string" ? repo.repoName : null;
+  const triageDueAt = isCustomRequest ? metadataString(event, "triageDueAt") : null;
 
   // "Use as testimonial" modal state
   const [testimonialModalOpen, setTestimonialModalOpen] = useState(false);
@@ -173,15 +196,15 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
       >
       <div className="flex items-start gap-3">
         {/* Source icon */}
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colors.bg} ${colors.text}`}>
-          {icon}
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isCustomRequest ? "bg-amber-500/15 text-amber-500" : `${colors.bg} ${colors.text}`}`}>
+          {isCustomRequest ? <GitBranch className="w-3.5 h-3.5" strokeWidth={1.5} /> : icon}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-medium text-gray-muted uppercase tracking-wide">
-              {event.source}
+              {isCustomRequest ? "custom repo request" : event.source}
             </span>
             <span className="text-[10px] text-gray-subtle">
               {formatTimestamp(event.createdAt)}
@@ -206,10 +229,67 @@ export function QueueCard({ event, onApprove, onDismiss, disabled }: QueueCardPr
               {event.body}
             </p>
           )}
+          {isCustomRequest && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                {formatWorkflowStatus(workflowStatus)}
+              </span>
+              {repoName && (
+                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                  Repo: {repoName}
+                </span>
+              )}
+              {triageDueAt && workflowStatus === "requested" && (
+                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                  Triage by {new Date(triageDueAt).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
-        {isPending && !disabled && (
+        {isPending && !disabled && isCustomRequest && onWorkflowAction && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
+            {workflowStatus === "requested" && (
+              <button
+                onClick={() => onWorkflowAction(event.id, "triaged")}
+                className="h-9 rounded-lg bg-amber-500/10 px-2.5 text-[12px] font-medium text-amber-700 hover:bg-amber-500 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                title="Mark triaged"
+              >
+                <ClipboardCheck className="w-4 h-4" strokeWidth={1.5} />
+                Triaged
+              </button>
+            )}
+            {(workflowStatus === "triaged" || workflowStatus === "quoted" || workflowStatus === "accepted") && (
+              <button
+                onClick={() => onWorkflowAction(event.id, "in_progress")}
+                className="h-9 rounded-lg bg-accent-dim px-2.5 text-[12px] font-medium text-accent hover:bg-accent hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                title="Mark in progress"
+              >
+                <GitBranch className="w-4 h-4" strokeWidth={1.5} />
+                Start
+              </button>
+            )}
+            <button
+              onClick={() => onWorkflowAction(event.id, "shipped")}
+              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+              title="Mark shipped"
+            >
+              <PackageCheck className="w-4 h-4" strokeWidth={1.5} />
+              Shipped
+            </button>
+            <button
+              onClick={() => onWorkflowAction(event.id, "declined")}
+              className="h-9 rounded-lg bg-gray-bg px-2.5 text-[12px] font-medium text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center gap-1.5 transition-colors"
+              title="Decline request"
+            >
+              <X className="w-4 h-4" strokeWidth={2} />
+              Decline
+            </button>
+          </div>
+        )}
+        {isPending && !disabled && !isCustomRequest && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
             {/* Use as Testimonial button for reviews */}
             {isReview && reviewData && (
