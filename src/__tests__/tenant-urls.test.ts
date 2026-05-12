@@ -5,6 +5,7 @@ import {
   getTenantDashboardUrl,
   getTenantPrimaryDomain,
   getTenantPublicUrl,
+  getTenantPublicUrlFromDomainMap,
 } from "../lib/tenant-urls";
 import type { TenantConfig } from "../lib/types";
 
@@ -110,5 +111,27 @@ describe("tenant URL helpers", () => {
 
   it("falls back to the platform tenant subdomain only when no real domain exists", () => {
     expect(getTenantPublicUrl(tenant(), "production")).toBe("https://gldf.scaffoldweb.com");
+  });
+
+  it("derives the active public site from CUSTOM_DOMAIN_MAP when tenant config is missing", () => {
+    expect(
+      getTenantPublicUrlFromDomainMap(
+        "gldf",
+        JSON.stringify({
+          "greatlakesdriedfruit.com": "gldf",
+          "admin.greatlakesdriedfruit.com": "gldf",
+          "demo.scaffoldweb.com": "gldf",
+        })
+      )
+    ).toBe("https://greatlakesdriedfruit.com");
+  });
+
+  it("does not turn admin-only domain map entries into public site URLs", () => {
+    expect(
+      getTenantPublicUrlFromDomainMap(
+        "gldf",
+        JSON.stringify({ "admin.greatlakesdriedfruit.com": "gldf" })
+      )
+    ).toBe("");
   });
 });

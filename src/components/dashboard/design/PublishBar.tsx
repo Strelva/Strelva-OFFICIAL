@@ -3,12 +3,20 @@
 import { useState } from "react";
 import { Upload, Clock, History, Loader2, Check, AlertCircle, RotateCcw } from "lucide-react";
 
+export interface PublishOutcome {
+  liveSite?: {
+    status?: "revalidated" | "not_configured" | "failed";
+    error?: string;
+  };
+}
+
 interface PublishBarProps {
   hasDrafts: boolean;
-  onPublish: () => Promise<void>;
+  onPublish: () => Promise<PublishOutcome | void>;
   onDiscard?: () => Promise<void>;
   onViewHistory?: () => void;
   lastPublished?: string;
+  liveSyncEnabled?: boolean;
 }
 
 export function PublishBar({
@@ -17,20 +25,38 @@ export function PublishBar({
   onDiscard,
   onViewHistory,
   lastPublished,
+  liveSyncEnabled = false,
 }: PublishBarProps) {
   const [publishing, setPublishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [published, setPublished] = useState(false);
+  const [lastOutcome, setLastOutcome] = useState<PublishOutcome | null>(null);
   const [error, setError] = useState(false);
+  const liveStatus = lastOutcome?.liveSite?.status;
+  const publishedStatusLabel =
+    liveStatus === "revalidated"
+      ? "Live site refreshed"
+      : liveStatus === "failed"
+        ? "Published to Scaffold - live refresh failed"
+        : "Published to Scaffold";
+  const idleStatusLabel = liveSyncEnabled ? "Live sync ready" : "No draft changes";
+  const publishedButtonLabel =
+    liveStatus === "revalidated" ? "Live refreshed" : liveStatus === "failed" ? "Refresh failed" : "Published";
+  const publishButtonLabel = liveSyncEnabled ? "Publish live" : "Publish to Scaffold";
+  const publishTitle = liveSyncEnabled
+    ? "Publishes Scaffold content and asks the connected live site to refresh."
+    : "Publishes Scaffold content only; no live-site refresh is configured.";
 
   const handlePublish = async () => {
     setPublishing(true);
     setError(false);
     try {
-      await onPublish();
+      const outcome = await onPublish();
+      setLastOutcome(outcome || null);
       setPublished(true);
       setTimeout(() => setPublished(false), 2000);
     } catch {
+      setLastOutcome(null);
       setError(true);
       setTimeout(() => setError(false), 3000);
     } finally {
@@ -74,9 +100,15 @@ export function PublishBar({
             <span className="text-[11px] font-medium">Draft preview active - review before publishing</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-emerald-400">
-            <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">{published ? "Published live" : "All changes live"}</span>
+          <div className={`flex items-center gap-1.5 ${published && liveStatus === "failed" ? "text-amber-400" : "text-emerald-400"}`}>
+            {published && liveStatus === "failed" ? (
+              <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
+            ) : (
+              <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
+            )}
+            <span className="text-[11px] font-medium">
+              {published ? publishedStatusLabel : idleStatusLabel}
+            </span>
           </div>
         )}
         {lastPublished && (
@@ -117,6 +149,7 @@ export function PublishBar({
         <button
           onClick={handlePublish}
           disabled={!hasDrafts || publishing}
+          title={publishTitle}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
             hasDrafts && !publishing
               ? "bg-accent text-white hover:bg-accent/90"
@@ -132,7 +165,13 @@ export function PublishBar({
           ) : (
             <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
           )}
-          {publishing ? "Publishing..." : published ? "Published live" : error ? "Failed" : "Publish live"}
+          {publishing
+            ? "Publishing..."
+            : published
+              ? publishedButtonLabel
+              : error
+                ? "Failed"
+                : publishButtonLabel}
         </button>
       </div>
     </div>

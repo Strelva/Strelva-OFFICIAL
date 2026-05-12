@@ -116,7 +116,7 @@ describe("site editor publish routes", () => {
     mockLogAuditEvent.mockResolvedValue(undefined);
     mockClearDraft.mockResolvedValue(undefined);
     mockAddEvent.mockResolvedValue({ id: "evt_1" });
-    mockRevalidateClientSite.mockResolvedValue(undefined);
+    mockRevalidateClientSite.mockResolvedValue({ success: true, skipped: true });
   });
 
   it("GET /api/page-config?draft=true returns the draft page config when present", async () => {
@@ -150,6 +150,7 @@ describe("site editor publish routes", () => {
     mockListDrafts.mockResolvedValue({ hero: true });
     mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
     mockGetDraftPageConfig.mockResolvedValue(PAGE_CONFIG);
+    mockRevalidateClientSite.mockResolvedValue({ success: true });
     const { POST } = await import("@/app/api/publish/route");
 
     const response = await POST();
@@ -159,11 +160,28 @@ describe("site editor publish routes", () => {
       success: true,
       publishedSections: ["hero"],
       publishedPageConfig: true,
+      liveSite: { status: "revalidated" },
     });
     expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant");
     expect(mockClearDraft).toHaveBeenCalledWith("hero", "test-tenant");
     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
+    expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", ["/"]);
+  });
+
+  it("POST /api/publish reports when publishing only updates Scaffold content", async () => {
+    mockRevalidateClientSite.mockResolvedValue({ success: true, skipped: true });
+    const { POST } = await import("@/app/api/publish/route");
+
+    const response = await POST();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      publishedSections: [],
+      publishedPageConfig: false,
+      liveSite: { status: "not_configured" },
+    });
   });
 
   it("DELETE /api/publish discards content drafts and the page-config draft", async () => {

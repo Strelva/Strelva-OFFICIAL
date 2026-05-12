@@ -21,6 +21,47 @@ function isAdminDomain(domain: string): boolean {
   return domain.startsWith("admin.");
 }
 
+function isLocalOrPreviewDomain(domain: string): boolean {
+  return domain.endsWith(".localhost") || domain.endsWith(".vercel.app");
+}
+
+function parseTenantDomainMap(raw: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter((entry): entry is [string, string] =>
+          typeof entry[0] === "string" && typeof entry[1] === "string"
+        )
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function getTenantPublicUrlFromDomainMap(
+  tenantId: string,
+  raw = process.env.CUSTOM_DOMAIN_MAP || "{}"
+): string {
+  const normalizedTenant = tenantId.toLowerCase();
+  const publicDomains = Object.entries(parseTenantDomainMap(raw))
+    .filter(([, mappedTenant]) => mappedTenant.toLowerCase() === normalizedTenant)
+    .map(([domain]) => normalizeTenantDomain(domain))
+    .filter((domain): domain is string =>
+      !!domain &&
+      !isAdminDomain(domain) &&
+      !isPlatformDomain(domain) &&
+      !isLocalOrPreviewDomain(domain)
+    );
+
+  const preferredDomain =
+    publicDomains.find((domain) => !domain.startsWith("www.")) ??
+    publicDomains.find((domain) => domain.startsWith("www."));
+
+  return preferredDomain ? `https://${preferredDomain}` : "";
+}
+
 function getTenantPublicDomain(tenant: TenantConfig): string | null {
   const productionDomain = normalizeTenantDomain(tenant.productionDomain);
   const siteUrlDomain = normalizeTenantDomain(tenant.siteUrl);

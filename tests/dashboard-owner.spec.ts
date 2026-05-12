@@ -44,7 +44,7 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
   await page.evaluate(async () => {
     await fetch("/api/publish", { method: "DELETE", credentials: "same-origin" }).catch(() => null);
   });
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
 
   const headline = page.getByLabel("Headline").first();
   await expect(headline).toBeVisible();
@@ -55,7 +55,7 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
   await expect(page.getByText("Draft preview active")).toBeVisible();
   await expect(page.getByText("Ready to publish")).toBeVisible();
   await expect(page.getByText(/Hero \/ Headline|Headline/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Publish live" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Publish live|Publish to Scaffold/ })).toBeVisible();
 
   await expect
     .poll(async () => {
@@ -70,7 +70,7 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
   await page.evaluate(async () => {
     await fetch("/api/publish", { method: "DELETE", credentials: "same-origin" });
   });
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
 
   await expect
     .poll(async () => {
@@ -83,14 +83,14 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
     .toBe(false);
 });
 
-test("client fallback site editor publishes drafts into the visible live preview", async ({ page, request }) => {
+test("client fallback site editor separates the active site from the editable draft preview", async ({ page, request }) => {
   test.setTimeout(60_000);
 
   const normalizePreviewText = (value: string) => value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
   const previewFrameContains = async (value: string) => {
     const needle = normalizePreviewText(value);
     const frames = page.frames().filter((frame) =>
-      frame.parentFrame() && frame.url().includes("preview=true")
+      frame.parentFrame() && (frame.url().includes("preview=true") || frame.url().includes("/api/edit-preview"))
     );
     for (const frame of frames) {
       const text = await frame.locator("body").innerText({ timeout: 500 }).catch(() => "");
@@ -99,7 +99,7 @@ test("client fallback site editor publishes drafts into the visible live preview
     return false;
   };
 
-  await page.goto("/client/gldf/dashboard/site");
+  await page.goto("/client/gldf/dashboard/site", { waitUntil: "domcontentloaded" });
   await request.delete("/client/gldf/api/publish");
 
   const originalRes = await request.get("/client/gldf/api/content/hero");
@@ -107,17 +107,21 @@ test("client fallback site editor publishes drafts into the visible live preview
   const testValue = `Published GLDF QA ${Date.now()}`;
 
   try {
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     const headline = page.getByLabel("Headline").first();
     await expect(headline).toBeVisible();
-    await expect.poll(() => previewFrameContains(original.headline)).toBe(true);
+    await expect(page.getByText("Active site", { exact: true })).toBeVisible();
+    await expect
+      .poll(() => page.frames().some((frame) => frame.parentFrame() && frame.url().includes("/api/live-preview")))
+      .toBe(true);
 
     await headline.fill(testValue);
     await page.getByRole("button", { name: /Save Draft|Save/i }).click();
     await expect(page.getByText("Ready to publish")).toBeVisible();
+    await expect(page.getByText("Draft preview", { exact: true })).toBeVisible();
     await expect.poll(() => previewFrameContains(testValue)).toBe(true);
 
-    await page.getByRole("button", { name: "Publish live" }).click();
+    await page.getByRole("button", { name: /Publish live|Publish to Scaffold/ }).click();
     await expect
       .poll(async () =>
         page.evaluate(async () => {
@@ -126,7 +130,7 @@ test("client fallback site editor publishes drafts into the visible live preview
         })
       )
       .toBe(testValue);
-    await expect.poll(() => previewFrameContains(testValue)).toBe(true);
+    await expect(page.getByText("Active site", { exact: true })).toBeVisible();
   } finally {
     await request.put("/client/gldf/api/content/hero", { data: original });
     await request.delete("/client/gldf/api/publish");

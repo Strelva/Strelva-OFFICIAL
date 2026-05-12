@@ -6,7 +6,7 @@ import { LayersPanel } from "./design/LayersPanel";
 import { DesignCanvas } from "./design/DesignCanvas";
 import { DesignPropertiesPanel } from "./design/DesignPropertiesPanel";
 import { PageSelector } from "./design/PageSelector";
-import { PublishBar } from "./design/PublishBar";
+import { PublishBar, type PublishOutcome } from "./design/PublishBar";
 import type { PageConfig, PageSectionConfig, SiteCapabilityManifest } from "@/lib/types";
 
 export type DesignNode = {
@@ -98,7 +98,7 @@ function buildTreeFromPageConfig(pageConfig: PageConfig | null, pageName: string
 }
 
 export function DesignMode() {
-  const { tenantId, siteUrl, previewUrl, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft, dashboardHref } = useDashboard();
+  const { tenantId, siteUrl, previewUrl, liveSyncEnabled, activePage, setActiveSection, triggerRefresh, editMode, hasDraft, setHasDraft, dashboardHref } = useDashboard();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(["page"]));
   const [zoom, setZoom] = useState(100);
@@ -412,38 +412,19 @@ export function DesignMode() {
   const hasAnyDraft = Object.values(hasDraft).some(Boolean);
 
   // Publish all drafts
-  const handlePublishAll = useCallback(async () => {
-    const sectionsWithDrafts = Object.entries(hasDraft)
-      .filter(([, has]) => has)
-      .map(([section]) => section);
-
-    for (const section of sectionsWithDrafts) {
-      try {
-        // Fetch draft content
-        const res = await fetch(dashboardHref(`/api/content/${section}?draft=true`), {
-          headers: { "X-Tenant": tenantId },
-        });
-        if (!res.ok) continue;
-        const draftData = await res.json();
-
-        // Publish it (write without draft flag)
-        await fetch(dashboardHref(`/api/content/${section}`), {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Tenant": tenantId,
-          },
-          body: JSON.stringify(draftData),
-        });
-      } catch (err) {
-        console.error(`Failed to publish ${section}:`, err);
-      }
+  const handlePublishAll = useCallback(async (): Promise<PublishOutcome> => {
+    const res = await fetch(dashboardHref("/api/publish"), {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Publish failed");
     }
-
-    // Clear all draft flags
     setHasDraft({});
     triggerRefresh();
-  }, [dashboardHref, hasDraft, tenantId, setHasDraft, triggerRefresh]);
+    return data as PublishOutcome;
+  }, [dashboardHref, setHasDraft, triggerRefresh]);
 
   return (
     <div className="flex flex-col h-full bg-surface-base">
@@ -504,6 +485,7 @@ export function DesignMode() {
       <PublishBar
         hasDrafts={hasAnyDraft}
         onPublish={handlePublishAll}
+        liveSyncEnabled={liveSyncEnabled}
       />
     </div>
   );

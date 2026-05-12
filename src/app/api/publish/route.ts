@@ -144,14 +144,28 @@ export async function POST() {
     }
 
     revalidatePath("/");
-    revalidateClientSite(tenant, ["/"]).catch((err) => {
+    let liveSite:
+      | { status: "revalidated" }
+      | { status: "not_configured" }
+      | { status: "failed"; error: string };
+    try {
+      const liveSiteResult = await revalidateClientSite(tenant, ["/"]);
+      liveSite = liveSiteResult.skipped
+        ? { status: "not_configured" }
+        : liveSiteResult.success
+          ? { status: "revalidated" }
+          : { status: "failed", error: liveSiteResult.error || "Unknown revalidation failure" };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : "Unknown revalidation failure";
       console.error("[publish POST] Failed to revalidate client site:", err);
-    });
+      liveSite = { status: "failed", error };
+    }
 
     return NextResponse.json({
       success: true,
       publishedSections,
       publishedPageConfig,
+      liveSite,
     });
   } catch (err) {
     console.error("[publish POST]", err);

@@ -66,14 +66,18 @@ describe("owner journey copy and links", () => {
     expect(workspace).toContain("Ready to publish");
     expect(workspace).toContain("markDraftReceipts");
     expect(workspace).not.toContain('label: "AI Chat"');
-    expect(preview).toContain('useState<PreviewSource>("editable")');
+    expect(preview).toContain('useState<PreviewSource>("live")');
+    expect(preview).toContain("Active site");
+    expect(preview).toContain("Draft preview");
     expect(preview).toContain("Site editor");
     expect(preview).toContain("buildAskAIPrompt");
     expect(preview).toContain("addEditReceipts");
     expect(properties).toContain("Click text in the preview");
     expect(properties).toContain("Draft saved - preview updated");
     expect(publishBar).toContain("Publish live");
-    expect(publishBar).toContain("Published live");
+    expect(publishBar).toContain("Publish to Scaffold");
+    expect(publishBar).toContain("Live site refreshed");
+    expect(publishBar).toContain("Published to Scaffold - live refresh failed");
   });
 
   it("keeps Sources honest about setup and availability", () => {

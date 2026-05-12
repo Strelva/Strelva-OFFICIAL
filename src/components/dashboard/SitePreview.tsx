@@ -85,6 +85,16 @@ function editableValuesMatch(a: unknown, b: unknown): boolean {
   }
 }
 
+function comparablePreviewHost(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost")) return null;
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 function buildAskAIPrompt(sectionLabel: string, fieldLabel?: string): string {
   const target = fieldLabel ? `${fieldLabel} in the ${sectionLabel}` : `${sectionLabel} section`;
   return `Update the ${target} on my site. Keep the current business facts, make it more specific, and save it as a draft before anything goes live.`;
@@ -114,7 +124,7 @@ export function SitePreview() {
     BREAKPOINTS[2]
   );
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
-  const [previewSource, setPreviewSource] = useState<PreviewSource>("editable");
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("live");
   const [scaffoldMode, setScaffoldMode] = useState(false);
   const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -126,6 +136,8 @@ export function SitePreview() {
     setActiveSection,
     activeSection,
     editMode,
+    hasDraft,
+    hasPageConfigDraft,
     setHasDraft,
     triggerRefresh,
     tenantId,
@@ -148,6 +160,7 @@ export function SitePreview() {
     ? Math.min(1, Math.max(0.35, canvasWidth / breakpoint.width))
     : 1;
   const shouldScaleFrame = Boolean(breakpoint.width && frameScale < 1);
+  const hasAnyDraft = Object.values(hasDraft).some(Boolean) || hasPageConfigDraft;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -198,13 +211,27 @@ export function SitePreview() {
     refresh: String(refreshKey),
   });
   const liveIframeSrc = dashboardHref(`/api/live-preview?${livePreviewParams.toString()}`);
-  const usesManagedEditPreview = Boolean(siteUrl && previewUrl && siteUrl === previewUrl);
+  const sitePreviewHost = siteUrl ? comparablePreviewHost(siteUrl) : null;
+  const editablePreviewHost = previewUrl ? comparablePreviewHost(previewUrl) : null;
+  const usesManagedEditPreview = Boolean(sitePreviewHost && editablePreviewHost && sitePreviewHost === editablePreviewHost);
   const editableIframeSrc = usesManagedEditPreview
     ? dashboardHref(`/api/edit-preview?${editPreviewParams.toString()}`)
     : directEditableIframeSrc;
-  const iframeSrc = previewSource === "live" && siteUrl ? liveIframeSrc : editableIframeSrc;
+  const requestedPreviewSource = previewSource === "live" && !siteUrl ? "editable" : previewSource;
+  const effectivePreviewSource = hasAnyDraft && !scaffoldMode ? "editable" : requestedPreviewSource;
+  const iframeSrc = effectivePreviewSource === "live" && siteUrl ? liveIframeSrc : editableIframeSrc;
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
-  const isLivePreview = previewSource === "live" && !!siteUrl;
+  const isLivePreview = effectivePreviewSource === "live" && !!siteUrl;
+  const previewKind = isLivePreview ? "Active site preview" : "Editable preview";
+  const previewBadgeLabel = isLivePreview ? "Active site" : hasAnyDraft ? "Draft preview" : "Editable preview";
+  const previewBadgeDetail = (() => {
+    try {
+      const url = new URL(isLivePreview ? liveTargetUrl : iframeSrc, "http://localhost");
+      return isLivePreview ? url.hostname : "unpublished Scaffold copy";
+    } catch {
+      return isLivePreview ? "live site" : "unpublished Scaffold copy";
+    }
+  })();
   // Cross-origin tenant preview hosts are expected: they still communicate
   // selection events to the dashboard through postMessage.
   const showExternalPreviewNotice = false;
@@ -219,13 +246,13 @@ export function SitePreview() {
     }));
 
   // Reset loading state when refreshKey or page changes (derived-state pattern).
-  const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource });
+  const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource: effectivePreviewSource });
   if (
     prevIframeKey.refreshKey !== refreshKey ||
     prevIframeKey.pagePath !== pagePath ||
-    prevIframeKey.previewSource !== previewSource
+    prevIframeKey.previewSource !== effectivePreviewSource
   ) {
-    setPrevIframeKey({ refreshKey, pagePath, previewSource });
+    setPrevIframeKey({ refreshKey, pagePath, previewSource: effectivePreviewSource });
     setPreviewStatus("loading");
     setPreviewErrorDismissed(false);
   }
@@ -459,6 +486,22 @@ export function SitePreview() {
         }`}
       >
         {!scaffoldMode && (
+          <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-9.5rem)] items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 py-2 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                isLivePreview ? "bg-emerald-300" : "bg-amber-300"
+              }`}
+            />
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em]">
+              {previewBadgeLabel}
+            </span>
+            <span className="min-w-0 truncate text-[11px] text-white/55">
+              {previewBadgeDetail}
+            </span>
+          </div>
+        )}
+
+        {!scaffoldMode && (
           <button
             type="button"
             onClick={() => {
@@ -513,15 +556,21 @@ export function SitePreview() {
               { value: "editable", label: "Edit" },
               { value: "live", label: "Live" },
             ].map((source) => {
-              const active = previewSource === source.value;
+              const active = effectivePreviewSource === source.value;
+              const disabled = source.value === "live" && !siteUrl;
               return (
                 <button
                   key={source.value}
                   type="button"
+                  disabled={disabled}
                   onClick={() => setPreviewSource(source.value as PreviewSource)}
                   aria-pressed={active}
                   className={`h-7 rounded-full px-3 text-[11px] font-medium transition-colors ${
-                    active ? "bg-white text-black" : "text-white/65 hover:text-white"
+                    active
+                      ? "bg-white text-black"
+                      : disabled
+                        ? "cursor-not-allowed text-white/25"
+                        : "text-white/65 hover:text-white"
                   }`}
                 >
                   {source.label}
@@ -582,7 +631,10 @@ export function SitePreview() {
             </button>
             <button
               type="button"
-              onClick={() => setScaffoldMode(false)}
+              onClick={() => {
+                setScaffoldMode(false);
+                if (!hasAnyDraft && siteUrl) setPreviewSource("live");
+              }}
               className="flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-medium text-black transition-colors hover:bg-white/90"
               title="Exit Scaffold mode"
               aria-label="Exit Scaffold mode"
@@ -611,17 +663,19 @@ export function SitePreview() {
         >
           <iframe
             ref={iframeRef}
-            key={`${previewSource}-${refreshKey}-${pagePath}`}
+            key={`${effectivePreviewSource}-${refreshKey}-${pagePath}`}
             src={iframeSrc}
             className="w-full h-full border-0"
-            title="Live site preview"
+            title={previewKind}
             onLoad={() => setPreviewStatus("ready")}
           />
           {previewStatus === "loading" && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt">
               <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center">
                 <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
-                <span className="text-[11px] text-gray-muted">Loading preview for {pagePath === "/" ? "home" : pagePath}</span>
+                <span className="text-[11px] text-gray-muted">
+                  Loading {isLivePreview ? "active site" : "editable preview"} for {pagePath === "/" ? "home" : pagePath}
+                </span>
                 <span className="max-w-full truncate text-[10px] text-gray-faint">{iframeSrc}</span>
               </div>
             </div>
@@ -630,9 +684,9 @@ export function SitePreview() {
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
               <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
                 <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-warm-white">Live preview is taking longer than expected</p>
+                <p className="text-sm font-medium text-warm-white">{previewKind} is taking longer than expected</p>
                 <p className="mt-2 text-xs leading-5 text-gray-muted">
-                  This is usually a DNS, auth, or network delay. You can still edit the selected section on the right or open the live site directly.
+                  This is usually a DNS, auth, or network delay. You can still edit the selected section on the right or open the active site directly.
                 </p>
                 <p className="mt-3 truncate rounded-md bg-surface-base px-3 py-2 font-mono text-[10px] text-gray-faint">
                   {iframeSrc}

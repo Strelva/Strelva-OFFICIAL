@@ -90,6 +90,7 @@ interface DashboardContextValue {
   tenantId: string;
   siteUrl: string;
   previewUrl: string;
+  liveSyncEnabled: boolean;
   dashboardBasePath: string;
   dashboardHref: (path: string) => string;
 
@@ -135,6 +136,7 @@ export function DashboardProvider({
   tenantId = "",
   siteUrl = "",
   previewUrl = "",
+  liveSyncEnabled = false,
   dashboardBasePath = "",
   siteModel = "wellness",
   autoPublish = true,
@@ -147,6 +149,7 @@ export function DashboardProvider({
   tenantId?: string;
   siteUrl?: string;
   previewUrl?: string;
+  liveSyncEnabled?: boolean;
   dashboardBasePath?: string;
   siteModel?: string;
   autoPublish?: boolean;
@@ -327,6 +330,7 @@ export function DashboardProvider({
         tenantId,
         siteUrl,
         previewUrl,
+        liveSyncEnabled,
         dashboardBasePath,
         dashboardHref,
         siteModel,

@@ -10,10 +10,10 @@ import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { getActorContext, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
-import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
-import { getTenantEditablePreviewUrl } from "@/lib/custom-repos";
+import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custom-repos";
 import { getLocalClientPreviewUrl } from "@/lib/preview-target";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
@@ -39,9 +39,11 @@ export default async function DashboardLayout({
   }
   const actor = await getActorContext(tenant);
   const tenantConfig = await getTenantConfig(tenant);
+  const domainMapSiteUrl = getTenantPublicUrlFromDomainMap(tenant);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
-    : "";
+    : domainMapSiteUrl;
+  const liveSyncEnabled = Boolean(tenantConfig?.revalidateUrl && tenantConfig?.revalidationSecret);
   const requestHost = requestHeaders.get("host") || "";
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
@@ -51,8 +53,13 @@ export default async function DashboardLayout({
     requestHost,
     requestProto,
   });
-  const previewUrl = localClientPreviewUrl
-    || getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
+  const tenantEditablePreviewUrl = getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
+  const shouldUseLocalClientPreviewUrl =
+    Boolean(localClientPreviewUrl) &&
+    (!tenantConfig || getTenantDeliveryModel(tenantConfig) !== "custom_repo");
+  const previewUrl = shouldUseLocalClientPreviewUrl
+    ? localClientPreviewUrl || ""
+    : tenantEditablePreviewUrl;
   let siteName = "Your Business";
   let ownerName = "";
   try {
@@ -81,6 +88,7 @@ export default async function DashboardLayout({
       siteUrl={siteUrl}
       siteModel={tenantConfig?.template || "wellness"}
       previewUrl={previewUrl}
+      liveSyncEnabled={liveSyncEnabled}
       dashboardBasePath={dashboardBasePath}
       autoPublish={tenantConfig?.autoPublish !== false}
       subscriptionStatus={subscriptionStatus}

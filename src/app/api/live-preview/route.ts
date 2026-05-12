@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, verifyAuth } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
-import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { normalizePreviewPath, prepareLivePreviewHtml } from "@/lib/preview-html";
 
 export async function GET(request: Request) {
@@ -15,14 +15,15 @@ export async function GET(request: Request) {
     if (denied) return denied;
 
     const tenantConfig = await getTenantConfig(tenant);
-    if (!tenantConfig) {
-      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    const siteUrl = tenantConfig
+      ? getTenantPublicUrl(
+          tenantConfig,
+          getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV
+        )
+      : getTenantPublicUrlFromDomainMap(tenant);
+    if (!siteUrl) {
+      return NextResponse.json({ error: "Tenant site not found" }, { status: 404 });
     }
-
-    const siteUrl = getTenantPublicUrl(
-      tenantConfig,
-      getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV
-    );
     const url = new URL(request.url);
     const previewPath = normalizePreviewPath(url.searchParams.get("path"));
     const target = new URL(previewPath, siteUrl);

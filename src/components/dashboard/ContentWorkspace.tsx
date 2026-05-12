@@ -10,7 +10,7 @@ import { PropertiesEditor } from "./PropertiesEditor";
 import { LayoutPanel } from "./LayoutPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
-import { PublishBar } from "./design/PublishBar";
+import { PublishBar, type PublishOutcome } from "./design/PublishBar";
 import type { SectionData } from "./ContentBrowser";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 
@@ -48,6 +48,7 @@ export function ContentWorkspace({
     setRightTab,
     rightCollapsed,
     siteUrl,
+    liveSyncEnabled,
     dashboardHref,
     hasDraft,
     hasPageConfigDraft,
@@ -80,19 +81,21 @@ export function ContentWorkspace({
     [editReceipts],
   );
 
-  const handlePublishAll = useCallback(async () => {
+  const handlePublishAll = useCallback(async (): Promise<PublishOutcome> => {
     const res = await fetch(dashboardHref("/api/publish"), {
       method: "POST",
       credentials: "same-origin",
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error("Publish failed");
+      throw new Error(data?.error || "Publish failed");
     }
     setHasDraft({});
     setHasPageConfigDraft(false);
     markDraftReceipts("published");
     triggerRefresh();
     await reloadDraftState();
+    return data as PublishOutcome;
   }, [dashboardHref, markDraftReceipts, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
 
   const handleDiscardDrafts = useCallback(async () => {
@@ -257,6 +260,7 @@ export function ContentWorkspace({
           hasDrafts={hasAnyDraft}
           onPublish={handlePublishAll}
           onDiscard={handleDiscardDrafts}
+          liveSyncEnabled={liveSyncEnabled}
         />
       </div>
       )}

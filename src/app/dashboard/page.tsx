@@ -10,7 +10,7 @@ import { getQueueCount } from "@/lib/events";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
-import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 
 function StatTile({
   label,
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
   const recentAiChanges = activity.slice(0, 3);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
-    : "";
+    : getTenantPublicUrlFromDomainMap(tenant);
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
   const nextAction = brief?.nextAction?.title || (pendingCount > 0 ? "Review what needs you" : "Make one useful site update");
   const nextActionDetail = brief?.nextAction?.description ||

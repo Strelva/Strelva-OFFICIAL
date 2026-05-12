@@ -270,6 +270,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     hasDraft,
     setHasDraft,
     siteModel,
+    liveSyncEnabled,
     dashboardHref,
     selectedNode,
     setChatPrompt,
@@ -580,7 +581,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
           <div>
             <p className="text-[11px] font-medium text-amber-300">Draft saved</p>
-            <p className="text-[10px] text-gray-faint">Review the preview, then publish live from the bottom bar.</p>
+            <p className="text-[10px] text-gray-faint">
+              {liveSyncEnabled
+                ? "Review the preview, then publish live from the bottom bar."
+                : "Review the preview, then publish Scaffold copy from the bottom bar."}
+            </p>
           </div>
         </div>
       )}
@@ -590,7 +595,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
           <Check className="w-4 h-4 text-emerald-500 animate-check-bounce" strokeWidth={2} />
           <span className="text-[12px] font-medium text-emerald-400">
-            {editMode === "draft" ? "Draft saved - preview updated" : "Published live - site updated"}
+            {editMode === "draft"
+              ? "Draft saved - preview updated"
+              : liveSyncEnabled
+                ? "Saved - live refresh requested"
+                : "Saved to Scaffold"}
           </span>
         </div>
       )}
