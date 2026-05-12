@@ -197,7 +197,7 @@ export function LayoutPanel() {
           Safe layout
         </p>
         <p className="mt-1 text-[12px] text-gray-faint">
-          Reorder, show, hide, and adjust approved spacing before Push.
+          Reorder, show, hide, and adjust approved spacing before publishing live.
         </p>
         <select
           value={activePage}

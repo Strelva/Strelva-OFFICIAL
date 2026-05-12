@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockUpdateTenant = vi.fn();
 const mockCreateTenant = vi.fn();
+const mockGetTenantConfig = vi.fn((_tenant?: string): Promise<unknown> =>
+  Promise.resolve({
+    id: "test-tenant",
+    subscriptionStatus: "active",
+    autoPublish: false,
+    customDomains: ["example.com"],
+  })
+);
 const mockLogActivity = vi.fn();
 const mockLogAuditEvent = vi.fn();
 const mockAddCustomDomain = vi.fn();
@@ -19,7 +27,7 @@ const mockReplyToReview = vi.fn();
 const mockGetSocialPosts = vi.fn();
 const mockSetSocialPosts = vi.fn();
 const mockSaveConnection = vi.fn();
-const mockHeadersGet = vi.fn((key: string) => {
+const mockHeadersGet = vi.fn((key: string): string | null => {
   if (key === "x-tenant") return "test-tenant";
   return null;
 });
@@ -49,14 +57,7 @@ vi.mock("@/lib/redis", () => ({
 }));
 
 vi.mock("@/lib/tenants", () => ({
-  getTenantConfig: vi.fn(() =>
-    Promise.resolve({
-      id: "test-tenant",
-      subscriptionStatus: "active",
-      autoPublish: false,
-      customDomains: ["example.com"],
-    })
-  ),
+  getTenantConfig: (tenant: string) => mockGetTenantConfig(tenant),
   getAllTenants: vi.fn(() => Promise.resolve([])),
   createTenant: (...args: unknown[]) => mockCreateTenant(...args),
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
@@ -175,6 +176,19 @@ vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
 }));
+
+beforeEach(() => {
+  mockHeadersGet.mockImplementation((key: string): string | null => {
+    if (key === "x-tenant") return "test-tenant";
+    return null;
+  });
+  mockGetTenantConfig.mockResolvedValue({
+    id: "test-tenant",
+    subscriptionStatus: "active",
+    autoPublish: false,
+    customDomains: ["example.com"],
+  });
+});
 
 describe("Track API Route Handler", () => {
   beforeEach(() => {
@@ -993,6 +1007,47 @@ describe("Tenant Settings Route Handler", () => {
 
     expect(response.status).toBe(200);
     expect(mockUpdateTenant).toHaveBeenCalledWith("test-tenant", { autoPublish: true });
+  });
+});
+
+describe("Custom repo dependency route handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHeadersGet.mockImplementation((key: string) => {
+      if (key === "x-tenant") return "gldf";
+      return null;
+    });
+    mockGetTenantConfig.mockResolvedValue({
+      id: "gldf",
+      subdomain: "gldf",
+      siteName: "Great Lakes Dried Fruit",
+      ownerName: "Great Lakes Dried Fruit",
+      industry: "food",
+      active: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      template: "food-brand",
+      deliveryModel: "custom_repo",
+      customRepo: { repoName: "gldf-storefront" },
+    });
+  });
+
+  it("GET /api/custom-repo/dependencies surfaces the GLDF Supabase pause", async () => {
+    const { GET } = await import("@/app/api/custom-repo/dependencies/route");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.hasBlockingDependency).toBe(true);
+    expect(data.blockingDependencies[0]).toEqual(
+      expect.objectContaining({
+        id: "gldf-supabase",
+        provider: "Supabase",
+        status: "paused",
+        severity: "critical",
+      })
+    );
+    expect(data.summary).toEqual({ status: "paused", severity: "critical" });
   });
 });
 

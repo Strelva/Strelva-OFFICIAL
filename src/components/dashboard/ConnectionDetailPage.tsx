@@ -206,14 +206,14 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     : status === "coming_soon"
       ? "This source is planned. It is not available for setup yet."
       : detail.connectionProvider === "google"
-        ? "OAuth is available for this Google Business source."
+        ? "Connect Google once, then the AI can use this as trusted business context."
         : detail.id === "google-search-console"
           ? "This source uses manual Search Console credential setup today, not OAuth."
           : detail.connectionProvider
-            ? "This source needs its provider connection before the AI can use it."
+            ? "Connect the provider before this source influences AI decisions."
             : detail.builtIn
               ? "This is a built-in Scaffold Web signal."
-              : "This source needs setup before the AI can use it.";
+              : "Set this up before it influences AI decisions.";
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
@@ -227,7 +227,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       </button>
 
       {/* Header */}
-      <div className="flex items-center gap-5 mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
         <div className="w-16 h-16 rounded-[18px] bg-accent-dim border border-accent/20 flex items-center justify-center">
           <span className="text-[20px] font-bold text-accent">{detail.icon}</span>
         </div>
@@ -237,7 +237,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             {detail.shortDescription}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} compact />
           {!isConnected && detail.connectionProvider === "google" && (
             <a
@@ -266,13 +266,12 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         </div>
       </div>
 
-      <div className="mb-8 grid gap-3 rounded-2xl border border-gray-border bg-surface-raised p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div className="mb-8 rounded-2xl border border-gray-border bg-surface-raised p-5">
         <div>
           <p className="text-[11px] uppercase tracking-[0.14em] text-gray-faint">Setup path</p>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.description}</p>
           <p className="mt-3 text-[12px] leading-relaxed text-gray-fg">{setupPath}</p>
         </div>
-        <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-8">
@@ -338,7 +337,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         </div>
       </div>
 
-      <div className="flex gap-8 mb-8">
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <div>
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">Refresh behavior</span>
           <p className="text-[13px] text-warm-black mt-1">{detail.syncFrequency}</p>

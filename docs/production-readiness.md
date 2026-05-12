@@ -4,6 +4,7 @@
 
 - Primary branch: `main`.
 - GLDF primary branch: `master` until intentionally renamed.
+- Rohlax Wellness primary branch: `main`.
 - Tag control-plane releases as `reb-vYYYY.MM.DD.N`.
 - Record compatible storefront tags or commit SHAs in each REB release note.
 
@@ -11,6 +12,7 @@
 
 - `src/lib/reb-contracts.ts` is the source of truth for route builders, tenant constants, revalidation payloads, and HMAC signing in this repo.
 - GLDF vendors the same contract helpers so both repos build independently without a sibling package dependency.
+- Rohlax Wellness vendors the same v1 contract helpers and exposes the same signed `/api/v1/revalidate` endpoint.
 - Versioned public storefront endpoints:
   - `GET /api/v1/content/:tenant/:section`
   - `GET /api/v1/page-config/:tenant`
@@ -43,6 +45,7 @@
 - Set the storefront `REVALIDATE_SECRET` to the same value.
 - Set tenant `revalidateUrl` to the storefront `/api/v1/revalidate` endpoint.
 - Set `REB_CUSTOM_REQUEST_SECRET` in REB and in any custom storefront that exposes `/api/reb-custom-request`; the values must match exactly and must not include copied newline text.
+- Run `pnpm check:custom-repos` from REB to verify local GLDF and Rohlax storefront repos still expose the expected Scaffold Web contract files, env templates, capability manifests, and signed revalidation endpoints.
 - Confirm custom domain mapping resolves tenant from host or use `/api/v1/*` public routes.
 - Add production domains in Vercel, including `www` and `admin` variants where used.
 - Configure DNS and wait for Vercel domain verification before sending traffic.

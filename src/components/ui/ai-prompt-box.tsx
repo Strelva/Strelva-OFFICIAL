@@ -123,9 +123,9 @@ const SOURCE_ACTIONS: SourcePromptAction[] = [
     icon: Search,
   },
   {
-    label: "Booking CTA",
-    message: "@Booking CTA Is my booking path clear enough?",
-    description: "Booking-click and CTA context.",
+    label: "Main CTA",
+    message: "@Main CTA Is my main site action clear enough?",
+    description: "CTA click context.",
     icon: CalendarDays,
   },
   {

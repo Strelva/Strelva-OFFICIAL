@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Minimize2, Monitor, Pencil, RefreshCw, Smartphone, Tablet, Wand2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
@@ -98,6 +99,60 @@ function setEditableValue(
   return apply(source, 0) as Record<string, unknown>;
 }
 
+function getEditableValue(source: Record<string, unknown>, path: string): unknown {
+  const parts = path.split(".").filter(Boolean);
+  let current: unknown = source;
+  for (const part of parts) {
+    if (!current || typeof current !== "object") return undefined;
+    const { key, index } = parsePathPart(part);
+    const record = current as Record<string, unknown>;
+    const value = record[key];
+    if (index !== undefined) {
+      if (!Array.isArray(value)) return undefined;
+      current = value[resolveArrayIndex(value, index)];
+    } else {
+      current = value;
+    }
+  }
+  return current;
+}
+
+function labelFromEditablePath(path: string): string {
+  const parts = path.split(".").filter(Boolean);
+  const last = parts[parts.length - 1] || path;
+  const cleaned = last
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .trim();
+  if (!cleaned) return path;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function summarizeEditableValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "Empty";
+  if (typeof value === "string") {
+    const compact = value.replace(/\s+/g, " ").trim();
+    if (!compact) return "Empty";
+    return compact.length > 92 ? `${compact.slice(0, 89)}...` : compact;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "Updated content";
+}
+
+function editableValuesMatch(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return Object.is(a, b);
+  }
+}
+
+function buildAskAIPrompt(sectionLabel: string, fieldLabel?: string): string {
+  const target = fieldLabel ? `${fieldLabel} in the ${sectionLabel}` : `${sectionLabel} section`;
+  return `Update the ${target} on my site. Keep the current business facts, make it more specific, and save it as a draft before anything goes live.`;
+}
+
 function toEditableNode(data: Record<string, unknown>): EditableNode | null {
   const section = typeof data.section === "string" ? data.section : null;
   if (!section) return null;
@@ -118,14 +173,16 @@ function toEditableNode(data: Record<string, unknown>): EditableNode | null {
 }
 
 export function SitePreview() {
+  const router = useRouter();
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
-    BREAKPOINTS[BREAKPOINTS.length - 1]
+    BREAKPOINTS[2]
   );
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
-  const [previewSource, setPreviewSource] = useState<PreviewSource>("live");
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("editable");
   const [scaffoldMode, setScaffoldMode] = useState(false);
   const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(0);
   const {
     refreshKey,
     scrollToSection,
@@ -145,10 +202,26 @@ export function SitePreview() {
     setChatPrompt,
     setRightTab,
     setSelectedNode,
+    selectedNode,
+    addEditReceipts,
   } = useDashboard();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const frameScale = breakpoint.width && canvasWidth > 0
+    ? Math.min(1, Math.max(0.35, canvasWidth / breakpoint.width))
+    : 1;
+  const shouldScaleFrame = Boolean(breakpoint.width && frameScale < 1);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const updateSize = () => setCanvasWidth(canvas.clientWidth);
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   // Build section→page mapping from the active site model's page config so
   // clicking a section jumps the preview to the right page.
@@ -280,6 +353,7 @@ export function SitePreview() {
       const res = await fetch(contentUrl, { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
+      const beforeValue = getEditableValue(data, field);
       const nextData = setEditableValue(data, field, value);
       const saveRes = await fetch(contentUrl, {
         method: "PUT",
@@ -288,13 +362,25 @@ export function SitePreview() {
         body: JSON.stringify(nextData),
       });
       if (saveRes.ok) {
+        if (!editableValuesMatch(beforeValue, value)) {
+          addEditReceipts([{
+            section,
+            sectionLabel: SECTION_LABELS[section] || labelFromEditablePath(section),
+            field,
+            fieldLabel: labelFromEditablePath(field),
+            before: summarizeEditableValue(beforeValue),
+            after: summarizeEditableValue(value),
+            source: "inline_canvas",
+            status: isDraft ? "draft" : "published",
+          }]);
+        }
         if (isDraft) {
           setHasDraft((prev) => ({ ...prev, [section]: true }));
         }
         triggerRefresh();
       }
     } catch {}
-  }, [dashboardHref, editMode, setHasDraft, triggerRefresh]);
+  }, [addEditReceipts, dashboardHref, editMode, setHasDraft, triggerRefresh]);
 
   // Listen for messages from iframe
   useEffect(() => {
@@ -344,15 +430,15 @@ export function SitePreview() {
           setContextMenu({
             section: data.section,
             label: SECTION_LABELS[data.section] || data.label || data.section,
-            x: data.x + iframeRect.left - canvasRect.left,
-            y: data.y + iframeRect.top - canvasRect.top,
+            x: data.x * frameScale + iframeRect.left - canvasRect.left,
+            y: data.y * frameScale + iframeRect.top - canvasRect.top,
           });
         }
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl, setRightTab, setSelectedNode]);
+  }, [setActiveSection, handleInlineEdit, siteUrl, previewUrl, setRightTab, setSelectedNode, frameScale]);
 
   // Close context menu on click outside or Escape
   useEffect(() => {
@@ -384,9 +470,10 @@ export function SitePreview() {
   const handleAskAI = useCallback(() => {
     if (!contextMenu) return;
     const label = contextMenu.label;
-    setChatPrompt(`Update my ${label.toLowerCase()}`);
+    setChatPrompt(buildAskAIPrompt(label));
+    router.push(dashboardHref("/dashboard/chat"));
     setContextMenu(null);
-  }, [contextMenu, setChatPrompt]);
+  }, [contextMenu, dashboardHref, router, setChatPrompt]);
 
   const handleViewSection = useCallback(() => {
     if (!contextMenu) return;
@@ -413,9 +500,14 @@ export function SitePreview() {
 
   const askAIForSelectedSection = useCallback(() => {
     const label = activeSectionLabel || "selected section";
-    setChatPrompt(`Update my ${label.toLowerCase()}`);
+    const fieldLabel =
+      selectedNode?.section === activeSection && selectedNode.field
+        ? selectedNode.label || labelFromEditablePath(selectedNode.field)
+        : undefined;
+    setChatPrompt(buildAskAIPrompt(label, fieldLabel));
     setRightTab("chat");
-  }, [activeSectionLabel, setChatPrompt, setRightTab]);
+    router.push(dashboardHref("/dashboard/chat"));
+  }, [activeSection, activeSectionLabel, dashboardHref, router, selectedNode, setChatPrompt, setRightTab]);
 
   return (
     <div
@@ -569,14 +661,18 @@ export function SitePreview() {
         )}
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full overflow-hidden bg-surface transition-[max-width] duration-200 ease-out ${
+          className={`relative h-full w-full shrink-0 overflow-hidden bg-surface transition-[max-width] duration-200 ease-out ${
             scaffoldMode
               ? "rounded-none"
               : `rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] xl:rounded-xl ${refreshKey > 0 ? "preview-flash" : ""}`
           }`}
           style={{
-            maxWidth: breakpoint.width ? `${breakpoint.width}px` : "100%",
+            width: breakpoint.width ? `${breakpoint.width}px` : "100%",
+            maxWidth: breakpoint.width ? undefined : "100%",
+            height: shouldScaleFrame ? `${100 / frameScale}%` : "100%",
             marginInline: "auto",
+            transform: shouldScaleFrame ? `scale(${frameScale})` : undefined,
+            transformOrigin: "top center",
           }}
         >
           <iframe

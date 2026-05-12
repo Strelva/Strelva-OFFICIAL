@@ -8,12 +8,31 @@ type RightTab = "properties" | "layout" | "chat";
 type EditMode = "live" | "draft";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 type PlanOverride = "founder_comp" | null;
+type EditReceiptStatus = "draft" | "published" | "discarded";
+type EditReceiptSource = "field_editor" | "inline_canvas" | "layout_editor" | "ai";
 
 export interface ImpersonationContext {
   isActive: boolean;
   actorEmail: string | null;
   tenantId: string;
 }
+
+export interface EditReceipt {
+  id: string;
+  section: string;
+  sectionLabel: string;
+  field: string;
+  fieldLabel: string;
+  before: string;
+  after: string;
+  source: EditReceiptSource;
+  status: EditReceiptStatus;
+  timestamp: number;
+}
+
+export type NewEditReceipt = Omit<EditReceipt, "id" | "status" | "timestamp"> & {
+  status?: EditReceiptStatus;
+};
 
 interface DashboardContextValue {
   // Mobile tab
@@ -63,6 +82,9 @@ interface DashboardContextValue {
   hasPageConfigDraft: boolean;
   setHasPageConfigDraft: Dispatch<SetStateAction<boolean>>;
   reloadDraftState: () => Promise<void>;
+  editReceipts: EditReceipt[];
+  addEditReceipts: (receipts: NewEditReceipt[]) => void;
+  markDraftReceipts: (status: Exclude<EditReceiptStatus, "draft">) => void;
 
   // Tenant site URL
   tenantId: string;
@@ -148,6 +170,7 @@ export function DashboardProvider({
   const [editMode, setEditMode] = useState<EditMode>("draft");
   const [hasDraft, setHasDraft] = useState<Record<string, boolean>>({});
   const [hasPageConfigDraft, setHasPageConfigDraft] = useState(false);
+  const [editReceipts, setEditReceipts] = useState<EditReceipt[]>([]);
   const dashboardHref = useCallback(
     (path: string) => `${dashboardBasePath}${path.startsWith("/") ? path : `/${path}`}`,
     [dashboardBasePath]
@@ -233,6 +256,34 @@ export function DashboardProvider({
     setChatDrawerOpen(true); // Also open the floating drawer
   }, []);
 
+  const addEditReceipts = useCallback((receipts: NewEditReceipt[]) => {
+    if (receipts.length === 0) return;
+    const timestamp = Date.now();
+    setEditReceipts((prev) => {
+      const nextReceipts = receipts.map(({ status = "draft", ...receipt }, index) => ({
+        ...receipt,
+        id: `${receipt.section}:${receipt.field}:${timestamp}:${index}`,
+        status,
+        timestamp,
+      }));
+      const replacedKeys = new Set(nextReceipts.map((receipt) => `${receipt.section}:${receipt.field}`));
+      return [
+        ...nextReceipts,
+        ...prev.filter((receipt) => receipt.status !== "draft" || !replacedKeys.has(`${receipt.section}:${receipt.field}`)),
+      ].slice(0, 30);
+    });
+  }, []);
+
+  const markDraftReceipts = useCallback((status: Exclude<EditReceiptStatus, "draft">) => {
+    setEditReceipts((prev) =>
+      prev.map((receipt) =>
+        receipt.status === "draft"
+          ? { ...receipt, status, timestamp: Date.now() }
+          : receipt
+      )
+    );
+  }, []);
+
   // Until hydration is complete, expose the server default (false)
   // so consumers render the same tree structure the server did.
   const safeLeftCollapsed = hasMounted ? leftCollapsed : false;
@@ -270,6 +321,9 @@ export function DashboardProvider({
         hasPageConfigDraft,
         setHasPageConfigDraft,
         reloadDraftState,
+        editReceipts,
+        addEditReceipts,
+        markDraftReceipts,
         tenantId,
         siteUrl,
         previewUrl,

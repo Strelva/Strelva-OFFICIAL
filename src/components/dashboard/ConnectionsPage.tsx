@@ -78,9 +78,9 @@ function ConnectionRow({
   const actionCopy = canUseNow ? "Ask AI with source" : "Connect first";
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-xl border border-gray-border bg-surface-raised p-4 transition-colors hover:border-accent/25">
+    <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-gray-border bg-surface-raised p-3.5 transition-colors hover:border-accent/25">
       <div className="flex items-start gap-3.5">
-      <div className={`w-[42px] h-[42px] rounded-xl ${connection.iconBg} flex items-center justify-center shrink-0`}>
+      <div className={`w-9 h-9 rounded-lg ${connection.iconBg} flex items-center justify-center shrink-0`}>
         <span className={`text-[14px] font-bold ${connection.iconColor}`}>{connection.icon}</span>
       </div>
       <div className="flex-1 min-w-0">
@@ -91,7 +91,7 @@ function ConnectionRow({
         >
           {connection.name}
         </button>
-        <span className="text-[12px] text-gray-muted block mt-0.5">{connection.addsIntelligence}</span>
+        <span className="text-[12px] text-gray-muted block mt-0.5 leading-relaxed">{connection.addsIntelligence}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SourceHealthBadge status={connection.status} lastSync={connection.lastSyncedAt} compact />
@@ -105,15 +105,9 @@ function ConnectionRow({
         </button>
       </div>
       </div>
-      <div className="grid grid-cols-[88px_1fr] gap-3 rounded-lg border border-gray-border bg-surface-inset px-3 py-2.5">
-        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">Setup</span>
-        <span className="text-[12px] text-warm-white">{setupCopy}</span>
-        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">Feeds</span>
-        <span className="text-[12px] leading-relaxed text-gray-muted">{connection.usedIn}</span>
-      </div>
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
-          {canUseNow ? "AI can use this to" : "Once connected, AI can"}
+          {setupCopy}
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">
           {connection.aiCanUseThisTo.slice(0, 2).join("; ")}
@@ -151,7 +145,7 @@ const CATEGORY_ORDER: IntelligenceCategory[] = [
   "can_take_action",
 ];
 
-type FilterTab = "All" | "AI using it" | "Needs attention";
+type FilterTab = "AI using it" | "Needs attention" | "All";
 
 export function ConnectionsPage() {
   const router = useRouter();
@@ -159,7 +153,7 @@ export function ConnectionsPage() {
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const apiHref = dashboardHref;
   const setChatPrompt = dashboard?.setChatPrompt;
-  const [activeTab, setActiveTab] = useState<FilterTab>("All");
+  const [activeTab, setActiveTab] = useState<FilterTab>("AI using it");
   const [query, setQuery] = useState("");
   const [sourceState, setSourceState] = useState<SourceState>({
     providerStatuses: {},
@@ -273,6 +267,14 @@ export function ConnectionsPage() {
     allConnections.find((connection) => connection.id === "google-business" && connection.status !== "connected") ??
     allConnections.find((connection) => connection.id === "website-activity") ??
     allConnections[0];
+  const sourcePriorities = allConnections
+    .filter((connection) =>
+      connection.intelligenceStatus === "ai_using_it" ||
+      connection.intelligenceStatus === "can_act_here" ||
+      connection.intelligenceStatus === "signal_available" ||
+      connection.id === featured?.id
+    )
+    .slice(0, 4);
   const runConnectionPrompt = (connection: Connection) => {
     const prompt =
       connection.sourcePrompt ||
@@ -285,7 +287,7 @@ export function ConnectionsPage() {
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 animate-route-enter">
+    <div className="h-full min-h-0 overflow-y-auto px-4 py-5 pb-28 sm:px-8 sm:py-7 animate-route-enter">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
         <div>
@@ -294,7 +296,7 @@ export function ConnectionsPage() {
           </p>
           <div className="flex items-baseline gap-3">
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-              What the AI can really use
+              What the AI should trust
             </h1>
             <span className="text-[13px] text-gray-muted">
               {usableNowCount} usable now
@@ -312,29 +314,54 @@ export function ConnectionsPage() {
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        Built-in site signals work now. Connected accounts add outside context. Sources that still need OAuth, credentials, or manual setup stay clearly marked until they are actually available.
+        A short source map for what can guide site changes today. Keep connected signals at the top; park anything that still needs setup.
       </p>
 
       {!query.trim() && (
-        <div className="mb-6 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Usable now</p>
-            <p className="mt-2 text-[24px] font-semibold text-warm-white">
-              {usableNowCount}
-            </p>
-            <p className="mt-1 text-[12px] text-gray-muted">Built-in or connected sources the AI can reference today.</p>
+        <div className="mb-6 rounded-2xl border border-glass-border bg-glass p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Source priorities</p>
+              <p className="mt-1 text-[13px] text-gray-muted">
+                {usableNowCount} usable now. {needsSetupCount} need setup before they should influence AI decisions.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("Needs attention")}
+              className="inline-flex min-h-[34px] w-full items-center justify-center rounded-lg border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-black sm:w-auto"
+            >
+              Review setup
+            </button>
           </div>
-          <div className="rounded-xl border border-gray-border bg-surface-raised p-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Needs setup</p>
-            <p className="mt-2 text-[24px] font-semibold text-warm-white">
-              {needsSetupCount}
-            </p>
-            <p className="mt-1 text-[12px] text-gray-muted">OAuth, credentials, manual setup, or sync repair required.</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {sourcePriorities.map((connection) => (
+              <button
+                key={`priority-${connection.id}`}
+                type="button"
+                onClick={() => router.push(dashboardHref(`/dashboard/sources/${connection.id}`))}
+                className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-gray-border bg-surface-raised px-3 py-2.5 text-left transition-colors hover:border-accent/30"
+              >
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${connection.iconBg}`}>
+                  <span className={`text-[11px] font-bold ${connection.iconColor}`}>{connection.icon}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-warm-black">{connection.name}</p>
+                  <p className="truncate text-[12px] text-gray-muted">{connection.addsIntelligence}</p>
+                </div>
+                <SourceHealthBadge
+                  status={connection.status}
+                  lastSync={connection.lastSyncedAt}
+                  compact
+                  className="hidden shrink-0 sm:inline-flex"
+                />
+              </button>
+            ))}
           </div>
           <button
             type="button"
             onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
-            className="rounded-xl border border-accent/25 bg-accent-dim p-4 text-left transition-colors hover:border-accent/45"
+            className="mt-3 w-full rounded-xl border border-accent/25 bg-accent-dim px-3 py-2.5 text-left transition-colors hover:border-accent/45"
           >
             <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Best next source</p>
             <p className="mt-2 text-[15px] font-medium text-warm-white">{featured.name}</p>
@@ -345,7 +372,7 @@ export function ConnectionsPage() {
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-glass-border mb-4 pb-0">
-        {(["All", "AI using it", "Needs attention"] as const).map((tab) => (
+        {(["AI using it", "Needs attention", "All"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -368,7 +395,7 @@ export function ConnectionsPage() {
                 <h2 className="text-[14px] font-medium text-warm-black">{INTELLIGENCE_CATEGORY_LABELS[group.category]}</h2>
                 <span className="text-[11px] text-gray-faint">{group.connections.length} sources</span>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 xl:grid-cols-2">
                 {group.connections.map((connection) => (
                   <ConnectionRow
                     key={`${group.category}-${connection.id}`}

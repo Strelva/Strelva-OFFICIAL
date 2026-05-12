@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
-import { LayoutList, PanelRightOpen, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, FileText, LayoutList, PanelRightOpen, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
+import type { EditReceipt } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { LayoutPanel } from "./LayoutPanel";
@@ -16,6 +17,20 @@ interface ContentWorkspaceProps {
   ownerName: string;
   sectionData: Record<string, SectionData>;
   timestamps: Record<string, string>;
+}
+
+type WorkspaceViewport = "mobile" | "tablet" | "desktop";
+
+function getWorkspaceViewport(): WorkspaceViewport {
+  if (typeof window === "undefined") return "desktop";
+  if (window.innerWidth >= 1024) return "desktop";
+  if (window.innerWidth >= 768) return "tablet";
+  return "mobile";
+}
+
+function shorten(value: string, max = 58): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length > max ? `${compact.slice(0, max - 3)}...` : compact;
 }
 
 export function ContentWorkspace({
@@ -37,8 +52,11 @@ export function ContentWorkspace({
     setHasPageConfigDraft,
     reloadDraftState,
     triggerRefresh,
+    editReceipts,
+    markDraftReceipts,
   } = useDashboard();
   void timestamps;
+  const [viewportMode, setViewportMode] = useState<WorkspaceViewport | null>(null);
 
   const sectionOptions = useMemo(
     () =>
@@ -50,6 +68,14 @@ export function ContentWorkspace({
   );
 
   const hasAnyDraft = Object.values(hasDraft).some(Boolean) || hasPageConfigDraft;
+  const draftSections = useMemo(
+    () => Object.entries(hasDraft).filter(([, value]) => value).map(([section]) => section),
+    [hasDraft],
+  );
+  const draftReceipts = useMemo(
+    () => editReceipts.filter((receipt) => receipt.status === "draft"),
+    [editReceipts],
+  );
 
   const handlePublishAll = useCallback(async () => {
     const res = await fetch(dashboardHref("/api/publish"), {
@@ -61,9 +87,10 @@ export function ContentWorkspace({
     }
     setHasDraft({});
     setHasPageConfigDraft(false);
+    markDraftReceipts("published");
     triggerRefresh();
     await reloadDraftState();
-  }, [dashboardHref, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
+  }, [dashboardHref, markDraftReceipts, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
 
   const handleDiscardDrafts = useCallback(async () => {
     const res = await fetch(dashboardHref("/api/publish"), {
@@ -75,9 +102,10 @@ export function ContentWorkspace({
     }
     setHasDraft({});
     setHasPageConfigDraft(false);
+    markDraftReceipts("discarded");
     triggerRefresh();
     await reloadDraftState();
-  }, [dashboardHref, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
+  }, [dashboardHref, markDraftReceipts, reloadDraftState, setHasDraft, setHasPageConfigDraft, triggerRefresh]);
 
   useEffect(() => {
     setRightTab("properties");
@@ -87,6 +115,13 @@ export function ContentWorkspace({
     if (activeSection || sectionOptions.length === 0) return;
     setActiveSection(sectionOptions[0].value);
   }, [activeSection, sectionOptions, setActiveSection]);
+
+  useEffect(() => {
+    const updateViewportMode = () => setViewportMode(getWorkspaceViewport());
+    updateViewportMode();
+    window.addEventListener("resize", updateViewportMode);
+    return () => window.removeEventListener("resize", updateViewportMode);
+  }, []);
 
   const rightPanelContent = (
     <>
@@ -113,6 +148,10 @@ export function ContentWorkspace({
         </div>
       </div>
 
+      {hasAnyDraft && (
+        <ReadyToPublishPanel receipts={draftReceipts} draftSections={draftSections} hasPageConfigDraft={hasPageConfigDraft} />
+      )}
+
       {/* Tab content */}
       <div className="flex min-h-0 flex-1 flex-col">
         {rightTab === "properties" ? (
@@ -129,40 +168,48 @@ export function ContentWorkspace({
   return (
     <div className="flex flex-col h-full bg-surface-base">
       <div className="flex min-h-0 flex-1 flex-col">
-      {/* Desktop: preview + right panel */}
-      <div className="hidden lg:flex flex-1 min-h-0">
-        <main className="flex-1 flex flex-col min-w-0">
-          <SitePreview />
-        </main>
+      {viewportMode === null && (
+        <div className="flex flex-1 items-center justify-center text-[12px] text-gray-muted">
+          Loading editor...
+        </div>
+      )}
 
-        {/* Right: Properties + Chat */}
-        <aside
-          className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
-            rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
-          }`}
-        >
-          {rightCollapsed ? (
-            <CollapsedRight />
-          ) : (
-            rightPanelContent
-          )}
-        </aside>
-      </div>
-
-      {/* Tablet: vertical split. */}
-      <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0">
-        <div className="h-[60%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1">
+      {viewportMode === "desktop" && (
+        <div className="flex flex-1 min-h-0">
+          <main className="flex-1 flex flex-col min-w-0">
             <SitePreview />
+          </main>
+
+          {/* Right: Properties + Chat */}
+          <aside
+            className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
+              rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
+            }`}
+          >
+            {rightCollapsed ? (
+              <CollapsedRight />
+            ) : (
+              rightPanelContent
+            )}
+          </aside>
+        </div>
+      )}
+
+      {viewportMode === "tablet" && (
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="h-[60%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
+            <div className="min-h-0 flex-1">
+              <SitePreview />
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col min-h-0">
+            {rightPanelContent}
           </div>
         </div>
-        <div className="flex-1 flex flex-col min-h-0">
-          {rightPanelContent}
-        </div>
-      </div>
+      )}
 
-      {/* Mobile: fallback message — editor isn't usable at this size */}
-      <div className="flex md:hidden flex-1 min-h-0 items-center justify-center px-6">
+      {viewportMode === "mobile" && (
+        <div className="flex flex-1 min-h-0 items-center justify-center px-6">
         <div className="max-w-sm text-center">
           <p className="text-lg font-medium text-warm-white mb-2">
             Site editor is not available on mobile
@@ -191,14 +238,84 @@ export function ContentWorkspace({
             </Link>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       </div>
-      <PublishBar
-        hasDrafts={hasAnyDraft}
-        onPublish={handlePublishAll}
-        onDiscard={handleDiscardDrafts}
-      />
+      {viewportMode !== "mobile" && (
+      <div className="shrink-0">
+        <PublishBar
+          hasDrafts={hasAnyDraft}
+          onPublish={handlePublishAll}
+          onDiscard={handleDiscardDrafts}
+        />
+      </div>
+      )}
+    </div>
+  );
+}
+
+function ReadyToPublishPanel({
+  receipts,
+  draftSections,
+  hasPageConfigDraft,
+}: {
+  receipts: EditReceipt[];
+  draftSections: string[];
+  hasPageConfigDraft: boolean;
+}) {
+  const visibleReceipts = receipts.slice(0, 3);
+  const hiddenCount = Math.max(0, receipts.length - visibleReceipts.length);
+  const sectionLabels = draftSections
+    .map((section) => SECTION_LABELS[section] || section)
+    .slice(0, 3);
+
+  return (
+    <div className="border-b border-gray-border bg-amber-500/[0.035] px-3 py-3">
+      <div className="mb-2 flex items-start gap-2">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/10 text-amber-300">
+          <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.7} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold text-warm-white">Ready to publish</p>
+          <p className="mt-0.5 text-[10px] leading-4 text-gray-faint">
+            {receipts.length > 0
+              ? `${receipts.length} saved ${receipts.length === 1 ? "edit is" : "edits are"} in the draft preview.`
+              : `${draftSections.length + (hasPageConfigDraft ? 1 : 0)} draft ${draftSections.length + (hasPageConfigDraft ? 1 : 0) === 1 ? "change is" : "changes are"} waiting for review.`}
+          </p>
+        </div>
+      </div>
+
+      {visibleReceipts.length > 0 ? (
+        <div className="space-y-1.5">
+          {visibleReceipts.map((receipt) => (
+            <div key={receipt.id} className="rounded-md border border-gray-border/70 bg-surface/70 px-2.5 py-2">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="truncate text-[10px] font-medium text-gray-muted">
+                  {receipt.sectionLabel} / {receipt.fieldLabel}
+                </span>
+                <span className="shrink-0 text-[9px] uppercase tracking-[0.08em] text-amber-300">
+                  Draft
+                </span>
+              </div>
+              <div className="grid gap-1 text-[10px] leading-4">
+                <p className="truncate text-gray-faint">Before: {shorten(receipt.before)}</p>
+                <p className="truncate text-warm-white">After: {shorten(receipt.after)}</p>
+              </div>
+            </div>
+          ))}
+          {hiddenCount > 0 && (
+            <p className="pl-1 text-[10px] text-gray-faint">+{hiddenCount} more saved {hiddenCount === 1 ? "edit" : "edits"}</p>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-md border border-gray-border/70 bg-surface/70 px-2.5 py-2 text-[10px] text-gray-muted">
+          <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+          <span className="truncate">
+            {sectionLabels.length > 0 ? sectionLabels.join(", ") : "Layout"} draft waiting in preview.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

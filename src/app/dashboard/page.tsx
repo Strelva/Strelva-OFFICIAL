@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
 
-  const [pageViews, bookingClicks, pendingCount, activity, brief, tenantConfig] = await Promise.all([
+  const [pageViews, customerActions, pendingCount, activity, brief, tenantConfig] = await Promise.all([
     getClickCounts("page-view", tenant),
     getClickCounts("booking-click", tenant),
     getQueueCount(tenant),
@@ -105,9 +105,9 @@ export default async function DashboardPage() {
             icon={TrendingUp}
           />
           <StatTile
-            label="Booking clicks"
-            value={bookingClicks.thisWeek}
-            detail={`${bookingClicks.total} total booking-intent clicks`}
+            label="Customer actions"
+            value={customerActions.thisWeek}
+            detail={`${customerActions.total} product/contact clicks tracked`}
             icon={MousePointerClick}
           />
           <StatTile

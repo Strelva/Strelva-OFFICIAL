@@ -11,6 +11,23 @@ import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { queueAiContentReview } from "@/lib/ai-review-queue";
 import type { ContentSection } from "@/lib/types";
 import { revalidateClientSite } from "@/lib/revalidate-client";
+import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
+
+export interface AgentExecutionToolTrace {
+  name: string;
+  input: unknown;
+  output?: unknown;
+  error?: string;
+  success: boolean;
+  stepNumber: number;
+}
+
+export interface AgentExecutionTrace {
+  text: string;
+  finishReason: string;
+  toolCalls: AgentExecutionToolTrace[];
+  agentResult: AgentResultContract;
+}
 
 function logisticsGuardrail(sectionNames: string): string {
   return `OPERATING BOUNDARIES:
@@ -154,6 +171,14 @@ export async function executeAgentPrompt(
   tenantId: string,
   userMessage: string
 ): Promise<string> {
+  const result = await executeAgentPromptDetailed(tenantId, userMessage);
+  return result.text;
+}
+
+export async function executeAgentPromptDetailed(
+  tenantId: string,
+  userMessage: string
+): Promise<AgentExecutionTrace> {
   const template = await getTemplateForTenant(tenantId);
   const tenantConfig = await getTenantConfig(tenantId);
   const capFragment = capabilityPromptFragment();
@@ -435,5 +460,35 @@ export async function executeAgentPrompt(
     stopWhen: stepCountIs(8),
   });
 
-  return result.text;
+  const toolCalls: AgentExecutionToolTrace[] = result.steps.flatMap((step) => {
+    const okCalls = step.toolResults.map((toolResult) => ({
+      name: toolResult.toolName,
+      input: toolResult.input,
+      output: toolResult.output,
+      success: true,
+      stepNumber: step.stepNumber,
+    }));
+    const errors = step.content
+      .filter((part) => part.type === "tool-error")
+      .map((part) => ({
+        name: part.toolName,
+        input: part.input,
+        error: part.error instanceof Error ? part.error.message : String(part.error),
+        success: false,
+        stepNumber: step.stepNumber,
+      }));
+
+    return [...okCalls, ...errors];
+  });
+
+  const actionResults = toolCalls
+    .map((call) => agentResultFromToolOutput(call.output))
+    .filter((action): action is NonNullable<typeof action> => Boolean(action));
+
+  return {
+    text: result.text,
+    finishReason: result.finishReason,
+    toolCalls,
+    agentResult: buildAgentResultContract(actionResults),
+  };
 }

@@ -13,7 +13,6 @@ import {
   AlertCircle,
   MessageCircle,
   X,
-  ShieldCheck,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
@@ -22,13 +21,15 @@ import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
+import { QueuePage } from "./QueuePage";
 import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from "@/lib/agent-results";
+import type { UnifiedEvent } from "@/lib/types";
 
 const SUGGESTION_CHIPS = [
-  { label: "Update this week's offer", icon: Clock, description: "Turn a real business change into updated site copy" },
-  { label: "Write this week's update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
-  { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note" },
-  { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, clicks, and freshness to pick the next move" },
+  { label: "Add this week's product news", icon: Clock, description: "Turn a real GLDF change into updated site copy" },
+  { label: "Write this week's customer update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
+  { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note", hideOnMobile: true },
+  { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, product interest, and freshness to pick the next move" },
 ];
 
 const INPUT_QUICK_ACTIONS = [
@@ -48,7 +49,7 @@ const INPUT_QUICK_ACTIONS = [
     label: "Show recent changes",
     icon: CalendarPlus,
     description: "Review what the AI or team changed lately.",
-    message: "Show me the recent changes made to my site and call out anything that still needs approval or a closer look.",
+    message: "Show me the recent changes made to my site and call out anything that belongs in Needs You or needs a closer look.",
   },
   {
     label: "Check site health",
@@ -86,6 +87,13 @@ interface ChatPanelProps {
   ownerName: string;
   onThreadCreated?: (id: string) => void;
   variant?: "full" | "compact";
+  needsYou?: {
+    openInitially?: boolean;
+    pending: UnifiedEvent[];
+    resolved: UnifiedEvent[];
+    pendingCount: number;
+    staleSectionCount: number;
+  };
 }
 
 function getGreeting(): string {
@@ -108,7 +116,7 @@ function isTransientFailureMessage(message: ChatMessage) {
   return message.role === "assistant" && message.content.trim() === TRANSIENT_CONNECT_FAILURE;
 }
 
-export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "full" }: ChatPanelProps) {
+export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "full", needsYou }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<UploadedFile[]>([]);
@@ -116,6 +124,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const [updateToast, setUpdateToast] = useState<UpdateToast | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [activeTools, setActiveTools] = useState<ToolCall[]>([]);
+  const [needsDrawerOpen, setNeedsDrawerOpen] = useState(Boolean(needsYou?.openInitially));
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentThreadRef = useRef<string | undefined>(threadId);
@@ -127,6 +136,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
 
   const dashCtx = useDashboardOptional();
   const dashboardHref = dashCtx?.dashboardHref ?? ((path: string) => path);
+  const pendingNeedsCount = needsYou?.pendingCount ?? 0;
 
   const showResultToast = useCallback((result: AgentResultContract) => {
     if (result.status === "no-op" && result.actions.length === 1) return;
@@ -227,6 +237,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     if (typeof window !== "undefined" && window.innerWidth < 768) return;
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (needsYou?.openInitially) setNeedsDrawerOpen(true);
+  }, [needsYou?.openInitially]);
 
   const sendChat = useCallback(
     async (text: string) => {
@@ -541,8 +555,22 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     });
   }, [isEmpty]);
 
+  useEffect(() => {
+    if (!isEmpty) return;
+    const resetScroll = () => {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    };
+    resetScroll();
+    const frame = requestAnimationFrame(resetScroll);
+    const timeout = window.setTimeout(resetScroll, 120);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [isEmpty]);
+
   return (
-    <div className={`flex h-full flex-col ${variant === "compact" ? "bg-surface" : ""}`}>
+    <div className={`relative flex h-full flex-col ${variant === "compact" ? "bg-surface" : ""}`}>
       {/* Scrollable content area */}
       <div
         ref={scrollRef}
@@ -551,11 +579,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       >
         {isEmpty ? (
           /* Empty state: greeting + chips */
-          <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-20 sm:justify-center sm:px-8 sm:py-12"}`}>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
-              <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              Site agent online
-            </div>
+          <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-16 sm:justify-center sm:px-8 sm:py-12"}`}>
             <h1
               className={`${variant === "compact" ? "text-[22px]" : "text-[28px] sm:text-[38px]"} font-semibold text-warm-black tracking-[-0.03em] text-center`}
               suppressHydrationWarning
@@ -563,38 +587,31 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               {getGreeting()}, {ownerName}
             </h1>
             <p className={`${variant === "compact" ? "text-[12px]" : "text-[14px] sm:text-[15px]"} text-gray-muted mt-3 text-center max-w-xl`}>
-              Make the site match the business today. The AI can update copy, draft customer-facing content, and flag what is worth improving next.
+              Tell me the business change. I can update the site, draft the customer note, or show what needs your okay before it goes live.
             </p>
 
             {variant !== "compact" && (
-              <div className="mt-6 grid w-full max-w-3xl gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
-                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
-                    <MessageCircle className="h-4 w-4 text-accent" strokeWidth={1.5} />
-                    Ask for one change
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-gray-muted">
-                    Start with hours, an offer, a service, or a weekly update.
+              <div className={`mt-6 w-full max-w-3xl flex-col gap-2 rounded-2xl border border-glass-border bg-glass p-3 sm:flex sm:flex-row sm:items-center sm:justify-between ${
+                pendingNeedsCount > 0 ? "flex" : "hidden"
+              }`}>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-warm-black">
+                    {pendingNeedsCount > 0
+                      ? `${pendingNeedsCount} item${pendingNeedsCount === 1 ? "" : "s"} need your okay`
+                      : "No drafts need your okay right now"}
+                  </p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
+                    Review larger AI changes in a side panel while keeping the conversation open.
                   </p>
                 </div>
-                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
-                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
-                    <ShieldCheck className="h-4 w-4 text-accent" strokeWidth={1.5} />
-                    Review the receipt
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-gray-muted">
-                    Every AI action shows what happened, its source, and whether approval is needed.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-glass-border bg-glass px-3 py-3 text-left">
-                  <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-warm-black">
-                    <BarChart3 className="h-4 w-4 text-accent" strokeWidth={1.5} />
-                    Watch the weekly proof
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-gray-muted">
-                    Your report turns visits, clicks, and AI updates into plain English.
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setNeedsDrawerOpen(true)}
+                  className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-border bg-surface-raised px-3 text-[12px] font-medium text-warm-black transition-colors hover:border-accent/35"
+                >
+                  <Inbox className="h-4 w-4" strokeWidth={1.5} />
+                  Needs You
+                </button>
               </div>
             )}
 
@@ -604,7 +621,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                 <button
                   key={chip.label}
                   onClick={() => sendChat(chip.label)}
-                  className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} rounded-xl bg-glass border border-glass-border hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
+                  className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} ${
+                    chip.hideOnMobile ? "hidden sm:block" : ""
+                  } rounded-xl bg-glass border border-glass-border hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
@@ -673,7 +692,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                       className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
                     >
                       <Inbox className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      Open needs approval
+                      Open Needs You
                     </Link>
                   )}
                 </div>
@@ -794,6 +813,41 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           </p>
         </div>
       </div>
+      {needsYou && variant !== "compact" && needsDrawerOpen && (
+        <>
+          <button
+            type="button"
+            className="absolute inset-0 z-30 bg-black/35"
+            onClick={() => setNeedsDrawerOpen(false)}
+            aria-label="Close Needs You"
+          />
+          <aside
+            className="absolute inset-y-0 right-0 z-40 w-full max-w-[520px] border-l border-glass-border bg-surface-base shadow-[0_24px_80px_rgba(0,0,0,0.38)] animate-overlay-enter"
+          >
+            <div className="flex h-12 items-center justify-between border-b border-glass-border px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <Inbox className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
+                <span className="truncate text-[13px] font-medium text-warm-black">Needs You</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNeedsDrawerOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
+                aria-label="Close Needs You"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </div>
+            <QueuePage
+              initialPending={needsYou.pending}
+              initialResolved={needsYou.resolved}
+              pendingCount={needsYou.pendingCount}
+              staleSectionCount={needsYou.staleSectionCount}
+              compact
+            />
+          </aside>
+        </>
+      )}
     </div>
   );
 }

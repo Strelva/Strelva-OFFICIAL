@@ -2,19 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, Inbox, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
+import { House, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useDashboard } from "./DashboardContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Today", icon: House },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Needs You", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Sources", icon: Link2 },
 ];
 
-export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
+export function MobileNav({ pendingCount: _pendingCount = 0 }: { pendingCount?: number }) {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const effectivePathname =
@@ -25,11 +24,12 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const getActiveIndex = useCallback(() => {
-    return NAV_ITEMS.findIndex((item) =>
-      item.href === "/dashboard"
+    return NAV_ITEMS.findIndex((item) => {
+      const matchHref = item.href;
+      return matchHref === "/dashboard"
         ? effectivePathname === "/dashboard"
-        : effectivePathname?.startsWith(item.href)
-    );
+        : effectivePathname?.startsWith(matchHref);
+    });
   }, [effectivePathname]);
 
   useEffect(() => {
@@ -65,12 +65,11 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
           }}
         />
         {NAV_ITEMS.map((item) => {
-          const isActive = item.href === "/dashboard"
+          const matchHref = item.href;
+          const isActive = matchHref === "/dashboard"
             ? effectivePathname === "/dashboard"
-            : effectivePathname?.startsWith(item.href);
+            : effectivePathname?.startsWith(matchHref);
           const Icon = item.icon;
-          const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
-
           return (
             <Link
               key={item.href}
@@ -83,11 +82,6 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
             >
               <div className="relative">
                 <Icon className="w-5 h-5" strokeWidth={1.5} />
-                {showBadge && (
-                  <span className="absolute -top-1 -right-2 w-4 h-4 text-[9px] font-semibold bg-accent text-surface-base rounded-full flex items-center justify-center">
-                    {pendingCount > 9 ? "9+" : pendingCount}
-                  </span>
-                )}
               </div>
               <span className="max-w-[54px] truncate text-[9px] font-medium">{item.label}</span>
             </Link>

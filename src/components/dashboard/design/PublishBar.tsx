@@ -71,12 +71,12 @@ export function PublishBar({
         {hasDrafts ? (
           <div className="flex items-center gap-1.5 text-amber-400">
             <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Draft preview active</span>
+            <span className="text-[11px] font-medium">Draft preview active - review before publishing</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-emerald-400">
             <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">All changes live</span>
+            <span className="text-[11px] font-medium">{published ? "Published live" : "All changes live"}</span>
           </div>
         )}
         {lastPublished && (
@@ -132,7 +132,7 @@ export function PublishBar({
           ) : (
             <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
           )}
-          {publishing ? "Pushing..." : published ? "Pushed!" : error ? "Failed" : "Push"}
+          {publishing ? "Publishing..." : published ? "Published live" : error ? "Failed" : "Publish live"}
         </button>
       </div>
     </div>

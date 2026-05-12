@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Code2, Download, Image as ImageIcon, Link2, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
@@ -10,6 +10,7 @@ import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL } from "@/lib/pricing";
+import type { CustomRepoExternalDependency } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +40,16 @@ type SiteCapabilitiesData = {
   customComponents?: { id: string; label: string; description?: string; adminOnly: boolean; supportedProps?: string[] }[];
 };
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
+type DependencyHealthData = {
+  deliveryModel: string;
+  dependencies: CustomRepoExternalDependency[];
+  blockingDependencies: CustomRepoExternalDependency[];
+  hasBlockingDependency: boolean;
+  summary: {
+    status: string;
+    severity: string;
+  };
+};
 
 function useDashboardApiPath() {
   const dashboard = useDashboardOptional();
@@ -63,7 +74,7 @@ const IDENTITY_FIELDS: readonly {
   { key: "ownerName", label: "Owner Name", description: "Shown in greetings" },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
-  { key: "bookingUrl", label: "Booking URL", description: "Where clients book", mono: true },
+  { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
   { key: "footerTagline", label: "Footer Tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
@@ -143,6 +154,7 @@ function setNestedValue(
 const SETTINGS_SECTIONS = [
   { id: "profile", label: "Business" },
   { id: "site-config", label: "Site config" },
+  { id: "dependencies", label: "Dependencies" },
   { id: "utilities", label: "Utilities" },
   { id: "ownership", label: "Ownership" },
   { id: "domains", label: "Domains" },
@@ -794,7 +806,7 @@ function NavigationFooterSection() {
           <p className="text-[11px] font-mono uppercase tracking-wider text-gray-faint">Navigation</p>
         </div>
         {navigation.menuItems.map((item, index) => (
-          <div key={`${item.label}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 border-b border-gray-border/50 px-5 py-3">
+          <div key={`${item.label}-${index}`} className="grid grid-cols-1 gap-2 border-b border-gray-border/50 px-5 py-3 sm:grid-cols-[1fr_1fr_auto]">
             <input
               value={item.label}
               onChange={(event) => updateNavItem(index, "label", event.target.value)}
@@ -821,7 +833,7 @@ function NavigationFooterSection() {
             </button>
           </div>
         ))}
-        <div className="flex items-center justify-between gap-3 px-5 py-3">
+        <div className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={() => {
@@ -834,7 +846,7 @@ function NavigationFooterSection() {
             <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             Add link
           </button>
-          <div className="grid flex-1 grid-cols-2 gap-2">
+          <div className="grid w-full flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
             <input
               value={navigation.ctaLabel}
               onChange={(event) => {
@@ -1070,6 +1082,136 @@ function CustomComponentsSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Dependency health section
+// ---------------------------------------------------------------------------
+
+const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string }> = {
+  healthy: { label: "Healthy", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
+  degraded: { label: "Degraded", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
+  paused: { label: "Paused", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  failing: { label: "Failing", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  unknown: { label: "Unknown", className: "border-gray-border text-gray-faint" },
+};
+
+function DependencyStatusPill({ status }: { status: string }) {
+  const copy = DEPENDENCY_STATUS_COPY[status] || DEPENDENCY_STATUS_COPY.unknown;
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${copy.className}`}>
+      {copy.label}
+    </span>
+  );
+}
+
+function DependencyHealthSection() {
+  const apiPath = useDashboardApiPath();
+  const [data, setData] = useState<DependencyHealthData | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => {
+    fetch(apiPath("/api/custom-repo/dependencies"), { credentials: "same-origin" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Could not load dependency health");
+        return res.json();
+      })
+      .then((next) => {
+        setError("");
+        setData(next);
+      })
+      .catch(() => setError("Could not load dependency health."));
+  }, [apiPath]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timeout);
+  }, [load]);
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-4 text-[12px] text-red-200">
+        {error}
+      </div>
+    );
+  }
+
+  if (!data) return <SkeletonLine width="w-full" height="h-24" />;
+
+  if (data.deliveryModel !== "custom_repo") {
+    return (
+      <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
+        <p className="text-[13px] text-warm-white">Platform template site</p>
+        <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
+          No custom repo dependency checks are needed for this tenant.
+        </p>
+      </div>
+    );
+  }
+
+  const hasDependencies = data.dependencies.length > 0;
+
+  return (
+    <div className="space-y-4">
+      {data.hasBlockingDependency && (
+        <div className="rounded-lg border border-amber-400/25 bg-amber-300/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
+            <div>
+              <p className="text-[13px] font-medium text-amber-50">
+                A custom repo dependency needs attention before the client site depends on it.
+              </p>
+              <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
+                REB is showing this here so paused services are caught before they look like a storefront or AI issue.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!hasDependencies && (
+        <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
+          <p className="text-[13px] text-warm-white">No external dependencies recorded</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
+            Add dependencies to the tenant custom repo metadata as they become operationally important.
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {data.dependencies.map((dependency) => (
+          <div key={dependency.id} className="rounded-lg border border-gray-border bg-surface-raised p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium text-warm-white">{dependency.name}</p>
+                <p className="mt-1 text-[12px] text-gray-muted">{dependency.provider} · {dependency.purpose}</p>
+              </div>
+              <DependencyStatusPill status={dependency.status} />
+            </div>
+            {(dependency.source || dependency.detectedAt) && (
+              <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-gray-faint">
+                {dependency.source || "Recorded dependency"}{dependency.detectedAt ? ` · ${dependency.detectedAt}` : ""}
+              </p>
+            )}
+            {dependency.notes && (
+              <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{dependency.notes}</p>
+            )}
+            {dependency.actionUrl && (
+              <a
+                href={dependency.actionUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
+              >
+                Open dependency
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Billing section
 // ---------------------------------------------------------------------------
 
@@ -1118,8 +1260,8 @@ function BillingSection() {
 
   return (
     <div className="rounded-lg border border-gray-border overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-5">
-        <div>
+      <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-2">
             Current plan
           </div>
@@ -1165,7 +1307,7 @@ function BillingSection() {
             }
           }}
           disabled={openingPortal || isFounderComp}
-          className="text-[12px] text-gray-muted border border-gray-border rounded-md px-4 py-2 hover:bg-surface-raised transition-colors disabled:opacity-60"
+          className="min-h-[38px] w-full rounded-md border border-gray-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-surface-raised disabled:opacity-60 sm:w-auto"
         >
           {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
         </button>
@@ -1282,11 +1424,15 @@ function PublishingSection() {
 const SECTION_META: Record<string, { title: string; description: string }> = {
   profile: {
     title: "Business profile",
-    description: "Core identity and booking details. Brand, hours, and AI rules now live in Ask AI.",
+    description: "Core identity and the primary action visitors should take. Brand, hours, and AI rules now live in Ask AI.",
   },
   "site-config": {
     title: "Site configurability",
     description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
+  },
+  dependencies: {
+    title: "Custom repo dependencies",
+    description: "External services the custom site relies on, with paused or failing services called out before they break the storefront.",
   },
   utilities: {
     title: "Operations utilities",
@@ -1375,7 +1521,7 @@ export default function SettingsPage() {
   const meta = SECTION_META[activeSection];
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-w-0 flex-col md:flex-row">
       {/* Settings nav */}
       <nav className="w-[200px] shrink-0 border-r border-gray-border p-6 pt-8 space-y-1 hidden md:block">
         <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-3 px-3">
@@ -1397,7 +1543,7 @@ export default function SettingsPage() {
       </nav>
 
       {/* Mobile section select */}
-      <div className="md:hidden border-b border-gray-border px-4 py-3">
+      <div className="shrink-0 border-b border-gray-border px-4 py-3 md:hidden">
         <DashSelect
           value={activeSection}
           onChange={(e) => setSection(e.target.value)}
@@ -1409,7 +1555,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
+      <div className="min-w-0 flex-1 overflow-y-auto p-4 pb-28 md:p-8 lg:p-10">
         <div className={activeSection === "ownership" ? "max-w-5xl" : "max-w-2xl"}>
           <div className="mb-8 rounded-2xl border border-glass-border bg-glass p-5">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
@@ -1443,6 +1589,7 @@ export default function SettingsPage() {
             </div>
           )}
           {activeSection === "site-config" && <SiteConfigSection />}
+          {activeSection === "dependencies" && <DependencyHealthSection />}
           {activeSection === "utilities" && <UtilitiesSection />}
           {activeSection === "ownership" && <OwnershipSection />}
           {activeSection === "domains" && <DomainsSection />}

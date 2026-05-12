@@ -66,7 +66,7 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   no_signal: {
     icon: RefreshCw,
-    label: "Not usable yet",
+    label: "Setup needed",
     bg: "bg-gray-bg",
     text: "text-gray-muted",
     dot: "bg-gray-muted",
@@ -141,7 +141,7 @@ export function SourceHealthBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium",
           config.bg,
           config.text,
           className

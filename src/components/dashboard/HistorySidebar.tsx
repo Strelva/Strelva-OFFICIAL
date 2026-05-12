@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   House,
-  Inbox,
   Link2,
   MessageCircle,
   Settings,
@@ -35,7 +34,6 @@ interface HistorySidebarProps {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Today", icon: House },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/review", label: "Needs You", icon: Inbox },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Sources", icon: Link2 },
 ];
@@ -43,11 +41,11 @@ const NAV_ITEMS = [
 const NAV_GROUPS = [
   {
     label: "Manage",
-    items: NAV_ITEMS.slice(0, 3),
+    items: NAV_ITEMS.slice(0, 2),
   },
   {
     label: "Site",
-    items: NAV_ITEMS.slice(3, 5),
+    items: NAV_ITEMS.slice(2, 4),
   },
 ];
 
@@ -55,7 +53,7 @@ export function HistorySidebar({
   ownerName,
   isOpen = true,
   onClose,
-  pendingCount = 0,
+  pendingCount: _pendingCount = 0,
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
@@ -67,6 +65,7 @@ export function HistorySidebar({
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"
       : pathname;
+  const isChatRoute = effectivePathname?.startsWith("/dashboard/chat");
 
   useEffect(() => {
     fetch(dashboardHref("/api/threads"), { credentials: "same-origin" })
@@ -135,12 +134,11 @@ export function HistorySidebar({
               </div>
               <ul className="px-3 pb-5">
                 {group.items.map((item) => {
-                  const isActive = item.href === "/dashboard"
+                  const matchHref = item.href;
+                  const isActive = matchHref === "/dashboard"
                     ? effectivePathname === "/dashboard"
-                    : effectivePathname?.startsWith(item.href);
+                    : effectivePathname?.startsWith(matchHref);
                   const Icon = item.icon;
-                  const showBadge = item.href === "/dashboard/review" && pendingCount > 0;
-
                   return (
                     <li key={item.href} className="py-0.5">
                       <Link
@@ -156,16 +154,11 @@ export function HistorySidebar({
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
-                        {showBadge && (
-                          <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                            {pendingCount > 9 ? "9+" : pendingCount}
-                          </span>
-                        )}
                       </Link>
                     </li>
                   );
                 })}
-                {group.label === "Manage" && (
+                {group.label === "Manage" && isChatRoute && (
                   <li className="mt-2 rounded-lg border border-gray-border bg-surface-raised/45 p-2">
                     <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
                       <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-faint">

@@ -62,7 +62,7 @@ const SURFACE_LABELS: Record<OperationSurface, string> = {
   site: "Site",
   assets: "Assets",
   sources: "Accounts",
-  review: "Needs approval",
+  review: "Needs You",
   newsletter: "Newsletter",
   social: "Social",
 };

@@ -129,7 +129,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               </div>
               <h2 className="text-[14px] font-medium text-warm-black">Stay in control</h2>
               <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
-                When something needs your review, it appears under Needs approval before it goes live.
+                When something needs your review, it opens in Needs You from Ask AI before it goes live.
               </p>
             </div>
           </div>
@@ -212,7 +212,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               icon={TrendingUp}
             />
             <StatCard
-              label="Booking Clicks"
+              label="Customer actions"
               value={brief.stats.bookingClicks}
               delta={brief.stats.bookingClicksDelta ?? 0}
               icon={MousePointerClick}

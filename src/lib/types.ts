@@ -437,6 +437,30 @@ export type CustomRepoRevalidationHealth =
   | "failing"
   | "not_configured";
 
+export type CustomRepoDependencyStatus =
+  | "healthy"
+  | "degraded"
+  | "paused"
+  | "failing"
+  | "unknown";
+
+export type CustomRepoDependencySeverity = "info" | "warning" | "critical";
+
+export interface CustomRepoExternalDependency {
+  id: string;
+  name: string;
+  provider: string;
+  purpose: string;
+  status: CustomRepoDependencyStatus;
+  severity: CustomRepoDependencySeverity;
+  detectedAt?: string;
+  lastCheckedAt?: string;
+  source?: string;
+  actionUrl?: string;
+  owner?: string;
+  notes?: string;
+}
+
 export interface CustomRepoMetadata {
   repoName?: string;
   repoUrl?: string;
@@ -453,6 +477,7 @@ export interface CustomRepoMetadata {
   supportsDraftPreview?: boolean;
   supportsInlineEditing?: boolean;
   customFeatures?: string[];
+  externalDependencies?: CustomRepoExternalDependency[];
   contractVersion?: string;
   revalidationHealth?: CustomRepoRevalidationHealth;
   buildCommand?: string;

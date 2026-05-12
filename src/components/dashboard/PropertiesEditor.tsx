@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Save, Check, RotateCcw, AlertCircle, MessageCircle, Pencil, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
@@ -75,6 +76,7 @@ interface PropertiesEditorProps {
 }
 
 type FieldDef = SimpleFieldDef;
+type ReceiptTarget = { key: string; label: string };
 
 // Walk a dot-path and return the leaf. Returns undefined for any missing branch.
 function getNestedValue(obj: unknown, path: string): unknown {
@@ -112,6 +114,85 @@ function setNestedValue(
   }
   cursor[parts[parts.length - 1]] = value;
   return next;
+}
+
+function valuesMatch(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return Object.is(a, b);
+  }
+}
+
+function toSentenceLabel(value: string): string {
+  const cleaned = value
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .trim();
+  if (!cleaned) return value;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function summarizeReceiptValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "Empty";
+  if (typeof value === "string") {
+    const compact = value.replace(/\s+/g, " ").trim();
+    if (!compact) return "Empty";
+    return compact.length > 92 ? `${compact.slice(0, 89)}...` : compact;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "Empty list";
+    const names = value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const label = record.name || record.label || record.author || record.title || record.value;
+        return typeof label === "string" && label.trim() ? label.trim() : null;
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+    return `${value.length} ${value.length === 1 ? "item" : "items"}${names.length ? `: ${names.join(", ")}` : ""}`;
+  }
+  if (typeof value === "object") return "Updated settings";
+  return String(value);
+}
+
+function buildEditReceipts({
+  section,
+  before,
+  after,
+  targets,
+  status,
+}: {
+  section: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  targets: ReceiptTarget[];
+  status: "draft" | "published";
+}) {
+  const sectionLabel = SECTION_LABELS[section] || toSentenceLabel(section);
+  const fallbackTargets =
+    targets.length > 0
+      ? targets
+      : Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
+          .filter((key) => !key.startsWith("_"))
+          .map((key) => ({ key, label: toSentenceLabel(key) }));
+
+  return fallbackTargets
+    .filter((target) => !valuesMatch(getNestedValue(before, target.key), getNestedValue(after, target.key)))
+    .slice(0, 6)
+    .map((target) => ({
+      section,
+      sectionLabel,
+      field: target.key,
+      fieldLabel: target.label,
+      before: summarizeReceiptValue(getNestedValue(before, target.key)),
+      after: summarizeReceiptValue(getNestedValue(after, target.key)),
+      source: "field_editor" as const,
+      status,
+    }));
 }
 
 // Generic fallback field definitions. Site-model schemas can override these
@@ -184,8 +265,19 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
 // Array sections use the inline editor from ARRAY_CONFIGS
 
 export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
-  const { triggerRefresh, editMode, hasDraft, setHasDraft, siteModel, dashboardHref, selectedNode } = useDashboard();
-  const siteModelSchema = getSiteModelSchema(siteModel);
+  const {
+    triggerRefresh,
+    editMode,
+    hasDraft,
+    setHasDraft,
+    siteModel,
+    dashboardHref,
+    selectedNode,
+    setChatPrompt,
+    addEditReceipts,
+  } = useDashboard();
+  const router = useRouter();
+  const siteModelSchema = useMemo(() => getSiteModelSchema(siteModel), [siteModel]);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -200,6 +292,32 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   }, [activeSection]);
 
   const isComposite = activeSection ? activeSection in COMPOSITE_SECTION_INFO : false;
+  const fields: FieldDef[] | undefined = useMemo(
+    () =>
+      activeSection && !isComposite
+        ? siteModelSchema?.sectionFields[activeSection] ?? SECTION_FIELDS[activeSection]
+        : undefined,
+    [activeSection, isComposite, siteModelSchema],
+  );
+  const siteModelArrays: SectionArrayConfig[] | undefined = useMemo(
+    () =>
+      activeSection && !isComposite
+        ? siteModelSchema?.sectionArrays[activeSection]
+        : undefined,
+    [activeSection, isComposite, siteModelSchema],
+  );
+  const legacyArrayConfig = activeSection && !isComposite ? ARRAY_CONFIGS[activeSection] : undefined;
+  const receiptTargets = useMemo<ReceiptTarget[]>(() => {
+    const arrayTargets = siteModelArrays
+      ? siteModelArrays.map((array) => ({ key: array.arrayKey, label: array.label }))
+      : legacyArrayConfig
+        ? [{ key: legacyArrayConfig.arrayKey, label: legacyArrayConfig.label }]
+        : [];
+    return [
+      ...(fields ?? []).map((field) => ({ key: field.key, label: field.label })),
+      ...arrayTargets,
+    ];
+  }, [fields, legacyArrayConfig, siteModelArrays]);
 
   // Fetch section data when activeSection changes (skip composites)
   useEffect(() => {
@@ -238,6 +356,15 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     setSaving(true);
     setSaveError(false);
     const isDraft = editMode === "draft";
+    const receipts = original
+      ? buildEditReceipts({
+          section: activeSection,
+          before: original,
+          after: data,
+          targets: receiptTargets,
+          status: isDraft ? "draft" : "published",
+        })
+      : [];
     try {
       const url = isDraft
         ? dashboardHref(`/api/content/${activeSection}?draft=true`)
@@ -249,6 +376,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         body: JSON.stringify(data),
       });
       if (res.ok) {
+        addEditReceipts(receipts);
         if (isDraft) {
           setHasDraft((prev) => ({ ...prev, [activeSection]: true }));
           setOriginal(data);
@@ -276,12 +404,20 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     } finally {
       setSaving(false);
     }
-  }, [activeSection, dashboardHref, data, editMode, triggerRefresh, setHasDraft]);
+  }, [activeSection, addEditReceipts, dashboardHref, data, editMode, original, receiptTargets, triggerRefresh, setHasDraft]);
 
   const handleReset = useCallback(() => {
     setData(original);
     setSaved(false);
   }, [original]);
+
+  const openAskAIForSection = useCallback((section: string, label: string, fieldLabel?: string) => {
+    const target = fieldLabel ? `${fieldLabel} in the ${label}` : label;
+    setChatPrompt(
+      `Update the ${target} section of my site. Keep the current business facts, make it more specific, and save it as a draft before anything goes live.`
+    );
+    router.push(dashboardHref("/dashboard/chat"));
+  }, [dashboardHref, router, setChatPrompt]);
 
   const hasChanges = data && original && JSON.stringify(data) !== JSON.stringify(original);
 
@@ -328,7 +464,20 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
             <MessageCircle className="w-[18px] h-[18px] text-sage" strokeWidth={1.5} />
           </div>
           <p className="text-[12px] text-gray-fg mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
-          <p className="text-[11px] text-gray-muted mb-4">Use AI Chat to make changes</p>
+          <p className="text-[11px] text-gray-muted mb-4">Ask AI to make changes</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<MessageCircle className="w-3 h-3" strokeWidth={1.5} />}
+            onClick={() => {
+              setChatPrompt(
+                `${info.chatPrompt}. Keep the current business facts and save the change as a draft before anything goes live.`
+              );
+              router.push(dashboardHref("/dashboard/chat"));
+            }}
+          >
+            Ask AI
+          </Button>
         </div>
       </div>
     );
@@ -342,16 +491,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     );
   }
 
-  // Resolve fields: site-model-specific → generic fallback
-  const fields: FieldDef[] | undefined =
-    siteModelSchema?.sectionFields[activeSection] ?? SECTION_FIELDS[activeSection];
-
-  // Resolve array editors: prefer the site model's declared arrays (may be multiple),
-  // fall back to the generic single ARRAY_CONFIGS entry.
-  const siteModelArrays: SectionArrayConfig[] | undefined =
-    siteModelSchema?.sectionArrays[activeSection];
-  const legacyArrayConfig = ARRAY_CONFIGS[activeSection];
-
   return (
     <div className="flex flex-col h-full bg-surface">
       {/* Section header */}
@@ -362,7 +501,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               {SECTION_LABELS[activeSection] || activeSection}
             </h3>
             <p className="mt-0.5 truncate text-[10px] text-gray-faint">
-              Click text in the preview or update fields here. Save draft, then Push when ready.
+              Click text in the preview or update fields here. Save draft, review, then publish live.
             </p>
           </div>
           <div className="flex items-center gap-1 rounded border border-gray-border bg-gray-bg-alt p-0.5">
@@ -416,7 +555,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.05] shrink-0 animate-fade-in-up">
           <div>
             <p className="text-[11px] font-medium text-amber-300">Unsaved draft changes</p>
-            <p className="text-[10px] text-gray-faint">Save this section before using the bottom Push button.</p>
+            <p className="text-[10px] text-gray-faint">Save this section to update the draft preview.</p>
           </div>
           <div className="flex items-center gap-1.5">
             <Button
@@ -445,7 +584,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
           <div>
             <p className="text-[11px] font-medium text-amber-300">Draft saved</p>
-            <p className="text-[10px] text-gray-faint">Review the preview, then use the bottom Push button to publish.</p>
+            <p className="text-[10px] text-gray-faint">Review the preview, then publish live from the bottom bar.</p>
           </div>
         </div>
       )}
@@ -454,7 +593,9 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {saved && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
           <Check className="w-4 h-4 text-emerald-500 animate-check-bounce" strokeWidth={2} />
-          <span className="text-[12px] font-medium text-emerald-400">Done — your site is updated</span>
+          <span className="text-[12px] font-medium text-emerald-400">
+            {editMode === "draft" ? "Draft saved - preview updated" : "Published live - site updated"}
+          </span>
         </div>
       )}
 
@@ -481,12 +622,30 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         </div>
         {selectedNode?.section === activeSection && selectedNode.field && (
           <div className="mx-4 mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2">
-            <p className="text-[11px] font-medium text-accent">
-              Selected {selectedNode.nodeType === "image" ? "image" : selectedNode.nodeType === "link" ? "link" : "field"}
-            </p>
-            <p className="mt-0.5 break-all text-[11px] text-gray-muted">
-              {selectedNode.label || selectedNode.field}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-accent">
+                  Selected {selectedNode.nodeType === "image" ? "image" : selectedNode.nodeType === "link" ? "link" : "field"}
+                </p>
+                <p className="mt-0.5 break-all text-[11px] text-gray-muted">
+                  {selectedNode.label || selectedNode.field}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<MessageCircle className="w-3 h-3" strokeWidth={1.5} />}
+                onClick={() =>
+                  openAskAIForSection(
+                    activeSection,
+                    SECTION_LABELS[activeSection] || toSentenceLabel(activeSection),
+                    selectedNode.label || toSentenceLabel(selectedNode.field || "selected field"),
+                  )
+                }
+              >
+                Ask AI
+              </Button>
+            </div>
           </div>
         )}
 

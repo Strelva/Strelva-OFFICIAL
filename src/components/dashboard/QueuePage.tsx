@@ -23,9 +23,10 @@ interface QueuePageProps {
   initialResolved: UnifiedEvent[];
   pendingCount: number;
   staleSectionCount?: number;
+  compact?: boolean;
 }
 
-export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0 }: QueuePageProps) {
+export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0, compact = false }: QueuePageProps) {
   const dashboard = useDashboardOptional();
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [tab, setTab] = useState<"pending" | "resolved">("pending");
@@ -111,19 +112,19 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   return (
     <div className="flex flex-col h-full animate-route-enter">
       {/* Header */}
-      <header className="shrink-0 px-4 sm:px-8 pt-5 sm:pt-7 pb-5 border-b border-glass-border">
+      <header className={`shrink-0 border-b border-glass-border ${compact ? "px-4 py-4" : "px-4 pb-5 pt-5 sm:px-8 sm:pt-7"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
               AI control center
             </p>
-            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+            <h1 className={`${compact ? "text-[22px]" : "text-[24px] sm:text-[30px]"} font-semibold text-warm-black tracking-[-0.02em]`}>
               Needs You
             </h1>
             <p className="text-[13px] text-gray-muted mt-2">
               {pendingCount > 0
                 ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for your okay before going live`
-                : "Nothing needs you right now. When a draft, reply, or larger change needs approval, it appears here first."}
+                : "Nothing needs you right now. Drafts, replies, and larger changes appear here before they go live."}
             </p>
           </div>
           {staleSectionCount > 0 && (
@@ -135,7 +136,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       </header>
 
       {/* Tabs - min-h ensures 44px tap targets */}
-      <div className="shrink-0 px-4 sm:px-8 pt-4">
+      <div className={`shrink-0 pt-4 ${compact ? "px-4" : "px-4 sm:px-8"}`}>
         <div className="flex gap-1 p-1 bg-surface-inset border border-glass-border rounded-xl w-fit">
           <button
             onClick={() => setTab("pending")}
@@ -166,8 +167,8 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       </div>
 
       {/* Content with crossfade */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5">
-        <div className="queue-tab-content max-w-3xl">
+      <div className={`flex-1 overflow-y-auto py-5 ${compact ? "px-4" : "px-4 sm:px-8"}`}>
+        <div className={`queue-tab-content ${compact ? "max-w-none" : "max-w-3xl"}`}>
           {tab === "resolved" && aiHandledThisMonth > 0 && (
             <p className="text-[13px] text-gray-muted mb-3">
               The AI handled {aiHandledThisMonth} item{aiHandledThisMonth === 1 ? "" : "s"} this month.

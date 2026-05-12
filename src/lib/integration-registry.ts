@@ -90,7 +90,7 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     providerId: "website-activity",
     shortDescription: "Visitor and click signals from the site",
     description:
-      "Website activity gives the AI a plain-English view of what visitors do: page visits, booking clicks, and which offers get attention. It powers reports and helps the AI suggest site updates based on actual behavior instead of guesses.",
+      "Website activity gives the AI a plain-English view of what visitors do: page visits, customer actions, and which offers get attention. It powers reports and helps the AI suggest site updates based on actual behavior instead of guesses.",
     icon: "WA",
     iconBg: "bg-accent-dim",
     iconColor: "text-accent",
@@ -100,11 +100,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     addsIntelligence: "What visitors do on the site and which calls-to-action they click.",
     aiCanUseThisTo: [
       "explain which pages and offers are getting attention",
-      "suggest clearer calls-to-action when booking clicks are low",
+      "suggest clearer calls-to-action when customer actions are low",
       "turn weekly traffic changes into plain-English next steps",
     ],
     exampleInsight:
-      "Booking clicks dropped this week even though visits stayed steady. Want me to test a clearer booking CTA on the homepage?",
+      "Customer actions dropped this week even though visits stayed steady. Want me to test a clearer product CTA on the homepage?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Website Activity What are visitors doing on my site that I should act on?",
     builtIn: true,
@@ -169,35 +169,35 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
   },
   {
     id: "booking-clicks",
-    displayName: "Booking Clicks",
-    providerId: "booking-clicks",
-    shortDescription: "Which offers turn visitors into booking intent",
+    displayName: "Customer Actions",
+    providerId: "customer-actions",
+    shortDescription: "Which pages and buttons create customer intent",
     description:
-      "Booking clicks show which parts of the website create intent. The AI uses this with site activity to suggest clearer CTAs, stronger offer copy, and weekly report summaries.",
-    icon: "BK",
+      "Customer actions show which parts of the website create intent. The AI uses this with site activity to suggest clearer CTAs, stronger product copy, and weekly report summaries.",
+    icon: "CA",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
     syncFrequency: "Live dashboard events",
     usedIn: "Reports, AI suggestions, chat",
     intelligenceCategory: "understands_demand",
-    addsIntelligence: "Which offers, pages, and buttons create booking intent.",
+    addsIntelligence: "Which offers, pages, and buttons create customer intent.",
     aiCanUseThisTo: [
       "explain whether visitors are taking the next step",
-      "suggest CTA copy when booking clicks are weak",
-      "compare service interest against site traffic",
+      "suggest CTA copy when customer actions are weak",
+      "compare product interest against site traffic",
     ],
     exampleInsight:
-      "People view the services page but rarely click Book Now. Want me to suggest a stronger CTA for that section?",
+      "People view a product page but rarely take the next step. Want me to suggest a clearer CTA for that section?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
-    sourcePrompt: "@Booking Clicks Which calls-to-action should I improve?",
+    sourcePrompt: "@Customer Actions Which calls-to-action should I improve?",
     builtIn: true,
     usesSignalInAi: true,
     usageExamples: [
       {
-        title: "Improve booking clicks",
-        prompt: "@Booking Clicks Which calls-to-action should I improve?",
+        title: "Improve customer actions",
+        prompt: "@Customer Actions Which calls-to-action should I improve?",
         response:
-          "Your services page gets attention but fewer booking clicks. I can suggest a clearer button label and stronger proof nearby.",
+          "Your product pages get attention but fewer customer actions. I can suggest a clearer button label and stronger proof nearby.",
       },
     ],
   },
@@ -301,7 +301,7 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
         title: "Queue a site update",
         prompt: "@Website What should I update next?",
         response:
-          "I can queue a homepage CTA update based on this week's booking-click pattern for approval.",
+          "I can queue a homepage CTA update based on this week's customer-action pattern for approval.",
       },
     ],
   },
@@ -342,37 +342,37 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
   },
   {
     id: "booking-cta",
-    displayName: "Booking CTA",
-    providerId: "booking-cta",
-    shortDescription: "The site action path for booking intent",
+    displayName: "Primary CTA",
+    providerId: "primary-cta",
+    shortDescription: "The site action path for customer intent",
     description:
-      "Booking CTA is the approval-gated place the AI can improve booking language and links on the website. It does not manage calendar availability; it helps the site send visitors to the right next step.",
+      "Primary CTA is the approval-gated place the AI can improve action language and links on the website. It does not invent a sales workflow; it helps the site send visitors to the right next step.",
     icon: "CTA",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
     syncFrequency: "On approved changes",
     usedIn: "Site updates, chat, reports",
     intelligenceCategory: "can_take_action",
-    addsIntelligence: "Where the site asks visitors to book, call, or take the next step.",
+    addsIntelligence: "Where the site asks visitors to shop, contact, subscribe, or take the next step.",
     aiCanUseThisTo: [
-      "draft clearer booking button copy",
+      "draft clearer action button copy",
       "align CTA language with the current offer",
-      "queue booking-section updates for approval",
+      "queue CTA updates for approval",
     ],
     exampleInsight:
-      "Your site says Contact Us, but visitors are trying to book. Want me to queue a clearer Book a Consultation CTA?",
-    actionPaths: ["Draft booking CTA update", "Queue site change for review"],
+      "Your product pages bury the next step. Want me to queue a clearer shop or contact CTA?",
+    actionPaths: ["Draft CTA update", "Queue site change for review"],
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
-    sourcePrompt: "@Booking CTA Is my booking path clear enough?",
+    sourcePrompt: "@Primary CTA Is my site action path clear enough?",
     builtIn: true,
     usesSignalInAi: true,
     canActWhenConnected: true,
     usageExamples: [
       {
-        title: "Improve booking CTA",
-        prompt: "@Booking CTA Is my booking path clear enough?",
+        title: "Improve primary CTA",
+        prompt: "@Primary CTA Is my site action path clear enough?",
         response:
-          "The next step could be clearer. I can queue a booking CTA update for approval.",
+          "The next step could be clearer. I can queue a CTA update for approval.",
       },
     ],
   },
@@ -696,6 +696,10 @@ export function normalizeIntegrationStatus(
 
   if (definition.availability === "coming_soon") {
     return "coming_soon";
+  }
+
+  if (definition.builtIn) {
+    return "connected";
   }
 
   if (definition.connectionProvider) {

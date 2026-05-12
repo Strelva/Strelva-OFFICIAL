@@ -197,7 +197,9 @@ function isPreviewRequest(req: NextRequest): boolean {
 
 function isLivePreviewRequest(req: NextRequest): boolean {
   const pathname = req.nextUrl.pathname;
-  return pathname === "/api/live-preview" || /^\/client\/[a-z0-9-]+\/api\/live-preview$/.test(pathname);
+  return pathname === "/api/live-preview" ||
+    pathname === "/api/edit-preview" ||
+    /^\/client\/[a-z0-9-]+\/api\/(live-preview|edit-preview)$/.test(pathname);
 }
 
 function getPreviewFrameAncestors(host: string, protocol: string): string[] {

@@ -1,11 +1,32 @@
 {
   "app": "reb",
-  "version": "reb-v2026.05.02.1",
+  "version": "reb-v2026.05.12.1",
   "compatibleGldf": {
     "tag": "gldf-v2026.05.02.1",
-    "commit": "e8059e0236c7e0344ba60c3b05fa8cf2f8b2e20b"
+    "commit": "fd088c507bcdaec82257c34ddff1b1f94c72fd34"
+  },
+  "compatibleRohlax": {
+    "tag": "rohlax-v2026.05.12.1",
+    "commit": "daece71b1c0476be355772744a4b39bcb1cd8944"
   },
   "contractVersion": "v1",
+  "customRepoWorkspace": {
+    "root": "..",
+    "repos": [
+      {
+        "tenant": "gldf",
+        "localPath": "../gldf",
+        "capabilityManifestPath": "/api/reb-capabilities",
+        "revalidatePath": "/api/v1/revalidate"
+      },
+      {
+        "tenant": "rohlax",
+        "localPath": "../rohlax-wellness",
+        "capabilityManifestPath": "/api/reb-capabilities",
+        "revalidatePath": "/api/v1/revalidate"
+      }
+    ]
+  },
   "requiredEnv": [
     "REVALIDATE_SECRET",
     "SENTRY_DSN",

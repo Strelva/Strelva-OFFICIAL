@@ -13,9 +13,9 @@ describe("owner journey copy and links", () => {
 
     expect(desktopNav).toContain("Today");
     expect(desktopNav).toContain("Ask AI");
-    expect(desktopNav).toContain("Needs You");
     expect(desktopNav).toContain("Site");
     expect(desktopNav).toContain("Sources");
+    expect(desktopNav).not.toContain('label: "Needs You"');
     expect(desktopNav).not.toContain("Approvals");
     expect(desktopNav).not.toContain("Connections");
     expect(desktopNav).not.toContain("Ownership");
@@ -23,8 +23,8 @@ describe("owner journey copy and links", () => {
 
     expect(mobileNav).toContain("Today");
     expect(mobileNav).toContain("Ask AI");
-    expect(mobileNav).toContain("Needs You");
     expect(mobileNav).toContain("Sources");
+    expect(mobileNav).not.toContain('label: "Needs You"');
     expect(mobileNav).not.toContain("Approvals");
     expect(mobileNav).not.toContain("Connections");
     expect(mobileNav).not.toContain("Ownership");
@@ -36,7 +36,7 @@ describe("owner journey copy and links", () => {
 
     expect(dashboardPage).toContain("See what is working. Change what is next.");
     expect(dashboardPage).toContain("People found you");
-    expect(dashboardPage).toContain("Booking clicks");
+    expect(dashboardPage).toContain("Customer actions");
     expect(dashboardPage).toContain("Needs you");
     expect(dashboardPage).toContain("Edit site");
     expect(dashboardPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat"))');
@@ -59,13 +59,21 @@ describe("owner journey copy and links", () => {
     const workspace = readRepoFile("src/components/dashboard/ContentWorkspace.tsx");
     const preview = readRepoFile("src/components/dashboard/SitePreview.tsx");
     const properties = readRepoFile("src/components/dashboard/PropertiesEditor.tsx");
+    const publishBar = readRepoFile("src/components/dashboard/design/PublishBar.tsx");
 
     expect(workspace).toContain('label: "Content"');
     expect(workspace).toContain('label: "Layout"');
+    expect(workspace).toContain("Ready to publish");
+    expect(workspace).toContain("markDraftReceipts");
     expect(workspace).not.toContain('label: "AI Chat"');
-    expect(preview).toContain('useState<PreviewSource>("live")');
+    expect(preview).toContain('useState<PreviewSource>("editable")');
     expect(preview).toContain("Site editor");
+    expect(preview).toContain("buildAskAIPrompt");
+    expect(preview).toContain("addEditReceipts");
     expect(properties).toContain("Click text in the preview");
+    expect(properties).toContain("Draft saved - preview updated");
+    expect(publishBar).toContain("Publish live");
+    expect(publishBar).toContain("Published live");
   });
 
   it("keeps Sources honest about setup and availability", () => {
@@ -73,13 +81,13 @@ describe("owner journey copy and links", () => {
     const detail = readRepoFile("src/components/dashboard/ConnectionDetailPage.tsx");
     const badges = readRepoFile("src/components/dashboard/SourceHealthBadge.tsx");
 
-    expect(sources).toContain("What the AI can really use");
-    expect(sources).toContain("Built-in site signals work now");
+    expect(sources).toContain("What the AI should trust");
+    expect(sources).toContain("A short source map");
     expect(sources).toContain("OAuth ready");
     expect(sources).toContain("Manual Search Console setup");
     expect(sources).not.toContain("Sources the AI can actually use");
     expect(detail).toContain("not OAuth");
-    expect(badges).toContain("Not usable yet");
+    expect(badges).toContain("Setup needed");
   });
 
   it("keeps AI result feedback actionable", () => {
@@ -87,7 +95,7 @@ describe("owner journey copy and links", () => {
     const agentResults = readRepoFile("src/lib/agent-results.ts");
 
     expect(chatPanel).toContain("View site");
-    expect(chatPanel).toContain("Open needs approval");
+    expect(chatPanel).toContain("Open Needs You");
     expect(agentResults).toContain("The live site has the change");
     expect(chatPanel).not.toContain("Queued for review");
   });

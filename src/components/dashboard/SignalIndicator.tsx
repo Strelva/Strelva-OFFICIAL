@@ -30,7 +30,7 @@ const SECTION_INSIGHTS: Record<string, (signals: SectionSignals) => string> = {
       ? `"${s.topService}" is your most clicked service`
       : s.clicks
       ? `Services section got ${s.clicks} click${s.clicks === 1 ? "" : "s"}`
-      : "Add booking links to track clicks",
+      : "Add action links to track clicks",
   testimonials: () => "Testimonials build trust - customers spend time here",
   story: (s) =>
     s.views
