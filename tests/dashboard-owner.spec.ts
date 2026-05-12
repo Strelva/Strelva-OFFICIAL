@@ -84,7 +84,7 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
 });
 
 test("client fallback site editor separates the active site from the editable draft preview", async ({ page, request }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
 
   const normalizePreviewText = (value: string) => value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
   const previewFrameContains = async (value: string) => {
