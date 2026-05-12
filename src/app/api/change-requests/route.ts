@@ -11,6 +11,20 @@ import {
   getTriageDueAt,
 } from "@/lib/custom-repos";
 
+const REQUEST_KINDS = new Set(["custom_design", "template", "infrastructure"]);
+
+function getRequestKind(value: unknown): "custom_design" | "template" | "infrastructure" {
+  return typeof value === "string" && REQUEST_KINDS.has(value)
+    ? value as "custom_design" | "template" | "infrastructure"
+    : "custom_design";
+}
+
+function getTitlePrefix(requestKind: "custom_design" | "template" | "infrastructure") {
+  if (requestKind === "template") return "Requested template change";
+  if (requestKind === "infrastructure") return "Requested infrastructure change";
+  return "Requested custom change";
+}
+
 export async function POST(request: Request) {
   const authed = await verifyAuth();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,6 +53,7 @@ export async function POST(request: Request) {
     const page = typeof body.page === "string" ? body.page : undefined;
     const label = typeof body.label === "string" ? body.label : undefined;
     const nodeType = typeof body.nodeType === "string" ? body.nodeType : undefined;
+    const requestKind = getRequestKind(body.requestKind);
     const rect = body.rect && typeof body.rect === "object" && !Array.isArray(body.rect)
       ? body.rect
       : undefined;
@@ -51,7 +66,7 @@ export async function POST(request: Request) {
       tenantId: tenant,
       source: "website",
       type: "change_request",
-      title: label ? `Requested custom change: ${label}` : "Requested custom site change",
+      title: label ? `${getTitlePrefix(requestKind)}: ${label}` : `${getTitlePrefix(requestKind)} for site`,
       body: prompt,
       status: "pending",
       metadata: {
@@ -62,6 +77,7 @@ export async function POST(request: Request) {
         nodeType,
         rect,
         kind: "custom_code_or_design_request",
+        requestKind,
         workflowStatus: "requested",
         requestedAt: requestedAt.toISOString(),
         triageDueAt: getTriageDueAt(requestedAt),

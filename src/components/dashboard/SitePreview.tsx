@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Minimize2, Monitor, Pencil, RefreshCw, Smartphone, Tablet, Wand2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 import type { EditableNode, EditableNodeType } from "@/lib/editor-types";
+import { getEditablePathValue, setEditablePathValue } from "@/lib/editable-path";
 
 type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
 type PreviewStatus = "loading" | "ready" | "error";
@@ -47,76 +47,6 @@ interface ContextMenu {
   y: number;
 }
 
-function parsePathPart(part: string): { key: string; index?: string } {
-  const match = part.match(/^([^\[]+)(?:\[([^\]]+)\])?$/);
-  if (!match) return { key: part };
-  return { key: match[1], index: match[2] };
-}
-
-function resolveArrayIndex(array: unknown[], index: string | undefined): number {
-  if (!index) return -1;
-  if (index === "featured") {
-    const found = array.findIndex(
-      (item) => item && typeof item === "object" && (item as Record<string, unknown>).featured === true
-    );
-    return found >= 0 ? found : 0;
-  }
-  const parsed = Number(index);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-function setEditableValue(
-  source: Record<string, unknown>,
-  path: string,
-  value: string
-): Record<string, unknown> {
-  const parts = path.split(".").filter(Boolean);
-  if (parts.length === 0) return source;
-
-  function apply(current: unknown, index: number): unknown {
-    const { key, index: arrayIndex } = parsePathPart(parts[index]);
-    const isLast = index === parts.length - 1;
-    const nextObject =
-      current && typeof current === "object" && !Array.isArray(current)
-        ? { ...(current as Record<string, unknown>) }
-        : {};
-
-    if (arrayIndex !== undefined) {
-      const existing = nextObject[key];
-      const array = Array.isArray(existing) ? [...existing] : [];
-      const itemIndex = resolveArrayIndex(array, arrayIndex);
-      array[itemIndex] = isLast
-        ? value
-        : apply(array[itemIndex] ?? {}, index + 1);
-      nextObject[key] = array;
-      return nextObject;
-    }
-
-    nextObject[key] = isLast ? value : apply(nextObject[key] ?? {}, index + 1);
-    return nextObject;
-  }
-
-  return apply(source, 0) as Record<string, unknown>;
-}
-
-function getEditableValue(source: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".").filter(Boolean);
-  let current: unknown = source;
-  for (const part of parts) {
-    if (!current || typeof current !== "object") return undefined;
-    const { key, index } = parsePathPart(part);
-    const record = current as Record<string, unknown>;
-    const value = record[key];
-    if (index !== undefined) {
-      if (!Array.isArray(value)) return undefined;
-      current = value[resolveArrayIndex(value, index)];
-    } else {
-      current = value;
-    }
-  }
-  return current;
-}
-
 function labelFromEditablePath(path: string): string {
   const parts = path.split(".").filter(Boolean);
   const last = parts[parts.length - 1] || path;
@@ -140,7 +70,14 @@ function summarizeEditableValue(value: unknown): string {
   return "Updated content";
 }
 
+function normalizeInlineText(value: string): string {
+  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function editableValuesMatch(a: unknown, b: unknown): boolean {
+  if (typeof a === "string" && typeof b === "string") {
+    return a === b || normalizeInlineText(a) === normalizeInlineText(b);
+  }
   try {
     return JSON.stringify(a) === JSON.stringify(b);
   } catch {
@@ -173,7 +110,6 @@ function toEditableNode(data: Record<string, unknown>): EditableNode | null {
 }
 
 export function SitePreview() {
-  const router = useRouter();
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
     BREAKPOINTS[2]
   );
@@ -250,6 +186,7 @@ export function SitePreview() {
   if (editMode === "draft") {
     editableParams.set("edit", "true");
   }
+  editableParams.set("refresh", String(refreshKey));
   const base = previewUrl || siteUrl || "";
   const directEditableIframeSrc = `${base}${pagePath}?${editableParams.toString()}`;
   const livePreviewParams = new URLSearchParams({
@@ -353,8 +290,9 @@ export function SitePreview() {
       const res = await fetch(contentUrl, { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
-      const beforeValue = getEditableValue(data, field);
-      const nextData = setEditableValue(data, field, value);
+      const beforeValue = getEditablePathValue(data, field);
+      if (editableValuesMatch(beforeValue, value)) return;
+      const nextData = setEditablePathValue(data, field, value);
       const saveRes = await fetch(contentUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -362,18 +300,16 @@ export function SitePreview() {
         body: JSON.stringify(nextData),
       });
       if (saveRes.ok) {
-        if (!editableValuesMatch(beforeValue, value)) {
-          addEditReceipts([{
-            section,
-            sectionLabel: SECTION_LABELS[section] || labelFromEditablePath(section),
-            field,
-            fieldLabel: labelFromEditablePath(field),
-            before: summarizeEditableValue(beforeValue),
-            after: summarizeEditableValue(value),
-            source: "inline_canvas",
-            status: isDraft ? "draft" : "published",
-          }]);
-        }
+        addEditReceipts([{
+          section,
+          sectionLabel: SECTION_LABELS[section] || labelFromEditablePath(section),
+          field,
+          fieldLabel: labelFromEditablePath(field),
+          before: summarizeEditableValue(beforeValue),
+          after: summarizeEditableValue(value),
+          source: "inline_canvas",
+          status: isDraft ? "draft" : "published",
+        }]);
         if (isDraft) {
           setHasDraft((prev) => ({ ...prev, [section]: true }));
         }
@@ -471,9 +407,8 @@ export function SitePreview() {
     if (!contextMenu) return;
     const label = contextMenu.label;
     setChatPrompt(buildAskAIPrompt(label));
-    router.push(dashboardHref("/dashboard/chat"));
     setContextMenu(null);
-  }, [contextMenu, dashboardHref, router, setChatPrompt]);
+  }, [contextMenu, setChatPrompt]);
 
   const handleViewSection = useCallback(() => {
     if (!contextMenu) return;
@@ -506,8 +441,7 @@ export function SitePreview() {
         : undefined;
     setChatPrompt(buildAskAIPrompt(label, fieldLabel));
     setRightTab("chat");
-    router.push(dashboardHref("/dashboard/chat"));
-  }, [activeSection, activeSectionLabel, dashboardHref, router, selectedNode, setChatPrompt, setRightTab]);
+  }, [activeSection, activeSectionLabel, selectedNode, setChatPrompt, setRightTab]);
 
   return (
     <div

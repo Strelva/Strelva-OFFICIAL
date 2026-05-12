@@ -1,12 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Send } from "lucide-react";
+import { Check, LayoutTemplate, Palette, Send, Wrench } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+
+type RequestKind = "custom_design" | "template" | "infrastructure";
+
+const REQUEST_KIND_OPTIONS: Array<{
+  value: RequestKind;
+  label: string;
+  icon: typeof Palette;
+}> = [
+  { value: "custom_design", label: "Design", icon: Palette },
+  { value: "template", label: "Template", icon: LayoutTemplate },
+  { value: "infrastructure", label: "Infra", icon: Wrench },
+];
 
 export function CustomChangeRequestPanel() {
   const { selectedNode, activeSection, activePage, dashboardHref } = useDashboard();
   const [prompt, setPrompt] = useState("");
+  const [requestKind, setRequestKind] = useState<RequestKind>("custom_design");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(false);
@@ -25,6 +38,7 @@ export function CustomChangeRequestPanel() {
         credentials: "same-origin",
         body: JSON.stringify({
           prompt,
+          requestKind,
           page: activePage,
           section,
           field: selectedNode?.field,
@@ -69,6 +83,29 @@ export function CustomChangeRequestPanel() {
               {selectedNode.field}
             </p>
           )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-1">
+          {REQUEST_KIND_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const active = requestKind === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setRequestKind(option.value)}
+                aria-pressed={active}
+                className={`flex h-8 items-center justify-center gap-1 rounded-md border text-[11px] font-medium transition-colors ${
+                  active
+                    ? "border-accent/40 bg-accent/15 text-accent"
+                    : "border-gray-border text-gray-muted hover:text-warm-white"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {option.label}
+              </button>
+            );
+          })}
         </div>
 
         <label className="mt-4 block text-[11px] text-gray-muted">

@@ -82,3 +82,53 @@ test("site editor saves a draft into the admin preview and can discard it", asyn
     })
     .toBe(false);
 });
+
+test("client fallback site editor publishes drafts into the visible live preview", async ({ page, request }) => {
+  test.setTimeout(60_000);
+
+  const normalizePreviewText = (value: string) => value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  const previewFrameContains = async (value: string) => {
+    const needle = normalizePreviewText(value);
+    const frames = page.frames().filter((frame) =>
+      frame.parentFrame() && frame.url().includes("preview=true")
+    );
+    for (const frame of frames) {
+      const text = await frame.locator("body").innerText({ timeout: 500 }).catch(() => "");
+      if (normalizePreviewText(text).includes(needle)) return true;
+    }
+    return false;
+  };
+
+  await page.goto("/client/gldf/dashboard/site");
+  await request.delete("/client/gldf/api/publish");
+
+  const originalRes = await request.get("/client/gldf/api/content/hero");
+  const original = await originalRes.json();
+  const testValue = `Published GLDF QA ${Date.now()}`;
+
+  try {
+    await page.reload({ waitUntil: "networkidle" });
+    const headline = page.getByLabel("Headline").first();
+    await expect(headline).toBeVisible();
+    await expect.poll(() => previewFrameContains(original.headline)).toBe(true);
+
+    await headline.fill(testValue);
+    await page.getByRole("button", { name: /Save Draft|Save/i }).click();
+    await expect(page.getByText("Ready to publish")).toBeVisible();
+    await expect.poll(() => previewFrameContains(testValue)).toBe(true);
+
+    await page.getByRole("button", { name: "Publish live" }).click();
+    await expect
+      .poll(async () =>
+        page.evaluate(async () => {
+          const res = await fetch("/client/gldf/api/content/hero", { credentials: "same-origin" });
+          return (await res.json()).headline;
+        })
+      )
+      .toBe(testValue);
+    await expect.poll(() => previewFrameContains(testValue)).toBe(true);
+  } finally {
+    await request.put("/client/gldf/api/content/hero", { data: original });
+    await request.delete("/client/gldf/api/publish");
+  }
+});

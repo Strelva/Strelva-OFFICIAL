@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Save, Check, RotateCcw, AlertCircle, MessageCircle, Pencil, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
@@ -276,7 +275,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     setChatPrompt,
     addEditReceipts,
   } = useDashboard();
-  const router = useRouter();
   const siteModelSchema = useMemo(() => getSiteModelSchema(siteModel), [siteModel]);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
@@ -416,8 +414,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     setChatPrompt(
       `Update the ${target} section of my site. Keep the current business facts, make it more specific, and save it as a draft before anything goes live.`
     );
-    router.push(dashboardHref("/dashboard/chat"));
-  }, [dashboardHref, router, setChatPrompt]);
+  }, [setChatPrompt]);
 
   const hasChanges = data && original && JSON.stringify(data) !== JSON.stringify(original);
 
@@ -473,7 +470,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               setChatPrompt(
                 `${info.chatPrompt}. Keep the current business facts and save the change as a draft before anything goes live.`
               );
-              router.push(dashboardHref("/dashboard/chat"));
             }}
           >
             Ask AI

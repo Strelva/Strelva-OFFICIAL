@@ -200,6 +200,7 @@ describe("site editor publish routes", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt: "Change the hero animation",
+        requestKind: "template",
         page: "home",
         section: "hero",
         field: "headline",
@@ -218,6 +219,10 @@ describe("site editor publish routes", () => {
         type: "change_request",
         status: "pending",
         body: "Change the hero animation",
+        title: "Requested template change: Hero headline",
+        metadata: expect.objectContaining({
+          requestKind: "template",
+        }),
       })
     );
   });

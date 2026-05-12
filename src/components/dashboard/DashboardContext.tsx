@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import type { EditableNode } from "@/lib/editor-types";
 
 type Panel = "content" | "preview" | "chat";
-type RightTab = "properties" | "layout" | "chat";
+type RightTab = "properties" | "chat" | "layout" | "request";
 type EditMode = "live" | "draft";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 type PlanOverride = "founder_comp" | null;

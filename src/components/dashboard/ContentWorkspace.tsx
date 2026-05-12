@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FileText, LayoutList, PanelRightOpen, SlidersHorizontal } from "lucide-react";
+import { CheckCircle2, FileText, GitBranch, LayoutList, MessageCircle, PanelRightOpen, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
 import type { EditReceipt } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { LayoutPanel } from "./LayoutPanel";
+import { ChatPanel } from "./ChatPanel";
+import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
 import { PublishBar } from "./design/PublishBar";
 import type { SectionData } from "./ContentBrowser";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
@@ -35,6 +37,7 @@ function shorten(value: string, max = 58): string {
 
 export function ContentWorkspace({
   siteName,
+  ownerName,
   sectionData,
   timestamps,
 }: ContentWorkspaceProps) {
@@ -126,15 +129,17 @@ export function ContentWorkspace({
   const rightPanelContent = (
     <>
       <div className="border-b border-gray-border bg-surface p-2 shrink-0">
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {[
             { value: "properties", label: "Content", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "chat", label: "AI", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
             { value: "layout", label: "Layout", icon: <LayoutList className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "request", label: "Request", icon: <GitBranch className="h-3.5 w-3.5" strokeWidth={1.5} /> },
           ].map((item) => (
             <button
               key={item.value}
               type="button"
-              onClick={() => setRightTab(item.value as "properties" | "layout" | "chat")}
+              onClick={() => setRightTab(item.value as "properties" | "chat" | "layout" | "request")}
               className={`flex h-8 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium transition-colors ${
                 rightTab === item.value
                   ? "bg-surface-raised text-warm-white shadow-sm"
@@ -156,8 +161,12 @@ export function ContentWorkspace({
       <div className="flex min-h-0 flex-1 flex-col">
         {rightTab === "properties" ? (
           <PropertiesEditor activeSection={activeSection} />
+        ) : rightTab === "chat" ? (
+          <ChatPanel ownerName={ownerName || siteName} variant="compact" />
         ) : rightTab === "layout" ? (
           <LayoutPanel />
+        ) : rightTab === "request" ? (
+          <CustomChangeRequestPanel />
         ) : (
           <PropertiesEditor activeSection={activeSection} />
         )}

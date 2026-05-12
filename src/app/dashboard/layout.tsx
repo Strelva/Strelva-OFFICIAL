@@ -14,6 +14,7 @@ import { getTenantPrimaryDomain, getTenantPublicUrl } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantEditablePreviewUrl } from "@/lib/custom-repos";
+import { getLocalClientPreviewUrl } from "@/lib/preview-target";
 import { ConversationLayoutClient } from "./ConversationLayoutClient";
 
 export default async function DashboardLayout({
@@ -45,7 +46,13 @@ export default async function DashboardLayout({
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
   const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : "";
-  const previewUrl = getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
+  const localClientPreviewUrl = getLocalClientPreviewUrl({
+    clientFallbackRoot,
+    requestHost,
+    requestProto,
+  });
+  const previewUrl = localClientPreviewUrl
+    || getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
   let siteName = "Your Business";
   let ownerName = "";
   try {

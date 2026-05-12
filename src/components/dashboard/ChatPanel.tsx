@@ -24,6 +24,8 @@ import { ToolOutput } from "./ToolOutput";
 import { QueuePage } from "./QueuePage";
 import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from "@/lib/agent-results";
 import type { UnifiedEvent } from "@/lib/types";
+import type { EditableNode } from "@/lib/editor-types";
+import { formatEditablePathValue, getEditablePathValue } from "@/lib/editable-path";
 
 const SUGGESTION_CHIPS = [
   { label: "Add this week's product news", icon: Clock, description: "Turn a real GLDF change into updated site copy" },
@@ -82,6 +84,20 @@ interface UpdateToast {
   nextAction: AgentResultReceipt["nextAction"];
 }
 
+interface AgentNodeContextPayload {
+  selectedSection: string;
+  selectedField?: string;
+  currentValue?: string;
+}
+
+function inferCustomRequestKind(text: string): "custom_design" | "template" | "infrastructure" {
+  if (/\b(template|component|section type|layout system)\b/i.test(text)) return "template";
+  if (/\b(infra|infrastructure|domain|routing|integration|schema|database|analytics|tracking|navigation)\b/i.test(text)) {
+    return "infrastructure";
+  }
+  return "custom_design";
+}
+
 interface ChatPanelProps {
   threadId?: string;
   ownerName: string;
@@ -116,6 +132,39 @@ function isTransientFailureMessage(message: ChatMessage) {
   return message.role === "assistant" && message.content.trim() === TRANSIENT_CONNECT_FAILURE;
 }
 
+async function buildSelectedNodeContext(
+  node: EditableNode | null | undefined,
+  dashboardHref: (path: string) => string
+): Promise<AgentNodeContextPayload | undefined> {
+  if (!node?.section) return undefined;
+
+  let currentValue: string | undefined;
+  if (node.field) {
+    try {
+      const res = await fetch(
+        dashboardHref(`/api/content/${encodeURIComponent(node.section)}?draft=true`),
+        { credentials: "same-origin" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          currentValue = formatEditablePathValue(
+            getEditablePathValue(data as Record<string, unknown>, node.field)
+          );
+        }
+      }
+    } catch {
+      // Best effort only. The agent can still read the section through tools.
+    }
+  }
+
+  return {
+    selectedSection: node.section,
+    selectedField: node.field,
+    currentValue: currentValue || node.label,
+  };
+}
+
 export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "full", needsYou }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -135,8 +184,17 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const shouldStickToBottomRef = useRef(true);
 
   const dashCtx = useDashboardOptional();
-  const dashboardHref = dashCtx?.dashboardHref ?? ((path: string) => path);
+  const contextDashboardHref = dashCtx?.dashboardHref;
+  const dashboardHref = useCallback(
+    (path: string) => contextDashboardHref?.(path) ?? path,
+    [contextDashboardHref]
+  );
   const pendingNeedsCount = needsYou?.pendingCount ?? 0;
+  const selectedObjectLabel =
+    dashCtx?.selectedNode?.label ||
+    dashCtx?.selectedNode?.field ||
+    dashCtx?.selectedNode?.section ||
+    dashCtx?.activeSection;
 
   const showResultToast = useCallback((result: AgentResultContract) => {
     if (result.status === "no-op" && result.actions.length === 1) return;
@@ -307,6 +365,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           credentials: "same-origin",
           body: JSON.stringify({
             prompt: text,
+            requestKind: inferCustomRequestKind(text),
             page: dashCtx?.activePage,
             section: dashCtx?.selectedNode?.section || dashCtx?.activeSection,
             field: dashCtx?.selectedNode?.field,
@@ -318,6 +377,11 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       }
 
       try {
+        const nodeContext = await buildSelectedNodeContext(
+          dashCtx?.selectedNode,
+          dashboardHref
+        );
+
         const res = await fetch(dashboardHref("/api/agent"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -329,6 +393,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               content: m.content,
             })),
             activeSection: dashCtx?.activeSection || null,
+            nodeContext,
             threadId: activeThreadId,
           }),
         });
@@ -804,7 +869,11 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             onFilesUploaded={(files) => setAttachments((current) => [...current, ...files])}
             onStop={handleStop}
             isLoading={isLoading}
-            placeholder="Tell me what you need..."
+            placeholder={
+              variant === "compact" && selectedObjectLabel
+                ? `Ask AI about ${selectedObjectLabel}`
+                : "Tell me what you need..."
+            }
             quickActions={INPUT_QUICK_ACTIONS}
             className={variant === "compact" ? "rounded-2xl" : undefined}
           />
