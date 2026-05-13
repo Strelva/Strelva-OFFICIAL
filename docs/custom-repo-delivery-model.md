@@ -4,6 +4,9 @@ Custom repos are the default paid-client delivery path. REB is the shared
 control plane for dashboard access, AI requests, content, review, reports,
 tenant settings, billing, and operational history.
 
+For the full build standard future codebases should follow, see
+`docs/future-codebase-integration.md`.
+
 ## Customer Promise
 
 Clients own a custom site experience. Scaffold manages the implementation,
