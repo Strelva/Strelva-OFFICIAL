@@ -886,7 +886,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
         <>
           <button
             type="button"
-            className="absolute inset-0 z-30 bg-black/35"
+            className="absolute inset-0 z-30 bg-[rgba(8,8,10,0.36)]"
             onClick={() => setNeedsDrawerOpen(false)}
             aria-label="Close Needs You"
           />

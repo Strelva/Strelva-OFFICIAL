@@ -4,7 +4,7 @@
 version: 2
 
 goal:
-  title: "REB Full Completion"
+  title: "Scaffold Web Full Completion"
   slug: "reb-full-completion"
   kind: open_ended
   tranche: "Diagnose the product from the repo, finish the core customer-facing product experience through wedge-moving verified slices, and audit the full product-completion outcome."

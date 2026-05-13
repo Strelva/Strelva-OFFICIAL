@@ -177,7 +177,7 @@ export function Hero({
 
       <div
         className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10"
-        style={{ animation: "bounce-subtle 2s ease-in-out infinite" }}
+        style={{ animation: "scroll-cue-drift 2s cubic-bezier(0.16, 1, 0.3, 1) infinite" }}
       >
         <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(250,249,247,0.3)" strokeWidth="1.5" />

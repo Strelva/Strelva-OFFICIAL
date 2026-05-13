@@ -10,9 +10,17 @@ test("marketing homepage gives a customer clear starting points", async ({ page 
   const response = await page.goto("/");
   expect(response?.ok()).toBeTruthy();
 
-  await expect(page.getByRole("heading", { name: /your business runs itself/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /get started/i }).first()).toHaveAttribute("href", "/onboard");
+  await expect(page.getByRole("heading", { name: /scaffold web/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /request access/i }).first()).toHaveAttribute("href", "/access-request");
   await expect(page.getByRole("link", { name: /sign in/i }).first()).toHaveAttribute("href", "/sign-in");
+});
+
+test("legacy onboard route redirects to the private-beta access request", async ({ page }) => {
+  const response = await page.goto("/onboard?ref=home-proof-loop");
+  expect(response?.status()).toBeLessThan(400);
+
+  await expect(page).toHaveURL(/\/access-request\?ref=home-proof-loop/);
+  await expect(page.getByRole("heading", { name: /what should scaffold handle first/i })).toBeVisible();
 });
 
 test("tenant public pages render without server errors", async ({ page }) => {
@@ -82,6 +90,8 @@ test("signed-out dashboard customers get the sign-in flow instead of a broken pa
   await expect(page).not.toHaveURL(/\/app/);
   await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
   await expect(page.getByRole("heading", { name: /sign in to scaffold web/i })).toBeVisible();
+  await expect(page.getByText("Secure dashboard handoff")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /continue to your website dashboard/i })).toBeVisible();
   await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
   await expect(page.getByText(/sign-in form is not loading/i)).toBeVisible();
   await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
@@ -109,6 +119,7 @@ test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) 
   await expect(page).not.toHaveURL(/\/app/);
   await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
   await expect(page.getByRole("heading", { name: /sign in to great lakes dried fruit/i })).toBeVisible();
+  await expect(page.getByText("Secure dashboard handoff")).toBeVisible();
   await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
 });
 
@@ -121,6 +132,7 @@ test("admin tenant host sign-in keeps the invited email context", async ({ page 
   await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
   await expect(page.getByText("Invited email:")).toBeVisible();
   await expect(page.getByText("owner@example.com")).toBeVisible();
+  await expect(page.getByText("This email stays attached when switching between sign-in and sign-up.")).toBeVisible();
   await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
 });
 

@@ -1,27 +1,27 @@
 # Future Codebase Integration Guide
 
-This guide defines how future client codebases should be built so they plug into REB cleanly, stay operable from the dashboard, and scale as the platform adds more tenants.
+This guide defines how future client codebases should be built so they plug into Scaffold Web cleanly, stay operable from the dashboard, and scale as the platform adds more tenants.
 
-REB is the control plane. Future client codebases are storefronts or service sites that render custom public experiences while consuming REB-owned content, page configuration, capabilities, operational state, and change workflows.
+Scaffold Web is the control plane. Future client codebases are storefronts or service sites that render custom public experiences while consuming Scaffold Web-owned content, page configuration, capabilities, operational state, and change workflows.
 
 ## Core Principle
 
-Build every future codebase as a REB-compatible product surface, not as a standalone website with a later integration pass.
+Build every future codebase as a Scaffold Web-compatible product surface, not as a standalone website with a later integration pass.
 
 That means each repo must:
 
-- Fetch editable content from REB using the versioned public API.
-- Publish a capability manifest so REB knows what the site can safely expose.
+- Fetch editable content from Scaffold Web using the versioned public API.
+- Publish a capability manifest so Scaffold Web knows what the site can safely expose.
 - Support signed revalidation so dashboard changes reach the public site quickly.
-- Keep local defaults so the public site degrades gracefully during REB outages.
+- Keep local defaults so the public site degrades gracefully during Scaffold Web outages.
 - Document commands, env vars, dependencies, rollback, and compatibility.
 - Treat tenant identity and contract version as first-class constants.
 
-## Current REB Contracts
+## Current Scaffold Web Contracts
 
 The current integration contract is `v1`.
 
-Source of truth inside REB:
+Source of truth inside Scaffold Web:
 
 - Contract helpers: `src/lib/reb-contracts.ts`
 - Public content API: `src/app/api/v1/content/[tenant]/[section]/route.ts`
@@ -34,7 +34,7 @@ Source of truth inside REB:
 - Workspace verifier: `scripts/custom-repo-workspace-check.ts`
 - Compatibility manifest: `release-manifest.json`
 
-Future repos should not invent new integration surfaces until the REB contract is intentionally versioned.
+Future repos should not invent new integration surfaces until the Scaffold Web contract is intentionally versioned.
 
 ## Required Repository Shape
 
@@ -53,7 +53,7 @@ src/app/api/v1/revalidate/route.ts
 scripts/production-checklist.ts or scripts/scaffold-web-check.mjs
 ```
 
-The exact app structure can vary by product, but those files are the minimum operational surface REB expects for a custom repo.
+The exact app structure can vary by product, but those files are the minimum operational surface Scaffold Web expects for a custom repo.
 
 Required package scripts:
 
@@ -64,7 +64,7 @@ Required package scripts:
 - `check`
 - A production or scaffold-specific checker such as `check:prod` or `check:scaffold`
 
-For client repos with custom ecommerce, rewards, admin proxying, or other special flows, add targeted scripts and endpoints, but keep the base REB contract unchanged.
+For client repos with custom ecommerce, rewards, admin proxying, or other special flows, add targeted scripts and endpoints, but keep the base Scaffold Web contract unchanged.
 
 ## Required Environment Variables
 
@@ -88,11 +88,11 @@ Add feature-specific env vars only when the repo owns that feature. Examples:
 - Storage: Blob or object-storage credentials.
 - Scheduled jobs: job-specific secrets such as reconcile or sync secrets.
 
-Do not put cross-tenant secrets or REB dashboard secrets into client repos unless the repo directly needs them.
+Do not put cross-tenant secrets or Scaffold Web dashboard secrets into client repos unless the repo directly needs them.
 
 ## Tenant Identity
 
-Tenant IDs must be stable, lowercase, URL-safe identifiers matching REB validation:
+Tenant IDs must be stable, lowercase, URL-safe identifiers matching Scaffold Web validation:
 
 ```text
 ^[a-z0-9-]+$
@@ -115,19 +115,19 @@ Future repos must consume content through:
 GET /api/v1/content/{tenant}/{section}
 ```
 
-REB validates:
+Scaffold Web validates:
 
 - Tenant format.
 - Tenant existence and active status.
-- Section existence in REB storage.
+- Section existence in Scaffold Web storage.
 - Section support in the tenant capability manifest.
 
 Repos should:
 
-- Centralize all REB fetches in one module.
+- Centralize all Scaffold Web fetches in one module.
 - Fetch by `TENANT_ID`.
-- Use local defaults when REB is unavailable.
-- Avoid direct reads from REB Redis, Sanity, or dev content files.
+- Use local defaults when Scaffold Web is unavailable.
+- Avoid direct reads from Scaffold Web Redis, Sanity, or dev content files.
 - Treat content as data, not layout authority.
 
 Supported shared content sections currently include:
@@ -150,11 +150,11 @@ navigation
 footer
 ```
 
-When a future repo needs new editable content, add the section first in REB types, schemas, defaults, editor UI, capability handling, and tests. Then consume it from the custom repo.
+When a future repo needs new editable content, add the section first in Scaffold Web types, schemas, defaults, editor UI, capability handling, and tests. Then consume it from the custom repo.
 
 ## Page Configuration
 
-Future repos that support REB-managed pages must consume:
+Future repos that support Scaffold Web-managed pages must consume:
 
 ```text
 GET /api/v1/page-config/{tenant}
@@ -170,7 +170,7 @@ Page config is for page-level composition:
 - Responsive overrides.
 - SEO metadata.
 
-Repos should use page config to decide which known components render and in what order. They should not allow arbitrary code, arbitrary component imports, or unbounded props from REB.
+Repos should use page config to decide which known components render and in what order. They should not allow arbitrary code, arbitrary component imports, or unbounded props from Scaffold Web.
 
 If a repo does not support page config, set `supportsPageConfig: false` in its manifest and tenant metadata.
 
@@ -182,13 +182,13 @@ Every future repo must expose:
 GET /api/reb-capabilities
 ```
 
-REB also exposes the merged manifest at:
+Scaffold Web also exposes the merged manifest at:
 
 ```text
 GET /api/v1/site-capabilities/{tenant}
 ```
 
-The manifest tells REB what is safe to show in the dashboard and what should become a custom request instead.
+The manifest tells Scaffold Web what is safe to show in the dashboard and what should become a custom request instead.
 
 Required manifest shape:
 
@@ -215,7 +215,7 @@ Required manifest shape:
 }
 ```
 
-Use the manifest to keep REB honest:
+Use the manifest to keep Scaffold Web honest:
 
 - Editable content sections get `draft` and `publish`.
 - Bespoke design or code-heavy sections get `request_custom`.
@@ -233,7 +233,7 @@ Future repos must expose a signed revalidation endpoint:
 POST /api/v1/revalidate
 ```
 
-REB sends:
+Scaffold Web sends:
 
 - Raw JSON body.
 - `x-reb-timestamp`.
@@ -249,7 +249,7 @@ Future repos must:
 - Revalidate only supported paths or tags.
 - Return non-2xx on invalid auth, invalid tenant, or malformed payload.
 
-REB records revalidation failures and can alert. Repos should also log revalidation failures locally because stale public pages break trust quickly.
+Scaffold Web records revalidation failures and can alert. Repos should also log revalidation failures locally because stale public pages break trust quickly.
 
 ## Draft Preview And Admin Handoff
 
@@ -257,8 +257,8 @@ Future repos should support draft preview when possible.
 
 Baseline expectations:
 
-- `?preview=true` or equivalent preview state fetches draft page config/content from REB.
-- Admin preview requests preserve the handoff from REB dashboard to the custom repo.
+- `?preview=true` or equivalent preview state fetches draft page config/content from Scaffold Web.
+- Admin preview requests preserve the handoff from Scaffold Web dashboard to the custom repo.
 - Preview mode cannot leak private dashboard data to public visitors.
 - Preview headers or query params are validated where the repo supports admin-only flows.
 
@@ -269,7 +269,7 @@ supportsDraftPreview: false
 supportsInlineEditing: false
 ```
 
-and make REB route users toward custom requests instead of broken editing affordances.
+and make Scaffold Web route users toward custom requests instead of broken editing affordances.
 
 ## Data Ownership
 
@@ -277,22 +277,22 @@ Use this boundary for future repos:
 
 | Data | Owner |
 | --- | --- |
-| Business content | REB |
-| Page configuration | REB |
-| Capability manifest | Custom repo, merged by REB |
+| Business content | Scaffold Web |
+| Page configuration | Scaffold Web |
+| Capability manifest | Custom repo, merged by Scaffold Web |
 | Public rendering | Custom repo |
-| Tenant config and billing status | REB |
-| AI conversations, queue, reports, activity | REB |
-| Ecommerce catalog or checkout implementation | Custom repo unless promoted to REB |
-| Rewards, accounts, or app-specific databases | Custom repo unless promoted to REB |
-| Analytics summaries shown to owners | REB |
-| External dependency status | REB tenant metadata plus repo docs |
+| Tenant config and billing status | Scaffold Web |
+| AI conversations, queue, reports, activity | Scaffold Web |
+| Ecommerce catalog or checkout implementation | Custom repo unless promoted to Scaffold Web |
+| Rewards, accounts, or app-specific databases | Custom repo unless promoted to Scaffold Web |
+| Analytics summaries shown to owners | Scaffold Web |
+| External dependency status | Scaffold Web tenant metadata plus repo docs |
 
-If a feature becomes common across multiple client repos, promote the contract to REB instead of copy-pasting custom code indefinitely.
+If a feature becomes common across multiple client repos, promote the contract to Scaffold Web instead of copy-pasting custom code indefinitely.
 
 ## Local Defaults And Failure Behavior
 
-Future repos must remain usable when REB is temporarily unavailable.
+Future repos must remain usable when Scaffold Web is temporarily unavailable.
 
 Required behavior:
 
@@ -305,9 +305,9 @@ Required behavior:
 
 The customer should see a stable site. The operator should see an actionable failure.
 
-## Tenant Metadata In REB
+## Tenant Metadata In Scaffold Web
 
-Each custom-repo tenant in REB should include:
+Each custom-repo tenant in Scaffold Web should include:
 
 ```ts
 {
@@ -359,29 +359,29 @@ Minimum fields:
 }
 ```
 
-REB's root `release-manifest.json` should record compatible custom repo tags or commits for active flagship repos. This prevents silent drift between the dashboard contract and public sites.
+Scaffold Web's root `release-manifest.json` should record compatible custom repo tags or commits for active flagship repos. This prevents silent drift between the dashboard contract and public sites.
 
 ## Testing And Verification
 
 Each future custom repo should test:
 
-- Contract constants match REB.
+- Contract constants match Scaffold Web.
 - Content fetch builds the correct `/api/v1/content/{tenant}/{section}` URL.
 - Page config fetch builds the correct `/api/v1/page-config/{tenant}` URL.
 - Capability endpoint returns schema-valid JSON.
 - Revalidation verifies signed requests and rejects bad signatures.
 - Revalidation rejects mismatched tenants.
-- Local defaults render when REB fetches fail.
+- Local defaults render when Scaffold Web fetches fail.
 - Production checklist catches missing env vars and broken contract files.
 
-REB should verify future repos through `pnpm check:custom-repos`. When a new repo is added, update:
+Scaffold Web should verify future repos through `pnpm check:custom-repos`. When a new repo is added, update:
 
 - `scripts/custom-repo-workspace-check.ts`
 - `release-manifest.json`
 - `docs/custom-repo-delivery-model.md`
 - This guide if the required contract changes.
 
-For REB itself, continue using:
+For Scaffold Web itself, continue using:
 
 ```bash
 pnpm lint
@@ -396,11 +396,11 @@ Use narrower commands while developing, but a release that changes the contract 
 
 ## Scaling Rules
 
-Use these rules as REB grows:
+Use these rules as Scaffold Web grows:
 
 1. Version contracts before changing public integration behavior.
-2. Add schema validation in REB before exposing new editable data to custom repos.
-3. Put shared primitives in REB, not in one-off client repos.
+2. Add schema validation in Scaffold Web before exposing new editable data to custom repos.
+3. Put shared primitives in Scaffold Web, not in one-off client repos.
 4. Keep custom repos responsible for bespoke rendering and client-specific product logic.
 5. Keep tenant state isolated by tenant ID in every API, cache key, and data store.
 6. Prefer capability negotiation over hardcoded dashboard assumptions.
@@ -413,19 +413,19 @@ Use these rules as REB grows:
 
 Use this sequence for each future client codebase:
 
-1. Create tenant record in REB with `deliveryModel: "custom_repo"`.
+1. Create tenant record in Scaffold Web with `deliveryModel: "custom_repo"`.
 2. Create the custom repo with the required file shape and scripts.
 3. Add `TENANT_ID`, `REB_CONTRACT_VERSION`, signed revalidation helpers, and local defaults.
-4. Implement centralized REB fetch helpers for content, page config, and capabilities.
+4. Implement centralized Scaffold Web fetch helpers for content, page config, and capabilities.
 5. Implement the public renderer using known components and bounded props.
 6. Expose `/api/reb-capabilities`.
 7. Expose `/api/v1/revalidate`.
 8. Add `.env.example`, `README.md`, `AGENTS.md`, production checklist, and rollback notes.
 9. Add `release-manifest.json`.
-10. Add tenant `customRepo` metadata in REB.
+10. Add tenant `customRepo` metadata in Scaffold Web.
 11. Add the repo to `scripts/custom-repo-workspace-check.ts`.
 12. Run repo-local `check`.
-13. Run REB `pnpm check:custom-repos`.
+13. Run Scaffold Web `pnpm check:custom-repos`.
 14. Smoke preview, publish, and signed revalidation from the dashboard.
 15. Record compatible commits or tags in release manifests.
 
@@ -438,9 +438,9 @@ Keep a feature custom when:
 - It is unique to one client.
 - It requires bespoke design or business logic.
 - It has unclear repeat demand.
-- It can be represented in REB as a custom request.
+- It can be represented in Scaffold Web as a custom request.
 
-Promote a feature into REB when:
+Promote a feature into Scaffold Web when:
 
 - Two or more repos need the same capability.
 - The owner workflow is identical across tenants.
@@ -448,23 +448,23 @@ Promote a feature into REB when:
 - The dashboard can expose it without code access.
 - It improves activation, retention, weekly reports, or proof of value for the core ICP.
 
-Promotion should add a REB contract, schema, editor surface, default data, tests, and migration notes before custom repos consume it.
+Promotion should add a Scaffold Web contract, schema, editor surface, default data, tests, and migration notes before custom repos consume it.
 
 ## Done Definition For Future Codebases
 
-A future codebase is REB-integrated only when all of this is true:
+A future codebase is Scaffold Web-integrated only when all of this is true:
 
-- REB can read its capability manifest.
-- REB can serve valid content and page config for its tenant.
-- The repo can render with REB data and with local fallbacks.
+- Scaffold Web can read its capability manifest.
+- Scaffold Web can serve valid content and page config for its tenant.
+- The repo can render with Scaffold Web data and with local fallbacks.
 - The repo rejects invalid revalidation signatures.
-- REB can trigger successful signed revalidation.
+- Scaffold Web can trigger successful signed revalidation.
 - The dashboard does not expose unsupported editing controls.
 - External dependencies are documented and reflected in tenant metadata.
 - Required env vars are documented.
 - Build, typecheck, tests, and production checklist pass.
-- `pnpm check:custom-repos` passes from REB.
+- `pnpm check:custom-repos` passes from Scaffold Web.
 - Release manifests record compatible contract versions and commits.
 - Rollback is documented and practical.
 
-If any item is missing, the repo may still be a good website, but it is not yet a scalable REB-integrated codebase.
+If any item is missing, the repo may still be a good website, but it is not yet a scalable Scaffold Web-integrated codebase.

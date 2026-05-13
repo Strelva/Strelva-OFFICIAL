@@ -62,7 +62,7 @@ export function EmailPopup() {
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       onClick={dismiss}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[rgba(13,12,11,0.52)] backdrop-blur-sm" />
 
       <div
         className="relative w-full max-w-md p-8 md:p-10 animate-popup"

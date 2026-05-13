@@ -195,6 +195,7 @@ describe("proxy host routing helpers", () => {
 
   it("rewrites only marketing root requests to /home", () => {
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/")).toBe(true);
+    expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/access-request")).toBe(false);
     expect(shouldRewriteMarketingRoot("scaffoldweb.com", "/onboard")).toBe(false);
     expect(shouldRewriteMarketingRoot("gldf.scaffoldweb.com", "/")).toBe(false);
   });

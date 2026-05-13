@@ -41,6 +41,9 @@ Tokens are defined in `src/app/globals.css`.
 - `--bark`, `--bark-light`, `--bark-faded`: body text, supporting text, and muted labels.
 - `--blush`, `--blush-light`, `--terra`, `--terra-light`: warmth, warning, editorial accent, and destructive states.
 - `--surface`, `--surface-base`, `--surface-raised`, `--surface-inset`: shared component surfaces.
+- `--warm-white`: tinted high-contrast text/control fill, used where pure white would feel harsh.
+- `--on-warm-white`: dark foreground for filled `--warm-white` controls.
+- `--overlay-scrim`: tinted modal and drawer backdrop color.
 
 ### Dashboard Tokens
 
@@ -51,6 +54,8 @@ Apply inside `[data-dashboard]`.
 - `--surface-raised`: controls, popovers, cards, and elevated rows.
 - `--surface-inset`: fields, wells, and preview containers.
 - `--glass`, `--glass-border`: overlays and floating controls only.
+- `--glass-active`: selected, pressed, or inline code/action backgrounds inside glass or raised surfaces.
+- `--overlay-scrim`: modal, drawer, and mobile navigation backdrop.
 - `--accent`, `--accent-dim`, `--accent-text`: primary product action and AI/system emphasis.
 - `--success`, `--success-dim`: completed checks, healthy sources, and publish success.
 - `--gray-*`: borders, muted text, separators, and inactive controls.
@@ -117,7 +122,7 @@ Launch target is WCAG 2.2 AA.
 - Interactive elements must be reachable and operable by keyboard.
 - Images need useful alt text unless decorative.
 - Dynamic status changes should be announced where they affect task completion.
-- Authentication, onboarding, and checkout flows must avoid cognitive-function tests unless an accessible alternative exists.
+- Authentication, access-request, and checkout flows must avoid cognitive-function tests unless an accessible alternative exists.
 
 ## Performance Standard
 
@@ -161,6 +166,6 @@ Before launch:
 - Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; `check:release` forces `REB_DEV_UNGATED_ACCESS=0` for smoke.
 - Verify dashboard desktop and mobile views manually.
 - Verify at least one tenant storefront on mobile and desktop.
-- Confirm marketing `/home`, `/onboard`, `/sign-in`, `/privacy`, and `/terms` are live.
+- Confirm marketing `/home`, `/access-request`, `/sign-in`, `/privacy`, and `/terms` are live.
 - Confirm webhooks, cron auth, domain routing, preview framing, and tenant revalidation.
 - Confirm this design kit and `docs/production-readiness.md` are updated with any launch-specific deviations.

@@ -7,7 +7,7 @@ import {
   verifyRevalidationSignature,
 } from "./reb-contracts";
 
-describe("REB/GLDF contract", () => {
+describe("Scaffold Web/GLDF contract", () => {
   it("signs and verifies revalidation payloads", () => {
     const secret = "test-secret";
     const timestamp = "1700000000000";

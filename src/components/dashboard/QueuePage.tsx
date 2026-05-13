@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useMemo, useTransition } from "react";
 import { Clock3 } from "lucide-react";
 import { QueueCard } from "./QueueCard";
 import { EmptyQueue } from "./EmptyQueue";
@@ -28,7 +28,10 @@ interface QueuePageProps {
 
 export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0, compact = false }: QueuePageProps) {
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [tab, setTab] = useState<"pending" | "resolved">("pending");
   const [pending, setPending] = useState(initialPending);
   const [resolved, setResolved] = useState(initialResolved);

@@ -176,7 +176,7 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
   };
 }
 
-/** Assign a user to a tenant. Call this from admin or onboarding flows only.
+/** Assign a user to a tenant. Call this from admin or access provisioning flows only.
  *  Do NOT call from hasTenantAccess — that creates a security hole. */
 export async function assignUserToTenant(
   userId: string,
@@ -209,7 +209,7 @@ export async function assignUserToTenant(
 
 /** Check if current user has access to a specific tenant.
  *  Uses Clerk publicMetadata.tenants (string[]) set per user.
- *  Tenants must be explicitly assigned via admin or onboarding flow. */
+ *  Tenants must be explicitly assigned via admin or access provisioning flow. */
 export async function hasTenantAccess(tenant: string): Promise<boolean> {
   if (isDevAccessBypassEnabled()) return true;
 

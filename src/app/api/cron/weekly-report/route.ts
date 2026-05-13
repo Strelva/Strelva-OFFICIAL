@@ -15,15 +15,16 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
 <body style="margin: 0; padding: 0; background: #f5f4f2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <div style="max-width: 520px; margin: 0 auto; padding: 40px 24px;">
     <div style="background: #fff; border-radius: 12px; padding: 32px; border: 1px solid #e8e6e3;">
-      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #7c9a8e; margin: 0 0 24px; font-weight: 600;">Weekly Update</p>
+      <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #7c9a8e; margin: 0 0 24px; font-weight: 700;">Weekly Update</p>
+      <h1 style="font-size: 22px; line-height: 1.2; color: #1a1510; margin: 0 0 20px; font-weight: 700;">Your weekly report</h1>
       ${paragraphs}
       <p style="margin: 24px 0 0;">
-        <a href="${dashboardUrl}" style="display: inline-block; color: #5d7f70; font-size: 14px; font-weight: 600; text-decoration: none;">
+        <a href="${dashboardUrl}" style="display: inline-block; color: #5d7f70; font-size: 18px; font-weight: 700; text-decoration: none;">
           View your weekly report &rarr;
         </a>
       </p>
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
-      <p style="font-size: 12px; color: #999; margin: 0;">
+      <p style="font-size: 13px; color: #77716a; margin: 0;">
         Sent by Scaffold Web for ${siteName}
       </p>
     </div>

@@ -1,5 +1,5 @@
 /**
- * Shared Upstash Redis client for REB.
+ * Shared Upstash Redis client for Scaffold Web.
  *
  * Used by: tenant config cache, rate limiting, chat session cache, rewards KV.
  * Returns null when UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is unset.

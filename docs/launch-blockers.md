@@ -1,4 +1,4 @@
-# REB Launch Blockers
+# Scaffold Web Launch Blockers
 
 Last local audit: May 10, 2026.
 
@@ -39,7 +39,7 @@ Expected results:
 - Only run the production smoke command after `https://scaffoldweb.com/api/health` stays on `scaffoldweb.com` and returns the Vercel Next.js health response.
 - First cron request returns `401`.
 - Second cron request returns a non-`401` response and logs an authorized maintenance run.
-- Root marketing-host sign-in or sign-up finishes at `/account`, where the invited owner can choose the correct site if needed; if that signed-in email has no tenant access, `/account` offers `Use invited email` and a support contact instead of only sales onboarding.
+- Root marketing-host sign-in or sign-up finishes at `/account`, where the invited owner can choose the correct site if needed; if that signed-in email has no tenant access, `/account` offers `Use invited email`, a support contact, and the private-beta access request.
 - Invited owner can reach `/dashboard/site` on `admin.greatlakesdriedfruit.com`.
 - Saving a content edit refreshes the preview iframe.
 - Clerk, Sanity, and Stripe provider dashboards show successful webhook deliveries for the configured production endpoints.
@@ -123,9 +123,9 @@ Move an item here only with owner approval in the release note. Each waiver must
 - Public storefront checkout now uses distributed rate limiting and prices Stripe sessions from server-side tenant product content instead of trusting browser-submitted names or prices.
 - Subscription checkout now rejects malformed JSON with `400 Invalid request body` and normalizes tenant/customer fields before Stripe metadata and admin return URLs.
 - Billing checkout and customer portal return URLs now derive from forwarded host/proto instead of trusting the browser `Origin` header; subscription checkout also normalizes customer emails.
-- Public onboarding and booking forms now use distributed rate limiting and sanitize/validate submitted fields; booking creation derives service name/duration from tenant content instead of browser-submitted service text, and availability checks reject unknown or coming-soon services.
+- Public access-request and booking forms now use distributed rate limiting and sanitize/validate submitted fields; booking creation derives service name/duration from tenant content instead of browser-submitted service text, and availability checks reject unknown or coming-soon services.
 - Booking update and booking-config writes now reject malformed or non-object JSON with `400 Invalid request body` before storage work.
-- Public tracking, onboarding, newsletter signup, booking, and checkout POST routes now reject malformed or non-object JSON with `400 Invalid request body` instead of surfacing generic server errors.
+- Public tracking, access-request, newsletter signup, booking, and checkout POST routes now reject malformed or non-object JSON with `400 Invalid request body` instead of surfacing generic server errors.
 - Newsletter subscribes and sends now use Redis-backed async rate limiting; subscriber names are trimmed/capped before storage.
 - Stale duplicate tenant `rohlax-wellness` was removed from Sanity; launch tenant `rohlax` has client/admin domains and revalidation configured.
 - `https://scaffoldweb.com/home` returns `200`.

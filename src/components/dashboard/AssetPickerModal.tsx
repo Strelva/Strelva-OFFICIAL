@@ -16,7 +16,10 @@ interface AssetPickerModalProps {
 
 export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalProps) {
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -143,7 +146,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim p-4"
       onClick={onClose}
     >
       <div

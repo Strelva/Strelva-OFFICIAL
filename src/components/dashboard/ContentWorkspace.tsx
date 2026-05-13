@@ -232,7 +232,7 @@ export function ContentWorkspace({
           <div className="grid gap-2">
             <a
               href={siteUrl || "/"}
-              className="inline-flex items-center justify-center rounded-lg bg-warm-white px-5 py-2.5 text-sm font-medium text-warm-black transition-colors hover:bg-warm-white/90"
+              className="inline-flex items-center justify-center rounded-lg bg-warm-white px-5 py-2.5 text-sm font-medium text-on-warm-white transition-colors hover:bg-warm-white/90"
             >
               View live site
             </a>

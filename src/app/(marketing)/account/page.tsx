@@ -98,14 +98,14 @@ function NoAccessState() {
             style={{ background: "var(--m-text)", color: "var(--m-bg)" }}
           />
           <Link
-            href="/onboard"
+            href="/access-request"
             className="text-[14px] font-medium px-8 py-3 border transition-colors hover:bg-white/5"
             style={{
               borderColor: "var(--m-rule)",
               color: "var(--m-text-2)",
             }}
           >
-            Start a new site
+            Request private beta access
           </Link>
         </div>
       </div>

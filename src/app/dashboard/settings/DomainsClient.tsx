@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, type FormEvent } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
@@ -21,7 +21,10 @@ interface Props {
 // Primary domain fields component
 function PrimaryDomainFields() {
   const dashboard = useDashboardOptional();
-  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const apiHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [productionDomain, setProductionDomain] = useState("");
   const [adminDomain, setAdminDomain] = useState("");
   const [loading, setLoading] = useState(true);

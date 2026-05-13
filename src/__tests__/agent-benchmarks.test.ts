@@ -8,7 +8,7 @@ import {
 } from "@/lib/agent-benchmarks";
 import type { AgentBenchmarkSubmission } from "@/lib/agent-benchmarks";
 
-describe("REB agent benchmarks", () => {
+describe("Scaffold Web agent benchmarks", () => {
   it("defines 25 canonical owner-operation cases across the five launch verticals", () => {
     expect(agentBenchmarkCases).toHaveLength(25);
     expect(new Set(agentBenchmarkCases.map((benchmarkCase) => benchmarkCase.id)).size).toBe(25);

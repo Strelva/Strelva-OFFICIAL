@@ -1159,7 +1159,7 @@ function DependencyHealthSection() {
                 A custom repo dependency needs attention before the client site depends on it.
               </p>
               <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
-                REB is showing this here so paused services are caught before they look like a storefront or AI issue.
+                Scaffold Web is showing this here so paused services are caught before they look like a storefront or AI issue.
               </p>
             </div>
           </div>

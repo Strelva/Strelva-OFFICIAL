@@ -68,5 +68,5 @@
 - [ ] `admin.yourbusiness.com/sign-in` and `/sign-up` render the tenant auth flow
 - [ ] `scaffoldweb.com` shows marketing page
 - [ ] `scaffoldweb.com/api/health` returns Vercel health JSON and does not redirect to `scaffoldweb-com.l.ink`
-- [ ] `scaffoldweb.com/onboard` shows chat onboarding
+- [ ] `scaffoldweb.com/access-request` shows the private-beta access request
 - [ ] `tenantid.scaffoldweb.com` is treated only as a fallback/platform route, not the customer-facing URL

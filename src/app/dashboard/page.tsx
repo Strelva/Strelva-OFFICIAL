@@ -133,7 +133,7 @@ export default async function DashboardPage() {
             <div className="flex flex-wrap gap-2">
               <Link
                 href={dashboardHref(pendingCount > 0 ? "/dashboard/review" : "/dashboard/site")}
-                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-warm-white px-4 text-[13px] font-medium text-warm-black transition-colors hover:bg-warm-white/90"
+                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-warm-white px-4 text-[13px] font-medium text-on-warm-white transition-colors hover:bg-warm-white/90"
               >
                 {pendingCount > 0 ? "Open Needs You" : "Open site editor"}
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />

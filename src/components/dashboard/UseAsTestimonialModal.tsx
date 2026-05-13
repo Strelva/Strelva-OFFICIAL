@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { X, Quote, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useDashboardOptional } from "./DashboardContext";
@@ -27,7 +27,10 @@ export function UseAsTestimonialModal({
   onSuccess,
 }: UseAsTestimonialModalProps) {
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [quote, setQuote] = useState(review?.text || "");
   const [author, setAuthor] = useState(review?.author || "");
   const [location, setLocation] = useState("");
@@ -36,13 +39,13 @@ export function UseAsTestimonialModal({
   const [error, setError] = useState<string | null>(null);
 
   // Reset form when review changes
-  useState(() => {
+  useEffect(() => {
     if (review) {
       setQuote(review.text);
       setAuthor(review.author);
       setLocation(`via ${review.source}`);
     }
-  });
+  }, [review]);
 
   const handleSave = useCallback(async () => {
     if (!quote.trim() || !author.trim()) {
@@ -101,7 +104,7 @@ export function UseAsTestimonialModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim p-4"
       onClick={onClose}
     >
       <div

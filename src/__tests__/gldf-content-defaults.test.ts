@@ -38,7 +38,7 @@ describe("GLDF content defaults", () => {
     expect(transformed.products[1].imageUrl).toBe("/images/product-bag.jpg");
   });
 
-  it("keeps REB food-brand page config aligned with the GLDF storefront layout", () => {
+  it("keeps Scaffold Web food-brand page config aligned with the GLDF storefront layout", () => {
     const sharedConfig = getDefaultPageConfig("food-brand");
 
     expect(sharedConfig.home.sections).toEqual(foodBrandTemplate.defaultPageConfig.home.sections);

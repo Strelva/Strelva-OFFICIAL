@@ -1,4 +1,4 @@
-title = "REB secret scanning"
+title = "Scaffold Web secret scanning"
 
 [allowlist]
 description = "Allow placeholders and documented env names."

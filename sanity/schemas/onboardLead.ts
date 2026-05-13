@@ -2,7 +2,7 @@ import { defineType, defineField } from "sanity";
 
 export const onboardLead = defineType({
   name: "onboardLead",
-  title: "Onboard Lead",
+  title: "Access Request",
   type: "document",
   fields: [
     defineField({ name: "businessName", title: "Business Name", type: "string", validation: (r) => r.required() }),

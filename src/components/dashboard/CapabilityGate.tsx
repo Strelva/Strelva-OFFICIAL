@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, createContext, useContext, useMemo, type ReactNode } from "react";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface CapabilityInfo {
@@ -26,7 +26,10 @@ export function useCapabilities() {
 
 export function CapabilityProvider({ children }: { children: ReactNode }) {
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [state, setState] = useState<CapabilityContextValue>({
     capabilities: [],
     loading: true,

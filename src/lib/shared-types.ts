@@ -1,7 +1,7 @@
 /**
- * Shared Content Types for REB Client Sites
+ * Shared Content Types for Scaffold Web Client Sites
  *
- * This file defines the canonical content schemas used by REB and client sites.
+ * This file defines the canonical content schemas used by Scaffold Web and client sites.
  * Client sites should either:
  * 1. Copy this file to their src/lib/shared-types.ts
  * 2. Import from a published @reb/types package (when available)
@@ -178,7 +178,7 @@ export type CoreContentMap = {
 };
 
 // =============================================================================
-// Extended Types (REB platform features, may not be needed by all client sites)
+// Extended Types (Scaffold Web platform features, may not be needed by all client sites)
 // =============================================================================
 
 export interface ShopItem {
@@ -277,7 +277,7 @@ export interface ThemeContent {
 }
 
 // =============================================================================
-// Full ContentSection and ContentMap (REB platform)
+// Full ContentSection and ContentMap (Scaffold Web platform)
 // =============================================================================
 
 export type ContentSection =

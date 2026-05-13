@@ -7,7 +7,7 @@ import {
   verifyRevalidationSignature,
 } from "@/lib/reb-contracts";
 
-describe("REB contracts", () => {
+describe("Scaffold Web contracts", () => {
   it("builds versioned storefront routes", () => {
     expect(rebRoutes.publicContent(GLDF_TENANT_ID, "hero")).toBe("/api/v1/content/gldf/hero");
     expect(rebRoutes.publicPageConfig(GLDF_TENANT_ID)).toBe("/api/v1/page-config/gldf");

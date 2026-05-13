@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Production Readiness Checklist for REB
+ * Production Readiness Checklist for Scaffold Web
  *
  * Run with: npx tsx scripts/production-checklist.ts
  *
@@ -154,7 +154,7 @@ function checkOptionalPair(idName: string, secretName: string, label: string): b
 }
 
 console.log("\n═══════════════════════════════════════════════════════════════");
-console.log("  REB Production Readiness Checklist");
+console.log("  Scaffold Web Production Readiness Checklist");
 console.log("═══════════════════════════════════════════════════════════════\n");
 
 console.log("─── Core Auth (Clerk) ───────────────────────────────────────────");

@@ -673,7 +673,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               body: JSON.stringify({
                 feature: normalizedFeature,
                 summary: cleanSummary,
-                requestedBy: "REB AI agent",
+                requestedBy: "Scaffold Web AI agent",
               }),
             });
 

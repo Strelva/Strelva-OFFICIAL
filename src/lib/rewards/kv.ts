@@ -1,5 +1,5 @@
 /**
- * Upstash Redis (HTTP) client factory for REB-owned rewards data.
+ * Upstash Redis (HTTP) client factory for Scaffold Web-owned rewards data.
  *
  * Delegates to the shared Redis client in src/lib/redis.ts so the entire
  * app uses a single connection. When credentials are unset, getKv() returns

@@ -472,21 +472,21 @@ export function SitePreview() {
 
   return (
     <div
-      className={
-        scaffoldMode
-          ? "fixed inset-0 z-[80] flex h-screen flex-col bg-black animate-overlay-enter"
-          : "flex h-full flex-col"
-      }
+        className={
+          scaffoldMode
+            ? "fixed inset-0 z-[80] flex h-screen flex-col bg-[oklch(4%_0.01_255)] animate-overlay-enter"
+            : "flex h-full flex-col"
+        }
     >
       {/* Canvas */}
       <div
         ref={canvasRef}
         className={`relative flex flex-1 justify-center overflow-hidden ${
-          scaffoldMode ? "bg-black p-0" : "bg-surface-base p-3 xl:p-4"
+          scaffoldMode ? "bg-[oklch(4%_0.01_255)] p-0" : "bg-surface-base p-3 xl:p-4"
         }`}
       >
         {!scaffoldMode && (
-          <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-9.5rem)] items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 py-2 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-9.5rem)] items-center gap-2 rounded-full border border-white/10 bg-[rgba(8,8,10,0.76)] px-3 py-2 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                 isLivePreview ? "bg-emerald-300" : "bg-amber-300"
@@ -508,7 +508,7 @@ export function SitePreview() {
               setPreviewSource("editable");
               setScaffoldMode(true);
             }}
-            className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 text-[12px] font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-black/90"
+            className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-[rgba(8,8,10,0.76)] px-3 text-[12px] font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(8,8,10,0.9)]"
           >
             <Wand2 className="h-3.5 w-3.5" strokeWidth={1.6} />
             Edit mode
@@ -517,7 +517,7 @@ export function SitePreview() {
 
         {scaffoldMode && (
           <div className="pointer-events-none absolute inset-x-4 bottom-5 z-20 flex items-end justify-center">
-            <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/78 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-overlay-enter">
+            <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[rgba(8,8,10,0.8)] p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-overlay-enter">
               <div className="flex items-center gap-1.5 px-2">
                 <Wand2 className="h-3.5 w-3.5 text-white" strokeWidth={1.6} />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">Site editor</span>
@@ -695,7 +695,7 @@ export function SitePreview() {
                   <button
                     type="button"
                     onClick={retryPreview}
-                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-warm-black hover:bg-warm-white/90"
+                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-on-warm-white hover:bg-warm-white/90"
                   >
                     Retry preview
                   </button>
@@ -734,7 +734,7 @@ export function SitePreview() {
                     href={liveTargetUrl || siteUrl || "/"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-warm-black hover:bg-warm-white/90"
+                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-on-warm-white hover:bg-warm-white/90"
                   >
                     Open live site
                   </a>

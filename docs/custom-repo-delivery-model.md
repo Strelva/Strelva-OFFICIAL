@@ -1,6 +1,6 @@
 # Custom Repo Delivery Model
 
-Custom repos are the default paid-client delivery path. REB is the shared
+Custom repos are the default paid-client delivery path. Scaffold Web is the shared
 control plane for dashboard access, AI requests, content, review, reports,
 tenant settings, billing, and operational history.
 
@@ -10,15 +10,15 @@ For the full build standard future codebases should follow, see
 ## Customer Promise
 
 Clients own a custom site experience. Scaffold manages the implementation,
-deployment, quality, and major changes. Clients request work through REB; they
+deployment, quality, and major changes. Clients request work through Scaffold Web; they
 do not get direct repo or code-editor access by default.
 
 ## Responsibilities
 
-- REB stores editable business content and site operations.
-- REB queues AI review items and custom repo requests.
+- Scaffold Web stores editable business content and site operations.
+- Scaffold Web queues AI review items and custom repo requests.
 - Custom repos render the public site and own bespoke frontend behavior.
-- Custom repos publish a capability manifest so REB only offers supported sections,
+- Custom repos publish a capability manifest so Scaffold Web only offers supported sections,
   variants, tokens, draft preview behavior, and admin-only custom components.
 - Scaffold triages custom repo requests within one business day.
 
@@ -27,18 +27,18 @@ do not get direct repo or code-editor access by default.
 - Consume `GET /api/v1/content/{tenant}/{section}`.
 - Consume `GET /api/v1/page-config/{tenant}` where the site supports page-level sections.
 - Consume `GET /api/v1/site-capabilities/{tenant}` or keep an equivalent local
-  manifest in sync with REB tenant metadata.
+  manifest in sync with Scaffold Web tenant metadata.
 - Expose a signed `POST /api/revalidate` endpoint.
-- Keep local defaults for REB outages.
+- Keep local defaults for Scaffold Web outages.
 - Document supported sections, variants, design tokens, custom features, env vars,
   build/test commands, deploy target, and rollback path.
 
 ## Current Precedents
 
 - GLDF: ecommerce, cart, rewards, Stripe, Supabase, custom section renderer,
-  REB content/page-config sync, signed revalidation.
+  Scaffold Web content/page-config sync, signed revalidation.
 - Rohlax Wellness: bespoke wellness pages, booking UX, motion system,
-  REB content fetch, signed revalidation.
+  Scaffold Web content fetch, signed revalidation.
 
 ## Workspace Connections
 
@@ -49,14 +49,14 @@ The local Scaffold Web workspace expects these sibling custom repos:
 | `gldf` | `../gldf` | `https://greatlakesdriedfruit.com` | `/api/reb-capabilities` | `/api/v1/revalidate` |
 | `rohlax` | `../rohlax-wellness` | `https://rohlaxwellness.com` | `/api/reb-capabilities` | `/api/v1/revalidate` |
 
-REB release metadata records both storefronts in `release-manifest.json`. Run
-`pnpm check:custom-repos` from the REB repo to verify that both sibling repos
+Scaffold Web release metadata records both storefronts in `release-manifest.json`. Run
+`pnpm check:custom-repos` from the Scaffold Web repo to verify that both sibling repos
 still expose the v1 contract files, env templates, capability manifests,
 admin-preview handoff, and signed revalidation endpoints expected by Scaffold Web.
 
 ## Tenant Metadata Requirements
 
-Each custom-repo tenant in REB should have:
+Each custom-repo tenant in Scaffold Web should have:
 
 - `deliveryModel: "custom_repo"`
 - `customRepo.repoName`

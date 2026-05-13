@@ -122,3 +122,4 @@ Business owners will pay $149/mo for a dashboard that proves their website is wo
 
 ## Execution Rules
 - NEVER add "Co-Authored-By" lines to commits
+- The user and project owner is Jacob Rhinehart. Address the user as Jacob when a name is needed; do not use any other personal name for the user.

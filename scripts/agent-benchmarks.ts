@@ -45,7 +45,7 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 function printHelp() {
-  console.log(`REB agent benchmark runner
+  console.log(`Scaffold Web agent benchmark runner
 
 Usage:
   pnpm bench:agent
@@ -119,7 +119,7 @@ function printList(cases: AgentBenchmarkCase[]) {
 }
 
 function printSummary(result: ReturnType<typeof runAgentBenchmarkSuite>) {
-  console.log(`REB Agent Benchmarks: ${result.passedCases}/${result.totalCases} passed, avg ${result.averageScore}/100`);
+  console.log(`Scaffold Web Agent Benchmarks: ${result.passedCases}/${result.totalCases} passed, avg ${result.averageScore}/100`);
   for (const grade of result.grades) {
     const mark = grade.pass ? "PASS" : "FAIL";
     console.log(`${mark} ${grade.caseId} ${grade.score}/100 ${grade.title}`);

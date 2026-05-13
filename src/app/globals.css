@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =============================================
-   REB — Design System
+   Scaffold Web — Design System
    ============================================= */
 
 :root {
@@ -20,6 +20,8 @@
   --terra:       #b5634b;
   --terra-light: #c97a64;
   --pure-white:  #ffffff;
+  --warm-white:  #faf9f7;
+  --on-warm-white: #1a1510;
   --warm-black:  #1a1510;
 
   /* Semantic grays — dashboard surfaces */
@@ -37,6 +39,8 @@
   --surface-base:   #faf9f7;
   --surface-raised: #f5f5f5;
   --surface-inset:  #fafafa;
+  --glass-active:   rgba(42, 37, 32, 0.06);
+  --overlay-scrim:  rgba(13, 12, 11, 0.58);
 }
 
 /* Dashboard dark theme — quiet product UI with neutral depth + blue accent */
@@ -53,6 +57,8 @@
   --bark-faded:  #666666;
   --terra:       #ef4444;
   --terra-light: #f87171;
+  --warm-white:  #f4f4f5;
+  --on-warm-white: oklch(11% 0.012 255);
   --warm-black:  #f4f4f5;
   --accent:      #6da3ff;
 
@@ -63,6 +69,8 @@
   --success-dim: rgba(52, 211, 153, 0.09);
   --glass:       rgba(255, 255, 255, 0.035);
   --glass-border: rgba(255, 255, 255, 0.075);
+  --glass-active: rgba(255, 255, 255, 0.075);
+  --overlay-scrim: rgba(8, 8, 10, 0.62);
 
   --gray-border:   rgba(255, 255, 255, 0.08);
   --gray-bg:       rgba(255, 255, 255, 0.045);
@@ -94,6 +102,8 @@
   --color-terra: var(--terra);
   --color-terra-light: var(--terra-light);
   --color-pure-white: var(--pure-white);
+  --color-warm-white: var(--warm-white);
+  --color-on-warm-white: var(--on-warm-white);
   --color-warm-black: var(--warm-black);
   --color-accent: var(--accent, #d4a052);
   --color-accent-dim: var(--accent-dim, rgba(91, 141, 239, 0.1));
@@ -102,6 +112,8 @@
   --color-success-dim: var(--success-dim, rgba(52, 211, 153, 0.09));
   --color-glass: var(--glass, rgba(255, 255, 255, 0.024));
   --color-glass-border: var(--glass-border, rgba(255, 255, 255, 0.04));
+  --color-glass-active: var(--glass-active, rgba(255, 255, 255, 0.075));
+  --color-overlay-scrim: var(--overlay-scrim, rgba(8, 8, 10, 0.62));
 
   /* Semantic grays */
   --color-gray-border: var(--gray-border);
@@ -165,6 +177,241 @@ body {
   outline: 2px dashed var(--sage);
   outline-offset: 2px;
   border-radius: 4px;
+}
+.marketing-root :focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--m-accent) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.marketing-root {
+  --m-bg: oklch(9.6% 0.009 250);
+  --m-panel: oklch(13.2% 0.011 248);
+  --m-panel-strong: oklch(17.5% 0.014 248);
+  --m-paper: oklch(14.6% 0.012 248);
+  --m-paper-muted: oklch(18.5% 0.014 248);
+  --m-paper-line: oklch(86% 0.012 230 / 0.13);
+  --m-surface: oklch(15.8% 0.012 248 / 0.92);
+  --m-raised: oklch(19.2% 0.015 248 / 0.96);
+  --m-rule: oklch(86% 0.012 230 / 0.16);
+  --m-rule-soft: oklch(86% 0.012 230 / 0.085);
+  --m-text: oklch(94.5% 0.008 235);
+  --m-text-2: oklch(73% 0.01 235);
+  --m-text-3: oklch(55% 0.011 235);
+  --m-ink: oklch(94.5% 0.008 235);
+  --m-ink-2: oklch(79% 0.01 235);
+  --m-accent: oklch(73% 0.105 178);
+  --m-accent-strong: oklch(79% 0.13 176);
+  --m-accent-soft: oklch(73% 0.105 178 / 0.14);
+  --m-accent-faint: oklch(73% 0.105 178 / 0.065);
+  --m-data: oklch(70% 0.08 202);
+  --m-success: oklch(72% 0.12 154);
+  --m-danger: oklch(66% 0.16 25);
+  --m-button: oklch(92.5% 0.01 235);
+  --m-button-text: oklch(10.5% 0.01 250);
+  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --m-ease-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --m-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --m-duration-instant: 140ms;
+  --m-duration-state: 260ms;
+  --m-duration-enter: 720ms;
+  background:
+    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 182 / 0.36), transparent 35rem),
+    linear-gradient(180deg, oklch(16% 0.018 245 / 0.74), transparent 30rem),
+    var(--m-bg);
+  color: var(--m-text);
+  color-scheme: dark;
+  min-height: 100vh;
+}
+.marketing-root::selection {
+  background: var(--m-accent);
+  color: var(--m-button-text);
+}
+
+.marketing-root {
+  background-color: var(--m-bg);
+  background-image:
+    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 182 / 0.36), transparent 35rem),
+    linear-gradient(180deg, oklch(16% 0.018 245 / 0.74), transparent 30rem);
+}
+
+.launch-enter {
+  animation: launch-enter var(--m-duration-enter, 720ms) var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.launch-sweep {
+  animation: launch-sweep 5600ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes launch-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes launch-sweep {
+  0% {
+    opacity: 0;
+    transform: translate3d(-72%, 0, 0);
+  }
+  18%,
+  58% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(72%, 0, 0);
+  }
+}
+
+.motion-rise {
+  animation: launch-enter var(--m-duration-enter, 720ms) var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: var(--motion-delay, 0ms);
+}
+
+.motion-item {
+  animation: motion-item-enter 640ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: calc(var(--i, 0) * 64ms + 180ms);
+}
+
+.marketing-button-primary,
+.marketing-button-secondary {
+  display: inline-flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.85rem 1.35rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    transform var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+    border-color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+    background-color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+    color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+    box-shadow var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1));
+}
+
+.marketing-button-primary {
+  background: var(--m-button);
+  color: var(--m-button-text);
+  box-shadow: 0 14px 44px oklch(4% 0.01 250 / 0.34);
+}
+
+.marketing-button-secondary {
+  border: 1px solid var(--m-rule);
+  background: var(--m-panel);
+  color: var(--m-text-2);
+}
+
+.marketing-button-primary:hover,
+.marketing-button-secondary:hover {
+  transform: translate3d(0, -2px, 0);
+}
+
+.marketing-button-primary:hover {
+  background: oklch(97% 0.006 235);
+  box-shadow: 0 18px 58px oklch(4% 0.01 250 / 0.44), 0 0 0 4px var(--m-accent-faint);
+}
+
+.marketing-button-secondary:hover {
+  border-color: var(--m-rule);
+  color: var(--m-text);
+  background: var(--m-panel-strong);
+}
+
+.marketing-system-frame {
+  isolation: isolate;
+}
+
+.marketing-system-frame::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(115deg, transparent 0 34%, oklch(96% 0.012 220 / 0.035) 50%, transparent 66%);
+}
+
+.process-line {
+  position: absolute;
+  bottom: 0.875rem;
+  left: 0.875rem;
+  top: 0.875rem;
+  width: 1px;
+  background: linear-gradient(180deg, var(--m-accent), var(--m-rule-soft));
+  transform-origin: top;
+  animation: process-line 1200ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 360ms both;
+}
+
+.progress-run {
+  width: 74%;
+  transform-origin: left;
+  animation: progress-run 2100ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 460ms both;
+}
+
+@keyframes motion-item-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes process-line {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes progress-run {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-enter,
+  .launch-sweep,
+  .motion-rise,
+  .motion-item,
+  .process-line,
+  .progress-run {
+    animation: none;
+  }
+
+  .motion-rise,
+  .motion-item {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  .process-line {
+    transform: scaleY(1);
+  }
+
+  .progress-run {
+    transform: scaleX(1);
+  }
 }
 [data-dashboard] :focus-visible {
   outline: 2px solid rgba(138, 182, 255, 0.45);
@@ -323,7 +570,7 @@ body {
 }
 
 /* ===== SCROLL INDICATOR ===== */
-@keyframes bounce-subtle {
+@keyframes scroll-cue-drift {
   0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
   50% { transform: translateX(-50%) translateY(6px); opacity: 0.6; }
 }
@@ -358,7 +605,7 @@ body {
   animation: typing-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* REB accent line — visual signature */
+/* Scaffold Web accent line — visual signature */
 .reb-accent-line {
   height: 2px;
   background: linear-gradient(90deg, var(--sage) 0%, var(--sage-dark) 50%, transparent 100%);
@@ -429,8 +676,8 @@ body {
 
 /* Active section accent — left border + subtle bg lift */
 .section-row-active {
-  border-left: 2px solid var(--sage);
   background: var(--gray-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sage) 46%, transparent);
 }
 
 /* Section expand/collapse spring */
@@ -463,14 +710,14 @@ body {
   animation: preview-highlight-ring 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Save checkmark bounce */
-@keyframes check-bounce {
+/* Save checkmark settle */
+@keyframes check-settle {
   0% { opacity: 0; transform: scale(0.5); }
-  60% { opacity: 1; transform: scale(1.15); }
+  60% { opacity: 1; transform: scale(1.05); }
   100% { opacity: 1; transform: scale(1); }
 }
-.animate-check-bounce {
-  animation: check-bounce 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-check-settle {
+  animation: check-settle 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Chat message entrance — slide in from sides */
@@ -575,8 +822,8 @@ body {
 
 /* Chat thinking state */
 @keyframes ai-text-shine {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
 }
 @keyframes ai-thinking-pop {
   0% {
@@ -594,11 +841,8 @@ body {
 }
 .ai-shining-text {
   display: inline-block;
-  background: linear-gradient(110deg, var(--gray-muted), 35%, #ffffff, 50%, var(--gray-muted), 75%, var(--gray-muted));
-  background-size: 200% 100%;
-  background-clip: text;
-  color: transparent;
-  animation: ai-text-shine 3.8s linear infinite;
+  color: var(--accent-text);
+  animation: ai-text-shine 3.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 .ai-thinking-pop {
   transform-origin: left center;
@@ -647,7 +891,7 @@ body {
   .animate-panel-right,
   .animate-overlay-enter,
   .animate-card-enter,
-  .animate-check-bounce,
+  .animate-check-settle,
   .animate-queue-card-enter,
   .ai-thinking-pop,
   .ai-output-pop,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Camera, ImageIcon, Loader2, Upload } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +20,10 @@ type UploadResult = {
 
 export default function PhotosPage() {
   const dashboard = useDashboardOptional();
-  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const apiHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);

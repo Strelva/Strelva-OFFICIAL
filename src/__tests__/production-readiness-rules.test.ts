@@ -1069,19 +1069,22 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   });
 
   it("uses distributed limiting and sanitized fields for public intake forms", () => {
-    const onboard = readFileSync(path.join(process.cwd(), "src/app/api/onboard/intake/route.ts"), "utf8");
+    const accessRequest = readFileSync(
+      path.join(process.cwd(), "src/app/api/access-request/intake/route.ts"),
+      "utf8",
+    );
     const booking = readFileSync(path.join(process.cwd(), "src/app/api/booking/route.ts"), "utf8");
     const bookingUpdate = readFileSync(path.join(process.cwd(), "src/app/api/booking/[id]/route.ts"), "utf8");
     const bookingConfig = readFileSync(path.join(process.cwd(), "src/app/api/booking/config/route.ts"), "utf8");
     const availability = readFileSync(path.join(process.cwd(), "src/app/api/booking/availability/route.ts"), "utf8");
     const subscribe = readFileSync(path.join(process.cwd(), "src/app/api/newsletter/subscribe/route.ts"), "utf8");
 
-    expect(onboard).toContain("isRateLimitedWindowedAsync");
-    expect(onboard).not.toContain("isRateLimitedWindowed(");
-    expect(onboard).toContain("normalizedEmail");
-    expect(onboard).toContain("safeDescription");
-    expect(onboard).toContain("readJsonObject(req)");
-    expect(onboard).toContain("Invalid request body");
+    expect(accessRequest).toContain("isRateLimitedWindowedAsync");
+    expect(accessRequest).not.toContain("isRateLimitedWindowed(");
+    expect(accessRequest).toContain("normalizedEmail");
+    expect(accessRequest).toContain("safeDescription");
+    expect(accessRequest).toContain("readJsonObject(req)");
+    expect(accessRequest).toContain("Invalid request body");
 
     expect(booking).toContain("cleanText");
     expect(booking).toContain("isValidDate");

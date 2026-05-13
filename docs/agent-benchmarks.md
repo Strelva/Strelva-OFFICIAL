@@ -1,4 +1,4 @@
-# REB Agent Benchmarks
+# Scaffold Web Agent Benchmarks
 
 This is the SWE-bench-style harness for Scaffold Web owner-agent work.
 

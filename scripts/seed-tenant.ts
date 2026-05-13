@@ -225,7 +225,7 @@ async function seed(tenantId: string) {
   }
 
   console.log(`\nDone! ${sections.length} sections seeded for "${tenantId}".`);
-  console.log(`\nOnboarding checklist:`);
+  console.log(`\nAccess setup checklist:`);
   console.log(`  □ Set Clerk publicMetadata: { tenants: ["${tenantId}"] } on client's user`);
   if (tenantConfig.productionDomain) {
     console.log(`  □ Add Vercel domain: ${tenantConfig.productionDomain}`);

@@ -65,7 +65,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+    <div className="fixed inset-0 bg-[rgba(8,8,10,0.64)] flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="invite-title">
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-sm">
         <h3 id="invite-title" className="text-lg font-medium text-white mb-1">Invite to {siteName}</h3>
         <p className="text-sm text-zinc-500 mb-4">
@@ -95,7 +95,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                   href={result.signUpUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block rounded-md border border-emerald-500/20 bg-black/20 px-3 py-2 break-all font-mono text-[11px] text-emerald-100 hover:text-white"
+                  className="block rounded-md border border-emerald-500/20 bg-[rgba(8,8,10,0.24)] px-3 py-2 break-all font-mono text-[11px] text-emerald-100 hover:text-white"
                 >
                   <span className="sr-only">Open manual signup link: </span>
                   {result.signUpUrl}
@@ -112,7 +112,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                       setCopyFailed(true);
                     }
                   }}
-                  className="rounded-md bg-emerald-300 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-emerald-200"
+                  className="rounded-md bg-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-200"
                 >
                   {copied ? "Copied signup link" : "Copy signup link"}
                 </button>

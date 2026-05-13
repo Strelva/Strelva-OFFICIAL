@@ -71,6 +71,10 @@ describe("dashboard route redirects", () => {
     expect(signIn).toContain("Invited email:");
     expect(signInPage).toContain("getInvitedEmail(params)");
     expect(signIn).toContain("Use the exact email address that received your invite");
+    expect(signIn).toContain("marketing-root min-h-dvh");
+    expect(signIn).toContain("Secure dashboard handoff");
+    expect(signIn).toContain("Continue to your website dashboard.");
+    expect(signIn).toContain("This email stays attached when switching between sign-in and");
     expect(signInPage).toContain("@/lib/marketing-hosts");
     expect(signInPage).toContain("@/lib/client-fallback");
     expect(signInPage).toContain("getClientFallbackRoot(requestHeaders)");
@@ -130,7 +134,7 @@ describe("dashboard route redirects", () => {
 
     expect(source).toContain("No invited sites on this account");
     expect(source).toContain("UseInvitedEmailButton");
-    expect(source).toContain("Start a new site");
+    expect(source).toContain("Request private beta access");
     expect(source).toContain("mailto:jacob@scaffoldweb.com");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("return <NoAccessState />");

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Naming**: Product is "Scaffold Web". Repo folder is "REB" (internal). Package name is "scaffold-web".
+**Naming**: Product is "Scaffold Web". Repo folder path is legacy lowercase `reb` (internal). Package name is "scaffold-web".
 
 ## Commands
 

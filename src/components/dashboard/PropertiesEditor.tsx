@@ -593,7 +593,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Saved confirmation */}
       {saved && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
-          <Check className="w-4 h-4 text-emerald-500 animate-check-bounce" strokeWidth={2} />
+          <Check className="w-4 h-4 text-emerald-500 animate-check-settle" strokeWidth={2} />
           <span className="text-[12px] font-medium text-emerald-400">
             {editMode === "draft"
               ? "Draft saved - preview updated"

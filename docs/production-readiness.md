@@ -1,4 +1,4 @@
-# REB Production Readiness
+# Scaffold Web Production Readiness
 
 ## Branch And Release Model
 
@@ -6,7 +6,7 @@
 - GLDF primary branch: `master` until intentionally renamed.
 - Rohlax Wellness primary branch: `main`.
 - Tag control-plane releases as `reb-vYYYY.MM.DD.N`.
-- Record compatible storefront tags or commit SHAs in each REB release note.
+- Record compatible storefront tags or commit SHAs in each Scaffold Web release note.
 
 ## API Contract
 
@@ -44,8 +44,8 @@
 - Provision tenant with `pnpm provision-tenant` and store a unique `revalidationSecret`.
 - Set the storefront `REVALIDATE_SECRET` to the same value.
 - Set tenant `revalidateUrl` to the storefront `/api/v1/revalidate` endpoint.
-- Set `REB_CUSTOM_REQUEST_SECRET` in REB and in any custom storefront that exposes `/api/reb-custom-request`; the values must match exactly and must not include copied newline text.
-- Run `pnpm check:custom-repos` from REB to verify local GLDF and Rohlax storefront repos still expose the expected Scaffold Web contract files, env templates, capability manifests, and signed revalidation endpoints.
+- Set `REB_CUSTOM_REQUEST_SECRET` in Scaffold Web and in any custom storefront that exposes `/api/reb-custom-request`; the values must match exactly and must not include copied newline text.
+- Run `pnpm check:custom-repos` from Scaffold Web to verify local GLDF and Rohlax storefront repos still expose the expected Scaffold Web contract files, env templates, capability manifests, and signed revalidation endpoints.
 - Confirm custom domain mapping resolves tenant from host or use `/api/v1/*` public routes.
 - Add production domains in Vercel, including `www` and `admin` variants where used.
 - Configure DNS and wait for Vercel domain verification before sending traffic.
@@ -108,8 +108,8 @@
 
 ## Content Schema Rollback Plan
 
-- Keep new content fields optional in REB for one storefront release.
-- Deploy storefront rendering support before requiring a new field in REB.
-- If content breaks a storefront, restore the previous content version from REB version history.
+- Keep new content fields optional in Scaffold Web for one storefront release.
+- Deploy storefront rendering support before requiring a new field in Scaffold Web.
+- If content breaks a storefront, restore the previous content version from Scaffold Web version history.
 - If code breaks a storefront, redeploy the previous Vercel deployment or release tag.
 - For incompatible schema changes, publish a new API version and keep `/api/v1/*` stable until all storefronts migrate.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, CircleCheck, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import {
   INTELLIGENCE_CATEGORY_LABELS,
@@ -35,7 +35,10 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const router = useRouter();
   const searchParams = useSearchParams();
   const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const dashboardHref = useMemo(
+    () => dashboard?.dashboardHref ?? ((path: string) => path),
+    [dashboard?.dashboardHref],
+  );
   const detail = getIntegrationDefinition(connectionId);
 
   const [credentialsValue, setCredentialsValue] = useState("");
@@ -95,7 +98,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       );
       setLastSyncedAt(conn?.lastSyncedAt ?? null);
     });
-  }, [dashboardHref, detail, searchParams]);
+  }, [dashboardHref, detail]);
 
   const handleSaveCredentials = async () => {
     if (!detail?.configField || !credentialsValue.trim()) return;
