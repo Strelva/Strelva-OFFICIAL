@@ -22,7 +22,7 @@ A admin.rohlaxwellness.com 76.76.21.21
 
 - Status: blocked
 - Owner: Jacob Rhinehart
-- Evidence: As of May 14, 2026, `pnpm check:prod` reads an active Sanity tenant with id `jacobtest`. The tenant has no customer-facing `productionDomain` or `customDomains`, no `adminDomain` or derivable `admin.<productionDomain>`, and no `revalidateUrl`, so the checker correctly fails `Tenant jacobtest client domain`, `Tenant jacobtest admin domain`, and `Tenant jacobtest revalidation`.
+- Evidence: As of May 14, 2026, a read-only Sanity query found active tenant `jacobtest` at document `_id` `THl7mfItZYUmELpcZNa2Zr`. The tenant has no customer-facing `productionDomain` or `customDomains`, no `adminDomain` or derivable `admin.<productionDomain>`, no `revalidateUrl`, and no `revalidationSecret`, so `pnpm check:prod` correctly fails `Tenant jacobtest client domain`, `Tenant jacobtest admin domain`, and `Tenant jacobtest revalidation`.
 - Required owner action: either deactivate `jacobtest` in Sanity if it is an internal test tenant, or configure its launch domains and revalidation fields before release. Active launch tenants need a customer-facing `productionDomain`/`customDomains` entry, an `adminDomain` or derivable `admin.<productionDomain>`, and `revalidateUrl` plus `revalidationSecret`.
 
 Copyable DNS verification commands:

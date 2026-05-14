@@ -670,6 +670,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("inactive internal demo tenant");
     expect(audit).toContain("Rohlax Cloudflare DNS");
     expect(audit).toContain("jacobtest");
+    expect(audit).toContain("THl7mfItZYUmELpcZNa2Zr");
     expect(audit).toContain("Tenant jacobtest client domain");
     expect(audit).toContain("69 passed, 4 warned, 6 failed, and 16 skipped");
     expect(audit).toContain("70 passed, 3 warned, 6 failed, and 16 skipped");
@@ -841,6 +842,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("Rohlax Cloudflare DNS");
     expect(launchBlockers).toContain("Jacob Test Tenant Launch Configuration");
     expect(launchBlockers).toContain("Tenant jacobtest client domain");
+    expect(launchBlockers).toContain("THl7mfItZYUmELpcZNa2Zr");
     expect(launchBlockers).toContain("deactivate `jacobtest` in Sanity");
     expect(launchBlockers).toContain("dax.ns.cloudflare.com");
     expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `scaffold-web");
