@@ -163,7 +163,7 @@ Current template categories:
 Before launch:
 
 - Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm audit`, `pnpm build`, `pnpm check:prod`, and `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke`.
-- Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; `check:release` forces `REB_DEV_UNGATED_ACCESS=0` for smoke.
+- Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; local smoke runs against the built Next app and `check:release` forces `REB_DEV_UNGATED_ACCESS=0`.
 - Verify dashboard desktop and mobile views manually.
 - Verify at least one tenant storefront on mobile and desktop.
 - Confirm marketing `/home`, `/access-request`, `/sign-in`, `/privacy`, and `/terms` are live.

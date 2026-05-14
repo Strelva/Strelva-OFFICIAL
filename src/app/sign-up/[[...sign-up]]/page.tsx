@@ -25,6 +25,11 @@ async function getPostSignUpUrl(): Promise<string> {
 }
 
 async function getSignUpSiteName() {
+  const requestHeaders = await headers();
+  const explicitTenant = requestHeaders.get("x-tenant");
+  const host = requestHeaders.get("host") || "";
+  if (!explicitTenant && isMarketingHost(host)) return "Scaffold Web";
+
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
   return getTenantSiteName(tenant, config);

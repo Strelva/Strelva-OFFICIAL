@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - AI website management",
-  description: "A managed website, weekly proof report, and AI update path for local businesses.",
+  title: "Scaffold Web - Free websites for local businesses",
+  description: "Request a free site for your local business, built for calls, bookings, and trust.",
 };
 
 export default function MarketingLayout({
@@ -17,14 +17,8 @@ export default function MarketingLayout({
         <div className="mx-auto flex h-11 max-w-[1400px] items-center justify-between gap-6 rounded-full border border-[var(--m-rule-soft)] bg-[var(--m-paper)] px-4 shadow-[0_18px_64px_oklch(4%_0.01_255_/_0.34)]">
           <Link
             href="/"
-            className="group flex items-center gap-2.5 text-[15px] font-semibold tracking-normal text-[color:var(--m-text)]"
+            className="text-[15px] font-semibold tracking-normal text-[color:var(--m-text)]"
           >
-            <span
-              aria-hidden="true"
-              className="grid size-5 place-items-center rounded-md border border-[var(--m-rule)] bg-[var(--m-panel)]"
-            >
-              <span className="size-2 rounded-[2px] bg-[var(--m-accent)]" />
-            </span>
             Scaffold Web
           </Link>
           <div className="hidden md:block" />
@@ -39,7 +33,7 @@ export default function MarketingLayout({
               href="/access-request"
               className="inline-flex h-8 items-center justify-center rounded-full bg-[var(--m-button)] px-4 text-[13px] font-medium text-[var(--m-button-text)] transition-transform duration-300 hover:-translate-y-0.5"
             >
-              Request access
+              Request a free site
             </Link>
           </nav>
         </div>

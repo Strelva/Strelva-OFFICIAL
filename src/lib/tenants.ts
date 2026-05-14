@@ -44,6 +44,14 @@ async function loadTenants(): Promise<TenantConfig[]> {
     const fromSanity = (docs || []).map(sanityToTenant);
     if (fromSanity.length > 0) {
       tenants = fromSanity;
+      if (!isProductionEnv()) {
+        const devTenants = await loadFromDevFile();
+        const existingIds = new Set(tenants.map((tenant) => tenant.id));
+        tenants = [
+          ...tenants,
+          ...devTenants.filter((tenant) => !existingIds.has(tenant.id)),
+        ];
+      }
     } else if (isProductionEnv()) {
       throw new Error("[PRODUCTION] Sanity returned no tenants — cannot fall back to dev file");
     } else {

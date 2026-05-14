@@ -10,6 +10,7 @@ import { foodBrandTemplate } from "./food-brand";
 import { restaurantTemplate } from "./restaurant";
 import { tradesTemplate } from "./trades";
 import { professionalTemplate } from "./professional";
+import { fashionStylistTemplate } from "./fashion-stylist";
 
 // Each template defines its own section/header/footer component shapes,
 // so prop types are intentionally polymorphic. Props are built via buildProps
@@ -54,6 +55,7 @@ const _registry: Record<string, TemplateDefinition> = {
   restaurant: restaurantTemplate,
   trades: tradesTemplate,
   professional: professionalTemplate,
+  "fashion-stylist": fashionStylistTemplate,
 };
 
 export function getTemplateRegistry(): Record<string, TemplateDefinition> {

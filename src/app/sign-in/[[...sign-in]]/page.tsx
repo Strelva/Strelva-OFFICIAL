@@ -19,10 +19,19 @@ async function getPostSignInUrl(): Promise<string> {
   return isMarketingHost(host) ? "/account" : "/dashboard";
 }
 
-export async function generateMetadata(): Promise<Metadata> {
+async function getSignInSiteName() {
+  const requestHeaders = await headers();
+  const explicitTenant = requestHeaders.get("x-tenant");
+  const host = requestHeaders.get("host") || "";
+  if (!explicitTenant && isMarketingHost(host)) return "Scaffold Web";
+
   const tenant = await getTenantFromHeaders();
   const config = await getTenantConfig(tenant);
-  const siteName = getTenantSiteName(tenant, config);
+  return getTenantSiteName(tenant, config);
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const siteName = await getSignInSiteName();
 
   return {
     title: `Sign in to ${siteName}`,
@@ -36,9 +45,7 @@ export default async function SignInPage({
   searchParams: Promise<InvitedEmailSearchParams>;
 }) {
   const params = await searchParams;
-  const tenant = await getTenantFromHeaders();
-  const config = await getTenantConfig(tenant);
-  const siteName = getTenantSiteName(tenant, config);
+  const siteName = await getSignInSiteName();
   const postSignInUrl = await getPostSignInUrl();
   const invitedEmail = getInvitedEmail(params);
 

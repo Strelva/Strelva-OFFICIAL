@@ -7,20 +7,20 @@ const tenantHost = tenantUrl.host;
 const externalBaseUrl = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 
 test("marketing homepage gives a customer clear starting points", async ({ page }) => {
-  const response = await page.goto("/");
+  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();
 
-  await expect(page.getByRole("heading", { name: /scaffold web/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /request access/i }).first()).toHaveAttribute("href", "/access-request");
+  await expect(page.getByRole("heading", { name: /get a free site/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /request a free site/i }).first()).toHaveAttribute("href", "/access-request");
   await expect(page.getByRole("link", { name: /sign in/i }).first()).toHaveAttribute("href", "/sign-in");
 });
 
-test("legacy onboard route redirects to the private-beta access request", async ({ page }) => {
-  const response = await page.goto("/onboard?ref=home-proof-loop");
+test("legacy onboard route redirects to the access request", async ({ page }) => {
+  const response = await page.goto("/onboard?ref=home-proof-loop", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(400);
 
   await expect(page).toHaveURL(/\/access-request\?ref=home-proof-loop/);
-  await expect(page.getByRole("heading", { name: /what should scaffold handle first/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /request your free site/i })).toBeVisible();
 });
 
 test("tenant public pages render without server errors", async ({ page }) => {
@@ -29,7 +29,7 @@ test("tenant public pages render without server errors", async ({ page }) => {
 
   const paths = externalBaseUrl ? ["/"] : ["/", "/services", "/contact"];
   for (const path of paths) {
-    const response = await page.goto(`${tenantOrigin}${path}`);
+    const response = await page.goto(`${tenantOrigin}${path}`, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${path} should not fail`).toBeLessThan(400);
     await expect(page.locator("body")).toBeVisible();
     await expect(page.locator("main").first()).toBeVisible();
@@ -84,7 +84,7 @@ test("normal tenant pages keep anti-framing protections", async ({ request }) =>
 });
 
 test("signed-out dashboard customers get the sign-in flow instead of a broken page", async ({ page }) => {
-  const response = await page.goto("/dashboard");
+  const response = await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
@@ -101,7 +101,7 @@ test("signed-out dashboard customers get the sign-in flow instead of a broken pa
 });
 
 test("signed-out account handoff returns users to sign-in", async ({ page }) => {
-  const response = await page.goto("/account");
+  const response = await page.goto("/account", { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
@@ -112,7 +112,7 @@ test("signed-out account handoff returns users to sign-in", async ({ page }) => 
 
 test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) => {
   const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(adminOrigin);
+  const response = await page.goto(adminOrigin, { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
@@ -125,7 +125,7 @@ test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) 
 
 test("admin tenant host sign-in keeps the invited email context", async ({ page }) => {
   const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(`${adminOrigin}/sign-in?email=owner%40example.com`);
+  const response = await page.goto(`${adminOrigin}/sign-in?email=owner%40example.com`, { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in\?email=owner%40example\.com/);
@@ -138,7 +138,7 @@ test("admin tenant host sign-in keeps the invited email context", async ({ page 
 
 test("admin tenant host sign-up uses the tenant invite context", async ({ page }) => {
   const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(`${adminOrigin}/sign-up?email=owner%40example.com`);
+  const response = await page.goto(`${adminOrigin}/sign-up?email=owner%40example.com`, { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-up/);
@@ -158,7 +158,7 @@ test("admin tenant host sign-up uses the tenant invite context", async ({ page }
 });
 
 test("signed-out no-access recovery returns users to sign-in", async ({ page }) => {
-  const response = await page.goto("/no-access");
+  const response = await page.goto("/no-access", { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);

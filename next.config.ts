@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["127.0.0.1", "gldf.localhost", "admin.gldf.localhost"],
+  distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "gldf.localhost",
+    "admin.gldf.localhost",
+    "jada.localhost",
+    "admin.jada.localhost",
+  ],
   images: {
     remotePatterns: [
       {
