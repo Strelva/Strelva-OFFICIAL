@@ -1,149 +1,49 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Activity,
-  ArrowRight,
-  ClipboardCheck,
-  Clock3,
-  FileCheck2,
-  MessageSquareText,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - The website loop local businesses can trust",
+  title: "Scaffold Web - Managed website operations for local businesses",
   description:
-    "Join the free website waitlist for local businesses that want weekly proof, plain-English updates, and a site that stays current.",
+    "Scaffold Web builds and manages local business websites with a weekly plain-English receipt and a simple update path.",
 };
 
-const reportRows = [
-  ["People found you", "47", "12 more than last week"],
-  ["Booking clicks", "8", "3 came from mobile"],
-  ["Updates handled", "3", "checked before publish"],
+const receiptLines = [
+  ["Found", "42 local visits from search and direct links"],
+  ["Clicked", "7 booking clicks, 3 calls, 2 menu views"],
+  ["Changed", "Hours fixed, new class added, old promo removed"],
+  ["Next", "Post the Saturday opening before Thursday noon"],
 ];
 
-const proofBadges = [
-  { Icon: FileCheck2, label: "Free first site" },
-  { Icon: ClipboardCheck, label: "Weekly proof report" },
-  { Icon: Clock3, label: "Plain-English updates" },
-];
-
-const momentumItems = [
-  "Site updates",
-  "Weekly reports",
-  "Reviews",
-  "Email",
-  "Social",
-  "Follow-ups",
-];
-
-function MomentumPanel() {
-  return (
-    <div className="mt-4 rounded-[18px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-[13px] font-medium text-[color:var(--m-accent)]">The site loop comes first</p>
-        <span className="text-[12px] text-[color:var(--m-text-3)]">then the rest compounds</span>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        {momentumItems.map((item, index) => (
-          <span
-            key={item}
-            className="motion-item rounded-md border border-[var(--m-rule-soft)] bg-[var(--m-bg)] px-2.5 py-2 text-[12px] leading-tight text-[color:var(--m-text-2)]"
-            style={{ "--i": index } as React.CSSProperties}
-          >
-            {item}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ReceiptPanel() {
+function ReceiptArtifact() {
   return (
     <div
-      aria-label="Preview of the Scaffold Web weekly receipt and update path"
-      className="marketing-system-frame motion-rise relative overflow-hidden rounded-[22px] border border-[var(--m-rule)] bg-[var(--m-paper)] shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)]"
+      aria-label="Weekly website receipt"
+      className="receipt-artifact-stage motion-rise"
       style={{ "--motion-delay": "120ms" } as React.CSSProperties}
     >
-      <span className="receipt-scan" aria-hidden="true" />
-      <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[var(--m-rule-soft)] px-5 py-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-7 shrink-0 place-items-center rounded-md border border-[var(--m-rule)] bg-[var(--m-panel)] text-[color:var(--m-accent)]">
-            <FileCheck2 className="size-4" />
-          </span>
-          <div>
-            <p className="text-[13px] font-medium text-[color:var(--m-text)]">Monday receipt</p>
-            <p className="mt-0.5 text-[12px] text-[color:var(--m-text-3)]">Report sent. Request handled.</p>
-          </div>
+      <div className="receipt-artifact" aria-hidden="true">
+        <span className="receipt-artifact-scan" />
+        <div className="receipt-artifact-top">
+          <span>Monday, 8:12 AM</span>
+          <strong>Scaffold Web</strong>
         </div>
-        <span className="hidden text-[12px] text-[color:var(--m-text-3)] sm:inline">
-          Website proof loop
-        </span>
-      </div>
-
-      <div className="grid gap-0 md:grid-cols-[0.86fr_1.14fr]">
-        <section className="border-b border-[var(--m-rule-soft)] p-5 md:border-b-0 md:border-r md:p-6">
-          <p className="text-[13px] text-[color:var(--m-text-3)]">Owner asks</p>
-          <div className="mt-4 rounded-[16px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--m-accent-soft)] text-[color:var(--m-accent)]">
-                <MessageSquareText className="size-4" />
-              </span>
-              <p className="text-[15px] leading-[1.55] text-[color:var(--m-text)]">
-                Add the Saturday class and booking link before Friday.
-              </p>
+        <p className="receipt-artifact-lead">
+          People found you this week. One update is worth making before the weekend.
+        </p>
+        <div className="receipt-artifact-list">
+          {receiptLines.map(([label, detail], index) => (
+            <div
+              key={label}
+              className="receipt-artifact-row motion-item"
+              style={{ "--i": index } as React.CSSProperties}
+            >
+              <span>{label}</span>
+              <p>{detail}</p>
             </div>
-          </div>
-
-          <div className="mt-5 grid gap-2">
-            {["Report sent", "Update drafted", "Reviewed before publish"].map((label, index) => (
-              <div key={label} className="motion-item flex items-center gap-3" style={{ "--i": index } as React.CSSProperties}>
-                <span className="grid size-6 shrink-0 place-items-center rounded-full border border-[var(--m-rule)] bg-[var(--m-bg)] text-[10px] text-[color:var(--m-text-3)]">
-                  {index + 1}
-                </span>
-                <span className="text-[13px] leading-[1.35] text-[color:var(--m-text-2)]">{label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="p-5 md:p-6">
-          <div className="grid gap-1">
-            {reportRows.map(([label, value, detail], index) => (
-              <div
-                key={label}
-                className="motion-item grid grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--m-rule-soft)] py-3 last:border-b-0"
-                style={{ "--i": index + 2 } as React.CSSProperties}
-              >
-                <div>
-                  <p className="text-[14px] text-[color:var(--m-text-2)]">{label}</p>
-                  <p className="mt-1 text-[12px] text-[color:var(--m-text-3)]">{detail}</p>
-                </div>
-                <span className="font-mono text-[30px] font-semibold tabular-nums leading-none text-[color:var(--m-text)]">
-                  {value}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 grid gap-3 rounded-[16px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4">
-            <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2 text-[13px] text-[color:var(--m-text-2)]">
-                <ShieldCheck className="size-4 text-[color:var(--m-success)]" />
-                Ready for review
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-[12px] text-[color:var(--m-accent)]">
-                <span className="signal-dot" aria-hidden="true" />
-                Queued
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-[var(--m-bg)]">
-              <span className="progress-run block h-full rounded-full bg-[var(--m-accent)]" />
-            </div>
-          </div>
-          <MomentumPanel />
-        </section>
+          ))}
+        </div>
+        <p className="receipt-artifact-foot">Owner note: add the Saturday opening. Publish only after review.</p>
       </div>
     </div>
   );
@@ -156,56 +56,186 @@ export default function HomePage() {
         .marketing-footer {
           display: none;
         }
+
+        .receipt-artifact-stage {
+          position: relative;
+          min-height: min(500px, calc(100svh - 11rem));
+        }
+
+        .receipt-artifact-stage::before {
+          position: absolute;
+          inset: 12% 7% 4% auto;
+          width: 42%;
+          content: "";
+          border-radius: 999px;
+          background: oklch(72% 0.1 178 / 0.12);
+          filter: blur(52px);
+        }
+
+        .receipt-artifact {
+          position: relative;
+          width: min(100%, 520px);
+          min-height: min(440px, calc(100svh - 12.5rem));
+          margin-left: auto;
+          overflow: hidden;
+          padding: clamp(1.15rem, 2vw, 1.55rem);
+          border: 1px solid oklch(75% 0.05 88 / 0.28);
+          border-radius: 8px;
+          background:
+            linear-gradient(180deg, oklch(91% 0.014 82 / 0.97), oklch(83% 0.018 84 / 0.94)),
+            var(--m-text);
+          color: oklch(18% 0.011 248);
+          box-shadow: 0 34px 95px oklch(4% 0.01 255 / 0.48);
+          transform: rotate(-1.1deg);
+          isolation: isolate;
+        }
+
+        .receipt-artifact::before,
+        .receipt-artifact::after {
+          position: absolute;
+          right: 0;
+          left: 0;
+          height: 18px;
+          content: "";
+          background:
+            radial-gradient(circle at 9px 0, transparent 8px, oklch(88% 0.015 82 / 0.98) 8.5px) repeat-x;
+          background-size: 18px 18px;
+          opacity: 0.7;
+        }
+
+        .receipt-artifact::before {
+          top: -1px;
+        }
+
+        .receipt-artifact::after {
+          bottom: -1px;
+          transform: rotate(180deg);
+        }
+
+        .receipt-artifact-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          color: oklch(28% 0.012 248 / 0.72);
+          font-size: 0.78rem;
+        }
+
+        .receipt-artifact-top strong {
+          color: oklch(20% 0.014 248);
+          font-weight: 700;
+        }
+
+        .receipt-artifact-lead {
+          margin-top: clamp(1.5rem, 3vw, 2.45rem);
+          max-width: 32rem;
+          color: oklch(16% 0.012 248);
+          font-size: clamp(1.18rem, 2.05vw, 1.55rem);
+          font-weight: 700;
+          letter-spacing: 0;
+          line-height: 1.15;
+        }
+
+        .receipt-artifact-list {
+          display: grid;
+          margin-top: clamp(1.3rem, 2.5vw, 1.9rem);
+          border-top: 1px solid oklch(45% 0.014 248 / 0.24);
+        }
+
+        .receipt-artifact-row {
+          display: grid;
+          grid-template-columns: 5.8rem minmax(0, 1fr);
+          gap: 1.15rem;
+          padding: 0.82rem 0;
+          border-bottom: 1px solid oklch(45% 0.014 248 / 0.24);
+        }
+
+        .receipt-artifact-row span {
+          color: oklch(30% 0.018 178);
+          font-size: 0.78rem;
+          font-weight: 800;
+        }
+
+        .receipt-artifact-row p {
+          color: oklch(24% 0.012 248 / 0.82);
+          font-size: 0.92rem;
+          line-height: 1.42;
+        }
+
+        .receipt-artifact-foot {
+          margin-top: clamp(1.4rem, 3vw, 2rem);
+          color: oklch(22% 0.012 248 / 0.72);
+          font-size: 0.9rem;
+          line-height: 1.45;
+        }
+
+        .receipt-artifact-scan {
+          position: absolute;
+          inset: -26% 0 auto;
+          z-index: -1;
+          height: 36%;
+          pointer-events: none;
+          background: linear-gradient(180deg, transparent, oklch(72% 0.1 178 / 0.18), transparent);
+          transform: translate3d(0, -40%, 0);
+          animation: receipt-artifact-scan 5400ms var(--m-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) 700ms infinite;
+        }
+
+        @keyframes receipt-artifact-scan {
+          0%,
+          38% {
+            opacity: 0;
+            transform: translate3d(0, -40%, 0);
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            transform: translate3d(0, 340%, 0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .receipt-artifact-scan {
+            animation: none;
+          }
+        }
       `}</style>
-      <div className="relative h-[100svh] overflow-hidden px-5 pt-20 md:px-8 md:pt-24">
+      <div className="relative h-[100svh] overflow-hidden px-5 pt-[4.25rem] md:px-8 md:pt-16">
         <main className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col">
-        <section className="grid min-h-0 flex-1 items-center gap-5 pb-4 pt-2 lg:grid-cols-[0.86fr_1.14fr] lg:gap-10">
-          <div className="motion-rise min-w-0">
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--m-rule-soft)] bg-[var(--m-panel)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--m-text-2)] sm:text-[13px]">
-              <Activity className="size-3.5 text-[color:var(--m-accent)]" />
-              The managed website loop for local businesses
-            </p>
-            <h1
-              className="max-w-[920px] font-semibold leading-[0.9] tracking-normal text-[color:var(--m-text)]"
-              style={{ fontSize: "clamp(3.05rem, 7.45vw, 7.9rem)" }}
-            >
-              Your website should report back.
-            </h1>
-            <p className="mt-4 max-w-[760px] text-[1.35rem] font-medium leading-[1.12] tracking-normal text-[color:var(--m-text)] sm:text-3xl md:text-4xl">
-              Weekly proof, fast updates, and human review before the public site changes.
-            </p>
-            <p className="mt-4 max-w-[610px] text-[15px] leading-[1.58] text-[color:var(--m-text-2)] sm:text-[17px] sm:leading-[1.65]">
-              Scaffold Web builds the site, watches what worked, and handles the small changes owners usually postpone. The first loop is simple: people found you, you ask for an update, the site stays current.
-            </p>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
-                Join the free-site waitlist
-                <ArrowRight className="size-4" />
-              </Link>
-              <Link href="/sign-up" className="marketing-button-secondary">
-                I have an invite
-              </Link>
+          <section className="grid min-h-0 flex-1 items-center gap-8 pb-4 pt-2 xl:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.88fr)] xl:gap-12">
+            <div className="motion-rise min-w-0">
+              <p className="mb-3 text-[13px] font-medium text-[color:var(--m-accent)]">
+                Managed website operations for local businesses
+              </p>
+              <h1
+                className="max-w-[790px] font-semibold leading-[0.91] tracking-normal text-[color:var(--m-text)]"
+                style={{ fontSize: "clamp(2.7rem, 5.1vw, 5.45rem)" }}
+              >
+                Your website should report back and know what to do next.
+              </h1>
+              <p className="mt-4 max-w-[650px] text-[1.08rem] font-medium leading-[1.26] tracking-normal text-[color:var(--m-text)] sm:text-[1.28rem] md:text-[1.42rem]">
+                Scaffold Web builds and runs the site behind your calls, bookings, visits, and trust. You see what worked, ask for changes in normal language, and approve before the public site changes.
+              </p>
+              <p className="mt-3 max-w-[610px] text-[15px] leading-[1.5] text-[color:var(--m-text-2)] sm:text-[16px] sm:leading-[1.55]">
+                Every week, your site sends a plain-English receipt: who found you, what they clicked, what changed, and the next move worth making.
+              </p>
+              <p className="mt-2 max-w-[610px] text-[15px] leading-[1.5] text-[color:var(--m-text-2)] sm:text-[16px] sm:leading-[1.55]">
+                Tell it what changed. Approve before it goes live.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
+                  Get my free first site
+                  <ArrowRight className="size-4" />
+                </Link>
+              </div>
             </div>
-          </div>
 
-          <div className="hidden md:block">
-            <ReceiptPanel />
-          </div>
-
-          <div className="hidden sm:block md:hidden">
-            <ReceiptPanel />
-          </div>
-        </section>
-
-        <div className="motion-rise hidden shrink-0 gap-3 border-t border-[var(--m-rule-soft)] py-4 sm:grid sm:grid-cols-3" style={{ "--motion-delay": "220ms" } as React.CSSProperties}>
-          {proofBadges.map(({ Icon, label }) => (
-            <div key={label} className="flex items-center gap-3 text-[13px] leading-[1.5] text-[color:var(--m-text-2)]">
-              <Icon className="size-4 shrink-0 text-[color:var(--m-accent)]" />
-              <span>{label}</span>
+            <div className="hidden xl:block">
+              <ReceiptArtifact />
             </div>
-          ))}
-        </div>
-      </main>
+          </section>
+        </main>
       </div>
     </>
   );
