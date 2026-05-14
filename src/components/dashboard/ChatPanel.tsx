@@ -28,7 +28,7 @@ import type { EditableNode } from "@/lib/editor-types";
 import { formatEditablePathValue, getEditablePathValue } from "@/lib/editable-path";
 
 const SUGGESTION_CHIPS = [
-  { label: "Add this week's product news", icon: Clock, description: "Turn a real GLDF change into updated site copy" },
+  { label: "Add this week's update", icon: Clock, description: "Turn a real business change into updated site copy" },
   { label: "Write this week's customer update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
   { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note", hideOnMobile: true },
   { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, product interest, and freshness to pick the next move" },
