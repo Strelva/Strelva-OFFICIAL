@@ -474,6 +474,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("checkCompletionAudit");
     expect(source).toContain("Latest observed checklist summary");
     expect(source).toContain("Rohlax Cloudflare DNS");
+    expect(source).toContain("Tenant jacobtest client domain");
     expect(source).toContain("checkCompletionAudit(\"docs/completion-audit.md\")");
     expect(source).toContain("checkPackageReleaseScripts");
     expect(source).toContain("checkCiWorkflow");
@@ -670,7 +671,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Rohlax Cloudflare DNS");
     expect(audit).toContain("jacobtest");
     expect(audit).toContain("Tenant jacobtest client domain");
+    expect(audit).toContain("69 passed, 4 warned, 6 failed, and 16 skipped");
     expect(audit).toContain("70 passed, 3 warned, 6 failed, and 16 skipped");
+    expect(audit).toContain("Redis tenant cache was empty");
     expect(audit).toContain("CLERK_WEBHOOK_SECRET");
     expect(audit).toContain("SANITY_WEBHOOK_SECRET");
     expect(audit).toContain("UPSTASH_REDIS_REST_URL");

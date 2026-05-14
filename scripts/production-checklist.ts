@@ -382,6 +382,8 @@ function checkCompletionAudit(path: string) {
     "Vercel app freshness",
     "inactive internal demo tenant",
     "Rohlax Cloudflare DNS",
+    "jacobtest",
+    "Tenant jacobtest client domain",
     "CLERK_WEBHOOK_SECRET",
     "SANITY_WEBHOOK_SECRET",
     "UPSTASH_REDIS_REST_URL",
