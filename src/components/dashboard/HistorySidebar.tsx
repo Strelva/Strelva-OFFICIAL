@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   House,
   Link2,
@@ -57,9 +57,11 @@ export function HistorySidebar({
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const activeThread = searchParams.get("thread");
   const effectivePathname =
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
@@ -81,6 +83,36 @@ export function HistorySidebar({
       })
       .catch(() => setThreads([]));
   }, [dashboardHref, pathname]);
+
+  async function deleteThread(threadId: string) {
+    if (deletingThreadId) return;
+    const previousThreads = threads;
+    const wasActive = activeThread === threadId;
+
+    setDeletingThreadId(threadId);
+    setThreads((current) => current.filter((thread) => thread.id !== threadId));
+    if (wasActive) {
+      router.push(dashboardHref("/dashboard/chat"));
+      onClose?.();
+    }
+
+    try {
+      const response = await fetch(dashboardHref(`/api/threads/${threadId}`), {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!response.ok && response.status !== 404) {
+        throw new Error("Could not delete chat");
+      }
+    } catch {
+      setThreads(previousThreads);
+      if (wasActive) {
+        router.push(dashboardHref(`/dashboard/chat?thread=${threadId}`));
+      }
+    } finally {
+      setDeletingThreadId(null);
+    }
+  }
 
   const sidebarContent = (variant: "desktop" | "mobile") => (
     <aside
@@ -180,24 +212,40 @@ export function HistorySidebar({
                         {threads.map((thread) => {
                           const isThreadActive = activeThread === thread.id;
                           return (
-                            <Link
+                            <div
                               key={thread.id}
-                              href={dashboardHref(`/dashboard/chat?thread=${thread.id}`)}
-                              prefetch={false}
-                              onClick={onClose}
-                              className={`block rounded-md px-2 py-1.5 transition-colors ${
+                              className={`group/thread relative rounded-md transition-colors ${
                                 isThreadActive
                                   ? "bg-gray-bg-hover text-warm-black"
                                   : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
                               }`}
                             >
-                              <span className="block truncate text-[12px] font-medium">
-                                {thread.title || "New chat"}
-                              </span>
-                              <span className="block truncate text-[10px] text-gray-faint">
-                                {thread.preview}
-                              </span>
-                            </Link>
+                              <Link
+                                href={dashboardHref(`/dashboard/chat?thread=${thread.id}`)}
+                                prefetch={false}
+                                onClick={onClose}
+                                className="block min-w-0 px-2 py-1.5 pr-7"
+                              >
+                                <span className="block truncate text-[12px] font-medium">
+                                  {thread.title || "New chat"}
+                                </span>
+                                <span className="block truncate text-[10px] text-gray-faint">
+                                  {thread.preview}
+                                </span>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void deleteThread(thread.id);
+                                }}
+                                disabled={deletingThreadId === thread.id}
+                                className="absolute right-1 top-1.5 flex h-5 w-5 items-center justify-center rounded text-gray-faint opacity-60 transition-colors hover:bg-gray-bg-hover hover:text-warm-black hover:opacity-100 focus:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={`Delete ${thread.title || "chat"}`}
+                                title="Delete chat"
+                              >
+                                <X className="h-3 w-3" strokeWidth={1.8} />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
