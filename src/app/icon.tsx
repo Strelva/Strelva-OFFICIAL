@@ -13,6 +13,7 @@ export default async function Icon() {
   const tenant = h.get("x-tenant") || "";
 
   let icon = DEFAULT_ICON;
+  let useScaffoldMark = !tenant;
 
   if (tenant) {
     const config = await getTenantConfig(tenant);
@@ -27,7 +28,74 @@ export default async function Icon() {
         ...DEFAULT_ICON,
         initials: config.siteName?.slice(0, 1) || DEFAULT_ICON.initials,
       };
+    } else {
+      useScaffoldMark = true;
     }
+  }
+
+  if (useScaffoldMark) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            backgroundColor: "#171412",
+            display: "flex",
+            position: "relative",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: 6,
+              top: 7,
+              width: 18,
+              height: 14,
+              border: "2px solid #faf9f7",
+              borderRadius: 3,
+              opacity: 0.92,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 9,
+              top: 11,
+              width: 12,
+              height: 2,
+              backgroundColor: "#8fb8a8",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 17,
+              top: 16,
+              width: 8,
+              height: 8,
+              backgroundColor: "#faf9f7",
+              transform: "rotate(45deg)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 21,
+              top: 22,
+              width: 8,
+              height: 3,
+              backgroundColor: "#faf9f7",
+              borderRadius: 2,
+              transform: "rotate(45deg)",
+            }}
+          />
+        </div>
+      ),
+      { ...size }
+    );
   }
 
   return new ImageResponse(
@@ -48,7 +116,7 @@ export default async function Icon() {
             fontFamily: "Georgia, serif",
             fontSize: 16,
             color: icon.fg,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           }}
         >
           {icon.initials}
