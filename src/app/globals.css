@@ -172,6 +172,773 @@ body {
   scrollbar-color: var(--cream-mid) transparent;
 }
 
+/* =============================================
+   Fashion Stylist Template — By Jada Ivey
+   Scoped to .jada-site so dashboard/scaffold UI stays untouched.
+   ============================================= */
+
+.jada-site {
+  --jada-ink: #102a8c;
+  --jada-muted: #4f6fc8;
+  --jada-white: #ffffff;
+  --jada-pink-wash: #ffd4e4;
+  --jada-pink: #ff5fa8;
+  --jada-blue: #4f7dff;
+  --jada-blue-wash: #dce8ff;
+  --jada-line: #d9e4ff;
+  --jada-shadow: 0 24px 70px rgba(26, 44, 114, 0.14);
+  --jada-radius: 8px;
+  --jada-max: 1180px;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(220, 232, 255, 0.76) 0, rgba(255, 255, 255, 0) 520px),
+    var(--jada-white);
+  color: var(--jada-ink);
+  font-family: var(--font-body), "Space Grotesk", Arial, sans-serif;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+.jada-site img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jada-site a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.jada-site button,
+.jada-site input,
+.jada-site select,
+.jada-site textarea {
+  font: inherit;
+}
+
+.jada-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 18px clamp(20px, 5vw, 72px);
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(223, 229, 251, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.jada-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--jada-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jada-brand img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.jada-nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.jada-nav a {
+  position: relative;
+  padding: 8px 0;
+}
+
+.jada-nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  left: 0;
+  height: 1px;
+  background: var(--jada-pink);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+}
+
+.jada-nav a:hover::after {
+  transform: scaleX(1);
+}
+
+.jada-menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--jada-line);
+  background: var(--jada-white);
+  cursor: pointer;
+}
+
+.jada-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 1px;
+  margin: 6px auto;
+  background: var(--jada-ink);
+}
+
+.jada-section,
+.jada-band,
+.jada-newsletter,
+.jada-footer {
+  padding-right: clamp(20px, 5vw, 72px);
+  padding-left: clamp(20px, 5vw, 72px);
+}
+
+.jada-section {
+  padding-top: clamp(70px, 9vw, 132px);
+  padding-bottom: clamp(70px, 9vw, 132px);
+}
+
+.jada-band {
+  padding-top: clamp(68px, 8vw, 112px);
+  padding-bottom: clamp(68px, 8vw, 112px);
+  background:
+    linear-gradient(90deg, rgba(255, 212, 228, 0.54), rgba(255, 255, 255, 0) 34%),
+    var(--jada-white);
+}
+
+.jada-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  gap: clamp(36px, 7vw, 92px);
+  align-items: center;
+  min-height: calc(100vh - 85px);
+}
+
+.jada-copy {
+  max-width: 620px;
+}
+
+.jada-label {
+  margin: 0 0 14px;
+  color: var(--jada-pink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.jada-site h1,
+.jada-site h2 {
+  margin-top: 0;
+  margin-bottom: 22px;
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 700;
+  line-height: 0.95;
+}
+
+.jada-site h1 {
+  max-width: 760px;
+  margin-bottom: 24px;
+  font-size: clamp(4rem, 9vw, 8.8rem);
+}
+
+.jada-site h2 {
+  font-size: clamp(2.65rem, 5.2vw, 5.6rem);
+}
+
+.jada-site h3 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  line-height: 1.1;
+}
+
+.jada-copy p:not(.jada-label),
+.jada-prose,
+.jada-newsletter p {
+  color: var(--jada-muted);
+  font-size: clamp(1rem, 1.3vw, 1.16rem);
+}
+
+.jada-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.jada-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--jada-ink);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.jada-button:hover,
+.jada-service-card button:hover,
+.jada-newsletter-form button:hover {
+  transform: translateY(-2px);
+}
+
+.jada-button-primary {
+  border-color: var(--jada-blue);
+  background: var(--jada-blue);
+  color: var(--jada-white);
+  box-shadow: 0 10px 24px rgba(79, 125, 255, 0.22);
+}
+
+.jada-button-secondary {
+  border-color: var(--jada-pink);
+  background: var(--jada-white);
+  color: var(--jada-pink);
+}
+
+.jada-hero-media {
+  position: relative;
+  min-height: 640px;
+}
+
+.jada-frame {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  background: var(--jada-white);
+  box-shadow: var(--jada-shadow);
+}
+
+.jada-frame-large {
+  top: 0;
+  right: 0;
+  width: 72%;
+  height: 82%;
+}
+
+.jada-frame-small {
+  bottom: 18px;
+  left: 0;
+  width: 42%;
+  height: 48%;
+}
+
+.jada-note {
+  position: absolute;
+  right: 4%;
+  bottom: 0;
+  width: min(320px, 48%);
+  padding: 22px;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  background: linear-gradient(135deg, var(--jada-pink-wash) 0%, var(--jada-blue-wash) 100%);
+  box-shadow: 0 18px 42px rgba(79, 125, 255, 0.16);
+}
+
+.jada-note strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.jada-note span {
+  color: var(--jada-muted);
+}
+
+.jada-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.84fr) minmax(320px, 1fr);
+  gap: clamp(34px, 7vw, 86px);
+  max-width: var(--jada-max);
+  margin: 0 auto;
+}
+
+.jada-quote-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+  gap: 36px;
+  max-width: var(--jada-max);
+  margin: 64px auto 0;
+  align-items: stretch;
+}
+
+.jada-quote-row > *,
+.jada-section-grid > *,
+.jada-workshop > *,
+.jada-consultation > * {
+  min-width: 0;
+}
+
+.jada-site blockquote {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: clamp(32px, 5vw, 64px);
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  background: linear-gradient(145deg, rgba(255, 212, 228, 0.62), rgba(220, 232, 255, 0.7));
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(2.2rem, 3.8vw, 4.2rem);
+  font-weight: 700;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.jada-founder-card,
+.jada-service-card,
+.jada-booking-form {
+  overflow: hidden;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  background: var(--jada-white);
+}
+
+.jada-founder-card {
+  display: grid;
+  grid-template-rows: minmax(280px, 1fr) auto;
+}
+
+.jada-founder-card div {
+  padding: 26px;
+}
+
+.jada-founder-card p,
+.jada-service-card p,
+.jada-faq-list p,
+.jada-footer p {
+  color: var(--jada-muted);
+  overflow-wrap: anywhere;
+}
+
+.jada-workshop,
+.jada-consultation {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(360px, 1fr);
+  gap: clamp(36px, 7vw, 88px);
+  align-items: center;
+}
+
+.jada-event-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 34px 0;
+}
+
+.jada-event-details div {
+  padding: 18px;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  background: linear-gradient(180deg, var(--jada-white), rgba(220, 232, 255, 0.5));
+}
+
+.jada-event-details dt {
+  color: var(--jada-blue);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.jada-event-details dd {
+  margin: 5px 0 0;
+  font-weight: 700;
+}
+
+.jada-workshop-poster {
+  overflow: hidden;
+  min-height: 520px;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  box-shadow: var(--jada-shadow);
+}
+
+.jada-heading {
+  max-width: var(--jada-max);
+  margin: 0 auto 44px;
+}
+
+.jada-heading h2 {
+  max-width: 920px;
+}
+
+.jada-service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  max-width: var(--jada-max);
+  margin: 0 auto;
+}
+
+.jada-service-card {
+  display: grid;
+  grid-template-rows: 300px auto;
+  background: linear-gradient(180deg, var(--jada-white), rgba(255, 212, 228, 0.34));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.jada-service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 44px rgba(79, 125, 255, 0.16);
+}
+
+.jada-service-card div {
+  padding: 22px;
+}
+
+.jada-service-card span {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--jada-pink);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jada-service-card button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--jada-blue);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.jada-portfolio-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 0.85fr;
+  grid-auto-rows: 260px;
+  gap: 16px;
+  max-width: var(--jada-max);
+  margin: 0 auto;
+}
+
+.jada-portfolio-grid img {
+  overflow: hidden;
+  border: 1px solid var(--jada-line);
+  border-radius: var(--jada-radius);
+  box-shadow: 0 12px 34px rgba(255, 126, 174, 0.12);
+}
+
+.jada-portfolio-grid img:first-child,
+.jada-portfolio-grid img:nth-child(3) {
+  grid-row: span 2;
+}
+
+.jada-faq-list {
+  border-top: 1px solid var(--jada-line);
+}
+
+.jada-faq-list details {
+  border-bottom: 1px solid var(--jada-line);
+}
+
+.jada-faq-list summary {
+  position: relative;
+  padding: 24px 38px 24px 0;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.jada-faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.jada-faq-list summary::after {
+  position: absolute;
+  right: 0;
+  top: 24px;
+  content: "+";
+  font-size: 1.35rem;
+}
+
+.jada-faq-list details[open] summary::after {
+  content: "-";
+}
+
+.jada-contact-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+  font-weight: 700;
+}
+
+.jada-booking-form {
+  display: grid;
+  gap: 16px;
+  padding: clamp(22px, 4vw, 34px);
+  background: linear-gradient(180deg, var(--jada-white), rgba(220, 232, 255, 0.48));
+  box-shadow: var(--jada-shadow);
+}
+
+.jada-booking-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jada-booking-form input,
+.jada-booking-form select,
+.jada-booking-form textarea,
+.jada-newsletter-form input {
+  width: 100%;
+  border: 1px solid #cdd7fb;
+  border-radius: var(--jada-radius);
+  background: var(--jada-white);
+  color: var(--jada-ink);
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.jada-booking-form input,
+.jada-booking-form select {
+  height: 48px;
+  padding: 0 14px;
+}
+
+.jada-booking-form textarea {
+  resize: vertical;
+  min-height: 130px;
+  padding: 14px;
+}
+
+.jada-booking-form input:focus,
+.jada-booking-form select:focus,
+.jada-booking-form textarea:focus,
+.jada-newsletter-form input:focus {
+  border-color: var(--jada-blue);
+  outline: 3px solid rgba(79, 125, 255, 0.16);
+}
+
+.jada-status {
+  min-height: 24px;
+  margin: 0;
+  color: var(--jada-blue);
+  font-weight: 700;
+}
+
+.jada-newsletter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+  gap: 28px;
+  align-items: center;
+  padding-top: 48px;
+  padding-bottom: 48px;
+  background: linear-gradient(100deg, var(--jada-pink-wash) 0%, var(--jada-blue-wash) 100%);
+}
+
+.jada-newsletter h2 {
+  margin-bottom: 10px;
+  font-size: clamp(2.2rem, 4vw, 4rem);
+}
+
+.jada-newsletter-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.jada-newsletter-form input,
+.jada-newsletter-form button {
+  height: 52px;
+  border-radius: 999px;
+}
+
+.jada-newsletter-form input {
+  padding: 0 16px;
+}
+
+.jada-newsletter-form button {
+  padding: 0 24px;
+  border: 1px solid var(--jada-blue);
+  background: var(--jada-blue);
+  color: var(--jada-white);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.jada-newsletter-form .jada-status {
+  grid-column: 1 / -1;
+}
+
+.jada-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  padding-top: 42px;
+  padding-bottom: 42px;
+  background: linear-gradient(100deg, var(--jada-blue) 0%, var(--jada-ink) 62%, var(--jada-pink) 100%);
+  color: var(--jada-white);
+}
+
+.jada-footer strong {
+  display: block;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.jada-footer p {
+  max-width: 520px;
+  margin-bottom: 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.jada-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-weight: 700;
+}
+
+.jada-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .jada-menu-toggle {
+    display: block;
+  }
+
+  .jada-nav {
+    position: absolute;
+    top: 84px;
+    right: 20px;
+    left: 20px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 12px;
+    border: 1px solid var(--jada-line);
+    border-radius: var(--jada-radius);
+    background: var(--jada-white);
+    box-shadow: var(--jada-shadow);
+  }
+
+  .jada-header.is-open .jada-nav {
+    display: flex;
+  }
+
+  .jada-nav a {
+    padding: 14px;
+  }
+
+  .jada-hero,
+  .jada-section-grid,
+  .jada-quote-row,
+  .jada-workshop,
+  .jada-consultation,
+  .jada-newsletter {
+    grid-template-columns: 1fr;
+  }
+
+  .jada-hero {
+    min-height: auto;
+    padding-top: 52px;
+  }
+
+  .jada-hero-media {
+    min-height: 560px;
+  }
+
+  .jada-service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jada-portfolio-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .jada-header {
+    padding: 14px 18px;
+  }
+
+  .jada-brand span {
+    display: none;
+  }
+
+  .jada-site h1 {
+    font-size: clamp(3.1rem, 15vw, 4.6rem);
+  }
+
+  .jada-hero-media {
+    min-height: 500px;
+  }
+
+  .jada-frame-large {
+    width: 86%;
+    height: 72%;
+  }
+
+  .jada-frame-small {
+    width: 50%;
+    height: 42%;
+  }
+
+  .jada-note {
+    right: 0;
+    width: 62%;
+    padding: 16px;
+  }
+
+  .jada-event-details,
+  .jada-service-grid,
+  .jada-portfolio-grid,
+  .jada-newsletter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .jada-service-card {
+    grid-template-rows: 260px auto;
+  }
+
+  .jada-portfolio-grid {
+    grid-auto-rows: 290px;
+  }
+
+  .jada-portfolio-grid img:first-child,
+  .jada-portfolio-grid img:nth-child(3) {
+    grid-row: auto;
+  }
+
+  .jada-footer {
+    flex-direction: column;
+  }
+}
+
 /* Focus-visible — dashed outline (Figma-inspired) */
 :focus-visible {
   outline: 2px dashed var(--sage);
