@@ -41,7 +41,7 @@
   webhook/API key values that do not match the expected production key shape.
 - Confirm Clerk publishable key, secret key, and webhook secret all come from the same live Clerk instance. Mixed Clerk instances can make `/sign-in` loop before the customer sees the invited-email guidance.
 - Keep `AI_AUTO_PUBLISH=false` for first production tenants unless the tenant has explicitly approved automatic publish.
-- Before release, audit active Sanity tenants and deactivate internal test tenants that should not be customer-facing. Every active launch tenant must have a customer-facing `productionDomain` or `customDomains` entry, an `adminDomain` or derivable `admin.<productionDomain>`, and `revalidateUrl` plus `revalidationSecret`; `pnpm check:prod` fails active tenants that are missing those fields.
+- Before release, audit active Sanity tenants with `*[_type == "tenant" && active != false] { _id, id, name, productionDomain, adminDomain, customDomains, revalidateUrl }` and deactivate internal test tenants that should not be customer-facing. Every active launch tenant must have a customer-facing `productionDomain` or `customDomains` entry, an `adminDomain` or derivable `admin.<productionDomain>`, and `revalidateUrl` plus `revalidationSecret`; `pnpm check:prod` fails active tenants that are missing those fields.
 - Provision tenant with `pnpm provision-tenant` and store a unique `revalidationSecret`.
 - Set the storefront `REVALIDATE_SECRET` to the same value.
 - Set tenant `revalidateUrl` to the storefront `/api/v1/revalidate` endpoint.

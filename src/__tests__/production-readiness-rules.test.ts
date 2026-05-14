@@ -941,6 +941,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("sign-in/sign-up links preserve it");
     expect(productionReadiness).toContain("same live Clerk instance");
     expect(productionReadiness).toContain("make `/sign-in` loop");
+    expect(productionReadiness).toContain('*[_type == "tenant" && active != false]');
     expect(productionReadiness).toContain("deactivate internal test tenants");
     expect(productionReadiness).toContain("Every active launch tenant must have a customer-facing `productionDomain` or `customDomains` entry");
     expect(productionReadiness).toContain("`pnpm check:prod` fails active tenants that are missing those fields");
