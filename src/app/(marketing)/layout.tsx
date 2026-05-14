@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - Free websites for local businesses",
-  description: "Request a free site for your local business, built for calls, bookings, and trust.",
+  title: "Scaffold Web - First AI workflows for local businesses",
+  description: "Join the free website waitlist and start with one practical AI workflow for your local business.",
 };
 
 export default function MarketingLayout({
@@ -33,7 +33,7 @@ export default function MarketingLayout({
               href="/access-request"
               className="inline-flex h-8 items-center justify-center rounded-full bg-[var(--m-button)] px-4 text-[13px] font-medium text-[var(--m-button-text)] transition-transform duration-300 hover:-translate-y-0.5"
             >
-              Request a free site
+              Join waitlist
             </Link>
           </nav>
         </div>

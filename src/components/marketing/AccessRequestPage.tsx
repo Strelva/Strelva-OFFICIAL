@@ -8,16 +8,16 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, MailCheck } from "
 type FormState = "idle" | "submitting" | "success" | "error";
 
 const requestOptions = [
-  "More calls",
-  "More bookings",
-  "A current site",
-  "Updates handled",
+  "Keep my site current",
+  "Get more booking clicks",
+  "Show what worked each week",
+  "Make updates easier",
 ];
 
 const nextSteps = [
-  "We read the request.",
-  "We email next steps.",
-  "Nothing publishes without review.",
+  "We read the request and first workflow.",
+  "We email the next step for the free site.",
+  "Nothing publishes without your review.",
 ];
 
 export function AccessRequestPage() {
@@ -33,6 +33,7 @@ function AccessRequestForm() {
   const ref = searchParams.get("ref") || "";
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
+  const [location, setLocation] = useState("");
   const [currentWebsite, setCurrentWebsite] = useState("");
   const [request, setRequest] = useState("");
   const [state, setState] = useState<FormState>("idle");
@@ -44,12 +45,13 @@ function AccessRequestForm() {
 
     const cleanBusinessName = businessName.trim();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanLocation = location.trim();
     const cleanWebsite = currentWebsite.trim();
     const cleanRequest = request.trim();
 
     if (!cleanBusinessName || !cleanEmail || !cleanRequest) {
       setState("error");
-      setMessage("Add your business, email, and first request.");
+      setMessage("Add your business, email, and first workflow.");
       return;
     }
 
@@ -70,8 +72,8 @@ function AccessRequestForm() {
           businessName: cleanBusinessName,
           email: cleanEmail,
           currentWebsite: cleanWebsite,
-          description: `Access request: ${cleanRequest}`,
-          location: "",
+          description: `Free website waitlist. First workflow: ${cleanRequest}`,
+          location: cleanLocation,
           referredBy: ref || "access-request",
         }),
       });
@@ -82,7 +84,7 @@ function AccessRequestForm() {
       }
 
       setState("success");
-      setMessage("Request received. We will email next steps.");
+      setMessage("Waitlist request received. We will email next steps.");
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "We could not send this yet. Try again.");
@@ -102,13 +104,13 @@ function AccessRequestForm() {
           </Link>
 
           <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
-            Free site request
+            Free website waitlist
           </p>
           <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-6xl md:text-7xl">
-            Request your free site.
+            Start with one workflow.
           </h1>
           <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
-            Tell us the business and the first job the site should handle.
+            Tell us the business, the public site you need, and the first practical AI workflow you want handled.
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common first outcomes">
@@ -154,7 +156,7 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                We will email next steps for the free site.
+                We will email next steps for the free first site and the workflow you want to start with.
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
@@ -171,7 +173,7 @@ function AccessRequestForm() {
               <div className="border-b border-[var(--m-rule-soft)] pb-5">
                 <p className="text-[13px] text-[color:var(--m-text-3)]">Takes one minute</p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--m-text)]">
-                  Send the basics.
+                  Join the waitlist.
                 </h2>
               </div>
 
@@ -188,6 +190,19 @@ function AccessRequestForm() {
                   />
                 </Field>
 
+                <Field label="City" htmlFor="location">
+                  <input
+                    id="location"
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder="Buffalo, NY"
+                    autoComplete="address-level2"
+                    className={fieldClassName}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Email" htmlFor="email">
                   <input
                     id="email"
@@ -200,26 +215,26 @@ function AccessRequestForm() {
                     className={fieldClassName}
                   />
                 </Field>
+
+                <Field label="Current site" htmlFor="current-website">
+                  <input
+                    id="current-website"
+                    value={currentWebsite}
+                    onChange={(event) => setCurrentWebsite(event.target.value)}
+                    placeholder="Website or booking page"
+                    autoComplete="url"
+                    inputMode="url"
+                    className={fieldClassName}
+                  />
+                </Field>
               </div>
 
-              <Field label="Current site" htmlFor="current-website">
-                <input
-                  id="current-website"
-                  value={currentWebsite}
-                  onChange={(event) => setCurrentWebsite(event.target.value)}
-                  placeholder="Website or booking page"
-                  autoComplete="url"
-                  inputMode="url"
-                  className={fieldClassName}
-                />
-              </Field>
-
-              <Field label="What do you want?" htmlFor="request">
+              <Field label="First workflow" htmlFor="request">
                 <textarea
                   id="request"
                   value={request}
                   onChange={(event) => setRequest(event.target.value)}
-                  placeholder="Example: I need more booking clicks and easier updates."
+                  placeholder="Example: I need a current site, weekly proof, and easier updates for new classes."
                   required
                   className={`${fieldClassName} min-h-36 resize-none py-3 leading-[1.55]`}
                 />
@@ -231,7 +246,7 @@ function AccessRequestForm() {
                   disabled={state === "submitting"}
                   className="marketing-button-primary h-13 px-6 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-65"
                 >
-                  {state === "submitting" ? "Sending..." : "Request free site"}
+                  {state === "submitting" ? "Sending..." : "Join free-site waitlist"}
                   <ArrowRight className="size-4" />
                 </button>
                 <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">

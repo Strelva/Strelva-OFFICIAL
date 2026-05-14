@@ -10,8 +10,8 @@ test("marketing homepage gives a customer clear starting points", async ({ page 
   const response = await page.goto("/", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();
 
-  await expect(page.getByRole("heading", { name: /get a free site/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /request a free site/i }).first()).toHaveAttribute("href", "/access-request");
+  await expect(page.getByRole("heading", { name: /put your first ai workflow to work/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /join waitlist/i }).first()).toHaveAttribute("href", "/access-request");
   await expect(page.getByRole("link", { name: /sign in/i }).first()).toHaveAttribute("href", "/sign-in");
 });
 
@@ -20,7 +20,7 @@ test("legacy onboard route redirects to the access request", async ({ page }) =>
   expect(response?.status()).toBeLessThan(400);
 
   await expect(page).toHaveURL(/\/access-request\?ref=home-proof-loop/);
-  await expect(page.getByRole("heading", { name: /request your free site/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /start with one workflow/i })).toBeVisible();
 });
 
 test("tenant public pages render without server errors", async ({ page }) => {

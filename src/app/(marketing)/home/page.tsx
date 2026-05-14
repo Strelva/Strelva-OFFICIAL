@@ -7,12 +7,13 @@ import {
   FileCheck2,
   MessageSquareText,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - Free websites for local businesses",
+  title: "Scaffold Web - Your first AI workflow starts with your website",
   description:
-    "Request a free site for your local business, built for calls, bookings, and trust.",
+    "Join the free website waitlist for local businesses ready to start with one practical AI workflow.",
 };
 
 const reportRows = [
@@ -22,10 +23,41 @@ const reportRows = [
 ];
 
 const proofBadges = [
-  { Icon: FileCheck2, label: "Free site request" },
-  { Icon: ClipboardCheck, label: "Built for calls and bookings" },
-  { Icon: Clock3, label: "One-minute form" },
+  { Icon: FileCheck2, label: "Free website waitlist" },
+  { Icon: ClipboardCheck, label: "One workflow to start" },
+  { Icon: Clock3, label: "More workflows coming" },
 ];
+
+const momentumItems = [
+  "Site updates",
+  "Weekly reports",
+  "Reviews",
+  "Email",
+  "Social",
+  "Follow-ups",
+];
+
+function MomentumPanel() {
+  return (
+    <div className="mt-4 rounded-[18px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-[13px] font-medium text-[color:var(--m-accent)]">More workflows coming</p>
+        <span className="text-[12px] text-[color:var(--m-text-3)]">after the site loop</span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {momentumItems.map((item, index) => (
+          <span
+            key={item}
+            className="motion-item rounded-md border border-[var(--m-rule-soft)] bg-[var(--m-bg)] px-2.5 py-2 text-[12px] leading-tight text-[color:var(--m-text-2)]"
+            style={{ "--i": index } as React.CSSProperties}
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ReceiptPanel() {
   return (
@@ -58,7 +90,7 @@ function ReceiptPanel() {
                 <MessageSquareText className="size-4" />
               </span>
               <p className="text-[15px] leading-[1.55] text-[color:var(--m-text)]">
-                Add the Saturday class and booking link.
+                Add the Saturday class and booking link before Friday.
               </p>
             </div>
           </div>
@@ -106,38 +138,8 @@ function ReceiptPanel() {
               <span className="progress-run block h-full rounded-full bg-[var(--m-accent)]" />
             </div>
           </div>
+          <MomentumPanel />
         </section>
-      </div>
-    </div>
-  );
-}
-
-function MobileProofPanel() {
-  return (
-    <div className="motion-rise mt-6 rounded-[18px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-4 md:hidden" style={{ "--motion-delay": "120ms" } as React.CSSProperties}>
-      <div className="flex items-center gap-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-[var(--m-rule)] bg-[var(--m-panel)] text-[color:var(--m-accent)]">
-          <FileCheck2 className="size-4" />
-        </span>
-        <div>
-          <p className="text-[13px] font-medium text-[color:var(--m-text)]">Free site request</p>
-          <p className="mt-0.5 text-[12px] text-[color:var(--m-text-3)]">Built for calls, bookings, and trust.</p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[var(--m-rule-soft)] pt-4">
-        <div>
-          <p className="font-mono text-2xl font-semibold leading-none text-[color:var(--m-text)]">47</p>
-          <p className="mt-1 text-[11px] leading-[1.25] text-[color:var(--m-text-3)]">people found you</p>
-        </div>
-        <div>
-          <p className="font-mono text-2xl font-semibold leading-none text-[color:var(--m-text)]">8</p>
-          <p className="mt-1 text-[11px] leading-[1.25] text-[color:var(--m-text-3)]">booking clicks</p>
-        </div>
-        <div>
-          <p className="font-mono text-2xl font-semibold leading-none text-[color:var(--m-text)]">3</p>
-          <p className="mt-1 text-[11px] leading-[1.25] text-[color:var(--m-text-3)]">updates handled</p>
-        </div>
       </div>
     </div>
   );
@@ -151,48 +153,51 @@ export default function HomePage() {
           display: none;
         }
       `}</style>
-      <div className="relative h-[100svh] overflow-hidden px-5 pt-24 md:px-8">
+      <div className="relative h-[100svh] overflow-hidden px-5 pt-20 md:px-8 md:pt-24">
         <main className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col">
-          <section className="grid min-h-0 flex-1 items-center gap-6 pb-6 pt-4 lg:grid-cols-[0.86fr_1.14fr] lg:gap-10">
-            <div className="motion-rise min-w-0">
-              <h1
-                className="max-w-[820px] font-semibold leading-[0.88] tracking-normal text-[color:var(--m-text)]"
-                style={{ fontSize: "clamp(3.5rem, 8vw, 8.2rem)" }}
-              >
-                Get a free site.
-              </h1>
-              <p className="mt-5 max-w-[720px] text-[1.65rem] font-medium leading-[1.12] tracking-normal text-[color:var(--m-text)] sm:text-3xl md:text-4xl">
-                Built for local businesses that need calls, bookings, and trust.
-              </p>
-              <p className="mt-5 max-w-[560px] text-[17px] leading-[1.65] text-[color:var(--m-text-2)]">
-                Request the site. We build the first version free.
-              </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
-                  Request a free site
-                  <ArrowRight className="size-4" />
-                </Link>
-                <Link href="/sign-up" className="marketing-button-secondary">
-                  I have an invite
-                </Link>
-              </div>
-              <MobileProofPanel />
+        <section className="grid min-h-0 flex-1 items-center gap-5 pb-4 pt-2 lg:grid-cols-[0.88fr_1.12fr] lg:gap-10">
+          <div className="motion-rise min-w-0">
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--m-rule-soft)] bg-[var(--m-panel)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--m-text-2)] sm:text-[13px]">
+              <Sparkles className="size-3.5 text-[color:var(--m-accent)]" />
+              One practical AI workflow to start
+            </p>
+            <h1
+              className="max-w-[920px] font-semibold leading-[0.9] tracking-normal text-[color:var(--m-text)]"
+              style={{ fontSize: "clamp(3rem, 7.25vw, 7.65rem)" }}
+            >
+              Put your first AI workflow to work.
+            </h1>
+            <p className="mt-4 max-w-[760px] text-[1.35rem] font-medium leading-[1.12] tracking-normal text-[color:var(--m-text)] sm:text-3xl md:text-4xl">
+              Start with your website: the public surface customers already see.
+            </p>
+            <p className="mt-4 max-w-[610px] text-[15px] leading-[1.58] text-[color:var(--m-text-2)] sm:text-[17px] sm:leading-[1.65]">
+              Scaffold Web builds local business sites, shows what worked each week, and helps you make updates in plain English. Join the waitlist for a free first site.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
+                Join the free-site waitlist
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link href="/sign-up" className="marketing-button-secondary">
+                I have an invite
+              </Link>
             </div>
-
-            <div className="hidden md:block">
-              <ReceiptPanel />
-            </div>
-          </section>
-
-          <div className="motion-rise hidden shrink-0 gap-3 border-t border-[var(--m-rule-soft)] py-4 sm:grid sm:grid-cols-3" style={{ "--motion-delay": "220ms" } as React.CSSProperties}>
-            {proofBadges.map(({ Icon, label }) => (
-              <div key={label} className="flex items-center gap-3 text-[13px] leading-[1.5] text-[color:var(--m-text-2)]">
-                <Icon className="size-4 shrink-0 text-[color:var(--m-accent)]" />
-                <span>{label}</span>
-              </div>
-            ))}
           </div>
-        </main>
+
+          <div className="hidden md:block">
+            <ReceiptPanel />
+          </div>
+        </section>
+
+        <div className="motion-rise hidden shrink-0 gap-3 border-t border-[var(--m-rule-soft)] py-4 sm:grid sm:grid-cols-3" style={{ "--motion-delay": "220ms" } as React.CSSProperties}>
+          {proofBadges.map(({ Icon, label }) => (
+            <div key={label} className="flex items-center gap-3 text-[13px] leading-[1.5] text-[color:var(--m-text-2)]">
+              <Icon className="size-4 shrink-0 text-[color:var(--m-accent)]" />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </main>
       </div>
     </>
   );
