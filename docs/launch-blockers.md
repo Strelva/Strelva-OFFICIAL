@@ -18,6 +18,13 @@ A www.rohlaxwellness.com 76.76.21.21
 A admin.rohlaxwellness.com 76.76.21.21
 ```
 
+### Jacob Test Tenant Launch Configuration
+
+- Status: blocked
+- Owner: Jacob Rhinehart
+- Evidence: As of May 14, 2026, `pnpm check:prod` reads an active Sanity tenant with id `jacobtest`. The tenant has no customer-facing `productionDomain` or `customDomains`, no `adminDomain` or derivable `admin.<productionDomain>`, and no `revalidateUrl`, so the checker correctly fails `Tenant jacobtest client domain`, `Tenant jacobtest admin domain`, and `Tenant jacobtest revalidation`.
+- Required owner action: either deactivate `jacobtest` in Sanity if it is an internal test tenant, or configure its launch domains and revalidation fields before release. Active launch tenants need a customer-facing `productionDomain`/`customDomains` entry, an `adminDomain` or derivable `admin.<productionDomain>`, and `revalidateUrl` plus `revalidationSecret`.
+
 Copyable DNS verification commands:
 
 ```bash
@@ -81,8 +88,8 @@ Move an item here only with owner approval in the release note. Each waiver must
 
 ### Production Live Verification
 
-- Status: app freshness resolved on May 14, 2026; final production verification remains pending Rohlax DNS and owner manual checks.
-- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://scaffoldweb.com/sign-in` serve `Sign in to Scaffold Web | Scaffold Web` from Vercel. The latest inspected production deployment is `dpl_AjSfZpDFeYtzGzjuMBKsJsPzXJA6` for `scaffold-web`, created May 14, 2026 at 10:19:30 EDT, Ready at `https://scaffold-cqqfkhtzo-rhinehart514-gmailcoms-projects.vercel.app`, with aliases for `https://scaffoldweb.com`, `https://*.scaffoldweb.com`, `https://demo.scaffoldweb.com`, `https://admin.rohlaxwellness.com`, and `https://admin.greatlakesdriedfruit.com`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Scaffold Web production-domain prerequisites are complete, while Rohlax Cloudflare DNS remains open.
+- Status: app freshness resolved on May 14, 2026; final production verification remains pending Rohlax DNS, `jacobtest` tenant configuration, and owner manual checks.
+- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://scaffoldweb.com/sign-in` serve `Sign in to Scaffold Web | Scaffold Web` from Vercel. The latest inspected production deployment is `dpl_AjSfZpDFeYtzGzjuMBKsJsPzXJA6` for `scaffold-web`, created May 14, 2026 at 10:19:30 EDT, Ready at `https://scaffold-cqqfkhtzo-rhinehart514-gmailcoms-projects.vercel.app`, with aliases for `https://scaffoldweb.com`, `https://*.scaffoldweb.com`, `https://demo.scaffoldweb.com`, `https://admin.rohlaxwellness.com`, and `https://admin.greatlakesdriedfruit.com`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Scaffold Web production-domain prerequisites are complete, while Rohlax Cloudflare DNS and `jacobtest` tenant configuration remain open.
 - Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
 
 ### Production Domain Routing

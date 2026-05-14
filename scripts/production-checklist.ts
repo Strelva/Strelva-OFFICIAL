@@ -1693,6 +1693,16 @@ function printReleaseActions() {
     console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
   }
   const tenantDnsFailures = results.filter((result) => result.status === "fail" && /^Tenant .+ DNS /.test(result.name));
+  const tenantConfigurationFailures = results.filter(
+    (result) => result.status === "fail" && /^Tenant .+ (client domain|admin domain|revalidation)$/.test(result.name),
+  );
+  if (tenantConfigurationFailures.length) {
+    console.log("- Tenant configuration: update active Sanity tenants before release, or deactivate test tenants that should not be customer-facing:");
+    for (const result of tenantConfigurationFailures) {
+      console.log(`  ${result.name}: ${result.message}`);
+    }
+    console.log("  Active launch tenants need a customer-facing productionDomain/customDomains entry, an adminDomain or derivable admin.<productionDomain>, and revalidateUrl plus revalidationSecret.");
+  }
   if (tenantDnsFailures.length) {
     console.log("- Tenant DNS: add the missing Vercel/Cloudflare DNS records, wait for propagation, then rerun `pnpm check:prod`:");
     for (const result of tenantDnsFailures) {

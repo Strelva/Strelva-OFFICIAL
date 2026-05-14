@@ -454,6 +454,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Vercel app freshness");
     expect(source).toContain("app-host smoke probe");
     expect(source).toContain("Tenant DNS: add the missing Vercel/Cloudflare DNS records");
+    expect(source).toContain("Tenant configuration: update active Sanity tenants before release");
+    expect(source).toContain("deactivate test tenants that should not be customer-facing");
+    expect(source).toContain("Active launch tenants need a customer-facing productionDomain/customDomains entry");
     expect(source).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(source).toContain("Deploy a clean release branch containing the current launch-readiness fixes");
     expect(source).toContain("do not only redeploy the existing stale production artifact");
@@ -665,6 +668,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("Vercel app freshness");
     expect(audit).toContain("inactive internal demo tenant");
     expect(audit).toContain("Rohlax Cloudflare DNS");
+    expect(audit).toContain("jacobtest");
+    expect(audit).toContain("Tenant jacobtest client domain");
+    expect(audit).toContain("70 passed, 3 warned, 6 failed, and 16 skipped");
     expect(audit).toContain("CLERK_WEBHOOK_SECRET");
     expect(audit).toContain("SANITY_WEBHOOK_SECRET");
     expect(audit).toContain("UPSTASH_REDIS_REST_URL");
@@ -830,6 +836,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("dig +short www.rohlaxwellness.com A");
     expect(launchBlockers).toContain("dig +short admin.rohlaxwellness.com A");
     expect(launchBlockers).toContain("Rohlax Cloudflare DNS");
+    expect(launchBlockers).toContain("Jacob Test Tenant Launch Configuration");
+    expect(launchBlockers).toContain("Tenant jacobtest client domain");
+    expect(launchBlockers).toContain("deactivate `jacobtest` in Sanity");
     expect(launchBlockers).toContain("dax.ns.cloudflare.com");
     expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `scaffold-web");
     expect(launchBlockers).toContain("A admin.rohlaxwellness.com 76.76.21.21");
