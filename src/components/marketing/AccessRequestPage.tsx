@@ -16,7 +16,7 @@ const requestOptions = [
 
 const nextSteps = [
   "We read the request and first workflow.",
-  "We email the next step for the free site.",
+  "We email the next step when the request is reviewed.",
   "Nothing publishes without your review.",
 ];
 
@@ -88,11 +88,17 @@ function AccessRequestForm() {
       const body = await response.json().catch(() => null);
       setState("success");
       setStatusUrl(typeof body?.statusUrl === "string" ? body.statusUrl : "");
-      setMessage(
-        body?.emailSent
-          ? "Waitlist request received. We emailed your delivery-status link."
-          : "Waitlist request received. Your delivery-status link is ready.",
-      );
+      if (body?.repeatSubmission) {
+        setMessage(
+          "We know you're excited. We've already got this email in the queue, one site at a time. Your delivery-status link is ready.",
+        );
+      } else {
+        setMessage(
+          body?.emailSent
+            ? "Request received. We emailed your delivery-status link and will follow up after review."
+            : "Request received. Your delivery-status link is ready. We will follow up after review.",
+        );
+      }
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "We could not send this yet. Try again.");
@@ -119,6 +125,7 @@ function AccessRequestForm() {
           </h1>
           <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
             Tell us the business, the public site you need, and the first practical AI workflow you want handled.
+            We will follow up after review.
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common first outcomes">
@@ -164,7 +171,7 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                {message || "We will email next steps for the free first site and the workflow you want to start with."}
+                {message || "We will email next steps for the free first site and the workflow you want to start with after review."}
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
@@ -269,7 +276,7 @@ function AccessRequestForm() {
                   <ArrowRight className="size-4" />
                 </button>
                 <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">
-                  No payment. No long form.
+                  No payment. No long form. We will follow up after review.
                 </p>
               </div>
 

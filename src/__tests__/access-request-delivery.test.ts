@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendEmail = vi.hoisted(() => vi.fn());
+const mockRedisStore = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
@@ -8,7 +9,14 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 vi.mock("@/lib/redis", () => ({
-  getRedis: vi.fn(() => null),
+  getRedis: vi.fn(() => ({
+    get: vi.fn((key: string) => Promise.resolve(mockRedisStore.get(key) ?? null)),
+    set: vi.fn((key: string, value: unknown) => {
+      mockRedisStore.set(key, value);
+      return Promise.resolve("OK");
+    }),
+    zadd: vi.fn(() => Promise.resolve(1)),
+  })),
 }));
 
 vi.mock("resend", () => ({
@@ -27,6 +35,7 @@ describe("access request delivery flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockRedisStore.clear();
     process.env = {
       ...originalEnv,
       NEXT_PUBLIC_SANITY_PROJECT_ID: "",
@@ -72,6 +81,43 @@ describe("access request delivery flow", () => {
       html: expect.stringContaining("No login is needed yet"),
       text: expect.stringContaining("No login is needed yet"),
     }));
+  });
+
+  it("returns the existing status link for repeat email submissions", async () => {
+    const { POST } = await import("@/app/api/access-request/intake/route");
+
+    const firstResponse = await POST(new Request("http://localhost/api/access-request/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessName: "Demo Studio",
+        email: "owner@example.com",
+        description: "Free website waitlist. First workflow: weekly proof",
+      }),
+    }));
+    const firstBody = await firstResponse.json();
+
+    mockSendEmail.mockClear();
+
+    const repeatResponse = await POST(new Request("http://localhost/api/access-request/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessName: "Second Studio",
+        email: "Owner@Example.com",
+        description: "Free website waitlist. First workflow: another site",
+      }),
+    }));
+
+    expect(repeatResponse.status).toBe(200);
+    const repeatBody = await repeatResponse.json();
+    expect(repeatBody).toMatchObject({
+      success: true,
+      emailSent: false,
+      repeatSubmission: true,
+      statusUrl: firstBody.statusUrl,
+    });
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it("renders safe email copy for business names and status URLs", async () => {

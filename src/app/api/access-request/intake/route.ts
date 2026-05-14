@@ -37,9 +37,19 @@ export async function POST(req: Request) {
   const safeCurrentWebsite = typeof currentWebsite === "string" ? currentWebsite.trim().slice(0, 300) : "";
   const safeReferredBy = typeof referredBy === "string" ? referredBy.trim().slice(0, 200) : "";
   const now = new Date().toISOString();
-  const statusToken = (await getExistingLeadToken(normalizedEmail)) || createDeliveryStatusToken();
+  const existingStatusToken = await getExistingLeadToken(normalizedEmail);
+  const statusToken = existingStatusToken || createDeliveryStatusToken();
   const requestOrigin = new URL(req.url).origin;
   const statusUrl = buildDeliveryStatusUrl(requestOrigin, statusToken);
+
+  if (existingStatusToken) {
+    return NextResponse.json({
+      success: true,
+      statusUrl,
+      emailSent: false,
+      repeatSubmission: true,
+    });
+  }
 
   const slackUrl = process.env.SLACK_WEBHOOK_URL;
   if (slackUrl) {
