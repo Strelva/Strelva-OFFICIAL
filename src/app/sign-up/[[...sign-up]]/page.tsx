@@ -1,132 +1,59 @@
-import { ClerkLoaded, ClerkLoading, SignUp } from "@clerk/nextjs";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import Link from "next/link";
+import { ArrowLeft, ArrowRight, MailCheck } from "lucide-react";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import {
-  getAuthSwitchUrl,
-  getInvitedEmail,
-  type InvitedEmailSearchParams,
-} from "@/lib/invited-email";
-import { isMarketingHost } from "@/lib/marketing-hosts";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { getTenantSiteName } from "@/lib/tenant-display";
-import { getTenantConfig } from "@/lib/tenants";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 
-async function getPostSignUpUrl(): Promise<string> {
-  const requestHeaders = await headers();
-  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-  if (clientFallbackRoot) {
-    return withClientFallbackRoot(clientFallbackRoot, "/dashboard");
-  }
+export const metadata: Metadata = {
+  title: "Dashboard signup is paused.",
+  description: "Scaffold Web dashboard signup is temporarily paused while free-site requests and customer access are handled by email.",
+};
 
-  const host = requestHeaders.get("host") || "";
-  return isMarketingHost(host) ? "/account" : "/dashboard";
-}
-
-async function getSignUpSiteName() {
-  const requestHeaders = await headers();
-  const explicitTenant = requestHeaders.get("x-tenant");
-  const host = requestHeaders.get("host") || "";
-  if (!explicitTenant && isMarketingHost(host)) return "Scaffold Web";
-
-  const tenant = await getTenantFromHeaders();
-  const config = await getTenantConfig(tenant);
-  return getTenantSiteName(tenant, config);
-}
-
-function getSignUpTitle(siteName: string) {
-  return siteName === "Scaffold Web"
-    ? "Create your dashboard account"
-    : `Create your ${siteName} dashboard account`;
-}
-
-export async function generateMetadata(): Promise<Metadata> {
-  const siteName = await getSignUpSiteName();
-
-  return {
-    title: getSignUpTitle(siteName),
-    description: `Create your account with the exact email address from your ${siteName} invite.`,
-  };
-}
-
-export default async function SignUpPage({
-  searchParams,
-}: {
-  searchParams: Promise<InvitedEmailSearchParams>;
-}) {
-  const params = await searchParams;
-  const siteName = await getSignUpSiteName();
-  const postSignUpUrl = await getPostSignUpUrl();
-  const title = getSignUpTitle(siteName);
-  const invitedEmail = getInvitedEmail(params);
+export default function SignUpPage() {
+  const title = "Dashboard signup is paused.";
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-10"
-      style={{ background: "#08080a" }}
-    >
+    <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
       <AuthDocumentTitle title={title} />
-      <div className="max-w-md text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#d4a052]">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-40px)] max-w-[960px] flex-col justify-center py-16">
+        <Link
+          href="/"
+          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+        >
+          <ArrowLeft className="size-4" />
           Scaffold Web
-        </p>
-        <h1 className="mt-3 text-2xl font-semibold text-[#e8e8ec]">
-          {title}
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-[#8e8e96]">
-          Use the exact email address that received your invite. That is how we
-          connect your account to the right website dashboard.
-        </p>
-        {invitedEmail ? (
-          <p className="mt-4 rounded-md border border-[#2b2418] bg-[#15110b] px-3 py-2 text-sm text-[#d9c099]">
-            Invited email: <span className="font-medium text-[#f1d7a5]">{invitedEmail}</span>
+        </Link>
+
+        <section className="mt-12 overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
+          <MailCheck className="size-9 text-[color:var(--m-accent)]" />
+          <p className="mt-6 text-[14px] font-medium text-[color:var(--m-text-3)]">
+            Free-site requests stay email-first
           </p>
-        ) : null}
+          <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-[color:var(--m-text)] sm:text-6xl">
+            {title}
+          </h1>
+          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
+            We are not asking new customers to create a Clerk account right now.
+            Request a free site and we will email your delivery-status link
+            after the request is received.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/access-request"
+              className="marketing-button-primary h-11 px-5 text-[14px]"
+            >
+              Request free site
+              <ArrowRight className="size-4" />
+            </Link>
+            <a
+              href="mailto:jacob@scaffoldweb.com?subject=Scaffold%20Web%20signup"
+              className="marketing-button-secondary h-11 px-5 text-[14px]"
+            >
+              Email Jacob
+            </a>
+          </div>
+        </section>
       </div>
-      <ClerkLoading>
-        <div className="w-full max-w-md rounded-xl border border-[#1c1c20] bg-[#0f0f12] p-6 text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border border-[#2b2418] border-t-[#d4a052]" />
-          <p className="text-sm font-medium text-[#e8e8ec]">Loading secure signup...</p>
-          <p className="mt-2 text-xs leading-5 text-[#8e8e96]">
-            If this takes more than a few seconds, use the invited email or email jacob@scaffoldweb.com.
-          </p>
-        </div>
-      </ClerkLoading>
-      <ClerkLoaded>
-        <SignUp
-          appearance={{
-            elements: {
-              rootBox: "mx-auto",
-              card: "shadow-none !bg-[#0f0f12] border border-[#1c1c20]",
-              headerTitle: "font-display !text-[#e8e8ec]",
-              headerSubtitle: "!text-[#8e8e96]",
-              socialButtonsBlockButton:
-                "!bg-[#1c1c20] !border-[#26262b] !text-[#e8e8ec] hover:!bg-[#26262b]",
-              formFieldLabel: "!text-[#8e8e96]",
-              formFieldInput:
-                "!bg-[#08080a] !border-[#26262b] !text-[#e8e8ec] focus:!border-[#d4a052]",
-              formButtonPrimary: "!bg-[#d4a052] hover:!bg-[#c4903e] !text-[#08080a]",
-              footerActionLink: "!text-[#d4a052] hover:!text-[#c4903e]",
-              footerActionText: "!text-[#55555c]",
-              dividerLine: "!bg-[#1c1c20]",
-              dividerText: "!text-[#55555c]",
-            },
-          }}
-          forceRedirectUrl={postSignUpUrl}
-          fallbackRedirectUrl={postSignUpUrl}
-          signInUrl={getAuthSwitchUrl("/sign-in", invitedEmail)}
-          initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}
-        />
-      </ClerkLoaded>
-      <p className="max-w-md text-center text-sm leading-6 text-[#66666f]">
-        If your invite email is missing, access does not appear after signup,
-        or the signup form is not loading, email{" "}
-        <a className="text-[#d4a052] underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
-          jacob@scaffoldweb.com
-        </a>{" "}
-        and we&apos;ll get it connected.
-      </p>
-    </div>
+    </main>
   );
 }

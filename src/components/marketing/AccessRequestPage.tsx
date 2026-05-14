@@ -8,14 +8,14 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, MailCheck } from "
 type FormState = "idle" | "submitting" | "success" | "error";
 
 const requestOptions = [
-  "Keep my site current",
+  "Launch a simple site",
   "Get more booking clicks",
-  "Show what worked each week",
+  "Replace an outdated site",
   "Make updates easier",
 ];
 
 const nextSteps = [
-  "We read the request and first workflow.",
+  "We read the business and site request.",
   "We email the next step when the request is reviewed.",
   "Nothing publishes without your review.",
 ];
@@ -50,9 +50,9 @@ function AccessRequestForm() {
     const cleanWebsite = currentWebsite.trim();
     const cleanRequest = request.trim();
 
-    if (!cleanBusinessName || !cleanEmail || !cleanRequest) {
+    if (!cleanBusinessName || !cleanEmail) {
       setState("error");
-      setMessage("Add your business, email, and first workflow.");
+      setMessage("Add your business and email.");
       return;
     }
 
@@ -74,7 +74,7 @@ function AccessRequestForm() {
           businessName: cleanBusinessName,
           email: cleanEmail,
           currentWebsite: cleanWebsite,
-          description: `Free website waitlist. First workflow: ${cleanRequest}`,
+          description: cleanRequest ? `Free site signup. Site request: ${cleanRequest}` : "Free site signup.",
           location: cleanLocation,
           referredBy: ref || "access-request",
         }),
@@ -118,17 +118,17 @@ function AccessRequestForm() {
           </Link>
 
           <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
-            Free website waitlist
+            Free site signup
           </p>
           <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-6xl md:text-7xl">
-            Start with one workflow.
+            Request your free site.
           </h1>
           <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
-            Tell us the business, the public site you need, and the first practical AI workflow you want handled.
-            We will follow up after review.
+            Tell us the business, where to send updates, and what the site should help customers do. We will follow up
+            after review.
           </p>
 
-          <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common first outcomes">
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common site goals">
             {requestOptions.map((option, index) => (
               <button
                 key={option}
@@ -171,7 +171,7 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                {message || "We will email next steps for the free first site and the workflow you want to start with after review."}
+                {message || "We will email next steps for the free site after review."}
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
@@ -199,7 +199,7 @@ function AccessRequestForm() {
               <div className="border-b border-[var(--m-rule-soft)] pb-5">
                 <p className="text-[13px] text-[color:var(--m-text-3)]">Takes one minute</p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--m-text)]">
-                  Join the waitlist.
+                  Sign up for a free site.
                 </h2>
               </div>
 
@@ -255,13 +255,12 @@ function AccessRequestForm() {
                 </Field>
               </div>
 
-              <Field label="First workflow" htmlFor="request">
+              <Field label="Site request" htmlFor="request">
                 <textarea
                   id="request"
                   value={request}
                   onChange={(event) => setRequest(event.target.value)}
-                  placeholder="Example: I need a current site, weekly proof, and easier updates for new classes."
-                  required
+                  placeholder="Example: I need a cleaner site that helps people book new classes."
                   className={`${fieldClassName} min-h-36 resize-none py-3 leading-[1.55]`}
                 />
               </Field>
@@ -272,7 +271,7 @@ function AccessRequestForm() {
                   disabled={state === "submitting"}
                   className="marketing-button-primary h-13 px-6 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-65"
                 >
-                  {state === "submitting" ? "Sending..." : "Join free-site waitlist"}
+                  {state === "submitting" ? "Sending..." : "Request free site"}
                   <ArrowRight className="size-4" />
                 </button>
                 <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">

@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `New free-site waitlist request:\n*${normalizedBusinessName}*\n${safeDescription || "No description"}\n${safeLocation || "No location"}\n${normalizedEmail}\nCurrent site: ${safeCurrentWebsite || "None"}\nReferred by: ${safeReferredBy || "Direct"}`,
+          text: `New free-site signup request:\n*${normalizedBusinessName}*\n${safeDescription || "No description"}\n${safeLocation || "No location"}\n${normalizedEmail}\nCurrent site: ${safeCurrentWebsite || "None"}\nReferred by: ${safeReferredBy || "Direct"}`,
         }),
       });
     } catch {
@@ -79,7 +79,14 @@ export async function POST(req: Request) {
     statusUpdatedAt: now,
   };
 
-  await saveDeliveryLead(leadData);
+  const leadPersisted = await saveDeliveryLead(leadData);
+  if (!leadPersisted) {
+    console.error("[access-request] Delivery status storage is not configured.");
+    return NextResponse.json(
+      { error: "Delivery tracking is not configured. Email jacob@scaffoldweb.com and we will get you added." },
+      { status: 503 },
+    );
+  }
 
   let emailSent = false;
   if (process.env.RESEND_API_KEY) {
@@ -89,13 +96,16 @@ export async function POST(req: Request) {
       const fromDomain = process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
       const subjectBusinessName = normalizedBusinessName.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-      await resend.emails.send({
+      const result = await resend.emails.send({
         from: `Scaffold Web <hello@${fromDomain}>`,
         to: normalizedEmail,
         subject: `We received ${subjectBusinessName}'s site request`,
         html: buildDeliveryStatusEmailHtml({ businessName: normalizedBusinessName, statusUrl }),
         text: buildDeliveryStatusEmailText({ businessName: normalizedBusinessName, statusUrl }),
       });
+      if (result.error || !result.data?.id) {
+        throw new Error(result.error?.message || "Resend did not return an email id.");
+      }
       emailSent = true;
     } catch (err) {
       console.error("[access-request] Delivery status email failed:", err);

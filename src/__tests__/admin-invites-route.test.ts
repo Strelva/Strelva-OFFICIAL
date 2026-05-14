@@ -64,7 +64,7 @@ describe("admin invites route", () => {
     mockGetUserList.mockResolvedValue({ data: [] });
     mockCreateInvite.mockResolvedValue(true);
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");
-    mockSendEmail.mockResolvedValue({ id: "email_123" });
+    mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
 
   afterEach(() => {

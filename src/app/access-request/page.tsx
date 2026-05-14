@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { AccessRequestPage } from "@/components/marketing/AccessRequestPage";
 
 export const metadata: Metadata = {
-  title: "Join the free website waitlist",
-  description: "Tell Scaffold Web the first website workflow your local business wants handled.",
+  title: "Request your free site",
+  description: "Tell Scaffold Web where to send updates and what your local business needs online.",
 };
 
 export default function Page() {

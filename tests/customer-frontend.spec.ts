@@ -10,9 +10,9 @@ test("marketing homepage gives a customer clear starting points", async ({ page 
   const response = await page.goto("/", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();
 
-  await expect(page.getByRole("heading", { name: /put your first ai workflow to work/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /join waitlist/i }).first()).toHaveAttribute("href", "/access-request");
-  await expect(page.getByRole("link", { name: /sign in/i }).first()).toHaveAttribute("href", "/sign-in");
+  await expect(page.getByRole("heading", { name: /a site that keeps up/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /request free site/i }).first()).toHaveAttribute("href", "/access-request");
+  await expect(page.getByRole("link", { name: /sign in/i })).toHaveCount(0);
 });
 
 test("legacy onboard route redirects to the access request", async ({ page }) => {
@@ -20,7 +20,7 @@ test("legacy onboard route redirects to the access request", async ({ page }) =>
   expect(response?.status()).toBeLessThan(400);
 
   await expect(page).toHaveURL(/\/access-request\?ref=home-proof-loop/);
-  await expect(page.getByRole("heading", { name: /start with one workflow/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /request your free site/i })).toBeVisible();
 });
 
 test("access request returns a no-login delivery status handoff", async ({ page }) => {
@@ -39,11 +39,12 @@ test("access request returns a no-login delivery status handoff", async ({ page 
   const response = await page.goto("/access-request?ref=test", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();
 
-  await page.locator("#business-name").fill("Demo Studio");
-  await page.locator("#location").fill("Buffalo, NY");
-  await page.locator("#email").fill("owner@example.com");
-  await page.locator("#request").fill("I need weekly proof and easier site updates.");
-  await page.getByRole("button", { name: /join free-site waitlist/i }).click();
+  await page.getByLabel("Business").fill("Demo Studio");
+  await page.getByLabel("City").fill("Buffalo, NY");
+  await page.getByLabel("Email").fill("owner@example.com");
+  await page.getByLabel("Site request").fill("I need a cleaner site and easier updates.");
+  await expect(page.getByLabel("Business")).toHaveValue("Demo Studio");
+  await page.getByRole("button", { name: /request free site/i }).click();
 
   await expect(page.getByRole("heading", { name: /request received/i })).toBeVisible();
   await expect(page.getByText(/we emailed your delivery-status link/i)).toBeVisible();
@@ -118,15 +119,13 @@ test("signed-out dashboard customers get the sign-in flow instead of a broken pa
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
-  await expect(page.getByRole("heading", { name: /sign in to scaffold web/i })).toBeVisible();
-  await expect(page.getByText("Secure dashboard handoff")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /continue to your website dashboard/i })).toBeVisible();
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
-  await expect(page.getByText(/sign-in form is not loading/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
+  await expect(page.getByText("Temporary access handoff")).toBeVisible();
+  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /email jacob/i })).toHaveAttribute(
     "href",
-    "mailto:jacob@scaffoldweb.com",
+    /mailto:jacob@scaffoldweb\.com/,
   );
 });
 
@@ -136,8 +135,8 @@ test("signed-out account handoff returns users to sign-in", async ({ page }) => 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 
 test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) => {
@@ -147,10 +146,9 @@ test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
-  await expect(page.getByRole("heading", { name: /sign in to great lakes dried fruit/i })).toBeVisible();
-  await expect(page.getByText("Secure dashboard handoff")).toBeVisible();
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
+  await expect(page.getByText("Temporary access handoff")).toBeVisible();
 });
 
 test("admin tenant host sign-in keeps the invited email context", async ({ page }) => {
@@ -159,11 +157,8 @@ test("admin tenant host sign-in keeps the invited email context", async ({ page 
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in\?email=owner%40example\.com/);
-  await expect(page).toHaveTitle(/Sign in to Great Lakes Dried Fruit \| Scaffold Web/);
-  await expect(page.getByText("Invited email:")).toBeVisible();
-  await expect(page.getByText("owner@example.com")).toBeVisible();
-  await expect(page.getByText("This email stays attached when switching between sign-in and sign-up.")).toBeVisible();
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 
 test("admin tenant host sign-up uses the tenant invite context", async ({ page }) => {
@@ -173,17 +168,12 @@ test("admin tenant host sign-up uses the tenant invite context", async ({ page }
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-up/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account \| Scaffold Web/);
-  await expect(
-    page.getByRole("heading", { name: /create your great lakes dried fruit dashboard account/i }),
-  ).toBeVisible();
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
-  await expect(page.getByText("Invited email:")).toBeVisible();
-  await expect(page.getByText("owner@example.com")).toBeVisible();
-  await expect(page.getByText(/signup form is not loading/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
+  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /dashboard signup is paused/i })).toBeVisible();
+  await expect(page.getByText("Free-site requests stay email-first")).toBeVisible();
+  await expect(page.getByRole("link", { name: /request free site/i })).toHaveAttribute(
     "href",
-    "mailto:jacob@scaffoldweb.com",
+    "/access-request",
   );
 });
 
@@ -193,17 +183,16 @@ test("signed-out no-access recovery returns users to sign-in", async ({ page }) 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Sign in to Scaffold Web \| Scaffold Web/);
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 
-test("sign-in page allows Clerk JS to load", async ({ request }) => {
+test("sign-in page uses the temporary no-Clerk handoff", async ({ request }) => {
   const response = await request.get("/sign-in");
   expect(response.status()).toBeLessThan(400);
 
-  const csp = response.headers()["content-security-policy"] || "";
-  expect(csp).toContain("script-src");
-  expect(csp).toContain("https://*.clerk.accounts.dev");
-  expect(csp).toContain("https://*.clerk.com");
-  expect(csp).toContain("https://clerk.scaffoldweb.com");
+  const html = await response.text();
+  expect(html).toContain("Dashboard sign-in is paused.");
+  expect(html).toContain("We are not using Clerk sign-in right now.");
+  expect(html).not.toContain("Loading secure sign-in");
 });

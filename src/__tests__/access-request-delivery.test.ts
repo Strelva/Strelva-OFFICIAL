@@ -44,7 +44,7 @@ describe("access request delivery flow", () => {
       RESEND_API_KEY: "re_test",
       RESEND_DOMAIN: "updates.scaffoldweb.com",
     };
-    mockSendEmail.mockResolvedValue({ id: "email_123" });
+    mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
 
   it("creates a no-login delivery link and sends the first signup email", async () => {
@@ -58,7 +58,7 @@ describe("access request delivery flow", () => {
         email: "Owner@Example.com",
         location: "Buffalo, NY",
         currentWebsite: "https://example.com",
-        description: "Free website waitlist. First workflow: weekly proof",
+        description: "Free site signup. Site request: weekly proof",
         referredBy: "test",
       }),
     }));
@@ -83,6 +83,33 @@ describe("access request delivery flow", () => {
     }));
   });
 
+  it("does not report email delivery when Resend returns an API error", async () => {
+    mockSendEmail.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Domain is not verified", name: "validation_error" },
+      headers: null,
+    });
+    const { POST } = await import("@/app/api/access-request/intake/route");
+
+    const response = await POST(new Request("http://localhost/api/access-request/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessName: "Demo Studio",
+        email: "owner@example.com",
+        description: "Free site signup. Site request: weekly proof",
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: true,
+      emailSent: false,
+    });
+    expect(body.statusUrl).toMatch(/^https:\/\/scaffoldweb\.com\/delivery\/[a-f0-9]{36}$/);
+  });
+
   it("returns the existing status link for repeat email submissions", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
 
@@ -92,7 +119,7 @@ describe("access request delivery flow", () => {
       body: JSON.stringify({
         businessName: "Demo Studio",
         email: "owner@example.com",
-        description: "Free website waitlist. First workflow: weekly proof",
+        description: "Free site signup. Site request: weekly proof",
       }),
     }));
     const firstBody = await firstResponse.json();
@@ -105,7 +132,7 @@ describe("access request delivery flow", () => {
       body: JSON.stringify({
         businessName: "Second Studio",
         email: "Owner@Example.com",
-        description: "Free website waitlist. First workflow: another site",
+        description: "Free site signup. Site request: another site",
       }),
     }));
 
