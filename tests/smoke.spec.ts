@@ -36,11 +36,11 @@ test("signup page explains invited email recovery", async ({ page }) => {
   await page.goto("/sign-up");
 
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Create your dashboard account \| Scaffold Web/);
-  await expect(page.getByRole("heading", { name: "Create your dashboard account" })).toBeVisible();
-  await expect(page.getByText("Use the exact email address that received your invite")).toBeVisible();
-  await expect(page.getByRole("link", { name: "jacob@scaffoldweb.com" })).toHaveAttribute(
+  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Scaffold Web/);
+  await expect(page.getByRole("heading", { name: /dashboard signup is paused/i })).toBeVisible();
+  await expect(page.getByText("Free-site requests stay email-first")).toBeVisible();
+  await expect(page.getByRole("link", { name: /request free site/i })).toHaveAttribute(
     "href",
-    "mailto:jacob@scaffoldweb.com",
+    "/access-request",
   );
 });

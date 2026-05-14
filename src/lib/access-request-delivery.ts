@@ -34,7 +34,7 @@ export const deliverySteps: Array<{
   {
     id: "received",
     label: "Request received",
-    detail: "Your business, current site, and first workflow are in the queue. We will follow up after review.",
+    detail: "Your business, current site, and free-site request are in the queue. We will follow up after review.",
   },
   {
     id: "reviewing",
@@ -140,7 +140,7 @@ export function buildDeliveryStatusEmailHtml(params: {
       <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Scaffold Web</p>
       <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Your site request is in the queue.</h1>
       <p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px;">
-        We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and the first workflow the site should handle. We will follow up after review.
+        We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and what the free site should help customers do. We will follow up after review.
       </p>
       <a href="${statusUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
         Track site delivery
@@ -161,7 +161,7 @@ export function buildDeliveryStatusEmailText(params: {
     "Your site request is in the queue.",
     "",
     `We received the request for ${businessName}.`,
-    "The first status is request received. Next we review the business, the current site, and the first workflow the site should handle. We will follow up after review.",
+    "The first status is request received. Next we review the business, the current site, and what the free site should help customers do. We will follow up after review.",
     "",
     `Track site delivery: ${params.statusUrl}`,
     "",
@@ -257,7 +257,9 @@ export async function getExistingLeadToken(email: string): Promise<string | null
   return lead?.statusToken ?? null;
 }
 
-export async function saveDeliveryLead(lead: DeliveryLead): Promise<void> {
+export async function saveDeliveryLead(lead: DeliveryLead): Promise<boolean> {
+  let persisted = false;
+
   if (hasLeadSanity) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existing = await (getSanityClient() as any).fetch(
@@ -273,6 +275,7 @@ export async function saveDeliveryLead(lead: DeliveryLead): Promise<void> {
         status: "new",
       });
     }
+    persisted = true;
   }
 
   const redis = getRedis();
@@ -282,5 +285,8 @@ export async function saveDeliveryLead(lead: DeliveryLead): Promise<void> {
     await redis.set(leadKey, payload);
     await redis.set(`lead-status:${lead.statusToken}`, payload);
     await redis.zadd("leads:all", { score: Date.now(), member: leadKey });
+    persisted = true;
   }
+
+  return persisted;
 }

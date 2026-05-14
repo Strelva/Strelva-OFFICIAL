@@ -1,59 +1,58 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { getInvitedEmail, type InvitedEmailSearchParams } from "@/lib/invited-email";
-import { isMarketingHost } from "@/lib/marketing-hosts";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { getTenantSiteName } from "@/lib/tenant-display";
-import { getTenantConfig } from "@/lib/tenants";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
-import { SignInClient } from "./SignInClient";
+import Link from "next/link";
+import { ArrowLeft, ArrowRight, MailCheck } from "lucide-react";
+import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 
-async function getPostSignInUrl(): Promise<string> {
-  const requestHeaders = await headers();
-  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-  if (clientFallbackRoot) {
-    return withClientFallbackRoot(clientFallbackRoot, "/dashboard");
-  }
+export const metadata: Metadata = {
+  title: "Dashboard sign-in is paused.",
+  description: "Scaffold Web dashboard sign-in is temporarily paused while customer access is handled by email.",
+};
 
-  const host = requestHeaders.get("host") || "";
-  return isMarketingHost(host) ? "/account" : "/dashboard";
-}
-
-async function getSignInSiteName() {
-  const requestHeaders = await headers();
-  const explicitTenant = requestHeaders.get("x-tenant");
-  const host = requestHeaders.get("host") || "";
-  if (!explicitTenant && isMarketingHost(host)) return "Scaffold Web";
-
-  const tenant = await getTenantFromHeaders();
-  const config = await getTenantConfig(tenant);
-  return getTenantSiteName(tenant, config);
-}
-
-export async function generateMetadata(): Promise<Metadata> {
-  const siteName = await getSignInSiteName();
-
-  return {
-    title: `Sign in to ${siteName}`,
-    description: "Sign in with the email address from your invite to access your website dashboard.",
-  };
-}
-
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: Promise<InvitedEmailSearchParams>;
-}) {
-  const params = await searchParams;
-  const siteName = await getSignInSiteName();
-  const postSignInUrl = await getPostSignInUrl();
-  const invitedEmail = getInvitedEmail(params);
+export default function SignInPage() {
+  const title = "Dashboard sign-in is paused.";
 
   return (
-    <SignInClient
-      invitedEmail={invitedEmail}
-      siteName={siteName}
-      postSignInUrl={postSignInUrl}
-    />
+    <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
+      <AuthDocumentTitle title={title} />
+      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-40px)] max-w-[960px] flex-col justify-center py-16">
+        <Link
+          href="/"
+          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+        >
+          <ArrowLeft className="size-4" />
+          Scaffold Web
+        </Link>
+
+        <section className="mt-12 overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
+          <MailCheck className="size-9 text-[color:var(--m-accent)]" />
+          <p className="mt-6 text-[14px] font-medium text-[color:var(--m-text-3)]">
+            Temporary access handoff
+          </p>
+          <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-[color:var(--m-text)] sm:text-6xl">
+            {title}
+          </h1>
+          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
+            We are not using Clerk sign-in right now. If you need access to a site,
+            email Jacob and he will send the current link or next step directly.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a
+              href="mailto:jacob@scaffoldweb.com?subject=Scaffold%20Web%20dashboard%20access"
+              className="marketing-button-primary h-11 px-5 text-[14px]"
+            >
+              Email Jacob
+              <ArrowRight className="size-4" />
+            </a>
+            <Link
+              href="/access-request"
+              className="marketing-button-secondary h-11 px-5 text-[14px]"
+            >
+              Request a free site
+            </Link>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }

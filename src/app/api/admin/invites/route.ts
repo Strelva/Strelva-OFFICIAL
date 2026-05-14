@@ -105,13 +105,16 @@ export async function POST(req: Request) {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
 
-      await resend.emails.send({
+      const result = await resend.emails.send({
         from: `Scaffold Web <hello@${process.env.RESEND_DOMAIN || "scaffoldweb.com"}>`,
         to: email,
         subject: `You're invited to manage ${siteNameText}`,
         html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
         text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
       });
+      if (result.error || !result.data?.id) {
+        throw new Error(result.error?.message || "Resend did not return an email id.");
+      }
 
       return NextResponse.json({
         success: true,
