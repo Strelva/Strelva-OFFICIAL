@@ -58,8 +58,39 @@
    dig +short scaffoldweb.com NS
    dig +short '*.scaffoldweb.com' CNAME
    curl -I -L https://scaffoldweb.com/api/health
-   pnpm check:prod
-   ```
+  pnpm check:prod
+  ```
+
+## Rohlax Wellness Cloudflare DNS
+
+`rohlaxwellness.com` uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`). Keep the Vercel domain entries in place and add the records Vercel recommends inside Cloudflare:
+
+```
+A www.rohlaxwellness.com 76.76.21.21
+A admin.rohlaxwellness.com 76.76.21.21
+```
+
+Current Vercel evidence:
+
+- `rohlaxwellness.com` is attached to project `rohlax-wellness`.
+- `admin.rohlaxwellness.com` is attached to project `reb-studio`.
+- `www.rohlaxwellness.com` is found under the account but still reports as not configured; confirm it is attached to the intended Vercel project if Vercel continues warning after the Cloudflare A record propagates.
+- On May 13, 2026, `www` and `admin` expose the CNAME `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND`. Treat that as partial DNS, not launch-ready routing.
+
+Verify:
+
+```
+vercel domains inspect rohlaxwellness.com
+vercel domains inspect www.rohlaxwellness.com
+vercel domains inspect admin.rohlaxwellness.com
+dig +short www.rohlaxwellness.com CNAME
+dig +short admin.rohlaxwellness.com CNAME
+dig +short www.rohlaxwellness.com A
+dig +short admin.rohlaxwellness.com A
+curl -I -L https://rohlaxwellness.com
+curl -I -L https://admin.rohlaxwellness.com
+pnpm check:prod
+```
 
 ## Verification
 

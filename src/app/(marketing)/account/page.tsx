@@ -105,7 +105,7 @@ function NoAccessState() {
               color: "var(--m-text-2)",
             }}
           >
-            Request private beta access
+            Request a free site
           </Link>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ContentMap } from "../src/lib/types";
 import { defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";
 import { gldfContentDefaults } from "../src/lib/gldf-content-defaults";
+import { demoContentDefaults } from "../src/lib/demo-content-defaults";
 
 for (const path of [".env.local", ".env"]) {
   if (!existsSync(path)) continue;
@@ -183,6 +184,7 @@ const caroleeDefaults: ContentMap = {
 
 const TENANT_DEFAULTS: Record<string, ContentMap> = {
   carolee: caroleeDefaults,
+  demo: demoContentDefaults,
   gldf: gldfContentDefaults,
 };
 

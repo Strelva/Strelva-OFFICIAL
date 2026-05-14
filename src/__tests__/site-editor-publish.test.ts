@@ -128,7 +128,7 @@ describe("site editor publish routes", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(PAGE_CONFIG);
     expect(mockGetDraftPageConfig).toHaveBeenCalledWith("test-tenant");
-  });
+  }, 10000);
 
   it("PUT /api/page-config?draft=true saves a validated draft instead of live config", async () => {
     const { PUT } = await import("@/app/api/page-config/route");

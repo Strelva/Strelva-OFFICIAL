@@ -8,16 +8,16 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, MailCheck } from "
 type FormState = "idle" | "submitting" | "success" | "error";
 
 const requestOptions = [
-  "More calls or bookings",
-  "A site that feels current",
-  "Weekly proof of what worked",
-  "Someone to handle updates",
+  "More calls",
+  "More bookings",
+  "A current site",
+  "Updates handled",
 ];
 
 const nextSteps = [
-  "We read the request and check whether the beta can help now.",
-  "If it fits, we ask a few practical questions by email.",
-  "Nothing gets built or published without a human review path.",
+  "We read the request.",
+  "We email next steps.",
+  "Nothing publishes without review.",
 ];
 
 export function AccessRequestPage() {
@@ -37,7 +37,6 @@ function AccessRequestForm() {
   const [request, setRequest] = useState("");
   const [state, setState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
-  const cameFromLanding = ref.startsWith("home");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,13 +49,13 @@ function AccessRequestForm() {
 
     if (!cleanBusinessName || !cleanEmail || !cleanRequest) {
       setState("error");
-      setMessage("Add your business, email, and what you want handled first.");
+      setMessage("Add your business, email, and first request.");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setState("error");
-      setMessage("Use a working email so we can reply with next steps.");
+      setMessage("Use a working email.");
       return;
     }
 
@@ -83,7 +82,7 @@ function AccessRequestForm() {
       }
 
       setState("success");
-      setMessage("Request received. We will email you with next steps.");
+      setMessage("Request received. We will email next steps.");
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "We could not send this yet. Try again.");
@@ -103,13 +102,13 @@ function AccessRequestForm() {
           </Link>
 
           <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
-            {cameFromLanding ? "From the proof loop" : "Private beta request"}
+            Free site request
           </p>
           <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-6xl md:text-7xl">
-            What should Scaffold handle first?
+            Request your free site.
           </h1>
           <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
-            Start with one useful outcome. We can learn the rest after we know what would make the website feel worth keeping open.
+            Tell us the business and the first job the site should handle.
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common first outcomes">
@@ -134,7 +133,7 @@ function AccessRequestForm() {
           <div className="mt-10 hidden rounded-[18px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-5 lg:block">
             <div className="flex items-center gap-3">
               <ClipboardCheck className="size-5 text-[color:var(--m-accent)]" />
-              <h2 className="text-[15px] font-medium text-[color:var(--m-text)]">What happens after this</h2>
+              <h2 className="text-[15px] font-medium text-[color:var(--m-text)]">After this</h2>
             </div>
             <ul className="mt-4 grid gap-3">
               {nextSteps.map((step) => (
@@ -155,7 +154,7 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                We will email next steps. If the first beta group is a fit, we will ask a few follow-up questions before anything gets built.
+                We will email next steps for the free site.
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
@@ -170,9 +169,9 @@ function AccessRequestForm() {
           ) : (
             <form className="grid gap-5 p-6 sm:p-8 md:p-10" onSubmit={onSubmit} noValidate aria-describedby="intake-status">
               <div className="border-b border-[var(--m-rule-soft)] pb-5">
-                <p className="text-[13px] text-[color:var(--m-text-3)]">Takes about one minute</p>
+                <p className="text-[13px] text-[color:var(--m-text-3)]">Takes one minute</p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--m-text)]">
-                  Send the shortest useful version.
+                  Send the basics.
                 </h2>
               </div>
 
@@ -208,7 +207,7 @@ function AccessRequestForm() {
                   id="current-website"
                   value={currentWebsite}
                   onChange={(event) => setCurrentWebsite(event.target.value)}
-                  placeholder="Website, booking page, or leave blank"
+                  placeholder="Website or booking page"
                   autoComplete="url"
                   inputMode="url"
                   className={fieldClassName}
@@ -220,7 +219,7 @@ function AccessRequestForm() {
                   id="request"
                   value={request}
                   onChange={(event) => setRequest(event.target.value)}
-                  placeholder="Example: I want more booking clicks, and I need someone to keep the site updated when classes change."
+                  placeholder="Example: I need more booking clicks and easier updates."
                   required
                   className={`${fieldClassName} min-h-36 resize-none py-3 leading-[1.55]`}
                 />
@@ -232,11 +231,11 @@ function AccessRequestForm() {
                   disabled={state === "submitting"}
                   className="marketing-button-primary h-13 px-6 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-65"
                 >
-                  {state === "submitting" ? "Sending..." : "Send request"}
+                  {state === "submitting" ? "Sending..." : "Request free site"}
                   <ArrowRight className="size-4" />
                 </button>
                 <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">
-                  No payment, no portal setup, no long questionnaire.
+                  No payment. No long form.
                 </p>
               </div>
 

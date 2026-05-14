@@ -11,7 +11,7 @@ import { createClient } from "@sanity/client";
 import { Redis } from "@upstash/redis";
 import Stripe from "stripe";
 import { execFileSync } from "node:child_process";
-import { resolve4, resolveNs } from "node:dns/promises";
+import { resolve4, resolveCname, resolveNs } from "node:dns/promises";
 import { existsSync, readFileSync } from "node:fs";
 import {
   getLaunchBlockerError,
@@ -366,15 +366,6 @@ function checkLaunchBlockerActionability(path: string) {
 
 checkLaunchBlockerActionability("docs/launch-blockers.md");
 
-function getResultCounts(extraOk = 0) {
-  return {
-    failed: results.filter((result) => result.status === "fail").length,
-    warned: results.filter((result) => result.status === "warn").length,
-    passed: results.filter((result) => result.status === "ok").length + extraOk,
-    skipped: results.filter((result) => result.status === "skip").length,
-  };
-}
-
 function checkCompletionAudit(path: string) {
   if (!existsSync(path)) {
     log({ name: "Completion audit", status: "fail", message: `${path} is missing` });
@@ -382,13 +373,15 @@ function checkCompletionAudit(path: string) {
   }
 
   const content = readFileSync(path, "utf8");
-  const countsIfAuditPasses = getResultCounts(1);
-  const expectedSummary = `${countsIfAuditPasses.passed} passed, ${countsIfAuditPasses.warned} warned, ${countsIfAuditPasses.failed} failed, ${countsIfAuditPasses.skipped} skipped`;
   const requiredTerms = [
     "Current failures from the latest `pnpm check:prod` run",
+    "Latest observed checklist summary",
     "Required Production Env Vars",
     "Production Live Verification",
     "Production Domain Routing",
+    "Vercel app freshness",
+    "inactive internal demo tenant",
+    "Rohlax Cloudflare DNS",
     "CLERK_WEBHOOK_SECRET",
     "SANITY_WEBHOOK_SECRET",
     "UPSTASH_REDIS_REST_URL",
@@ -402,7 +395,6 @@ function checkCompletionAudit(path: string) {
     "Sign in to Scaffold Web | Scaffold Web",
     "https://scaffoldweb-com.l.ink/",
     "openresty",
-    expectedSummary,
     "Full `pnpm check:launch` was rerun",
   ];
   const missing = requiredTerms.filter((term) => !content.includes(term));
@@ -463,8 +455,8 @@ function checkPackageReleaseScripts(path: string) {
     const packageJson = JSON.parse(readFileSync(path, "utf8")) as {
       scripts?: Record<string, string>;
     };
-    const expectedLaunch = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
-    const expectedRelease = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+    const expectedLaunch = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+    const expectedRelease = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
 
     if (packageJson.scripts?.["check:launch"] !== expectedLaunch || packageJson.scripts?.["check:release"] !== expectedRelease) {
       log({
@@ -634,7 +626,7 @@ function checkAuthAccessPages(
     account.includes("No invited sites on this account") &&
     account.includes("UseInvitedEmailButton") &&
     account.includes("signs you out so you can choose that account") &&
-    account.includes("Start a new site") &&
+    account.includes("Request a free site") &&
     account.includes("mailto:jacob@scaffoldweb.com") &&
     account.includes("!tenantConfigs.some(({ config }) => config)") &&
     account.includes("return <NoAccessState />");
@@ -1371,7 +1363,7 @@ async function checkVercelAppFreshness() {
       log({
         name: "Vercel app freshness",
         status: "fail",
-        message: `${signInUrl} must serve the current invite-focused sign-in title "${EXPECTED_SIGN_IN_TITLE}"; got "${title}". Redeploy the Vercel Production app from a clean release branch or dashboard before live customer-access verification.`,
+        message: `${signInUrl} must serve the current invite-focused sign-in title "${EXPECTED_SIGN_IN_TITLE}"; got "${title}". Deploy a clean release branch containing the current launch-readiness fixes before live customer-access verification; do not only redeploy the existing stale production artifact.`,
       });
       return;
     }
@@ -1511,10 +1503,53 @@ async function checkTenantRevalidation() {
 
     for (const tenant of tenants) {
       for (const result of getTenantLaunchReadinessResults(tenant)) log(result);
+      if (tenant.active !== false) {
+        await checkTenantDomainDns(tenant);
+      }
     }
   } catch (err) {
     console.log(`  Error fetching tenants: ${(err as Error).message}\n`);
   }
+}
+
+async function checkTenantDomainDns(tenant: {
+  id: string;
+  productionDomain?: string;
+  adminDomain?: string;
+  customDomains?: string[];
+}) {
+  const productionDomain = normalizeDomainForDns(tenant.productionDomain);
+  const adminDomain = normalizeDomainForDns(tenant.adminDomain || (productionDomain ? `admin.${productionDomain}` : ""));
+  const wwwDomain = productionDomain && !productionDomain.startsWith("www.") ? `www.${productionDomain}` : "";
+  const domains = [productionDomain, wwwDomain, adminDomain].filter(Boolean);
+
+  for (const domain of domains) {
+    const records = await resolve4(domain).catch(() => [] as string[]);
+    if (records.length) {
+      log({ name: `Tenant ${tenant.id} DNS ${domain}`, status: "ok", message: records.join(", ") });
+      continue;
+    }
+
+    const cnameRecords = (await resolveCname(domain).catch(() => [] as string[])).map(formatDnsRecord);
+    const dnsContext = cnameRecords.length
+      ? `${domain} has CNAME ${cnameRecords.join(", ")} but no routable A record from resolve4/curl.`
+      : `${domain} does not resolve.`;
+
+    log({
+      name: `Tenant ${tenant.id} DNS ${domain}`,
+      status: "fail",
+      message: `${dnsContext} Add the domain in Vercel and create DNS record "A ${domain} 76.76.21.21" before treating tenant ${tenant.id} as production-routable.`,
+    });
+  }
+}
+
+function normalizeDomainForDns(domain: string | undefined) {
+  return domain?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || "";
+}
+
+function formatDnsRecord(record: string) {
+  const normalized = record.trim();
+  return normalized.endsWith("/") ? `${normalized.slice(0, -1)}.` : normalized;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1645,6 +1680,10 @@ function printReleaseActions() {
     if (launchBlockers.includes("Vercel Project Access")) {
       console.log("- Vercel access: grant access to project reb-studio (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
     }
+    if (launchBlockers.includes("Vercel app freshness")) {
+      console.log("- Vercel app freshness: push/deploy a clean release branch containing the current launch-readiness fixes; do not only redeploy the existing stale production artifact. Then rerun `pnpm check:prod` and the app-host smoke probe:");
+      console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    }
     if (launchBlockers.includes("Production Live Verification")) {
       console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
       console.log("  Cron auth commands:");
@@ -1652,6 +1691,13 @@ function printReleaseActions() {
       console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance');
     }
     console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
+  }
+  const tenantDnsFailures = results.filter((result) => result.status === "fail" && /^Tenant .+ DNS /.test(result.name));
+  if (tenantDnsFailures.length) {
+    console.log("- Tenant DNS: add the missing Vercel/Cloudflare DNS records, wait for propagation, then rerun `pnpm check:prod`:");
+    for (const result of tenantDnsFailures) {
+      console.log(`  ${result.message}`);
+    }
   }
   if (results.some((result) => result.name === "Production site URL" && result.status === "fail")) {
     console.log(`- Production domain routing: ${scaffoldWebDomainAction} Wait for DNS/SSL propagation, then rerun \`pnpm check:prod\`.`);

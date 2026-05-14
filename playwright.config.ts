@@ -2,11 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = process.env.PLAYWRIGHT_PORT || "3100";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}`;
+const useBuiltApp = process.env.PLAYWRIGHT_BUILT_APP === "1";
 
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -14,7 +15,9 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: `pnpm exec next dev --port ${port}`,
+        command: useBuiltApp
+          ? `pnpm exec next start --port ${port}`
+          : `PLAYWRIGHT_DIST_DIR=.next-playwright pnpm exec next dev --port ${port}`,
         url: `${baseURL}/api/health`,
         reuseExistingServer: false,
         timeout: 120_000,

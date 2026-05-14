@@ -1,21 +1,49 @@
 # Scaffold Web Launch Blockers
 
-Last local audit: May 10, 2026.
+Last local audit: May 13, 2026.
 
 This file tracks launch blockers that cannot be resolved by code changes alone. `pnpm check:prod` fails while this file contains unwaived blockers. A release is not complete until this file is empty or every remaining item is explicitly waived in the release note with owner approval.
 
 ## Current Blockers
 
-None.
+### Vercel app freshness
+
+- Status: blocked
+- Owner: Jacob Rhinehart
+- Evidence: `pnpm check:prod` on May 13, 2026 still sees `https://reb-studio.vercel.app/sign-in` render `Sign in to Harbor & Pine Wellness | Scaffold Web` instead of `Sign in to Scaffold Web | Scaffold Web`. Read-only `vercel inspect https://reb-studio.vercel.app --scope rhinehart514-gmailcoms-projects` shows the production alias resolves to Ready deployment `dpl_97eSddQpWfqPCvp2eFX9K6o2DAna`, created Wed May 13, 2026 16:19:17 EDT, with aliases for `scaffoldweb.com`, `*.scaffoldweb.com`, `reb-studio.vercel.app`, `admin.rohlaxwellness.com`, and `admin.greatlakesdriedfruit.com`; this points to stale deployed code rather than a missing Vercel alias.
+- Required owner action: commit/push or otherwise promote a clean release branch that contains the current launch-readiness worktree changes, deploy that release through Vercel, then rerun `pnpm check:prod` and the Vercel-host freshness probe. Do not only redeploy the existing `dpl_97eSddQpWfqPCvp2eFX9K6o2DAna` artifact; it still serves the stale auth title.
+
+```bash
+PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"
+```
+
+### Rohlax Cloudflare DNS
+
+- Status: blocked
+- Owner: Jacob Rhinehart
+- Evidence: `https://rohlaxwellness.com` returns `200` from Vercel. As of May 13, 2026, `dig +short www.rohlaxwellness.com CNAME` and `dig +short admin.rohlaxwellness.com CNAME` return `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND` for both hostnames, so the records are not production-routable. `vercel domains inspect` confirms the domain uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`) instead of Vercel nameservers; Vercel recommends the A records below. `admin.rohlaxwellness.com` is attached to `reb-studio`; the apex is attached to `rohlax-wellness`; `www.rohlaxwellness.com` is found under the account but still reports as not configured.
+- Required owner action: confirm the `www` hostname is attached to the intended Vercel project if needed, add these Cloudflare DNS records, wait for propagation, then rerun `pnpm check:prod`.
+
+```text
+A www.rohlaxwellness.com 76.76.21.21
+A admin.rohlaxwellness.com 76.76.21.21
+```
 
 Copyable DNS verification commands:
 
 ```bash
 vercel domains inspect scaffoldweb.com
+vercel domains inspect rohlaxwellness.com
 dig +short scaffoldweb.com A
 dig +short scaffoldweb.com NS
 dig +short '*.scaffoldweb.com' CNAME
+dig +short www.rohlaxwellness.com CNAME
+dig +short admin.rohlaxwellness.com CNAME
+dig +short www.rohlaxwellness.com A
+dig +short admin.rohlaxwellness.com A
 curl -I -L https://scaffoldweb.com/api/health
+curl -I -L https://rohlaxwellness.com
+curl -I -L https://admin.rohlaxwellness.com
 pnpm check:prod
 ```
 
@@ -23,6 +51,8 @@ Expected DNS/HTTP results:
 
 - `dig +short scaffoldweb.com A` includes `76.76.21.21`, or the nameserver check shows `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
 - The wildcard CNAME resolves to Vercel when wildcard subdomains are managed through DNS records.
+- The Rohlax CNAME checks may expose partial Vercel aliasing, but launch readiness requires the A checks and `curl` probes to work.
+- `dig +short www.rohlaxwellness.com A` and `dig +short admin.rohlaxwellness.com A` return routable records after Cloudflare is updated.
 - `curl -I -L https://scaffoldweb.com/api/health` stays on `https://scaffoldweb.com/api/health`, returns Vercel headers, and does not redirect to `scaffoldweb-com.l.ink`.
 
 Copyable verification commands:
@@ -62,8 +92,8 @@ Move an item here only with owner approval in the release note. Each waiver must
 
 ### Production Live Verification
 
-- Status: resolved locally on May 10, 2026.
-- Evidence: production env was pulled from Vercel, the Production deployment was rebuilt from the latest Vercel deployment, and the Vercel app-host freshness check confirms `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; that prerequisite chain is now complete for the unauthenticated release gate.
+- Status: pending redeploy on May 13, 2026.
+- Evidence: production env was pulled from Vercel and the local built-app gate passes, but the Vercel app-host freshness check still sees `https://reb-studio.vercel.app/sign-in` serve `Sign in to Harbor & Pine Wellness | Scaffold Web`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and DNS prerequisites for Scaffold Web are complete, but the stale Vercel app deploy remains open.
 - Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
 
 ### Production Domain Routing
@@ -87,12 +117,12 @@ Move an item here only with owner approval in the release note. Each waiver must
 - `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for `rhinehart514-gmailcoms-projects/reb-studio`.
 - `pnpm lint` passes.
 - `pnpm typecheck` passes.
-- `pnpm test` passes: 261 tests across 28 files.
+- `pnpm test` passes: 345 tests across 36 files.
 - `pnpm audit` passes with no known vulnerabilities after upgrading Clerk, Next, Vercel Blob, next-sanity, Sanity, Vitest, and eslint-config-next and forcing patched transitive dependency versions with pnpm overrides.
 - The old `react-social-media-embed` dependency was removed; the Instagram section now renders dependency-free outbound cards, avoiding a React 19 peer warning and third-party embed-script CSP risk.
 - `pnpm build` passes on Next 16.2.6 with the `src/proxy.ts` convention.
-- `REB_DEV_UNGATED_ACCESS=0 pnpm smoke` passes: 20 Playwright tests on an isolated local port so an unrelated `localhost:3000` server cannot satisfy smoke checks. The suite covers direct `/dashboard` access, signed-out `/account` handoff, signed-out `/no-access` recovery, rendered auth page titles, root and admin-host sign-up guidance, invited-email sign-in context, the `admin.gldf.localhost` dashboard entry point, and cron protection.
-- `pnpm check:launch` passes end to end with lint, typecheck, 261 unit tests across 28 files, `pnpm audit`, `pnpm build`, and 20 smoke tests with `REB_DEV_UNGATED_ACCESS=0`.
+- `REB_DEV_UNGATED_ACCESS=0 pnpm smoke` passes: 21 Playwright tests on an isolated local port so an unrelated `localhost:3000` server cannot satisfy smoke checks. The suite covers direct `/dashboard` access, signed-out `/account` handoff, signed-out `/no-access` recovery, rendered auth page titles, root and admin-host sign-up guidance, invited-email sign-in context, the `admin.gldf.localhost` dashboard entry point, and cron protection.
+- `pnpm check:launch` passes end to end with lint, typecheck, 345 unit tests across 36 files, `pnpm audit`, `pnpm build`, and 21 built-app smoke tests with `REB_DEV_UNGATED_ACCESS=0`.
 - `pnpm check:prod` verifies the customer frontend smoke suite still covers dashboard, account handoff, no-access, admin-host, rendered auth page titles, sign-up invite guidance, invited-email recovery, Clerk JS CSP, cron protection, and no `/app` regressions.
 - `pnpm check:prod` verifies the auth page source still routes root marketing-host auth through `/account`, routes tenant/admin-host auth to `/dashboard`, avoids `/app`, includes the support email, keeps invite-focused browser metadata, and keeps no-access account switching.
 - `pnpm check:prod` verifies `/admin` tenant rows expose owner-email invites and that the invite modal posts to `/api/admin/invites` with exact-email guidance, accessible dialog/status semantics, and persistent open/copy manual signup fallback when email delivery is unavailable.
@@ -155,7 +185,7 @@ PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://gre
 ```
 
 The GitHub Release workflow refuses to create a `reb-vYYYY.MM.DD.N` tag unless the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
-`pnpm check:release` forces `REB_DEV_UNGATED_ACCESS=0` for smoke so signed-out access checks cannot be bypassed by the dev-access flag.
+`pnpm check:release` runs local smoke against the built Next app and forces `REB_DEV_UNGATED_ACCESS=0` so signed-out access checks cannot be bypassed by the dev-access flag.
 
 Then manually verify:
 
