@@ -74,7 +74,7 @@ describe("access request delivery flow", () => {
       from: "Scaffold Web <hello@updates.scaffoldweb.com>",
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
-      html: expect.stringContaining("Track site delivery"),
+      html: expect.stringContaining(`href="${body.statusUrl}"`),
       text: expect.stringContaining(`Track site delivery: ${body.statusUrl}`),
     }));
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
@@ -140,11 +140,15 @@ describe("access request delivery flow", () => {
     const repeatBody = await repeatResponse.json();
     expect(repeatBody).toMatchObject({
       success: true,
-      emailSent: false,
+      emailSent: true,
       repeatSubmission: true,
       statusUrl: firstBody.statusUrl,
     });
-    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: "owner@example.com",
+      html: expect.stringContaining(`href="${firstBody.statusUrl}"`),
+      text: expect.stringContaining(`Track site delivery: ${firstBody.statusUrl}`),
+    }));
   });
 
   it("renders safe email copy for business names and status URLs", async () => {

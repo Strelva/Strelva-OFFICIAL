@@ -90,7 +90,9 @@ function AccessRequestForm() {
       setStatusUrl(typeof body?.statusUrl === "string" ? body.statusUrl : "");
       if (body?.repeatSubmission) {
         setMessage(
-          "We know you're excited. We've already got this email in the queue, one site at a time. Your delivery-status link is ready.",
+          body?.emailSent
+            ? "We already have this email in the queue, one site at a time. We resent your delivery-status link."
+            : "We already have this email in the queue, one site at a time. Your delivery-status link is ready.",
         );
       } else {
         setMessage(
