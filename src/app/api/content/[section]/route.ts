@@ -20,6 +20,7 @@ import { requireActiveSubscription } from "@/lib/subscription";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { readJsonObject } from "@/lib/request-body";
 import { sectionSchemas } from "@/lib/schemas";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateForTenant(tenant);
@@ -138,8 +139,9 @@ export async function PUT(
 
     revalidatePath("/");
 
-    // Trigger revalidation on standalone client site
-    revalidateClientSite(tenant, ["/"]).catch((err) => {
+    // Trigger revalidation on standalone client site. Settings-like sections
+    // affect layout, metadata, links, and design tokens across many routes.
+    revalidateClientSite(tenant, clientRevalidationTargetForSections([s])).catch((err) => {
       console.error("[content PUT] Failed to revalidate client site:", err);
     });
 

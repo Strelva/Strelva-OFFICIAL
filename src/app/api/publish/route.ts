@@ -23,6 +23,7 @@ import { sectionSchemas } from "@/lib/schemas";
 import { diffFields } from "@/lib/utils";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -102,7 +103,7 @@ export async function POST() {
       validatedPageConfig = parsed.pageConfig;
     }
 
-    const publishedSections: string[] = [];
+    const publishedSections: ContentSection[] = [];
     for (const draft of parsedDrafts) {
       const current = await getContent(draft.section, tenant) as unknown as Record<string, unknown>;
       const next = draft.data as ContentMap[typeof draft.section];
@@ -149,7 +150,12 @@ export async function POST() {
       | { status: "not_configured" }
       | { status: "failed"; error: string };
     try {
-      const liveSiteResult = await revalidateClientSite(tenant, ["/"]);
+      const liveSiteResult = await revalidateClientSite(
+        tenant,
+        clientRevalidationTargetForSections(publishedSections, {
+          pageConfigChanged: publishedPageConfig,
+        })
+      );
       liveSite = liveSiteResult.skipped
         ? { status: "not_configured" }
         : liveSiteResult.success

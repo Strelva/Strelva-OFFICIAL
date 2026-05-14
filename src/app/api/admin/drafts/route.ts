@@ -18,6 +18,7 @@ import { sectionSchemas } from "@/lib/schemas";
 import { diffFields } from "@/lib/utils";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { readJsonObject } from "@/lib/request-body";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 export async function GET() {
   if (!(await isSuperAdmin())) {
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
     });
     await clearDraft(typedSection, tenant);
     revalidatePath("/");
-    revalidateClientSite(tenant, ["/"]).catch(() => {});
+    revalidateClientSite(tenant, clientRevalidationTargetForSections([typedSection])).catch(() => {});
   } else {
     await clearDraft(typedSection, tenant);
     await logAuditEvent({

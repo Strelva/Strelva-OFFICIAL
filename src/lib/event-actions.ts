@@ -10,6 +10,7 @@ import {
   recordSectionUpdate,
   setContent,
 } from "./storage";
+import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { diffFields } from "./utils";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
@@ -116,7 +117,7 @@ export async function resolveEventAction(
         const { revalidatePath } = await import("next/cache");
         revalidatePath("/");
         const { revalidateClientSite } = await import("./revalidate-client");
-        revalidateClientSite(tenantId, ["/"]).catch(() => {});
+        revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
       }
 
       await clearDraft(section, tenantId);

@@ -32,6 +32,7 @@ import {
   type AgentActionResult,
 } from "@/lib/agent-results";
 import { readJsonObject } from "@/lib/request-body";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 type IncomingMessagePart = { type?: string; text?: string };
 
@@ -539,6 +540,13 @@ Only use tools for manifest-supported sections and actions. If the user requests
               await appendVersion(section as ContentSection, parsed.data, "ai", tenant, diffFields(current, data as Record<string, unknown>));
               const { revalidatePath } = await import("next/cache");
               revalidatePath("/");
+              const { revalidateClientSite } = await import("@/lib/revalidate-client");
+              revalidateClientSite(
+                tenant,
+                clientRevalidationTargetForSections([section as ContentSection])
+              ).catch((err) => {
+                console.error("[agent] Failed to revalidate client site:", err);
+              });
             } else {
               const event = await queueAiContentReview({
                 tenantId: tenant,

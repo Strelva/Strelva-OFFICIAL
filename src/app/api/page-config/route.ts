@@ -13,6 +13,8 @@ import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermissi
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
+import { revalidateClientSite } from "@/lib/revalidate-client";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -84,6 +86,12 @@ export async function PUT(request: Request) {
       });
     }
     revalidatePath("/");
+    revalidateClientSite(
+      tenant,
+      clientRevalidationTargetForSections([], { pageConfigChanged: true })
+    ).catch((err) => {
+      console.error("[page-config PUT] Failed to revalidate client site:", err);
+    });
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to save page config" }, { status: 500 });

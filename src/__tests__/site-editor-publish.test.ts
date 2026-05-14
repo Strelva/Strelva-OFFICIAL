@@ -166,7 +166,7 @@ describe("site editor publish routes", () => {
     expect(mockClearDraft).toHaveBeenCalledWith("hero", "test-tenant");
     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
-    expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", ["/"]);
+    expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", "all");
   });
 
   it("POST /api/publish reports when publishing only updates Scaffold content", async () => {

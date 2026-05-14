@@ -11,6 +11,7 @@ import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { queueAiContentReview } from "@/lib/ai-review-queue";
 import type { ContentSection } from "@/lib/types";
 import { revalidateClientSite } from "@/lib/revalidate-client";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
 
 export interface AgentExecutionToolTrace {
@@ -280,7 +281,10 @@ export async function executeAgentPromptDetailed(
           revalidatePath("/");
 
           // Trigger revalidation on standalone client site
-          revalidateClientSite(tenantId, ["/"]).catch((err) => {
+          revalidateClientSite(
+            tenantId,
+            clientRevalidationTargetForSections([section as ContentSection])
+          ).catch((err) => {
             console.error("[agent] Failed to revalidate client site:", err);
           });
         } else {
