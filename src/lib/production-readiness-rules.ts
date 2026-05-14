@@ -1,6 +1,7 @@
 export type ReadinessStatus = "ok" | "warn" | "fail" | "skip";
 
 export interface TenantReadinessInput {
+  _id?: string;
   id: string;
   active?: boolean;
   productionDomain?: string;
@@ -170,6 +171,7 @@ export function validateProductionEnvValue(name: string, value: string): string 
 
 export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): TenantReadinessResult[] {
   const tenantIsActive = tenant.active !== false;
+  const activeTenantContext = tenantIsActive && tenant._id ? ` (Sanity document ${tenant._id})` : "";
   const productionDomain = normalizeReadinessDomain(tenant.productionDomain);
   const adminDomain = normalizeReadinessDomain(tenant.adminDomain);
   const clientCustomDomains = tenant.customDomains?.map(normalizeReadinessDomain).filter((domain) =>
@@ -186,7 +188,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
     name: `Tenant ${tenant.id} client domain`,
     status: tenantIsActive ? "fail" : "warn",
     message: tenantIsActive
-      ? "Active tenant has no customer-facing productionDomain/customDomains entry configured"
+      ? `Active tenant has no customer-facing productionDomain/customDomains entry configured${activeTenantContext}`
       : "Inactive tenant has no customer-facing productionDomain/customDomains entry configured",
   });
 
@@ -199,7 +201,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
     name: `Tenant ${tenant.id} admin domain`,
     status: tenantIsActive ? "fail" : "warn",
     message: tenantIsActive
-      ? "Active tenant has no admin domain and none can be derived"
+      ? `Active tenant has no admin domain and none can be derived${activeTenantContext}`
       : "Inactive tenant has no admin domain and none can be derived",
   });
 
@@ -212,7 +214,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
       name: `Tenant ${tenant.id} revalidation`,
       status: tenantIsActive ? "fail" : "warn",
       message: tenantIsActive
-        ? "Active tenant URL set but NO SECRET (generate with: openssl rand -hex 32)"
+        ? `Active tenant URL set but NO SECRET (generate with: openssl rand -hex 32)${activeTenantContext}`
         : "Inactive tenant URL set but NO SECRET (generate with: openssl rand -hex 32)",
     });
   } else {
@@ -220,7 +222,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
       name: `Tenant ${tenant.id} revalidation`,
       status: tenantIsActive ? "fail" : "skip",
       message: tenantIsActive
-        ? "Active tenant has no revalidateUrl configured"
+        ? `Active tenant has no revalidateUrl configured${activeTenantContext}`
         : "Inactive tenant has no revalidateUrl configured",
     });
   }

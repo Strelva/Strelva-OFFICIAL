@@ -1492,6 +1492,7 @@ async function checkTenantRevalidation() {
     });
 
     const tenants = await client.fetch<Array<{
+      _id?: string;
       id: string;
       name: string;
       active?: boolean;
@@ -1501,7 +1502,7 @@ async function checkTenantRevalidation() {
       customDomains?: string[];
       revalidateUrl?: string;
       revalidationSecret?: string;
-    }>>(`*[_type == "tenant"] { id, name, active, productionDomain, adminDomain, siteUrl, customDomains, revalidateUrl, revalidationSecret }`);
+    }>>(`*[_type == "tenant"] { _id, id, name, active, productionDomain, adminDomain, siteUrl, customDomains, revalidateUrl, revalidationSecret }`);
 
     for (const tenant of tenants) {
       for (const result of getTenantLaunchReadinessResults(tenant)) log(result);

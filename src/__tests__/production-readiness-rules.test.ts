@@ -181,6 +181,20 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     ]);
   });
 
+  it("includes Sanity document ids in active tenant launch failures", () => {
+    const results = getTenantLaunchReadinessResults({
+      _id: "THl7mfItZYUmELpcZNa2Zr",
+      id: "jacobtest",
+      active: true,
+    });
+
+    expect(results.map((result) => result.message)).toEqual([
+      "Active tenant has no customer-facing productionDomain/customDomains entry configured (Sanity document THl7mfItZYUmELpcZNa2Zr)",
+      "Active tenant has no admin domain and none can be derived (Sanity document THl7mfItZYUmELpcZNa2Zr)",
+      "Active tenant has no revalidateUrl configured (Sanity document THl7mfItZYUmELpcZNa2Zr)",
+    ]);
+  });
+
   it("passes configured active tenant launch domains and revalidation", () => {
     const results = getTenantLaunchReadinessResults({
       id: "gldf",
