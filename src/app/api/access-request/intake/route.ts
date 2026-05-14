@@ -43,10 +43,16 @@ export async function POST(req: Request) {
   const statusUrl = buildDeliveryStatusUrl(requestOrigin, statusToken);
 
   if (existingStatusToken) {
+    const emailSent = await sendDeliveryStatusEmail({
+      businessName: normalizedBusinessName,
+      email: normalizedEmail,
+      statusUrl,
+    });
+
     return NextResponse.json({
       success: true,
       statusUrl,
-      emailSent: false,
+      emailSent,
       repeatSubmission: true,
     });
   }
@@ -88,29 +94,41 @@ export async function POST(req: Request) {
     );
   }
 
-  let emailSent = false;
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromDomain = process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
-      const subjectBusinessName = normalizedBusinessName.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-
-      const result = await resend.emails.send({
-        from: `Scaffold Web <hello@${fromDomain}>`,
-        to: normalizedEmail,
-        subject: `We received ${subjectBusinessName}'s site request`,
-        html: buildDeliveryStatusEmailHtml({ businessName: normalizedBusinessName, statusUrl }),
-        text: buildDeliveryStatusEmailText({ businessName: normalizedBusinessName, statusUrl }),
-      });
-      if (result.error || !result.data?.id) {
-        throw new Error(result.error?.message || "Resend did not return an email id.");
-      }
-      emailSent = true;
-    } catch (err) {
-      console.error("[access-request] Delivery status email failed:", err);
-    }
-  }
+  const emailSent = await sendDeliveryStatusEmail({
+    businessName: normalizedBusinessName,
+    email: normalizedEmail,
+    statusUrl,
+  });
 
   return NextResponse.json({ success: true, statusUrl, emailSent });
+}
+
+async function sendDeliveryStatusEmail(params: {
+  businessName: string;
+  email: string;
+  statusUrl: string;
+}): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
+    const subjectBusinessName = params.businessName.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    const result = await resend.emails.send({
+      from: `Scaffold Web <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `We received ${subjectBusinessName}'s site request`,
+      html: buildDeliveryStatusEmailHtml({ businessName: params.businessName, statusUrl: params.statusUrl }),
+      text: buildDeliveryStatusEmailText({ businessName: params.businessName, statusUrl: params.statusUrl }),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error("[access-request] Delivery status email failed:", err);
+    return false;
+  }
 }
