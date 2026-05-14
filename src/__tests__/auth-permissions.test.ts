@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCurrentUser = vi.fn();
+const mockAuth = vi.fn();
+const mockConsumeInvite = vi.fn();
+const mockGetInvite = vi.fn();
 const mockGetUser = vi.fn();
 const mockUpdateUserMetadata = vi.fn();
 const mockGetTenantConfig = vi.fn();
 
 vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
+  auth: () => mockAuth(),
   currentUser: () => mockCurrentUser(),
   clerkClient: vi.fn(() =>
     Promise.resolve({
@@ -16,6 +19,11 @@ vi.mock("@clerk/nextjs/server", () => ({
       },
     })
   ),
+}));
+
+vi.mock("../lib/invites", () => ({
+  consumeInvite: (...args: unknown[]) => mockConsumeInvite(...args),
+  getInvite: (...args: unknown[]) => mockGetInvite(...args),
 }));
 
 vi.mock("../lib/tenants", () => ({
@@ -30,6 +38,9 @@ describe("auth permission helpers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.SUPER_ADMIN_EMAILS;
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockGetInvite.mockResolvedValue(null);
+    mockConsumeInvite.mockResolvedValue(null);
     mockGetTenantConfig.mockResolvedValue({ id: "gldf" });
   });
 
@@ -128,5 +139,57 @@ describe("auth permission helpers", () => {
         tenantRoles: { gldf: "admin" },
       },
     });
+  });
+
+  it("claims a pending invite for the signed-in user's exact email", async () => {
+    mockCurrentUser.mockResolvedValue({
+      id: "user_123",
+      emailAddresses: [{ emailAddress: "Owner@Example.com" }],
+      publicMetadata: { tenants: [] },
+    });
+    mockGetInvite.mockResolvedValue({
+      tenant: "gldf",
+      role: "owner",
+      invitedAt: "2026-05-13T00:00:00.000Z",
+    });
+    mockGetUser.mockResolvedValue({
+      publicMetadata: { tenants: [] },
+    });
+
+    const { claimPendingInviteForCurrentUser } = await import("../lib/auth");
+    const claimed = await claimPendingInviteForCurrentUser("gldf");
+
+    expect(claimed).toEqual({
+      email: "owner@example.com",
+      tenant: "gldf",
+      role: "owner",
+    });
+    expect(mockGetInvite).toHaveBeenCalledWith("owner@example.com");
+    expect(mockUpdateUserMetadata).toHaveBeenCalledWith("user_123", {
+      publicMetadata: {
+        tenants: ["gldf"],
+        tenantRoles: { gldf: "owner" },
+      },
+    });
+    expect(mockConsumeInvite).toHaveBeenCalledWith("owner@example.com");
+  });
+
+  it("leaves other-tenant invites pending on tenant-specific recovery", async () => {
+    mockCurrentUser.mockResolvedValue({
+      id: "user_123",
+      emailAddresses: [{ emailAddress: "owner@example.com" }],
+      publicMetadata: { tenants: [] },
+    });
+    mockGetInvite.mockResolvedValue({
+      tenant: "rohlax",
+      role: "owner",
+      invitedAt: "2026-05-13T00:00:00.000Z",
+    });
+
+    const { claimPendingInviteForCurrentUser } = await import("../lib/auth");
+
+    await expect(claimPendingInviteForCurrentUser("gldf")).resolves.toBeNull();
+    expect(mockUpdateUserMetadata).not.toHaveBeenCalled();
+    expect(mockConsumeInvite).not.toHaveBeenCalled();
   });
 });

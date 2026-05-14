@@ -102,10 +102,10 @@ describe("proxy host routing helpers", () => {
   });
 
   it("normalizes marketing domains from production env format", () => {
-    expect(parseMarketingDomains("https://reb.studio, www.reb.studio/, scaffoldweb.com")).toEqual([
-      "reb.studio",
-      "www.reb.studio",
+    expect(parseMarketingDomains("https://scaffoldweb.com, www.scaffoldweb.com/, localhost:3000")).toEqual([
       "scaffoldweb.com",
+      "www.scaffoldweb.com",
+      "localhost:3000",
     ]);
   });
 
@@ -114,7 +114,6 @@ describe("proxy host routing helpers", () => {
     expect(shouldResolveCustomDomain("localhost:3000")).toBe(false);
     expect(shouldResolveCustomDomain("127.0.0.1:3000")).toBe(false);
     expect(shouldResolveCustomDomain("gldf.localhost:3000")).toBe(false);
-    expect(shouldResolveCustomDomain("reb-studio.vercel.app")).toBe(false);
     expect(shouldResolveCustomDomain("gldf.scaffoldweb.com")).toBe(false);
     expect(shouldResolveCustomDomain("greatlakesdriedfruit.com")).toBe(true);
   });

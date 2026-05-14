@@ -8,7 +8,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
-import { getActorContext, hasTenantAccess } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getActorContext, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
@@ -35,6 +35,10 @@ export default async function DashboardLayout({
 
   const hasAccess = await hasTenantAccess(tenant);
   if (!hasAccess) {
+    const claimedInvite = await claimPendingInviteForCurrentUser(tenant);
+    if (claimedInvite) {
+      redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"));
+    }
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
   const actor = await getActorContext(tenant);

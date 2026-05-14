@@ -3,15 +3,25 @@ import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
+import { claimPendingInviteForCurrentUser } from "@/lib/auth";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 
 export default async function NoAccessPage() {
-  const clientFallbackRoot = getClientFallbackRoot(await headers());
+  const requestHeaders = await headers();
+  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
+  const targetTenant = requestHeaders.get("x-tenant") || undefined;
   const { userId } = await auth();
 
   if (!userId && !isDevAccessBypassEnabled()) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
+  }
+
+  if (userId) {
+    const claimedInvite = await claimPendingInviteForCurrentUser(targetTenant);
+    if (claimedInvite) {
+      redirect(targetTenant ? withClientFallbackRoot(clientFallbackRoot, "/dashboard") : "/account");
+    }
   }
 
   return (

@@ -1,27 +1,16 @@
 # Scaffold Web Launch Blockers
 
-Last local audit: May 13, 2026.
+Last local audit: May 14, 2026.
 
 This file tracks launch blockers that cannot be resolved by code changes alone. `pnpm check:prod` fails while this file contains unwaived blockers. A release is not complete until this file is empty or every remaining item is explicitly waived in the release note with owner approval.
 
 ## Current Blockers
 
-### Vercel app freshness
-
-- Status: blocked
-- Owner: Jacob Rhinehart
-- Evidence: `pnpm check:prod` on May 13, 2026 still sees `https://reb-studio.vercel.app/sign-in` render `Sign in to Harbor & Pine Wellness | Scaffold Web` instead of `Sign in to Scaffold Web | Scaffold Web`. Read-only `vercel inspect https://reb-studio.vercel.app --scope rhinehart514-gmailcoms-projects` shows the production alias resolves to Ready deployment `dpl_97eSddQpWfqPCvp2eFX9K6o2DAna`, created Wed May 13, 2026 16:19:17 EDT, with aliases for `scaffoldweb.com`, `*.scaffoldweb.com`, `reb-studio.vercel.app`, `admin.rohlaxwellness.com`, and `admin.greatlakesdriedfruit.com`; this points to stale deployed code rather than a missing Vercel alias.
-- Required owner action: commit/push or otherwise promote a clean release branch that contains the current launch-readiness worktree changes, deploy that release through Vercel, then rerun `pnpm check:prod` and the Vercel-host freshness probe. Do not only redeploy the existing `dpl_97eSddQpWfqPCvp2eFX9K6o2DAna` artifact; it still serves the stale auth title.
-
-```bash
-PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"
-```
-
 ### Rohlax Cloudflare DNS
 
 - Status: blocked
 - Owner: Jacob Rhinehart
-- Evidence: `https://rohlaxwellness.com` returns `200` from Vercel. As of May 13, 2026, `dig +short www.rohlaxwellness.com CNAME` and `dig +short admin.rohlaxwellness.com CNAME` return `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND` for both hostnames, so the records are not production-routable. `vercel domains inspect` confirms the domain uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`) instead of Vercel nameservers; Vercel recommends the A records below. `admin.rohlaxwellness.com` is attached to `reb-studio`; the apex is attached to `rohlax-wellness`; `www.rohlaxwellness.com` is found under the account but still reports as not configured.
+- Evidence: `https://rohlaxwellness.com` returns `200` from Vercel. As of May 14, 2026, `dig +short www.rohlaxwellness.com CNAME` and `dig +short admin.rohlaxwellness.com CNAME` return `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND` for both hostnames, so the records are not production-routable. `vercel domains inspect` confirms the domain uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`) instead of Vercel nameservers; Vercel recommends the A records below. `admin.rohlaxwellness.com` is attached to `scaffold-web`; the apex is attached to `rohlax-wellness`; `www.rohlaxwellness.com` is found under the account but still reports as not configured.
 - Required owner action: confirm the `www` hostname is attached to the intended Vercel project if needed, add these Cloudflare DNS records, wait for propagation, then rerun `pnpm check:prod`.
 
 ```text
@@ -92,8 +81,8 @@ Move an item here only with owner approval in the release note. Each waiver must
 
 ### Production Live Verification
 
-- Status: pending redeploy on May 13, 2026.
-- Evidence: production env was pulled from Vercel and the local built-app gate passes, but the Vercel app-host freshness check still sees `https://reb-studio.vercel.app/sign-in` serve `Sign in to Harbor & Pine Wellness | Scaffold Web`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and DNS prerequisites for Scaffold Web are complete, but the stale Vercel app deploy remains open.
+- Status: app freshness resolved on May 14, 2026; final production verification remains pending Rohlax DNS and owner manual checks.
+- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://scaffoldweb.com/sign-in` serve `Sign in to Scaffold Web | Scaffold Web` from Vercel. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Scaffold Web production-domain prerequisites are complete, while Rohlax Cloudflare DNS remains open.
 - Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
 
 ### Production Domain Routing
@@ -109,12 +98,12 @@ Move an item here only with owner approval in the release note. Each waiver must
   - Provider value sources: `CLERK_WEBHOOK_SECRET` from Clerk Dashboard -> Webhooks; `SANITY_WEBHOOK_SECRET` from Sanity project webhook settings; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from Upstash Redis database -> REST API section; `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from Sentry project settings -> Client Keys / DSN; `REB_CUSTOM_REQUEST_SECRET` is a generated shared custom-storefront bearer secret; `STRIPE_SCAFFOLD_PRICE_ID` from Stripe live-mode Products and must be exactly $149/month USD.
   - Clerk publishable key, secret key, and webhook secret must come from the same live Clerk instance; mismatched Clerk apps can make `/sign-in` loop.
   - Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If a generated secret must be rotated, generate it with `openssl rand -hex 32`, update the matching provider or caller, run `vercel env pull .env.production.local --environment=production`, then rerun `pnpm check:prod`.
-  - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://reb-studio.vercel.app/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`.
+  - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://scaffoldweb.com/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`.
 - Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `REB_CUSTOM_REQUEST_SECRET` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://scaffoldweb.com/api/clerk/webhook`, Sanity project webhook settings for `https://scaffoldweb.com/api/sanity/webhook`, Upstash Redis -> REST API, Sentry project settings -> Client Keys / DSN, and a generated shared custom-storefront bearer secret. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add REB_CUSTOM_REQUEST_SECRET production`.
 - `STRIPE_SCAFFOLD_PRICE_ID` resolves to live active Stripe price `price_1TVgq0D99ZGeTugfVuSggW3o` on product `prod_UKnWPSG3QOtOUz`, with `amount=14900`, `currency=usd`, and `interval=month`, matching the intended `$149/month USD` recurring plan.
 - `pnpm check:prod` now confirms Upstash Redis connectivity with `PING: PONG`; the remaining Redis warning is only that the tenant cache is empty and will populate on first request.
 - `docs/design-kit.md` exists and covers WCAG 2.2 AA, Core Web Vitals, AI surfaces, and template expansion rules.
-- `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for `rhinehart514-gmailcoms-projects/reb-studio`.
+- `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for `rhinehart514-gmailcoms-projects/scaffold-web`.
 - `pnpm lint` passes.
 - `pnpm typecheck` passes.
 - `pnpm test` passes: 345 tests across 36 files.

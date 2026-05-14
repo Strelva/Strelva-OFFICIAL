@@ -210,7 +210,6 @@ function getPreviewFrameAncestors(host: string, protocol: string): string[] {
     "https://scaffoldweb.com",
     "https://www.scaffoldweb.com",
     "https://admin.scaffoldweb.com",
-    "https://reb-studio.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
   ]);
@@ -242,7 +241,7 @@ export function buildContentSecurityPolicy(params: {
       "frame-src 'self' https: http://localhost:* http://*.localhost:*",
       "base-uri 'self' https:",
       "form-action 'self'",
-      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://scaffoldweb.com https://admin.scaffoldweb.com https://reb-studio.vercel.app",
+      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://scaffoldweb.com https://admin.scaffoldweb.com",
     ].join("; ");
   }
 

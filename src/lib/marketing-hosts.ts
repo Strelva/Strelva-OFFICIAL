@@ -7,7 +7,6 @@ export const DEFAULT_MARKETING_HOSTS = [
   "127.0.0.1",
   "127.0.0.1:3000",
   "127.0.0.1:3001",
-  "reb-studio.vercel.app",
 ] as const;
 
 export function parseMarketingDomains(raw = process.env.MARKETING_DOMAINS || ""): string[] {

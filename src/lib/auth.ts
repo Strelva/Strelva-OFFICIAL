@@ -1,6 +1,7 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { isDevAccessBypassEnabled } from "./dev-access";
+import { consumeInvite, getInvite } from "./invites";
 import { getTenantConfig } from "./tenants";
 
 export const CLIENT_ROLES = ["viewer", "editor", "admin", "owner"] as const;
@@ -23,6 +24,10 @@ type ClerkPublicMetadata = {
 export type TenantAccessGrant = {
   tenant: string;
   role: ClientRole;
+};
+
+export type ClaimedInviteGrant = TenantAccessGrant & {
+  email: string;
 };
 
 const ROLE_RANK: Record<ClientRole, number> = {
@@ -62,6 +67,21 @@ function normalizeTenant(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const tenant = value.trim();
   return tenant ? tenant : null;
+}
+
+function normalizeEmailAddress(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+function getUserEmailAddresses(user: { emailAddresses?: Array<{ emailAddress?: string | null }> } | null): string[] {
+  const emails = new Set<string>();
+  for (const emailRecord of user?.emailAddresses || []) {
+    const email = normalizeEmailAddress(emailRecord.emailAddress);
+    if (email) emails.add(email);
+  }
+  return [...emails];
 }
 
 export function roleMeetsMinimum(role: ClientRole, minimum: ClientRole): boolean {
@@ -134,7 +154,7 @@ export async function verifyAuth(): Promise<boolean> {
 /** Get the current user's email */
 export async function getCurrentUserEmail(): Promise<string | null> {
   const user = await currentUser();
-  return user?.emailAddresses?.[0]?.emailAddress || null;
+  return getUserEmailAddresses(user)[0] || null;
 }
 
 /** Check if current user is a super admin */
@@ -205,6 +225,43 @@ export async function assignUserToTenant(
   } catch {
     return false;
   }
+}
+
+/**
+ * Recover from delayed/missed Clerk webhooks by claiming a pending invite for
+ * the currently signed-in user's exact email address. This is intentionally
+ * separate from hasTenantAccess so ordinary authorization checks never grant
+ * access by side effect.
+ */
+export async function claimPendingInviteForCurrentUser(
+  targetTenant?: string
+): Promise<ClaimedInviteGrant | null> {
+  if (isDevAccessBypassEnabled()) return null;
+
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  const user = await currentUser();
+  if (!user) return null;
+
+  for (const email of getUserEmailAddresses(user)) {
+    const invite = await getInvite(email);
+    if (!invite) continue;
+    if (targetTenant && invite.tenant !== targetTenant) continue;
+
+    const role = invite.role || "owner";
+    const existingRole = getRoleForTenantFromMetadata(user.publicMetadata, invite.tenant);
+    const needsAssignment = !existingRole || !roleMeetsMinimum(existingRole, role);
+    if (needsAssignment) {
+      const assigned = await assignUserToTenant(userId, invite.tenant, role);
+      if (!assigned) continue;
+    }
+
+    await consumeInvite(email);
+    return { email, tenant: invite.tenant, role };
+  }
+
+  return null;
 }
 
 /** Check if current user has access to a specific tenant.

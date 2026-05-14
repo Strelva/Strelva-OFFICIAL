@@ -116,6 +116,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         emailSent: true,
+        signUpUrl,
         message: `Invite sent to ${email}`,
       });
     } catch (err) {

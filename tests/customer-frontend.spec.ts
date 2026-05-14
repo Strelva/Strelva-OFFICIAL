@@ -23,6 +23,36 @@ test("legacy onboard route redirects to the access request", async ({ page }) =>
   await expect(page.getByRole("heading", { name: /start with one workflow/i })).toBeVisible();
 });
 
+test("access request returns a no-login delivery status handoff", async ({ page }) => {
+  await page.route("**/api/access-request/intake", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        emailSent: true,
+        statusUrl: "/delivery/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      }),
+    });
+  });
+
+  const response = await page.goto("/access-request?ref=test", { waitUntil: "domcontentloaded" });
+  expect(response?.ok()).toBeTruthy();
+
+  await page.locator("#business-name").fill("Demo Studio");
+  await page.locator("#location").fill("Buffalo, NY");
+  await page.locator("#email").fill("owner@example.com");
+  await page.locator("#request").fill("I need weekly proof and easier site updates.");
+  await page.getByRole("button", { name: /join free-site waitlist/i }).click();
+
+  await expect(page.getByRole("heading", { name: /request received/i })).toBeVisible();
+  await expect(page.getByText(/we emailed your delivery-status link/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /track delivery status/i })).toHaveAttribute(
+    "href",
+    "/delivery/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  );
+});
+
 test("tenant public pages render without server errors", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));

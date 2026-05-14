@@ -26,7 +26,7 @@ Right now the production blocker list is:
 
 You need admin access to:
 
-- Vercel project: `reb-studio`
+- Vercel project: `scaffold-web`
 - Clerk production app
 - Sanity project
 - Upstash account
@@ -42,7 +42,7 @@ vercel whoami
 vercel link
 ```
 
-Confirm the linked Vercel project is `reb-studio`.
+Confirm the linked Vercel project is `scaffold-web`.
 
 ## How To Add A Secret To Vercel
 

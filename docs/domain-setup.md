@@ -3,7 +3,7 @@
 ## Adding a new tenant's custom domain
 
 1. Purchase domain (Porkbun, Namecheap, Google Domains, etc.)
-2. Add to the Vercel project (`reb-studio`):
+2. Add to the Vercel project (`scaffold-web`):
    ```
    vercel domains add yourbusiness.com
    vercel domains add www.yourbusiness.com
@@ -15,7 +15,7 @@
    CNAME www.yourbusiness.com    cname.vercel-dns.com
    CNAME admin.yourbusiness.com  cname.vercel-dns.com
    ```
-4. Update env on `reb-studio`:
+4. Update env on `scaffold-web`:
    ```
    CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid"}
    ```
@@ -30,7 +30,7 @@
 
 ## scaffoldweb.com (platform + wildcard subdomains)
 
-1. Domain is already added to Vercel project `reb-studio` with wildcard support:
+1. Domain is already added to Vercel project `scaffold-web` with wildcard support:
    ```
    vercel domains add scaffoldweb.com
    vercel domains add *.scaffoldweb.com
@@ -48,7 +48,7 @@
 3. Remove any Porkbun/l.ink forwarding. `scaffoldweb.com/api/health` must not redirect to `scaffoldweb-com.l.ink`.
 4. Update env var:
    ```
-   MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,reb-studio.vercel.app,reb.studio,www.reb.studio
+   MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com
    ```
 5. Wildcard enables `{tenant}.scaffoldweb.com` routing via proxy subdomain extraction.
 6. Verify:
@@ -73,7 +73,7 @@ A admin.rohlaxwellness.com 76.76.21.21
 Current Vercel evidence:
 
 - `rohlaxwellness.com` is attached to project `rohlax-wellness`.
-- `admin.rohlaxwellness.com` is attached to project `reb-studio`.
+- `admin.rohlaxwellness.com` is attached to project `scaffold-web`.
 - `www.rohlaxwellness.com` is found under the account but still reports as not configured; confirm it is attached to the intended Vercel project if Vercel continues warning after the Cloudflare A record propagates.
 - On May 13, 2026, `www` and `admin` expose the CNAME `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND`. Treat that as partial DNS, not launch-ready routing.
 

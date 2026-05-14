@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
-import { isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
 import {
   getTenantDashboardFallbackUrl,
@@ -29,6 +29,12 @@ export default async function AccountPage() {
   if (await isSuperAdmin()) {
     const tenants = (await getAllTenants()).filter(isActiveTenant);
     return <TenantPicker tenants={tenants.map((config) => ({ id: config.id, config }))} isSuperAdmin />;
+  }
+
+  const claimedInvite = await claimPendingInviteForCurrentUser();
+  if (claimedInvite) {
+    const config = await getTenantConfig(claimedInvite.tenant);
+    if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
   }
 
   const user = await currentUser();

@@ -38,6 +38,7 @@ function AccessRequestForm() {
   const [request, setRequest] = useState("");
   const [state, setState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
+  const [statusUrl, setStatusUrl] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,6 +64,7 @@ function AccessRequestForm() {
 
     setState("submitting");
     setMessage("");
+    setStatusUrl("");
 
     try {
       const response = await fetch("/api/access-request/intake", {
@@ -83,8 +85,14 @@ function AccessRequestForm() {
         throw new Error(body?.error || "We could not send this yet. Try again.");
       }
 
+      const body = await response.json().catch(() => null);
       setState("success");
-      setMessage("Waitlist request received. We will email next steps.");
+      setStatusUrl(typeof body?.statusUrl === "string" ? body.statusUrl : "");
+      setMessage(
+        body?.emailSent
+          ? "Waitlist request received. We emailed your delivery-status link."
+          : "Waitlist request received. Your delivery-status link is ready.",
+      );
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "We could not send this yet. Try again.");
@@ -156,17 +164,28 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                We will email next steps for the free first site and the workflow you want to start with.
+                {message || "We will email next steps for the free first site and the workflow you want to start with."}
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
               </p>
-              <Link
-                href="/"
-                className="marketing-button-primary mt-8 h-11 px-5 text-[14px]"
-              >
-                Back to launch page
-              </Link>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                {statusUrl ? (
+                  <Link
+                    href={statusUrl}
+                    className="marketing-button-primary h-11 px-5 text-[14px]"
+                  >
+                    Track delivery status
+                    <ArrowRight className="size-4" />
+                  </Link>
+                ) : null}
+                <Link
+                  href="/"
+                  className="marketing-button-secondary h-11 px-5 text-[14px]"
+                >
+                  Back to launch page
+                </Link>
+              </div>
             </div>
           ) : (
             <form className="grid gap-5 p-6 sm:p-8 md:p-10" onSubmit={onSubmit} noValidate aria-describedby="intake-status">

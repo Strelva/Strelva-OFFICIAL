@@ -89,6 +89,12 @@ function mustBeBareDomain(value: string) {
   return valid ? null : "Must be a bare domain like updates.scaffoldweb.com for production launch";
 }
 
+function mustBeScaffoldSenderDomain(value: string) {
+  return value === "updates.scaffoldweb.com" || value.endsWith(".scaffoldweb.com")
+    ? null
+    : "Must use a verified Scaffold Web sender domain like updates.scaffoldweb.com";
+}
+
 function isBareDomain(value: string) {
   return mustBeBareDomain(value) === null;
 }
@@ -137,7 +143,7 @@ const productionEnvValidators: Record<string, (value: string) => string | null> 
   STRIPE_SCAFFOLD_PRICE_ID: mustStartWith("price_"),
   STRIPE_WEBHOOK_SECRET: mustStartWith("whsec_"),
   RESEND_API_KEY: mustStartWith("re_"),
-  RESEND_DOMAIN: mustBeBareDomain,
+  RESEND_DOMAIN: allOf(mustBeBareDomain, mustBeScaffoldSenderDomain),
   SENTRY_DSN: allOf(mustBeHttps, mustNotBeLocalhost),
   NEXT_PUBLIC_SENTRY_DSN: allOf(mustBeHttps, mustNotBeLocalhost),
   NEXT_PUBLIC_SITE_URL: allOf(mustBeHttps, mustNotBeLocalhost),

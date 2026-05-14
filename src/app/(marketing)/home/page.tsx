@@ -1,31 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  Activity,
   ArrowRight,
   ClipboardCheck,
   Clock3,
   FileCheck2,
   MessageSquareText,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - Your first AI workflow starts with your website",
+  title: "Scaffold Web - The website loop local businesses can trust",
   description:
-    "Join the free website waitlist for local businesses ready to start with one practical AI workflow.",
+    "Join the free website waitlist for local businesses that want weekly proof, plain-English updates, and a site that stays current.",
 };
 
 const reportRows = [
-  ["People found you", "47", "+12 this week"],
-  ["Booking clicks", "8", "3 from mobile"],
-  ["Updates handled", "3", "human checked"],
+  ["People found you", "47", "12 more than last week"],
+  ["Booking clicks", "8", "3 came from mobile"],
+  ["Updates handled", "3", "checked before publish"],
 ];
 
 const proofBadges = [
-  { Icon: FileCheck2, label: "Free website waitlist" },
-  { Icon: ClipboardCheck, label: "One workflow to start" },
-  { Icon: Clock3, label: "More workflows coming" },
+  { Icon: FileCheck2, label: "Free first site" },
+  { Icon: ClipboardCheck, label: "Weekly proof report" },
+  { Icon: Clock3, label: "Plain-English updates" },
 ];
 
 const momentumItems = [
@@ -41,8 +41,8 @@ function MomentumPanel() {
   return (
     <div className="mt-4 rounded-[18px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-[13px] font-medium text-[color:var(--m-accent)]">More workflows coming</p>
-        <span className="text-[12px] text-[color:var(--m-text-3)]">after the site loop</span>
+        <p className="text-[13px] font-medium text-[color:var(--m-accent)]">The site loop comes first</p>
+        <span className="text-[12px] text-[color:var(--m-text-3)]">then the rest compounds</span>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {momentumItems.map((item, index) => (
@@ -66,6 +66,7 @@ function ReceiptPanel() {
       className="marketing-system-frame motion-rise relative overflow-hidden rounded-[22px] border border-[var(--m-rule)] bg-[var(--m-paper)] shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)]"
       style={{ "--motion-delay": "120ms" } as React.CSSProperties}
     >
+      <span className="receipt-scan" aria-hidden="true" />
       <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[var(--m-rule-soft)] px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <span className="grid size-7 shrink-0 place-items-center rounded-md border border-[var(--m-rule)] bg-[var(--m-panel)] text-[color:var(--m-accent)]">
@@ -132,7 +133,10 @@ function ReceiptPanel() {
                 <ShieldCheck className="size-4 text-[color:var(--m-success)]" />
                 Ready for review
               </span>
-              <span className="text-[12px] text-[color:var(--m-accent)]">Queued</span>
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-[color:var(--m-accent)]">
+                <span className="signal-dot" aria-hidden="true" />
+                Queued
+              </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[var(--m-bg)]">
               <span className="progress-run block h-full rounded-full bg-[var(--m-accent)]" />
@@ -155,23 +159,23 @@ export default function HomePage() {
       `}</style>
       <div className="relative h-[100svh] overflow-hidden px-5 pt-20 md:px-8 md:pt-24">
         <main className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col">
-        <section className="grid min-h-0 flex-1 items-center gap-5 pb-4 pt-2 lg:grid-cols-[0.88fr_1.12fr] lg:gap-10">
+        <section className="grid min-h-0 flex-1 items-center gap-5 pb-4 pt-2 lg:grid-cols-[0.86fr_1.14fr] lg:gap-10">
           <div className="motion-rise min-w-0">
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--m-rule-soft)] bg-[var(--m-panel)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--m-text-2)] sm:text-[13px]">
-              <Sparkles className="size-3.5 text-[color:var(--m-accent)]" />
-              One practical AI workflow to start
+              <Activity className="size-3.5 text-[color:var(--m-accent)]" />
+              The managed website loop for local businesses
             </p>
             <h1
               className="max-w-[920px] font-semibold leading-[0.9] tracking-normal text-[color:var(--m-text)]"
-              style={{ fontSize: "clamp(3rem, 7.25vw, 7.65rem)" }}
+              style={{ fontSize: "clamp(3.05rem, 7.45vw, 7.9rem)" }}
             >
-              Put your first AI workflow to work.
+              Your website should report back.
             </h1>
             <p className="mt-4 max-w-[760px] text-[1.35rem] font-medium leading-[1.12] tracking-normal text-[color:var(--m-text)] sm:text-3xl md:text-4xl">
-              Start with your website: the public surface customers already see.
+              Weekly proof, fast updates, and human review before the public site changes.
             </p>
             <p className="mt-4 max-w-[610px] text-[15px] leading-[1.58] text-[color:var(--m-text-2)] sm:text-[17px] sm:leading-[1.65]">
-              Scaffold Web builds local business sites, shows what worked each week, and helps you make updates in plain English. Join the waitlist for a free first site.
+              Scaffold Web builds the site, watches what worked, and handles the small changes owners usually postpone. The first loop is simple: people found you, you ask for an update, the site stays current.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
@@ -185,6 +189,10 @@ export default function HomePage() {
           </div>
 
           <div className="hidden md:block">
+            <ReceiptPanel />
+          </div>
+
+          <div className="hidden sm:block md:hidden">
             <ReceiptPanel />
           </div>
         </section>

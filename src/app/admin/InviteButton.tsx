@@ -69,7 +69,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-sm">
         <h3 id="invite-title" className="text-lg font-medium text-white mb-1">Invite to {siteName}</h3>
         <p className="text-sm text-zinc-500 mb-4">
-          They&apos;ll get an email with a sign-up link. Access is assigned to this exact email on signup.
+          They&apos;ll get a tenant/admin sign-up link. Access is assigned to this exact email on signup, and the no-access page can recover it if Clerk is slow.
         </p>
 
         {result && (
@@ -89,7 +89,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-emerald-200">
                   Share this link only with {email.trim().toLowerCase()}.{" "}
-                  Access is tied to that exact email.
+                  Access is tied to that exact email, and it opens the stable Scaffold fallback route for this site.
                 </p>
                 <a
                   href={result.signUpUrl}

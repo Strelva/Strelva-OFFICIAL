@@ -60,7 +60,7 @@ describe("admin invites route", () => {
       id: "gldf",
       siteName: `A&B <script>alert("x")</script>`,
     });
-    mockGetTenantDashboardUrl.mockReturnValue("https://admin.example.com/sign-up");
+    mockGetTenantDashboardUrl.mockReturnValue("https://admin.greatlakesdriedfruit.com/sign-up");
     mockGetUserList.mockResolvedValue({ data: [] });
     mockCreateInvite.mockResolvedValue(true);
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");
@@ -81,9 +81,11 @@ describe("admin invites route", () => {
     }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       success: true,
       emailSent: true,
+      signUpUrl: "https://admin.greatlakesdriedfruit.com/sign-up?email=owner%40example.com",
     });
     expect(mockCreateInvite).toHaveBeenCalledWith(
       "owner@example.com",
@@ -102,7 +104,7 @@ describe("admin invites route", () => {
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),
       text: expect.stringContaining(
-        "Create your account: https://admin.example.com/sign-up?email=owner%40example.com",
+        "Create your account: https://admin.greatlakesdriedfruit.com/sign-up?email=owner%40example.com",
       ),
     }));
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({

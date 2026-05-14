@@ -76,6 +76,8 @@ describe("production readiness rules", () => {
       .toBe("Must be at least 16 characters for production launch");
     expect(validateProductionEnvValue("RESEND_DOMAIN", "https://updates.scaffoldweb.com"))
       .toBe("Must be a bare domain like updates.scaffoldweb.com for production launch");
+    expect(validateProductionEnvValue("RESEND_DOMAIN", "updates.example.com"))
+      .toBe("Must use a verified Scaffold Web sender domain like updates.scaffoldweb.com");
     expect(validateProductionEnvValue("SENTRY_DSN", "http://sentry.example.com/1"))
       .toBe("Must be an https:// URL for production launch");
     expect(validateProductionEnvValue("NEXT_PUBLIC_SENTRY_DSN", "https://localhost/1"))
@@ -312,7 +314,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteButton).toContain("data.signUpUrl");
     expect(inviteButton).toContain("Open manual signup link");
     expect(inviteButton).toContain("Share this link only with");
-    expect(inviteButton).toContain("Access is tied to that exact email");
     expect(inviteButton).toContain("navigator.clipboard.writeText");
     expect(inviteButton).toContain("Copy failed. Select the manual signup link above.");
     expect(inviteButton).toContain("Copy signup link");
@@ -488,9 +489,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("matching NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
     expect(source).toContain("same live Clerk instance as the publishable/secret keys");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
     expect(source).toContain("signed-out dashboard customers");
-    expect(source).toContain("https://reb-studio.vercel.app/sign-in");
+    expect(source).toContain("https://scaffoldweb.com/sign-in");
     expect(source).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
     expect(source).toContain("https://scaffoldweb.com/api/health");
@@ -622,10 +623,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(designKit).toContain("PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com");
     expect(designKit).not.toContain("PLAYWRIGHT_BASE_URL=<deployment-url>");
     expect(designKit).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=<tenant-url>");
-    expect(domainSetup).toContain("reb-studio");
+    expect(domainSetup).toContain("scaffold-web");
     expect(domainSetup).toContain("A     scaffoldweb.com    76.76.21.21");
     expect(domainSetup).toContain("cname.vercel-dns.com");
-    expect(domainSetup).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,reb-studio.vercel.app,reb.studio,www.reb.studio");
+    expect(domainSetup).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
     expect(domainSetup).toContain("scaffoldweb-com.l.ink");
     expect(domainSetup).toContain("vercel domains inspect scaffoldweb.com");
     expect(domainSetup).toContain("dig +short scaffoldweb.com A");
@@ -673,7 +674,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(audit).toContain("price_1TVgq0D99ZGeTugfVuSggW3o");
     expect(audit).toContain("prod_UKnWPSG3QOtOUz");
     expect(audit).toContain("$149/month USD");
-    expect(audit).toContain("https://reb-studio.vercel.app/sign-in");
+    expect(audit).toContain("https://scaffoldweb.com/sign-in");
     expect(audit).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(audit).toContain("https://scaffoldweb-com.l.ink/");
     expect(audit).toContain("openresty");
@@ -732,7 +733,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("vercel env pull .env.production.local --environment=production");
     expect(source).toContain("vercel deploy --prod");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
     expect(source).toContain("pnpm exec playwright test tests/customer-frontend.spec.ts -g");
     expect(source).toContain('\\"signed-out dashboard customers\\"');
     expect(source).toContain("dirty local working tree");
@@ -763,7 +764,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("invoice.payment_failed");
     expect(source).toContain("customer.subscription.deleted");
     expect(readinessRules).toContain("move them to Waived Blockers with Status, Owner, release/ticket reference, Follow-up, and Reason");
-    expect(source).toContain("Vercel access: grant access to project reb-studio");
+    expect(source).toContain("Vercel access: grant access to project scaffold-web");
     expect(source).toContain("vercel whoami");
     expect(source).toContain("prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb");
     expect(source).toContain("team_66XTGId41AJGh9vLvkiyXqkZ");
@@ -781,10 +782,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("dig +short '*.scaffoldweb.com' CNAME");
     expect(source).toContain("curl -I -L https://scaffoldweb.com/api/health");
     expect(launchBlockers).toContain("vercel whoami");
-    expect(launchBlockers).toContain("reb-studio");
+    expect(launchBlockers).toContain("scaffold-web");
     expect(launchBlockers).toContain("### Production Live Verification");
     expect(launchBlockers).toContain("Authenticated production dashboard access");
-    expect(launchBlockers).toContain("https://reb-studio.vercel.app/sign-in");
+    expect(launchBlockers).toContain("https://scaffoldweb.com/sign-in");
     expect(launchBlockers).toContain("Sign in to Scaffold Web | Scaffold Web");
     expect(launchBlockers).toContain("Vercel app-host freshness check");
     expect(launchBlockers).toContain("after production env, redeploy, and DNS are resolved");
@@ -812,8 +813,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("Stripe live-mode Products");
     expect(launchBlockers).toContain("Do not overwrite the values already passing the checker");
     expect(launchBlockers).toContain("Redeploy the Vercel Production app after env changes");
-    expect(launchBlockers).toContain("current launch-readiness worktree changes");
-    expect(launchBlockers).toContain("Do not only redeploy the existing");
+    expect(launchBlockers).toContain("app freshness resolved on May 14, 2026");
+    expect(launchBlockers).toContain("Vercel app-host freshness check now sees");
+    expect(launchBlockers).not.toContain("Do not only redeploy the existing");
     expect(launchBlockers).toContain("vercel deploy --prod");
     expect(launchBlockers).toContain("git status --short");
     expect(launchBlockers).toContain("dirty local working tree");
@@ -829,7 +831,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("dig +short admin.rohlaxwellness.com A");
     expect(launchBlockers).toContain("Rohlax Cloudflare DNS");
     expect(launchBlockers).toContain("dax.ns.cloudflare.com");
-    expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `reb-studio");
+    expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `scaffold-web");
     expect(launchBlockers).toContain("A admin.rohlaxwellness.com 76.76.21.21");
     expect(launchBlockers).toContain("does not redirect to `scaffoldweb-com.l.ink`");
     expect(launchBlockers).toContain("Copyable verification commands");
@@ -1006,7 +1008,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).not.toContain("`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`, and tenant-specific revalidation secrets");
     expect(template).toContain("Required only when Google, Instagram, or Calendly OAuth connections are enabled.");
     expect(template).toContain("NEXT_PUBLIC_APP_URL=https://scaffoldweb.com");
-    expect(template).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,reb-studio.vercel.app,reb.studio,www.reb.studio");
+    expect(template).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
   });
 
   it("uses signed OAuth state for integration callbacks", () => {

@@ -51,8 +51,8 @@ const locallyGeneratedSecrets = new Set([
 ]);
 
 const scaffoldWebDomainAction =
-  "Point scaffoldweb.com at Vercel project reb-studio with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
-const VERCEL_APP_URL = "https://reb-studio.vercel.app";
+  "Point scaffoldweb.com at Vercel project scaffold-web with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
+const VERCEL_APP_URL = "https://scaffoldweb.com";
 const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
 const SCAFFOLD_MONTHLY_PRICE_CENTS = 14900;
 const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
@@ -189,10 +189,10 @@ checkFileContains("docs/design-kit.md", "Design kit", [
   "Template Expansion Rules",
 ]);
 checkFileContains("docs/domain-setup.md", "Domain setup doc", [
-  "reb-studio",
+  "scaffold-web",
   "A     scaffoldweb.com    76.76.21.21",
   "cname.vercel-dns.com",
-  "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com,reb-studio.vercel.app,reb.studio,www.reb.studio",
+  "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com",
   "scaffoldweb-com.l.ink",
   "pnpm check:prod",
 ]);
@@ -332,9 +332,9 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel deploy --prod",
     "git status --short",
     "dirty local working tree",
-    "PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app",
+    "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
     "signed-out dashboard customers",
-    "https://reb-studio.vercel.app/sign-in",
+    "https://scaffoldweb.com/sign-in",
     "Sign in to Scaffold Web | Scaffold Web",
     "Production Live Verification",
     "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
@@ -391,7 +391,7 @@ function checkCompletionAudit(path: string) {
     "price_1TVgq0D99ZGeTugfVuSggW3o",
     "prod_UKnWPSG3QOtOUz",
     "$149/month USD",
-    "https://reb-studio.vercel.app/sign-in",
+    "https://scaffoldweb.com/sign-in",
     "Sign in to Scaffold Web | Scaffold Web",
     "https://scaffoldweb-com.l.ink/",
     "openresty",
@@ -1639,7 +1639,7 @@ function printReleaseActions() {
     console.log("  # When env checks pass, redeploy before live verification:");
     console.log("  git status --short");
     console.log("  vercel deploy --prod");
-    console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    console.log("  PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     console.log();
   }
 
@@ -1678,11 +1678,11 @@ function printReleaseActions() {
   }
   if (results.some((result) => result.name === "Launch blockers" && result.status === "fail")) {
     if (launchBlockers.includes("Vercel Project Access")) {
-      console.log("- Vercel access: grant access to project reb-studio (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
+      console.log("- Vercel access: grant access to project scaffold-web (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
     }
     if (launchBlockers.includes("Vercel app freshness")) {
       console.log("- Vercel app freshness: push/deploy a clean release branch containing the current launch-readiness fixes; do not only redeploy the existing stale production artifact. Then rerun `pnpm check:prod` and the app-host smoke probe:");
-      console.log("  PLAYWRIGHT_BASE_URL=https://reb-studio.vercel.app PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+      console.log("  PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     }
     if (launchBlockers.includes("Production Live Verification")) {
       console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");

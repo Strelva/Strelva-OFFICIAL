@@ -11,6 +11,26 @@ export const onboardLead = defineType({
     defineField({ name: "email", title: "Email", type: "string", validation: (r) => r.required() }),
     defineField({ name: "currentWebsite", title: "Current Website", type: "url" }),
     defineField({ name: "referredBy", title: "Referred By", type: "string" }),
+    defineField({ name: "statusToken", title: "Public Status Token", type: "string" }),
+    defineField({
+      name: "deliveryStatus",
+      title: "Delivery Status",
+      type: "string",
+      options: {
+        list: [
+          "received",
+          "reviewing",
+          "drafting",
+          "owner_review",
+          "launch_ready",
+          "launched",
+          "paused",
+        ],
+      },
+      initialValue: "received",
+    }),
+    defineField({ name: "submittedAt", title: "Submitted At", type: "datetime" }),
+    defineField({ name: "statusUpdatedAt", title: "Status Updated At", type: "datetime" }),
     defineField({ name: "status", title: "Status", type: "string", options: { list: ["new", "contacted", "qualified", "converted", "lost"] }, initialValue: "new" }),
   ],
   preview: {

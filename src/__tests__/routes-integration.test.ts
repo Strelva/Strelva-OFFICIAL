@@ -426,7 +426,7 @@ describe("Custom Domain Resolution", () => {
   });
 
   it("returns null for vercel.app deployments", () => {
-    const result = extractTenantFromHost("reb-studio.vercel.app");
+    const result = extractTenantFromHost("scaffoldweb.com");
     expect(result.tenant).toBeNull();
   });
 

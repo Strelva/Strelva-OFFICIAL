@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
-import { getRedis } from "@/lib/redis";
 import { readJsonObject } from "@/lib/request-body";
-import { getSanityClient } from "@/lib/sanity";
-
-const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
+import {
+  buildDeliveryStatusEmailHtml,
+  buildDeliveryStatusEmailText,
+  buildDeliveryStatusUrl,
+  createDeliveryStatusToken,
+  getExistingLeadToken,
+  saveDeliveryLead,
+} from "@/lib/access-request-delivery";
 
 export async function POST(req: Request) {
   if (await isRateLimitedWindowedAsync(rateLimitKey(req, "access-request-intake"), 5, 3600_000)) {
@@ -32,6 +36,10 @@ export async function POST(req: Request) {
   const safeLocation = typeof location === "string" ? location.trim().slice(0, 200) : "";
   const safeCurrentWebsite = typeof currentWebsite === "string" ? currentWebsite.trim().slice(0, 300) : "";
   const safeReferredBy = typeof referredBy === "string" ? referredBy.trim().slice(0, 200) : "";
+  const now = new Date().toISOString();
+  const statusToken = (await getExistingLeadToken(normalizedEmail)) || createDeliveryStatusToken();
+  const requestOrigin = new URL(req.url).origin;
+  const statusUrl = buildDeliveryStatusUrl(requestOrigin, statusToken);
 
   const slackUrl = process.env.SLACK_WEBHOOK_URL;
   if (slackUrl) {
@@ -55,30 +63,34 @@ export async function POST(req: Request) {
     email: normalizedEmail,
     currentWebsite: safeCurrentWebsite || null,
     referredBy: safeReferredBy || null,
+    statusToken,
+    deliveryStatus: "received" as const,
+    submittedAt: now,
+    statusUpdatedAt: now,
   };
 
-  if (hasSanity) {
-    const existing = await getSanityClient().fetch(
-      `*[_type == "onboardLead" && email == $email][0]._id`,
-      { email: normalizedEmail }
-    );
-    if (existing) {
-      await getSanityClient().patch(existing).set(leadData).commit();
-    } else {
-      await getSanityClient().create({
-        _type: "onboardLead",
-        ...leadData,
-        status: "new",
+  await saveDeliveryLead(leadData);
+
+  let emailSent = false;
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const fromDomain = process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
+      const subjectBusinessName = normalizedBusinessName.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+      await resend.emails.send({
+        from: `Scaffold Web <hello@${fromDomain}>`,
+        to: normalizedEmail,
+        subject: `We received ${subjectBusinessName}'s site request`,
+        html: buildDeliveryStatusEmailHtml({ businessName: normalizedBusinessName, statusUrl }),
+        text: buildDeliveryStatusEmailText({ businessName: normalizedBusinessName, statusUrl }),
       });
+      emailSent = true;
+    } catch (err) {
+      console.error("[access-request] Delivery status email failed:", err);
     }
   }
 
-  const redis = getRedis();
-  if (redis) {
-    const leadKey = `lead:${normalizedEmail}`;
-    await redis.set(leadKey, JSON.stringify({ ...leadData, createdAt: new Date().toISOString() }));
-    await redis.zadd("leads:all", { score: Date.now(), member: leadKey });
-  }
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, statusUrl, emailSent });
 }

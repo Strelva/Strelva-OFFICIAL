@@ -40,6 +40,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
 
 vi.mock("@/lib/dev-access", () => ({
   getDevAccessTenant: () => null,
+  isDevAccessBypassEnabled: () => false,
 }));
 
 vi.mock("@/lib/tenant-urls", () => ({
