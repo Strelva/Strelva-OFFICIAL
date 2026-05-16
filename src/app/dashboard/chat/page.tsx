@@ -9,6 +9,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { detectStaleSections } from "@/lib/reports";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import type { ContentSection } from "@/lib/types";
+import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ChatPageClient } from "./ChatPageClient";
 
 export default async function ChatPage({
@@ -45,16 +46,19 @@ export default async function ChatPage({
   ).length;
 
   return (
-    <ChatPageClient
-      threadId={params.thread}
-      ownerName={ownerName}
-      needsYou={{
-        openInitially: params.needs === "1",
-        pending,
-        resolved,
-        pendingCount,
-        staleSectionCount,
-      }}
-    />
+    <>
+      <EngagementTracker event="ai-chat-open" />
+      <ChatPageClient
+        threadId={params.thread}
+        ownerName={ownerName}
+        needsYou={{
+          openInitially: params.needs === "1",
+          pending,
+          resolved,
+          pendingCount,
+          staleSectionCount,
+        }}
+      />
+    </>
   );
 }

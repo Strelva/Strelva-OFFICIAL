@@ -8,6 +8,10 @@ import { SECTION_TO_TYPE } from "./content-store";
 
 // --- Click tracking ---
 
+function sanityClickPath(key: string): string {
+  return `clicks['${key.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}']`;
+}
+
 export async function trackClick(
   event: string,
   tenant: string = DEFAULT_TENANT
@@ -17,28 +21,25 @@ export async function trackClick(
   if (hasSanity) {
     // Use a single tracking document per tenant, increment counters
     const docId = `clicks-${tenant}`;
-    try {
-      await getSanityClient()
-        .patch(docId)
-        .setIfMissing({ _type: "activityLog", tenant, text: "click-tracking", activityType: "system", time: new Date().toISOString(), clicks: {} })
-        .inc({ [`clicks.${event}_${today}`]: 1, [`clicks.${event}_total`]: 1 })
-        .commit({ autoGenerateArrayKeys: true });
-    } catch {
-      // Document doesn't exist yet
-      await getSanityClient().createIfNotExists({
-        _id: docId,
-        _type: "activityLog",
-        tenant,
-        text: "click-tracking",
-        activityType: "system",
-        time: new Date().toISOString(),
-      });
-      await getSanityClient()
-        .patch(docId)
-        .setIfMissing({ clicks: {} })
-        .inc({ [`clicks.${event}_${today}`]: 1, [`clicks.${event}_total`]: 1 })
-        .commit({ autoGenerateArrayKeys: true });
-    }
+    const dailyKey = `${event}_${today}`;
+    const totalKey = `${event}_total`;
+    const dailyPath = sanityClickPath(dailyKey);
+    const totalPath = sanityClickPath(totalKey);
+    const client = getSanityClient();
+    await client.createIfNotExists({
+      _id: docId,
+      _type: "activityLog",
+      tenant,
+      text: "click-tracking",
+      activityType: "system",
+      time: new Date().toISOString(),
+      clicks: {},
+    });
+    await client
+      .patch(docId)
+      .setIfMissing({ clicks: {}, [dailyPath]: 0, [totalPath]: 0 })
+      .inc({ [dailyPath]: 1, [totalPath]: 1 })
+      .commit({ autoGenerateArrayKeys: true });
     return;
   }
 
@@ -99,6 +100,34 @@ export async function getClickCounts(
     lastWeekCount += clicks[`${event}:${key}`] || 0;
   }
   return { total, today: todayCount, thisWeek: weekCount, lastWeek: lastWeekCount };
+}
+
+function newestIsoDate(keys: string[], event: string, separator: "_" | ":"): string | null {
+  let newest: string | null = null;
+  const prefix = `${event}${separator}`;
+  for (const key of keys) {
+    if (!key.startsWith(prefix) || key.endsWith(`${separator}total`)) continue;
+    const date = key.slice(prefix.length);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (!newest || date > newest) newest = date;
+  }
+  return newest;
+}
+
+export async function getLastClickDate(
+  event: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<string | null> {
+  if (hasSanity) {
+    const docId = `clicks-${tenant}`;
+    const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
+    const clicks = (doc || {}) as Record<string, number>;
+    return newestIsoDate(Object.keys(clicks), event, "_");
+  }
+
+  const store = await readDevContent(tenant);
+  const clicks = (store.__clicks as Record<string, number>) ?? {};
+  return newestIsoDate(Object.keys(clicks), event, ":");
 }
 
 export interface DailyMetric {

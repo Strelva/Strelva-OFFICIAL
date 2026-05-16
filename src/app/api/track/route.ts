@@ -14,7 +14,15 @@ const ALLOWED_EVENTS = new Set([
   "menu-click",
   "map-click",
   "directions-click",
+  "dashboard-open",
+  "ai-chat-open",
+  "report-view",
+  "referral-click",
 ]);
+
+function isAllowedEvent(event: string): boolean {
+  return ALLOWED_EVENTS.has(event) || /^booking-click:[a-z0-9][a-z0-9_-]{0,79}$/i.test(event);
+}
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     const { event } = body;
-    if (typeof event !== "string" || !ALLOWED_EVENTS.has(event)) {
+    if (typeof event !== "string" || !isAllowedEvent(event)) {
       return NextResponse.json({ error: "Invalid event" }, { status: 400 });
     }
     const tenant = await getTenantFromHeaders();

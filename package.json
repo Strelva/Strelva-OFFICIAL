@@ -29,6 +29,7 @@
     "@sentry/nextjs": "10.51.0",
     "@studio-freight/lenis": "^1.0.42",
     "@upstash/redis": "1.37.0",
+    "@vercel/analytics": "2.0.1",
     "@vercel/blob": "^2.3.3",
     "ai": "6.0.116",
     "date-fns": "4.1.0",

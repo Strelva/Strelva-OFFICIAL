@@ -42,6 +42,99 @@ describe("owner journey copy and links", () => {
     expect(dashboardPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat"))');
   });
 
+  it("keeps self-serve onboarding focused on instant setup", () => {
+    const onboardPage = readRepoFile("src/app/onboard/page.tsx");
+    const signUpPage = readRepoFile("src/app/sign-up/[[...sign-up]]/page.tsx");
+
+    expect(onboardPage).toContain("/api/self-serve/tenant");
+    expect(onboardPage).toContain("Tell us about the business. We prepare the site.");
+    expect(onboardPage).toContain("Create starter site");
+    expect(onboardPage).toContain("AI to pre-fill useful first content");
+    expect(onboardPage).toContain("Update hours or booking details before publishing.");
+    expect(onboardPage).not.toContain('redirect(`/access-request${suffix}`)');
+
+    expect(signUpPage).toContain("isSelfServeSignup");
+    expect(signUpPage).toContain('redirectUrl?.startsWith("/onboard")');
+    expect(signUpPage).toContain("Create the account. Then we prepare the site.");
+    expect(signUpPage).toContain('const title = "Dashboard signup is paused.";');
+  });
+
+  it("lands new self-serve owners on first-run quick wins", () => {
+    const selfServe = readRepoFile("src/lib/self-serve.ts");
+    const selfServeRoute = readRepoFile("src/app/api/self-serve/tenant/route.ts");
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+
+    expect(selfServe).toContain('getTenantDashboardUrl(tenant, "/dashboard?welcome=1")');
+    expect(selfServeRoute).toContain("successUrl: result.dashboardUrl");
+    expect(dashboardPage).toContain("searchValue(params.welcome) === \"1\"");
+    expect(dashboardPage).toContain("Your starter site is ready. Make the first useful wins.");
+    expect(dashboardPage).toContain("Update hours");
+    expect(dashboardPage).toContain("Connect Google Business");
+    expect(dashboardPage).toContain("Draft first blog post");
+  });
+
+  it("keeps rollback safety visible from the owner dashboard", () => {
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
+    const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
+    const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
+
+    expect(dashboardPage).toContain("getLatestSiteSnapshot(tenant)");
+    expect(dashboardPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
+    expect(safetyPanel).toContain("Revert to a last good version");
+    expect(safetyPanel).toContain("Save backup");
+    expect(safetyPanel).toContain("Restore latest backup");
+    expect(snapshotRoute).toContain("restoreSiteSnapshot");
+    expect(snapshotRoute).toContain("Saved a full-site backup");
+    expect(snapshotRoute).toContain("Restored full site from");
+    expect(maintenance).toContain("createDailySiteSnapshot");
+    expect(maintenance).toContain("snapshotsCreated");
+  });
+
+  it("keeps retention proof and re-engagement signals wired into owner surfaces", () => {
+    const packageJson = readRepoFile("package.json");
+    const rootLayout = readRepoFile("src/app/layout.tsx");
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const chatPage = readRepoFile("src/app/dashboard/chat/page.tsx");
+    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
+    const tracker = readRepoFile("src/components/dashboard/EngagementTracker.tsx");
+    const retentionPanel = readRepoFile("src/components/dashboard/RetentionPanel.tsx");
+    const retention = readRepoFile("src/lib/retention.ts");
+    const analyticsStore = readRepoFile("src/lib/storage/analytics-store.ts");
+    const trackRoute = readRepoFile("src/app/api/track/route.ts");
+    const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
+
+    expect(packageJson).toContain('"@vercel/analytics"');
+    expect(rootLayout).toContain('import { Analytics } from "@vercel/analytics/next"');
+    expect(rootLayout).toContain("<Analytics />");
+    expect(dashboardPage).toContain("getOwnerRetentionSignals(tenant)");
+    expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
+    expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");
+    expect(chatPage).toContain('<EngagementTracker event="ai-chat-open" />');
+    expect(reportsPage).toContain('<EngagementTracker event="report-view" />');
+    expect(tracker).toContain('"dashboard-open"');
+    expect(tracker).toContain('"ai-chat-open"');
+    expect(tracker).toContain('"report-view"');
+    expect(tracker).toContain('import { track } from "@vercel/analytics"');
+    expect(tracker).toContain("track(event)");
+    expect(retentionPanel).toContain("AI changes this week");
+    expect(retentionPanel).toContain("Traffic after AI updates");
+    expect(retentionPanel).toContain("Engagement signals");
+    expect(retentionPanel).not.toContain("Retention engine");
+    expect(retention).toContain("queueRetentionReengagement");
+    expect(retention).toContain("retention_reengagement");
+    expect(retention).toContain("No AI changes in");
+    expect(analyticsStore).toContain("sanityClickPath");
+    expect(analyticsStore).toContain(".setIfMissing({ clicks: {}, [dailyPath]: 0, [totalPath]: 0 })");
+    expect(analyticsStore).toContain(".inc({ [dailyPath]: 1, [totalPath]: 1 })");
+    expect(trackRoute).toContain('"dashboard-open"');
+    expect(trackRoute).toContain('"ai-chat-open"');
+    expect(trackRoute).toContain('"report-view"');
+    expect(trackRoute).toContain('"referral-click"');
+    expect(maintenance).toContain("queueRetentionReengagement");
+    expect(maintenance).toContain("reengagementQueued");
+  });
+
   it("keeps weekly reports reachable as the proof surface", () => {
     const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
     const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");

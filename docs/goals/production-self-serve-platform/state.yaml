@@ -1,0 +1,646 @@
+# GoalBuddy v2 state.yaml
+# Board truth lives here. goal.md is the editable charter; notes/ holds long receipts only.
+
+version: 2
+
+goal:
+  title: "Production Self-Serve Platform"
+  slug: "production-self-serve-platform"
+  kind: existing_plan
+  tranche: "Validate the current repo and named branches, then complete successive safe verified slices for self-serve activation, retention analytics/briefs, and rollback safety."
+  status: done
+  intake:
+    original_request: "Production-grade self-serve onboarding, retention analytics/weekly briefs, and backup/versioning/rollback safety."
+    interpreted_outcome: "Scaffold Web becomes a self-serve local-business platform where owners can sign up, get live quickly, see proof of value, receive retention prompts, and trust AI changes because rollback/audit safety exists."
+    input_shape: existing_plan
+    audience: "Jacob and local business owners"
+    authority: requested
+    proof_type: test
+    completion_proof: "Tests and current repo evidence prove self-serve signup/onboarding, first-run quick wins, owner metrics/weekly brief retention surfaces, churn re-engagement hooks, and rollback/audit safety are implemented or only externally blocked."
+    likely_misfire: "Shipping dashboard polish or generic planning while the under-10-minute self-serve activation path remains founder-heavy."
+    blind_spots_considered:
+      - "Named branches may contain useful work that should be inspected rather than recreated."
+      - "Production credentials and third-party providers may block live external verification."
+      - "Owner metrics must be sourced from real activity/event data, not decorative counts."
+      - "AI autonomy should not increase without visible audit and rollback confidence."
+    existing_plan_facts:
+      - "Complete self-serve B2C signup -> instant subdomain site + AI agent boot."
+      - "Inspect and potentially ship existing branches `codex/self-serve-b2c-product` and `codex/free-site-signup-copy`."
+      - "Guided first-time owner journey: tell us about your business -> AI pre-fills content -> one-click publish."
+      - "Welcome quick wins: hours update, Google Business sync, first blog post."
+      - "Owner dashboard metrics: AI changes this week, traffic from AI content, engagement signals."
+      - "Weekly email brief should be beautiful and actionable."
+      - "Churn predictors: low logins or no AI usage in 14 days -> auto-re-engage sequence."
+      - "Simple product analytics via PostHog or Vercel Analytics plus custom events."
+      - "One-click revert, daily backups, and owner-visible audit log with diff are non-negotiable safety net."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: bundled_not_installed
+  worker: bundled_not_installed
+  judge: bundled_not_installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/production-self-serve-platform/"
+    command: "npx goalbuddy board docs/goals/production-self-serve-platform"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: medium
+    objective: "Map the current repo state and named branches against the three requested product tracks."
+    inputs:
+      - "AGENTS.md instructions in conversation"
+      - "package.json"
+      - "docs/*.md"
+      - "src/app routes and API handlers"
+      - "src/lib tenant, storage, analytics, reports, weekly brief, events, auth, agent files"
+      - "tests and existing dirty diff"
+      - "Branches `codex/self-serve-b2c-product` and `codex/free-site-signup-copy` if present"
+    constraints:
+      - "Read-only."
+      - "Do not edit implementation files."
+      - "Preserve the user-provided plan facts."
+      - "Separate repo facts from product taste judgments and hypotheses."
+    expected_output:
+      - "Current self-serve/onboarding coverage and gaps"
+      - "Current analytics/weekly brief/retention coverage and gaps"
+      - "Current backup/versioning/rollback/audit coverage and gaps"
+      - "Useful work present on named branches"
+      - "Verification commands and risk flags"
+      - "Ranked candidate Worker slices"
+    receipt:
+      result: done
+      note: "notes/T001-scout-map.md"
+      summary: "Current main is still email-first/founder-heavy for signup, while `origin/codex/self-serve-b2c-product` contains a coherent self-serve tenant provisioning API, starter content builder, checkout helper, and tests. Weekly proof/report and per-section rollback primitives already exist; churn re-engagement and full-site backup/restore are not proven."
+      evidence:
+        - "src/app/onboard/page.tsx"
+        - "src/app/access-request/page.tsx"
+        - "src/app/api/access-request/intake/route.ts"
+        - "src/app/sign-up/[[...sign-up]]/page.tsx"
+        - "origin/codex/self-serve-b2c-product:src/lib/self-serve.ts"
+        - "origin/codex/self-serve-b2c-product:src/app/api/self-serve/tenant/route.ts"
+        - "src/app/dashboard/page.tsx"
+        - "src/app/dashboard/reports/page.tsx"
+        - "src/lib/weekly-brief.ts"
+        - "src/lib/storage/version-store.ts"
+        - "src/app/api/content/[section]/versions/route.ts"
+      spawned_tasks:
+        - T002
+  - id: T002
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Choose the first largest safe useful implementation slice from Scout findings."
+    inputs:
+      - "T001 receipt"
+      - "Current dirty diff"
+    constraints:
+      - "Do not implement."
+      - "Prioritize under-10-minute self-serve activation unless repo evidence proves a safety or trust blocker must come first."
+      - "Prefer integrating useful existing branch work over recreating it."
+      - "Worker task must include allowed_files, verify commands, and stop conditions."
+    expected_output:
+      - "Decision"
+      - "Rejected alternatives"
+      - "Exact Worker objective"
+      - "allowed_files"
+      - "verify"
+      - "stop_if"
+      - "Whether ChatGPT strategy critique is needed before implementation"
+    receipt:
+      result: done
+      decision: "Integrate the backend self-serve tenant provisioning/API/test slice from `origin/codex/self-serve-b2c-product` first, while preserving the current email-first `/access-request` and invite-guarded `/sign-up` UX."
+      rationale: "This is the largest safe useful move toward the user's highest-leverage outcome: instant tenant/subdomain/starter-site creation. It creates the missing platform primitive without prematurely replacing current signup copy or dashboard surfaces."
+      rejected_alternatives:
+        - "Merge the full self-serve branch UI wholesale: higher regression risk because current main intentionally changed `/onboard`, `/sign-up`, access requests, billing audit, and owner copy after that branch."
+        - "Start with retention analytics: useful, but retention depends on owners first reaching a real self-serve activation moment."
+        - "Start with full-site rollback: important safety work, but current per-section version restore already provides some safety while self-serve has no current backend primitive."
+      chatgpt_strategy_critique: "Not required before this backend primitive because repo evidence and the user-provided sequence are aligned. No callable ChatGPT web surface was available in this session; use the strategy loop later for onboarding copy/demo narrative once the primitive exists."
+      next_allowed_task: T003
+      allowed_files:
+        - "src/lib/self-serve.ts"
+        - "src/lib/billing.ts"
+        - "src/app/api/self-serve/tenant/route.ts"
+        - "src/app/api/self-serve/checkout/route.ts"
+        - "src/__tests__/self-serve.test.ts"
+        - "src/__tests__/self-serve-routes.test.ts"
+      verify:
+        - "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts"
+        - "pnpm typecheck"
+        - "git diff --check"
+      stop_if:
+        - "Need to replace current `/access-request`, `/onboard`, or `/sign-up` UX."
+        - "Need production credentials or destructive tenant writes to verify."
+        - "Self-serve APIs require changes outside allowed files."
+        - "Verification fails twice."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Integrate the backend self-serve tenant provisioning/API/test slice from the self-serve branch while preserving current signup and access-request UX."
+    allowed_files:
+      - "src/lib/self-serve.ts"
+      - "src/lib/billing.ts"
+      - "src/app/api/self-serve/tenant/route.ts"
+      - "src/app/api/self-serve/checkout/route.ts"
+      - "src/__tests__/self-serve.test.ts"
+      - "src/__tests__/self-serve-routes.test.ts"
+    verify:
+      - "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need files outside allowed_files."
+      - "Behavior is ambiguous."
+      - "Verification fails twice."
+      - "Need production credentials or destructive data changes."
+    receipt:
+      result: done
+      changed_files:
+        - "src/lib/self-serve.ts"
+        - "src/lib/billing.ts"
+        - "src/app/api/self-serve/tenant/route.ts"
+        - "src/app/api/self-serve/checkout/route.ts"
+        - "src/__tests__/self-serve.test.ts"
+        - "src/__tests__/self-serve-routes.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+      summary: "Added the backend self-serve primitive: authenticated owners can create a tenant/subdomain/starter site, get owner access assigned, seed default content/page config, log the creation, and optionally start subscription checkout. Added route/unit coverage for provisioning and checkout."
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Audit the completed first slice and decide the next product track or final status."
+    inputs:
+      - "T003 receipt"
+      - "Last verification"
+      - "Current dirty diff"
+    constraints:
+      - "Do not implement."
+      - "Treat first-slice success as a checkpoint, not full completion, unless evidence proves the full original outcome."
+    expected_output:
+      - "slice_complete: true | false"
+      - "full_outcome_complete: true | false"
+      - "missing evidence"
+      - "next task if not complete"
+    receipt:
+      result: done
+      decision: "First slice is complete and verified, but the full owner outcome is not complete because no current UI path calls the new self-serve tenant API."
+      slice_complete: true
+      full_outcome_complete: false
+      missing_evidence:
+        - "`/onboard` still redirects to `/access-request` instead of guiding an owner through business details -> account -> tenant creation."
+        - "`/sign-up` still blocks non-invite signup, so a non-invited owner cannot return to onboarding after account creation."
+        - "Welcome quick wins, retention re-engagement, and full-site rollback remain unimplemented."
+      next_allowed_task: T005
+      spawned_tasks:
+        - T005
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Replace the `/onboard` redirect with a guided owner setup surface that collects business context, opens account creation/sign-in when needed, calls `/api/self-serve/tenant`, and lands in dashboard/starter-site success."
+    allowed_files:
+      - "src/app/onboard/page.tsx"
+      - "src/app/sign-up/[[...sign-up]]/page.tsx"
+      - "src/__tests__/owner-journey-copy.test.ts"
+      - "src/__tests__/self-serve-routes.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/self-serve-routes.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need to change Clerk middleware, tenant routing, or auth contracts."
+      - "Need production credentials or destructive tenant writes to verify."
+      - "The existing invite signup path would regress."
+      - "Verification fails twice."
+    receipt:
+      result: done
+      changed_files:
+        - "src/app/onboard/page.tsx"
+        - "src/app/sign-up/[[...sign-up]]/page.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/self-serve-routes.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "pnpm exec playwright screenshot --viewport-size=1440,1000 http://localhost:3000/onboard /tmp/reb-onboard.png"
+          status: pass
+        - cmd: "pnpm exec playwright screenshot --viewport-size=390,900 http://localhost:3000/onboard /tmp/reb-onboard-mobile.png"
+          status: pass
+        - cmd: "pnpm exec playwright screenshot --viewport-size=1440,900 'http://localhost:3000/sign-up?redirect_url=%2Fonboard' /tmp/reb-signup-selfserve.png"
+          status: pass
+      summary: "Replaced `/onboard` redirect with a guided owner setup surface that saves draft business context, prompts account creation when needed, calls `/api/self-serve/tenant`, and shows dashboard/starter-site success. Added a narrow `/sign-up?redirect_url=/onboard` self-serve exception while preserving paused non-invite signup. Rendered `/onboard` on desktop/mobile; Clerk dev-key redirect-loop warning prevented confirming the loaded Clerk form."
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Add a first-run dashboard welcome sequence for self-serve tenants with quick wins for hours, Google/source sync, and the first AI content update."
+    allowed_files:
+      - "src/lib/self-serve.ts"
+      - "src/app/api/self-serve/tenant/route.ts"
+      - "src/app/dashboard/page.tsx"
+      - "src/__tests__/owner-journey-copy.test.ts"
+      - "src/__tests__/self-serve-routes.test.ts"
+      - "src/__tests__/self-serve.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/self-serve-routes.test.ts src/__tests__/self-serve.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need new persistent onboarding tables or production email credentials."
+      - "Need to change dashboard routing/auth contracts."
+      - "Verification fails twice."
+    receipt:
+      result: done
+      changed_files:
+        - "src/lib/self-serve.ts"
+        - "src/app/api/self-serve/tenant/route.ts"
+        - "src/app/dashboard/page.tsx"
+        - "src/__tests__/owner-journey-copy.test.ts"
+        - "src/__tests__/self-serve-routes.test.ts"
+        - "src/__tests__/self-serve.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/self-serve-routes.test.ts src/__tests__/self-serve.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf pnpm exec next dev -p 3001"
+          status: pass
+        - cmd: "pnpm exec playwright screenshot --viewport-size=1440,1000 'http://localhost:3001/dashboard?welcome=1' /tmp/reb-dashboard-welcome.png"
+          status: pass
+      summary: "Self-serve tenants now land on `/dashboard?welcome=1`; checkout success uses the same welcome dashboard URL. The dashboard renders first-run quick wins for updating hours, connecting Google Business, and drafting the first blog post. Rendered smoke check confirmed the welcome panel is visible with dev access enabled."
+  - id: T007
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Choose the next largest safe slice from the remaining explicit requirements: retention analytics/re-engagement or full-site backup/versioning/rollback."
+    inputs:
+      - "T001 scout note"
+      - "T003, T005, and T006 receipts"
+      - "Current repo evidence for weekly reports, event queues, activity logs, audit logs, and version restore"
+    constraints:
+      - "Do not implement."
+      - "Prefer rollback safety if increasing self-serve or AI autonomy makes safety the next trust bottleneck."
+      - "Prefer retention analytics if current safety coverage is sufficient for the next activation demo."
+      - "Next Worker task must include allowed_files, verify commands, and stop_if conditions."
+    expected_output:
+      - "Decision"
+      - "Rejected alternatives"
+      - "Exact Worker objective"
+      - "allowed_files"
+      - "verify"
+      - "stop_if"
+    receipt:
+      result: done
+      decision: "Do rollback safety next: add full-site snapshots, daily maintenance backups, and an owner-visible one-click restore panel."
+      rationale: "Self-serve onboarding now creates a tenant and sends owners into AI-powered setup. The next trust bottleneck is fear of broken content. Existing per-section restore helps, but the user explicitly called full-site backup/versioning/rollback non-negotiable and current evidence does not prove full-site snapshots or daily backups."
+      rejected_alternatives:
+        - "Retention analytics next: weekly reports and basic proof metrics already exist, while full-site rollback is still missing."
+        - "Product analytics provider wiring: useful, but less trust-critical than reversible AI/site changes."
+        - "Churn re-engagement first: depends on sufficient activity events and owner usage after activation; safe rollback improves confidence before autonomy increases."
+      next_allowed_task: T008
+      allowed_files:
+        - "src/lib/storage/site-snapshot-store.ts"
+        - "src/lib/storage/index.ts"
+        - "src/app/api/site-snapshots/route.ts"
+        - "src/app/api/cron/maintenance/route.ts"
+        - "src/components/dashboard/SiteSafetyPanel.tsx"
+        - "src/app/dashboard/page.tsx"
+        - "src/__tests__/site-snapshots.test.ts"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      verify:
+        - "pnpm test src/__tests__/site-snapshots.test.ts src/__tests__/owner-journey-copy.test.ts"
+        - "pnpm typecheck"
+        - "git diff --check"
+      stop_if:
+        - "Need to change core content schemas or tenant auth contracts."
+        - "Need production Blob/Redis credentials to verify local behavior."
+        - "Need destructive restore against production data."
+        - "Verification fails twice."
+  - id: T008
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Add full-site snapshot backup and one-click restore safety using existing content storage, maintenance cron, and dashboard owner UI."
+    allowed_files:
+      - "src/lib/storage/site-snapshot-store.ts"
+      - "src/lib/storage/index.ts"
+      - "src/app/api/site-snapshots/route.ts"
+      - "src/app/api/cron/maintenance/route.ts"
+      - "src/components/dashboard/SiteSafetyPanel.tsx"
+      - "src/app/dashboard/page.tsx"
+      - "src/__tests__/site-snapshots.test.ts"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/site-snapshots.test.ts src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need files outside allowed_files."
+      - "Need production Blob/Redis credentials to verify local behavior."
+      - "Need destructive restore against production data."
+      - "Verification fails twice."
+    receipt:
+      result: done
+      changed_files:
+        - "src/lib/storage/site-snapshot-store.ts"
+        - "src/lib/storage/index.ts"
+        - "src/app/api/site-snapshots/route.ts"
+        - "src/app/api/cron/maintenance/route.ts"
+        - "src/components/dashboard/SiteSafetyPanel.tsx"
+        - "src/app/dashboard/page.tsx"
+        - "src/__tests__/site-snapshots.test.ts"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/site-snapshots.test.ts src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf pnpm exec next dev -p 3001"
+          status: pass
+        - cmd: "pnpm exec playwright screenshot --viewport-size=1440,1100 'http://localhost:3001/dashboard?welcome=1' /tmp/reb-dashboard-safety.png"
+          status: pass
+      summary: "Added full-site snapshots across all editable sections, owner API for manual backup and restore, maintenance cron daily backups, and a dashboard Safety net panel with save/restore controls. Restore saves a pre-restore backup and logs owner-visible activity."
+  - id: T009
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Choose the next retention analytics and re-engagement slice now that self-serve activation and rollback safety have verified local coverage."
+    inputs:
+      - "Original retention requirements"
+      - "Current dashboard proof metrics"
+      - "Weekly brief/report evidence"
+      - "Existing activity, event, and track APIs"
+    constraints:
+      - "Do not implement."
+      - "Prioritize owner-visible metrics and churn predictors over decorative analytics."
+      - "Next Worker task must include allowed_files, verify commands, and stop_if conditions."
+    expected_output:
+      - "Decision"
+      - "Rejected alternatives"
+      - "Exact Worker objective"
+      - "allowed_files"
+      - "verify"
+      - "stop_if"
+    receipt:
+      result: done
+      decision: "Add retention analytics and re-engagement signals next: custom dashboard/chat/report tracking, owner-visible retention metrics, and maintenance-created re-engagement suggestions for inactivity risk."
+      rationale: "The product now has activation and rollback safety. The remaining explicit growth/retention gap is proving repeat value at $149/mo: AI changes this week, engagement signals, report views, and no-AI/no-dashboard risk."
+      rejected_alternatives:
+        - "Install a third-party analytics provider first: custom event coverage is the missing product behavior and can later feed PostHog/Vercel Analytics."
+        - "Only beautify weekly email briefs: weekly brief surfaces already exist; churn detection and owner engagement signals are weaker."
+        - "Build a full email campaign system now: larger blast radius and provider-dependent; maintenance can queue re-engagement suggestions first."
+      next_allowed_task: T010
+      allowed_files:
+        - "src/lib/retention.ts"
+        - "src/lib/storage/analytics-store.ts"
+        - "src/lib/storage/index.ts"
+        - "src/app/api/track/route.ts"
+        - "src/app/api/cron/maintenance/route.ts"
+        - "src/components/dashboard/EngagementTracker.tsx"
+        - "src/components/dashboard/RetentionPanel.tsx"
+        - "src/app/dashboard/page.tsx"
+        - "src/app/dashboard/chat/page.tsx"
+        - "src/app/dashboard/reports/page.tsx"
+        - "src/__tests__/retention.test.ts"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      verify:
+        - "pnpm test src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts"
+        - "pnpm typecheck"
+        - "git diff --check"
+      stop_if:
+        - "Need production analytics provider credentials."
+        - "Need to alter auth or tenant routing contracts."
+        - "Need to send real customer emails."
+        - "Verification fails twice."
+  - id: T010
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Add owner engagement tracking, retention/churn signal computation, dashboard retention metrics, and maintenance-generated re-engagement suggestions."
+    allowed_files:
+      - "src/lib/retention.ts"
+      - "src/lib/storage/analytics-store.ts"
+      - "src/lib/storage/index.ts"
+      - "src/app/api/track/route.ts"
+      - "src/app/api/cron/maintenance/route.ts"
+      - "src/components/dashboard/EngagementTracker.tsx"
+      - "src/components/dashboard/RetentionPanel.tsx"
+      - "src/app/dashboard/page.tsx"
+      - "src/app/dashboard/chat/page.tsx"
+      - "src/app/dashboard/reports/page.tsx"
+      - "src/__tests__/retention.test.ts"
+      - "src/__tests__/owner-journey-copy.test.ts"
+    verify:
+      - "pnpm test src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need production analytics provider credentials."
+      - "Need to alter auth or tenant routing contracts."
+      - "Need to send real customer emails."
+      - "Verification fails twice."
+    receipt:
+      result: done
+      changed_files:
+        - "src/lib/retention.ts"
+        - "src/lib/storage/analytics-store.ts"
+        - "src/lib/storage/index.ts"
+        - "src/app/api/track/route.ts"
+        - "src/app/api/cron/maintenance/route.ts"
+        - "src/components/dashboard/EngagementTracker.tsx"
+        - "src/components/dashboard/RetentionPanel.tsx"
+        - "src/app/dashboard/page.tsx"
+        - "src/app/dashboard/chat/page.tsx"
+        - "src/app/dashboard/reports/page.tsx"
+        - "src/__tests__/retention.test.ts"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm test src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts"
+          status: pass
+        - cmd: "pnpm test src/__tests__/site-snapshots.test.ts"
+          status: pass
+        - cmd: "pnpm test src/__tests__/analytics-store.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf pnpm exec next dev -p 3001"
+          status: pass
+        - cmd: "playwright-cli open http://gldf.localhost:3001/dashboard?welcome=1 && screenshot output/playwright/dashboard-retention-fixed.png"
+          status: pass
+      summary: "Added tenant-aware owner engagement events for dashboard, AI chat, report views, and referrals; computed weekly AI/traffic/engagement and inactivity risk signals; rendered an owner-friendly Weekly proof panel; queued retention re-engagement suggestions from maintenance; and fixed Sanity click-counter paths so hyphenated analytics events persist instead of returning 500."
+  - id: T011
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: default
+    objective: "Close the explicit product analytics provider gap by adding Vercel Web Analytics and mirroring dashboard engagement events into Vercel custom events."
+    allowed_files:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "src/app/layout.tsx"
+      - "src/components/dashboard/EngagementTracker.tsx"
+      - "src/proxy.ts"
+      - "src/__tests__/owner-journey-copy.test.ts"
+      - "src/__tests__/middleware-routing.test.ts"
+    verify:
+      - "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/middleware-routing.test.ts src/__tests__/retention.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"
+    stop_if:
+      - "Need access to the Vercel dashboard to enable the production project setting."
+      - "Need to deploy to production to observe live Vercel Analytics data."
+    receipt:
+      result: done
+      changed_files:
+        - "package.json"
+        - "pnpm-lock.yaml"
+        - "src/app/layout.tsx"
+        - "src/components/dashboard/EngagementTracker.tsx"
+        - "src/proxy.ts"
+        - "src/__tests__/owner-journey-copy.test.ts"
+      commands:
+        - cmd: "pnpm add @vercel/analytics"
+          status: pass
+          note: "Installed @vercel/analytics 2.0.1 per current Vercel Web Analytics docs."
+        - cmd: "pnpm test src/__tests__/owner-journey-copy.test.ts src/__tests__/middleware-routing.test.ts src/__tests__/retention.test.ts"
+          status: pass
+        - cmd: "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts src/__tests__/site-snapshots.test.ts src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts src/__tests__/middleware-routing.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "playwright-cli open http://gldf.localhost:3001/dashboard?welcome=1 && screenshot output/playwright/dashboard-retention-analytics.png"
+          status: pass
+          note: "Dashboard rendered with Vercel Analytics debug pageview logs and /api/track 200. Console still shows the pre-existing Clerk dev telemetry/CSP noise."
+      summary: "Root layout now injects Vercel Web Analytics, the dashboard engagement tracker mirrors custom events to Vercel `track(event)`, and CSP allows the Vercel development analytics script."
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Audit whether the full production self-serve platform outcome is complete."
+    inputs:
+      - "All done task receipts"
+      - "Last verification"
+      - "Current dirty diff"
+      - "Original user plan"
+    constraints:
+      - "Do not implement."
+      - "Reject completion if any required Worker task is still queued or active."
+      - "Reject completion if any explicit requirement lacks direct current-state evidence."
+      - "Reject completion if the broader original outcome still has safe local follow-up slices."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "requirement-by-requirement evidence"
+      - "missing evidence"
+      - "next task if not complete"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      summary: "The production self-serve platform tranche is complete in local code: owners can self-serve into a starter tenant/site, get guided first-run quick wins, see repeat-value proof and engagement signals, receive maintenance-queued re-engagement suggestions after inactivity, and trust AI/site changes through full-site snapshots, daily backups, restore controls, and existing per-section version diff history."
+      evidence:
+        self_serve_activation:
+          - "src/app/onboard/page.tsx"
+          - "src/app/sign-up/[[...sign-up]]/page.tsx"
+          - "src/lib/self-serve.ts"
+          - "src/app/api/self-serve/tenant/route.ts"
+          - "src/app/api/self-serve/checkout/route.ts"
+          - "src/app/dashboard/page.tsx"
+        retention_analytics:
+          - "src/lib/retention.ts"
+          - "src/components/dashboard/RetentionPanel.tsx"
+          - "src/components/dashboard/EngagementTracker.tsx"
+          - "src/app/api/track/route.ts"
+          - "src/app/api/cron/maintenance/route.ts"
+          - "src/app/layout.tsx"
+          - "package.json"
+        weekly_reports:
+          - "src/app/dashboard/reports/page.tsx"
+          - "src/components/dashboard/WeeklyBriefClient.tsx"
+          - "src/app/api/cron/weekly-report/route.ts"
+          - "src/lib/weekly-brief.ts"
+        rollback_safety:
+          - "src/lib/storage/site-snapshot-store.ts"
+          - "src/app/api/site-snapshots/route.ts"
+          - "src/components/dashboard/SiteSafetyPanel.tsx"
+          - "src/app/api/cron/maintenance/route.ts"
+          - "src/components/dashboard/VersionHistory.tsx"
+          - "src/app/api/content/[section]/versions/route.ts"
+      constraints_or_external_followup:
+        - "Live Vercel Web Analytics data still requires enabling Web Analytics in the deployed Vercel project and production traffic."
+        - "Live customer email delivery still depends on RESEND_API_KEY/domain configuration already used by the weekly-report cron."
+      commands:
+        - cmd: "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts src/__tests__/site-snapshots.test.ts src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts src/__tests__/middleware-routing.test.ts"
+          status: pass
+        - cmd: "pnpm typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: pass
+    task: T999
+    commands:
+      - "pnpm test src/__tests__/self-serve.test.ts src/__tests__/self-serve-routes.test.ts src/__tests__/site-snapshots.test.ts src/__tests__/retention.test.ts src/__tests__/owner-journey-copy.test.ts src/__tests__/middleware-routing.test.ts"
+      - "pnpm typecheck"
+      - "git diff --check"

@@ -4,6 +4,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { hasTenantAccess } from "@/lib/auth";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getWeeklyBrief, getWeeklyBriefs } from "@/lib/weekly-brief";
+import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 
 export default async function ReportsPage() {
@@ -20,5 +21,10 @@ export default async function ReportsPage() {
     getWeeklyBriefs(tenant),
   ]);
 
-  return <WeeklyBriefClient brief={brief} history={history} />;
+  return (
+    <>
+      <EngagementTracker event="report-view" />
+      <WeeklyBriefClient brief={brief} history={history} />
+    </>
+  );
 }

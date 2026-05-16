@@ -39,6 +39,7 @@ export {
   trackClick,
   getClickCounts,
   getDailyMetrics,
+  getLastClickDate,
   getClickCountsByPrefix,
   recordSectionUpdate,
   getSectionTimestamps,
@@ -71,6 +72,21 @@ export { getSearchData, setSearchData } from "./search-store";
 // Reports
 export { saveWeeklyReport, getWeeklyReports } from "./report-store";
 export type { StoredWeeklyReport } from "./report-store";
+
+// Full-site snapshots
+export {
+  createDailySiteSnapshot,
+  createSiteSnapshot,
+  getLatestSiteSnapshot,
+  getSiteSnapshots,
+  restoreSiteSnapshot,
+  SITE_SNAPSHOT_SECTIONS,
+} from "./site-snapshot-store";
+export type {
+  SiteSnapshot,
+  SiteSnapshotReason,
+  SiteSnapshotSummary,
+} from "./site-snapshot-store";
 
 // Page Config
 export {
