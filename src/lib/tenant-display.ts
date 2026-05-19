@@ -3,6 +3,7 @@ import { DEFAULT_TENANT } from "./storage/core";
 
 const FALLBACK_TENANT_NAMES: Record<string, string> = {
   gldf: "Great Lakes Dried Fruit",
+  rohlax: "Rohlax Wellness",
 };
 
 function titleCaseTenantId(tenant: string): string {
