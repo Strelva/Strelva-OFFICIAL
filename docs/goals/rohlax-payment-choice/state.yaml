@@ -1,0 +1,91 @@
+version: 2
+
+goal:
+  title: "Rohlax Wellness Choose-and-Pay Handoff"
+  slug: "rohlax-payment-choice"
+  kind: lightweight_operator_goal
+  tranche: "Create a one-time choose-your-amount payment page and send the Rohlax email."
+  status: ready
+  intake:
+    original_request: "rohlax wellness is going to pay from range of $300 to $1000 -- want them to choose and pay thoguh find this and make this a goal and have this prepped for an email"
+    interpreted_outcome: "Let Rohlax Wellness choose a one-time payment amount between $300 and $1,000, then pay through Stripe from a simple email."
+    input_shape: operator_payment_handoff
+    audience: "Rohlax Wellness client contact; Jacob as operator."
+    authority: requested
+    proof_type: external_payment
+    completion_proof: "Payment page is live, email is sent, and Stripe payment succeeds."
+    likely_misfire: "Using the fixed Scaffold Web subscription checkout instead of a one-time variable-amount payment link."
+    local_facts:
+      - "Rohlax tenant id is `rohlax`."
+      - "`rohlaxwellness.com` maps to `rohlax` in local environment config."
+      - "Rohlax currently bypasses normal subscription blocking as founder-comp style access."
+      - "The existing subscription checkout creates a fixed monthly plan checkout, not a $300-$1,000 choice."
+
+rules:
+  preserve_existing_work: true
+  do_not_change_app_billing_for_this_goal: true
+  one_active_task: true
+  no_completion_without_payment_confirmation: true
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: implementation
+    assignee: Codex
+    status: done
+    objective: "Create the Rohlax choose-your-amount payment page and Stripe checkout endpoint."
+    steps:
+      - "Build `/pay/rohlax` with $300-$1,000 amount selection."
+      - "Build `/api/pay/rohlax` to create a one-time Stripe Checkout Session."
+      - "Validate the selected amount server-side before creating checkout."
+      - "Keep the endpoint specific to Rohlax while making the page feel like a flexible website-payment page, not a Rohlax-branded one-off."
+      - "Make clear there is no expected/default amount, while quietly starting the form at $600."
+      - "Make clear payment is a courtesy only, does not affect the normal 3-5 day response window, and does not include extra coverage right now."
+      - "Make clear admin site access is guaranteed free for life."
+    verify:
+      - "Open `/pay/rohlax` locally and confirm the page renders."
+      - "Confirm the endpoint rejects amounts outside $300 to $1,000."
+    receipt:
+      result: done
+      payment_url: "https://scaffoldweb.com/pay/rohlax"
+  - id: T002
+    type: operator
+    assignee: Jacob
+    status: ready
+    objective: "Send the prepared Rohlax payment email."
+    inputs:
+      - "notes/T001-email-draft.md"
+    verify:
+      - "Email includes `https://scaffoldweb.com/pay/rohlax`."
+      - "Email states the $300-$1,000 range plainly."
+    receipt:
+      result: pending
+      sent_at: null
+  - id: T003
+    type: operator
+    assignee: Jacob
+    status: blocked
+    blocked_by: T002
+    objective: "Confirm payment and close the loop."
+    verify:
+      - "Stripe shows a successful one-time payment from Rohlax Wellness."
+      - "Record the chosen amount in this goal state or a follow-up note."
+    receipt:
+      result: pending
+      amount_paid: null
+  - id: T004
+    type: operator
+    assignee: Jacob
+    status: ready
+    objective: "Give Chelsea Rohlax admin access."
+    inputs:
+      - "notes/T002-chelsea-access-handoff.md"
+    verify:
+      - "Chelsea's exact email is confirmed."
+      - "An invite is created for tenant `rohlax` using that exact email."
+      - "Chelsea can sign in and reach the Rohlax dashboard."
+    receipt:
+      result: pending
+      chelsea_email: null
+      invite_link: null
