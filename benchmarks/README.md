@@ -48,7 +48,40 @@ Every check rolls up into one of these dimensions for per-dimension scoring:
 - **State restraint** — Did sections that should be untouched stay untouched?
 - **Response content** — Substring assertions on the agent's text
 - **Refusal / clarify** — Did the agent refuse or ask for clarification when it should have?
+- **Judge (LLM)** — Tone / specificity / voice grading by a smarter model than the agent under test
 - **Agent runtime** — Did the agent run without throwing?
+
+## The LLM-as-judge layer
+
+Deterministic checks can confirm what the agent did. They cannot grade
+whether a refusal helpfully redirects, whether a blog post sounds
+AI-written, or whether a clarifying question is actually useful. The judge
+layer fills that gap.
+
+A case with `judgeRubrics` declares one or more yes/no questions plus
+criteria. After deterministic checks pass, the evaluator runs each rubric
+in parallel through a stronger model (default: `gemini-2.5-pro`) using
+`generateObject` for structured `{ pass, reasoning }` output.
+
+Override the judge with:
+
+```bash
+BENCHMARK_JUDGE_MODEL=gemini-2.5-pro pnpm bench:agent   # default
+```
+
+(In the future, point this at a different model via the AI SDK
+`provider/model` string format. The judge call uses `@ai-sdk/google`
+today, so override values must be Google models. Cross-provider judging
+would need a small adapter — left as a follow-up.)
+
+**Cost.** Each rubric is ~$0.002 of Gemini Pro API spend. K1 has 3
+rubrics, K2 has 2, plus single rubrics on A1, F1, G1, H1 — adds ~$0.02
+to a full run.
+
+**Where rubrics live in the report.** Each judge result becomes one
+CheckResult in the `judge` dimension. The reasoning the judge produced
+appears as the check's detail, so when a rubric fails you can see WHY
+it failed without re-running.
 
 ## Running
 

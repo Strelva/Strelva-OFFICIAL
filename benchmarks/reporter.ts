@@ -18,6 +18,7 @@ const CATEGORY_LABEL: Record<CheckCategory, string> = {
   "state-restraint": "State restraint",
   "response-content": "Response content",
   refusal: "Refusal / clarify",
+  judge: "Judge (LLM)",
   "agent-runtime": "Agent runtime",
 };
 
@@ -50,6 +51,7 @@ export function summarize(combined: Combined[]): BenchmarkSummary {
       "state-restraint": { passing: 0, failing: 0 },
       "response-content": { passing: 0, failing: 0 },
       refusal: { passing: 0, failing: 0 },
+      judge: { passing: 0, failing: 0 },
       "agent-runtime": { passing: 0, failing: 0 },
     },
   };

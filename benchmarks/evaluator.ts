@@ -11,6 +11,7 @@
  */
 
 import type { BenchmarkCase } from "./cases";
+import { runJudgeRubrics } from "./judge";
 import { sectionDiffer, type CaseRun } from "./runner";
 
 export type CheckCategory =
@@ -22,6 +23,7 @@ export type CheckCategory =
   | "state-restraint"
   | "response-content"
   | "refusal"
+  | "judge"
   | "agent-runtime";
 
 export interface CheckResult {
@@ -103,10 +105,10 @@ function getGovernanceAction(run: CaseRun, section: string): string | undefined 
   return undefined;
 }
 
-export function evaluateCase(
+export async function evaluateCase(
   caseDef: BenchmarkCase,
   run: CaseRun,
-): CaseGrade {
+): Promise<CaseGrade> {
   const checks: CheckResult[] = [];
 
   if (run.status === "agent-threw") {
@@ -310,6 +312,24 @@ export function evaluateCase(
           unsourced.length === 0
             ? "no unsourced numbers"
             : `unsourced numbers in response: ${unsourced.join(", ")}`,
+      });
+    }
+  }
+
+  // 6. LLM-as-judge rubrics. Run after deterministic checks because the
+  // judge is expensive (~$0.002/rubric on gemini-2.5-pro) and would waste
+  // budget if the run had a structural failure. Rubrics within a case
+  // fan out in parallel.
+  if (caseDef.judgeRubrics?.length) {
+    const judgeResults = await runJudgeRubrics(caseDef, run, caseDef.judgeRubrics);
+    for (const result of judgeResults) {
+      checks.push({
+        category: "judge",
+        name: `[${result.judgeModel}] ${result.rubricName}`,
+        pass: result.pass,
+        detail: result.errored
+          ? `judge call failed: ${result.errorMessage}`
+          : result.reasoning,
       });
     }
   }

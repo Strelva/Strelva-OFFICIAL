@@ -64,7 +64,7 @@ export async function runBenchmark(options: BenchmarkOptions = {}): Promise<{
   for (const caseDef of active) {
     process.stdout.write(`  · ${caseDef.id} ${caseDef.description}…`);
     const run = await runCase(caseDef);
-    const grade = evaluateCase(caseDef, run);
+    const grade = await evaluateCase(caseDef, run);
     combined.push({ caseDef, run, grade });
     process.stdout.write(grade.pass ? " ✓\n" : ` ✗ (${grade.failures.length} fail)\n`);
   }
