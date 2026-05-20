@@ -14,6 +14,7 @@
     "smoke": "playwright test",
     "smoke:admin": "REB_DEV_UNGATED_ACCESS=1 playwright test tests/admin-operator.spec.ts",
     "smoke:dashboard": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/dashboard-owner.spec.ts",
+    "bench:agent": "npx tsx scripts/run-benchmark.ts",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:custom-repos": "tsx scripts/custom-repo-workspace-check.ts",
