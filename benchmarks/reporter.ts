@@ -8,6 +8,12 @@ import path from "node:path";
 import type { BenchmarkCase } from "./cases";
 import type { CaseGrade, CheckCategory, CheckResult } from "./evaluator";
 import type { CaseRun } from "./runner";
+import {
+  asciiBarTable,
+  headlineSvg,
+  horizontalBarChartSvg,
+  type BarRow,
+} from "./svg";
 
 /**
  * Public model pricing per 1M tokens (USD). Update when Google rates change.
@@ -274,7 +280,9 @@ export function renderMarkdown(
   const lines: string[] = [];
   lines.push(`# Scaffold AI Benchmark — ${meta.startedAt}`);
   lines.push("");
-  lines.push(`## Headline`);
+
+  // Headline visual — big number + progress bar.
+  lines.push(headlineSvg(summary.resolved, summary.totalCases));
   lines.push("");
   lines.push(
     `**Resolved: ${summary.resolved} / ${summary.totalCases} (${pct(summary.resolved, summary.totalCases)})** — SWE-bench-style binary; deterministic checks only.`,
@@ -293,27 +301,49 @@ export function renderMarkdown(
     `- Cost per resolved: ${summary.resolved > 0 ? formatCost(summary.cost.costPerResolved) : "n/a"}`,
   );
   lines.push("");
-  lines.push("## Resolved by difficulty");
-  lines.push("");
-  lines.push("| Difficulty | Resolved | Total | % |");
-  lines.push("|---|---|---|---|");
-  for (const [diff, counts] of Object.entries(summary.difficulties)) {
-    if (counts.total === 0) continue;
-    lines.push(
-      `| ${diff} | ${counts.resolved} | ${counts.total} | ${pct(counts.resolved, counts.total)} |`,
-    );
+
+  // ── Difficulty chart (SVG) ───────────────────────────────────────────
+  const difficultyRows: BarRow[] = (Object.entries(summary.difficulties) as Array<
+    ["easy" | "medium" | "hard", { resolved: number; total: number }]
+  >)
+    .filter(([, c]) => c.total > 0)
+    .map(([label, c]) => ({ label, value: c.resolved, total: c.total }));
+  if (difficultyRows.length > 0) {
+    lines.push("## Resolved by difficulty");
+    lines.push("");
+    lines.push(horizontalBarChartSvg("", difficultyRows, { labelWidth: 70 }));
+    lines.push("");
   }
-  lines.push("");
-  lines.push("## Resolved by category");
-  lines.push("");
-  lines.push("| Category | Resolved | Total | % |");
-  lines.push("|---|---|---|---|");
-  for (const [cat, counts] of Object.entries(summary.categories)) {
-    lines.push(
-      `| ${cat} | ${counts.resolved} | ${counts.total} | ${pct(counts.resolved, counts.total)} |`,
-    );
+
+  // ── Category bars (ASCII for compact view) ───────────────────────────
+  const categoryRows: BarRow[] = Object.entries(summary.categories).map(
+    ([cat, c]) => ({ label: cat, value: c.resolved, total: c.total }),
+  );
+  if (categoryRows.length > 0) {
+    lines.push("## Resolved by category");
+    lines.push("");
+    lines.push(asciiBarTable(categoryRows));
+    lines.push("");
   }
-  lines.push("");
+
+  // ── Per-dimension bars (ASCII) ───────────────────────────────────────
+  const dimensionRows: BarRow[] = (Object.entries(summary.dimensions) as Array<
+    [CheckCategory, { passing: number; failing: number }]
+  >)
+    .filter(([, c]) => c.passing + c.failing > 0)
+    .map(([cat, c]) => ({
+      label: CATEGORY_LABEL[cat],
+      value: c.passing,
+      total: c.passing + c.failing,
+    }));
+  if (dimensionRows.length > 0) {
+    lines.push("## Per-dimension check pass rate");
+    lines.push("");
+    lines.push(asciiBarTable(dimensionRows));
+    lines.push("");
+  }
+
+  // ── Cost breakdown ───────────────────────────────────────────────────
   lines.push("## Cost breakdown");
   lines.push("");
   lines.push("| Source | Input tokens | Output tokens | Cost |");
@@ -330,18 +360,7 @@ export function renderMarkdown(
     `| **Total** | ${summary.cost.agentInputTokens + summary.cost.judgeInputTokens} | ${summary.cost.agentOutputTokens + summary.cost.judgeOutputTokens} | **${formatCost(summary.cost.totalCost)}** |`,
   );
   lines.push("");
-  lines.push("## Per-dimension check pass rate");
-  lines.push("");
-  lines.push("| Dimension | Passing | Total | % |");
-  lines.push("|---|---|---|---|");
-  for (const [dim, counts] of Object.entries(summary.dimensions)) {
-    const total = counts.passing + counts.failing;
-    if (total === 0) continue;
-    lines.push(
-      `| ${CATEGORY_LABEL[dim as CheckCategory]} | ${counts.passing} | ${total} | ${pct(counts.passing, total)} |`,
-    );
-  }
-  lines.push("");
+
   lines.push("## Per-case detail");
   lines.push("");
 
