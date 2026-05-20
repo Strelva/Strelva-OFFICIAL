@@ -9,6 +9,11 @@
  * A single rejection resets the counter to zero.
  */
 
+// Note: approval INCR and rejection SET are not atomic relative to each other.
+// Under concurrent admin actions on the same tenant, the streak could drift by ±1.
+// This is acceptable because auto-approval is a convenience optimization, not a
+// security boundary. The governance system still validates all changes.
+
 import { getRedis } from "./redis";
 import type { TenantConfig, ContentSection } from "./types";
 import type { AiGovernanceDecision } from "./ai-governance";
@@ -83,7 +88,7 @@ export async function recordRejection(tenantId: string): Promise<void> {
   if (!redis) return;
 
   try {
-    await redis.set(`${APPROVAL_COUNT_PREFIX}${tenantId}`, 0);
+    await redis.set(`${APPROVAL_COUNT_PREFIX}${tenantId}`, 0, { ex: 90 * 24 * 60 * 60 });
   } catch {
     // Non-fatal
   }

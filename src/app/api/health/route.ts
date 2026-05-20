@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@sanity/client";
-import { Redis } from "@upstash/redis";
+import { getRedis } from "@/lib/redis";
+import { getSanityClient } from "@/lib/sanity";
 
 const APP_VERSION = process.env.APP_VERSION || "0.1.0";
 const TIMEOUT_MS = 3_000;
@@ -10,7 +10,6 @@ type ServiceStatus = "ok" | "not configured" | "error";
 interface ServiceCheck {
   status: ServiceStatus;
   responseMs: number;
-  error?: string;
 }
 
 interface HealthResponse {
@@ -24,7 +23,6 @@ interface HealthResponse {
     stripe: ServiceCheck;
     gemini: ServiceCheck;
   };
-  errors?: string[];
 }
 
 /** Race a promise against a timeout. Rejects on timeout. */
@@ -44,22 +42,13 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; ms: number }
 }
 
 async function checkSanity(): Promise<ServiceCheck> {
-  const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-  const token = process.env.SANITY_API_TOKEN;
-
-  if (!projectId || !token) {
+  if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.SANITY_API_TOKEN) {
     return { status: "not configured", responseMs: 0 };
   }
 
   try {
     const { ms } = await timed(async () => {
-      const client = createClient({
-        projectId,
-        dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-        apiVersion: "2024-01-01",
-        useCdn: false,
-        token,
-      });
+      const client = getSanityClient();
       await withTimeout(
         client.fetch<number>(`count(*[_type == "siteSettings"])`),
         TIMEOUT_MS,
@@ -69,29 +58,26 @@ async function checkSanity(): Promise<ServiceCheck> {
 
     return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", responseMs: TIMEOUT_MS, error: `Sanity: ${message}` };
+    console.error("[health] Sanity check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
 async function checkRedis(): Promise<ServiceCheck> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!url || !token) {
+  const redis = getRedis();
+  if (!redis) {
     return { status: "not configured", responseMs: 0 };
   }
 
   try {
     const { ms } = await timed(async () => {
-      const redis = new Redis({ url, token });
       await withTimeout(redis.ping(), TIMEOUT_MS, "Redis");
     });
 
     return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", responseMs: TIMEOUT_MS, error: `Redis: ${message}` };
+    console.error("[health] Redis check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
@@ -127,8 +113,8 @@ async function checkClerk(): Promise<ServiceCheck> {
 
     return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", responseMs: TIMEOUT_MS, error: `Clerk: ${message}` };
+    console.error("[health] Clerk check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
@@ -149,15 +135,15 @@ async function checkStripe(): Promise<ServiceCheck> {
         "Stripe",
       );
 
-      if (!res.ok && res.status !== 401) {
+      if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
     });
 
     return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", responseMs: TIMEOUT_MS, error: `Stripe: ${message}` };
+    console.error("[health] Stripe check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
@@ -185,8 +171,8 @@ async function checkGemini(): Promise<ServiceCheck> {
 
     return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", responseMs: TIMEOUT_MS, error: `Gemini: ${message}` };
+    console.error("[health] Gemini check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
@@ -201,16 +187,11 @@ export async function GET() {
 
   const checks = { redis, sanity, clerk, stripe, gemini };
 
-  const errors: string[] = [];
-  for (const check of Object.values(checks)) {
-    if (check.error) errors.push(check.error);
-  }
-
   // "down" if core services (redis or sanity) are failing
   // "degraded" if any non-core service is failing
   // "healthy" if everything is ok or not configured
   const coreDown = redis.status === "error" || sanity.status === "error";
-  const anyError = errors.length > 0;
+  const anyError = Object.values(checks).some((c) => c.status === "error");
 
   const status: HealthResponse["status"] = coreDown
     ? "down"
@@ -225,10 +206,6 @@ export async function GET() {
     checks,
   };
 
-  if (errors.length > 0) {
-    body.errors = errors;
-  }
-
-  const httpStatus = coreDown ? 503 : anyError ? 200 : 200;
+  const httpStatus = coreDown ? 503 : 200;
   return NextResponse.json(body, { status: httpStatus });
 }
