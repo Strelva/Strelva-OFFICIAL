@@ -94,13 +94,13 @@ describe("SSRF Protection", () => {
   describe("validateUrlSafety", () => {
     it("rejects ftp:// scheme", async () => {
       await expect(validateUrlSafety("ftp://example.com")).rejects.toThrow(
-        "Only HTTP and HTTPS URLs are allowed"
+        "Blocked: non-HTTP scheme"
       );
     });
 
     it("rejects file:// scheme", async () => {
       await expect(validateUrlSafety("file:///etc/passwd")).rejects.toThrow(
-        "Only HTTP and HTTPS URLs are allowed"
+        "Blocked: non-HTTP scheme"
       );
     });
 
@@ -114,21 +114,26 @@ describe("SSRF Protection", () => {
       mockLookup.mockResolvedValueOnce({ address: "127.0.0.1" });
       await expect(
         validateUrlSafety("https://evil.example.com")
-      ).rejects.toThrow("private/internal");
+      ).rejects.toThrow("Blocked: resolved to private IP");
     });
 
     it("rejects URLs resolving to 169.254.169.254 (cloud metadata)", async () => {
       mockLookup.mockResolvedValueOnce({ address: "169.254.169.254" });
       await expect(
         validateUrlSafety("https://metadata.example.com")
-      ).rejects.toThrow("private/internal");
+      ).rejects.toThrow("Blocked: resolved to private IP");
     });
 
     it("allows URLs resolving to public IPs", async () => {
       mockLookup.mockResolvedValueOnce({ address: "93.184.216.34" });
-      await expect(
-        validateUrlSafety("https://example.com")
-      ).resolves.toBeUndefined();
+      const result = await validateUrlSafety("https://example.com");
+      expect(result).toEqual({ address: "93.184.216.34" });
+    });
+
+    it("forces IPv4 resolution", async () => {
+      mockLookup.mockResolvedValueOnce({ address: "93.184.216.34" });
+      await validateUrlSafety("https://example.com");
+      expect(mockLookup).toHaveBeenCalledWith("example.com", { family: 4 });
     });
   });
 });
@@ -265,14 +270,14 @@ describe("runAudit", () => {
   it("rejects private IP targets via SSRF protection", async () => {
     mockLookup.mockResolvedValueOnce({ address: "10.0.0.1" });
     await expect(runAudit("https://internal.corp")).rejects.toThrow(
-      "private/internal"
+      "Blocked: resolved to private IP"
     );
   });
 
   it("prepends https:// to bare domain", async () => {
     await runAudit("example.com");
-    // DNS lookup should have been called with "example.com"
-    expect(mockLookup).toHaveBeenCalledWith("example.com");
+    // DNS lookup should have been called with "example.com" and IPv4 forced
+    expect(mockLookup).toHaveBeenCalledWith("example.com", { family: 4 });
   });
 
   it("returns all 6 category results", async () => {

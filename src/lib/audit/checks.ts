@@ -17,15 +17,17 @@ export function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-export async function validateUrlSafety(url: string): Promise<void> {
+export async function validateUrlSafety(url: string): Promise<{ address: string }> {
   const parsed = new URL(url);
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Only HTTP and HTTPS URLs are allowed");
+    throw new Error(`Blocked: non-HTTP scheme "${parsed.protocol}"`);
   }
-  const { address } = await dns.promises.lookup(parsed.hostname);
+  // Force IPv4 to prevent IPv6 SSRF bypass (::1, ::ffff:127.0.0.1, fe80::, etc.)
+  const { address } = await dns.promises.lookup(parsed.hostname, { family: 4 });
   if (isPrivateIP(address)) {
-    throw new Error("URLs pointing to private/internal addresses are not allowed");
+    throw new Error(`Blocked: resolved to private IP ${address}`);
   }
+  return { address };
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,8 @@ function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 // ---------------------------------------------------------------------------
 // Shared PageSpeed API fetch (used by webVitals + mobile)
 // ---------------------------------------------------------------------------
+// Note: Google PageSpeed API requires the key as a query parameter.
+// Ensure Sentry/logging does not capture full request URLs to prevent key leakage.
 async function fetchPageSpeedData(
   url: string,
   apiKey: string | undefined
@@ -101,7 +105,7 @@ async function checkWebVitals(
     const perfScore = psData.lighthouseResult?.categories?.performance?.score;
 
     // LCP
-    const lcpMs = audits["largest-contentful-paint"]?.numericValue ?? 0;
+    const lcpMs = audits["largest-contentful-paint"]?.numericValue ?? 8000; // default: slow
     const lcpScore =
       lcpMs <= 2500 ? 100 : lcpMs <= 4000 ? 60 : 20;
     checks.push({
@@ -117,7 +121,7 @@ async function checkWebVitals(
     });
 
     // CLS
-    const clsVal = audits["cumulative-layout-shift"]?.numericValue ?? 0;
+    const clsVal = audits["cumulative-layout-shift"]?.numericValue ?? 0.5; // default: poor
     const clsScore = clsVal <= 0.1 ? 100 : clsVal <= 0.25 ? 60 : 20;
     checks.push({
       name: "Cumulative Layout Shift (CLS)",
@@ -132,7 +136,7 @@ async function checkWebVitals(
     });
 
     // INP / TBT (proxy for INP in lab data)
-    const tbtMs = audits["total-blocking-time"]?.numericValue ?? 0;
+    const tbtMs = audits["total-blocking-time"]?.numericValue ?? 1000; // default: poor
     const tbtScore = tbtMs <= 200 ? 100 : tbtMs <= 600 ? 60 : 20;
     checks.push({
       name: "Total Blocking Time (TBT)",
@@ -275,8 +279,7 @@ async function checkMobile(
 // ---------------------------------------------------------------------------
 // 3. Basic SEO (parse HTML)
 // ---------------------------------------------------------------------------
-function checkSEO(html: string, _url: string): CategoryResult {
-  const $ = cheerio.load(html);
+function checkSEO(html: string, _url: string, $: cheerio.CheerioAPI): CategoryResult {
   const checks: CheckResult[] = [];
 
   // Title tag
@@ -411,8 +414,7 @@ function checkSEO(html: string, _url: string): CategoryResult {
 // ---------------------------------------------------------------------------
 // 4. Schema / Structured Data
 // ---------------------------------------------------------------------------
-function checkSchema(html: string): CategoryResult {
-  const $ = cheerio.load(html);
+function checkSchema(html: string, $: cheerio.CheerioAPI): CategoryResult {
   const checks: CheckResult[] = [];
 
   // JSON-LD
@@ -556,8 +558,7 @@ async function checkSSL(url: string): Promise<CategoryResult> {
 // ---------------------------------------------------------------------------
 // 6. Basic Accessibility
 // ---------------------------------------------------------------------------
-function checkAccessibility(html: string): CategoryResult {
-  const $ = cheerio.load(html);
+function checkAccessibility(html: string, $: cheerio.CheerioAPI): CategoryResult {
   const checks: CheckResult[] = [];
 
   // Lang attribute
@@ -718,6 +719,16 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
     }
   }
 
+  // Guard against DNS rebinding: if fetch followed a redirect to a different
+  // host, validate the final host resolves to a public IP as well.
+  const finalUrl = new URL(fetchedUrl);
+  if (finalUrl.hostname !== new URL(url).hostname) {
+    const { address: finalAddress } = await dns.promises.lookup(finalUrl.hostname, { family: 4 });
+    if (isPrivateIP(finalAddress)) {
+      throw new Error(`Blocked: redirect target resolved to private IP ${finalAddress}`);
+    }
+  }
+
   // Fetch PageSpeed data once and share between webVitals + mobile
   const psData = await fetchPageSpeedData(fetchedUrl, apiKey);
 
@@ -728,10 +739,11 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
     checkSSL(fetchedUrl),
   ]);
 
-  // These are sync and use the HTML we already fetched
-  const seo = checkSEO(html, fetchedUrl);
-  const schema = checkSchema(html);
-  const a11y = checkAccessibility(html);
+  // Parse HTML once and share across sync checks
+  const $ = cheerio.load(html);
+  const seo = checkSEO(html, fetchedUrl, $);
+  const schema = checkSchema(html, $);
+  const a11y = checkAccessibility(html, $);
 
   return [webVitals, seo, mobile, schema, ssl, a11y];
 }

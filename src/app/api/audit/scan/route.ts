@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { Redis } from "@upstash/redis";
+import { getRedis } from "@/lib/redis";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult } from "@/lib/audit/types";
@@ -24,6 +25,8 @@ async function checkRateLimit(
 }
 
 export async function POST(request: NextRequest) {
+  // x-forwarded-for is set by Vercel's edge network and is trustworthy in this environment.
+  // If deployed elsewhere, this header could be spoofed. Use req.ip or a platform-specific method.
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
@@ -69,6 +72,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Check result cache before running audit
+  const cacheKey = `reb:audit:${normalizedUrl}`;
+  const cacheRedis = getRedis();
+  if (cacheRedis) {
+    try {
+      const cached = await cacheRedis.get(cacheKey);
+      if (cached) {
+        return NextResponse.json(typeof cached === "string" ? JSON.parse(cached) : cached);
+      }
+    } catch {
+      // Cache miss or error — proceed with fresh audit
+    }
+  }
+
   try {
     const categories = await runAudit(normalizedUrl);
     const overallScore = computeOverallScore(categories);
@@ -81,6 +98,11 @@ export async function POST(request: NextRequest) {
       grade,
       categories,
     };
+
+    // Cache successful result for 1 hour
+    if (cacheRedis) {
+      await cacheRedis.set(cacheKey, JSON.stringify(result), { ex: 3600 }).catch(() => {});
+    }
 
     return NextResponse.json(result);
   } catch (err) {
