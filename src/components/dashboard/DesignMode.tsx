@@ -207,6 +207,14 @@ export function DesignMode() {
         });
       }
 
+      // Handle inline text edits from iframe
+      if (event.data?.type === "reb-inline-edit") {
+        const { section, field, value } = event.data;
+        if (section && field && value !== undefined) {
+          handleContentUpdate(section, field, value);
+        }
+      }
+
       // Also handle legacy reb-section-clicked for backwards compat
       if (event.data?.type === "reb-section-clicked") {
         const section = event.data.section;
@@ -236,7 +244,7 @@ export function DesignMode() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [tree, setActiveSection]);
+  }, [tree, setActiveSection, handleContentUpdate]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
