@@ -58,26 +58,22 @@ export function DesignCanvas({
         setRectFromMessage({ id: section, rect });
       }
 
-      // Handle hover events from EditModeOverlay
+      // Handle hover events from EditModeOverlay (now includes rect)
       if (event.data?.type === "reb-section-hovered") {
-        if (section) {
-          // Request rect for hover overlay
+        if (section && rect) {
+          setHoveredSection({ id: section, rect });
+        } else if (section) {
+          // Fallback: request rect if not included
           if (iframeRef.current?.contentWindow) {
             iframeRef.current.contentWindow.postMessage({
               type: "reb-request-rect",
               section,
             }, "*");
           }
-          // We'll get the rect back via reb-node-rect; store hover id for now
           setHoveredSection((prev) => prev?.id === section ? prev : { id: section, rect: { top: 0, left: 0, width: 0, height: 0 } });
         } else {
           setHoveredSection(null);
         }
-      }
-
-      // Update hover rect when we get a rect response for the hovered section
-      if (event.data?.type === "reb-node-rect" && section && rect) {
-        setHoveredSection((prev) => prev && prev.id === section ? { id: section, rect } : prev);
       }
     }
     window.addEventListener("message", handleMessage);

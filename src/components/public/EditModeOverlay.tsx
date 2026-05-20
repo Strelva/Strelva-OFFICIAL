@@ -80,7 +80,16 @@ export function EditModeOverlay() {
       setHoveredSection(sectionType);
       const rect = el.getBoundingClientRect();
       setLabelPos({ top: rect.top + window.scrollY, left: rect.left });
-      window.parent.postMessage({ type: "reb-section-hovered", section: sectionType }, "*");
+      window.parent.postMessage({
+        type: "reb-section-hovered",
+        section: sectionType,
+        rect: {
+          top: rect.top + window.scrollY,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+      }, "*");
     }
 
     function handleMouseLeave() {
@@ -216,6 +225,9 @@ export function EditModeOverlay() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        (e.target as HTMLElement).blur();
+      }
+      if (e.key === "Escape") {
         (e.target as HTMLElement).blur();
       }
     }
