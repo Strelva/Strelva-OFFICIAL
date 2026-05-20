@@ -1,26 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, type RefObject } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, type RefObject } from "react";
 import { Minus, Plus, Maximize2 } from "lucide-react";
 import type { NodeRect } from "../DesignMode";
-
-// Section type to human-readable label (keep in sync with DesignMode)
-const SECTION_LABELS: Record<string, string> = {
-  hero: "Hero Section",
-  services: "Services",
-  story: "About / Story",
-  testimonials: "Testimonials",
-  faq: "FAQ",
-  contact: "Contact",
-  footer: "Footer",
-  navigation: "Navigation",
-  "page-header": "Page Header",
-  "page-cta": "Call to Action",
-  events: "Events",
-  providers: "Team / Providers",
-  products: "Products",
-  shop: "Shop",
-};
+import { SECTION_LABELS } from "@/components/ui/section-labels";
 
 function sectionLabel(id: string): string {
   return SECTION_LABELS[id] || id.charAt(0).toUpperCase() + id.slice(1);
@@ -44,13 +27,27 @@ export function DesignCanvas({
   iframeRef,
 }: DesignCanvasProps) {
   const scale = zoom / 100;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [rectFromMessage, setRectFromMessage] = useState<{ id: string; rect: NodeRect } | null>(null);
   const [hoveredSection, setHoveredSection] = useState<{ id: string; rect: NodeRect } | null>(null);
 
+  // Derive the preview origin for postMessage validation
+  const previewOrigin = useMemo(() => {
+    if (!siteUrl) return null;
+    try { return new URL(siteUrl).origin; } catch { return null; }
+  }, [siteUrl]);
+
   // Listen for rect updates and hover events from iframe
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      // Validate message origin
+      if (!event.origin || event.origin === 'null') return;
+      const allowedOrigins = [window.location.origin];
+      if (previewOrigin) allowedOrigins.push(previewOrigin);
+      if (!allowedOrigins.includes(event.origin)) return;
+
       const section = event.data?.section;
       const rect = event.data?.rect;
 
@@ -68,7 +65,7 @@ export function DesignCanvas({
             iframeRef.current.contentWindow.postMessage({
               type: "reb-request-rect",
               section,
-            }, "*");
+            }, previewOrigin || "*");
           }
           setHoveredSection((prev) => prev?.id === section ? prev : { id: section, rect: { top: 0, left: 0, width: 0, height: 0 } });
         } else {
@@ -78,14 +75,14 @@ export function DesignCanvas({
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [iframeRef]);
+  }, [iframeRef, previewOrigin]);
 
   // Enable edit mode in iframe when loaded
   useEffect(() => {
     if (iframeLoaded && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, "*");
+      iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, previewOrigin || "*");
     }
-  }, [iframeLoaded, iframeRef]);
+  }, [iframeLoaded, iframeRef, previewOrigin]);
 
   // Cmd/Ctrl + scroll to zoom
   useEffect(() => {
@@ -94,7 +91,7 @@ export function DesignCanvas({
       if (we.metaKey || we.ctrlKey) {
         we.preventDefault();
         const delta = we.deltaY > 0 ? -10 : 10;
-        onZoomChange(Math.min(200, Math.max(25, zoom + delta)));
+        onZoomChange(Math.min(200, Math.max(25, zoomRef.current + delta)));
       }
     };
     const el = document.querySelector("[data-canvas-viewport]");
@@ -102,7 +99,7 @@ export function DesignCanvas({
       el.addEventListener("wheel", handleWheel, { passive: false });
       return () => el.removeEventListener("wheel", handleWheel);
     }
-  }, [zoom, onZoomChange]);
+  }, [onZoomChange]);
 
   // Use message rect if it matches current selection, otherwise use prop
   const displayRect = useMemo(() => {
@@ -203,6 +200,7 @@ export function DesignCanvas({
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-surface-raised/90 backdrop-blur-lg border border-gray-border rounded-xl px-2 py-1.5 shadow-lg">
         <button
           onClick={() => onZoomChange(Math.max(25, zoom - 25))}
+          aria-label="Zoom out"
           className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
         >
           <Minus className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -212,6 +210,7 @@ export function DesignCanvas({
         </span>
         <button
           onClick={() => onZoomChange(Math.min(200, zoom + 25))}
+          aria-label="Zoom in"
           className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
         >
           <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />

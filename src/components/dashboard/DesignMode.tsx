@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useDashboard } from "./DashboardContext";
 import { LayersPanel } from "./design/LayersPanel";
 import { DesignCanvas } from "./design/DesignCanvas";
@@ -8,6 +8,7 @@ import { DesignPropertiesPanel } from "./design/DesignPropertiesPanel";
 import { PageSelector } from "./design/PageSelector";
 import { PublishBar, type PublishOutcome } from "./design/PublishBar";
 import type { PageConfig, PageSectionConfig, SiteCapabilityManifest } from "@/lib/types";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
 
 export type DesignNode = {
   id: string;
@@ -46,24 +47,6 @@ export type NodeRect = {
   left: number;
   width: number;
   height: number;
-};
-
-// Section type to human-readable label
-const SECTION_LABELS: Record<string, string> = {
-  hero: "Hero Section",
-  services: "Services",
-  story: "About / Story",
-  testimonials: "Testimonials",
-  faq: "FAQ",
-  contact: "Contact",
-  footer: "Footer",
-  navigation: "Navigation",
-  "page-header": "Page Header",
-  "page-cta": "Call to Action",
-  events: "Events",
-  providers: "Team / Providers",
-  products: "Products",
-  shop: "Shop",
 };
 
 function buildTreeFromPageConfig(pageConfig: PageConfig | null, pageName: string): DesignNode[] {
@@ -179,9 +162,22 @@ export function DesignMode() {
     triggerRefresh();
   }, [activePage, dashboardHref, setHasDraft, sitePageConfig, triggerRefresh]);
 
+  // Derive the preview origin for postMessage validation
+  const previewOrigin = useMemo(() => {
+    const url = previewUrl || siteUrl;
+    if (!url) return null;
+    try { return new URL(url).origin; } catch { return null; }
+  }, [previewUrl, siteUrl]);
+
   // Listen for iframe messages (node selection with rect)
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      // Validate message origin
+      if (!event.origin || event.origin === 'null') return;
+      const allowedOrigins = [window.location.origin];
+      if (previewOrigin) allowedOrigins.push(previewOrigin);
+      if (!allowedOrigins.includes(event.origin)) return;
+
       if (event.data?.type === "reb-node-selected") {
         const { section, field, rect, label, nodeType } = event.data;
 
@@ -236,7 +232,7 @@ export function DesignMode() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [tree, setActiveSection]);
+  }, [tree, setActiveSection, previewOrigin]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -276,10 +272,10 @@ export function DesignMode() {
         iframeRef.current.contentWindow.postMessage({
           type: "reb-request-rect",
           section: node.sectionType,
-        }, "*");
+        }, previewOrigin || "*");
       }
     }
-  }, [tree, setActiveSection]);
+  }, [tree, setActiveSection, previewOrigin]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -405,12 +401,19 @@ export function DesignMode() {
       }
     } catch (err) {
       console.error("Failed to update content:", err);
+      throw err;
     }
   }, [dashboardHref, tenantId, editMode, setHasDraft, triggerRefresh]);
 
   // Handle inline text edits from iframe (separate effect to avoid before-declaration)
   useEffect(() => {
     function handleInlineEdit(event: MessageEvent) {
+      // Validate message origin
+      if (!event.origin || event.origin === 'null') return;
+      const allowedOrigins = [window.location.origin];
+      if (previewOrigin) allowedOrigins.push(previewOrigin);
+      if (!allowedOrigins.includes(event.origin)) return;
+
       if (event.data?.type === "reb-inline-edit") {
         const { section, field, value } = event.data;
         if (section && field && value !== undefined) {
@@ -420,7 +423,7 @@ export function DesignMode() {
     }
     window.addEventListener("message", handleInlineEdit);
     return () => window.removeEventListener("message", handleInlineEdit);
-  }, [handleContentUpdate]);
+  }, [handleContentUpdate, previewOrigin]);
 
   // Check if any section has a draft
   const hasAnyDraft = Object.values(hasDraft).some(Boolean);

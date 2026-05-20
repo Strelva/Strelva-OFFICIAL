@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+function getParentOrigin(): string {
+  try {
+    return document.referrer ? new URL(document.referrer).origin : "*";
+  } catch {
+    return "*";
+  }
+}
+
 export function EditModeOverlay() {
   const [editMode, setEditMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -59,7 +67,7 @@ export function EditModeOverlay() {
               width: rect.width,
               height: rect.height,
             },
-          }, "*");
+          }, getParentOrigin());
         }
       }
     }
@@ -89,13 +97,13 @@ export function EditModeOverlay() {
           width: rect.width,
           height: rect.height,
         },
-      }, "*");
+      }, getParentOrigin());
     }
 
     function handleMouseLeave() {
       setHoveredSection(null);
       setLabelPos(null);
-      window.parent.postMessage({ type: "reb-section-hovered", section: null }, "*");
+      window.parent.postMessage({ type: "reb-section-hovered", section: null }, getParentOrigin());
     }
 
     function handleClick(e: Event) {
@@ -125,13 +133,13 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        }, getParentOrigin());
 
         // Also send legacy message for backwards compat
         window.parent.postMessage({
           type: "reb-section-clicked",
           section: editable || sectionType,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -151,7 +159,7 @@ export function EditModeOverlay() {
           label,
           x: me.clientX,
           y: me.clientY,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -218,7 +226,7 @@ export function EditModeOverlay() {
           section,
           field,
           value,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -261,7 +269,7 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        }, getParentOrigin());
       }
     }
 

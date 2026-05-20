@@ -627,9 +627,11 @@ function AITab({
   }, [executeAgentPrompt]);
 
   const handlePreviewApprove = useCallback(() => {
+    // TODO: Actually apply the pending diffs to the content via onContentUpdate.
+    // Currently this only clears the preview state without persisting changes.
     if (!pendingPreview) return;
     setPendingPreview(null);
-    setResponse({ type: "success", message: "Changes applied." });
+    setResponse({ type: "success", message: "Preview cleared. Changes were not persisted." });
   }, [pendingPreview]);
 
   const handlePreviewReject = useCallback(() => {
