@@ -1,9 +1,21 @@
 # Scaffold AI Benchmark
 
-A real benchmark for the AI agent. Adversarial prompts run against the actual
-agent surface; the evaluator grades observable behavior (tool calls,
-governance routing, content state diffs, response content). Output is a
-Markdown report you commit and diff between runs.
+A real benchmark for the AI agent, scored SWE-bench-Verified style:
+
+- **Resolved%** — primary headline metric. Binary per case: did the agent
+  fully complete the task per the deterministic checks (tool selection,
+  governance, state diff, response substrings, refusal cues)? `pnpm
+  bench:agent` exits 0 iff every case resolves.
+- **Quality%** — secondary, advisory. LLM-judge-graded tone/voice/specificity
+  on cases that have rubrics. Surfaces in the report but does not affect
+  the exit code.
+- **Resolved by difficulty** — easy / medium / hard breakdown. Fine-grained
+  enough to see whether a system-prompt change improved hard cases at the
+  cost of easy ones.
+- **Cost per resolved** — USD spent to get one resolved case. Lets you
+  compare agent models on quality-adjusted price.
+
+Output is a Markdown report you commit and diff between runs.
 
 ## Why this exists
 

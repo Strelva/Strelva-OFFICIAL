@@ -40,6 +40,7 @@ function shouldRun(caseId: string, filter?: string[]): boolean {
 
 export async function runBenchmark(options: BenchmarkOptions = {}): Promise<{
   reportPath: string | null;
+  resolved: number;
   passing: number;
   total: number;
 }> {
@@ -49,7 +50,7 @@ export async function runBenchmark(options: BenchmarkOptions = {}): Promise<{
 
   if (active.length === 0) {
     console.log("No active cases to run with the given filter.");
-    return { reportPath: null, passing: 0, total: 0 };
+    return { reportPath: null, resolved: 0, passing: 0, total: 0 };
   }
 
   console.log(`Running ${active.length} active case${active.length === 1 ? "" : "s"}…`);
@@ -71,14 +72,15 @@ export async function runBenchmark(options: BenchmarkOptions = {}): Promise<{
 
   await cleanupBenchmarkFixture();
 
-  const summary = summarize(combined);
+  const agentModel = options.modelLabel ?? "gemini-2.5-flash";
+  const summary = summarize(combined, agentModel);
   printConsoleSummary(combined, summary);
 
   let reportPath: string | null = null;
   if (!options.skipReportFile) {
     const markdown = renderMarkdown(combined, summary, {
       startedAt,
-      model: options.modelLabel ?? "gemini-2.5-flash",
+      model: agentModel,
       tenantId: BENCHMARK_TENANT_ID,
     });
     const reportsDir = options.reportsDir ?? path.join(process.cwd(), "benchmarks", "reports");
@@ -86,8 +88,10 @@ export async function runBenchmark(options: BenchmarkOptions = {}): Promise<{
     console.log(`Report written to ${reportPath}`);
   }
 
+  // Surface Resolved% as the primary outcome — SWE-bench style.
   return {
     reportPath,
+    resolved: summary.resolved,
     passing: summary.passing,
     total: summary.totalCases,
   };
