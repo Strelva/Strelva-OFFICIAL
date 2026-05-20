@@ -10,18 +10,22 @@ import {
 describe("integration registry", () => {
   it("uses one discoverable registry for list and detail entries", () => {
     expect(getIntegrationDefinition("google-search-console")).toBeDefined();
-    expect(getIntegrationDefinition("vegaro")).toBeDefined();
+    expect(getIntegrationDefinition("yelp")).toBeDefined();
     expect(DISCOVERABLE_INTEGRATIONS.map((integration) => integration.id)).toEqual(
-      expect.arrayContaining(["google-search-console", "vegaro"])
+      expect.arrayContaining(["google-search-console", "yelp"])
     );
+    // Vegaro was previously included as a `coming_soon` placeholder. It was
+    // removed to keep the Sources page honest — re-add this assertion when
+    // the integration is actually built.
+    expect(getIntegrationDefinition("vegaro")).toBeUndefined();
   });
 
   it("filters by display name, provider id, id, and description", () => {
     expect(filterIntegrations(DISCOVERABLE_INTEGRATIONS, "Search Console").map((i) => i.id)).toEqual([
       "google-search-console",
     ]);
-    expect(filterIntegrations(DISCOVERABLE_INTEGRATIONS, "vegaro").map((i) => i.id)).toEqual([
-      "vegaro",
+    expect(filterIntegrations(DISCOVERABLE_INTEGRATIONS, "yelp").map((i) => i.id)).toEqual([
+      "yelp",
     ]);
     expect(filterIntegrations(DISCOVERABLE_INTEGRATIONS, "reviews").map((i) => i.id)).toEqual(
       expect.arrayContaining(["google-business", "yelp"])

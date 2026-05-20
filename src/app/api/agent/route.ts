@@ -1351,8 +1351,6 @@ Only use tools for manifest-supported sections and actions. If the user requests
               categories: getIntegrationCategories(integration),
               description: integration.addsIntelligence,
               addsIntelligence: integration.addsIntelligence,
-              aiCanUseThisTo: integration.aiCanUseThisTo,
-              exampleInsight: integration.exampleInsight,
               actionPaths: integration.actionPaths ?? [],
               appearsIn: integration.appearsIn,
               lastSyncedAt: lastUpdated,

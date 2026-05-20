@@ -28,6 +28,16 @@ export const INTELLIGENCE_CATEGORY_LABELS: Record<IntelligenceCategory, string> 
   can_take_action: "Can Take Action",
 };
 
+/**
+ * @deprecated The marketing-style fields `usageExamples`, `exampleInsight`,
+ * and `aiCanUseThisTo` are no longer rendered anywhere in the UX. They are
+ * kept as optional and retained on existing entries only so we don't churn
+ * 600+ lines of data on a single commit; they'll be removed in a follow-up.
+ *
+ * Do NOT consume these fields in new UI code. Use `addsIntelligence` as the
+ * one-line description of what a source provides, and surface insights from
+ * real tenant data, never from registry strings.
+ */
 export interface IntegrationUsageExample {
   title: string;
   prompt: string;
@@ -45,12 +55,9 @@ export interface IntegrationDefinition {
   iconColor: string;
   syncFrequency: string;
   usedIn: string;
-  usageExamples: IntegrationUsageExample[];
   intelligenceCategory: IntelligenceCategory;
   additionalIntelligenceCategories?: IntelligenceCategory[];
   addsIntelligence: string;
-  aiCanUseThisTo: string[];
-  exampleInsight: string;
   actionPaths?: string[];
   appearsIn: string[];
   sourcePrompt?: string;
@@ -61,6 +68,12 @@ export interface IntegrationDefinition {
   settingsKey?: string;
   configField?: string;
   availability?: "available" | "coming_soon";
+  /** @deprecated Do not render. Real insights come from tenant data. */
+  exampleInsight?: string;
+  /** @deprecated Do not render. */
+  aiCanUseThisTo?: string[];
+  /** @deprecated Do not render. */
+  usageExamples?: IntegrationUsageExample[];
 }
 
 export interface RawConnectionStatus {
@@ -625,46 +638,9 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
       },
     ],
   },
-  {
-    id: "vegaro",
-    displayName: "Vegaro",
-    providerId: "vegaro",
-    shortDescription: "Booking demand context from Vegaro",
-    description:
-      "Vegaro can become a booking-demand source for the AI. Setup is not live yet, so it should be treated as a planned signal rather than an active scheduling or reminder channel.",
-    icon: "VG",
-    iconBg: "bg-[rgba(255,255,255,0.03)]",
-    iconColor: "text-gray-fg",
-    syncFrequency: "Real-time webhooks",
-    usedIn: "Booking notifications, calendar sync",
-    intelligenceCategory: "understands_demand",
-    addsIntelligence: "What gets booked and when demand changes.",
-    aiCanUseThisTo: [
-      "suggest which services to promote when bookings rise",
-      "explain booking trends in reports",
-      "suggest clearer booking CTAs around high-demand services",
-    ],
-    exampleInsight:
-      "If sports massage bookings rise two weeks in a row, I can suggest promoting that service on the homepage.",
-    appearsIn: ["Suggestions"],
-    sourcePrompt: "@Vegaro What booking trends should I act on?",
-    connectionProvider: "vegaro",
-    availability: "coming_soon",
-    usageExamples: [
-      {
-        title: "Any new bookings today?",
-        prompt: "Do I have any new bookings?",
-        response:
-          "You have 3 new bookings today: Sarah M. at 10am, James K. at 2pm, and Emily R. at 4:30pm. All confirmed.",
-      },
-      {
-        title: "Who's coming in tomorrow?",
-        prompt: "Show me tomorrow's schedule",
-        response:
-          "Tomorrow you have 5 appointments starting at 9am. Your busiest time is 1-3pm. Want me to send reminder texts to your clients?",
-      },
-    ],
-  },
+  // Vegaro was here as a `coming_soon` placeholder. Removed — it occupied
+  // real estate on the Sources page for a connection that wasn't actually
+  // available. Re-add when the integration is built.
 ];
 
 export const DISCOVERABLE_INTEGRATIONS = INTEGRATION_REGISTRY;
@@ -765,8 +741,6 @@ export function filterIntegrations(
       integration.description,
       integration.shortDescription,
       integration.addsIntelligence,
-      integration.exampleInsight,
-      ...integration.aiCanUseThisTo,
     ]
       .join(" ")
       .toLowerCase()

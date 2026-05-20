@@ -280,25 +280,20 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-8">
         <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">
-            {canUseNow ? "Data this provides" : "Data this would provide"}
+            What this signal is
           </span>
           <p className="mt-2 text-[15px] font-medium text-warm-black">{detail.addsIntelligence}</p>
-          <div className="mt-5">
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">
-              {canUseNow ? "AI can use this to" : "Once connected, AI can"}
-            </span>
-            <ul className="mt-2 space-y-2">
-              {detail.aiCanUseThisTo.map((item) => (
-                <li key={item} className="text-[13px] leading-relaxed text-gray-muted">
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3">
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Example</span>
-            <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.exampleInsight}</p>
-          </div>
+          {canUseNow ? (
+            <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
+              This source is active. The AI uses it in chat, suggestions, and the weekly report when relevant data lands.
+            </p>
+          ) : (
+            <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
+              {status === "coming_soon"
+                ? "Not available for setup yet — listed here so you know it's planned."
+                : "Connect this source before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers."}
+            </p>
+          )}
         </div>
         <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">Connection state</span>

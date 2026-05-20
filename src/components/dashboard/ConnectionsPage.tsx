@@ -10,7 +10,6 @@ import {
   filterIntegrations,
   getIntegrationCategories,
   normalizeIntegrationStatus,
-  type IntegrationUsageExample,
   type IntegrationStatus,
   type IntelligenceCategory,
   type IntelligenceStatus,
@@ -34,10 +33,7 @@ export interface Connection {
   intelligenceCategories: IntelligenceCategory[];
   lastSyncedAt: string | null;
   usedIn: string;
-  usageExamples: IntegrationUsageExample[];
   addsIntelligence: string;
-  aiCanUseThisTo: string[];
-  exampleInsight: string;
   actionPaths: string[];
   sourcePrompt: string | null;
 }
@@ -108,9 +104,6 @@ function ConnectionRow({
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
           {setupCopy}
-        </p>
-        <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">
-          {connection.aiCanUseThisTo.slice(0, 2).join("; ")}
         </p>
       </div>
       <div className="mt-auto flex flex-wrap gap-2">
@@ -221,10 +214,7 @@ export function ConnectionsPage() {
           intelligenceCategories: getIntegrationCategories(integration),
           lastSyncedAt: rawConnection?.lastSyncedAt ?? null,
           usedIn: integration.usedIn,
-          usageExamples: integration.usageExamples,
           addsIntelligence: integration.addsIntelligence,
-          aiCanUseThisTo: integration.aiCanUseThisTo,
-          exampleInsight: integration.exampleInsight,
           actionPaths: integration.actionPaths ?? [],
           sourcePrompt: integration.sourcePrompt ?? null,
         };
@@ -278,7 +268,6 @@ export function ConnectionsPage() {
   const runConnectionPrompt = (connection: Connection) => {
     const prompt =
       connection.sourcePrompt ||
-      connection.usageExamples[0]?.prompt ||
       `@${connection.name} Suggest my next site update from this source`;
     if (setChatPrompt) {
       setChatPrompt(prompt);

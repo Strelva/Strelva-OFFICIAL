@@ -69,8 +69,6 @@ export interface ConnectionData {
     status?: "no_signal" | "signal_available" | "ai_using_it" | "needs_attention" | "can_act_here";
     description?: string;
     addsIntelligence?: string;
-    aiCanUseThisTo?: string[];
-    exampleInsight?: string;
     actionPaths?: string[];
     sourceProof?: string;
   }>;
@@ -485,11 +483,6 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
                 {conn.description && (
                   <span className="text-[11px] text-gray-muted block leading-relaxed">{conn.description}</span>
                 )}
-                {conn.aiCanUseThisTo?.length ? (
-                  <span className="mt-1 text-[11px] text-gray-faint block leading-relaxed">
-                    AI can: {conn.aiCanUseThisTo.slice(0, 2).join("; ")}
-                  </span>
-                ) : null}
                 {conn.sourceProof && (
                   <span className="mt-1 text-[10px] text-gray-faint block">{conn.sourceProof}</span>
                 )}
