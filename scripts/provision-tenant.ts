@@ -39,6 +39,19 @@ const VALID_INDUSTRIES = [
   "fashion-stylist",
 ] as const;
 
+const VALID_FEATURES = [
+  "booking",
+  "newsletter",
+  "blog",
+  "events",
+  "shop",
+  "products",
+  "rewards",
+  "providers",
+  "instagram",
+  "reviews",
+] as const;
+
 interface TenantConfig {
   id: string;
   subdomain: string;
@@ -113,6 +126,26 @@ function validateIndustry(industry: string): string | null {
   return null;
 }
 
+function validateFeatures(features: string[]): string | null {
+  const invalid = features.filter(
+    (f) => !VALID_FEATURES.includes(f as (typeof VALID_FEATURES)[number])
+  );
+  if (invalid.length > 0)
+    return `Invalid features: ${invalid.join(", ")}. Valid: ${VALID_FEATURES.join(", ")}`;
+  return null;
+}
+
+function validateUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol))
+      return "URL must use http or https protocol";
+    return null;
+  } catch {
+    return "Invalid URL format";
+  }
+}
+
 function generateInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -132,6 +165,37 @@ function parseArgs(): { config: Partial<TenantConfig>; flags: ProvisionFlags } {
     if (args[i] === "--dry-run") {
       flags.dryRun = true;
       continue;
+    }
+    if (args[i] === "--help" || args[i] === "-h") {
+      console.log(`
+Usage: pnpm provision-tenant [options]
+
+Required:
+  --id <id>              Tenant ID (lowercase, hyphens allowed)
+  --subdomain <sub>      Subdomain for scaffoldweb.com
+  --siteName <name>      Display name for the site
+  --ownerName <name>     Business owner's name
+  --industry <type>      ${VALID_INDUSTRIES.join(" | ")}
+  --ownerEmail <email>   Owner's email address
+
+Optional:
+  --template <template>  Template (defaults to industry)
+  --features <list>      Comma-separated: ${VALID_FEATURES.join(", ")}
+  --productionDomain <d> Custom domain (e.g., mybusiness.com)
+  --adminDomain <d>      Admin domain (defaults to admin.<productionDomain>)
+  --customDomains <list> Additional domains (comma-separated)
+  --bookingProvider <p>  Booking platform name
+  --bookingUrl <url>     Booking URL
+  --ownerPhone <phone>   Owner's phone number
+  --referredBy <ref>     Referral source
+
+Flags:
+  --dry-run              Show what would be created without writing
+  --help, -h             Show this help message
+
+Run without arguments for interactive mode.
+`);
+      process.exit(0);
     }
     const key = args[i]?.replace(/^--/, "");
     const value = args[i + 1];
@@ -374,6 +438,14 @@ async function main() {
   if (config.industry) {
     const e = validateIndustry(config.industry);
     if (e) errors.push(e);
+  }
+  if (config.features && config.features.length > 0) {
+    const e = validateFeatures(config.features);
+    if (e) errors.push(e);
+  }
+  if (config.bookingUrl) {
+    const e = validateUrl(config.bookingUrl);
+    if (e) errors.push(`Booking URL: ${e}`);
   }
   if (errors.length > 0) {
     console.error("\nValidation errors:");

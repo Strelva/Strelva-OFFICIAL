@@ -107,7 +107,7 @@ The revalidation route handler at `/api/v1/revalidate`:
 
 ## Ship Checklist
 
-- [ ] `npm run build` passes
+- [ ] `pnpm build` passes
 - [ ] Primary CTA works
 - [ ] Scaffold Web content fallback works without `SCAFFOLD_API_URL`
 - [ ] `?preview=true` fetches draft content/page config without caching
