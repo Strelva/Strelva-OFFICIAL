@@ -116,6 +116,8 @@ SCAFFOLD_API_URL=https://scaffoldweb.com
 REVALIDATION_SECRET=<from provisioning output>
 ```
 
+> **Note:** The revalidation route handler accepts both `REVALIDATION_SECRET` and the legacy `REVALIDATE_SECRET` name. Existing deployed repos may use the older name.
+
 ## Step 3: Seed Content
 
 Back in the Scaffold Web repo:

@@ -156,6 +156,10 @@ function generateInitials(name: string): string {
     .slice(0, 2);
 }
 
+function shellEscape(s: string): string {
+  return s.replace(/'/g, "'\\''");
+}
+
 function parseArgs(): { config: Partial<TenantConfig>; flags: ProvisionFlags } {
   const args = process.argv.slice(2);
   const config: Record<string, string> = {};
@@ -202,6 +206,8 @@ Run without arguments for interactive mode.
     if (key && value && !value.startsWith("--")) {
       config[key] = value;
       i++;
+    } else if (key) {
+      console.warn(`Warning: --${key} provided without a value, ignoring.`);
     }
   }
 
@@ -294,10 +300,15 @@ async function getInteractiveConfig(): Promise<Partial<TenantConfig>> {
 
 function loadTenants(): TenantConfig[] {
   try {
-    return JSON.parse(fs.readFileSync(TENANTS_FILE, "utf-8"));
-  } catch {
-    console.error("Warning: Could not load tenants file, starting fresh");
-    return [];
+    const raw = fs.readFileSync(TENANTS_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch (err: unknown) {
+    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.log("No existing tenants file found, starting fresh.");
+      return [];
+    }
+    console.error(`Error reading ${TENANTS_FILE}: ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
   }
 }
 
@@ -388,9 +399,12 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
   if (tenant.bookingUrl) console.log(`BOOKING_URL=${tenant.bookingUrl}`);
 
   console.log(`\n--- Vercel CLI Commands ---\n`);
-  console.log(`vercel env add TENANT_ID production <<< "${tenant.id}"`);
-  console.log(`vercel env add SCAFFOLD_API_URL production <<< "https://scaffoldweb.com"`);
-  console.log(`vercel env add REVALIDATION_SECRET production <<< "${tenant.revalidationSecret}"`);
+  console.log(`vercel env add TENANT_ID production <<< '${tenant.id}'`);
+  console.log(`vercel env add SCAFFOLD_API_URL production <<< 'https://scaffoldweb.com'`);
+  console.log(`vercel env add NEXT_PUBLIC_SITE_NAME production <<< '${shellEscape(tenant.siteName)}'`);
+  console.log(`vercel env add NEXT_PUBLIC_SITE_URL production <<< '${tenant.siteUrl}'`);
+  console.log(`vercel env add REVALIDATION_SECRET production <<< '${tenant.revalidationSecret}'`);
+  console.log(`vercel env add OWNER_EMAIL production <<< '${shellEscape(tenant.ownerEmail)}'`);
   if (tenant.productionDomain) {
     console.log(`vercel domains add ${tenant.productionDomain}`);
     console.log(`vercel domains add www.${tenant.productionDomain}`);
@@ -479,6 +493,10 @@ async function main() {
     customDomains: config.customDomains || [],
     productionDomain,
     adminDomain,
+    // Set to "none" for new tenants. Billing is currently gated off
+    // (isBillingEnabled() returns false when no Stripe price is configured).
+    // When billing is enabled, this should be changed to "trialing" or handled
+    // by the checkout flow setting it to "active".
     subscriptionStatus: "none",
     bookingProvider: config.bookingProvider,
     bookingUrl: config.bookingUrl,
