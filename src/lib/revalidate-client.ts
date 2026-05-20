@@ -4,6 +4,7 @@ import { getRedis } from "./redis";
 import { alert } from "./monitoring";
 import { getSectionTimestamps } from "./storage";
 import { logger } from "./logger";
+import { addSentryBreadcrumb } from "./sentry-context";
 
 export interface RevalidationFailure {
   tenantId: string;
@@ -76,6 +77,7 @@ export async function revalidateClientSite(
   tenantId: string,
   paths: string[] | "all" = "all"
 ): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+  addSentryBreadcrumb("webhook", "Revalidation webhook delivery", { tenantId, paths: paths === "all" ? "all" : paths.join(",") });
   const config = await getTenantConfig(tenantId);
 
   if (!config?.revalidateUrl) {

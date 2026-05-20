@@ -14,6 +14,7 @@ import { clientRevalidationTargetForSections } from "@/lib/content-revalidation"
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
+import { addSentryBreadcrumb } from "@/lib/sentry-context";
 
 export interface AgentExecutionToolTrace {
   name: string;
@@ -222,6 +223,7 @@ export async function executeAgentPromptDetailed(
   tenantId: string,
   userMessage: string
 ): Promise<AgentExecutionTrace> {
+  addSentryBreadcrumb("agent", "Agent execution started", { tenantId, messageLength: userMessage.length });
   const template = await getTemplateForTenant(tenantId);
   const tenantConfig = await getTenantConfig(tenantId);
   const capFragment = capabilityPromptFragment();
