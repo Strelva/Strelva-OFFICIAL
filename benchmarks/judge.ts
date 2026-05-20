@@ -33,6 +33,8 @@ export interface JudgeResult {
   judgeModel: string;
   errored: boolean;
   errorMessage?: string;
+  /** Token usage for this single judge call, if surfaced by the SDK. */
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
 }
 
 const judgeOutputSchema = z.object({
@@ -94,7 +96,7 @@ export async function runJudgeRubric(
 ): Promise<JudgeResult> {
   const modelName = judgeModelName();
   try {
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: google(modelName),
       schema: judgeOutputSchema,
       prompt: buildJudgePrompt(caseDef, run, rubric),
@@ -105,6 +107,13 @@ export async function runJudgeRubric(
       reasoning: object.reasoning,
       judgeModel: modelName,
       errored: false,
+      usage: usage
+        ? {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: usage.totalTokens ?? 0,
+          }
+        : undefined,
     };
   } catch (err) {
     return {

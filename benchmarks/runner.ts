@@ -26,6 +26,12 @@ interface RawToolCall {
   stepNumber: number;
 }
 
+export interface AgentUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface CaseRun {
   caseId: string;
   status: "ok" | "agent-threw";
@@ -35,6 +41,7 @@ export interface CaseRun {
   toolCalls: RawToolCall[];
   contentBefore: ContentMap;
   contentAfter: ContentMap;
+  agentUsage?: AgentUsage;
   errorMessage?: string;
 }
 
@@ -117,6 +124,7 @@ export async function runCase(caseDef: BenchmarkCase): Promise<CaseRun> {
   let agentText = "";
   let finishReason = "unknown";
   let toolCalls: RawToolCall[] = [];
+  let agentUsage: AgentUsage | undefined;
   let status: "ok" | "agent-threw" = "ok";
   let errorMessage: string | undefined;
 
@@ -136,6 +144,13 @@ export async function runCase(caseDef: BenchmarkCase): Promise<CaseRun> {
       success: call.success,
       stepNumber: call.stepNumber,
     }));
+    if (trace.usage) {
+      agentUsage = {
+        inputTokens: trace.usage.inputTokens,
+        outputTokens: trace.usage.outputTokens,
+        totalTokens: trace.usage.totalTokens,
+      };
+    }
   } catch (err) {
     status = "agent-threw";
     errorMessage = err instanceof Error ? err.message : String(err);
@@ -153,6 +168,7 @@ export async function runCase(caseDef: BenchmarkCase): Promise<CaseRun> {
     toolCalls,
     contentBefore,
     contentAfter,
+    agentUsage,
     errorMessage,
   };
 }

@@ -23,11 +23,19 @@ export interface AgentExecutionToolTrace {
   stepNumber: number;
 }
 
+export interface AgentExecutionUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface AgentExecutionTrace {
   text: string;
   finishReason: string;
   toolCalls: AgentExecutionToolTrace[];
   agentResult: AgentResultContract;
+  /** Aggregated token usage across all model calls in this run. */
+  usage?: AgentExecutionUsage;
 }
 
 // Cache built system prompts per tenant. Keyed on a signature derived from
@@ -520,10 +528,22 @@ export async function executeAgentPromptDetailed(
     .map((call) => agentResultFromToolOutput(call.output))
     .filter((action): action is NonNullable<typeof action> => Boolean(action));
 
+  // Aggregate token usage across every model call in this run. The AI SDK
+  // surfaces this on the final result; each step adds to it. Used by the
+  // benchmark to compute cost-per-resolved and cost-per-case metrics.
+  const usage: AgentExecutionUsage | undefined = result.usage
+    ? {
+        inputTokens: result.usage.inputTokens ?? 0,
+        outputTokens: result.usage.outputTokens ?? 0,
+        totalTokens: result.usage.totalTokens ?? 0,
+      }
+    : undefined;
+
   return {
     text: result.text,
     finishReason: result.finishReason,
     toolCalls,
     agentResult: buildAgentResultContract(actionResults),
+    usage,
   };
 }

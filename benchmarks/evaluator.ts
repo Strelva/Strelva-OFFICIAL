@@ -33,12 +33,35 @@ export interface CheckResult {
   detail: string;
 }
 
+export interface JudgeUsageAggregate {
+  judgeModel: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface CaseGrade {
   caseId: string;
+  /**
+   * SWE-bench-style binary outcome: did the agent complete the task per the
+   * deterministic checks? `true` iff every non-judge check passed AND the
+   * agent didn't throw. Independent of tone/quality grading.
+   */
+  resolved: boolean;
+  /**
+   * Tone/voice grade — `true` iff all judge rubrics passed, `null` when the
+   * case has no rubrics. Reported separately from `resolved` so a case can
+   * be Resolved-without-Quality (right answer, robotic tone) or
+   * Quality-without-Resolved (warm refusal of the wrong thing).
+   */
+  qualityPass: boolean | null;
+  /** Convenience: still true iff resolved && qualityPass !== false. */
   pass: boolean;
   checks: CheckResult[];
   /** Convenience: failed checks only. */
   failures: CheckResult[];
+  /** Judge token usage rolled up across this case's rubrics. */
+  judgeUsage?: JudgeUsageAggregate;
 }
 
 const REFUSAL_CUES = [
@@ -120,6 +143,8 @@ export async function evaluateCase(
     });
     return {
       caseId: caseDef.id,
+      resolved: false,
+      qualityPass: null,
       pass: false,
       checks,
       failures: checks,
@@ -320,8 +345,13 @@ export async function evaluateCase(
   // judge is expensive (~$0.002/rubric on gemini-2.5-pro) and would waste
   // budget if the run had a structural failure. Rubrics within a case
   // fan out in parallel.
+  let judgeUsage: JudgeUsageAggregate | undefined;
   if (caseDef.judgeRubrics?.length) {
     const judgeResults = await runJudgeRubrics(caseDef, run, caseDef.judgeRubrics);
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let totalTokens = 0;
+    let judgeModel = "";
     for (const result of judgeResults) {
       checks.push({
         category: "judge",
@@ -331,14 +361,36 @@ export async function evaluateCase(
           ? `judge call failed: ${result.errorMessage}`
           : result.reasoning,
       });
+      if (result.usage) {
+        inputTokens += result.usage.inputTokens;
+        outputTokens += result.usage.outputTokens;
+        totalTokens += result.usage.totalTokens;
+      }
+      judgeModel = result.judgeModel;
+    }
+    if (totalTokens > 0) {
+      judgeUsage = { judgeModel, inputTokens, outputTokens, totalTokens };
     }
   }
 
   const failures = checks.filter((c) => !c.pass);
+
+  // SWE-bench style split: "resolved" = deterministic checks all pass.
+  // "qualityPass" = judge checks all pass (or null when no rubrics).
+  const nonJudgeChecks = checks.filter((c) => c.category !== "judge");
+  const judgeChecks = checks.filter((c) => c.category === "judge");
+  const resolved = nonJudgeChecks.every((c) => c.pass);
+  const qualityPass =
+    judgeChecks.length === 0 ? null : judgeChecks.every((c) => c.pass);
+  const overallPass = resolved && qualityPass !== false;
+
   return {
     caseId: caseDef.id,
-    pass: failures.length === 0,
+    resolved,
+    qualityPass,
+    pass: overallPass,
     checks,
     failures,
+    judgeUsage,
   };
 }

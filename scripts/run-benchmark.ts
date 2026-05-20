@@ -64,12 +64,13 @@ async function main() {
 
   const { runBenchmark } = await import("../benchmarks/index");
   const filter = process.argv.slice(2);
-  const { passing, total } = await runBenchmark({
+  const { resolved, total } = await runBenchmark({
     filter: filter.length > 0 ? filter : undefined,
   });
 
-  // Exit non-zero if anything failed so CI surfaces it.
-  process.exit(passing === total ? 0 : 1);
+  // SWE-bench style: exit 0 iff everything resolved. Quality (judge) failures
+  // surface in the report but do not fail the CI signal — they're advisory.
+  process.exit(resolved === total ? 0 : 1);
 }
 
 void main();
