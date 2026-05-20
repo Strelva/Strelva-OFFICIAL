@@ -156,6 +156,18 @@ export function AuditPage() {
     const cleaned = url.trim();
     if (!cleaned) return;
 
+    // Client-side URL validation
+    let normalizedUrl = cleaned;
+    if (!normalizedUrl.match(/^https?:\/\//i)) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+    try {
+      new URL(normalizedUrl);
+    } catch {
+      setError("Please enter a valid URL (e.g., example.com)");
+      return;
+    }
+
     setState("scanning");
     setError("");
     setResult(null);

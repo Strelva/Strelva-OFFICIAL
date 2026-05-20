@@ -1,6 +1,32 @@
+import * as dns from "node:dns";
 import * as cheerio from "cheerio";
 import type { CategoryResult, CheckResult, PageSpeedResult } from "./types";
 import { averageCheckScores } from "./scoring";
+
+// ---------------------------------------------------------------------------
+// SSRF protection
+// ---------------------------------------------------------------------------
+function isPrivateIP(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts[0] === 10) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 127) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (ip === "0.0.0.0") return true;
+  return false;
+}
+
+async function validateUrlSafety(url: string): Promise<void> {
+  const parsed = new URL(url);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Only HTTP and HTTPS URLs are allowed");
+  }
+  const { address } = await dns.promises.lookup(parsed.hostname);
+  if (isPrivateIP(address)) {
+    throw new Error("URLs pointing to private/internal addresses are not allowed");
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Category weights (must sum to 1)
@@ -30,15 +56,30 @@ function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
+// Shared PageSpeed API fetch (used by webVitals + mobile)
+// ---------------------------------------------------------------------------
+async function fetchPageSpeedData(
+  url: string,
+  apiKey: string | undefined
+): Promise<PageSpeedResult | null> {
+  if (!apiKey) return null;
+  const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE`;
+  const res = await fetchWithTimeout(apiUrl, 30_000);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
 // 1. Core Web Vitals (via Google PageSpeed Insights API)
 // ---------------------------------------------------------------------------
 async function checkWebVitals(
-  url: string,
-  apiKey: string | undefined
+  _url: string,
+  apiKey: string | undefined,
+  psData: PageSpeedResult | null
 ): Promise<CategoryResult> {
   const checks: CheckResult[] = [];
 
-  if (!apiKey) {
+  if (!apiKey || !psData) {
     checks.push({
       name: "PageSpeed API",
       status: "warn",
@@ -56,13 +97,8 @@ async function checkWebVitals(
   }
 
   try {
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE`;
-    const res = await fetchWithTimeout(apiUrl, 30_000);
-    if (!res.ok) throw new Error(`PageSpeed API returned ${res.status}`);
-
-    const data: PageSpeedResult = await res.json();
-    const audits = data.lighthouseResult?.audits ?? {};
-    const perfScore = data.lighthouseResult?.categories?.performance?.score;
+    const audits = psData.lighthouseResult?.audits ?? {};
+    const perfScore = psData.lighthouseResult?.categories?.performance?.score;
 
     // LCP
     const lcpMs = audits["largest-contentful-paint"]?.numericValue ?? 0;
@@ -150,12 +186,13 @@ async function checkWebVitals(
 // 2. Mobile Responsiveness (from same PageSpeed API call)
 // ---------------------------------------------------------------------------
 async function checkMobile(
-  url: string,
-  apiKey: string | undefined
+  _url: string,
+  apiKey: string | undefined,
+  psData: PageSpeedResult | null
 ): Promise<CategoryResult> {
   const checks: CheckResult[] = [];
 
-  if (!apiKey) {
+  if (!apiKey || !psData) {
     checks.push({
       name: "Mobile Check",
       status: "warn",
@@ -172,12 +209,7 @@ async function checkMobile(
   }
 
   try {
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE`;
-    const res = await fetchWithTimeout(apiUrl, 30_000);
-    if (!res.ok) throw new Error(`PageSpeed API returned ${res.status}`);
-
-    const data: PageSpeedResult = await res.json();
-    const audits = data.lighthouseResult?.audits ?? {};
+    const audits = psData.lighthouseResult?.audits ?? {};
 
     // Viewport meta tag
     const viewportAudit = audits["viewport"];
@@ -660,6 +692,9 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
   let url = inputUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
+  // SSRF protection — reject private/internal addresses
+  await validateUrlSafety(url);
+
   const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
 
   // Fetch the page HTML
@@ -683,10 +718,13 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
     }
   }
 
+  // Fetch PageSpeed data once and share between webVitals + mobile
+  const psData = await fetchPageSpeedData(fetchedUrl, apiKey);
+
   // Run checks in parallel where possible
   const [webVitals, mobile, ssl] = await Promise.all([
-    checkWebVitals(fetchedUrl, apiKey),
-    checkMobile(fetchedUrl, apiKey),
+    checkWebVitals(fetchedUrl, apiKey, psData),
+    checkMobile(fetchedUrl, apiKey, psData),
     checkSSL(fetchedUrl),
   ]);
 

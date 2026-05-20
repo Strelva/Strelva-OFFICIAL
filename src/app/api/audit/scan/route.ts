@@ -1,32 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { Redis } from "@upstash/redis";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult } from "@/lib/audit/types";
 
-// In-memory rate limiting (per IP, 3 scans per day).
-// Resets naturally on cold start — acceptable for basic abuse prevention.
-const rateMap = new Map<string, { count: number; resetAt: number }>();
-const MAX_ENTRIES = 10_000;
+const redis = Redis.fromEnv();
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateMap.get(ip);
+const MAX_SCANS_PER_DAY = 3;
 
-  if (!entry || now > entry.resetAt) {
-    // Evict expired entries if map grows too large
-    if (rateMap.size >= MAX_ENTRIES) {
-      for (const [key, val] of rateMap) {
-        if (now > val.resetAt) rateMap.delete(key);
-      }
-    }
-    rateMap.set(ip, { count: 1, resetAt: now + 86_400_000 });
-    return false;
+async function checkRateLimit(
+  ip: string
+): Promise<{ allowed: boolean; remaining: number }> {
+  const key = `reb:audit-ratelimit:${ip}`;
+  const count = await redis.incr(key);
+  if (count === 1) {
+    await redis.expire(key, 86400); // 24 hours
   }
-
-  if (entry.count >= 3) return true;
-  entry.count++;
-  return false;
+  return {
+    allowed: count <= MAX_SCANS_PER_DAY,
+    remaining: Math.max(0, MAX_SCANS_PER_DAY - count),
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -35,10 +29,11 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-real-ip") ||
     "unknown";
 
-  if (isRateLimited(ip)) {
+  const { allowed, remaining } = await checkRateLimit(ip);
+  if (!allowed) {
     return NextResponse.json(
       { error: "Rate limited. You can scan up to 3 sites per day." },
-      { status: 429 }
+      { status: 429, headers: { "X-RateLimit-Remaining": String(remaining) } }
     );
   }
 
