@@ -1,6 +1,22 @@
+/**
+ * Scaffold Web ↔ custom-repo contract.
+ *
+ * Stable wire format consumed by client repos (Rohlax, GLDF, future
+ * custom repos). The version constant is exported as both the canonical
+ * SCAFFOLD_CONTRACT_VERSION and the legacy REB_CONTRACT_VERSION alias —
+ * existing custom-repo code that imports the REB_* name keeps working
+ * while new code migrates to SCAFFOLD_*.
+ *
+ * Header names (`x-reb-timestamp`, `x-reb-signature`) are intentionally
+ * NOT renamed: they are part of the wire format and every deployed
+ * custom repo verifies them. Renaming would break revalidation
+ * unilaterally. A future v2 contract can switch to `x-scaffold-*`.
+ */
 import * as crypto from "crypto";
 
-export const REB_CONTRACT_VERSION = "v1" as const;
+export const SCAFFOLD_CONTRACT_VERSION = "v1" as const;
+/** @deprecated Use SCAFFOLD_CONTRACT_VERSION. Kept for backward compatibility. */
+export const REB_CONTRACT_VERSION = SCAFFOLD_CONTRACT_VERSION;
 export const GLDF_TENANT_ID = "gldf" as const;
 
 export interface RevalidationPayload {
@@ -96,9 +112,13 @@ export function parseRevalidationPayload(value: unknown): RevalidationPayload | 
   };
 }
 
-export const rebRoutes = {
+export const scaffoldRoutes = {
   publicContent: (tenant: string, section: string) =>
-    `/api/${REB_CONTRACT_VERSION}/content/${tenant}/${section}`,
-  publicPageConfig: (tenant: string) => `/api/${REB_CONTRACT_VERSION}/page-config/${tenant}`,
-  revalidate: () => `/api/${REB_CONTRACT_VERSION}/revalidate`,
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/content/${tenant}/${section}`,
+  publicPageConfig: (tenant: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/page-config/${tenant}`,
+  revalidate: () => `/api/${SCAFFOLD_CONTRACT_VERSION}/revalidate`,
 } as const;
+
+/** @deprecated Use scaffoldRoutes. Kept for backward compatibility. */
+export const rebRoutes = scaffoldRoutes;

@@ -664,7 +664,11 @@ Only use tools for manifest-supported sections and actions. If the user requests
             tenantConfig?.customRepo?.productionUrl || tenantConfig?.siteUrl,
             siteManifest.customRequestEndpoint
           );
-          const secret = process.env.REB_CUSTOM_REQUEST_SECRET;
+          // Prefer SCAFFOLD_* env names; fall back to legacy REB_* so deployed
+          // custom repos that still set the old name keep working.
+          const secret =
+            process.env.SCAFFOLD_CUSTOM_REQUEST_SECRET ??
+            process.env.REB_CUSTOM_REQUEST_SECRET;
           if (!requestUrl || !secret) {
             const message = "Custom requests are not fully configured for this site yet.";
             recordActionResult({ status: "blocked", message });
