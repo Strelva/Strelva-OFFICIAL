@@ -12,6 +12,7 @@ import {
 } from "./storage";
 import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { diffFields } from "./utils";
+import { recordApproval, recordRejection } from "./ai-auto-approve";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
 
@@ -121,6 +122,15 @@ export async function resolveEventAction(
       }
 
       await clearDraft(section, tenantId);
+    }
+
+    // Track approval/rejection streak for auto-approve threshold
+    if (event.source === "ai") {
+      if (action === "approved") {
+        recordApproval(tenantId).catch(() => {});
+      } else {
+        recordRejection(tenantId).catch(() => {});
+      }
     }
 
     return { changed: true };

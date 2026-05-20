@@ -283,9 +283,12 @@ export async function executeAgentPromptDetailed(
           }
         }
 
-        const governance = decideAiContentGovernance(section as ContentSection, parsed.data, {
+        const baseGovernance = decideAiContentGovernance(section as ContentSection, parsed.data, {
           tenantAutoPublish: tenantConfig?.autoPublish,
         });
+
+        const { maybeAutoApprove } = await import("@/lib/ai-auto-approve");
+        const governance = await maybeAutoApprove(tenantConfig, section as ContentSection, baseGovernance);
 
         if (governance.action === "block") {
           return {

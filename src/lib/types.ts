@@ -548,6 +548,8 @@ export interface TenantConfig {
   referredBy?: string;
   /** When false, AI agent writes to drafts instead of publishing directly. Defaults to true. */
   autoPublish?: boolean;
+  /** After N consecutive approved changes without rejection, auto-promote low-risk AI changes. null = disabled. */
+  autoApproveThreshold?: number | null;
   /** Behold.so feed ID — stable identifier, no token refresh needed. Per-tenant. */
   beholdFeedId?: string;
   /** Social media platform configuration (post-launch integration). */
