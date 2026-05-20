@@ -1,5 +1,39 @@
-import { GET as publicPageConfigGET } from "@/app/api/public/page-config/[tenant]/route";
+/**
+ * Scaffold Web v1 public page-config API.
+ *
+ * Stable contract consumed by custom-repo client sites. Change the response
+ * shape only by versioning (add a v2 sibling).
+ */
+import { NextResponse } from "next/server";
+import { getDraftPageConfig, getPageConfig } from "@/lib/storage";
+import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
+import { getTenantConfig } from "@/lib/tenants";
 
-export function GET(request: Request, context: { params: Promise<unknown> }) {
-  return publicPageConfigGET(request, context as { params: Promise<{ tenant: string }> });
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ tenant: string }> }
+) {
+  const { tenant } = await params;
+
+  if (!/^[a-z0-9-]+$/.test(tenant)) {
+    return NextResponse.json({ error: "Invalid tenant" }, { status: 400 });
+  }
+
+  try {
+    const config = await getTenantConfig(tenant);
+    if (!config || config.active === false) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+
+    const manifest = await getSiteCapabilityManifest(tenant);
+    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    const pageConfig =
+      preview && manifest.supportsDraftPreview
+        ? (await getDraftPageConfig(tenant)) || (await getPageConfig(tenant))
+        : await getPageConfig(tenant);
+    return NextResponse.json(pageConfig);
+  } catch (err) {
+    console.error("[v1 page-config GET]", tenant, err);
+    return NextResponse.json({ error: "Failed to load page config" }, { status: 500 });
+  }
 }

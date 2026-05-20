@@ -8,6 +8,11 @@ import { defaults } from "../defaults";
 import { getSanityClient, getSanityReadClient, sanityImageUrl } from "../sanity";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getDraftContent } from "./draft-store";
+import {
+  getCachedContent,
+  invalidateCachedContent,
+  setCachedContent,
+} from "./content-cache";
 
 export { DEFAULT_TENANT };
 
@@ -104,22 +109,40 @@ export async function getContent<K extends ContentSection>(
   tenant: string = DEFAULT_TENANT,
   options?: { preview?: boolean }
 ): Promise<ContentMap[K]> {
-  // If preview mode is enabled, check for draft content first
+  // Preview reads bypass the public cache — they intentionally surface
+  // unpublished drafts. Go straight to the draft store and fall through to
+  // the published source on miss without populating Redis.
   if (options?.preview) {
     const draft = await getDraftContent(section, tenant);
     if (draft) return draft;
+  } else {
+    // Hot path: Redis-backed cache in front of the source of truth.
+    const cached = await getCachedContent(section, tenant);
+    if (cached !== null) return cached;
   }
 
+  let data: ContentMap[K];
   if (hasSanity) {
     const type = SECTION_TO_TYPE[section];
     const query = `*[_type == $type && tenant == $tenant][0]`;
     const doc = await getSanityReadClient().fetch(query, { type, tenant });
-    if (doc) return transformSanityImages(section, doc);
-    // Fall through to dev file if Sanity has no data for this tenant
+    if (doc) {
+      data = transformSanityImages(section, doc);
+    } else {
+      const store = await readDevContent(tenant);
+      data = (store[section] as ContentMap[K]) ?? defaults[section];
+    }
+  } else {
+    const store = await readDevContent(tenant);
+    data = (store[section] as ContentMap[K]) ?? defaults[section];
   }
 
-  const store = await readDevContent(tenant);
-  return (store[section] as ContentMap[K]) ?? defaults[section];
+  // Populate cache on miss (skip in preview — drafts never enter the public
+  // cache).
+  if (!options?.preview) {
+    await setCachedContent(section, tenant, data);
+  }
+  return data;
 }
 
 export async function setContent<K extends ContentSection>(
@@ -127,27 +150,38 @@ export async function setContent<K extends ContentSection>(
   data: ContentMap[K],
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasSanity) {
-    const type = SECTION_TO_TYPE[section];
-    const query = `*[_type == $type && tenant == $tenant][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { type, tenant });
+  try {
+    if (hasSanity) {
+      const type = SECTION_TO_TYPE[section];
+      const query = `*[_type == $type && tenant == $tenant][0]._id`;
+      const existingId = await getSanityClient().fetch(query, { type, tenant });
 
-    const doc = {
-      _type: type,
-      tenant,
-      ...(data as unknown as Record<string, unknown>),
-    };
+      const doc = {
+        _type: type,
+        tenant,
+        ...(data as unknown as Record<string, unknown>),
+      };
 
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
+      if (existingId) {
+        await getSanityClient().patch(existingId).set(doc).commit();
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await getSanityClient().create(doc as any);
+      }
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await getSanityClient().create(doc as any);
+      const store = await readDevContent(tenant);
+      store[section] = data;
+      await writeDevContent(store, tenant);
     }
-    return;
+  } catch (err) {
+    // Source-of-truth write failed — drop any stale cache entry so the next
+    // read repopulates from whatever wins (Sanity, dev file, or defaults).
+    await invalidateCachedContent(section, tenant);
+    throw err;
   }
 
-  const store = await readDevContent(tenant);
-  store[section] = data;
-  await writeDevContent(store, tenant);
+  // Source of truth updated successfully — write-through to the cache so the
+  // next public read is fast and consistent without an invalidate-then-
+  // thundering-herd window.
+  await setCachedContent(section, tenant, data);
 }

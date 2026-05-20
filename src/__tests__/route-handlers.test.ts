@@ -377,15 +377,15 @@ describe("Admin access handoff route handlers", () => {
   });
 });
 
-describe("Public Content API Route Handlers", () => {
+describe("v1 Public Content API Route Handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("GET /api/public/content/:tenant/:section returns tenant content without Clerk auth", async () => {
-    const { GET } = await import("@/app/api/public/content/[tenant]/[section]/route");
+  it("GET /api/v1/content/:tenant/:section returns tenant content without Clerk auth", async () => {
+    const { GET } = await import("@/app/api/v1/content/[tenant]/[section]/route");
 
-    const response = await GET(new Request("http://localhost/api/public/content/test-tenant/hero"), {
+    const response = await GET(new Request("http://localhost/api/v1/content/test-tenant/hero"), {
       params: Promise.resolve({ tenant: "test-tenant", section: "hero" }),
     });
 
@@ -393,10 +393,10 @@ describe("Public Content API Route Handlers", () => {
     await expect(response.json()).resolves.toEqual({ headline: "Fresh content" });
   });
 
-  it("GET /api/public/page-config/:tenant returns tenant page config without Clerk auth", async () => {
-    const { GET } = await import("@/app/api/public/page-config/[tenant]/route");
+  it("GET /api/v1/page-config/:tenant returns tenant page config without Clerk auth", async () => {
+    const { GET } = await import("@/app/api/v1/page-config/[tenant]/route");
 
-    const response = await GET(new Request("http://localhost/api/public/page-config/test-tenant"), {
+    const response = await GET(new Request("http://localhost/api/v1/page-config/test-tenant"), {
       params: Promise.resolve({ tenant: "test-tenant" }),
     });
 
@@ -404,10 +404,10 @@ describe("Public Content API Route Handlers", () => {
     await expect(response.json()).resolves.toEqual({ home: { sections: [] } });
   });
 
-  it("GET /api/public/content/:tenant/:section rejects invalid tenant slugs", async () => {
-    const { GET } = await import("@/app/api/public/content/[tenant]/[section]/route");
+  it("GET /api/v1/content/:tenant/:section rejects invalid tenant slugs", async () => {
+    const { GET } = await import("@/app/api/v1/content/[tenant]/[section]/route");
 
-    const response = await GET(new Request("http://localhost/api/public/content/../hero"), {
+    const response = await GET(new Request("http://localhost/api/v1/content/../hero"), {
       params: Promise.resolve({ tenant: "../", section: "hero" }),
     });
 

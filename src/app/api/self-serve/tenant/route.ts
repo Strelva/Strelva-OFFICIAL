@@ -4,7 +4,9 @@ import { z } from "zod";
 import { createTenantSubscriptionCheckout, BillingConfigurationError } from "@/lib/billing";
 import {
   createSelfServeTenant,
+  isSelfServeEnabled,
   normalizeTenantSlug,
+  SELF_SERVE_DISABLED_MESSAGE,
   SelfServeProvisioningError,
   validateTenantSlug,
 } from "@/lib/self-serve";
@@ -35,6 +37,9 @@ function getUserName(user: Awaited<ReturnType<typeof currentUser>>, fallback: st
 }
 
 export async function POST(req: Request) {
+  if (!isSelfServeEnabled()) {
+    return NextResponse.json({ error: SELF_SERVE_DISABLED_MESSAGE }, { status: 503 });
+  }
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -15,6 +15,19 @@ import type {
   TenantFeature,
 } from "./types";
 
+/**
+ * Self-serve auto-provisioning is gated off. Every paid client gets a
+ * hand-built custom repo (see `DEFAULT_DELIVERY_MODEL` in `custom-repos.ts`).
+ * Leave this flag off in production; the only lead path is /access-request.
+ * Flip to "true" only if Jacob explicitly wants self-serve back on.
+ */
+export function isSelfServeEnabled(): boolean {
+  return process.env.SELF_SERVE_ENABLED === "true";
+}
+
+export const SELF_SERVE_DISABLED_MESSAGE =
+  "Self-serve signup is off. Every Scaffold Web site is hand-built. Request one at /access-request or email jacob@scaffoldweb.com.";
+
 export const SELF_SERVE_CONTENT_SECTIONS: ContentSection[] = [
   "hero",
   "services",

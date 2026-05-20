@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
  * Subscription and billing tests.
@@ -6,6 +6,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * Tests the subscription status logic and billing webhook
  * event-to-status mapping. Mocks getTenantConfig and updateTenant
  * so no disk or network IO is needed.
+ *
+ * Billing is gated by STRIPE_SCAFFOLD_PRICE_ID. While that env var is
+ * unset, `isBillingEnabled()` returns false and `getEffectiveSubscriptionStatus`
+ * short-circuits to "active" so dashboards aren't locked out for tenants
+ * that never paid. These tests exercise the gate ON, so we set the env
+ * var around each test.
  */
 
 // --- Mock tenants module before importing subscription ---
@@ -16,6 +22,18 @@ vi.mock("../lib/tenants", () => ({
   getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args),
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
 }));
+
+const ORIGINAL_STRIPE_PRICE = process.env.STRIPE_SCAFFOLD_PRICE_ID;
+beforeEach(() => {
+  process.env.STRIPE_SCAFFOLD_PRICE_ID = "price_test_billing_on";
+});
+afterEach(() => {
+  if (ORIGINAL_STRIPE_PRICE === undefined) {
+    delete process.env.STRIPE_SCAFFOLD_PRICE_ID;
+  } else {
+    process.env.STRIPE_SCAFFOLD_PRICE_ID = ORIGINAL_STRIPE_PRICE;
+  }
+});
 
 import {
   getEffectiveSubscriptionStatus,

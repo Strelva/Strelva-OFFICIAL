@@ -37,46 +37,6 @@ describe("timeAgo", () => {
   });
 });
 
-describe("content validation rules", () => {
-  const VALID_SECTIONS = [
-    "hero", "services", "story", "testimonials",
-    "events", "providers", "contact", "settings",
-  ];
-
-  it("defines 8 content sections", () => {
-    expect(VALID_SECTIONS).toHaveLength(8);
-  });
-
-  it("includes the canonical content sections", () => {
-    expect(VALID_SECTIONS).toContain("services");
-    expect(VALID_SECTIONS).toContain("contact");
-    expect(VALID_SECTIONS).toContain("events");
-    expect(VALID_SECTIONS).toContain("providers");
-  });
-});
-
-describe("required fields per section", () => {
-  const REQUIRED_FIELDS: Record<string, string[]> = {
-    hero: ["headline", "tagline", "ctaText"],
-    services: ["headline"],
-    story: ["headline", "statement"],
-    testimonials: [],
-    events: [],
-    providers: [],
-    contact: ["email"],
-    settings: ["siteName"],
-  };
-
-  it("hero requires headline, tagline, and CTA", () => {
-    expect(REQUIRED_FIELDS.hero).toEqual(["headline", "tagline", "ctaText"]);
-  });
-
-  it("contact requires email", () => {
-    expect(REQUIRED_FIELDS.contact).toEqual(["email"]);
-  });
-
-  it("events and providers have no required fields (optional content)", () => {
-    expect(REQUIRED_FIELDS.events).toEqual([]);
-    expect(REQUIRED_FIELDS.providers).toEqual([]);
-  });
-});
+// NOTE: removed local-fixture tautology suites that asserted the contents of
+// arrays defined inside the test file itself. Real section/required-field
+// coverage lives in `schemas.test.ts` and `content-crud.test.ts`.

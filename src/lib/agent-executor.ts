@@ -30,6 +30,25 @@ export interface AgentExecutionTrace {
   agentResult: AgentResultContract;
 }
 
+// Cache built system prompts per tenant. Keyed on a signature derived from
+// section timestamps + capability fragment so the cache is invalidated as
+// soon as any section is updated (setContent calls recordSectionUpdate).
+// This prevents a thundering herd of Redis reads when many chat turns hit
+// the same tenant in quick succession.
+interface PromptCacheEntry {
+  signature: string;
+  prompt: string;
+  cachedAt: number;
+}
+const promptCache = new Map<string, PromptCacheEntry>();
+const PROMPT_CACHE_TTL_MS = 60_000;
+
+/** Test/manual hook to drop cached prompts. */
+export function clearAgentPromptCache(tenant?: string): void {
+  if (tenant) promptCache.delete(tenant);
+  else promptCache.clear();
+}
+
 function logisticsGuardrail(sectionNames: string): string {
   return `OPERATING BOUNDARIES:
 - You are a website/content operations assistant, not the business's order desk, fulfillment team, inventory system, payment processor, booking agent, or customer support inbox.
@@ -47,6 +66,20 @@ async function buildSystemPrompt(
   const template = await getTemplateForTenant(tenant);
   const sections = template.contentSections;
 
+  // Cheap first read: timestamps tell us whether anything changed since the
+  // last build. On hit we return the cached prompt and skip the N section
+  // reads + click count read.
+  const timestamps = await getSectionTimestamps(tenant);
+  const signature = `${capFragment.length}:${JSON.stringify(timestamps)}`;
+  const cached = promptCache.get(tenant);
+  if (
+    cached &&
+    cached.signature === signature &&
+    Date.now() - cached.cachedAt < PROMPT_CACHE_TTL_MS
+  ) {
+    return cached.prompt;
+  }
+
   const contentEntries = await Promise.all(
     sections.map(
       async (s) =>
@@ -58,10 +91,7 @@ async function buildSystemPrompt(
   );
   const content: Record<string, Record<string, unknown>> =
     Object.fromEntries(contentEntries);
-  const [bookingClicks, timestamps] = await Promise.all([
-    getClickCounts("booking-click", tenant),
-    getSectionTimestamps(tenant),
-  ]);
+  const bookingClicks = await getClickCounts("booking-click", tenant);
 
   const settings = content.settings || {};
   const contact = content.contact || {};
@@ -165,6 +195,7 @@ Available sections: ${sectionNames}.`;
 
   prompt += `\n\nBe conversational, warm, and helpful. Confirm changes after making them. Never remove content unless explicitly asked. For array items, preserve all existing items unless told to remove specific ones.`;
 
+  promptCache.set(tenant, { signature, prompt, cachedAt: Date.now() });
   return prompt;
 }
 

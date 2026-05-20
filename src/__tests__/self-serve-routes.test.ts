@@ -14,6 +14,10 @@ vi.mock("@clerk/nextjs/server", () => ({
   currentUser: () => mockCurrentUser(),
 }));
 
+// Note: routes consult `isSelfServeEnabled()` before doing any work. Self-serve
+// auto-provisioning is gated off by default (custom-repo-for-all). The mock
+// forces it ON so the underlying path stays test-covered; a separate
+// describe block below verifies the disabled-gate response.
 vi.mock("@/lib/self-serve", () => ({
   createSelfServeTenant: (...args: unknown[]) => mockCreateSelfServeTenant(...args),
   SelfServeProvisioningError: class SelfServeProvisioningError extends Error {
@@ -25,7 +29,11 @@ vi.mock("@/lib/self-serve", () => ({
   normalizeTenantSlug: (value: string) =>
     value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
   validateTenantSlug: (slug: string) => (slug.length >= 3 ? null : "Subdomain must be at least 3 characters."),
+  isSelfServeEnabled: () => mockSelfServeEnabled(),
+  SELF_SERVE_DISABLED_MESSAGE: "Self-serve signup is off.",
 }));
+
+const mockSelfServeEnabled = vi.fn(() => true);
 
 vi.mock("@/lib/billing", () => ({
   createTenantSubscriptionCheckout: (...args: unknown[]) => mockCreateTenantSubscriptionCheckout(...args),
@@ -58,6 +66,7 @@ const tenant = {
 describe("self-serve tenant route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSelfServeEnabled.mockReturnValue(true);
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockCurrentUser.mockResolvedValue({
       firstName: "Avery",
@@ -123,6 +132,7 @@ describe("self-serve tenant route", () => {
 describe("self-serve checkout route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSelfServeEnabled.mockReturnValue(true);
     mockVerifyAuth.mockResolvedValue(true);
     mockRequireTenantPermission.mockResolvedValue(null);
     mockGetTenantConfig.mockResolvedValue(tenant);
@@ -148,5 +158,32 @@ describe("self-serve checkout route", () => {
       stripeCustomerId: "cus_123",
     });
     expect(mockRequireTenantPermission).toHaveBeenCalledWith("sunrise-yoga", "billing:manage");
+  });
+});
+
+describe("self-serve routes gated off", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSelfServeEnabled.mockReturnValue(false);
+  });
+
+  it("returns 503 from the tenant route when self-serve is disabled", async () => {
+    const { POST } = await import("@/app/api/self-serve/tenant/route");
+    const response = await POST(new Request("http://localhost/api/self-serve/tenant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessName: "Sunrise Yoga" }),
+    }));
+    expect(response.status).toBe(503);
+  });
+
+  it("returns 503 from the checkout route when self-serve is disabled", async () => {
+    const { POST } = await import("@/app/api/self-serve/checkout/route");
+    const response = await POST(new Request("http://localhost/api/self-serve/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: "sunrise-yoga" }),
+    }));
+    expect(response.status).toBe(503);
   });
 });

@@ -54,7 +54,10 @@ const scaffoldWebDomainAction =
   "Point scaffoldweb.com at Vercel project scaffold-web with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
 const VERCEL_APP_URL = "https://scaffoldweb.com";
 const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
-const SCAFFOLD_MONTHLY_PRICE_CENTS = 14900;
+// Billing price is intentionally undecided: client sites are free for now and
+// the admin-side price has not been set. If STRIPE_SCAFFOLD_PRICE_ID is
+// configured, we validate the *shape* (recurring monthly USD), not a specific
+// amount. Re-pin a specific cents amount here when pricing is committed.
 const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
 
 const envSourceHints: Record<string, string> = {
@@ -81,7 +84,7 @@ const envSourceHints: Record<string, string> = {
   SANITY_WEBHOOK_SECRET: "Sanity webhook secret you configure for /api/sanity/webhook",
   SENTRY_DSN: "Sentry project DSN",
   NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
-  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id for exactly $149/month",
+  STRIPE_SCAFFOLD_PRICE_ID: "Optional. Stripe live recurring monthly USD price id when admin-side billing is turned on. Leave unset while client sites are free.",
   STRIPE_SECRET_KEY: "Stripe live secret key",
   STRIPE_WEBHOOK_SECRET: "Stripe billing webhook signing secret",
   SUPER_ADMIN_EMAILS: "Comma-separated owner/admin email addresses",
@@ -317,7 +320,6 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel env add UPSTASH_REDIS_REST_TOKEN production",
     "vercel env add SENTRY_DSN production",
     "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
-    "exactly $149/month",
     "Provider value sources",
     "Clerk Dashboard -> Webhooks",
     "Sanity project webhook settings",
@@ -366,52 +368,10 @@ function checkLaunchBlockerActionability(path: string) {
 
 checkLaunchBlockerActionability("docs/launch-blockers.md");
 
-function checkCompletionAudit(path: string) {
-  if (!existsSync(path)) {
-    log({ name: "Completion audit", status: "fail", message: `${path} is missing` });
-    return;
-  }
-
-  const content = readFileSync(path, "utf8");
-  const requiredTerms = [
-    "Current failures from the latest `pnpm check:prod` run",
-    "Latest observed checklist summary",
-    "Required Production Env Vars",
-    "Production Live Verification",
-    "Production Domain Routing",
-    "Vercel app freshness",
-    "inactive internal demo tenant",
-    "Rohlax Cloudflare DNS",
-    "jacobtest",
-    "Tenant jacobtest client domain",
-    "CLERK_WEBHOOK_SECRET",
-    "SANITY_WEBHOOK_SECRET",
-    "UPSTASH_REDIS_REST_URL",
-    "UPSTASH_REDIS_REST_TOKEN",
-    "SENTRY_DSN",
-    "NEXT_PUBLIC_SENTRY_DSN",
-    "price_1TVgq0D99ZGeTugfVuSggW3o",
-    "prod_UKnWPSG3QOtOUz",
-    "$149/month USD",
-    "https://scaffoldweb.com/sign-in",
-    "Sign in to Scaffold Web | Scaffold Web",
-    "https://scaffoldweb-com.l.ink/",
-    "openresty",
-    "Full `pnpm check:launch` was rerun",
-  ];
-  const missing = requiredTerms.filter((term) => !content.includes(term));
-
-  if (missing.length) {
-    log({
-      name: "Completion audit",
-      status: "fail",
-      message: `${path} must mirror the current check:prod blockers and latest local launch evidence`,
-    });
-    return;
-  }
-
-  log({ name: "Completion audit", status: "ok", message: `${path} mirrors current production blocker evidence` });
-}
+// Note: the self-referential `checkCompletionAudit` (a 62KB markdown file
+// that the checker parsed for stringly-typed evidence of its own assertions)
+// was removed alongside docs/completion-audit.md. Launch evidence lives in
+// the live check:prod output, not in a doc that paraphrases the checker.
 
 function checkReleaseWorkflow(path: string) {
   if (!existsSync(path)) {
@@ -754,9 +714,6 @@ function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
 checkTenantDomainAccess("src/app/api/admin/domains/route.ts", "src/app/api/tenant/domains/route.ts");
 
 function checkPublicStorefrontApi(paths: {
-  publicContent: string;
-  publicPageConfig: string;
-  publicSiteCapabilities: string;
   v1Content: string;
   v1PageConfig: string;
   v1SiteCapabilities: string;
@@ -767,43 +724,41 @@ function checkPublicStorefrontApi(paths: {
     return;
   }
 
-  const publicContent = readFileSync(paths.publicContent, "utf8");
-  const publicPageConfig = readFileSync(paths.publicPageConfig, "utf8");
-  const publicSiteCapabilities = readFileSync(paths.publicSiteCapabilities, "utf8");
   const v1Content = readFileSync(paths.v1Content, "utf8");
   const v1PageConfig = readFileSync(paths.v1PageConfig, "utf8");
   const v1SiteCapabilities = readFileSync(paths.v1SiteCapabilities, "utf8");
-  const contentOk =
-    publicContent.includes("/^[a-z0-9-]+$/.test(tenant)") &&
-    publicContent.includes("getTenantConfig(tenant)") &&
-    publicContent.includes("config.active === false") &&
-    publicContent.includes("isValidSection(section, tenant)") &&
-    publicContent.includes("getSiteCapabilityManifest(tenant)") &&
-    publicContent.includes("getContent(section as ContentSection, tenant");
-  const pageConfigOk =
-    publicPageConfig.includes("/^[a-z0-9-]+$/.test(tenant)") &&
-    publicPageConfig.includes("getTenantConfig(tenant)") &&
-    publicPageConfig.includes("config.active === false") &&
-    publicPageConfig.includes("getSiteCapabilityManifest(tenant)") &&
-    publicPageConfig.includes("getPageConfig(tenant)");
-  const siteCapabilitiesOk =
-    publicSiteCapabilities.includes("/^[a-z0-9-]+$/.test(tenant)") &&
-    publicSiteCapabilities.includes("getTenantConfig(tenant)") &&
-    publicSiteCapabilities.includes("config.active === false") &&
-    publicSiteCapabilities.includes("getSiteCapabilityManifest(tenant)");
-  const aliasesOk =
-    v1Content.includes('from "@/app/api/public/content/[tenant]/[section]/route"') &&
-    v1Content.includes("return publicContentGET(") &&
-    v1PageConfig.includes('from "@/app/api/public/page-config/[tenant]/route"') &&
-    v1PageConfig.includes("return publicPageConfigGET(") &&
-    v1SiteCapabilities.includes('from "@/app/api/public/site-capabilities/[tenant]/route"') &&
-    v1SiteCapabilities.includes("return publicSiteCapabilitiesGET(");
 
-  if (!contentOk || !pageConfigOk || !siteCapabilitiesOk || !aliasesOk) {
+  // v1 owns the public storefront contract directly — no `/api/public/*`
+  // re-export alias. Each handler must validate the tenant slug, require an
+  // active tenant, and call the canonical storage/capability libs so a future
+  // v2 can diverge from v1 without silent breakage.
+  const contentOk =
+    v1Content.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    v1Content.includes("getTenantConfig(tenant)") &&
+    v1Content.includes("config.active === false") &&
+    v1Content.includes("isValidSection(section, tenant)") &&
+    v1Content.includes("getSiteCapabilityManifest(tenant)") &&
+    v1Content.includes("getContent(") &&
+    !v1Content.includes("@/app/api/public/");
+  const pageConfigOk =
+    v1PageConfig.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    v1PageConfig.includes("getTenantConfig(tenant)") &&
+    v1PageConfig.includes("config.active === false") &&
+    v1PageConfig.includes("getSiteCapabilityManifest(tenant)") &&
+    v1PageConfig.includes("getPageConfig(tenant)") &&
+    !v1PageConfig.includes("@/app/api/public/");
+  const siteCapabilitiesOk =
+    v1SiteCapabilities.includes("/^[a-z0-9-]+$/.test(tenant)") &&
+    v1SiteCapabilities.includes("getTenantConfig(tenant)") &&
+    v1SiteCapabilities.includes("config.active === false") &&
+    v1SiteCapabilities.includes("getSiteCapabilityManifest(tenant)") &&
+    !v1SiteCapabilities.includes("@/app/api/public/");
+
+  if (!contentOk || !pageConfigOk || !siteCapabilitiesOk) {
     log({
       name: "Public storefront API",
       status: "fail",
-      message: "/api/v1 storefront APIs must stay thin aliases to public routes, and public routes must validate tenant slugs, active tenants, and allowed content sections before reading storage",
+      message: "/api/v1 storefront APIs must own the contract directly (no @/app/api/public/* re-exports) and validate tenant slugs, active tenants, and allowed content sections before reading storage",
     });
     return;
   }
@@ -811,14 +766,11 @@ function checkPublicStorefrontApi(paths: {
   log({
     name: "Public storefront API",
     status: "ok",
-    message: "/api/v1 storefront APIs remain public read-only aliases with tenant and section validation",
+    message: "/api/v1 storefront APIs own the contract directly with tenant and section validation",
   });
 }
 
 checkPublicStorefrontApi({
-  publicContent: "src/app/api/public/content/[tenant]/[section]/route.ts",
-  publicPageConfig: "src/app/api/public/page-config/[tenant]/route.ts",
-  publicSiteCapabilities: "src/app/api/public/site-capabilities/[tenant]/route.ts",
   v1Content: "src/app/api/v1/content/[tenant]/[section]/route.ts",
   v1PageConfig: "src/app/api/v1/page-config/[tenant]/route.ts",
   v1SiteCapabilities: "src/app/api/v1/site-capabilities/[tenant]/route.ts",
@@ -1081,7 +1033,9 @@ const hasRedisToken = checkEnvVar("UPSTASH_REDIS_REST_TOKEN", true);
 
 console.log("\n─── Billing (Stripe) ────────────────────────────────────────────");
 const hasStripeKey = checkEnvVar("STRIPE_SECRET_KEY", true);
-checkEnvVar("STRIPE_SCAFFOLD_PRICE_ID", true, false);
+// Optional while admin-side pricing is undecided. Mark required again when
+// the price is committed and billing is turned on.
+checkEnvVar("STRIPE_SCAFFOLD_PRICE_ID", false, false);
 checkEnvVar("STRIPE_WEBHOOK_SECRET", true);
 
 console.log("\n─── Email (Resend) ──────────────────────────────────────────────");
@@ -1102,12 +1056,6 @@ checkEnvVar("SENTRY_DSN", true, false);
 checkEnvVar("NEXT_PUBLIC_SENTRY_DSN", true, false);
 checkEnvVar("SLACK_WEBHOOK_URL", false, false);
 checkEnvVar("FOUNDER_CLERK_USER_ID", false, false);
-
-console.log("\n─── SMS (Twilio) ────────────────────────────────────────────────");
-const hasTwilioSid = checkEnvVar("TWILIO_ACCOUNT_SID", false, false);
-const hasTwilioToken = checkEnvVar("TWILIO_AUTH_TOKEN", false);
-checkEnvVar("TWILIO_PHONE_NUMBER", false, false);
-checkEnvVar("SMS_SUGGESTIONS_ENABLED", false, false);
 
 console.log("\n─── OAuth Connections ───────────────────────────────────────────");
 const hasGoogleOAuth = checkOptionalPair("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "Google");
@@ -1243,7 +1191,8 @@ async function checkStripe() {
     await stripe.balance.retrieve();
     log({ name: "Stripe connectivity", status: "ok", message: "API key valid" });
 
-    // Check price ID
+    // Check price ID shape only. Specific amount is intentionally not pinned
+    // while admin-side pricing is undecided. If the env var is unset we skip.
     const priceId = process.env.STRIPE_SCAFFOLD_PRICE_ID;
     if (priceId) {
       try {
@@ -1254,57 +1203,33 @@ async function checkStripe() {
         const productId =
           typeof price.product === "string" ? price.product : price.product?.id || "unknown_product";
         const priceSummary = `price=${price.id}, product=${productId}, livemode=${price.livemode}, active=${price.active}, amount=${amount || "custom"}, currency=${currency}, interval=${interval || "one-time"}`;
-        if (
-          amount !== SCAFFOLD_MONTHLY_PRICE_CENTS ||
-          interval !== "month" ||
-          currency !== SCAFFOLD_MONTHLY_PRICE_CURRENCY
-        ) {
+        if (interval !== "month" || currency !== SCAFFOLD_MONTHLY_PRICE_CURRENCY) {
           failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");
           log({
             name: "Stripe price ID",
             status: "fail",
-            message: `Expected $149/month USD for Scaffold Web; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}. Create or select the live $149 monthly Stripe price and update STRIPE_SCAFFOLD_PRICE_ID.`,
+            message: `Expected a recurring monthly USD Stripe price; got ${amount ? `$${amount / 100}` : "custom"}/${interval || "one-time"} ${currency.toUpperCase()}. Current Stripe price details: ${priceSummary}.`,
           });
           return;
         }
         log({
           name: "Stripe price ID",
           status: "ok",
-          message: "Valid ($149/month USD)",
+          message: `Valid recurring monthly USD price ($${(amount / 100).toFixed(2)}/month)`,
         });
       } catch {
         failedEnvVars.add("STRIPE_SCAFFOLD_PRICE_ID");
         log({ name: "Stripe price ID", status: "fail", message: "Invalid price ID" });
       }
+    } else {
+      log({
+        name: "Stripe price ID",
+        status: "skip",
+        message: "STRIPE_SCAFFOLD_PRICE_ID not set — admin-side billing is off",
+      });
     }
   } catch (err) {
     log({ name: "Stripe connectivity", status: "fail", message: `Error: ${(err as Error).message}` });
-  }
-}
-
-async function checkTwilio() {
-  if (!hasTwilioSid || !hasTwilioToken) {
-    log({ name: "Twilio connectivity", status: "skip", message: "Not configured" });
-    return;
-  }
-
-  try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID!;
-    const authToken = process.env.TWILIO_AUTH_TOKEN!;
-    const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
-      headers: { Authorization: `Basic ${auth}` },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      log({ name: "Twilio connectivity", status: "ok", message: `Account: ${data.friendly_name}` });
-    } else {
-      log({ name: "Twilio connectivity", status: "fail", message: `HTTP ${res.status}` });
-    }
-  } catch (err) {
-    log({ name: "Twilio connectivity", status: "fail", message: `Error: ${(err as Error).message}` });
   }
 }
 
@@ -1421,11 +1346,6 @@ function printWebhookUrls() {
   console.log("  Trigger: on create/update/delete");
   console.log("  Filter: _type in ['tenant', 'hero', 'services', 'story', ...] && defined(tenant)");
   console.log("  Secret: Set SANITY_WEBHOOK_SECRET to match\n");
-
-  console.log("Twilio SMS Webhook:");
-  console.log(`  URL: ${baseUrl}/api/sms/webhook`);
-  console.log("  Method: HTTP POST");
-  console.log("  Note: Signature validated via TWILIO_AUTH_TOKEN\n");
 
   console.log("Calendly Webhook (if using):");
   console.log(`  URL: ${baseUrl}/api/webhooks/calendly`);
@@ -1568,7 +1488,6 @@ function printCronJobs() {
     { path: "/api/cron/maintenance", schedule: "0 3 * * *", desc: "Maintenance cleanup (daily 3am UTC)" },
     { path: "/api/cron/weekly-report", schedule: "0 14 * * 1", desc: "Weekly reports (Mon 2pm UTC)" },
     { path: "/api/cron/staleness", schedule: "0 6 * * *", desc: "Content staleness check (daily 6am UTC)" },
-    { path: "/api/cron/sms-suggestion", schedule: "0 15 * * 1", desc: "SMS suggestions (Mon 3pm UTC)" },
     { path: "/api/cron/search-console", schedule: "0 7 * * *", desc: "Search console sync (daily 7am UTC)" },
     { path: "/api/cron/daily-summary", schedule: "0 8 * * *", desc: "Daily summary (daily 8am UTC)" },
     { path: "/api/cron/poll-yelp", schedule: "0 6 * * *", desc: "Yelp reviews (daily 6am UTC)" },
@@ -1732,7 +1651,6 @@ async function run() {
   await checkSanity();
   await checkRedis();
   await checkStripe();
-  await checkTwilio();
   await checkProductionSiteUrl();
   await checkVercelAppFreshness();
 
@@ -1740,7 +1658,6 @@ async function run() {
   printDomainChecklist();
   await checkTenantRevalidation();
   printCronJobs();
-  checkCompletionAudit("docs/completion-audit.md");
 
   console.log("═══════════════════════════════════════════════════════════════");
   console.log("  Summary");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createTenantSubscriptionCheckout, BillingConfigurationError } from "@/lib/billing";
 import { getCurrentUserEmail, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { isSelfServeEnabled, SELF_SERVE_DISABLED_MESSAGE } from "@/lib/self-serve";
 import { getTenantConfig } from "@/lib/tenants";
 
 const checkoutSchema = z.object({
@@ -9,6 +10,9 @@ const checkoutSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!isSelfServeEnabled()) {
+    return NextResponse.json({ error: SELF_SERVE_DISABLED_MESSAGE }, { status: 503 });
+  }
   if (!(await verifyAuth())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

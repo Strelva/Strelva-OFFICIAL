@@ -5,24 +5,35 @@
 import type { SitePageConfig } from "../types";
 import { getSanityClient, getSanityReadClient } from "../sanity";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import {
+  getCachedPageConfig,
+  invalidateCachedPageConfig,
+  setCachedPageConfig,
+} from "./content-cache";
 
 export async function getPageConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<SitePageConfig | null> {
+  const cached = await getCachedPageConfig(tenant);
+  if (cached !== null) return cached;
+
+  let config: SitePageConfig | null = null;
   if (hasSanity) {
     const doc = await getSanityReadClient().fetch(
       `*[_type == "pageConfig" && tenant == $tenant][0]`,
       { tenant }
     );
     if (doc) {
-      const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...config } = doc;
-      return config.pages as SitePageConfig;
+      const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...rest } = doc;
+      config = rest.pages as SitePageConfig;
     }
-    return null;
+  } else {
+    const store = await readDevContent(tenant);
+    config = (store.__pageConfig as SitePageConfig) ?? null;
   }
 
-  const store = await readDevContent(tenant);
-  return (store.__pageConfig as SitePageConfig) ?? null;
+  if (config) await setCachedPageConfig(tenant, config);
+  return config;
 }
 
 export async function getDraftPageConfig(
@@ -44,21 +55,27 @@ export async function setPageConfig(
   config: SitePageConfig,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasSanity) {
-    const query = `*[_type == "pageConfig" && tenant == $tenant][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant });
-    const doc = { _type: "pageConfig" as const, tenant, pages: config };
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
+  try {
+    if (hasSanity) {
+      const query = `*[_type == "pageConfig" && tenant == $tenant][0]._id`;
+      const existingId = await getSanityClient().fetch(query, { tenant });
+      const doc = { _type: "pageConfig" as const, tenant, pages: config };
+      if (existingId) {
+        await getSanityClient().patch(existingId).set(doc).commit();
+      } else {
+        await getSanityClient().create(doc);
+      }
     } else {
-      await getSanityClient().create(doc);
+      const store = await readDevContent(tenant);
+      store.__pageConfig = config;
+      await writeDevContent(store, tenant);
     }
-    return;
+  } catch (err) {
+    await invalidateCachedPageConfig(tenant);
+    throw err;
   }
 
-  const store = await readDevContent(tenant);
-  store.__pageConfig = config;
-  await writeDevContent(store, tenant);
+  await setCachedPageConfig(tenant, config);
 }
 
 export async function setDraftPageConfig(

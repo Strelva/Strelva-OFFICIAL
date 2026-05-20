@@ -7,8 +7,19 @@ type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "no
 /** Grace period for past_due status in days. After this, access is blocked. */
 const PAST_DUE_GRACE_DAYS = 3;
 
+/**
+ * Admin-side billing is "on" only when STRIPE_SCAFFOLD_PRICE_ID is configured.
+ * While client sites are free and admin pricing is undecided, this returns
+ * false and subscription gates short-circuit to "active" so the dashboard
+ * isn't locked out for tenants that never paid.
+ */
+export function isBillingEnabled(): boolean {
+  return Boolean(process.env.STRIPE_SCAFFOLD_PRICE_ID);
+}
+
 export async function getEffectiveSubscriptionStatus(tenant: string): Promise<SubscriptionStatus> {
   if (isDevAccessBypassEnabled()) return "active";
+  if (!isBillingEnabled()) return "active";
 
   const config = await getTenantConfig(tenant);
   if (config?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax") {
@@ -40,6 +51,7 @@ export async function isWithinPastDueGrace(tenant: string): Promise<boolean> {
 
 export async function requireActiveSubscription(tenant: string): Promise<NextResponse | null> {
   if (isDevAccessBypassEnabled()) return null;
+  if (!isBillingEnabled()) return null;
 
   const status = await getEffectiveSubscriptionStatus(tenant);
 

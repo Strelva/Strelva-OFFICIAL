@@ -141,8 +141,21 @@ describe("Content API - Tenant Access Checks", () => {
 });
 
 describe("Content API - Subscription Checks", () => {
+  // These tests exercise the subscription gate ON. While admin-side pricing is
+  // undecided (STRIPE_SCAFFOLD_PRICE_ID unset), `isBillingEnabled()` returns
+  // false and the gate short-circuits to "active" so the dashboard isn't
+  // locked out for tenants that never paid. Force billing-on for this block.
+  const ORIGINAL_STRIPE_PRICE = process.env.STRIPE_SCAFFOLD_PRICE_ID;
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.STRIPE_SCAFFOLD_PRICE_ID = "price_test_billing_on";
+  });
+  afterEach(() => {
+    if (ORIGINAL_STRIPE_PRICE === undefined) {
+      delete process.env.STRIPE_SCAFFOLD_PRICE_ID;
+    } else {
+      process.env.STRIPE_SCAFFOLD_PRICE_ID = ORIGINAL_STRIPE_PRICE;
+    }
   });
 
   it("requireActiveSubscription blocks cancelled subscriptions with 402", async () => {
@@ -201,66 +214,9 @@ describe("Content API - Subscription Checks", () => {
   });
 });
 
-// ============================================================================
-// 2. SMS Webhook Tests
-// ============================================================================
-
-describe("SMS Webhook - Signature Validation", () => {
-  it("rejects request with invalid Twilio signature", async () => {
-    const { validateRequest } = await import("twilio");
-
-    const authToken = "test-auth-token";
-    const invalidSignature = "invalid-signature-xyz";
-    const webhookUrl = "https://example.com/api/sms/webhook";
-    const params = { From: "+15551234567", Body: "yes" };
-
-    const isValid = validateRequest(authToken, invalidSignature, webhookUrl, params);
-    expect(isValid).toBe(false);
-  });
-
-  it("rejects request with empty signature", async () => {
-    const { validateRequest } = await import("twilio");
-
-    const authToken = "test-auth-token";
-    const emptySignature = "";
-    const webhookUrl = "https://example.com/api/sms/webhook";
-    const params = { From: "+15551234567", Body: "yes" };
-
-    const isValid = validateRequest(authToken, emptySignature, webhookUrl, params);
-    expect(isValid).toBe(false);
-  });
-});
-
-describe("SMS Webhook - Environment Checks", () => {
-  it("should fail when SMS enabled but TWILIO_AUTH_TOKEN missing", () => {
-    const originalSms = process.env.SMS_SUGGESTIONS_ENABLED;
-    const originalToken = process.env.TWILIO_AUTH_TOKEN;
-
-    process.env.SMS_SUGGESTIONS_ENABLED = "true";
-    delete process.env.TWILIO_AUTH_TOKEN;
-
-    // The security check that should be in the route
-    const shouldReject =
-      process.env.SMS_SUGGESTIONS_ENABLED === "true" &&
-      !process.env.TWILIO_AUTH_TOKEN;
-
-    expect(shouldReject).toBe(true);
-
-    process.env.SMS_SUGGESTIONS_ENABLED = originalSms;
-    if (originalToken) process.env.TWILIO_AUTH_TOKEN = originalToken;
-  });
-
-  it("should allow when SMS disabled", () => {
-    const originalSms = process.env.SMS_SUGGESTIONS_ENABLED;
-
-    process.env.SMS_SUGGESTIONS_ENABLED = "false";
-
-    const isDisabled = process.env.SMS_SUGGESTIONS_ENABLED !== "true";
-    expect(isDisabled).toBe(true);
-
-    process.env.SMS_SUGGESTIONS_ENABLED = originalSms;
-  });
-});
+// SMS / Twilio webhook tests removed — Twilio dependency and the SMS surface
+// were deleted as part of the custom-repo-for-all decision. SMS suggestion
+// scaffolding was unused and pre-revenue.
 
 // ============================================================================
 // 3. Stripe Billing Webhook Tests

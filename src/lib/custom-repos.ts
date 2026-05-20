@@ -8,6 +8,12 @@ import type {
   TenantDeliveryModel,
 } from "./types";
 
+// Every paid client gets a hand-built custom repo (no template-rendered
+// in-app fallback). Self-serve auto-provisioning is gated off; the only path
+// to a public site is Jacob building the repo and the access-request intake
+// at /access-request. The `platform_template` delivery model still exists in
+// the type so existing tenant records remain readable, but new tenants
+// default to "custom_repo".
 export const DEFAULT_DELIVERY_MODEL: TenantDeliveryModel = "custom_repo";
 export const CUSTOM_REPO_CONTRACT_VERSION = "v1";
 

@@ -83,16 +83,6 @@ export const tenant = defineType({
     }),
     // Client integrations (per-tenant, not platform-level)
     defineField({ name: "slackWebhookUrl", title: "Slack Webhook URL", type: "url" }),
-    defineField({
-      name: "twilioConfig",
-      title: "Twilio Config",
-      type: "object",
-      fields: [
-        defineField({ name: "accountSid", title: "Account SID", type: "string" }),
-        defineField({ name: "authToken", title: "Auth Token", type: "string" }),
-        defineField({ name: "phoneNumber", title: "Phone Number", type: "string" }),
-      ],
-    }),
     defineField({ name: "googleSearchConsoleKey", title: "Google Search Console Key", type: "text" }),
     defineField({ name: "instagramAccessToken", title: "Instagram Access Token", type: "string" }),
     defineField({ name: "revalidateUrl", title: "Revalidate URL", type: "url", description: "URL to POST to when content changes (e.g., https://clientsite.com/api/revalidate)" }),
