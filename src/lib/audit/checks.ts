@@ -6,7 +6,7 @@ import { averageCheckScores } from "./scoring";
 // ---------------------------------------------------------------------------
 // SSRF protection
 // ---------------------------------------------------------------------------
-function isPrivateIP(ip: string): boolean {
+export function isPrivateIP(ip: string): boolean {
   const parts = ip.split(".").map(Number);
   if (parts[0] === 10) return true;
   if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
@@ -17,7 +17,7 @@ function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-async function validateUrlSafety(url: string): Promise<void> {
+export async function validateUrlSafety(url: string): Promise<void> {
   const parsed = new URL(url);
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error("Only HTTP and HTTPS URLs are allowed");
