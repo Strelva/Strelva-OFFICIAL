@@ -97,24 +97,23 @@ async function checkRedis(): Promise<ServiceCheck> {
 
 async function checkClerk(): Promise<ServiceCheck> {
   const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  if (!secretKey || !publishableKey) {
+    return { status: "not configured", responseMs: 0 };
+  }
+
+  // Extract the Clerk frontend API domain from the publishable key
+  const domain = publishableKey.startsWith("pk_")
+    ? `https://${Buffer.from(publishableKey.replace(/^pk_(test|live)_/, ""), "base64").toString("utf-8").replace(/\$$/, "")}`
+    : null;
+
+  if (!domain) {
     return { status: "not configured", responseMs: 0 };
   }
 
   try {
     const { ms } = await timed(async () => {
       // Lightweight check: hit the Clerk JWKS endpoint (no auth needed, always public)
-      const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-      // Extract the Clerk frontend API domain from the publishable key
-      const domain = publishableKey.startsWith("pk_")
-        ? `https://${Buffer.from(publishableKey.replace(/^pk_(test|live)_/, ""), "base64").toString("utf-8").replace(/\$$/, "")}`
-        : null;
-
-      if (!domain) {
-        // Fallback: just verify the secret key format is valid
-        return;
-      }
-
       const res = await withTimeout(
         fetch(`${domain}/.well-known/jwks.json`, { method: "GET" }),
         TIMEOUT_MS,
@@ -172,7 +171,9 @@ async function checkGemini(): Promise<ServiceCheck> {
     const { ms } = await timed(async () => {
       // Lightweight: list models endpoint
       const res = await withTimeout(
-        fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=1`),
+        fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", {
+          headers: { "x-goog-api-key": key },
+        }),
         TIMEOUT_MS,
         "Gemini",
       );

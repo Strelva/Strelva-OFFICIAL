@@ -68,7 +68,7 @@ export async function recordApproval(tenantId: string): Promise<number> {
   try {
     const key = `${APPROVAL_COUNT_PREFIX}${tenantId}`;
     const newCount = await redis.incr(key);
-    // No TTL needed; rejections reset the counter
+    await redis.expire(key, 90 * 24 * 60 * 60); // 90-day TTL, refreshed on each approval
     return newCount;
   } catch {
     return 0;
