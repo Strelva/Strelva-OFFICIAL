@@ -89,13 +89,14 @@ export function DesignCanvas({
 
   // Cmd/Ctrl + scroll to zoom
   useEffect(() => {
-    function handleWheel(e: WheelEvent) {
-      if (e.metaKey || e.ctrlKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -10 : 10;
+    const handleWheel = (e: Event) => {
+      const we = e as WheelEvent;
+      if (we.metaKey || we.ctrlKey) {
+        we.preventDefault();
+        const delta = we.deltaY > 0 ? -10 : 10;
         onZoomChange(Math.min(200, Math.max(25, zoom + delta)));
       }
-    }
+    };
     const el = document.querySelector("[data-canvas-viewport]");
     if (el) {
       el.addEventListener("wheel", handleWheel, { passive: false });

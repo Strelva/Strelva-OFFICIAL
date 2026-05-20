@@ -207,14 +207,6 @@ export function DesignMode() {
         });
       }
 
-      // Handle inline text edits from iframe
-      if (event.data?.type === "reb-inline-edit") {
-        const { section, field, value } = event.data;
-        if (section && field && value !== undefined) {
-          handleContentUpdate(section, field, value);
-        }
-      }
-
       // Also handle legacy reb-section-clicked for backwards compat
       if (event.data?.type === "reb-section-clicked") {
         const section = event.data.section;
@@ -244,7 +236,7 @@ export function DesignMode() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [tree, setActiveSection, handleContentUpdate]);
+  }, [tree, setActiveSection]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -415,6 +407,20 @@ export function DesignMode() {
       console.error("Failed to update content:", err);
     }
   }, [dashboardHref, tenantId, editMode, setHasDraft, triggerRefresh]);
+
+  // Handle inline text edits from iframe (separate effect to avoid before-declaration)
+  useEffect(() => {
+    function handleInlineEdit(event: MessageEvent) {
+      if (event.data?.type === "reb-inline-edit") {
+        const { section, field, value } = event.data;
+        if (section && field && value !== undefined) {
+          handleContentUpdate(section, field, value);
+        }
+      }
+    }
+    window.addEventListener("message", handleInlineEdit);
+    return () => window.removeEventListener("message", handleInlineEdit);
+  }, [handleContentUpdate]);
 
   // Check if any section has a draft
   const hasAnyDraft = Object.values(hasDraft).some(Boolean);
