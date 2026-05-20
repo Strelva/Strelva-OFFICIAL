@@ -1,8 +1,30 @@
 "use client";
 
-import { useEffect, useState, useMemo, type RefObject } from "react";
+import { useEffect, useState, useMemo, useCallback, type RefObject } from "react";
 import { Minus, Plus, Maximize2 } from "lucide-react";
 import type { NodeRect } from "../DesignMode";
+
+// Section type to human-readable label (keep in sync with DesignMode)
+const SECTION_LABELS: Record<string, string> = {
+  hero: "Hero Section",
+  services: "Services",
+  story: "About / Story",
+  testimonials: "Testimonials",
+  faq: "FAQ",
+  contact: "Contact",
+  footer: "Footer",
+  navigation: "Navigation",
+  "page-header": "Page Header",
+  "page-cta": "Call to Action",
+  events: "Events",
+  providers: "Team / Providers",
+  products: "Products",
+  shop: "Shop",
+};
+
+function sectionLabel(id: string): string {
+  return SECTION_LABELS[id] || id.charAt(0).toUpperCase() + id.slice(1);
+}
 
 interface DesignCanvasProps {
   siteUrl: string;
@@ -24,19 +46,43 @@ export function DesignCanvas({
   const scale = zoom / 100;
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [rectFromMessage, setRectFromMessage] = useState<{ id: string; rect: NodeRect } | null>(null);
+  const [hoveredSection, setHoveredSection] = useState<{ id: string; rect: NodeRect } | null>(null);
 
-  // Listen for rect updates from iframe
+  // Listen for rect updates and hover events from iframe
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const section = event.data?.section;
       const rect = event.data?.rect;
+
       if ((event.data?.type === "reb-node-rect" || event.data?.type === "reb-node-selected") && section && rect) {
         setRectFromMessage({ id: section, rect });
+      }
+
+      // Handle hover events from EditModeOverlay
+      if (event.data?.type === "reb-section-hovered") {
+        if (section) {
+          // Request rect for hover overlay
+          if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({
+              type: "reb-request-rect",
+              section,
+            }, "*");
+          }
+          // We'll get the rect back via reb-node-rect; store hover id for now
+          setHoveredSection((prev) => prev?.id === section ? prev : { id: section, rect: { top: 0, left: 0, width: 0, height: 0 } });
+        } else {
+          setHoveredSection(null);
+        }
+      }
+
+      // Update hover rect when we get a rect response for the hovered section
+      if (event.data?.type === "reb-node-rect" && section && rect) {
+        setHoveredSection((prev) => prev && prev.id === section ? { id: section, rect } : prev);
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [iframeRef]);
 
   // Enable edit mode in iframe when loaded
   useEffect(() => {
@@ -44,6 +90,22 @@ export function DesignCanvas({
       iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, "*");
     }
   }, [iframeLoaded, iframeRef]);
+
+  // Cmd/Ctrl + scroll to zoom
+  useEffect(() => {
+    function handleWheel(e: WheelEvent) {
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -10 : 10;
+        onZoomChange(Math.min(200, Math.max(25, zoom + delta)));
+      }
+    }
+    const el = document.querySelector("[data-canvas-viewport]");
+    if (el) {
+      el.addEventListener("wheel", handleWheel, { passive: false });
+      return () => el.removeEventListener("wheel", handleWheel);
+    }
+  }, [zoom, onZoomChange]);
 
   // Use message rect if it matches current selection, otherwise use prop
   const displayRect = useMemo(() => {
@@ -53,15 +115,18 @@ export function DesignCanvas({
     return nodeRect;
   }, [rectFromMessage, selectedId, nodeRect]);
 
-  const handleIframeLoad = () => {
+  // Don't show hover overlay on the selected section
+  const showHover = hoveredSection && hoveredSection.id !== selectedId && hoveredSection.rect.width > 0;
+
+  const handleIframeLoad = useCallback(() => {
     setIframeLoaded(true);
-  };
+  }, []);
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#0a0a0a] relative">
-      <div className="flex-1 overflow-auto flex items-start justify-center p-8">
+      <div data-canvas-viewport className="flex-1 overflow-auto flex items-start justify-center p-8">
         <div
-          className="relative bg-surface-base rounded-lg shadow-2xl border border-gray-border overflow-hidden"
+          className="relative bg-surface-base rounded-lg shadow-2xl border border-gray-border overflow-hidden transition-transform duration-150"
           style={{
             transform: `scale(${scale})`,
             transformOrigin: "top center",
@@ -76,6 +141,25 @@ export function DesignCanvas({
             title="Site preview"
             onLoad={handleIframeLoad}
           />
+
+          {/* Hover overlay - subtle highlight before click */}
+          {showHover && (
+            <div
+              className="absolute pointer-events-none border border-accent/40 rounded-sm transition-all duration-100"
+              style={{
+                top: hoveredSection.rect.top,
+                left: hoveredSection.rect.left,
+                width: hoveredSection.rect.width,
+                height: hoveredSection.rect.height,
+                backgroundColor: "rgba(91, 141, 239, 0.04)",
+              }}
+            >
+              <div className="absolute -top-6 left-0 bg-accent/80 text-white text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+                {sectionLabel(hoveredSection.id)}
+              </div>
+            </div>
+          )}
+
           {/* Selection overlay - positioned based on real DOM rect */}
           {selectedId && displayRect && displayRect.width > 0 && (
             <div
@@ -104,14 +188,15 @@ export function DesignCanvas({
                 )
               )}
               <div className="absolute -top-7 left-0 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
-                {selectedId}
+                {sectionLabel(selectedId)}
               </div>
             </div>
           )}
+
           {/* Fallback: show label without rect if no rect available */}
           {selectedId && (!displayRect || displayRect.width === 0) && (
             <div className="absolute top-4 left-4 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
-              Selected: {selectedId}
+              Selected: {sectionLabel(selectedId)}
             </div>
           )}
         </div>
@@ -138,6 +223,7 @@ export function DesignCanvas({
         <button
           onClick={() => onZoomChange(100)}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+          title="Reset to 100%"
         >
           <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
