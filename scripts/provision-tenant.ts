@@ -3,52 +3,41 @@
  * Tenant Provisioning Script
  *
  * Usage:
- *   npx tsx scripts/provision-tenant.ts --id mysite --subdomain mysite --siteName "My Site" --ownerName "John" --industry wellness --ownerEmail john@example.com
+ *   pnpm provision-tenant --id mysite --subdomain mysite --siteName "My Site" --ownerName "John" --industry wellness --ownerEmail john@example.com
  *
  * Or run interactively:
- *   npx tsx scripts/provision-tenant.ts
+ *   pnpm provision-tenant
+ *
+ * Flags:
+ *   --dry-run  Show what would be created without writing anything
  *
  * Required fields:
- *   --id           Unique tenant identifier (lowercase, no spaces)
- *   --subdomain    Subdomain for the site
- *   --siteName     Display name for the site
- *   --ownerName    Owner's first name
- *   --industry     Industry type (wellness, food-brand, restaurant, trades, professional)
- *   --ownerEmail   Owner's email address
+ *   --id, --subdomain, --siteName, --ownerName, --industry, --ownerEmail
  *
  * Optional fields:
- *   --template           Template to use (defaults to industry)
- *   --features           Comma-separated features (e.g. "booking,newsletter")
- *   --customDomains      Comma-separated custom domains
- *   --productionDomain   Customer-facing domain (e.g. yourbusiness.com)
- *   --adminDomain        Dashboard domain (defaults to admin.<productionDomain>)
- *   --bookingProvider    Booking provider name
- *   --bookingUrl         Booking URL
- *   --ownerPhone         Owner's phone number
+ *   --template, --features, --customDomains, --productionDomain, --adminDomain,
+ *   --bookingProvider, --bookingUrl, --ownerPhone, --referredBy
  *
  * Environment variables:
- *   VERCEL_TOKEN         If set, will create Vercel project automatically
- *   VERCEL_TEAM_ID       Team ID for Vercel (optional)
- *
- * Example:
- *   npx tsx scripts/provision-tenant.ts \
- *     --id "buffalo-barber" \
- *     --subdomain "buffalo-barber" \
- *     --siteName "Buffalo Barber Co" \
- *     --ownerName "Mike" \
- *     --industry "trades" \
- *     --ownerEmail "mike@buffalobarber.com" \
- *     --features "booking,newsletter" \
- *     --bookingProvider "Square" \
- *     --bookingUrl "https://squareup.com/appointments/book/buffalo-barber"
+ *   VERCEL_TOKEN    If set, will create Vercel project automatically
+ *   VERCEL_TEAM_ID  Team ID for Vercel (optional)
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import * as readline from 'readline';
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
+import * as readline from "readline";
 
-const TENANTS_FILE = path.join(__dirname, '..', 'dev-tenants.json');
+const TENANTS_FILE = path.join(__dirname, "..", "dev-tenants.json");
+
+const VALID_INDUSTRIES = [
+  "wellness",
+  "food-brand",
+  "restaurant",
+  "trades",
+  "professional",
+  "fashion-stylist",
+] as const;
 
 interface TenantConfig {
   id: string;
@@ -59,6 +48,7 @@ interface TenantConfig {
   active: boolean;
   createdAt: string;
   template: string;
+  deliveryModel: string;
   features: string[];
   customDomains: string[];
   productionDomain?: string;
@@ -68,6 +58,7 @@ interface TenantConfig {
   bookingUrl?: string;
   ownerEmail: string;
   ownerPhone?: string;
+  referredBy?: string;
   resendDomain?: string;
   siteUrl: string;
   revalidateUrl: string;
@@ -81,80 +72,140 @@ interface TenantConfig {
   };
 }
 
+interface ProvisionFlags {
+  dryRun: boolean;
+}
+
 function generateSecret(): string {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 function normalizeDomain(domain: string | undefined): string | undefined {
-  const normalized = domain?.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const normalized = domain
+    ?.trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "");
   return normalized || undefined;
 }
 
-function parseArgs(): Partial<TenantConfig> {
+function validateId(id: string): string | null {
+  if (!/^[a-z0-9-]+$/.test(id))
+    return "Tenant ID must be lowercase letters, numbers, and hyphens only";
+  if (id.length < 2 || id.length > 63)
+    return "Tenant ID must be between 2 and 63 characters";
+  if (id.startsWith("-") || id.endsWith("-"))
+    return "Tenant ID cannot start or end with a hyphen";
+  return null;
+}
+
+function validateEmail(email: string): string | null {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return "Invalid email address format";
+  return null;
+}
+
+function validateIndustry(industry: string): string | null {
+  if (
+    !VALID_INDUSTRIES.includes(industry as (typeof VALID_INDUSTRIES)[number])
+  )
+    return `Industry must be one of: ${VALID_INDUSTRIES.join(", ")}`;
+  return null;
+}
+
+function generateInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function parseArgs(): { config: Partial<TenantConfig>; flags: ProvisionFlags } {
   const args = process.argv.slice(2);
   const config: Record<string, string> = {};
+  const flags: ProvisionFlags = { dryRun: false };
 
-  for (let i = 0; i < args.length; i += 2) {
-    const key = args[i]?.replace(/^--/, '');
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--dry-run") {
+      flags.dryRun = true;
+      continue;
+    }
+    const key = args[i]?.replace(/^--/, "");
     const value = args[i + 1];
-    if (key && value) {
+    if (key && value && !value.startsWith("--")) {
       config[key] = value;
+      i++;
     }
   }
 
   return {
-    id: config.id,
-    subdomain: config.subdomain,
-    siteName: config.siteName,
-    ownerName: config.ownerName,
-    industry: config.industry,
-    template: config.template,
-    features: config.features?.split(',').map(f => f.trim()),
-    customDomains: config.customDomains?.split(',').map(d => normalizeDomain(d)).filter(Boolean) as string[] | undefined,
-    productionDomain: normalizeDomain(config.productionDomain),
-    adminDomain: normalizeDomain(config.adminDomain),
-    bookingProvider: config.bookingProvider,
-    bookingUrl: config.bookingUrl,
-    ownerEmail: config.ownerEmail,
-    ownerPhone: config.ownerPhone,
+    config: {
+      id: config.id,
+      subdomain: config.subdomain,
+      siteName: config.siteName,
+      ownerName: config.ownerName,
+      industry: config.industry,
+      template: config.template,
+      features: config.features?.split(",").map((f) => f.trim()),
+      customDomains: config.customDomains
+        ?.split(",")
+        .map((d) => normalizeDomain(d))
+        .filter(Boolean) as string[] | undefined,
+      productionDomain: normalizeDomain(config.productionDomain),
+      adminDomain: normalizeDomain(config.adminDomain),
+      bookingProvider: config.bookingProvider,
+      bookingUrl: config.bookingUrl,
+      ownerEmail: config.ownerEmail,
+      ownerPhone: config.ownerPhone,
+      referredBy: config.referredBy,
+    },
+    flags,
   };
 }
 
-async function prompt(question: string, defaultValue?: string): Promise<string> {
+async function prompt(
+  question: string,
+  defaultValue?: string,
+): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-
-  const suffix = defaultValue ? ` [${defaultValue}]` : '';
-
+  const suffix = defaultValue ? ` [${defaultValue}]` : "";
   return new Promise((resolve) => {
     rl.question(`${question}${suffix}: `, (answer) => {
       rl.close();
-      resolve(answer.trim() || defaultValue || '');
+      resolve(answer.trim() || defaultValue || "");
     });
   });
 }
 
 async function getInteractiveConfig(): Promise<Partial<TenantConfig>> {
-  console.log('\n--- Tenant Provisioning ---\n');
-
-  const id = await prompt('Tenant ID (lowercase, no spaces)');
-  const subdomain = await prompt('Subdomain', id);
-  const siteName = await prompt('Site Name');
-  const ownerName = await prompt('Owner Name');
-  const industry = await prompt('Industry (wellness/food-brand/restaurant/trades/professional)');
-  const ownerEmail = await prompt('Owner Email');
-  const template = await prompt('Template', industry);
-  const featuresStr = await prompt('Features (comma-separated)', 'newsletter');
-  const bookingProvider = await prompt('Booking Provider (optional)');
-  const bookingUrl = await prompt('Booking URL (optional)');
-  const ownerPhone = await prompt('Owner Phone (optional)');
-  const productionDomain = normalizeDomain(await prompt('Website Domain (optional, e.g. yourbusiness.com)'));
-  const adminDomain = normalizeDomain(await prompt(
-    'Admin Domain (optional)',
-    productionDomain ? `admin.${productionDomain}` : undefined
-  ));
+  console.log("\n--- Tenant Provisioning (interactive) ---\n");
+  const id = await prompt("Tenant ID (lowercase, no spaces)");
+  const subdomain = await prompt("Subdomain", id);
+  const siteName = await prompt("Site Name");
+  const ownerName = await prompt("Owner Name");
+  const industry = await prompt(`Industry (${VALID_INDUSTRIES.join("/")})`);
+  const ownerEmail = await prompt("Owner Email");
+  const template = await prompt("Template", industry);
+  const featuresStr = await prompt("Features (comma-separated)", "newsletter");
+  const bookingProvider = await prompt("Booking Provider (optional)");
+  const bookingUrl = await prompt("Booking URL (optional)");
+  const ownerPhone = await prompt("Owner Phone (optional)");
+  const productionDomain = normalizeDomain(
+    await prompt("Website Domain (optional, e.g. yourbusiness.com)"),
+  );
+  const adminDomain = normalizeDomain(
+    await prompt(
+      "Admin Domain (optional)",
+      productionDomain ? `admin.${productionDomain}` : undefined,
+    ),
+  );
+  const referredBy = await prompt("Referred By (optional)");
 
   return {
     id,
@@ -164,58 +215,66 @@ async function getInteractiveConfig(): Promise<Partial<TenantConfig>> {
     industry,
     ownerEmail,
     template,
-    features: featuresStr.split(',').map(f => f.trim()).filter(Boolean),
+    features: featuresStr
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean),
     bookingProvider: bookingProvider || undefined,
     bookingUrl: bookingUrl || undefined,
     ownerPhone: ownerPhone || undefined,
     productionDomain,
     adminDomain,
+    referredBy: referredBy || undefined,
   };
 }
 
 function loadTenants(): TenantConfig[] {
   try {
-    const data = fs.readFileSync(TENANTS_FILE, 'utf-8');
-    return JSON.parse(data);
+    return JSON.parse(fs.readFileSync(TENANTS_FILE, "utf-8"));
   } catch {
-    console.error('Warning: Could not load tenants file, starting fresh');
+    console.error("Warning: Could not load tenants file, starting fresh");
     return [];
   }
 }
 
 function saveTenants(tenants: TenantConfig[]): void {
-  fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenants, null, 2) + '\n');
+  fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenants, null, 2) + "\n");
 }
 
-async function createVercelProject(tenant: TenantConfig): Promise<boolean> {
+async function createVercelProject(
+  tenant: TenantConfig,
+  dryRun: boolean,
+): Promise<boolean> {
   const token = process.env.VERCEL_TOKEN;
   if (!token) return false;
-
-  console.log('\nCreating Vercel project...');
 
   const teamId = process.env.VERCEL_TEAM_ID;
   const projectName = `${tenant.id}-site`;
 
+  if (dryRun) {
+    console.log(`[dry-run] Would create Vercel project: ${projectName}`);
+    return true;
+  }
+
+  console.log("\nCreating Vercel project...");
   try {
     const url = teamId
       ? `https://api.vercel.com/v9/projects?teamId=${teamId}`
-      : 'https://api.vercel.com/v9/projects';
+      : "https://api.vercel.com/v9/projects";
 
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        name: projectName,
-        framework: 'nextjs',
-      }),
+      body: JSON.stringify({ name: projectName, framework: "nextjs" }),
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error(`Failed to create Vercel project: ${error}`);
+      console.error(
+        `Failed to create Vercel project: ${await response.text()}`,
+      );
       return false;
     }
 
@@ -227,40 +286,113 @@ async function createVercelProject(tenant: TenantConfig): Promise<boolean> {
   }
 }
 
-async function main() {
-  let config = parseArgs();
+function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
+  const prefix = flags.dryRun ? "[DRY RUN] " : "";
+  const line = "=".repeat(60);
 
-  // If required fields missing, go interactive
+  console.log(`\n${line}`);
+  console.log(`${prefix}TENANT PROVISIONING SUMMARY`);
+  console.log(`${line}\n`);
+
+  console.log(`  Tenant ID:          ${tenant.id}`);
+  console.log(`  Site Name:          ${tenant.siteName}`);
+  console.log(`  Owner:              ${tenant.ownerName} <${tenant.ownerEmail}>`);
+  console.log(`  Industry:           ${tenant.industry}`);
+  console.log(`  Template:           ${tenant.template}`);
+  console.log(`  Delivery Model:     ${tenant.deliveryModel}`);
+  console.log(`  Features:           ${tenant.features.join(", ") || "none"}`);
+  console.log(`  Site URL:           ${tenant.siteUrl}`);
+  console.log(`  Revalidate URL:     ${tenant.revalidateUrl}`);
+  if (tenant.productionDomain) {
+    console.log(`  Production Domain:  ${tenant.productionDomain}`);
+    console.log(`  Admin Domain:       ${tenant.adminDomain || `admin.${tenant.productionDomain}`}`);
+  }
+  if (tenant.bookingProvider) {
+    console.log(`  Booking:            ${tenant.bookingProvider} (${tenant.bookingUrl})`);
+  }
+  if (tenant.referredBy) {
+    console.log(`  Referred By:        ${tenant.referredBy}`);
+  }
+
+  console.log(`\n--- Environment Variables for Client Site ---\n`);
+  console.log(`TENANT_ID=${tenant.id}`);
+  console.log(`SCAFFOLD_API_URL=https://scaffoldweb.com`);
+  console.log(`NEXT_PUBLIC_SITE_NAME=${tenant.siteName}`);
+  console.log(`NEXT_PUBLIC_SITE_URL=${tenant.siteUrl}`);
+  console.log(`REVALIDATION_SECRET=${tenant.revalidationSecret}`);
+  console.log(`OWNER_EMAIL=${tenant.ownerEmail}`);
+  if (tenant.bookingUrl) console.log(`BOOKING_URL=${tenant.bookingUrl}`);
+
+  console.log(`\n--- Vercel CLI Commands ---\n`);
+  console.log(`vercel env add TENANT_ID production <<< "${tenant.id}"`);
+  console.log(`vercel env add SCAFFOLD_API_URL production <<< "https://scaffoldweb.com"`);
+  console.log(`vercel env add REVALIDATION_SECRET production <<< "${tenant.revalidationSecret}"`);
+  if (tenant.productionDomain) {
+    console.log(`vercel domains add ${tenant.productionDomain}`);
+    console.log(`vercel domains add www.${tenant.productionDomain}`);
+  }
+  if (tenant.adminDomain) console.log(`vercel domains add ${tenant.adminDomain}`);
+
+  console.log(`\n--- Next Steps ---\n`);
+  console.log(`  [ ] Create client repo from custom-repo-starter/`);
+  console.log(`  [ ] Set env vars on Vercel (see commands above)`);
+  console.log(`  [ ] Run: pnpm seed-tenant ${tenant.id}`);
+  console.log(`  [ ] Set Clerk publicMetadata: { tenants: ["${tenant.id}"] }`);
+  if (tenant.productionDomain) {
+    console.log(`  [ ] Configure DNS for ${tenant.productionDomain}`);
+    console.log(`  [ ] Configure DNS for ${tenant.adminDomain || `admin.${tenant.productionDomain}`}`);
+  }
+  console.log(`  [ ] Test revalidation webhook (see PROVISIONING.md)`);
+  console.log(`  [ ] Verify site renders with fallback content`);
+  console.log(`  [ ] Deploy client repo and verify live content`);
+  console.log(`\n${line}\n`);
+}
+
+async function main() {
+  const { config: parsedConfig, flags } = parseArgs();
+  let config = parsedConfig;
+
+  if (flags.dryRun) console.log("\n[DRY RUN MODE] No files will be written.\n");
+
   if (!config.id || !config.subdomain || !config.siteName || !config.ownerName || !config.industry || !config.ownerEmail) {
     config = { ...config, ...(await getInteractiveConfig()) };
   }
 
-  // Validate required fields
-  const required = ['id', 'subdomain', 'siteName', 'ownerName', 'industry', 'ownerEmail'] as const;
+  const required = ["id", "subdomain", "siteName", "ownerName", "industry", "ownerEmail"] as const;
+  const errors: string[] = [];
   for (const field of required) {
-    if (!config[field]) {
-      console.error(`Error: Missing required field: ${field}`);
-      process.exit(1);
-    }
+    if (!config[field]) errors.push(`Missing required field: ${field}`);
+  }
+  if (config.id) {
+    const e = validateId(config.id);
+    if (e) errors.push(e);
+  }
+  if (config.ownerEmail) {
+    const e = validateEmail(config.ownerEmail);
+    if (e) errors.push(e);
+  }
+  if (config.industry) {
+    const e = validateIndustry(config.industry);
+    if (e) errors.push(e);
+  }
+  if (errors.length > 0) {
+    console.error("\nValidation errors:");
+    for (const err of errors) console.error(`  - ${err}`);
+    process.exit(1);
   }
 
-  // Load existing tenants
   const tenants = loadTenants();
-
-  // Check for duplicate ID
-  if (tenants.find(t => t.id === config.id)) {
+  if (tenants.find((t) => t.id === config.id)) {
     console.error(`Error: Tenant with ID "${config.id}" already exists`);
     process.exit(1);
   }
 
-  // Generate secrets and URLs
   const revalidationSecret = generateSecret();
   const productionDomain = normalizeDomain(config.productionDomain);
   const adminDomain = normalizeDomain(config.adminDomain) || (productionDomain ? `admin.${productionDomain}` : undefined);
   const siteUrl = productionDomain ? `https://${productionDomain}` : `https://${config.subdomain}.scaffoldweb.com`;
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
 
-  // Build full tenant config
   const tenant: TenantConfig = {
     id: config.id!,
     subdomain: config.subdomain!,
@@ -268,57 +400,34 @@ async function main() {
     ownerName: config.ownerName!,
     industry: config.industry!,
     active: true,
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: new Date().toISOString().split("T")[0],
     template: config.template || config.industry!,
-    features: config.features || ['newsletter'],
+    deliveryModel: "custom_repo",
+    features: config.features || ["newsletter"],
     customDomains: config.customDomains || [],
     productionDomain,
     adminDomain,
-    subscriptionStatus: 'active',
+    subscriptionStatus: "none",
     bookingProvider: config.bookingProvider,
     bookingUrl: config.bookingUrl,
     ownerEmail: config.ownerEmail!,
     ownerPhone: config.ownerPhone,
+    referredBy: config.referredBy,
     siteUrl,
     revalidateUrl,
     revalidationSecret,
+    branding: { initials: generateInitials(config.siteName!) },
   };
 
-  // Add to tenants
-  tenants.push(tenant);
-  saveTenants(tenants);
-
-  console.log(`\n✓ Tenant "${tenant.siteName}" added to dev-tenants.json`);
-
-  // Try Vercel project creation
-  if (process.env.VERCEL_TOKEN) {
-    await createVercelProject(tenant);
+  if (!flags.dryRun) {
+    tenants.push(tenant);
+    saveTenants(tenants);
+    console.log(`\nTenant "${tenant.siteName}" added to dev-tenants.json`);
+    if (process.env.VERCEL_TOKEN) await createVercelProject(tenant, false);
   }
 
-  // Output env vars needed for client site
-  console.log('\n--- Environment Variables for Client Site Deployment ---\n');
-  console.log(`TENANT_ID=${tenant.id}`);
-  console.log(`NEXT_PUBLIC_SITE_NAME=${tenant.siteName}`);
-  console.log(`NEXT_PUBLIC_SITE_URL=${tenant.siteUrl}`);
-  console.log(`REVALIDATE_SECRET=${revalidationSecret}`);
-  console.log(`OWNER_EMAIL=${tenant.ownerEmail}`);
-  if (tenant.bookingUrl) {
-    console.log(`BOOKING_URL=${tenant.bookingUrl}`);
-  }
-
-  console.log('\n--- Vercel CLI Commands ---\n');
-  console.log(`# Set env vars:`);
-  console.log(`vercel env add TENANT_ID production <<< "${tenant.id}"`);
-  console.log(`vercel env add REVALIDATE_SECRET production <<< "${revalidationSecret}"`);
-  if (tenant.productionDomain) {
-    console.log(`vercel domains add ${tenant.productionDomain}`);
-    console.log(`vercel domains add www.${tenant.productionDomain}`);
-  }
-  if (tenant.adminDomain) {
-    console.log(`vercel domains add ${tenant.adminDomain}`);
-  }
-
-  console.log('\n--- Done ---\n');
+  printSummary(tenant, flags);
+  if (flags.dryRun) console.log("[DRY RUN] No changes were made. Remove --dry-run to provision.\n");
 }
 
 main().catch(console.error);
