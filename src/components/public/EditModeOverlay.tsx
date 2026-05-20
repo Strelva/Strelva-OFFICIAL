@@ -10,6 +10,10 @@ function getParentOrigin(): string {
   }
 }
 
+function isValidSectionId(s: unknown): s is string {
+  return typeof s === "string" && /^[a-zA-Z0-9_-]+$/.test(s);
+}
+
 export function EditModeOverlay() {
   const [editMode, setEditMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -21,6 +25,9 @@ export function EditModeOverlay() {
   // Listen for dashboard-driven edit mode toggles
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      const parentOrigin = getParentOrigin();
+      if (parentOrigin !== "*" && event.origin !== parentOrigin) return;
+
       if (event.data?.type === "reb-edit-mode") {
         setEditMode(event.data.enabled);
       }
@@ -34,13 +41,16 @@ export function EditModeOverlay() {
     if (!editMode) return;
 
     function handleMessage(event: MessageEvent) {
+      const parentOrigin = getParentOrigin();
+      if (parentOrigin !== "*" && event.origin !== parentOrigin) return;
+
       if (event.data?.type === "reb-highlight-section") {
         // Remove previous highlight
         document.querySelectorAll(".reb-highlighted").forEach((el) => {
           el.classList.remove("reb-highlighted");
         });
         // Apply new highlight
-        if (event.data.section) {
+        if (isValidSectionId(event.data.section)) {
           const target =
             document.querySelector(`[data-reb-section="${event.data.section}"]`) ||
             document.querySelector(`[data-reb-editable="${event.data.section}"]`);
@@ -54,6 +64,7 @@ export function EditModeOverlay() {
       // Handle rect request from parent
       if (event.data?.type === "reb-request-rect") {
         const section = event.data.section;
+        if (!isValidSectionId(section)) return;
         const el = document.querySelector(`[data-reb-section="${section}"]`) ||
                    document.querySelector(`[data-reb-editable="${section}"]`);
         if (el) {
@@ -203,6 +214,7 @@ export function EditModeOverlay() {
 
     function handleFocus(e: Event) {
       const el = e.target as HTMLElement;
+      el.dataset.rebOriginal = el.textContent || "";
       el.style.outline = "2px solid var(--sage)";
       el.style.outlineOffset = "2px";
       el.style.borderRadius = "2px";
@@ -210,6 +222,7 @@ export function EditModeOverlay() {
 
     function handleBlur(e: Event) {
       const el = e.target as HTMLElement;
+      delete el.dataset.rebOriginal;
       el.style.outline = "";
       el.style.outlineOffset = "";
       el.style.borderRadius = "";
@@ -236,7 +249,10 @@ export function EditModeOverlay() {
         (e.target as HTMLElement).blur();
       }
       if (e.key === "Escape") {
-        (e.target as HTMLElement).blur();
+        const el = e.target as HTMLElement;
+        el.textContent = el.dataset.rebOriginal ?? el.textContent;
+        delete el.dataset.rebOriginal;
+        el.blur();
       }
     }
 
@@ -304,7 +320,7 @@ export function EditModeOverlay() {
 
   if (!editMode) return null;
 
-  const label = hoveredSection
+  const label = hoveredSection && isValidSectionId(hoveredSection)
     ? document.querySelector(`[data-reb-section="${hoveredSection}"]`)?.getAttribute("data-reb-label") || hoveredSection
     : null;
 

@@ -291,7 +291,7 @@ export function DesignMode() {
 
     // Find section and toggle visibility
     const updatedSections = pageConfig.sections.map(s =>
-      s.type === id ? { ...s, visible: !s.visible } : s
+      s.type === id ? { ...s, visible: s.visible !== false ? false : true } : s
     );
 
     try {
@@ -376,11 +376,12 @@ export function DesignMode() {
       const current = await res.json();
 
       // Update the field (handle nested paths like "services[0].name")
-      const updated = { ...current };
+      const updated = structuredClone(current);
       const parts = field.replace(/\[(\d+)\]/g, ".$1").split(".");
       let obj = updated;
       for (let i = 0; i < parts.length - 1; i++) {
         obj = obj[parts[i]];
+        if (obj == null) return; // bail if path doesn't exist
       }
       obj[parts[parts.length - 1]] = value;
 
@@ -417,7 +418,9 @@ export function DesignMode() {
       if (event.data?.type === "reb-inline-edit") {
         const { section, field, value } = event.data;
         if (section && field && value !== undefined) {
-          handleContentUpdate(section, field, value);
+          handleContentUpdate(section, field, value).catch((err) => {
+            console.error("Inline edit failed:", err);
+          });
         }
       }
     }

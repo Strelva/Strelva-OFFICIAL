@@ -220,6 +220,7 @@ export function DesignCanvas({
           onClick={() => onZoomChange(100)}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
           title="Reset to 100%"
+          aria-label="Reset zoom to 100%"
         >
           <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>

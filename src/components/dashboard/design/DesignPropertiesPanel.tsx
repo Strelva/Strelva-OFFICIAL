@@ -16,6 +16,8 @@ import type { PreviewDiff, RiskAssessment } from "@/lib/agent-risk";
 import type { SectionCapability } from "@/lib/types";
 import type { SelectedNode } from "../DesignMode";
 
+const isMac = typeof navigator !== "undefined" && (/Mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? "") || /Mac/i.test(navigator.platform ?? ""));
+
 type LayoutGap = 'tight' | 'normal' | 'loose';
 type LayoutPadding = 'none' | 'normal' | 'spacious';
 
@@ -275,6 +277,12 @@ function ContentTab({
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Clean up save timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(saveTimerRef.current);
+  }, []);
 
   // Reset local content when node changes
   useEffect(() => {
@@ -294,10 +302,12 @@ function ContentTab({
         localContent
       );
       setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 2000);
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
       setSaveStatus("error");
-      setTimeout(() => setSaveStatus("idle"), 3000);
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
     } finally {
       setIsSaving(false);
     }
@@ -349,7 +359,7 @@ function ContentTab({
             />
             <div className="flex items-center justify-between mt-2">
               <span className="text-[9px] text-gray-faint">
-                {navigator.platform.includes("Mac") ? "Cmd" : "Ctrl"}+Enter to save
+                {isMac ? "Cmd" : "Ctrl"}+Enter to save
               </span>
               {onContentUpdate && node.sectionType && (
                 <button
@@ -730,7 +740,7 @@ function AITab({
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-[9px] text-gray-faint">
-            {navigator.platform.includes("Mac") ? "Cmd" : "Ctrl"}+Enter
+            {isMac ? "Cmd" : "Ctrl"}+Enter
           </span>
           <button
             onClick={handleApply}
