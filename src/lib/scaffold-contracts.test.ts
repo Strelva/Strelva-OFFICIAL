@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   createRevalidationBody,
   parseRevalidationPayload,
-  rebRoutes,
+  scaffoldRoutes,
   signRevalidationBody,
   verifyRevalidationSignature,
-} from "./reb-contracts";
+} from "./scaffold-contracts";
 
 describe("Scaffold Web/GLDF contract", () => {
   it("signs and verifies revalidation payloads", () => {
@@ -55,9 +55,9 @@ describe("Scaffold Web/GLDF contract", () => {
   });
 
   it("builds stable v1 public routes", () => {
-    expect(rebRoutes.publicContent("gldf", "hero")).toBe("/api/v1/content/gldf/hero");
-    expect(rebRoutes.publicPageConfig("gldf")).toBe("/api/v1/page-config/gldf");
-    expect(rebRoutes.revalidate()).toBe("/api/v1/revalidate");
+    expect(scaffoldRoutes.publicContent("gldf", "hero")).toBe("/api/v1/content/gldf/hero");
+    expect(scaffoldRoutes.publicPageConfig("gldf")).toBe("/api/v1/page-config/gldf");
+    expect(scaffoldRoutes.revalidate()).toBe("/api/v1/revalidate");
   });
 
   it("validates revalidation payloads", () => {

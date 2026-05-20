@@ -36,6 +36,8 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 
 Scaffold Web is the **control plane**. Each paid client site is a separate **custom repo** that pulls content/config from the control plane over a versioned API.
 
+**Naming note:** the project rename from "reb" → "scaffoldweb" is ongoing. New code uses `SCAFFOLD_*` env vars, `SCAFFOLD_CONTRACT_VERSION`, `scaffoldRoutes`, etc. Legacy `REB_*` names are kept as deprecated aliases so deployed custom repos (Rohlax, GLDF) keep working. HMAC headers (`x-reb-timestamp`/`x-reb-signature`) and Redis key prefixes (`reb:`) are intentionally **not** renamed — those are wire-level or persistent-data details that require coordinated rollout to change.
+
 - Host → tenant resolution in `src/proxy.ts`: subdomain (`gldf.scaffoldweb.com`, `admin.gldf.scaffoldweb.com`), then `/client/{tenant}/...` path fallback, then custom-domain map (Redis/Sanity-backed via `/api/internal/domain-map`), then `?tenant=` query.
 - The public storefront contract is **`/api/v1/*`** — owned directly (no `@/app/api/public/*` re-export layer). The v1 routes are the canonical wire shape consumed by client repos. Change them only by versioning (add a v2 sibling).
 - Custom-repo wiring: `src/lib/custom-repos.ts`, `src/lib/revalidate-client.ts` (signed HMAC revalidation), `custom-repo-starter/` (drop-in scaffold), `scripts/custom-repo-workspace-check.ts`, `release-manifest.json`.
@@ -70,7 +72,7 @@ Scaffold Web is the **control plane**. Each paid client site is a separate **cus
 - `src/lib/storage/content-store.ts` — Sanity/dev-file source-of-truth implementation
 - `src/lib/auth.ts` — Clerk + per-tenant roles + super-admin email allowlist
 - `src/lib/site-capabilities.ts` — capability manifest builder (merged with optional remote manifest from the custom repo)
-- `src/lib/reb-contracts.ts` — versioned route helpers + HMAC revalidation signing/verification
+- `src/lib/scaffold-contracts.ts` — versioned route helpers + HMAC revalidation signing/verification (legacy `REB_*` symbol aliases are still exported for back-compat)
 
 ---
 

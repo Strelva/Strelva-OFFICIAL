@@ -1,4 +1,4 @@
-import { createRevalidationBody, signRevalidationBody } from "./reb-contracts";
+import { createRevalidationBody, signRevalidationBody } from "./scaffold-contracts";
 import { getTenantConfig } from "./tenants";
 import { getRedis } from "./redis";
 import { alert } from "./monitoring";

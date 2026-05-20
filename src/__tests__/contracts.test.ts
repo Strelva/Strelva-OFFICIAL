@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   createRevalidationBody,
   GLDF_TENANT_ID,
-  rebRoutes,
+  scaffoldRoutes,
   signRevalidationBody,
   verifyRevalidationSignature,
-} from "@/lib/reb-contracts";
+} from "@/lib/scaffold-contracts";
 
 describe("Scaffold Web contracts", () => {
   it("builds versioned storefront routes", () => {
-    expect(rebRoutes.publicContent(GLDF_TENANT_ID, "hero")).toBe("/api/v1/content/gldf/hero");
-    expect(rebRoutes.publicPageConfig(GLDF_TENANT_ID)).toBe("/api/v1/page-config/gldf");
-    expect(rebRoutes.revalidate()).toBe("/api/v1/revalidate");
+    expect(scaffoldRoutes.publicContent(GLDF_TENANT_ID, "hero")).toBe("/api/v1/content/gldf/hero");
+    expect(scaffoldRoutes.publicPageConfig(GLDF_TENANT_ID)).toBe("/api/v1/page-config/gldf");
+    expect(scaffoldRoutes.revalidate()).toBe("/api/v1/revalidate");
   });
 
   it("round-trips signed revalidation payloads", () => {

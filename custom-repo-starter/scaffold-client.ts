@@ -1,4 +1,23 @@
-export const REB_CONTRACT_VERSION = "v1" as const;
+/**
+ * Scaffold Web client for custom repos.
+ *
+ * Drop this file into a per-client repo (Rohlax, GLDF, etc.) so the
+ * public site can fetch content, page config, and the capability
+ * manifest from Scaffold Web's /api/v1/* contract.
+ *
+ * Env vars:
+ *   - TENANT_ID            (required)            the tenant slug
+ *   - SCAFFOLD_API_URL     (preferred)           https://scaffoldweb.com
+ *   - REB_API_URL          (legacy alias)        falls back when SCAFFOLD_API_URL is unset
+ *
+ * Legacy `REB_*` names are kept readable so existing custom repos do not
+ * have to migrate env vars in lockstep with this client file. New repos
+ * should set `SCAFFOLD_API_URL`.
+ */
+
+export const SCAFFOLD_CONTRACT_VERSION = "v1" as const;
+/** @deprecated Use SCAFFOLD_CONTRACT_VERSION. */
+export const REB_CONTRACT_VERSION = SCAFFOLD_CONTRACT_VERSION;
 
 export interface PageSectionConfig {
   type: string;
@@ -66,29 +85,36 @@ export function getTenantId(): string {
   return requiredEnv("TENANT_ID");
 }
 
-export function getRebBaseUrl(): string | null {
-  return process.env.REB_API_URL?.replace(/\/$/, "") || null;
+export function getScaffoldBaseUrl(): string | null {
+  const url = process.env.SCAFFOLD_API_URL ?? process.env.REB_API_URL;
+  return url?.replace(/\/$/, "") || null;
 }
 
-export const rebRoutes = {
+/** @deprecated Use getScaffoldBaseUrl. */
+export const getRebBaseUrl = getScaffoldBaseUrl;
+
+export const scaffoldRoutes = {
   publicContent: (tenant: string, section: string) =>
-    `/api/${REB_CONTRACT_VERSION}/content/${tenant}/${section}`,
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/content/${tenant}/${section}`,
   publicPageConfig: (tenant: string) =>
-    `/api/${REB_CONTRACT_VERSION}/page-config/${tenant}`,
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/page-config/${tenant}`,
   publicSiteCapabilities: (tenant: string) =>
-    `/api/${REB_CONTRACT_VERSION}/site-capabilities/${tenant}`,
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/site-capabilities/${tenant}`,
 } as const;
 
-export async function fetchRebContent<T>(
+/** @deprecated Use scaffoldRoutes. */
+export const rebRoutes = scaffoldRoutes;
+
+export async function fetchScaffoldContent<T>(
   section: string,
   fallback: T,
   opts: { preview?: boolean } = {}
 ): Promise<T> {
-  const baseUrl = getRebBaseUrl();
+  const baseUrl = getScaffoldBaseUrl();
   if (!baseUrl) return fallback;
 
   try {
-    const url = new URL(`${baseUrl}${rebRoutes.publicContent(getTenantId(), section)}`);
+    const url = new URL(`${baseUrl}${scaffoldRoutes.publicContent(getTenantId(), section)}`);
     if (opts.preview) url.searchParams.set("preview", "true");
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["content", `content:${section}`] },
@@ -101,15 +127,18 @@ export async function fetchRebContent<T>(
   }
 }
 
-export async function fetchRebPageConfig(
+/** @deprecated Use fetchScaffoldContent. */
+export const fetchRebContent = fetchScaffoldContent;
+
+export async function fetchScaffoldPageConfig(
   fallback: SitePageConfig,
   opts: { preview?: boolean } = {}
 ): Promise<SitePageConfig> {
-  const baseUrl = getRebBaseUrl();
+  const baseUrl = getScaffoldBaseUrl();
   if (!baseUrl) return fallback;
 
   try {
-    const url = new URL(`${baseUrl}${rebRoutes.publicPageConfig(getTenantId())}`);
+    const url = new URL(`${baseUrl}${scaffoldRoutes.publicPageConfig(getTenantId())}`);
     if (opts.preview) url.searchParams.set("preview", "true");
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["page-config"] },
@@ -122,14 +151,17 @@ export async function fetchRebPageConfig(
   }
 }
 
-export async function fetchRebSiteCapabilities(
+/** @deprecated Use fetchScaffoldPageConfig. */
+export const fetchRebPageConfig = fetchScaffoldPageConfig;
+
+export async function fetchScaffoldSiteCapabilities(
   fallback: SiteCapabilityManifest
 ): Promise<SiteCapabilityManifest> {
-  const baseUrl = getRebBaseUrl();
+  const baseUrl = getScaffoldBaseUrl();
   if (!baseUrl) return fallback;
 
   try {
-    const res = await fetch(`${baseUrl}${rebRoutes.publicSiteCapabilities(getTenantId())}`, {
+    const res = await fetch(`${baseUrl}${scaffoldRoutes.publicSiteCapabilities(getTenantId())}`, {
       next: { revalidate: 60, tags: ["site-capabilities"] },
     });
     if (!res.ok) return fallback;
@@ -138,3 +170,6 @@ export async function fetchRebSiteCapabilities(
     return fallback;
   }
 }
+
+/** @deprecated Use fetchScaffoldSiteCapabilities. */
+export const fetchRebSiteCapabilities = fetchScaffoldSiteCapabilities;

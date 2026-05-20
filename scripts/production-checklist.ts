@@ -47,6 +47,7 @@ const locallyGeneratedSecrets = new Set([
   "CRON_SECRET",
   "INTERNAL_API_SECRET",
   "OAUTH_STATE_SECRET",
+  "SCAFFOLD_CUSTOM_REQUEST_SECRET",
   "REB_CUSTOM_REQUEST_SECRET",
 ]);
 
@@ -77,7 +78,8 @@ const envSourceHints: Record<string, string> = {
   NEXT_PUBLIC_APP_URL: "https://scaffoldweb.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
   NEXT_PUBLIC_SITE_URL: "https://scaffoldweb.com",
-  REB_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints",
+  SCAFFOLD_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints. Canonical name; the agent route falls back to REB_CUSTOM_REQUEST_SECRET if this is unset.",
+  REB_CUSTOM_REQUEST_SECRET: "Legacy alias for SCAFFOLD_CUSTOM_REQUEST_SECRET. Kept readable so deployed custom repos that still set the REB_ name keep working.",
   RESEND_API_KEY: "Resend production API key",
   RESEND_DOMAIN: "Verified Resend sending domain",
   SANITY_API_TOKEN: "Sanity production API token with content read/write permissions",
@@ -1049,7 +1051,19 @@ console.log("\n─── Cron & Internal API Security ────────�
 checkEnvVar("CRON_SECRET", true);
 checkEnvVar("INTERNAL_API_SECRET", true);
 checkEnvVar("OAUTH_STATE_SECRET", true);
-checkEnvVar("REB_CUSTOM_REQUEST_SECRET", true);
+// Either SCAFFOLD_CUSTOM_REQUEST_SECRET (canonical) or REB_CUSTOM_REQUEST_SECRET
+// (legacy alias) satisfies the bearer-secret requirement. Don't fail the gate
+// when only the legacy name is set; the agent reads both.
+const hasScaffoldCustomRequest = checkEnvVar("SCAFFOLD_CUSTOM_REQUEST_SECRET", false, false);
+const hasLegacyCustomRequest = checkEnvVar("REB_CUSTOM_REQUEST_SECRET", false, false);
+if (!hasScaffoldCustomRequest && !hasLegacyCustomRequest) {
+  log({
+    name: "ENV: SCAFFOLD_CUSTOM_REQUEST_SECRET",
+    status: "fail",
+    message: "Set SCAFFOLD_CUSTOM_REQUEST_SECRET (or legacy REB_CUSTOM_REQUEST_SECRET)",
+  });
+  failedEnvVars.add("SCAFFOLD_CUSTOM_REQUEST_SECRET");
+}
 
 console.log("\n─── Monitoring & Notifications ──────────────────────────────────");
 checkEnvVar("SENTRY_DSN", true, false);
