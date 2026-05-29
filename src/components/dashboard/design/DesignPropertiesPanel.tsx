@@ -1,15 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignStartVertical,
-  AlignCenterVertical,
-  AlignEndVertical,
   Images,
   TrendingUp,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { AgentTrace, type TraceStep } from "../AgentTrace";
@@ -19,6 +15,8 @@ import { useDashboardOptional } from "../DashboardContext";
 import type { PreviewDiff, RiskAssessment } from "@/lib/agent-risk";
 import type { SectionCapability } from "@/lib/types";
 import type { SelectedNode } from "../DesignMode";
+
+const isMac = typeof navigator !== "undefined" && (/Mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? "") || /Mac/i.test(navigator.platform ?? ""));
 
 type LayoutGap = 'tight' | 'normal' | 'loose';
 type LayoutPadding = 'none' | 'normal' | 'spacious';
@@ -78,7 +76,7 @@ export function DesignPropertiesPanel({
       </div>
 
       {/* Analytics indicator */}
-      {analytics && (analytics.clicks || analytics.views) && (
+      {analytics && (analytics.clicks || analytics.views) ? (
         <div className="px-4 py-2 border-b border-gray-border bg-accent/5">
           <div className="flex items-center gap-2">
             <TrendingUp
@@ -100,12 +98,12 @@ export function DesignPropertiesPanel({
             </span>
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="flex-1 overflow-y-auto">
         {!selectedNode ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-[12px] text-gray-faint">Select a layer to edit</p>
+          <div className="flex flex-col items-center justify-center h-full gap-2 px-6">
+            <p className="text-[12px] text-gray-faint text-center">Select a section in the layers panel or click on the canvas</p>
           </div>
         ) : activeTab === "design" ? (
           <DesignTab
@@ -137,72 +135,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       <span className="text-[10px] font-medium text-gray-faint uppercase tracking-wider">
         {children}
       </span>
-    </div>
-  );
-}
-
-function PropertyRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between px-4 py-1.5">
-      <span className="text-[11px] text-gray-muted">{label}</span>
-      <div className="flex items-center gap-1.5">{children}</div>
-    </div>
-  );
-}
-
-function NumberInput({
-  value,
-  unit,
-  width = 56,
-  onChange,
-}: {
-  value: number;
-  unit?: string;
-  width?: number;
-  onChange?: (value: number) => void;
-}) {
-  const [localValue, setLocalValue] = useState(value.toString());
-
-  const handleBlur = useCallback(() => {
-    const num = parseFloat(localValue);
-    if (!isNaN(num) && onChange) {
-      onChange(num);
-    }
-  }, [localValue, onChange]);
-
-  return (
-    <div
-      className="flex items-center bg-surface-base border border-gray-border rounded-md px-2 h-[26px] focus-within:border-accent/50"
-      style={{ width }}
-    >
-      <input
-        type="text"
-        value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
-        onBlur={handleBlur}
-        className="w-full bg-transparent text-[11px] text-warm-black text-right outline-none tabular-nums"
-      />
-      {unit && (
-        <span className="text-[10px] text-gray-faint ml-0.5">{unit}</span>
-      )}
-    </div>
-  );
-}
-
-function ColorSwatch({ color }: { color: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className="w-5 h-5 rounded-md border border-gray-border"
-        style={{ backgroundColor: color }}
-      />
-      <span className="text-[11px] text-gray-muted font-mono">{color}</span>
     </div>
   );
 }
@@ -239,190 +171,93 @@ function DesignTab({
     }
   };
 
+  if (node.type !== "section") {
+    return (
+      <div className="flex items-center justify-center h-32 px-6">
+        <p className="text-[11px] text-gray-faint text-center">
+          Design controls are available for sections. Select a section in the layers panel.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="py-2">
-      {node.type === "section" && (
-        <>
-          <SectionLabel>Section Variant</SectionLabel>
-          <div className="px-4 py-3">
-            <select
-              value={currentVariant}
-              onChange={(event) => {
-                if (node.sectionType && onVariantUpdate) {
-                  onVariantUpdate(node.sectionType, event.target.value);
-                }
-              }}
-              className="h-8 w-full rounded-md border border-gray-border bg-surface-base px-2 text-[11px] text-warm-black outline-none focus:border-accent/50"
-            >
-              {variants.map((variant) => (
-                <option key={variant} value={variant}>
-                  {variant.charAt(0).toUpperCase() + variant.slice(1)}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-[10px] leading-4 text-gray-faint">
-              Variants come from this site&apos;s capability manifest.
-            </p>
-          </div>
-
-          <SectionLabel>Section Layout</SectionLabel>
-          <div className="px-4 py-3 space-y-3">
-            <div>
-              <span className="text-[10px] text-gray-faint mb-1.5 block">Gap</span>
-              <div className="flex items-center gap-1">
-                {(['tight', 'normal', 'loose'] as const).map((gap) => (
-                  <button
-                    key={gap}
-                    onClick={() => handleGapChange(gap)}
-                    className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
-                      currentGap === gap
-                        ? "bg-accent/15 text-accent border border-accent/30"
-                        : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
-                    }`}
-                  >
-                    {gap.charAt(0).toUpperCase() + gap.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="text-[10px] text-gray-faint mb-1.5 block">Padding</span>
-              <div className="flex items-center gap-1">
-                {(['none', 'normal', 'spacious'] as const).map((padding) => (
-                  <button
-                    key={padding}
-                    onClick={() => handlePaddingChange(padding)}
-                    className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
-                      currentPadding === padding
-                        ? "bg-accent/15 text-accent border border-accent/30"
-                        : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
-                    }`}
-                  >
-                    {padding.charAt(0).toUpperCase() + padding.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      <SectionLabel>Layout</SectionLabel>
-      <div className="px-4 py-3 space-y-2.5">
-        <div className="flex items-center gap-1">
-          {(["horizontal", "vertical", "none"] as const).map((dir) => (
-            <button
-              key={dir}
-              className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
-                node.layout === dir
-                  ? "bg-accent/15 text-accent border border-accent/30"
-                  : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
-              }`}
-            >
-              {dir === "none" ? "Abs" : dir === "horizontal" ? "Row" : "Col"}
-            </button>
+      <SectionLabel>Section Variant</SectionLabel>
+      <div className="px-4 py-3">
+        <select
+          value={currentVariant}
+          onChange={(event) => {
+            if (node.sectionType && onVariantUpdate) {
+              onVariantUpdate(node.sectionType, event.target.value);
+            }
+          }}
+          className="h-8 w-full rounded-md border border-gray-border bg-surface-base px-2 text-[11px] text-warm-black outline-none focus:border-accent/50"
+        >
+          {variants.map((variant) => (
+            <option key={variant} value={variant}>
+              {variant.charAt(0).toUpperCase() + variant.slice(1)}
+            </option>
           ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {[AlignStartVertical, AlignCenterVertical, AlignEndVertical].map(
-            (Icon, i) => (
+        </select>
+        {variants.length <= 1 && (
+          <p className="mt-2 text-[10px] leading-4 text-gray-faint">
+            This section has one variant. Custom sites can define more via the capability manifest.
+          </p>
+        )}
+      </div>
+
+      <SectionLabel>Spacing</SectionLabel>
+      <div className="px-4 py-3 space-y-3">
+        <div>
+          <span className="text-[10px] text-gray-faint mb-1.5 block">Gap between elements</span>
+          <div className="flex items-center gap-1">
+            {(['tight', 'normal', 'loose'] as const).map((gap) => (
               <button
-                key={i}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-gray-faint hover:text-gray-muted hover:bg-surface-base border border-transparent hover:border-gray-border transition-colors"
+                key={gap}
+                onClick={() => handleGapChange(gap)}
+                className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
+                  currentGap === gap
+                    ? "bg-accent/15 text-accent border border-accent/30"
+                    : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
+                }`}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                {gap.charAt(0).toUpperCase() + gap.slice(1)}
               </button>
-            )
-          )}
-          <div className="w-px h-4 bg-gray-border mx-1" />
-          {[AlignLeft, AlignCenter, AlignRight].map((Icon, i) => (
-            <button
-              key={i}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-gray-faint hover:text-gray-muted hover:bg-surface-base border border-transparent hover:border-gray-border transition-colors"
-            >
-              <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <SectionLabel>Size</SectionLabel>
-      <div className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <span className="text-[10px] text-gray-faint mb-1 block">W</span>
-            <NumberInput value={node.width} unit="px" width={80} />
-          </div>
-          <div className="flex-1">
-            <span className="text-[10px] text-gray-faint mb-1 block">H</span>
-            <NumberInput value={node.height} unit="px" width={80} />
+            ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <div className="flex-1">
-            <span className="text-[10px] text-gray-faint mb-1 block">X</span>
-            <NumberInput value={node.x} width={80} />
-          </div>
-          <div className="flex-1">
-            <span className="text-[10px] text-gray-faint mb-1 block">Y</span>
-            <NumberInput value={node.y} width={80} />
+        <div>
+          <span className="text-[10px] text-gray-faint mb-1.5 block">Section padding</span>
+          <div className="flex items-center gap-1">
+            {(['none', 'normal', 'spacious'] as const).map((padding) => (
+              <button
+                key={padding}
+                onClick={() => handlePaddingChange(padding)}
+                className={`flex-1 h-[28px] rounded-md text-[10px] font-medium transition-colors ${
+                  currentPadding === padding
+                    ? "bg-accent/15 text-accent border border-accent/30"
+                    : "bg-surface-base text-gray-muted border border-gray-border hover:border-gray-muted"
+                }`}
+              >
+                {padding.charAt(0).toUpperCase() + padding.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <SectionLabel>Fill</SectionLabel>
-      <div className="px-4 py-3">
-        <ColorSwatch color={node.fill || "#transparent"} />
+      <SectionLabel>Section Info</SectionLabel>
+      <div className="px-4 py-3 space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-gray-faint">Type</span>
+          <span className="text-[11px] text-gray-muted font-mono">{node.sectionType}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-gray-faint">Variant</span>
+          <span className="text-[11px] text-gray-muted font-mono">{currentVariant}</span>
+        </div>
       </div>
-
-      {node.layout !== "none" && (
-        <>
-          <SectionLabel>Spacing</SectionLabel>
-          <div className="px-4 py-3 space-y-1.5">
-            <PropertyRow label="Gap">
-              <NumberInput value={node.gap || 0} unit="px" />
-            </PropertyRow>
-            <PropertyRow label="Padding">
-              <NumberInput value={node.padding || 0} unit="px" />
-            </PropertyRow>
-          </div>
-        </>
-      )}
-
-      <SectionLabel>Corner Radius</SectionLabel>
-      <div className="px-4 py-3">
-        <PropertyRow label="Radius">
-          <NumberInput value={node.cornerRadius || 0} unit="px" />
-        </PropertyRow>
-      </div>
-
-      <SectionLabel>Opacity</SectionLabel>
-      <div className="px-4 py-3">
-        <PropertyRow label="Opacity">
-          <NumberInput value={(node.opacity ?? 1) * 100} unit="%" />
-        </PropertyRow>
-      </div>
-
-      {node.type === "text" && (
-        <>
-          <SectionLabel>Typography</SectionLabel>
-          <div className="px-4 py-3 space-y-1.5">
-            <PropertyRow label="Font">
-              <span className="text-[11px] text-gray-muted">
-                {node.fontFamily || "Inter"}
-              </span>
-            </PropertyRow>
-            <PropertyRow label="Size">
-              <NumberInput value={node.fontSize || 16} unit="px" />
-            </PropertyRow>
-            <PropertyRow label="Weight">
-              <span className="text-[11px] text-gray-muted">
-                {node.fontWeight || "400"}
-              </span>
-            </PropertyRow>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -440,18 +275,39 @@ function ContentTab({
 }) {
   const [localContent, setLocalContent] = useState(node.content || node.label);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Clean up save timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(saveTimerRef.current);
+  }, []);
+
+  // Reset local content when node changes
+  useEffect(() => {
+    setLocalContent(node.content || node.label);
+    setSaveStatus("idle");
+  }, [node.id, node.content, node.label]);
 
   const handleSave = useCallback(async () => {
     if (!node.sectionType || !onContentUpdate) return;
 
     setIsSaving(true);
+    setSaveStatus("idle");
     try {
       await onContentUpdate(
         node.sectionType,
         node.field || "content",
         localContent
       );
+      setSaveStatus("saved");
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
     } finally {
       setIsSaving(false);
     }
@@ -460,7 +316,6 @@ function ContentTab({
   const handleImageSelect = useCallback(async (url: string) => {
     if (!node.sectionType || !onContentUpdate) return;
 
-    // For images, we update the imageUrl or backgroundImageUrl field
     const imageField = node.field || "imageUrl";
     await onContentUpdate(node.sectionType, imageField, url);
   }, [node.sectionType, node.field, onContentUpdate]);
@@ -472,26 +327,55 @@ function ContentTab({
         {node.type === "text" || node.type === "button" ? (
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] text-gray-faint">Text</span>
-              {hasDraft && (
-                <span className="text-[9px] text-amber-500 font-medium">Draft</span>
-              )}
+              <span className="text-[10px] text-gray-faint">
+                {node.field || "Text"}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {hasDraft && (
+                  <span className="text-[9px] text-amber-500 font-medium px-1.5 py-0.5 rounded bg-amber-400/10">Draft</span>
+                )}
+                {saveStatus === "saved" && (
+                  <span className="text-[9px] text-emerald-500 font-medium flex items-center gap-0.5">
+                    <Check className="w-3 h-3" strokeWidth={2} />
+                    Saved
+                  </span>
+                )}
+                {saveStatus === "error" && (
+                  <span className="text-[9px] text-red-400 font-medium">Save failed</span>
+                )}
+              </div>
             </div>
             <textarea
               value={localContent}
               onChange={(e) => setLocalContent(e.target.value)}
-              rows={3}
-              className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none focus:border-accent/50 transition-colors"
+              rows={4}
+              className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-y focus:border-accent/50 transition-colors"
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
             />
-            {onContentUpdate && node.sectionType && (
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : editMode === "draft" ? "Save Draft" : "Publish"}
-              </button>
-            )}
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[9px] text-gray-faint">
+                {isMac ? "Cmd" : "Ctrl"}+Enter to save
+              </span>
+              {onContentUpdate && node.sectionType && (
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="h-[28px] px-3 rounded-lg bg-accent text-white text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2} />
+                      Saving
+                    </>
+                  ) : editMode === "draft" ? "Save Draft" : "Publish"}
+                </button>
+              )}
+            </div>
           </div>
         ) : node.type === "image" ? (
           <div>
@@ -521,13 +405,13 @@ function ContentTab({
             <p className="text-[11px] text-gray-muted mb-3">
               Editing section: <span className="text-accent font-medium">{node.label}</span>
             </p>
-            <p className="text-[10px] text-gray-faint">
-              Click on text elements in the canvas to edit them directly, or use the AI tab to make changes.
+            <p className="text-[10px] text-gray-faint leading-relaxed">
+              Click on text elements in the canvas to edit them directly, or switch to the AI tab for AI-powered changes.
             </p>
           </div>
         ) : (
           <p className="text-[11px] text-gray-faint">
-            Select a text or image layer to edit content.
+            Select a text or image element to edit content.
           </p>
         )}
       </div>
@@ -545,12 +429,12 @@ function ContentTab({
         </>
       )}
 
-      {node.sectionType && (
+      {node.sectionType && node.type !== "section" && (
         <>
-          <SectionLabel>Section Info</SectionLabel>
+          <SectionLabel>Element Info</SectionLabel>
           <div className="px-4 py-3 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-faint">Type</span>
+              <span className="text-[10px] text-gray-faint">Section</span>
               <span className="text-[11px] text-gray-muted font-mono">{node.sectionType}</span>
             </div>
             {node.field && (
@@ -564,6 +448,62 @@ function ContentTab({
       )}
     </div>
   );
+}
+
+// Contextual quick actions based on section type
+function getQuickActions(sectionType?: string): { label: string; prompt: string }[] {
+  const common = [
+    { label: "Rewrite copy", prompt: "Rewrite the copy to be more compelling and engaging" },
+    { label: "Shorten", prompt: "Make the content more concise while keeping the key message" },
+    { label: "Fix grammar", prompt: "Fix any grammar or spelling issues" },
+  ];
+
+  switch (sectionType) {
+    case "hero":
+      return [
+        { label: "Better headline", prompt: "Suggest a more compelling headline that grabs attention" },
+        { label: "Stronger CTA", prompt: "Make the call-to-action button text more action-oriented" },
+        ...common,
+      ];
+    case "services":
+      return [
+        { label: "Add benefits", prompt: "Emphasize the benefits of each service, not just features" },
+        { label: "Add social proof", prompt: "Weave in credibility signals like experience, certifications, or number of clients" },
+        ...common,
+      ];
+    case "testimonials":
+      return [
+        { label: "Highlight results", prompt: "Emphasize the outcomes and results mentioned in testimonials" },
+        ...common,
+      ];
+    case "story":
+      return [
+        { label: "More personal", prompt: "Make the about section more personal and relatable" },
+        { label: "Add credentials", prompt: "Highlight qualifications, experience, and what makes this business unique" },
+        ...common,
+      ];
+    case "contact":
+      return [
+        { label: "Add urgency", prompt: "Add a sense of urgency or reason to reach out now" },
+        ...common,
+      ];
+    case "faq":
+      return [
+        { label: "Suggest questions", prompt: "Suggest 2-3 additional FAQ questions that potential customers commonly ask" },
+        ...common,
+      ];
+    case "page-cta":
+      return [
+        { label: "Stronger CTA", prompt: "Make the call-to-action more compelling with urgency and clear value" },
+        { label: "A/B variant", prompt: "Write an alternative version of this CTA section for A/B testing" },
+        ...common,
+      ];
+    default:
+      return [
+        { label: "Add emphasis", prompt: "Add more emphasis and urgency to the messaging" },
+        ...common,
+      ];
+  }
 }
 
 function AITab({
@@ -580,6 +520,7 @@ function AITab({
   );
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
   const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [traceSteps, setTraceSteps] = useState<TraceStep[]>([]);
   const [pendingPreview, setPendingPreview] = useState<{
@@ -604,19 +545,18 @@ function AITab({
     );
   }, []);
 
-  const executeAgentPrompt = useCallback(async (userPrompt: string) => {
+  const executeAgentPrompt = useCallback(async (userPrompt: string, actionLabel?: string) => {
     if (!userPrompt.trim() || !node.sectionType) return;
 
     setIsApplying(true);
+    setActiveAction(actionLabel || null);
     setResponse(null);
     setTraceSteps([]);
     setPendingPreview(null);
 
     try {
-      // Build context-aware prompt
       const contextualPrompt = `I'm looking at the ${node.label} section (${node.sectionType}). ${userPrompt}`;
 
-      // Build node context for enhanced agent awareness
       const nodeContext = {
         selectedSection: node.sectionType,
         selectedField: node.field,
@@ -638,7 +578,6 @@ function AITab({
         throw new Error(err.error || `Request failed: ${res.status}`);
       }
 
-      // Stream the response
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No response body");
 
@@ -655,14 +594,12 @@ function AITab({
 
         for (const line of lines) {
           if (line.startsWith("__TOOL__")) {
-            // Mark previous step as complete
             if (currentStepId) {
               updateTraceStep(currentStepId, "success");
             }
             const label = line.replace("__TOOL__", "");
             currentStepId = addTraceStep(label);
           } else if (line.startsWith("__RESULT__")) {
-            // Final agent contract is consumed by ChatPanel; design trace only needs text/tool steps.
             continue;
           } else {
             fullText += line;
@@ -670,14 +607,12 @@ function AITab({
         }
       }
 
-      // Mark final step as complete
       if (currentStepId) {
         updateTraceStep(currentStepId, "success");
       }
 
       setResponse({ type: "success", message: fullText.trim() || "Done." });
 
-      // Trigger content refresh if we have a callback
       if (onContentUpdate && node.sectionType) {
         window.dispatchEvent(new CustomEvent("reb-content-refresh", { detail: { section: node.sectionType } }));
       }
@@ -688,6 +623,7 @@ function AITab({
       });
     } finally {
       setIsApplying(false);
+      setActiveAction(null);
       setPrompt("");
     }
   }, [dashboardHref, node.sectionType, node.label, node.field, node.content, onContentUpdate, addTraceStep, updateTraceStep]);
@@ -696,15 +632,16 @@ function AITab({
     executeAgentPrompt(prompt);
   }, [prompt, executeAgentPrompt]);
 
-  const handleQuickAction = useCallback((actionPrompt: string) => {
-    executeAgentPrompt(actionPrompt);
+  const handleQuickAction = useCallback((action: { label: string; prompt: string }) => {
+    executeAgentPrompt(action.prompt, action.label);
   }, [executeAgentPrompt]);
 
   const handlePreviewApprove = useCallback(() => {
+    // TODO: Actually apply the pending diffs to the content via onContentUpdate.
+    // Currently this only clears the preview state without persisting changes.
     if (!pendingPreview) return;
-    // TODO: Apply the changes via API
     setPendingPreview(null);
-    setResponse({ type: "success", message: "Changes applied." });
+    setResponse({ type: "success", message: "Preview cleared. Changes were not persisted." });
   }, [pendingPreview]);
 
   const handlePreviewReject = useCallback(() => {
@@ -712,14 +649,8 @@ function AITab({
     setResponse({ type: "error", message: "Changes cancelled." });
   }, []);
 
-  const quickActions = [
-    { label: "Rewrite copy", prompt: "Rewrite the copy to be more compelling and engaging" },
-    { label: "Shorten", prompt: "Make the content more concise while keeping the key message" },
-    { label: "Add emphasis", prompt: "Add more emphasis and urgency to the messaging" },
-    { label: "Fix grammar", prompt: "Fix any grammar or spelling issues" },
-  ];
+  const quickActions = getQuickActions(node.sectionType);
 
-  // Show preview if pending
   if (pendingPreview) {
     return (
       <div className="py-2 px-3">
@@ -737,30 +668,29 @@ function AITab({
 
   return (
     <div className="py-2">
-      <SectionLabel>AI Edit</SectionLabel>
-      <div className="px-4 py-3">
-        <p className="text-[11px] text-gray-muted mb-3">
-          Describe changes for{" "}
-          <span className="text-accent font-medium">{node.label}</span>
-          {node.field && (
-            <span className="text-gray-faint"> ({node.field})</span>
-          )}
-        </p>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder={`e.g. "Make the headline punchier" or "Add a second paragraph about pricing"`}
-          rows={4}
-          disabled={isApplying}
-          className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none placeholder:text-gray-faint focus:border-accent/50 transition-colors disabled:opacity-50"
-        />
-        <button
-          onClick={handleApply}
-          disabled={isApplying || !prompt.trim()}
-          className="mt-2 w-full h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
-        >
-          {isApplying ? "Working..." : "Apply with AI"}
-        </button>
+      <SectionLabel>Quick Actions</SectionLabel>
+      <div className="px-4 py-3 flex flex-wrap gap-1.5">
+        {quickActions.map((action) => (
+          <button
+            key={action.label}
+            onClick={() => handleQuickAction(action)}
+            disabled={isApplying}
+            className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium transition-colors disabled:opacity-50 ${
+              activeAction === action.label
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "bg-surface-base border border-gray-border text-gray-muted hover:text-warm-black hover:border-gray-muted"
+            }`}
+          >
+            {activeAction === action.label ? (
+              <span className="flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2} />
+                {action.label}
+              </span>
+            ) : (
+              action.label
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Agent Trace */}
@@ -775,8 +705,8 @@ function AITab({
           <div
             className={`p-3 rounded-lg text-[11px] leading-relaxed ${
               response.type === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-red-50 text-red-800 border border-red-200"
+                ? "bg-emerald-950/30 text-emerald-300 border border-emerald-800/50"
+                : "bg-red-950/30 text-red-300 border border-red-800/50"
             }`}
           >
             {response.message.slice(0, 300)}
@@ -785,18 +715,46 @@ function AITab({
         </div>
       )}
 
-      <SectionLabel>Quick Actions</SectionLabel>
-      <div className="px-4 py-3 flex flex-wrap gap-1.5">
-        {quickActions.map((action) => (
+      <SectionLabel>Custom Prompt</SectionLabel>
+      <div className="px-4 py-3">
+        <p className="text-[11px] text-gray-muted mb-2">
+          Describe changes for{" "}
+          <span className="text-accent font-medium">{node.label}</span>
+          {node.field && (
+            <span className="text-gray-faint"> ({node.field})</span>
+          )}
+        </p>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder={`e.g. "Make the headline punchier" or "Add a paragraph about pricing"`}
+          rows={3}
+          disabled={isApplying}
+          className="w-full bg-surface-base border border-gray-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none resize-none placeholder:text-gray-faint focus:border-accent/50 transition-colors disabled:opacity-50"
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && prompt.trim()) {
+              e.preventDefault();
+              handleApply();
+            }
+          }}
+        />
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[9px] text-gray-faint">
+            {isMac ? "Cmd" : "Ctrl"}+Enter
+          </span>
           <button
-            key={action.label}
-            onClick={() => handleQuickAction(action.prompt)}
-            disabled={isApplying}
-            className="px-2.5 py-1 rounded-md bg-surface-base border border-gray-border text-[10px] text-gray-muted hover:text-warm-black hover:border-gray-muted transition-colors disabled:opacity-50"
+            onClick={handleApply}
+            disabled={isApplying || !prompt.trim()}
+            className="h-[28px] px-3 rounded-lg bg-accent text-white text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
-            {action.label}
+            {isApplying ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2} />
+                Working
+              </>
+            ) : "Apply with AI"}
           </button>
-        ))}
+        </div>
       </div>
     </div>
   );

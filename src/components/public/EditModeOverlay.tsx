@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from "react";
 
+function getParentOrigin(): string {
+  try {
+    return document.referrer ? new URL(document.referrer).origin : "*";
+  } catch {
+    return "*";
+  }
+}
+
+function isValidSectionId(s: unknown): s is string {
+  return typeof s === "string" && /^[a-zA-Z0-9_-]+$/.test(s);
+}
+
 export function EditModeOverlay() {
   const [editMode, setEditMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -13,6 +25,9 @@ export function EditModeOverlay() {
   // Listen for dashboard-driven edit mode toggles
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      const parentOrigin = getParentOrigin();
+      if (parentOrigin !== "*" && event.origin !== parentOrigin) return;
+
       if (event.data?.type === "reb-edit-mode") {
         setEditMode(event.data.enabled);
       }
@@ -26,13 +41,16 @@ export function EditModeOverlay() {
     if (!editMode) return;
 
     function handleMessage(event: MessageEvent) {
+      const parentOrigin = getParentOrigin();
+      if (parentOrigin !== "*" && event.origin !== parentOrigin) return;
+
       if (event.data?.type === "reb-highlight-section") {
         // Remove previous highlight
         document.querySelectorAll(".reb-highlighted").forEach((el) => {
           el.classList.remove("reb-highlighted");
         });
         // Apply new highlight
-        if (event.data.section) {
+        if (isValidSectionId(event.data.section)) {
           const target =
             document.querySelector(`[data-reb-section="${event.data.section}"]`) ||
             document.querySelector(`[data-reb-editable="${event.data.section}"]`);
@@ -46,6 +64,7 @@ export function EditModeOverlay() {
       // Handle rect request from parent
       if (event.data?.type === "reb-request-rect") {
         const section = event.data.section;
+        if (!isValidSectionId(section)) return;
         const el = document.querySelector(`[data-reb-section="${section}"]`) ||
                    document.querySelector(`[data-reb-editable="${section}"]`);
         if (el) {
@@ -59,7 +78,7 @@ export function EditModeOverlay() {
               width: rect.width,
               height: rect.height,
             },
-          }, "*");
+          }, getParentOrigin());
         }
       }
     }
@@ -80,13 +99,22 @@ export function EditModeOverlay() {
       setHoveredSection(sectionType);
       const rect = el.getBoundingClientRect();
       setLabelPos({ top: rect.top + window.scrollY, left: rect.left });
-      window.parent.postMessage({ type: "reb-section-hovered", section: sectionType }, "*");
+      window.parent.postMessage({
+        type: "reb-section-hovered",
+        section: sectionType,
+        rect: {
+          top: rect.top + window.scrollY,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+      }, getParentOrigin());
     }
 
     function handleMouseLeave() {
       setHoveredSection(null);
       setLabelPos(null);
-      window.parent.postMessage({ type: "reb-section-hovered", section: null }, "*");
+      window.parent.postMessage({ type: "reb-section-hovered", section: null }, getParentOrigin());
     }
 
     function handleClick(e: Event) {
@@ -116,13 +144,13 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        }, getParentOrigin());
 
         // Also send legacy message for backwards compat
         window.parent.postMessage({
           type: "reb-section-clicked",
           section: editable || sectionType,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -142,7 +170,7 @@ export function EditModeOverlay() {
           label,
           x: me.clientX,
           y: me.clientY,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -186,6 +214,7 @@ export function EditModeOverlay() {
 
     function handleFocus(e: Event) {
       const el = e.target as HTMLElement;
+      el.dataset.rebOriginal = el.textContent || "";
       el.style.outline = "2px solid var(--sage)";
       el.style.outlineOffset = "2px";
       el.style.borderRadius = "2px";
@@ -193,6 +222,7 @@ export function EditModeOverlay() {
 
     function handleBlur(e: Event) {
       const el = e.target as HTMLElement;
+      delete el.dataset.rebOriginal;
       el.style.outline = "";
       el.style.outlineOffset = "";
       el.style.borderRadius = "";
@@ -209,7 +239,7 @@ export function EditModeOverlay() {
           section,
           field,
           value,
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -217,6 +247,12 @@ export function EditModeOverlay() {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         (e.target as HTMLElement).blur();
+      }
+      if (e.key === "Escape") {
+        const el = e.target as HTMLElement;
+        el.textContent = el.dataset.rebOriginal ?? el.textContent;
+        delete el.dataset.rebOriginal;
+        el.blur();
       }
     }
 
@@ -249,7 +285,7 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        }, getParentOrigin());
       }
     }
 
@@ -284,7 +320,7 @@ export function EditModeOverlay() {
 
   if (!editMode) return null;
 
-  const label = hoveredSection
+  const label = hoveredSection && isValidSectionId(hoveredSection)
     ? document.querySelector(`[data-reb-section="${hoveredSection}"]`)?.getAttribute("data-reb-label") || hoveredSection
     : null;
 
