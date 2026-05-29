@@ -65,7 +65,7 @@ export function DesignCanvas({
             iframeRef.current.contentWindow.postMessage({
               type: "reb-request-rect",
               section,
-            }, previewOrigin || "*");
+            }, previewOrigin ?? window.location.origin);
           }
           setHoveredSection((prev) => prev?.id === section ? prev : { id: section, rect: { top: 0, left: 0, width: 0, height: 0 } });
         } else {
@@ -80,7 +80,7 @@ export function DesignCanvas({
   // Enable edit mode in iframe when loaded
   useEffect(() => {
     if (iframeLoaded && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, previewOrigin || "*");
+      iframeRef.current.contentWindow.postMessage({ type: "reb-edit-mode", enabled: true }, previewOrigin ?? window.location.origin);
     }
   }, [iframeLoaded, iframeRef, previewOrigin]);
 

@@ -277,7 +277,7 @@ function ContentTab({
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Clean up save timer on unmount
   useEffect(() => {
@@ -637,11 +637,10 @@ function AITab({
   }, [executeAgentPrompt]);
 
   const handlePreviewApprove = useCallback(() => {
-    // TODO: Actually apply the pending diffs to the content via onContentUpdate.
-    // Currently this only clears the preview state without persisting changes.
     if (!pendingPreview) return;
+    // Not yet wired to content pipeline -- clear state and inform user
     setPendingPreview(null);
-    setResponse({ type: "success", message: "Preview cleared. Changes were not persisted." });
+    setResponse({ type: "info", message: "Preview approval coming soon. Changes were not saved." });
   }, [pendingPreview]);
 
   const handlePreviewReject = useCallback(() => {

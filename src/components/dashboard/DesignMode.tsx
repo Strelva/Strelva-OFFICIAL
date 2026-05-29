@@ -272,7 +272,7 @@ export function DesignMode() {
         iframeRef.current.contentWindow.postMessage({
           type: "reb-request-rect",
           section: node.sectionType,
-        }, previewOrigin || "*");
+        }, previewOrigin ?? window.location.origin);
       }
     }
   }, [tree, setActiveSection, previewOrigin]);
@@ -378,11 +378,14 @@ export function DesignMode() {
       // Update the field (handle nested paths like "services[0].name")
       const updated = structuredClone(current);
       const parts = field.replace(/\[(\d+)\]/g, ".$1").split(".");
+      const UNSAFE_KEYS = new Set(["__proto__", "prototype", "constructor"]);
       let obj = updated;
       for (let i = 0; i < parts.length - 1; i++) {
+        if (UNSAFE_KEYS.has(parts[i])) return;
         obj = obj[parts[i]];
-        if (obj == null) return; // bail if path doesn't exist
+        if (obj == null) return;
       }
+      if (UNSAFE_KEYS.has(parts[parts.length - 1])) return;
       obj[parts[parts.length - 1]] = value;
 
       // Save
