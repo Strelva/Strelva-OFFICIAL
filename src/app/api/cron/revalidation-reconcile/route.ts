@@ -9,29 +9,31 @@ export async function GET(request: Request) {
 
   const results = await reconcileRevalidations();
 
-  const revalidatedCount = results.filter((r) => r.action === "revalidated").length;
-  const failedCount = results.filter((r) => r.action === "failed").length;
-  const skippedCount = results.filter((r) => r.action === "skipped").length;
-  const upToDateCount = results.filter((r) => r.action === "up_to_date").length;
+  const counts = results.reduce(
+    (acc, r) => { acc[r.action] = (acc[r.action] || 0) + 1; return acc; },
+    {} as Record<string, number>,
+  );
+  const revalidated = counts.revalidated || 0;
+  const failed = counts.failed || 0;
 
-  if (failedCount > 0 && process.env.SLACK_WEBHOOK_URL) {
-    const failed = results.filter((r) => r.action === "failed");
-    fetch(process.env.SLACK_WEBHOOK_URL, {
+  if (failed > 0 && process.env.SLACK_WEBHOOK_URL) {
+    const failedItems = results.filter((r) => r.action === "failed");
+    await fetch(process.env.SLACK_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `Revalidation reconciliation: ${revalidatedCount} re-synced, ${failedCount} failed — ${failed.map((f) => `${f.tenantId}: ${f.error}`).join(", ")}`,
+        text: `Revalidation reconciliation: ${revalidated} re-synced, ${failed} failed — ${failedItems.map((f) => `${f.tenantId}: ${f.error}`).join(", ")}`,
       }),
     }).catch(() => {});
   }
 
-  const status = failedCount === results.length && results.length > 0 ? 500 : 200;
+  const status = failed === results.length && results.length > 0 ? 500 : 200;
 
   return NextResponse.json({
     total: results.length,
-    revalidated: revalidatedCount,
-    failed: failedCount,
-    skipped: skippedCount,
-    up_to_date: upToDateCount,
+    revalidated,
+    failed,
+    skipped: counts.skipped || 0,
+    up_to_date: counts.up_to_date || 0,
   }, { status });
 }

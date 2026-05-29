@@ -110,10 +110,8 @@ export async function POST(request: NextRequest) {
       tags: { feature: "audit-scan" },
       extra: { url: normalizedUrl },
     });
-    const message =
-      err instanceof Error ? err.message : "An unexpected error occurred.";
     return NextResponse.json(
-      { error: `Scan failed: ${message}` },
+      { error: "Scan failed. Please try again." },
       { status: 500 }
     );
   }
