@@ -1,21 +1,28 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@sanity/client";
-import { Redis } from "@upstash/redis";
+import { getRedis } from "@/lib/redis";
+import { getSanityClient } from "@/lib/sanity";
 
 const APP_VERSION = process.env.APP_VERSION || "0.1.0";
 const TIMEOUT_MS = 3_000;
 
 type ServiceStatus = "ok" | "not configured" | "error";
 
+interface ServiceCheck {
+  status: ServiceStatus;
+  responseMs: number;
+}
+
 interface HealthResponse {
-  status: "ok" | "degraded";
+  status: "healthy" | "degraded" | "down";
   version: string;
   timestamp: string;
-  services: {
-    sanity: ServiceStatus;
-    redis: ServiceStatus;
+  checks: {
+    redis: ServiceCheck;
+    sanity: ServiceCheck;
+    clerk: ServiceCheck;
+    stripe: ServiceCheck;
+    gemini: ServiceCheck;
   };
-  errors?: string[];
 }
 
 /** Race a promise against a timeout. Rejects on timeout. */
@@ -28,81 +35,177 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-async function checkSanity(): Promise<{ status: ServiceStatus; error?: string }> {
-  const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-  const token = process.env.SANITY_API_TOKEN;
+async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; ms: number }> {
+  const start = performance.now();
+  const result = await fn();
+  return { result, ms: Math.round(performance.now() - start) };
+}
 
-  if (!projectId || !token) {
-    return { status: "not configured" };
+async function checkSanity(): Promise<ServiceCheck> {
+  if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.SANITY_API_TOKEN) {
+    return { status: "not configured", responseMs: 0 };
   }
 
   try {
-    const client = createClient({
-      projectId,
-      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-      apiVersion: "2024-01-01",
-      useCdn: false,
-      token,
+    const { ms } = await timed(async () => {
+      const client = getSanityClient();
+      await withTimeout(
+        client.fetch<number>(`count(*[_type == "siteSettings"])`),
+        TIMEOUT_MS,
+        "Sanity",
+      );
     });
 
-    await withTimeout(
-      client.fetch<number>(`count(*[_type == "siteSettings"])`),
-      TIMEOUT_MS,
-      "Sanity",
-    );
-
-    return { status: "ok" };
+    return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", error: `Sanity: ${message}` };
+    console.error("[health] Sanity check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
-async function checkRedis(): Promise<{ status: ServiceStatus; error?: string }> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!url || !token) {
-    return { status: "not configured" };
+async function checkRedis(): Promise<ServiceCheck> {
+  const redis = getRedis();
+  if (!redis) {
+    return { status: "not configured", responseMs: 0 };
   }
 
   try {
-    const redis = new Redis({ url, token });
+    const { ms } = await timed(async () => {
+      await withTimeout(redis.ping(), TIMEOUT_MS, "Redis");
+    });
 
-    await withTimeout(redis.ping(), TIMEOUT_MS, "Redis");
-
-    return { status: "ok" };
+    return { status: "ok", responseMs: ms };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return { status: "error", error: `Redis: ${message}` };
+    console.error("[health] Redis check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
+  }
+}
+
+async function checkClerk(): Promise<ServiceCheck> {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  if (!secretKey || !publishableKey) {
+    return { status: "not configured", responseMs: 0 };
+  }
+
+  // Extract the Clerk frontend API domain from the publishable key
+  const domain = publishableKey.startsWith("pk_")
+    ? `https://${Buffer.from(publishableKey.replace(/^pk_(test|live)_/, ""), "base64").toString("utf-8").replace(/\$$/, "")}`
+    : null;
+
+  if (!domain) {
+    return { status: "not configured", responseMs: 0 };
+  }
+
+  try {
+    const { ms } = await timed(async () => {
+      // Lightweight check: hit the Clerk JWKS endpoint (no auth needed, always public)
+      const res = await withTimeout(
+        fetch(`${domain}/.well-known/jwks.json`, { method: "GET" }),
+        TIMEOUT_MS,
+        "Clerk",
+      );
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    });
+
+    return { status: "ok", responseMs: ms };
+  } catch (err) {
+    console.error("[health] Clerk check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
+  }
+}
+
+async function checkStripe(): Promise<ServiceCheck> {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return { status: "not configured", responseMs: 0 };
+  }
+
+  try {
+    const { ms } = await timed(async () => {
+      // Lightweight ping: list 1 event (minimal data, fast)
+      const res = await withTimeout(
+        fetch("https://api.stripe.com/v1/events?limit=1", {
+          headers: { Authorization: `Bearer ${key}` },
+        }),
+        TIMEOUT_MS,
+        "Stripe",
+      );
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    });
+
+    return { status: "ok", responseMs: ms };
+  } catch (err) {
+    console.error("[health] Stripe check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
+  }
+}
+
+async function checkGemini(): Promise<ServiceCheck> {
+  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!key) {
+    return { status: "not configured", responseMs: 0 };
+  }
+
+  try {
+    const { ms } = await timed(async () => {
+      // Lightweight: list models endpoint
+      const res = await withTimeout(
+        fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", {
+          headers: { "x-goog-api-key": key },
+        }),
+        TIMEOUT_MS,
+        "Gemini",
+      );
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    });
+
+    return { status: "ok", responseMs: ms };
+  } catch (err) {
+    console.error("[health] Gemini check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
 
 export async function GET() {
-  const [sanityResult, redisResult] = await Promise.all([
+  const [sanity, redis, clerk, stripe, gemini] = await Promise.all([
     checkSanity(),
     checkRedis(),
+    checkClerk(),
+    checkStripe(),
+    checkGemini(),
   ]);
 
-  const errors: string[] = [];
-  if (sanityResult.error) errors.push(sanityResult.error);
-  if (redisResult.error) errors.push(redisResult.error);
+  const checks = { redis, sanity, clerk, stripe, gemini };
 
-  const hasError = sanityResult.status === "error" || redisResult.status === "error";
+  // "down" if core services (redis or sanity) are failing
+  // "degraded" if any non-core service is failing
+  // "healthy" if everything is ok or not configured
+  const coreDown = redis.status === "error" || sanity.status === "error";
+  const anyError = Object.values(checks).some((c) => c.status === "error");
+
+  const status: HealthResponse["status"] = coreDown
+    ? "down"
+    : anyError
+      ? "degraded"
+      : "healthy";
 
   const body: HealthResponse = {
-    status: hasError ? "degraded" : "ok",
+    status,
     version: APP_VERSION,
     timestamp: new Date().toISOString(),
-    services: {
-      sanity: sanityResult.status,
-      redis: redisResult.status,
-    },
+    checks,
   };
 
-  if (errors.length > 0) {
-    body.errors = errors;
-  }
-
-  return NextResponse.json(body, { status: hasError ? 503 : 200 });
+  const httpStatus = coreDown ? 503 : 200;
+  return NextResponse.json(body, { status: httpStatus });
 }
