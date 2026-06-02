@@ -2,7 +2,7 @@
 
 This file provides guidance to Codex when working with code in this repository.
 
-**Naming**: Product is "Scaffold Web". Repo folder path is legacy lowercase `reb` (internal). Package name is `scaffold-web`.
+**Naming**: Product is "Strelva". Repo folder path is legacy lowercase `reb` (internal). Package name is `scaffold-web`.
 
 ## Commands
 
@@ -34,11 +34,11 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 
 ## Multi-tenant architecture
 
-Scaffold Web is the **control plane**. Each paid client site is a separate **custom repo** that pulls content/config from the control plane over a versioned API.
+Strelva is the **control plane**. Each paid client site is a separate **custom repo** that pulls content/config from the control plane over a versioned API.
 
 **Naming note:** the project rename from "reb" → "scaffoldweb" is ongoing. New code uses `SCAFFOLD_*` env vars, `SCAFFOLD_CONTRACT_VERSION`, `scaffoldRoutes`, etc. Legacy `REB_*` names are kept as deprecated aliases so deployed custom repos (Rohlax, GLDF) keep working. HMAC headers (`x-reb-timestamp`/`x-reb-signature`) and Redis key prefixes (`reb:`) are intentionally **not** renamed — those are wire-level or persistent-data details that require coordinated rollout to change.
 
-- Host → tenant resolution in `src/proxy.ts`: subdomain (`gldf.scaffoldweb.com`, `admin.gldf.scaffoldweb.com`), then `/client/{tenant}/...` path fallback, then custom-domain map (Redis/Sanity-backed via `/api/internal/domain-map`), then `?tenant=` query.
+- Host → tenant resolution in `src/proxy.ts`: subdomain (`gldf.strelva.com`, `admin.gldf.strelva.com`), then `/client/{tenant}/...` path fallback, then custom-domain map (Redis/Sanity-backed via `/api/internal/domain-map`), then `?tenant=` query.
 - The public storefront contract is **`/api/v1/*`** — owned directly (no `@/app/api/public/*` re-export layer). The v1 routes are the canonical wire shape consumed by client repos. Change them only by versioning (add a v2 sibling).
 - Custom-repo wiring: `src/lib/custom-repos.ts`, `src/lib/revalidate-client.ts` (signed HMAC revalidation), `custom-repo-starter/` (drop-in scaffold), `scripts/custom-repo-workspace-check.ts`, `release-manifest.json`.
 - `DEFAULT_DELIVERY_MODEL` is `"custom_repo"`. Every paid client is a separate hand-built repo. The `platform_template` value still exists in the type for legacy tenant records but should not be used for new tenants. Self-serve auto-provisioning is gated off (`SELF_SERVE_ENABLED=false` default) — leads come through `/access-request`, Jacob builds the repo.
@@ -76,10 +76,10 @@ Scaffold Web is the **control plane**. Each paid client site is a separate **cus
 
 ---
 
-# Scaffold Web — AI Website Management Platform
+# Strelva — AI Website Management Platform
 
 ## What This Is
-A control plane for local-business websites. Owners see a dashboard with what's happening on their site and chat with an AI that handles updates. The public website lives in a separate **custom repo** that pulls content from Scaffold Web's `/api/v1/*` contract.
+A control plane for local-business websites. Owners see a dashboard with what's happening on their site and chat with an AI that handles updates. The public website lives in a separate **custom repo** that pulls content from Strelva's `/api/v1/*` contract.
 
 ## One-Liner
 "See what's working. Tell the AI what to change."

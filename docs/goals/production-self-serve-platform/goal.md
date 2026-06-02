@@ -2,7 +2,7 @@
 
 ## Objective
 
-Turn Scaffold Web into a production-grade self-serve platform by validating and executing the highest-leverage slices for B2C signup/onboarding, retention analytics/weekly briefs, and backup/versioning/rollback safety.
+Turn Strelva into a production-grade self-serve platform by validating and executing the highest-leverage slices for B2C signup/onboarding, retention analytics/weekly briefs, and backup/versioning/rollback safety.
 
 ## Original Request
 
@@ -11,7 +11,7 @@ Turn Scaffold Web into a production-grade self-serve platform by validating and 
 ## Intake Summary
 
 - Input shape: `existing_plan`
-- Audience: Jacob and local business owners using Scaffold Web
+- Audience: Jacob and local business owners using Strelva
 - Authority: `requested`
 - Proof type: `test`
 - Completion proof: Current repo evidence proves a local business can self-serve sign up, receive an instant tenant/subdomain/site/agent boot path, complete a guided first-time owner journey, receive quick-win welcome/weekly retention surfaces, see meaningful owner metrics and audit history, and safely roll back content with verified tests or documented blockers.

@@ -88,7 +88,7 @@ export async function GET() {
           `${primaryDomain}: config=${tenant.id}, env=${envTenant}`
         );
       }
-      if (!envTenant && !primaryDomain.includes("scaffoldweb.com")) {
+      if (!envTenant && !primaryDomain.includes("strelva.com")) {
         metrics.tenantDomainDrift.push(
           `${primaryDomain}: missing from CUSTOM_DOMAIN_MAP`
         );

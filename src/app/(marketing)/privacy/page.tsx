@@ -18,8 +18,8 @@ export default function PrivacyPage() {
         </p>
 
         <p>
-          Scaffold Web (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
-          operates the AI website management platform at scaffoldweb.com. This
+          Strelva (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
+          operates the AI website management platform at strelva.com. This
           Privacy Policy explains how we collect, use, and protect your
           information.
         </p>
@@ -136,11 +136,11 @@ export default function PrivacyPage() {
         <p>
           Questions about this policy? Email us at{" "}
           <a
-            href="mailto:jacob@scaffoldweb.com"
+            href="mailto:jacob@strelva.com"
             className="underline hover:opacity-80"
             style={{ color: "var(--m-accent)" }}
           >
-            jacob@scaffoldweb.com
+            jacob@strelva.com
           </a>
         </p>
       </div>

@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       const resend = new Resend(process.env.RESEND_API_KEY);
 
       const result = await resend.emails.send({
-        from: `Scaffold Web <hello@${process.env.RESEND_DOMAIN || "scaffoldweb.com"}>`,
+        from: `Strelva <hello@${process.env.RESEND_DOMAIN || "strelva.com"}>`,
         to: email,
         subject: `You're invited to manage ${siteNameText}`,
         html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),

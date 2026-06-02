@@ -5,7 +5,7 @@
 Chelsea should receive two things:
 
 1. The flexible website payment page:
-   `https://scaffoldweb.com/pay/rohlax`
+   `https://strelva.com/pay/rohlax`
 
 2. Rohlax admin/dashboard access, tied to her exact email address through the existing invite system.
 
@@ -43,7 +43,7 @@ Hi Chelsea,
 Here are the two links for the website handoff:
 
 Payment page:
-https://scaffoldweb.com/pay/rohlax
+https://strelva.com/pay/rohlax
 
 Admin access:
 [INSERT INVITE SIGN-UP LINK]

@@ -28,17 +28,17 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://scaffoldweb.com")
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://strelva.com")
   ),
-  applicationName: "Scaffold Web",
+  applicationName: "Strelva",
   title: {
-    default: "Scaffold Web",
-    template: "%s | Scaffold Web",
+    default: "Strelva",
+    template: "%s | Strelva",
   },
   description: "AI website management, reporting, and content operations for small businesses.",
   category: "technology",
   openGraph: {
-    siteName: "Scaffold Web",
+    siteName: "Strelva",
     type: "website",
   },
 };

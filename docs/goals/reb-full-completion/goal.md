@@ -1,4 +1,4 @@
-# Scaffold Web Full Completion
+# Strelva Full Completion
 
 ## Objective
 
@@ -11,7 +11,7 @@ Prepare and execute a GoalBuddy-driven product completion tranche for the `reb` 
 ## Intake Summary
 
 - Input shape: `vague`
-- Audience: Jacob / Scaffold Web customers
+- Audience: Jacob / Strelva customers
 - Authority: `requested`
 - Proof type: `artifact`
 - Completion proof: Final audit proves the customer-facing and operator-facing product flows are complete enough for real product use, with implemented slices verified by tests/build/browser or documented blockers.

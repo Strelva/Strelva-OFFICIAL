@@ -26,7 +26,7 @@ export function isSelfServeEnabled(): boolean {
 }
 
 export const SELF_SERVE_DISABLED_MESSAGE =
-  "Self-serve signup is off. Every Scaffold Web site is hand-built. Request one at /access-request or email jacob@scaffoldweb.com.";
+  "Self-serve signup is off. Every Strelva site is hand-built. Request one at /access-request or email jacob@strelva.com.";
 
 export const SELF_SERVE_CONTENT_SECTIONS: ContentSection[] = [
   "hero",
@@ -192,7 +192,7 @@ export function buildSelfServeStarterContent(input: SelfServeTenantInput): Conte
     accentText: ownerName ? `${ownerName}, owner` : "Local business",
     statement: description,
     paragraphs: [
-      `${businessName} is getting set up on Scaffold Web so the site can stay current without becoming another chore.`,
+      `${businessName} is getting set up on Strelva so the site can stay current without becoming another chore.`,
       "Add your story, services, photos, proof, and booking details here. The AI can draft and update this as the business grows.",
     ],
     quote: "",
@@ -303,7 +303,7 @@ export async function createSelfServeTenant(
   const template = input.template || inferSelfServeTemplate(input.industry);
   const siteUrl =
     process.env.NODE_ENV === "production"
-      ? `https://${slug}.scaffoldweb.com`
+      ? `https://${slug}.strelva.com`
       : `http://${slug}.localhost:3000`;
   const revalidationSecret = generateSecret();
 

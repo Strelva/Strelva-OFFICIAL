@@ -95,7 +95,7 @@ test("tenant preview pages can be embedded by the dashboard", async ({ request }
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");
   if (externalBaseUrl) {
-    expect(response.headers()["content-security-policy"]).toContain("https://admin.scaffoldweb.com");
+    expect(response.headers()["content-security-policy"]).toContain("https://admin.strelva.com");
   } else {
     expect(response.headers()["content-security-policy"]).toContain("http://admin.gldf.localhost");
   }

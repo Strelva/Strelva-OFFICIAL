@@ -94,10 +94,10 @@ describe("domain lifecycle groundwork", () => {
   it("rejects reserved platform domains", async () => {
     const { addCustomDomain, isValidDomain } = await import("../lib/domains");
 
-    expect(isValidDomain("customer.scaffoldweb.com")).toBe(false);
+    expect(isValidDomain("customer.strelva.com")).toBe(false);
     expect(isValidDomain("preview.vercel.app")).toBe(false);
 
-    await expect(addCustomDomain("beta", "customer.scaffoldweb.com")).resolves.toEqual({
+    await expect(addCustomDomain("beta", "customer.strelva.com")).resolves.toEqual({
       ok: false,
       status: 400,
       error: "Invalid domain format",

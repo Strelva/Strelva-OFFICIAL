@@ -25,7 +25,7 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
       </p>
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
       <p style="font-size: 13px; color: #77716a; margin: 0;">
-        Sent by Scaffold Web for ${siteName}
+        Sent by Strelva for ${siteName}
       </p>
     </div>
   </div>
@@ -69,7 +69,7 @@ export async function GET() {
       if (process.env.RESEND_API_KEY) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
-        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.scaffoldweb.com";
+        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.strelva.com";
 
         await resend.emails.send({
           from: `${report.tenant.siteName} <report@${domain}>`,

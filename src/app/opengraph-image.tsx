@@ -7,7 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const DEFAULT_OG = {
-  name: "Scaffold Web",
+  name: "Strelva",
   tagline: "Your site works while you sleep",
   initials: "S",
   bg: "#3d3229",

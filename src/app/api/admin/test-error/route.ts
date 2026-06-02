@@ -20,7 +20,7 @@ export async function POST() {
     route: "/api/admin/test-error",
   });
 
-  const testError = new Error("Scaffold Web test error — verify Sentry pipeline");
+  const testError = new Error("Strelva test error — verify Sentry pipeline");
   Sentry.captureException(testError);
 
   await Sentry.flush(2000);

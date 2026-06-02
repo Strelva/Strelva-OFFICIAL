@@ -25,7 +25,7 @@ describe("production readiness rules", () => {
   });
 
   it("rejects copied Vercel values with wrapping quotes or literal newline text", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "\"https://scaffoldweb.com\""))
+    expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "\"https://strelva.com\""))
       .toBe("Must not include wrapping quotes in the stored Vercel value");
     expect(validateProductionEnvValue("CUSTOM_DOMAIN_MAP", "{\"example.com\":\"demo\"}\\n"))
       .toBe("Must not include a literal \\n; remove copied newline text in Vercel");
@@ -58,7 +58,7 @@ describe("production readiness rules", () => {
     expect(validateProductionEnvValue("STRIPE_SECRET_KEY", "sk_live_example")).toBeNull();
     expect(validateProductionEnvValue("STRIPE_SCAFFOLD_PRICE_ID", "price_example")).toBeNull();
     expect(validateProductionEnvValue("RESEND_API_KEY", "re_example")).toBeNull();
-    expect(validateProductionEnvValue("RESEND_DOMAIN", "updates.scaffoldweb.com")).toBeNull();
+    expect(validateProductionEnvValue("RESEND_DOMAIN", "updates.strelva.com")).toBeNull();
     expect(validateProductionEnvValue("SENTRY_DSN", "https://public@sentry.example.com/1")).toBeNull();
     expect(validateProductionEnvValue("NEXT_PUBLIC_SENTRY_DSN", "https://public@sentry.example.com/1")).toBeNull();
   });
@@ -74,10 +74,10 @@ describe("production readiness rules", () => {
       .toBe("Must be at least 20 characters for production launch");
     expect(validateProductionEnvValue("SANITY_WEBHOOK_SECRET", "short"))
       .toBe("Must be at least 16 characters for production launch");
-    expect(validateProductionEnvValue("RESEND_DOMAIN", "https://updates.scaffoldweb.com"))
-      .toBe("Must be a bare domain like updates.scaffoldweb.com for production launch");
+    expect(validateProductionEnvValue("RESEND_DOMAIN", "https://updates.strelva.com"))
+      .toBe("Must be a bare domain like updates.strelva.com for production launch");
     expect(validateProductionEnvValue("RESEND_DOMAIN", "updates.example.com"))
-      .toBe("Must use a verified Scaffold Web sender domain like updates.scaffoldweb.com");
+      .toBe("Must use a verified Strelva sender domain like updates.strelva.com");
     expect(validateProductionEnvValue("SENTRY_DSN", "http://sentry.example.com/1"))
       .toBe("Must be an https:// URL for production launch");
     expect(validateProductionEnvValue("NEXT_PUBLIC_SENTRY_DSN", "https://localhost/1"))
@@ -85,13 +85,13 @@ describe("production readiness rules", () => {
   });
 
   it("rejects local or non-HTTPS production URLs", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "http://scaffoldweb.com"))
+    expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "http://strelva.com"))
       .toBe("Must be an https:// URL for production launch");
     expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "https://localhost:3000"))
       .toBe("Must not point at localhost for production launch");
     expect(validateProductionEnvValue("UPSTASH_REDIS_REST_URL", "http://redis.example.com"))
       .toBe("Must be an https:// URL for production launch");
-    expect(validateProductionEnvValue("NEXT_PUBLIC_APP_URL", "http://scaffoldweb.com"))
+    expect(validateProductionEnvValue("NEXT_PUBLIC_APP_URL", "http://strelva.com"))
       .toBe("Must be an https:// URL for production launch");
     expect(validateProductionEnvValue("NEXT_PUBLIC_APP_URL", "https://127.0.0.1:3100"))
       .toBe("Must not point at localhost for production launch");
@@ -99,7 +99,7 @@ describe("production readiness rules", () => {
 
   it("validates optional domain routing env values when present", () => {
     expect(validateProductionEnvValue("CUSTOM_DOMAIN_MAP", '{"greatlakesdriedfruit.com":"gldf"}')).toBeNull();
-    expect(validateProductionEnvValue("MARKETING_DOMAINS", "scaffoldweb.com,www.scaffoldweb.com")).toBeNull();
+    expect(validateProductionEnvValue("MARKETING_DOMAINS", "strelva.com,www.strelva.com")).toBeNull();
 
     expect(validateProductionEnvValue("CUSTOM_DOMAIN_MAP", "not json"))
       .toBe("Must be valid JSON mapping bare domains to tenant IDs for production launch");
@@ -107,7 +107,7 @@ describe("production readiness rules", () => {
       .toBe('Must map bare domains to tenant IDs like {"example.com":"tenant-id"}');
     expect(validateProductionEnvValue("CUSTOM_DOMAIN_MAP", '{"example.com":"Tenant ID"}'))
       .toBe('Must map bare domains to tenant IDs like {"example.com":"tenant-id"}');
-    expect(validateProductionEnvValue("MARKETING_DOMAINS", "https://scaffoldweb.com"))
+    expect(validateProductionEnvValue("MARKETING_DOMAINS", "https://strelva.com"))
       .toBe("Must be a comma-separated list of bare domains for production launch");
   });
 
@@ -474,7 +474,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Tenant configuration: update active Sanity tenants before release");
     expect(source).toContain("deactivate test tenants that should not be customer-facing");
     expect(source).toContain("Active launch tenants need a customer-facing productionDomain/customDomains entry");
-    expect(source).toContain("Sign in to Scaffold Web | Scaffold Web");
+    expect(source).toContain("Sign in to Strelva | Strelva");
     expect(source).toContain("Deploy a clean release branch containing the current launch-readiness fixes");
     expect(source).toContain("do not only redeploy the existing stale production artifact");
     expect(source).toContain("getDnsContext");
@@ -509,13 +509,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("matching NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
     expect(source).toContain("same live Clerk instance as the publishable/secret keys");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("signed-out dashboard customers");
-    expect(source).toContain("https://scaffoldweb.com/sign-in");
-    expect(source).toContain("Sign in to Scaffold Web | Scaffold Web");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
-    expect(source).toContain("https://scaffoldweb.com/api/health");
-    expect(source).toContain("curl -i https://scaffoldweb.com/api/cron/maintenance");
+    expect(source).toContain("https://strelva.com/sign-in");
+    expect(source).toContain("Sign in to Strelva | Strelva");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
+    expect(source).toContain("https://strelva.com/api/health");
+    expect(source).toContain("curl -i https://strelva.com/api/cron/maintenance");
     expect(source).toContain("/api/admin/invites");
     expect(source).toContain("exact invited email");
     expect(source).toContain("signed-out `/dashboard` and `/no-access` redirect to `/sign-in`");
@@ -556,7 +556,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("signed-out account handoff returns users to sign-in");
     expect(source).toContain("signup page explains invited email recovery");
     expect(source).toContain("admin tenant host sign-up uses the tenant invite context");
-    expect(source).toContain("toHaveTitle(/Sign in to Scaffold Web");
+    expect(source).toContain("toHaveTitle(/Sign in to Strelva");
     expect(source).toContain("toHaveTitle(/Sign in to Great Lakes Dried Fruit");
     expect(source).toContain("toHaveTitle(/Create your dashboard account");
     expect(source).toContain("toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account");
@@ -573,7 +573,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     // pages instead. The negative assertion still holds.
     expect(customerFrontendSmoke).not.toContain("Use the email address from your invite");
     expect(source).toContain("sign-in page allows Clerk JS to load");
-    expect(source).toContain("https://clerk.scaffoldweb.com");
+    expect(source).toContain("https://clerk.strelva.com");
     expect(source).toContain("signupNoAppOk");
     expect(source).toContain("including public sign-up");
     expect(source).toContain("cover sign-in/sign-up recovery paths, account handoff, Clerk JS CSP, and cron protection");
@@ -622,7 +622,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("MARKETING_DOMAINS must include");
     expect(source).toContain("root-domain auth returns customers to /account");
     expect(source).toContain("must resolve to the Vercel Next.js app");
-    expect(source).toContain("A scaffoldweb.com 76.76.21.21");
+    expect(source).toContain("A strelva.com 76.76.21.21");
     expect(source).toContain("remove Porkbun/l.ink forwarding");
     expect(source).toContain("Production domain routing");
     expect(source).toContain("requiredEnv entries are covered by check:prod or storefront handoff docs");
@@ -641,19 +641,19 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(ci).toContain("REB_DEV_UNGATED_ACCESS");
     expect(designKit).toContain("pnpm audit");
     expect(designKit).toContain("pnpm check:release");
-    expect(designKit).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(designKit).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(designKit).toContain("PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com");
     expect(designKit).not.toContain("PLAYWRIGHT_BASE_URL=<deployment-url>");
     expect(designKit).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=<tenant-url>");
     expect(domainSetup).toContain("scaffold-web");
-    expect(domainSetup).toContain("A     scaffoldweb.com    76.76.21.21");
+    expect(domainSetup).toContain("A     strelva.com    76.76.21.21");
     expect(domainSetup).toContain("cname.vercel-dns.com");
-    expect(domainSetup).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
+    expect(domainSetup).toContain("MARKETING_DOMAINS=strelva.com,www.strelva.com");
     expect(domainSetup).toContain("scaffoldweb-com.l.ink");
-    expect(domainSetup).toContain("vercel domains inspect scaffoldweb.com");
-    expect(domainSetup).toContain("dig +short scaffoldweb.com A");
-    expect(domainSetup).toContain("dig +short scaffoldweb.com NS");
-    expect(domainSetup).toContain("dig +short '*.scaffoldweb.com' CNAME");
+    expect(domainSetup).toContain("vercel domains inspect strelva.com");
+    expect(domainSetup).toContain("dig +short strelva.com A");
+    expect(domainSetup).toContain("dig +short strelva.com NS");
+    expect(domainSetup).toContain("dig +short '*.strelva.com' CNAME");
     expect(domainSetup).toContain("Rohlax Wellness Cloudflare DNS");
     expect(domainSetup).toContain("dax.ns.cloudflare.com");
     expect(domainSetup).toContain("dig +short www.rohlaxwellness.com CNAME");
@@ -720,12 +720,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("vercel env pull .env.production.local --environment=production");
     expect(source).toContain("vercel deploy --prod");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("pnpm exec playwright test tests/customer-frontend.spec.ts -g");
     expect(source).toContain('\\"signed-out dashboard customers\\"');
     expect(source).toContain("dirty local working tree");
     expect(source).toContain("Production Live Verification");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("Clerk/Sanity/Stripe webhook deliveries");
     expect(source).toContain("cron 401");
     expect(source).toContain("production live-verification steps");
@@ -743,7 +743,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("use Invite for each tenant ownerEmail");
     expect(source).toContain("signs up or signs in with the exact invited email");
     expect(source).toContain("email stays prefilled when switching between sign-up and sign-in");
-    expect(source).toContain("scaffoldweb.com auth reaches /account");
+    expect(source).toContain("strelva.com auth reaches /account");
     expect(source).toContain("admin.greatlakesdriedfruit.com auth reaches /dashboard/site");
     expect(source).toContain("content create/update/delete events");
     expect(source).toContain("checkout.session.completed");
@@ -756,27 +756,27 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb");
     expect(source).toContain("team_66XTGId41AJGh9vLvkiyXqkZ");
     expect(source).toContain("Production live verification");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("root marketing auth reaches /account");
     expect(source).toContain("invited-owner /dashboard/site access");
     expect(source).toContain("Clerk/Sanity/Stripe webhook deliveries are successful");
     expect(source).toContain("cron 401/success behavior works with CRON_SECRET");
     expect(source).toContain("clear docs/launch-blockers.md Current Blockers");
     expect(source).toContain("DNS verification commands:");
-    expect(source).toContain("vercel domains inspect scaffoldweb.com");
-    expect(source).toContain("dig +short scaffoldweb.com A");
-    expect(source).toContain("dig +short scaffoldweb.com NS");
-    expect(source).toContain("dig +short '*.scaffoldweb.com' CNAME");
-    expect(source).toContain("curl -I -L https://scaffoldweb.com/api/health");
+    expect(source).toContain("vercel domains inspect strelva.com");
+    expect(source).toContain("dig +short strelva.com A");
+    expect(source).toContain("dig +short strelva.com NS");
+    expect(source).toContain("dig +short '*.strelva.com' CNAME");
+    expect(source).toContain("curl -I -L https://strelva.com/api/health");
     expect(launchBlockers).toContain("vercel whoami");
     expect(launchBlockers).toContain("scaffold-web");
     expect(launchBlockers).toContain("### Production Live Verification");
     expect(launchBlockers).toContain("Authenticated production dashboard access");
-    expect(launchBlockers).toContain("https://scaffoldweb.com/sign-in");
-    expect(launchBlockers).toContain("Sign in to Scaffold Web | Scaffold Web");
+    expect(launchBlockers).toContain("https://strelva.com/sign-in");
+    expect(launchBlockers).toContain("Sign in to Strelva | Strelva");
     expect(launchBlockers).toContain("Vercel app-host freshness check");
     expect(launchBlockers).toContain("after production env, redeploy, and DNS are resolved");
-    expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(launchBlockers).toContain("Clerk/Sanity/Stripe webhook deliveries");
     expect(launchBlockers).toContain("Copyable Vercel env commands");
     expect(launchBlockers).toContain("vercel env add CLERK_WEBHOOK_SECRET production");
@@ -802,11 +802,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("git status --short");
     expect(launchBlockers).toContain("dirty local working tree");
     expect(launchBlockers).toContain("Copyable DNS verification commands");
-    expect(launchBlockers).toContain("vercel domains inspect scaffoldweb.com");
+    expect(launchBlockers).toContain("vercel domains inspect strelva.com");
     expect(launchBlockers).toContain("vercel domains inspect rohlaxwellness.com");
-    expect(launchBlockers).toContain("dig +short scaffoldweb.com A");
-    expect(launchBlockers).toContain("dig +short scaffoldweb.com NS");
-    expect(launchBlockers).toContain("dig +short '*.scaffoldweb.com' CNAME");
+    expect(launchBlockers).toContain("dig +short strelva.com A");
+    expect(launchBlockers).toContain("dig +short strelva.com NS");
+    expect(launchBlockers).toContain("dig +short '*.strelva.com' CNAME");
     expect(launchBlockers).toContain("dig +short www.rohlaxwellness.com CNAME");
     expect(launchBlockers).toContain("dig +short admin.rohlaxwellness.com CNAME");
     expect(launchBlockers).toContain("dig +short www.rohlaxwellness.com A");
@@ -821,15 +821,15 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("A admin.rohlaxwellness.com 76.76.21.21");
     expect(launchBlockers).toContain("does not redirect to `scaffoldweb-com.l.ink`");
     expect(launchBlockers).toContain("Copyable verification commands");
-    expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://scaffoldweb.com");
+    expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(launchBlockers).toContain("PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com");
     expect(launchBlockers).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=https://admin.<custom-domain>");
     expect(launchBlockers).not.toContain("PLAYWRIGHT_BASE_URL=<production-or-preview-url>");
     expect(launchBlockers).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=<tenant-url>");
-    expect(launchBlockers).toContain("curl -i https://scaffoldweb.com/api/cron/maintenance");
-    expect(launchBlockers).toContain("https://scaffoldweb.com/api/health");
-    expect(launchBlockers).toContain("stays on `scaffoldweb.com`");
-    expect(launchBlockers).toContain('curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance');
+    expect(launchBlockers).toContain("curl -i https://strelva.com/api/cron/maintenance");
+    expect(launchBlockers).toContain("https://strelva.com/api/health");
+    expect(launchBlockers).toContain("stays on `strelva.com`");
+    expect(launchBlockers).toContain('curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance');
     expect(launchBlockers).toContain("## Waived Blockers");
     expect(launchBlockers).toContain("Status: waived");
     expect(launchBlockers).toContain("Owner: <name or email>");
@@ -928,12 +928,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Owner:");
     expect(productionReadiness).toContain("Follow-up:");
     expect(productionReadiness).toContain("Reason:");
-    expect(productionReadiness).toContain("https://scaffoldweb.com/api/clerk/webhook");
+    expect(productionReadiness).toContain("https://strelva.com/api/clerk/webhook");
     expect(productionReadiness).toContain("user.created");
     expect(productionReadiness).toContain("CLERK_WEBHOOK_SECRET");
-    expect(productionReadiness).toContain("https://scaffoldweb.com/api/sanity/webhook");
+    expect(productionReadiness).toContain("https://strelva.com/api/sanity/webhook");
     expect(productionReadiness).toContain("SANITY_WEBHOOK_SECRET");
-    expect(productionReadiness).toContain("https://scaffoldweb.com/api/billing/webhook");
+    expect(productionReadiness).toContain("https://strelva.com/api/billing/webhook");
     expect(productionReadiness).toContain("checkout.session.completed");
     expect(productionReadiness).toContain("invoice.paid");
     expect(productionReadiness).toContain("invoice.payment_failed");
@@ -992,11 +992,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(checklist).toContain("Google Cloud OAuth client secret");
     expect(checklist).toContain("Meta app Instagram OAuth client secret");
     expect(checklist).toContain("Calendly OAuth app client secret");
-    expect(productionReadiness).toContain("Set `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth connections are enabled.");
+    expect(productionReadiness).toContain("Set `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth connections are enabled.");
     expect(productionReadiness).not.toContain("`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`, and tenant-specific revalidation secrets");
     expect(template).toContain("Required only when Google, Instagram, or Calendly OAuth connections are enabled.");
-    expect(template).toContain("NEXT_PUBLIC_APP_URL=https://scaffoldweb.com");
-    expect(template).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
+    expect(template).toContain("NEXT_PUBLIC_APP_URL=https://strelva.com");
+    expect(template).toContain("MARKETING_DOMAINS=strelva.com,www.strelva.com");
   });
 
   it("uses signed OAuth state for integration callbacks", () => {

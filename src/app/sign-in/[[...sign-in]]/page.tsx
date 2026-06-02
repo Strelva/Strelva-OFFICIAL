@@ -11,7 +11,7 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 
 export const metadata: Metadata = {
   title: "Dashboard access",
-  description: "Sign in to a delivered Scaffold Web dashboard, or request a free site first.",
+  description: "Sign in to a delivered Strelva dashboard, or request a free site first.",
 };
 
 export const dynamic = "force-dynamic";
@@ -88,7 +88,7 @@ export default async function SignInPage({
               className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
             >
               <ArrowLeft className="size-4" />
-              Scaffold Web
+              Strelva
             </Link>
             <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
               Invited dashboard access
@@ -97,7 +97,7 @@ export default async function SignInPage({
               Sign in to manage {invite.siteName}.
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
-              Use <strong>{invite.email}</strong> so Scaffold Web can connect
+              Use <strong>{invite.email}</strong> so Strelva can connect
               the pending invite, open the dashboard, and show what is working.
             </p>
           </section>
@@ -133,7 +133,7 @@ export default async function SignInPage({
               className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
             >
               <ArrowLeft className="size-4" />
-              Scaffold Web
+              Strelva
             </Link>
             <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
               Client dashboard
@@ -143,7 +143,7 @@ export default async function SignInPage({
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
               Use the email address connected to this site. After sign-in,
-              Scaffold Web will open the dashboard for {tenantAuth.siteName}.
+              Strelva will open the dashboard for {tenantAuth.siteName}.
             </p>
           </section>
 
@@ -172,7 +172,7 @@ export default async function SignInPage({
           className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
         >
           <ArrowLeft className="size-4" />
-          Scaffold Web
+          Strelva
         </Link>
 
         <section className="mt-12 overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
@@ -191,7 +191,7 @@ export default async function SignInPage({
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
-              href="mailto:jacob@scaffoldweb.com?subject=Scaffold%20Web%20dashboard%20access"
+              href="mailto:jacob@strelva.com?subject=Strelva%20dashboard%20access"
               className="marketing-button-primary h-11 px-5 text-[14px]"
             >
               Email Jacob

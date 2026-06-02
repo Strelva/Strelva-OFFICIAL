@@ -40,9 +40,9 @@ describe("access request delivery flow", () => {
       ...originalEnv,
       NEXT_PUBLIC_SANITY_PROJECT_ID: "",
       SANITY_API_TOKEN: "",
-      NEXT_PUBLIC_SITE_URL: "https://scaffoldweb.com",
+      NEXT_PUBLIC_SITE_URL: "https://strelva.com",
       RESEND_API_KEY: "re_test",
-      RESEND_DOMAIN: "updates.scaffoldweb.com",
+      RESEND_DOMAIN: "updates.strelva.com",
     };
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
@@ -69,9 +69,9 @@ describe("access request delivery flow", () => {
       success: true,
       emailSent: true,
     });
-    expect(body.statusUrl).toMatch(/^https:\/\/scaffoldweb\.com\/delivery\/[a-f0-9]{36}$/);
+    expect(body.statusUrl).toMatch(/^https:\/\/strelva\.com\/delivery\/[a-f0-9]{36}$/);
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Scaffold Web <hello@updates.scaffoldweb.com>",
+      from: "Strelva <hello@updates.strelva.com>",
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
       html: expect.stringContaining(`href="${body.statusUrl}"`),
@@ -107,7 +107,7 @@ describe("access request delivery flow", () => {
       success: true,
       emailSent: false,
     });
-    expect(body.statusUrl).toMatch(/^https:\/\/scaffoldweb\.com\/delivery\/[a-f0-9]{36}$/);
+    expect(body.statusUrl).toMatch(/^https:\/\/strelva\.com\/delivery\/[a-f0-9]{36}$/);
   });
 
   it("returns the existing status link for repeat email submissions", async () => {
@@ -156,15 +156,15 @@ describe("access request delivery flow", () => {
 
     const html = buildDeliveryStatusEmailHtml({
       businessName: `A&B <script>alert("x")</script>`,
-      statusUrl: `https://scaffoldweb.com/delivery/abc"><script>alert(1)</script>`,
+      statusUrl: `https://strelva.com/delivery/abc"><script>alert(1)</script>`,
     });
     const text = buildDeliveryStatusEmailText({
       businessName: "A&B\r\nBcc: attacker@example.com",
-      statusUrl: "https://scaffoldweb.com/delivery/abc",
+      statusUrl: "https://strelva.com/delivery/abc",
     });
 
     expect(html).toContain("A&amp;B alert(&quot;x&quot;)");
-    expect(html).toContain("https://scaffoldweb.com/delivery/abc&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("https://strelva.com/delivery/abc&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>");
     expect(text).toContain("A&B Bcc: attacker@example.com");
     expect(text).not.toContain("\r");

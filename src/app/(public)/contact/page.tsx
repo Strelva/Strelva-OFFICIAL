@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://scaffoldweb.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
   const description = `Get in touch with ${settings.siteName}. Find our location, hours, and contact information.`;
   return {
     title: `Contact | ${settings.siteName}`,

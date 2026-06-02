@@ -16,8 +16,8 @@ function titleCaseTenantId(tenant: string): string {
 
 export function getTenantSiteName(tenant: string, config: TenantConfig | undefined): string {
   if (config?.siteName) return config.siteName;
-  if (tenant === DEFAULT_TENANT) return "Scaffold Web";
+  if (tenant === DEFAULT_TENANT) return "Strelva";
   if (FALLBACK_TENANT_NAMES[tenant]) return FALLBACK_TENANT_NAMES[tenant];
 
-  return titleCaseTenantId(tenant) || "Scaffold Web";
+  return titleCaseTenantId(tenant) || "Strelva";
 }

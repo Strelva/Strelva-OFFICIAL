@@ -55,7 +55,7 @@ describe("admin invites route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.RESEND_API_KEY = "re_test";
-    process.env.RESEND_DOMAIN = "updates.scaffoldweb.com";
+    process.env.RESEND_DOMAIN = "updates.strelva.com";
     mockGetTenantConfig.mockResolvedValue({
       id: "gldf",
       siteName: `A&B <script>alert("x")</script>`,
@@ -99,7 +99,7 @@ describe("admin invites route", () => {
       "production",
     );
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Scaffold Web <hello@updates.scaffoldweb.com>",
+      from: "Strelva <hello@updates.strelva.com>",
       to: "owner@example.com",
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),

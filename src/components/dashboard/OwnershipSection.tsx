@@ -32,7 +32,7 @@ const MANAGED_ITEMS = [
   "Hosting, deployment pipeline, uptime monitoring, SSL, and production build configuration.",
   "Dashboard software, AI tools, review workflow, analytics presentation, and weekly report generation.",
   "Integration tokens, webhook plumbing, cache/revalidation setup, and platform maintenance.",
-  "Scaffold Web platform source code, deployment credentials, and admin operations.",
+  "Strelva platform source code, deployment credentials, and admin operations.",
 ];
 
 const HANDOFF_STEPS = [
@@ -54,11 +54,11 @@ const HANDOFF_STEPS = [
   },
   {
     title: "Remove domains",
-    body: "After traffic points away, ask Scaffold Web to remove connected custom domains so no stale routing remains.",
+    body: "After traffic points away, ask Strelva to remove connected custom domains so no stale routing remains.",
   },
   {
     title: "Revoke admin access",
-    body: "Remove Scaffold Web from registrar, Google Business Profile, booking, social, email, and analytics accounts after handoff verification.",
+    body: "Remove Strelva from registrar, Google Business Profile, booking, social, email, and analytics accounts after handoff verification.",
   },
 ];
 
@@ -125,7 +125,7 @@ export function OwnershipSection() {
       );
       setNotice(kind === "content" ? "Content export downloaded." : "Asset manifest downloaded.");
     } catch {
-      setError("Could not download that export. Try again or ask Scaffold Web for a handoff package.");
+      setError("Could not download that export. Try again or ask Strelva for a handoff package.");
     } finally {
       setDownloading(null);
     }
@@ -143,9 +143,9 @@ export function OwnershipSection() {
         body: JSON.stringify({ notes: "Client opened ownership settings handoff request." }),
       });
       if (!res.ok) throw new Error("Request failed");
-      setNotice("Handoff request recorded. Scaffold Web can coordinate timing from here.");
+      setNotice("Handoff request recorded. Strelva can coordinate timing from here.");
     } catch {
-      setError("Could not record the handoff request. You can still download exports and contact Scaffold Web directly.");
+      setError("Could not record the handoff request. You can still download exports and contact Strelva directly.");
     } finally {
       setRequesting(false);
     }
@@ -163,7 +163,7 @@ export function OwnershipSection() {
       if (!res.ok || !body?.portalUrl) {
         setBillingError(
           res.status === 404 || !dashboard?.hasStripeCustomer
-            ? "Billing portal is not connected yet. Ask Scaffold Web to handle cancellation timing."
+            ? "Billing portal is not connected yet. Ask Strelva to handle cancellation timing."
             : body?.error || "Could not open the billing portal.",
         );
         return;
@@ -187,7 +187,7 @@ export function OwnershipSection() {
             Ownership
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-            See what belongs to your business, what Scaffold Web manages, and what to export before any offboarding, DNS, or billing change.
+            See what belongs to your business, what Strelva manages, and what to export before any offboarding, DNS, or billing change.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -235,7 +235,7 @@ export function OwnershipSection() {
         <section className="rounded-xl border border-glass-border bg-glass p-5">
           <div className="mb-4 flex items-center gap-2">
             <Lock className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-medium text-warm-white">Scaffold Web manages</h3>
+            <h3 className="text-[16px] font-medium text-warm-white">Strelva manages</h3>
           </div>
           <div className="space-y-3">
             {MANAGED_ITEMS.map((item) => (
@@ -337,7 +337,7 @@ export function OwnershipSection() {
               <p className="text-[13px] font-medium text-warm-white">Admin revocation</p>
             </div>
             <p className="text-[12px] leading-relaxed text-gray-muted">
-              After exports, DNS handoff, and billing timing are confirmed, remove Scaffold Web access from registrar, Google Business, booking, social, email, and analytics accounts.
+              After exports, DNS handoff, and billing timing are confirmed, remove Strelva access from registrar, Google Business, booking, social, email, and analytics accounts.
             </p>
           </div>
         </section>

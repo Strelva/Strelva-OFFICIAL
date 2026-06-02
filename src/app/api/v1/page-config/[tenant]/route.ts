@@ -1,5 +1,5 @@
 /**
- * Scaffold Web v1 public page-config API.
+ * Strelva v1 public page-config API.
  *
  * Stable contract consumed by custom-repo client sites. Change the response
  * shape only by versioning (add a v2 sibling).

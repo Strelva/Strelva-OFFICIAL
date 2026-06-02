@@ -1,5 +1,5 @@
 /**
- * KV-backed rewards member repository (Scaffold Web-owned).
+ * KV-backed rewards member repository (Strelva-owned).
  *
  * Mirrors the Redis hash layout GLDF has today, but tenant-scoped under
  * reb:rewards:{tenant}:*. Every function is async and throws

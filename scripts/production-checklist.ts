@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Production Readiness Checklist for Scaffold Web
+ * Production Readiness Checklist for Strelva
  *
  * Run with: npx tsx scripts/production-checklist.ts
  *
@@ -52,9 +52,9 @@ const locallyGeneratedSecrets = new Set([
 ]);
 
 const scaffoldWebDomainAction =
-  "Point scaffoldweb.com at Vercel project scaffold-web with A scaffoldweb.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
-const VERCEL_APP_URL = "https://scaffoldweb.com";
-const EXPECTED_SIGN_IN_TITLE = "Sign in to Scaffold Web | Scaffold Web";
+  "Point strelva.com at Vercel project scaffold-web with A strelva.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
+const VERCEL_APP_URL = "https://strelva.com";
+const EXPECTED_SIGN_IN_TITLE = "Sign in to Strelva | Strelva";
 // Billing price is intentionally undecided: client sites are free for now and
 // the admin-side price has not been set. If STRIPE_SCAFFOLD_PRICE_ID is
 // configured, we validate the *shape* (recurring monthly USD), not a specific
@@ -75,9 +75,9 @@ const envSourceHints: Record<string, string> = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "Clerk dashboard live instance",
   NEXT_PUBLIC_CLERK_SIGN_IN_URL: "Set to /sign-in",
   NEXT_PUBLIC_CLERK_SIGN_UP_URL: "Set to /sign-up",
-  NEXT_PUBLIC_APP_URL: "https://scaffoldweb.com or the deployed control-plane URL used for OAuth callbacks",
+  NEXT_PUBLIC_APP_URL: "https://strelva.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
-  NEXT_PUBLIC_SITE_URL: "https://scaffoldweb.com",
+  NEXT_PUBLIC_SITE_URL: "https://strelva.com",
   SCAFFOLD_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints. Canonical name; the agent route falls back to REB_CUSTOM_REQUEST_SECRET if this is unset.",
   REB_CUSTOM_REQUEST_SECRET: "Legacy alias for SCAFFOLD_CUSTOM_REQUEST_SECRET. Kept readable so deployed custom repos that still set the REB_ name keep working.",
   RESEND_API_KEY: "Resend production API key",
@@ -159,7 +159,7 @@ function checkOptionalPair(idName: string, secretName: string, label: string): b
 }
 
 console.log("\n═══════════════════════════════════════════════════════════════");
-console.log("  Scaffold Web Production Readiness Checklist");
+console.log("  Strelva Production Readiness Checklist");
 console.log("═══════════════════════════════════════════════════════════════\n");
 
 console.log("─── Core Auth (Clerk) ───────────────────────────────────────────");
@@ -195,9 +195,9 @@ checkFileContains("docs/design-kit.md", "Design kit", [
 ]);
 checkFileContains("docs/domain-setup.md", "Domain setup doc", [
   "scaffold-web",
-  "A     scaffoldweb.com    76.76.21.21",
+  "A     strelva.com    76.76.21.21",
   "cname.vercel-dns.com",
-  "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com",
+  "MARKETING_DOMAINS=strelva.com,www.strelva.com",
   "scaffoldweb-com.l.ink",
   "pnpm check:prod",
 ]);
@@ -214,9 +214,9 @@ checkFileContains("docs/production-readiness.md", "Production readiness doc", [
   "vercel deploy --prod",
   "git status --short",
   "dirty local working tree",
-  "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
-  "https://scaffoldweb.com/api/health",
-  "curl -i https://scaffoldweb.com/api/cron/maintenance",
+  "PLAYWRIGHT_BASE_URL=https://strelva.com",
+  "https://strelva.com/api/health",
+  "curl -i https://strelva.com/api/cron/maintenance",
   "root marketing hosts",
   "/account",
   "Use invited email",
@@ -336,17 +336,17 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel deploy --prod",
     "git status --short",
     "dirty local working tree",
-    "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
+    "PLAYWRIGHT_BASE_URL=https://strelva.com",
     "signed-out dashboard customers",
-    "https://scaffoldweb.com/sign-in",
-    "Sign in to Scaffold Web | Scaffold Web",
+    "https://strelva.com/sign-in",
+    "Sign in to Strelva | Strelva",
     "Production Live Verification",
-    "PLAYWRIGHT_BASE_URL=https://scaffoldweb.com",
-    "https://scaffoldweb.com/api/cron/maintenance",
-    "https://scaffoldweb.com/api/health",
+    "PLAYWRIGHT_BASE_URL=https://strelva.com",
+    "https://strelva.com/api/cron/maintenance",
+    "https://strelva.com/api/health",
     "Clerk/Sanity/Stripe webhook deliveries",
-    "curl -i https://scaffoldweb.com/api/cron/maintenance",
-    'curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance',
+    "curl -i https://strelva.com/api/cron/maintenance",
+    'curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance',
     "cron 401",
     "Status: waived",
     "Owner:",
@@ -493,7 +493,7 @@ function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
     "admin tenant host sign-up uses the tenant invite context",
     "signed-out no-access recovery returns users to sign-in",
     "signup page explains invited email recovery",
-    "toHaveTitle(/Sign in to Scaffold Web",
+    "toHaveTitle(/Sign in to Strelva",
     "toHaveTitle(/Sign in to Great Lakes Dried Fruit",
     "toHaveTitle(/Create your dashboard account",
     "toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account",
@@ -502,7 +502,7 @@ function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
     "cron maintenance endpoint is not public",
     "/api/cron/maintenance",
     "process.env.PLAYWRIGHT_BASE_URL",
-    "https://clerk.scaffoldweb.com",
+    "https://clerk.strelva.com",
     "not.toHaveURL(/\\/app/)",
   ];
   const missing = requiredTerms.filter((term) => !content.includes(term));
@@ -569,7 +569,7 @@ function checkAuthAccessPages(
     signUp.includes('"/account"') &&
     signUp.includes('"/dashboard"') &&
     [signIn, signUp].every((content) =>
-      content.includes("mailto:jacob@scaffoldweb.com") &&
+      content.includes("mailto:jacob@strelva.com") &&
       content.includes("form is not loading") &&
       !content.includes('"/app"')
     );
@@ -582,7 +582,7 @@ function checkAuthAccessPages(
     noAccess.includes("UseInvitedEmailButton") &&
     noAccess.includes("signs you out so you can choose that account") &&
     noAccess.includes('withClientFallbackRoot(clientFallbackRoot, "/sign-in")') &&
-    noAccess.includes("mailto:jacob@scaffoldweb.com") &&
+    noAccess.includes("mailto:jacob@strelva.com") &&
     noAccess.includes('href="/account"') &&
     noAccess.includes("Choose another site") &&
     !noAccess.includes('href="/"');
@@ -591,7 +591,7 @@ function checkAuthAccessPages(
     account.includes("UseInvitedEmailButton") &&
     account.includes("signs you out so you can choose that account") &&
     account.includes("Request a free site") &&
-    account.includes("mailto:jacob@scaffoldweb.com") &&
+    account.includes("mailto:jacob@strelva.com") &&
     account.includes("!tenantConfigs.some(({ config }) => config)") &&
     account.includes("return <NoAccessState />");
   const recoveryButtonOk =
@@ -1339,7 +1339,7 @@ async function getDnsContext(host: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function printWebhookUrls() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://scaffoldweb.com";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
 
   console.log("\n═══════════════════════════════════════════════════════════════");
   console.log("  Webhook URLs (configure in external services)");
@@ -1575,7 +1575,7 @@ function printReleaseActions() {
     console.log("  # When env checks pass, redeploy before live verification:");
     console.log("  git status --short");
     console.log("  vercel deploy --prod");
-    console.log("  PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    console.log("  PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     console.log();
   }
 
@@ -1598,16 +1598,16 @@ function printReleaseActions() {
     failedEnvs.includes("RESEND_API_KEY") ||
     failedEnvs.includes("RESEND_DOMAIN")
   ) {
-    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email, the email stays prefilled when switching between sign-up and sign-in, scaffoldweb.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
+    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email, the email stays prefilled when switching between sign-up and sign-in, strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
   }
   if (failedEnvs.includes("CLERK_WEBHOOK_SECRET")) {
-    console.log("- Clerk webhook: configure https://scaffoldweb.com/api/clerk/webhook for user.created.");
+    console.log("- Clerk webhook: configure https://strelva.com/api/clerk/webhook for user.created.");
   }
   if (failedEnvs.includes("SANITY_WEBHOOK_SECRET")) {
-    console.log("- Sanity webhook: configure https://scaffoldweb.com/api/sanity/webhook for content create/update/delete events with the matching SANITY_WEBHOOK_SECRET.");
+    console.log("- Sanity webhook: configure https://strelva.com/api/sanity/webhook for content create/update/delete events with the matching SANITY_WEBHOOK_SECRET.");
   }
   if (failedEnvs.includes("STRIPE_WEBHOOK_SECRET")) {
-    console.log("- Stripe webhook: configure https://scaffoldweb.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
+    console.log("- Stripe webhook: configure https://strelva.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
   }
   if (failedEnvs.includes("UPSTASH_REDIS_REST_URL") || failedEnvs.includes("UPSTASH_REDIS_REST_TOKEN")) {
     console.log("- Redis: provision Upstash REST credentials before enabling production queues, rate limits, and reports.");
@@ -1618,13 +1618,13 @@ function printReleaseActions() {
     }
     if (launchBlockers.includes("Vercel app freshness")) {
       console.log("- Vercel app freshness: push/deploy a clean release branch containing the current launch-readiness fixes; do not only redeploy the existing stale production artifact. Then rerun `pnpm check:prod` and the app-host smoke probe:");
-      console.log("  PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+      console.log("  PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     }
     if (launchBlockers.includes("Production Live Verification")) {
-      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
+      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
       console.log("  Cron auth commands:");
-      console.log("    curl -i https://scaffoldweb.com/api/cron/maintenance");
-      console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance');
+      console.log("    curl -i https://strelva.com/api/cron/maintenance");
+      console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance');
     }
     console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
   }
@@ -1648,11 +1648,11 @@ function printReleaseActions() {
   if (results.some((result) => result.name === "Production site URL" && result.status === "fail")) {
     console.log(`- Production domain routing: ${scaffoldWebDomainAction} Wait for DNS/SSL propagation, then rerun \`pnpm check:prod\`.`);
     console.log("  DNS verification commands:");
-    console.log("    vercel domains inspect scaffoldweb.com");
-    console.log("    dig +short scaffoldweb.com A");
-    console.log("    dig +short scaffoldweb.com NS");
-    console.log("    dig +short '*.scaffoldweb.com' CNAME");
-    console.log("    curl -I -L https://scaffoldweb.com/api/health");
+    console.log("    vercel domains inspect strelva.com");
+    console.log("    dig +short strelva.com A");
+    console.log("    dig +short strelva.com NS");
+    console.log("    dig +short '*.strelva.com' CNAME");
+    console.log("    curl -I -L https://strelva.com/api/health");
   }
   console.log();
 }

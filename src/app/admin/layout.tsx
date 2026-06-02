@@ -17,7 +17,7 @@ export default async function AdminLayout({
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="text-sm font-semibold tracking-wide text-white">
-              Scaffold Web Admin
+              Strelva Admin
             </span>
             <div className="flex items-center gap-4 text-sm text-zinc-400">
               <Link href="/admin" className="hover:text-white transition-colors">

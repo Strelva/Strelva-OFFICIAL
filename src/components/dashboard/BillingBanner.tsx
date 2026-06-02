@@ -32,7 +32,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
       if (!res.ok) {
         setError(
           res.status === 404
-            ? "Billing is not connected yet. Ask Scaffold Web to turn on the billing portal."
+            ? "Billing is not connected yet. Ask Strelva to turn on the billing portal."
             : body?.error || "Couldn't open billing. Try again.",
         );
         return;

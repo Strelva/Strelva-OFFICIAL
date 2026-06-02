@@ -685,7 +685,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               body: JSON.stringify({
                 feature: normalizedFeature,
                 summary: cleanSummary,
-                requestedBy: "Scaffold Web AI agent",
+                requestedBy: "Strelva AI agent",
               }),
             });
 
@@ -1382,7 +1382,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
           const settings = await getContent("settings", tenant);
 
           // Build the site URL
-          const domain = config?.productionDomain || `${tenant}.scaffoldweb.com`;
+          const domain = config?.productionDomain || `${tenant}.strelva.com`;
           const url = `https://${domain}`;
 
           return {

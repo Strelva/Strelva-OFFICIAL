@@ -14,7 +14,7 @@ goal:
     authority: requested
     proof_type: external_payment
     completion_proof: "Payment page is live, email is sent, and Stripe payment succeeds."
-    likely_misfire: "Using the fixed Scaffold Web subscription checkout instead of a one-time variable-amount payment link."
+    likely_misfire: "Using the fixed Strelva subscription checkout instead of a one-time variable-amount payment link."
     local_facts:
       - "Rohlax tenant id is `rohlax`."
       - "`rohlaxwellness.com` maps to `rohlax` in local environment config."
@@ -48,7 +48,7 @@ tasks:
       - "Confirm the endpoint rejects amounts outside $300 to $1,000."
     receipt:
       result: done
-      payment_url: "https://scaffoldweb.com/pay/rohlax"
+      payment_url: "https://strelva.com/pay/rohlax"
   - id: T002
     type: operator
     assignee: Jacob
@@ -57,7 +57,7 @@ tasks:
     inputs:
       - "notes/T001-email-draft.md"
     verify:
-      - "Email includes `https://scaffoldweb.com/pay/rohlax`."
+      - "Email includes `https://strelva.com/pay/rohlax`."
       - "Email states the $300-$1,000 range plainly."
     receipt:
       result: pending

@@ -121,7 +121,7 @@ export function ReportsClient({
         <div className="mb-8">
           <h1 className="text-[24px] font-medium text-warm-white">Weekly reports</h1>
           <p className="text-[13px] text-gray-muted mt-1">
-            Plain-English proof of what Scaffold Web handled for {siteName}
+            Plain-English proof of what Strelva handled for {siteName}
           </p>
         </div>
 
@@ -166,7 +166,7 @@ export function ReportsClient({
             Why this matters
           </div>
           <p className="text-[14px] leading-relaxed text-gray-fg">
-            This week Scaffold Web helped {pageViews.thisWeek.toLocaleString()} people find you, tracked {bookingClicks.thisWeek.toLocaleString()} high-intent action{bookingClicks.thisWeek === 1 ? "" : "s"}, and kept a record of what changed on your site.
+            This week Strelva helped {pageViews.thisWeek.toLocaleString()} people find you, tracked {bookingClicks.thisWeek.toLocaleString()} high-intent action{bookingClicks.thisWeek === 1 ? "" : "s"}, and kept a record of what changed on your site.
           </p>
         </div>
 

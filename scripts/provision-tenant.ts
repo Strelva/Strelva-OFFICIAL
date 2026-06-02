@@ -176,7 +176,7 @@ Usage: pnpm provision-tenant [options]
 
 Required:
   --id <id>              Tenant ID (lowercase, hyphens allowed)
-  --subdomain <sub>      Subdomain for scaffoldweb.com
+  --subdomain <sub>      Subdomain for strelva.com
   --siteName <name>      Display name for the site
   --ownerName <name>     Business owner's name
   --industry <type>      ${VALID_INDUSTRIES.join(" | ")}
@@ -391,7 +391,7 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
 
   console.log(`\n--- Environment Variables for Client Site ---\n`);
   console.log(`TENANT_ID=${tenant.id}`);
-  console.log(`SCAFFOLD_API_URL=https://scaffoldweb.com`);
+  console.log(`SCAFFOLD_API_URL=https://strelva.com`);
   console.log(`NEXT_PUBLIC_SITE_NAME=${tenant.siteName}`);
   console.log(`NEXT_PUBLIC_SITE_URL=${tenant.siteUrl}`);
   console.log(`REVALIDATION_SECRET=${tenant.revalidationSecret}`);
@@ -400,7 +400,7 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
 
   console.log(`\n--- Vercel CLI Commands ---\n`);
   console.log(`vercel env add TENANT_ID production <<< '${tenant.id}'`);
-  console.log(`vercel env add SCAFFOLD_API_URL production <<< 'https://scaffoldweb.com'`);
+  console.log(`vercel env add SCAFFOLD_API_URL production <<< 'https://strelva.com'`);
   console.log(`vercel env add NEXT_PUBLIC_SITE_NAME production <<< '${shellEscape(tenant.siteName)}'`);
   console.log(`vercel env add NEXT_PUBLIC_SITE_URL production <<< '${tenant.siteUrl}'`);
   console.log(`vercel env add REVALIDATION_SECRET production <<< '${tenant.revalidationSecret}'`);
@@ -476,7 +476,7 @@ async function main() {
   const revalidationSecret = generateSecret();
   const productionDomain = normalizeDomain(config.productionDomain);
   const adminDomain = normalizeDomain(config.adminDomain) || (productionDomain ? `admin.${productionDomain}` : undefined);
-  const siteUrl = productionDomain ? `https://${productionDomain}` : `https://${config.subdomain}.scaffoldweb.com`;
+  const siteUrl = productionDomain ? `https://${productionDomain}` : `https://${config.subdomain}.strelva.com`;
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
 
   const tenant: TenantConfig = {

@@ -109,7 +109,7 @@ export async function GET() {
       "Download original files from each listed URL before changing DNS.",
       "Keep filenames and alt-text mapping together for the next provider.",
       "Confirm logo, hero images, service photos, provider photos, and product photos are present.",
-      "Ask Scaffold Web for any source files that are not represented by a public URL.",
+      "Ask Strelva for any source files that are not represented by a public URL.",
     ],
   };
 

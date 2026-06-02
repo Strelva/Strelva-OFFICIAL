@@ -1,6 +1,6 @@
 # First-Time Production Secrets Setup
 
-This is the plain-English checklist for getting Scaffold Web production-ready.
+This is the plain-English checklist for getting Strelva production-ready.
 Do not paste real secrets into ChatGPT, Slack, GitHub, or docs. Put them directly into Vercel Production environment variables.
 
 ## Goal
@@ -19,7 +19,7 @@ Right now the production blocker list is:
 - Missing `UPSTASH_REDIS_REST_TOKEN`
 - Missing `SENTRY_DSN`
 - Missing `NEXT_PUBLIC_SENTRY_DSN`
-- `scaffoldweb.com` DNS points to Porkbun/l.ink forwarding instead of Vercel
+- `strelva.com` DNS points to Porkbun/l.ink forwarding instead of Vercel
 - Final live verification has not been run
 
 ## Before You Start
@@ -32,7 +32,7 @@ You need admin access to:
 - Upstash account
 - Sentry account
 - Stripe live account
-- Porkbun or wherever `scaffoldweb.com` DNS is managed
+- Porkbun or wherever `strelva.com` DNS is managed
 
 From the repo:
 
@@ -72,7 +72,7 @@ In Clerk:
 3. Add an endpoint:
 
 ```text
-https://scaffoldweb.com/api/clerk/webhook
+https://strelva.com/api/clerk/webhook
 ```
 
 4. Select event:
@@ -102,7 +102,7 @@ In Sanity:
 4. Endpoint URL:
 
 ```text
-https://scaffoldweb.com/api/sanity/webhook
+https://strelva.com/api/sanity/webhook
 ```
 
 5. Trigger it for content create/update/delete events.
@@ -148,7 +148,7 @@ Sentry is required by the production checker for monitoring.
 
 In Sentry:
 
-1. Create or open the Scaffold Web project.
+1. Create or open the Strelva project.
 2. Use a Next.js / JavaScript project.
 3. Find the DSN/client key.
 4. Use the DSN for both server and browser unless Sentry gives you separate values:
@@ -167,7 +167,7 @@ The current production `STRIPE_SCAFFOLD_PRICE_ID` already points to the intended
 If you ever need to recreate it in Stripe live mode:
 
 1. Open Products.
-2. Create or open the Scaffold Web product.
+2. Create or open the Strelva product.
 3. Create a recurring monthly price:
 
 ```text
@@ -190,7 +190,7 @@ Paste the new `$149/mo` live `price_...` value.
 Stripe webhook should also be configured:
 
 ```text
-https://scaffoldweb.com/api/billing/webhook
+https://strelva.com/api/billing/webhook
 ```
 
 Required events:
@@ -204,18 +204,18 @@ customer.subscription.deleted
 
 The current checker says `STRIPE_WEBHOOK_SECRET` is already set, but verify it matches this endpoint.
 
-## 6. DNS For scaffoldweb.com
+## 6. DNS For strelva.com
 
-Right now `scaffoldweb.com` routes to Porkbun/l.ink forwarding, not the Vercel Next.js app.
+Right now `strelva.com` routes to Porkbun/l.ink forwarding, not the Vercel Next.js app.
 
 In Porkbun DNS:
 
-1. Remove URL forwarding / l.ink forwarding for `scaffoldweb.com`.
+1. Remove URL forwarding / l.ink forwarding for `strelva.com`.
 2. Either point the apex at Vercel:
 
 ```text
 Type: A
-Host: scaffoldweb.com or @
+Host: strelva.com or @
 Value: 76.76.21.21
 ```
 
@@ -229,13 +229,13 @@ ns2.vercel-dns.com
 Then verify:
 
 ```bash
-vercel domains inspect scaffoldweb.com
-dig +short scaffoldweb.com A
-dig +short scaffoldweb.com NS
-curl -I -L https://scaffoldweb.com/api/health
+vercel domains inspect strelva.com
+dig +short strelva.com A
+dig +short strelva.com NS
+curl -I -L https://strelva.com/api/health
 ```
 
-Expected result: `https://scaffoldweb.com/api/health` should stay on `scaffoldweb.com` and return the Vercel Next.js health response. It should not redirect to `scaffoldweb-com.l.ink`.
+Expected result: `https://strelva.com/api/health` should stay on `strelva.com` and return the Vercel Next.js health response. It should not redirect to `scaffoldweb-com.l.ink`.
 
 ## 7. Pull Env And Recheck
 
@@ -266,12 +266,12 @@ Do not deploy from a dirty working tree unless you intentionally want those loca
 After env, DNS, and redeploy are complete:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 ```
 
 Then manually verify:
 
-- `https://scaffoldweb.com/api/health` returns the app health response.
+- `https://strelva.com/api/health` returns the app health response.
 - Signed-out `/dashboard` redirects to `/sign-in`.
 - `/sign-in` and `/sign-up` explain using the invited email.
 - An invited owner can access `/dashboard/site`.
@@ -282,8 +282,8 @@ Then manually verify:
 - Cron is protected:
 
 ```bash
-curl -i https://scaffoldweb.com/api/cron/maintenance
-curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance
+curl -i https://strelva.com/api/cron/maintenance
+curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance
 ```
 
 The first cron request should return `401`. The second should not return `401`.
@@ -306,6 +306,6 @@ pnpm check:prod
 
 - Do not use test-mode Clerk or Stripe keys.
 - Do not use a Stripe price unless it is live, monthly, USD, and exactly `$149`.
-- Do not leave `scaffoldweb.com` forwarding through l.ink.
+- Do not leave `strelva.com` forwarding through l.ink.
 - Do not mark launch blockers as waived unless there is an explicit owner-approved reason and follow-up date.
-- Do not consider launch complete until `pnpm check:release` passes against `https://scaffoldweb.com`.
+- Do not consider launch complete until `pnpm check:release` passes against `https://strelva.com`.

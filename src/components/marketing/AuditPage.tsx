@@ -225,7 +225,7 @@ export function AuditPage() {
             className="inline-flex items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
           >
             <ArrowLeft className="size-4" />
-            Scaffold Web
+            Strelva
           </Link>
         </div>
 
@@ -379,7 +379,7 @@ export function AuditPage() {
                 Your site scored {result.overallScore}/100.
               </h3>
               <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-[color:var(--m-text-2)]">
-                Scaffold Web builds and manages local business websites that
+                Strelva builds and manages local business websites that
                 score higher — with AI-powered updates, health monitoring, and
                 weekly reports.
               </p>

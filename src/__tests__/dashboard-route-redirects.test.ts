@@ -106,7 +106,7 @@ describe("dashboard route redirects", () => {
     expect(signUp).toContain('"/dashboard"');
 
     for (const source of [signIn, signUp]) {
-      expect(source).toContain("mailto:jacob@scaffoldweb.com");
+      expect(source).toContain("mailto:jacob@strelva.com");
       expect(source).not.toContain('"/app"');
     }
     expect(signInPage).not.toContain('"/app"');
@@ -129,7 +129,7 @@ describe("dashboard route redirects", () => {
     expect(source).toContain('withClientFallbackRoot(clientFallbackRoot, "/sign-in")');
     expect(source).toContain("Use the exact email address that received your invite");
     expect(source).toContain("signs you out so you can choose that account");
-    expect(source).toContain("mailto:jacob@scaffoldweb.com");
+    expect(source).toContain("mailto:jacob@strelva.com");
     expect(source).toContain('href="/account"');
     expect(source).toContain("Choose another site");
     expect(source).not.toContain('href="/"');
@@ -142,7 +142,7 @@ describe("dashboard route redirects", () => {
     expect(source).toContain("No invited sites on this account");
     expect(source).toContain("UseInvitedEmailButton");
     expect(source).toContain("Request a free site");
-    expect(source).toContain("mailto:jacob@scaffoldweb.com");
+    expect(source).toContain("mailto:jacob@strelva.com");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("return <NoAccessState />");
   });

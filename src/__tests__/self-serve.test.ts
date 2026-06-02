@@ -164,8 +164,8 @@ describe("tenant subscription checkout", () => {
       tenant: makeTenant({ stripeCustomerId: undefined }),
       customerEmail: "avery@example.com",
       customerName: "Avery",
-      successUrl: "https://scaffoldweb.com/success",
-      cancelUrl: "https://scaffoldweb.com/cancel",
+      successUrl: "https://strelva.com/success",
+      cancelUrl: "https://strelva.com/cancel",
     });
 
     expect(checkout.checkoutUrl).toBe("https://checkout.stripe.com/session");

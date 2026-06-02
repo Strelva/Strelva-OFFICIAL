@@ -1,6 +1,6 @@
 export const DEFAULT_MARKETING_HOSTS = [
-  "scaffoldweb.com",
-  "www.scaffoldweb.com",
+  "strelva.com",
+  "www.strelva.com",
   "localhost",
   "localhost:3000",
   "localhost:3001",

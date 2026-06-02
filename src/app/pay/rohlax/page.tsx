@@ -31,7 +31,7 @@ export default async function RohlaxPaymentPage({ searchParams }: PageProps) {
             Website payment
           </Link>
           <a
-            href="mailto:jacob@scaffoldweb.com"
+            href="mailto:jacob@strelva.com"
             className="text-[13px] font-medium text-[#5f7667] hover:text-[#172117]"
           >
             Contact Jacob

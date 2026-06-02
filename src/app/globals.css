@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =============================================
-   Scaffold Web — Design System
+   Strelva — Design System
    ============================================= */
 
 :root {
@@ -1428,7 +1428,7 @@ body {
   animation: typing-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Scaffold Web accent line — visual signature */
+/* Strelva accent line — visual signature */
 .reb-accent-line {
   height: 2px;
   background: linear-gradient(90deg, var(--sage) 0%, var(--sage-dark) 50%, transparent 100%);

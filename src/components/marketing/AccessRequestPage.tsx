@@ -116,7 +116,7 @@ function AccessRequestForm() {
             className="inline-flex items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
           >
             <ArrowLeft className="size-4" />
-            Scaffold Web
+            Strelva
           </Link>
 
           <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">

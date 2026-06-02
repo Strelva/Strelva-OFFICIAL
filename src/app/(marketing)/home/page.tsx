@@ -4,9 +4,9 @@ import { ArrowRight } from "lucide-react";
 import { HeroWordRotator } from "@/components/marketing/HeroWordRotator";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - Managed website operations for local businesses",
+  title: "Strelva - Managed website operations for local businesses",
   description:
-    "Scaffold Web builds and manages local business websites with a weekly plain-English receipt and a simple update path.",
+    "Strelva builds and manages local business websites with a weekly plain-English receipt and a simple update path.",
 };
 
 export default function HomePage() {
@@ -51,7 +51,7 @@ export default function HomePage() {
                 <HeroWordRotator />
               </h1>
               <p className="mt-6 max-w-[660px] text-[17px] leading-[1.55] tracking-normal text-[color:var(--m-text-2)] sm:text-[19px]">
-                Send the change. Scaffold keeps the site current, checks it before publish, and shows what worked.
+                Send the change. Strelva keeps the site current, checks it before publish, and shows what worked.
               </p>
               <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
                 <Link href="/access-request?ref=home-hero" className="marketing-button-primary">

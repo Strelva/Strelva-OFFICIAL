@@ -83,8 +83,8 @@ function NoAccessState() {
           className="text-[15px] leading-relaxed mb-4"
           style={{ color: "var(--m-text-2)" }}
         >
-          You&apos;re signed in, but this email is not connected to a Scaffold
-          Web dashboard yet. Most access issues happen when the invite was sent
+          You&apos;re signed in, but this email is not connected to a Strelva
+          dashboard yet. Most access issues happen when the invite was sent
           to a different email address.
         </p>
         <p
@@ -93,8 +93,8 @@ function NoAccessState() {
         >
           Use the exact email address that received your invite. The button
           below signs you out so you can choose that account. You can also email{" "}
-          <a className="underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
-            jacob@scaffoldweb.com
+          <a className="underline-offset-4 hover:underline" href="mailto:jacob@strelva.com">
+            jacob@strelva.com
           </a>{" "}
           and we&apos;ll connect the right account.
         </p>
@@ -188,7 +188,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
                   className="text-[13px] mt-0.5"
                   style={{ color: "var(--m-text-3)" }}
                 >
-                  Fallback via scaffoldweb.com
+                  Fallback via strelva.com
                   <span className="block">{domain}</span>
                 </div>
               </a>

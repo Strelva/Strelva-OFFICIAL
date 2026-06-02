@@ -1,10 +1,10 @@
-# Scaffold Web Design Kit
+# Strelva Design Kit
 
-This kit is the source of truth for Scaffold Web product surfaces and tenant storefront direction. It is intentionally practical: ship clear, accessible, fast interfaces first, then add expressive details where they help the business feel specific.
+This kit is the source of truth for Strelva product surfaces and tenant storefront direction. It is intentionally practical: ship clear, accessible, fast interfaces first, then add expressive details where they help the business feel specific.
 
 ## 2026 Design Position
 
-Scaffold Web should feel like a calm operating system for local businesses, not a generic AI landing page.
+Strelva should feel like a calm operating system for local businesses, not a generic AI landing page.
 
 - Product UI is quiet, dense, dark, and operational. It should support repeated daily use, scanning, queue review, content editing, and owner approvals.
 - Tenant storefronts are warm, visual, and brand-led. The first viewport should show the real business, product, place, result, or owner whenever content is available.
@@ -14,7 +14,7 @@ Scaffold Web should feel like a calm operating system for local businesses, not 
 
 ## Brand System
 
-### Scaffold Web Control Plane
+### Strelva Control Plane
 
 - Mood: precise, restrained, capable, no-hype.
 - Background: near-black product canvas with neutral raised surfaces.
@@ -162,8 +162,8 @@ Current template categories:
 
 Before launch:
 
-- Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm audit`, `pnpm build`, `pnpm check:prod`, and `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke`.
-- Or run `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; local smoke runs against the built Next app and `check:release` forces `REB_DEV_UNGATED_ACCESS=0`.
+- Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm audit`, `pnpm build`, `pnpm check:prod`, and `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke`.
+- Or run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; local smoke runs against the built Next app and `check:release` forces `REB_DEV_UNGATED_ACCESS=0`.
 - Verify dashboard desktop and mobile views manually.
 - Verify at least one tenant storefront on mobile and desktop.
 - Confirm marketing `/home`, `/access-request`, `/sign-in`, `/privacy`, and `/terms` are live.

@@ -1,6 +1,6 @@
 # Design
 
-Scaffold Web uses one shared token contract for three surface families: the product dashboard, Scaffold marketing pages, and tenant storefronts.
+Strelva uses one shared token contract for three surface families: the product dashboard, Strelva marketing pages, and tenant storefronts.
 
 ## Product Dashboard
 
@@ -31,9 +31,9 @@ Tenant storefronts are brand-led and visual. They use tenant theme variables fro
 - Keep product radii compact, usually `6px` to `8px`; reserve full pills for small controls and status indicators.
 - Component primitives in `src/components/ui` are preferred over hand-rolled controls for new dashboard work.
 
-## Scaffold Marketing
+## Strelva Marketing
 
-The Scaffold Web marketing surface is a restrained technical brand scene, not a generic AI SaaS page. It should feel precise, operational, and trustworthy: dark graphite surfaces, tinted neutrals, a green-cyan system accent, visible proof loops, and direct signup paths.
+The Strelva marketing surface is a restrained technical brand scene, not a generic AI SaaS page. It should feel precise, operational, and trustworthy: dark graphite surfaces, tinted neutrals, a green-cyan system accent, visible proof loops, and direct signup paths.
 
 - Marketing pages use the `--m-*` token family in `src/app/globals.css`.
 - Color strategy is restrained technical: graphite base, tinted rules, one green-cyan system accent, and warm-white primary actions.

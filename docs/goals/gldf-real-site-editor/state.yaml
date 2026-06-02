@@ -4,21 +4,21 @@ goal:
   title: "Make GLDF Site Editing Real"
   slug: "gldf-real-site-editor"
   kind: specific
-  tranche: "Fill the Scaffold Web-to-GLDF editing gap so the owner dashboard edits the real GLDF storefront path."
+  tranche: "Fill the Strelva-to-GLDF editing gap so the owner dashboard edits the real GLDF storefront path."
   status: done
   intake:
     original_request: "/goal lets fully get this gap filled and fully working"
     interpreted_outcome: "The GLDF dashboard site editor must preview, edit, publish, and revalidate the same custom GLDF storefront that customers see without waiting on a GLDF production deploy."
     input_shape: specific
-    audience: "GLDF owner and Scaffold operator"
+    audience: "GLDF owner and Strelva operator"
     authority: requested
     proof_type: demo
-    completion_proof: "Browser shows live preview via Scaffold Web proxy by default and Edit mode iframe pointed at Scaffold Web's authenticated edit-preview proxy for the GLDF storefront; tests pass on Scaffold Web and GLDF contracts."
-    likely_misfire: "Scaffold Web could make its generic template preview editable while still not editing the real GLDF custom storefront."
+    completion_proof: "Browser shows live preview via Strelva proxy by default and Edit mode iframe pointed at Strelva's authenticated edit-preview proxy for the GLDF storefront; tests pass on Strelva and GLDF contracts."
+    likely_misfire: "Strelva could make its generic template preview editable while still not editing the real GLDF custom storefront."
     blind_spots_considered:
-      - "GLDF is a separate repo and must speak the Scaffold Web iframe edit protocol."
-      - "Scaffold Web should inject the edit bridge itself so owner editing works before GLDF is redeployed."
-      - "Publishing must still revalidate GLDF after Scaffold Web content writes."
+      - "GLDF is a separate repo and must speak the Strelva iframe edit protocol."
+      - "Strelva should inject the edit bridge itself so owner editing works before GLDF is redeployed."
+      - "Publishing must still revalidate GLDF after Strelva content writes."
       - "The owner-facing Edit button must actually enter editable preview mode."
     existing_plan_facts: []
 
@@ -60,7 +60,7 @@ tasks:
     assignee: PM
     status: done
     reasoning_hint: default
-    objective: "Trace the Scaffold Web-to-GLDF preview and publish contract."
+    objective: "Trace the Strelva-to-GLDF preview and publish contract."
     inputs:
       - "/Users/laneyfraass/websites/reb"
       - "/Users/laneyfraass/websites/gldf"
@@ -73,15 +73,15 @@ tasks:
       result: done
       summary: "Mapped the cross-repo contract and identified the wrong editable preview origin."
       evidence:
-        - "GLDF reads Scaffold Web content via `/api/v1/content/gldf/[section]` and page config via `/api/v1/page-config/gldf`."
+        - "GLDF reads Strelva content via `/api/v1/content/gldf/[section]` and page config via `/api/v1/page-config/gldf`."
         - "GLDF draft preview is controlled by `?preview=true` -> `x-reb-preview`."
-        - "Scaffold Web editable iframe URLs were derived from the dashboard request origin, which could point Edit mode at Scaffold Web's local preview instead of GLDF."
+        - "Strelva editable iframe URLs were derived from the dashboard request origin, which could point Edit mode at Strelva's local preview instead of GLDF."
   - id: T002
     type: worker
     assignee: Worker
     status: done
     reasoning_hint: default
-    objective: "Point Scaffold Web Edit mode at the custom GLDF storefront."
+    objective: "Point Strelva Edit mode at the custom GLDF storefront."
     allowed_files:
       - "src/app/api/edit-preview/route.ts"
       - "src/app/api/live-preview/route.ts"
@@ -97,7 +97,7 @@ tasks:
       - "Tenant preview URL cannot be derived from local repo truth."
     receipt:
       result: done
-      summary: "Custom-repo tenants now use their real storefront URL as the edit source, and Scaffold Web serves an authenticated managed edit preview proxy."
+      summary: "Custom-repo tenants now use their real storefront URL as the edit source, and Strelva serves an authenticated managed edit preview proxy."
       changed_files:
         - "src/app/api/edit-preview/route.ts"
         - "src/app/dashboard/layout.tsx"
@@ -114,13 +114,13 @@ tasks:
       evidence:
         - "`getTenantEditablePreviewUrl` keeps platform templates local but chooses custom repo production/storefront URLs for custom-repo draft preview."
         - "`Edit mode` now switches `previewSource` to `editable` immediately."
-        - "`/api/edit-preview` fetches the real storefront with `preview=true&edit=true`, strips executable storefront scripts, and injects the Scaffold Web edit bridge into the returned HTML."
+        - "`/api/edit-preview` fetches the real storefront with `preview=true&edit=true`, strips executable storefront scripts, and injects the Strelva edit bridge into the returned HTML."
   - id: T003
     type: worker
     assignee: Worker
     status: done
     reasoning_hint: default
-    objective: "Add Scaffold Web edit-mode iframe hooks to GLDF."
+    objective: "Add Strelva edit-mode iframe hooks to GLDF."
     allowed_files:
       - "/Users/laneyfraass/websites/gldf/src/app/(public)/layout.tsx"
       - "/Users/laneyfraass/websites/gldf/src/components/public/EditModeOverlay.tsx"
@@ -133,7 +133,7 @@ tasks:
       - "GLDF lacks data-reb-field/data-reb-section markers."
     receipt:
       result: done
-      summary: "The GLDF storefront now implements the Scaffold Web iframe edit protocol."
+      summary: "The GLDF storefront now implements the Strelva iframe edit protocol."
       changed_files:
         - "/Users/laneyfraass/websites/gldf/src/app/(public)/layout.tsx"
         - "/Users/laneyfraass/websites/gldf/src/components/public/EditModeOverlay.tsx"
@@ -159,7 +159,7 @@ tasks:
       - "Browser verification"
       - "Test output"
     constraints:
-      - "Reject completion if Edit mode still points at Scaffold Web's generic local preview."
+      - "Reject completion if Edit mode still points at Strelva's generic local preview."
     expected_output:
       - "complete | not_complete"
       - "remaining risks"
@@ -169,11 +169,11 @@ tasks:
       full_outcome_complete: true
       evidence:
         - "Browser verified `/client/gldf/dashboard/site`: default iframe source is `/client/gldf/api/live-preview?path=%2F&refresh=0`."
-        - "After clicking `Edit mode`, the editable iframe source becomes `/client/gldf/api/edit-preview?path=%2F&refresh=0`, so Scaffold Web owns the inline edit bridge and no GLDF production deploy is required for dashboard editing."
-        - "Scaffold Web typecheck, lint, custom-repo/owner-journey tests, publish/revalidation/site-capabilities tests, and `git diff --check` passed."
+        - "After clicking `Edit mode`, the editable iframe source becomes `/client/gldf/api/edit-preview?path=%2F&refresh=0`, so Strelva owns the inline edit bridge and no GLDF production deploy is required for dashboard editing."
+        - "Strelva typecheck, lint, custom-repo/owner-journey tests, publish/revalidation/site-capabilities tests, and `git diff --check` passed."
         - "GLDF typecheck, lint, contract tests, and `git diff --check` passed."
       remaining_risks:
-        - "Scaffold Web lint still reports 11 pre-existing warnings unrelated to this change."
+        - "Strelva lint still reports 11 pre-existing warnings unrelated to this change."
         - "Both repos had pre-existing dirty work; unrelated changes were preserved."
 
 checks:

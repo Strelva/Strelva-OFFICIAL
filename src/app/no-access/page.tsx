@@ -31,15 +31,15 @@ export default async function NoAccessPage() {
           No access to this site
         </h1>
         <p className="text-zinc-400 mb-6">
-          You&apos;re signed in, but this email is not connected to a Scaffold Web
+          You&apos;re signed in, but this email is not connected to a Strelva
           dashboard yet. Most access issues happen when the invite was sent to a
           different email address.
         </p>
         <p className="text-sm text-zinc-500 mb-6">
           Use the exact email address that received your invite. The button
           below signs you out so you can choose that account. You can also email{" "}
-          <a className="text-zinc-300 underline-offset-4 hover:underline" href="mailto:jacob@scaffoldweb.com">
-            jacob@scaffoldweb.com
+          <a className="text-zinc-300 underline-offset-4 hover:underline" href="mailto:jacob@strelva.com">
+            jacob@strelva.com
           </a>{" "}
           and we&apos;ll connect the right account.
         </p>

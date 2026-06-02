@@ -11,7 +11,7 @@ goal:
   status: done
   intake:
     original_request: "Production-grade self-serve onboarding, retention analytics/weekly briefs, and backup/versioning/rollback safety."
-    interpreted_outcome: "Scaffold Web becomes a self-serve local-business platform where owners can sign up, get live quickly, see proof of value, receive retention prompts, and trust AI changes because rollback/audit safety exists."
+    interpreted_outcome: "Strelva becomes a self-serve local-business platform where owners can sign up, get live quickly, see proof of value, receive retention prompts, and trust AI changes because rollback/audit safety exists."
     input_shape: existing_plan
     audience: "Jacob and local business owners"
     authority: requested

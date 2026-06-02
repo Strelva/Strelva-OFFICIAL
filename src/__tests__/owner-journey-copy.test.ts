@@ -168,9 +168,9 @@ describe("owner journey copy and links", () => {
     expect(properties).toContain("Click text in the preview");
     expect(properties).toContain("Draft saved - preview updated");
     expect(publishBar).toContain("Publish live");
-    expect(publishBar).toContain("Publish to Scaffold");
+    expect(publishBar).toContain("Publish to Strelva");
     expect(publishBar).toContain("Live site refreshed");
-    expect(publishBar).toContain("Published to Scaffold - live refresh failed");
+    expect(publishBar).toContain("Published to Strelva - live refresh failed");
   });
 
   it("keeps Sources honest about setup and availability", () => {
@@ -232,7 +232,7 @@ describe("owner journey copy and links", () => {
     expect(settingsPage).toContain('{ id: "ownership", label: "Ownership" }');
     expect(settingsPage).toContain("/dashboard/settings#ownership");
     expect(ownershipPage).toContain("Your business owns");
-    expect(ownershipPage).toContain("Scaffold Web manages");
+    expect(ownershipPage).toContain("Strelva manages");
     expect(ownershipPage).toContain("Export content");
     expect(ownershipPage).toContain("Export assets");
     expect(ownershipPage).toContain("DNS and domain handoff");

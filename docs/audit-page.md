@@ -1,6 +1,6 @@
 # Audit Page Architecture
 
-Free site health scoring tool at `/audit`. Top-of-funnel lead gen: visitor enters a URL, gets a 0-100 score with letter grade, sees where their site is weak, then hits the CTA to request a free Scaffold Web site.
+Free site health scoring tool at `/audit`. Top-of-funnel lead gen: visitor enters a URL, gets a 0-100 score with letter grade, sees where their site is weak, then hits the CTA to request a free Strelva site.
 
 No signup required. 3 scans per day per IP.
 

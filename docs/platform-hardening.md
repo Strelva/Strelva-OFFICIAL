@@ -1,6 +1,6 @@
 # Platform Hardening
 
-Production hardening for Scaffold Web: observability, reliability, and security improvements.
+Production hardening for Strelva: observability, reliability, and security improvements.
 
 **Branch:** `feat/platform-hardening`
 
@@ -51,7 +51,7 @@ Services with missing env vars report `"not configured"` and do not drag status 
 
 ### Wiring to monitoring
 
-Point UptimeRobot or Better Stack at `https://scaffoldweb.com/api/health`. Alert on:
+Point UptimeRobot or Better Stack at `https://strelva.com/api/health`. Alert on:
 - HTTP 503 (core service down)
 - JSON body `.status !== "healthy"` (degraded)
 - Response time > 5s (individual check timeout is 3s, but network adds overhead)

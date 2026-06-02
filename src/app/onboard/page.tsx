@@ -218,7 +218,7 @@ function OnboardExperience() {
               Tell us about the business. We prepare the site.
             </h1>
             <p className="mt-5 max-w-lg text-[15px] leading-7 text-[#a7a29a]">
-              Add the basics once. Scaffold Web creates the tenant, starter content, dashboard access, and first proof path so you can get live quickly.
+              Add the basics once. Strelva creates the tenant, starter content, dashboard access, and first proof path so you can get live quickly.
             </p>
           </div>
 
@@ -251,7 +251,7 @@ function OnboardExperience() {
                     className="onboard-input"
                   />
                 </Field>
-                <Field label="Scaffold subdomain" required hint={`${slugify(form.requestedSlug || "your-business")}.scaffoldweb.com`}>
+                <Field label="Strelva subdomain" required hint={`${slugify(form.requestedSlug || "your-business")}.strelva.com`}>
                   <input
                     value={form.requestedSlug}
                     onChange={(event) => updateField("requestedSlug", slugify(event.target.value))}

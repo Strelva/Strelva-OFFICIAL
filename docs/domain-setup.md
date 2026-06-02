@@ -28,36 +28,36 @@
    pnpm check:prod
    ```
 
-## scaffoldweb.com (platform + wildcard subdomains)
+## strelva.com (platform + wildcard subdomains)
 
 1. Domain is already added to Vercel project `scaffold-web` with wildcard support:
    ```
-   vercel domains add scaffoldweb.com
-   vercel domains add *.scaffoldweb.com
+   vercel domains add strelva.com
+   vercel domains add *.strelva.com
    ```
 2. Configure DNS. With Porkbun-managed DNS, Vercel currently recommends:
    ```
-   A     scaffoldweb.com    76.76.21.21
-   CNAME *.scaffoldweb.com  cname.vercel-dns.com
+   A     strelva.com    76.76.21.21
+   CNAME *.strelva.com  cname.vercel-dns.com
    ```
    Alternatively, switch nameservers to:
    ```
    ns1.vercel-dns.com
    ns2.vercel-dns.com
    ```
-3. Remove any Porkbun/l.ink forwarding. `scaffoldweb.com/api/health` must not redirect to `scaffoldweb-com.l.ink`.
+3. Remove any Porkbun/l.ink forwarding. `strelva.com/api/health` must not redirect to `scaffoldweb-com.l.ink`.
 4. Update env var:
    ```
-   MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com
+   MARKETING_DOMAINS=strelva.com,www.strelva.com
    ```
-5. Wildcard enables `{tenant}.scaffoldweb.com` routing via proxy subdomain extraction.
+5. Wildcard enables `{tenant}.strelva.com` routing via proxy subdomain extraction.
 6. Verify:
    ```
-   vercel domains inspect scaffoldweb.com
-   dig +short scaffoldweb.com A
-   dig +short scaffoldweb.com NS
-   dig +short '*.scaffoldweb.com' CNAME
-   curl -I -L https://scaffoldweb.com/api/health
+   vercel domains inspect strelva.com
+   dig +short strelva.com A
+   dig +short strelva.com NS
+   dig +short '*.strelva.com' CNAME
+   curl -I -L https://strelva.com/api/health
   pnpm check:prod
   ```
 
@@ -97,7 +97,7 @@ pnpm check:prod
 - [ ] `yourbusiness.com` shows the tenant's public site
 - [ ] `admin.yourbusiness.com` redirects root traffic to `/dashboard`
 - [ ] `admin.yourbusiness.com/sign-in` and `/sign-up` render the tenant auth flow
-- [ ] `scaffoldweb.com` shows marketing page
-- [ ] `scaffoldweb.com/api/health` returns Vercel health JSON and does not redirect to `scaffoldweb-com.l.ink`
-- [ ] `scaffoldweb.com/access-request` shows the private-beta access request
-- [ ] `tenantid.scaffoldweb.com` is treated only as a fallback/platform route, not the customer-facing URL
+- [ ] `strelva.com` shows marketing page
+- [ ] `strelva.com/api/health` returns Vercel health JSON and does not redirect to `scaffoldweb-com.l.ink`
+- [ ] `strelva.com/access-request` shows the private-beta access request
+- [ ] `tenantid.strelva.com` is treated only as a fallback/platform route, not the customer-facing URL

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The visual editor is a Figma-inspired interface inside the Scaffold Web dashboard that lets tenants see and edit their live site without leaving the admin panel. It renders the client site inside an iframe and communicates with it via `postMessage` to enable section selection, hover highlights, inline text editing, and AI-powered content changes.
+The visual editor is a Figma-inspired interface inside the Strelva dashboard that lets tenants see and edit their live site without leaving the admin panel. It renders the client site inside an iframe and communicates with it via `postMessage` to enable section selection, hover highlights, inline text editing, and AI-powered content changes.
 
 The editor is composed of four panels arranged left-to-right:
 

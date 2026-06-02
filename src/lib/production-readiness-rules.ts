@@ -87,13 +87,13 @@ function mustBeEmailList(value: string) {
 
 function mustBeBareDomain(value: string) {
   const valid = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(value);
-  return valid ? null : "Must be a bare domain like updates.scaffoldweb.com for production launch";
+  return valid ? null : "Must be a bare domain like updates.strelva.com for production launch";
 }
 
 function mustBeScaffoldSenderDomain(value: string) {
-  return value === "updates.scaffoldweb.com" || value.endsWith(".scaffoldweb.com")
+  return value === "updates.strelva.com" || value.endsWith(".strelva.com")
     ? null
-    : "Must use a verified Scaffold Web sender domain like updates.scaffoldweb.com";
+    : "Must use a verified Strelva sender domain like updates.strelva.com";
 }
 
 function isBareDomain(value: string) {
@@ -175,7 +175,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
   const productionDomain = normalizeReadinessDomain(tenant.productionDomain);
   const adminDomain = normalizeReadinessDomain(tenant.adminDomain);
   const clientCustomDomains = tenant.customDomains?.map(normalizeReadinessDomain).filter((domain) =>
-    domain && !domain.startsWith("admin.") && !domain.endsWith(".scaffoldweb.com") && !domain.endsWith(".vercel.app")
+    domain && !domain.startsWith("admin.") && !domain.endsWith(".strelva.com") && !domain.endsWith(".vercel.app")
   );
   const results: TenantReadinessResult[] = [];
   const hasClientDomain = !!productionDomain || !!clientCustomDomains?.length;

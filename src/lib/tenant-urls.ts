@@ -14,7 +14,7 @@ function withoutWww(domain: string): string {
 }
 
 function isPlatformDomain(domain: string): boolean {
-  return domain.endsWith(".scaffoldweb.com");
+  return domain.endsWith(".strelva.com");
 }
 
 function isAdminDomain(domain: string): boolean {
@@ -126,7 +126,7 @@ export function getTenantDashboardHost(tenant: TenantConfig): string {
   if (primaryDomain) return `admin.${primaryDomain}`;
 
   const subdomain = tenant.subdomain || tenant.id;
-  return `${subdomain}.scaffoldweb.com`;
+  return `${subdomain}.strelva.com`;
 }
 
 export function getTenantDashboardUrl(
@@ -153,7 +153,7 @@ export function getTenantDashboardFallbackUrl(
   const tenantId = tenant.subdomain || tenant.id;
 
   if (environment === "production") {
-    return `https://scaffoldweb.com/client/${tenantId}${normalizedPath}`;
+    return `https://strelva.com/client/${tenantId}${normalizedPath}`;
   }
 
   return `http://localhost:3000/client/${tenantId}${normalizedPath}`;
@@ -167,7 +167,7 @@ export function getTenantPublicUrl(
     const publicDomain = getTenantPublicDomain(tenant);
     if (publicDomain) return `https://${publicDomain}`;
     const subdomain = tenant.subdomain || tenant.id;
-    return `https://${subdomain}.scaffoldweb.com`;
+    return `https://${subdomain}.strelva.com`;
   }
 
   const subdomain = tenant.subdomain || tenant.id;

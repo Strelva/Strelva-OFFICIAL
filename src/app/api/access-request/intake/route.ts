@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   if (!leadPersisted) {
     console.error("[access-request] Delivery status storage is not configured.");
     return NextResponse.json(
-      { error: "Delivery tracking is not configured. Email jacob@scaffoldweb.com and we will get you added." },
+      { error: "Delivery tracking is not configured. Email jacob@strelva.com and we will get you added." },
       { status: 503 },
     );
   }

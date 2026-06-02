@@ -12,7 +12,7 @@ export const demoContentDefaults: ContentMap = {
     headline: "Small Studio.\nFull Schedule.",
     subheadline: "Demo Wellness Studio",
     tagline:
-      "A fictional local wellness studio used to show how Scaffold Web helps owners see what is working and tell the AI what to change.",
+      "A fictional local wellness studio used to show how Strelva helps owners see what is working and tell the AI what to change.",
     ctaText: "Book a Class",
     ctaLink: "#services",
     backgroundImageUrl:
@@ -33,7 +33,7 @@ export const demoContentDefaults: ContentMap = {
         price: "24",
         featured: true,
         who_its_for: "Beginners, returning clients, and anyone who wants a steady weekday practice",
-        booking_link: "https://scaffoldweb.com/access-request",
+        booking_link: "https://strelva.com/access-request",
         comingSoon: false,
         image_url:
           "https://images.unsplash.com/photo-1575052814086-f385e2e2ad1b?w=1200&h=900&fit=crop&q=85",
@@ -47,7 +47,7 @@ export const demoContentDefaults: ContentMap = {
         price: "90",
         featured: false,
         who_its_for: "Clients recovering confidence, rebuilding consistency, or wanting personal attention",
-        booking_link: "https://scaffoldweb.com/access-request",
+        booking_link: "https://strelva.com/access-request",
         comingSoon: false,
         image_url:
           "https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=1200&h=900&fit=crop&q=85",
@@ -61,7 +61,7 @@ export const demoContentDefaults: ContentMap = {
         price: "28",
         featured: false,
         who_its_for: "New clients, regulars, and small groups who want a relaxed weekend reset",
-        booking_link: "https://scaffoldweb.com/access-request",
+        booking_link: "https://strelva.com/access-request",
         comingSoon: false,
         image_url:
           "https://images.unsplash.com/photo-1510894347713-fc3ed6fdf539?w=1200&h=900&fit=crop&q=85",
@@ -76,7 +76,7 @@ export const demoContentDefaults: ContentMap = {
       "Harbor & Pine is a realistic demo business: small team, clear services, steady bookings, and updates that should not require a web developer.",
     paragraphs: [
       "Maya opened Harbor & Pine after years of teaching in shared rooms and community centers. The studio is intentionally small, warm, and practical: classes are easy to understand, easy to book, and easy to return to.",
-      "This tenant gives Scaffold Web a marketing-safe story to demonstrate the owner dashboard, AI content updates, booking prompts, weekly reports, and site preview without exposing a real customer's private data.",
+      "This tenant gives Strelva a marketing-safe story to demonstrate the owner dashboard, AI content updates, booking prompts, weekly reports, and site preview without exposing a real customer's private data.",
       "Use it to show the before-and-after moment: an owner asks for a Saturday class update, the website changes, and the dashboard records the proof.",
     ],
     stats: [
@@ -130,7 +130,7 @@ export const demoContentDefaults: ContentMap = {
         description:
           "A 90-minute mobility and breath workshop for clients who want a guided reset before summer schedules get busy.",
         hosted_by: "Maya",
-        external_link: "https://scaffoldweb.com/access-request",
+        external_link: "https://strelva.com/access-request",
         image_url:
           "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&h=900&fit=crop&q=85",
       },
@@ -149,7 +149,7 @@ export const demoContentDefaults: ContentMap = {
         service: "Movement assessments and recovery plans",
         why_i_recommend:
           "Helpful for clients who need clinical support before returning to group classes.",
-        booking_link: "https://scaffoldweb.com/access-request",
+        booking_link: "https://strelva.com/access-request",
         phone: "(555) 014-2026",
         photo_url:
           "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=900&h=900&fit=crop&q=85",
@@ -157,14 +157,14 @@ export const demoContentDefaults: ContentMap = {
     ],
   },
   contact: {
-    email: "demo@scaffoldweb.com",
+    email: "demo@strelva.com",
     phone: "(555) 014-1490",
     address: "123 Harbor Street, Buffalo, NY",
     hours: "Mon-Fri 7 AM-6 PM, Sat 9 AM-1 PM",
     locationTitle: "Buffalo\nDemo Studio",
     locationDescription:
-      "A fictional local wellness studio used for Scaffold Web marketing, demos, and training flows.",
-    instagramUrl: "https://instagram.com/scaffoldweb",
+      "A fictional local wellness studio used for Strelva marketing, demos, and training flows.",
+    instagramUrl: "https://instagram.com/strelva",
     facebookUrl: "",
     googleMapsUrl: "",
   },
@@ -172,15 +172,15 @@ export const demoContentDefaults: ContentMap = {
     siteName: "Harbor & Pine Wellness",
     siteTagline: "Pilates, mobility, and calm weekly routines",
     siteDescription:
-      "A fictional local wellness studio used for Scaffold Web marketing demos. See what is working and tell the AI what to change.",
+      "A fictional local wellness studio used for Strelva marketing demos. See what is working and tell the AI what to change.",
     siteKeywords:
-      "demo wellness studio, pilates demo, local business website demo, Scaffold Web",
+      "demo wellness studio, pilates demo, local business website demo, Strelva",
     ownerName: "Maya",
     ownerTitle: "Studio Owner",
-    footerTagline: "A marketing-safe demo tenant for Scaffold Web.",
+    footerTagline: "A marketing-safe demo tenant for Strelva.",
     copyrightText: "Harbor & Pine Wellness",
-    bookingUrl: "https://scaffoldweb.com/access-request",
-    instagramHandle: "scaffoldweb",
+    bookingUrl: "https://strelva.com/access-request",
+    instagramHandle: "strelva",
     vagaro_embed_id: "",
   },
   faq: {
@@ -205,7 +205,7 @@ export const demoContentDefaults: ContentMap = {
         id: "demo",
         question: "Is Harbor & Pine a real customer?",
         answer:
-          "No. This is a fictional demo tenant for showing Scaffold Web's website, dashboard, AI update, and weekly report workflows.",
+          "No. This is a fictional demo tenant for showing Strelva's website, dashboard, AI update, and weekly report workflows.",
       },
     ],
   },
@@ -221,7 +221,7 @@ export const demoContentDefaults: ContentMap = {
         description: "A printable two-week routine for clients between classes.",
         category: "Digital guide",
         price: "12",
-        external_link: "https://scaffoldweb.com/access-request",
+        external_link: "https://strelva.com/access-request",
         image_url:
           "https://images.unsplash.com/photo-1540206395-68808572332f?w=1200&h=900&fit=crop&q=85",
       },
@@ -259,7 +259,7 @@ export const demoContentDefaults: ContentMap = {
   },
   footer: {
     ...defaultFooter,
-    tagline: "A marketing-safe demo tenant for Scaffold Web.",
+    tagline: "A marketing-safe demo tenant for Strelva.",
     columns: [
       {
         heading: "Explore",
@@ -272,12 +272,12 @@ export const demoContentDefaults: ContentMap = {
       {
         heading: "Demo",
         links: [
-          { label: "demo@scaffoldweb.com", href: "mailto:demo@scaffoldweb.com" },
-          { label: "Scaffold Web", href: "https://scaffoldweb.com" },
+          { label: "demo@strelva.com", href: "mailto:demo@strelva.com" },
+          { label: "Strelva", href: "https://strelva.com" },
         ],
       },
     ],
-    socialLinks: [{ label: "Instagram", href: "https://instagram.com/scaffoldweb" }],
+    socialLinks: [{ label: "Instagram", href: "https://instagram.com/strelva" }],
     copyrightText: "Harbor & Pine Wellness",
   },
 };

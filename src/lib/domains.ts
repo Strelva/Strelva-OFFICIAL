@@ -5,8 +5,8 @@ import { normalizeTenantDomain } from "./tenant-urls";
 
 const CLAIMS_REDIS_KEY = "reb:domain-claims";
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i;
-const RESERVED_SUFFIXES = [".localhost", ".vercel.app", ".scaffoldweb.com"];
-const RESERVED_DOMAINS = new Set(["localhost", "scaffoldweb.com", "www.scaffoldweb.com"]);
+const RESERVED_SUFFIXES = [".localhost", ".vercel.app", ".strelva.com"];
+const RESERVED_DOMAINS = new Set(["localhost", "strelva.com", "www.strelva.com"]);
 
 type VercelDomainResponse = {
   name?: string;

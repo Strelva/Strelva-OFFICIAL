@@ -101,10 +101,10 @@ describe("auth permission helpers", () => {
   });
 
   it("lets scaffold super admins override tenant permissions", async () => {
-    process.env.SUPER_ADMIN_EMAILS = "jacob@scaffoldweb.com";
+    process.env.SUPER_ADMIN_EMAILS = "jacob@strelva.com";
     mockCurrentUser.mockResolvedValue({
       id: "admin_123",
-      emailAddresses: [{ emailAddress: "jacob@scaffoldweb.com" }],
+      emailAddresses: [{ emailAddress: "jacob@strelva.com" }],
       publicMetadata: { tenants: [] },
     });
 

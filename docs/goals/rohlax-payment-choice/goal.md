@@ -12,14 +12,14 @@ Create a simple payment handoff for Rohlax Wellness that lets them choose a one-
 
 - Rohlax Wellness maps to the `rohlax` tenant via `CUSTOM_DOMAIN_MAP`.
 - Rohlax currently has founder-comp style access in subscription gating, so this should not use the normal app subscription checkout.
-- The app's built-in subscription checkout is fixed to the single Scaffold Web monthly plan price.
+- The app's built-in subscription checkout is fixed to the single Strelva monthly plan price.
 - Stripe supports "Customers choose what to pay" Payment Links / Checkout with minimum and maximum bounds for one-time payments.
 
 ## Payment Setup Recommendation
 
 Use the dedicated app payment flow outside the app's `$149/mo` subscription path:
 
-- URL: `https://scaffoldweb.com/pay/rohlax`
+- URL: `https://strelva.com/pay/rohlax`
 - API: `/api/pay/rohlax`
 - Product/title in Stripe: `Website payment`
 - Type: one-time payment
@@ -39,7 +39,7 @@ Use the dedicated app payment flow outside the app's `$149/mo` subscription path
 
 ## Likely Misfire To Avoid
 
-Do not send the existing Scaffold Web subscription checkout link. That path is for the fixed monthly plan, not this one-time Rohlax payment range.
+Do not send the existing Strelva subscription checkout link. That path is for the fixed monthly plan, not this one-time Rohlax payment range.
 
 ## Starter Command
 

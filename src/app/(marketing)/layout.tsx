@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Scaffold Web - Free sites for local businesses",
+  title: "Strelva - Free sites for local businesses",
   description: "Request a free public site built around calls, bookings, and trust.",
 };
 
@@ -19,7 +19,7 @@ export default function MarketingLayout({
             href="/"
             className="text-[15px] font-semibold tracking-normal text-[color:var(--m-text)]"
           >
-            Scaffold Web
+            Strelva
           </Link>
           <div className="hidden md:block" />
           <nav className="flex items-center gap-4">
@@ -38,7 +38,7 @@ export default function MarketingLayout({
       <footer className="marketing-footer px-6">
         <div className="mx-auto flex max-w-[1400px] flex-col justify-between gap-4 py-8 md:flex-row">
           <div className="text-[13px] font-medium text-[color:var(--m-text)]">
-            Scaffold Web
+            Strelva
           </div>
           <div className="flex gap-8 text-[13px] text-[color:var(--m-text-3)]">
             <Link href="/privacy" className="hover:underline">
@@ -47,7 +47,7 @@ export default function MarketingLayout({
             <Link href="/terms" className="hover:underline">
               Terms
             </Link>
-            <a href="mailto:jacob@scaffoldweb.com" className="hover:underline">
+            <a href="mailto:jacob@strelva.com" className="hover:underline">
               Contact
             </a>
           </div>

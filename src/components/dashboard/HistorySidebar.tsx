@@ -124,7 +124,7 @@ export function HistorySidebar({
     >
       {/* Mobile close button */}
       <div className="flex items-center justify-between p-3 lg:hidden border-b border-glass-border">
-        <span className="text-[13px] font-medium text-warm-black">Scaffold Web</span>
+        <span className="text-[13px] font-medium text-warm-black">Strelva</span>
         <button
           onClick={onClose}
           className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"

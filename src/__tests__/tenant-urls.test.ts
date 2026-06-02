@@ -31,12 +31,12 @@ describe("tenant URL helpers", () => {
     );
   });
 
-  it("builds stable scaffoldweb.com fallback dashboard URLs", () => {
+  it("builds stable strelva.com fallback dashboard URLs", () => {
     expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard/site", "development")).toBe(
       "http://localhost:3000/client/gldf/dashboard/site"
     );
     expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard", "production")).toBe(
-      "https://scaffoldweb.com/client/gldf/dashboard"
+      "https://strelva.com/client/gldf/dashboard"
     );
   });
 
@@ -110,7 +110,7 @@ describe("tenant URL helpers", () => {
   });
 
   it("falls back to the platform tenant subdomain only when no real domain exists", () => {
-    expect(getTenantPublicUrl(tenant(), "production")).toBe("https://gldf.scaffoldweb.com");
+    expect(getTenantPublicUrl(tenant(), "production")).toBe("https://gldf.strelva.com");
   });
 
   it("derives the active public site from CUSTOM_DOMAIN_MAP when tenant config is missing", () => {
@@ -120,7 +120,7 @@ describe("tenant URL helpers", () => {
         JSON.stringify({
           "greatlakesdriedfruit.com": "gldf",
           "admin.greatlakesdriedfruit.com": "gldf",
-          "demo.scaffoldweb.com": "gldf",
+          "demo.strelva.com": "gldf",
         })
       )
     ).toBe("https://greatlakesdriedfruit.com");

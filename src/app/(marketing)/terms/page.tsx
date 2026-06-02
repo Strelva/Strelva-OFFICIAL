@@ -20,8 +20,8 @@ export default function TermsPage() {
         </p>
 
         <p>
-          These Terms of Service (&quot;Terms&quot;) govern your use of Scaffold
-          Web&apos;s AI website management platform. By using our service, you
+          These Terms of Service (&quot;Terms&quot;) govern your use of
+          Strelva&apos;s AI website management platform. By using our service, you
           agree to these Terms.
         </p>
 
@@ -32,7 +32,7 @@ export default function TermsPage() {
           The Service
         </h2>
         <p>
-          Scaffold Web provides AI-powered website management for small
+          Strelva provides AI-powered website management for small
           businesses. This includes website hosting, content updates via our AI
           agent, weekly performance reports, and ongoing maintenance.
         </p>
@@ -88,7 +88,7 @@ export default function TermsPage() {
         >
           Acceptable Use
         </h2>
-        <p>You agree not to use Scaffold Web to:</p>
+        <p>You agree not to use Strelva to:</p>
         <ul className="list-disc pl-6 space-y-2">
           <li>Host illegal, harmful, or fraudulent content</li>
           <li>Infringe on intellectual property rights</li>
@@ -119,7 +119,7 @@ export default function TermsPage() {
           Limitation of Liability
         </h2>
         <p>
-          To the maximum extent permitted by law, Scaffold Web&apos;s liability
+          To the maximum extent permitted by law, Strelva&apos;s liability
           is limited to the amount you paid for the service in the 12 months
           preceding any claim. We are not liable for indirect, incidental, or
           consequential damages.
@@ -175,11 +175,11 @@ export default function TermsPage() {
         <p>
           Questions about these Terms? Email us at{" "}
           <a
-            href="mailto:jacob@scaffoldweb.com"
+            href="mailto:jacob@strelva.com"
             className="underline hover:opacity-80"
             style={{ color: "var(--m-accent)" }}
           >
-            jacob@scaffoldweb.com
+            jacob@strelva.com
           </a>
         </p>
       </div>

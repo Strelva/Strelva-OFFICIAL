@@ -39,7 +39,7 @@ export function ConversationShell({
           <div className="shrink-0 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2 text-amber-100">
             <div className="flex items-center gap-2 text-[12px]">
               <ShieldAlert className="h-4 w-4 text-amber-200" strokeWidth={1.7} />
-              <span className="font-medium text-amber-50">Acting as Scaffold admin</span>
+              <span className="font-medium text-amber-50">Acting as Strelva admin</span>
               <span className="hidden sm:inline text-amber-100/80">
                 {impersonation.actorEmail || "Super admin"} is viewing tenant {impersonation.tenantId}. Admin saves are audit logged.
               </span>
@@ -57,7 +57,7 @@ export function ConversationShell({
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
           <div className="min-w-0">
-            <span className="block text-[13px] font-medium text-warm-black leading-tight">Scaffold Web</span>
+            <span className="block text-[13px] font-medium text-warm-black leading-tight">Strelva</span>
             <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
           </div>
         </header>

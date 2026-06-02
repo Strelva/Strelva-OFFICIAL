@@ -97,8 +97,8 @@ const AI_CONTEXT_ACTIONS: SourcePromptAction[] = [
   },
   {
     label: "Custom site request",
-    message: "I need a custom design or code change that is beyond normal content editing. Create a Scaffold Web request from this chat and ask me for the exact change, page, and section.",
-    description: "Routes to Scaffold Web.",
+    message: "I need a custom design or code change that is beyond normal content editing. Create a Strelva request from this chat and ask me for the exact change, page, and section.",
+    description: "Routes to Strelva.",
     icon: MessageSquareText,
   },
 ];

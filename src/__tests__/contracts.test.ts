@@ -7,7 +7,7 @@ import {
   verifyRevalidationSignature,
 } from "@/lib/scaffold-contracts";
 
-describe("Scaffold Web contracts", () => {
+describe("Strelva contracts", () => {
   it("builds versioned storefront routes", () => {
     expect(scaffoldRoutes.publicContent(GLDF_TENANT_ID, "hero")).toBe("/api/v1/content/gldf/hero");
     expect(scaffoldRoutes.publicPageConfig(GLDF_TENANT_ID)).toBe("/api/v1/page-config/gldf");

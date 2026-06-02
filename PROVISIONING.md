@@ -1,11 +1,11 @@
 # Provisioning a New Client
 
-End-to-end guide for spinning up a new Scaffold Web tenant and its custom repo.
+End-to-end guide for spinning up a new Strelva tenant and its custom repo.
 
 ## Overview
 
 Every paid client gets:
-1. A **tenant record** in Scaffold Web (Sanity in prod, `dev-tenants.json` locally)
+1. A **tenant record** in Strelva (Sanity in prod, `dev-tenants.json` locally)
 2. A **custom repo** (separate Next.js project) that serves the public website
 3. **Signed revalidation** so content edits in the dashboard push to the live site
 4. **Clerk auth** so the client can log into their admin dashboard
@@ -13,7 +13,7 @@ Every paid client gets:
 
 ## Prerequisites
 
-- Access to the Scaffold Web repo (`~/Projects/REB`)
+- Access to the Strelva repo (`~/Projects/REB`)
 - Node.js 20+ and pnpm installed
 - For production: Vercel account, Clerk dashboard access, domain registrar access
 
@@ -73,7 +73,7 @@ cd ~/Projects/buffalo-barber-site
 ```
 
 The starter includes:
-- **`scaffold-client.ts`** -- typed fetch client for all Scaffold Web API endpoints
+- **`scaffold-client.ts`** -- typed fetch client for all Strelva API endpoints
 - **`revalidate-route.ts`** -- Next.js route handler with HMAC signature verification
 - **`content-defaults.ts`** -- fallback content for all 15 section types
 - **`README.md`** -- setup and ship checklist
@@ -112,7 +112,7 @@ REVALIDATION_SECRET=<from provisioning output>
 
 # Production (set via Vercel CLI or dashboard)
 TENANT_ID=buffalo-barber
-SCAFFOLD_API_URL=https://scaffoldweb.com
+SCAFFOLD_API_URL=https://strelva.com
 REVALIDATION_SECRET=<from provisioning output>
 ```
 
@@ -120,7 +120,7 @@ REVALIDATION_SECRET=<from provisioning output>
 
 ## Step 3: Seed Content
 
-Back in the Scaffold Web repo:
+Back in the Strelva repo:
 
 ```bash
 pnpm seed-tenant buffalo-barber
@@ -146,7 +146,7 @@ This writes all 15 content sections to the storage backend (Sanity in prod, dev 
 cd ~/Projects/buffalo-barber-site
 vercel link
 vercel env add TENANT_ID production <<< "buffalo-barber"
-vercel env add SCAFFOLD_API_URL production <<< "https://scaffoldweb.com"
+vercel env add SCAFFOLD_API_URL production <<< "https://strelva.com"
 vercel env add REVALIDATION_SECRET production <<< "<secret>"
 vercel domains add buffalobarber.com
 vercel domains add www.buffalobarber.com
@@ -176,7 +176,7 @@ vercel deploy --prod
 
 ### Revalidation webhook
 
-Scaffold Web POSTs to the client repo's `/api/v1/revalidate` endpoint.
+Strelva POSTs to the client repo's `/api/v1/revalidate` endpoint.
 
 **Headers:**
 - `Content-Type: application/json`
@@ -217,7 +217,7 @@ The header names `x-reb-timestamp` and `x-reb-signature` are part of the v1 wire
        |                       |
        | fetchScaffoldContent  | POST /api/v1/revalidate
        v                       ^
-[Scaffold Web (Vercel)]  ------|
+[Strelva (Vercel)]  ------|
        |
        v
 [Sanity CMS] <-> [Redis Cache]
@@ -225,10 +225,10 @@ The header names `x-reb-timestamp` and `x-reb-signature` are part of the v1 wire
 
 ## Troubleshooting
 
-**Revalidation returns 401:** Check `REVALIDATION_SECRET` matches between Scaffold Web tenant config and the client repo. Ensure system clocks are within 5 minutes.
+**Revalidation returns 401:** Check `REVALIDATION_SECRET` matches between Strelva tenant config and the client repo. Ensure system clocks are within 5 minutes.
 
 **Content shows fallback instead of real data:** Verify `SCAFFOLD_API_URL` is set and reachable. Check `TENANT_ID` matches exactly. Verify content was seeded.
 
-**Client can't log into admin dashboard:** Verify Clerk `publicMetadata.tenants` includes the tenant ID. Check that `admin.domain.com` resolves to the Scaffold Web Vercel project.
+**Client can't log into admin dashboard:** Verify Clerk `publicMetadata.tenants` includes the tenant ID. Check that `admin.domain.com` resolves to the Strelva Vercel project.
 
 **Revalidation failures in Slack:** Check `reb:revalidation:failures` in Redis. The reconciliation cron auto-retries stale revalidations.

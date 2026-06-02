@@ -45,7 +45,7 @@ vi.mock("@/lib/dev-access", () => ({
 
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardFallbackUrl: (tenant: { id: string }) =>
-    `https://scaffoldweb.com/client/${tenant.id}/dashboard`,
+    `https://strelva.com/client/${tenant.id}/dashboard`,
   getTenantDashboardHost: (tenant: { id: string }) => `admin.${tenant.id}.example.com`,
 }));
 
@@ -97,7 +97,7 @@ describe("account page access handoff", () => {
     expect(text).toContain("Use the exact email address that received your invite");
     expect(text).toContain("signs you out so you can choose that account");
     expect(text).toContain("Use invited email");
-    expect(text).toContain("jacob@scaffoldweb.com");
+    expect(text).toContain("jacob@strelva.com");
   });
 
   it("hides archived tenants from the super-admin account picker", async () => {

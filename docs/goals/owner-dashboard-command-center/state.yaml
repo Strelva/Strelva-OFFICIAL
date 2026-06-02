@@ -10,7 +10,7 @@ goal:
     original_request: "considering my annotations please create a goal with this and do all of the PRs"
     interpreted_outcome: "Make the owner dashboard honestly show what can be edited, what data the AI can use, what changed, and what needs attention."
     input_shape: existing_plan
-    audience: "Local business owners using Scaffold Web, plus Jacob as operator."
+    audience: "Local business owners using Strelva, plus Jacob as operator."
     authority: requested
     proof_type: test
     completion_proof: "Annotated dashboard pages are implemented, tested, and browser-verified."

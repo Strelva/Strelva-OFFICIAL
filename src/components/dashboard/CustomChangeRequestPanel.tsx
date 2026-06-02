@@ -66,7 +66,7 @@ export function CustomChangeRequestPanel() {
           Custom request
         </p>
         <p className="mt-1 text-[12px] leading-5 text-gray-faint">
-          Code, animation, custom component, and deeper layout changes go to the Scaffold Web team.
+          Code, animation, custom component, and deeper layout changes go to the Strelva team.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export function CustomChangeRequestPanel() {
         {sent && (
           <p className="mt-2 flex items-center gap-1 text-[11px] text-emerald-400">
             <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Request sent to Scaffold Web.
+            Request sent to Strelva.
           </p>
         )}
       </div>

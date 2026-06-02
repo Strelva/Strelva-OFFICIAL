@@ -4,7 +4,7 @@ import { schemaTypes } from "./sanity/schemas";
 
 export default defineConfig({
   name: "scaffold-web",
-  title: "Scaffold Web — Client Sites",
+  title: "Strelva — Client Sites",
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
   plugins: [structureTool()],

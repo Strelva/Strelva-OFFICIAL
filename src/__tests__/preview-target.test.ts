@@ -16,7 +16,7 @@ describe("preview target selection", () => {
     expect(
       getLocalClientPreviewUrl({
         clientFallbackRoot: "/client/gldf",
-        requestHost: "scaffoldweb.com",
+        requestHost: "strelva.com",
         requestProto: "https",
       })
     ).toBeNull();

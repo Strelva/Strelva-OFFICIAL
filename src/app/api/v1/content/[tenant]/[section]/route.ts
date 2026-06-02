@@ -1,5 +1,5 @@
 /**
- * Scaffold Web v1 public content API.
+ * Strelva v1 public content API.
  *
  * Stable contract consumed by custom-repo client sites. The response shape
  * here is the canonical v1 contract — change it only by versioning (add a

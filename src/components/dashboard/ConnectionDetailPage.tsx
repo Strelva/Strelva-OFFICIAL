@@ -215,7 +215,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           : detail.connectionProvider
             ? "Connect the provider before this source influences AI decisions."
             : detail.builtIn
-              ? "This is a built-in Scaffold Web signal."
+              ? "This is a built-in Strelva signal."
               : "Set this up before it influences AI decisions.";
 
   return (

@@ -137,7 +137,7 @@ export function buildDeliveryStatusEmailHtml(params: {
 
   return `
     <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
-      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Scaffold Web</p>
+      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
       <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Your site request is in the queue.</h1>
       <p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px;">
         We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and what the free site should help customers do. We will follow up after review.

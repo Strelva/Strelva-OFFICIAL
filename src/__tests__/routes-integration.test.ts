@@ -354,8 +354,8 @@ describe("Tenant Access Denial (403)", () => {
 // ============================================================================
 
 describe("Custom Domain Resolution", () => {
-  it("extracts tenant from subdomain on scaffoldweb.com", () => {
-    const result = extractTenantFromHost("gldf.scaffoldweb.com");
+  it("extracts tenant from subdomain on strelva.com", () => {
+    const result = extractTenantFromHost("gldf.strelva.com");
     expect(result.tenant).toBe("gldf");
     expect(result.isAdminSubdomain).toBe(false);
   });
@@ -366,13 +366,13 @@ describe("Custom Domain Resolution", () => {
     expect(result.isAdminSubdomain).toBe(false);
   });
 
-  it("returns null for marketing host scaffoldweb.com", () => {
-    const result = extractTenantFromHost("scaffoldweb.com");
+  it("returns null for marketing host strelva.com", () => {
+    const result = extractTenantFromHost("strelva.com");
     expect(result.tenant).toBeNull();
   });
 
-  it("returns null for www.scaffoldweb.com", () => {
-    const result = extractTenantFromHost("www.scaffoldweb.com");
+  it("returns null for www.strelva.com", () => {
+    const result = extractTenantFromHost("www.strelva.com");
     expect(result.tenant).toBeNull();
   });
 
@@ -382,22 +382,22 @@ describe("Custom Domain Resolution", () => {
   });
 
   it("returns null for vercel.app deployments", () => {
-    const result = extractTenantFromHost("scaffoldweb.com");
+    const result = extractTenantFromHost("strelva.com");
     expect(result.tenant).toBeNull();
   });
 
   it("extracts tenant from complex subdomain", () => {
-    const result = extractTenantFromHost("my-business-name.scaffoldweb.com");
+    const result = extractTenantFromHost("my-business-name.strelva.com");
     expect(result.tenant).toBe("my-business-name");
   });
 
   it("ignores www subdomain", () => {
-    const result = extractTenantFromHost("www.scaffoldweb.com");
+    const result = extractTenantFromHost("www.strelva.com");
     expect(result.tenant).toBeNull();
   });
 
   it("ignores admin subdomain", () => {
-    const result = extractTenantFromHost("admin.scaffoldweb.com");
+    const result = extractTenantFromHost("admin.strelva.com");
     expect(result.tenant).toBeNull();
   });
 });

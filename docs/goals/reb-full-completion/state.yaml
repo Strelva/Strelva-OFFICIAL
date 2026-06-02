@@ -4,7 +4,7 @@
 version: 2
 
 goal:
-  title: "Scaffold Web Full Completion"
+  title: "Strelva Full Completion"
   slug: "reb-full-completion"
   kind: open_ended
   tranche: "Diagnose the product from the repo, finish the core customer-facing product experience through wedge-moving verified slices, and audit the full product-completion outcome."
@@ -13,7 +13,7 @@ goal:
     original_request: "lets run goals for us to focus on getting fto full cpmpletion and consider advance-product-version"
     interpreted_outcome: "Run a GoalBuddy board that drives the reb product toward full product completion using a codebase-first product operator lens."
     input_shape: vague
-    audience: "Jacob / Scaffold Web customers"
+    audience: "Jacob / Strelva customers"
     authority: requested
     proof_type: artifact
     completion_proof: "Final audit proves the customer-facing and operator-facing product flows are complete enough for real product use, with implemented slices verified by tests/build/browser or documented blockers."

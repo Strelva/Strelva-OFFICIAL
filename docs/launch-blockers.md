@@ -1,4 +1,4 @@
-# Scaffold Web Launch Blockers
+# Strelva Launch Blockers
 
 Last local audit: May 14, 2026.
 
@@ -28,16 +28,16 @@ A admin.rohlaxwellness.com 76.76.21.21
 Copyable DNS verification commands:
 
 ```bash
-vercel domains inspect scaffoldweb.com
+vercel domains inspect strelva.com
 vercel domains inspect rohlaxwellness.com
-dig +short scaffoldweb.com A
-dig +short scaffoldweb.com NS
-dig +short '*.scaffoldweb.com' CNAME
+dig +short strelva.com A
+dig +short strelva.com NS
+dig +short '*.strelva.com' CNAME
 dig +short www.rohlaxwellness.com CNAME
 dig +short admin.rohlaxwellness.com CNAME
 dig +short www.rohlaxwellness.com A
 dig +short admin.rohlaxwellness.com A
-curl -I -L https://scaffoldweb.com/api/health
+curl -I -L https://strelva.com/api/health
 curl -I -L https://rohlaxwellness.com
 curl -I -L https://admin.rohlaxwellness.com
 pnpm check:prod
@@ -45,24 +45,24 @@ pnpm check:prod
 
 Expected DNS/HTTP results:
 
-- `dig +short scaffoldweb.com A` includes `76.76.21.21`, or the nameserver check shows `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
+- `dig +short strelva.com A` includes `76.76.21.21`, or the nameserver check shows `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
 - The wildcard CNAME resolves to Vercel when wildcard subdomains are managed through DNS records.
 - The Rohlax CNAME checks may expose partial Vercel aliasing, but launch readiness requires the A checks and `curl` probes to work.
 - `dig +short www.rohlaxwellness.com A` and `dig +short admin.rohlaxwellness.com A` return routable records after Cloudflare is updated.
-- `curl -I -L https://scaffoldweb.com/api/health` stays on `https://scaffoldweb.com/api/health`, returns Vercel headers, and does not redirect to `scaffoldweb-com.l.ink`.
+- `curl -I -L https://strelva.com/api/health` stays on `https://strelva.com/api/health`, returns Vercel headers, and does not redirect to `scaffoldweb-com.l.ink`.
 
 Copyable verification commands:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 
-curl -i https://scaffoldweb.com/api/cron/maintenance
-curl -i -H "Authorization: Bearer $CRON_SECRET" https://scaffoldweb.com/api/cron/maintenance
+curl -i https://strelva.com/api/cron/maintenance
+curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance
 ```
 
 Expected results:
 
-- Only run the production smoke command after `https://scaffoldweb.com/api/health` stays on `scaffoldweb.com` and returns the Vercel Next.js health response.
+- Only run the production smoke command after `https://strelva.com/api/health` stays on `strelva.com` and returns the Vercel Next.js health response.
 - First cron request returns `401`.
 - Second cron request returns a non-`401` response and logs an authorized maintenance run.
 - Root marketing-host sign-in or sign-up finishes at `/account`, where the invited owner can choose the correct site if needed; if that signed-in email has no tenant access, `/account` offers `Use invited email`, a support contact, and the private-beta access request.
@@ -89,24 +89,24 @@ Move an item here only with owner approval in the release note. Each waiver must
 ### Production Live Verification
 
 - Status: app freshness resolved on May 14, 2026; final production verification remains pending Rohlax DNS, `jacobtest` tenant configuration, and owner manual checks.
-- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://scaffoldweb.com/sign-in` serve `Sign in to Scaffold Web | Scaffold Web` from Vercel. The latest inspected production deployment is `dpl_AjSfZpDFeYtzGzjuMBKsJsPzXJA6` for `scaffold-web`, created May 14, 2026 at 10:19:30 EDT, Ready at `https://scaffold-cqqfkhtzo-rhinehart514-gmailcoms-projects.vercel.app`, with aliases for `https://scaffoldweb.com`, `https://*.scaffoldweb.com`, `https://demo.scaffoldweb.com`, `https://admin.rohlaxwellness.com`, and `https://admin.greatlakesdriedfruit.com`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Scaffold Web production-domain prerequisites are complete, while Rohlax Cloudflare DNS and `jacobtest` tenant configuration remain open.
-- Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
+- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://strelva.com/sign-in` serve `Sign in to Strelva | Strelva` from Vercel. The latest inspected production deployment is `dpl_AjSfZpDFeYtzGzjuMBKsJsPzXJA6` for `scaffold-web`, created May 14, 2026 at 10:19:30 EDT, Ready at `https://scaffold-cqqfkhtzo-rhinehart514-gmailcoms-projects.vercel.app`, with aliases for `https://strelva.com`, `https://*.strelva.com`, `https://demo.strelva.com`, `https://admin.rohlaxwellness.com`, and `https://admin.greatlakesdriedfruit.com`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Strelva production-domain prerequisites are complete, while Rohlax Cloudflare DNS and `jacobtest` tenant configuration remain open.
+- Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
 
 ### Production Domain Routing
 
 - Status: resolved locally on May 10, 2026.
-- Evidence: Porkbun DNS now has `A scaffoldweb.com 76.76.21.21` and `CNAME *.scaffoldweb.com cname.vercel-dns.com`. `dig +short scaffoldweb.com A` returns `76.76.21.21`, public resolvers `1.1.1.1`, `8.8.8.8`, and `9.9.9.9` return the same, and `curl -I -L https://scaffoldweb.com/api/health` stays on `scaffoldweb.com`, returns `HTTP/2 200`, `server: Vercel`, `content-type: application/json`, and no longer redirects to `scaffoldweb-com.l.ink`.
+- Evidence: Porkbun DNS now has `A strelva.com 76.76.21.21` and `CNAME *.strelva.com cname.vercel-dns.com`. `dig +short strelva.com A` returns `76.76.21.21`, public resolvers `1.1.1.1`, `8.8.8.8`, and `9.9.9.9` return the same, and `curl -I -L https://strelva.com/api/health` stays on `strelva.com`, returns `HTTP/2 200`, `server: Vercel`, `content-type: application/json`, and no longer redirects to `scaffoldweb-com.l.ink`.
 - Required owner action: keep the DNS verification commands in this file for future rotations and rerun them after any registrar, nameserver, or Vercel domain changes.
 
 - Resolved env handoff reference:
   - Required owner action: Production env has been set, pulled, and rechecked locally; keep this handoff text for future rotations.
-  - Minimum production values to confirm in Vercel: live Clerk keys and webhook secret, `SUPER_ADMIN_EMAILS`, Google AI key, Sanity project/dataset/API token/webhook secret, Upstash REST URL/token, Stripe live key/price/webhook secret, Resend key/domain, generated `CRON_SECRET` / `INTERNAL_API_SECRET` / `OAUTH_STATE_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://scaffoldweb.com`, and `NEXT_PUBLIC_APP_URL=https://scaffoldweb.com` when Google, Instagram, or Calendly OAuth is enabled.
+  - Minimum production values to confirm in Vercel: live Clerk keys and webhook secret, `SUPER_ADMIN_EMAILS`, Google AI key, Sanity project/dataset/API token/webhook secret, Upstash REST URL/token, Stripe live key/price/webhook secret, Resend key/domain, generated `CRON_SECRET` / `INTERNAL_API_SECRET` / `OAUTH_STATE_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://strelva.com`, and `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth is enabled.
   - Copyable Vercel env commands retained for rotation reference: `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, `vercel env add REB_CUSTOM_REQUEST_SECRET production`, and `vercel env add NEXT_PUBLIC_APP_URL production` when OAuth is enabled.
   - Provider value sources: `CLERK_WEBHOOK_SECRET` from Clerk Dashboard -> Webhooks; `SANITY_WEBHOOK_SECRET` from Sanity project webhook settings; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from Upstash Redis database -> REST API section; `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from Sentry project settings -> Client Keys / DSN; `REB_CUSTOM_REQUEST_SECRET` is a generated shared custom-storefront bearer secret; `STRIPE_SCAFFOLD_PRICE_ID` is optional while admin-side pricing is undecided — when set it must be a live recurring monthly USD Stripe price configured under Stripe live-mode Products.
   - Clerk publishable key, secret key, and webhook secret must come from the same live Clerk instance; mismatched Clerk apps can make `/sign-in` loop.
   - Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If a generated secret must be rotated, generate it with `openssl rand -hex 32`, update the matching provider or caller, run `vercel env pull .env.production.local --environment=production`, then rerun `pnpm check:prod`.
-  - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://scaffoldweb.com/sign-in` serves `Sign in to Scaffold Web | Scaffold Web`.
-- Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `REB_CUSTOM_REQUEST_SECRET` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://scaffoldweb.com/api/clerk/webhook`, Sanity project webhook settings for `https://scaffoldweb.com/api/sanity/webhook`, Upstash Redis -> REST API, Sentry project settings -> Client Keys / DSN, and a generated shared custom-storefront bearer secret. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add REB_CUSTOM_REQUEST_SECRET production`.
+  - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://strelva.com/sign-in` serves `Sign in to Strelva | Strelva`.
+- Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `REB_CUSTOM_REQUEST_SECRET` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://strelva.com/api/clerk/webhook`, Sanity project webhook settings for `https://strelva.com/api/sanity/webhook`, Upstash Redis -> REST API, Sentry project settings -> Client Keys / DSN, and a generated shared custom-storefront bearer secret. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add SANITY_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add REB_CUSTOM_REQUEST_SECRET production`.
 - `STRIPE_SCAFFOLD_PRICE_ID` is intentionally unpinned: client sites are free for now and the admin-side price is undecided. `pnpm check:prod` skips the price check when the env var is unset and only validates the recurring-monthly-USD shape when it is set.
 - `pnpm check:prod` now confirms Upstash Redis connectivity with `PING: PONG`; the remaining Redis warning is only that the tenant cache is empty and will populate on first request.
 - `docs/design-kit.md` exists and covers WCAG 2.2 AA, Core Web Vitals, AI surfaces, and template expansion rules.
@@ -142,7 +142,7 @@ Move an item here only with owner approval in the release note. Each waiver must
 - `pnpm check:prod` verifies `/api/v1/content/:tenant/:section` and `/api/v1/page-config/:tenant` stay thin aliases to the public storefront routes, and that those routes validate tenant slugs, active tenants, and allowed template sections before reading public storefront data.
 - `pnpm check:prod` verifies Google, Instagram, and Calendly OAuth callbacks call `verifyOAuthState(state)`, reject invalid state, derive `tenantId` from `verifiedState`, and only then save tenant connections.
 - Sanity webhooks now fail closed when `SANITY_WEBHOOK_SECRET` is missing or provider signature verification fails, using `next-sanity/webhook` rather than a hand-rolled signature parser.
-- Production webhook handoff now documents the exact Sanity endpoint (`https://scaffoldweb.com/api/sanity/webhook`), Stripe endpoint (`https://scaffoldweb.com/api/billing/webhook`), required Stripe events, and matching `SANITY_WEBHOOK_SECRET`/`STRIPE_WEBHOOK_SECRET` values in `docs/production-readiness.md`; `pnpm check:prod` also prints those setup reminders.
+- Production webhook handoff now documents the exact Sanity endpoint (`https://strelva.com/api/sanity/webhook`), Stripe endpoint (`https://strelva.com/api/billing/webhook`), required Stripe events, and matching `SANITY_WEBHOOK_SECRET`/`STRIPE_WEBHOOK_SECRET` values in `docs/production-readiness.md`; `pnpm check:prod` also prints those setup reminders.
 - Stripe billing webhooks fail closed without `STRIPE_WEBHOOK_SECRET`, verify the `stripe-signature` with Stripe's webhook verifier, retain event idempotency, and handle the launch-critical subscription events; `pnpm check:prod` verifies this route coverage.
 - Clerk webhooks fail closed without `CLERK_WEBHOOK_SECRET`, verify Svix signatures, and only auto-assign invited users from signed `user.created` events; `pnpm check:prod` verifies this route coverage.
 - Calendly and Vegaro booking webhooks now fail closed when their webhook secret is missing, the signature is missing, or signature verification fails.
@@ -154,7 +154,7 @@ Move an item here only with owner approval in the release note. Each waiver must
 - Public tracking, access-request, newsletter signup, booking, and checkout POST routes now reject malformed or non-object JSON with `400 Invalid request body` instead of surfacing generic server errors.
 - Newsletter subscribes and sends now use Redis-backed async rate limiting; subscriber names are trimmed/capped before storage.
 - Stale duplicate tenant `rohlax-wellness` was removed from Sanity; launch tenant `rohlax` has client/admin domains and revalidation configured.
-- `https://scaffoldweb.com/home` returns `200`.
+- `https://strelva.com/home` returns `200`.
 - `https://greatlakesdriedfruit.com/` redirects to `https://www.greatlakesdriedfruit.com/` and returns `200`.
 - `https://admin.greatlakesdriedfruit.com/` redirects to `/dashboard`, then to `/sign-in` for signed-out users and returns the Vercel/Next.js sign-in page.
 - Root body background/text color now comes from CSS instead of duplicate inline body styles, removing a React hydration mismatch warning seen during smoke runs.
@@ -171,13 +171,13 @@ pnpm audit
 pnpm build
 pnpm check:prod
 git status --short
-REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke
+REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke
 ```
 
 Equivalent one-command local gate:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://scaffoldweb.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 ```
 
 The GitHub Release workflow refuses to create a `reb-vYYYY.MM.DD.N` tag unless the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.

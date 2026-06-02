@@ -12,8 +12,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Site delivery status | Scaffold Web",
-  description: "Track the status of a Scaffold Web site request.",
+  title: "Site delivery status | Strelva",
+  description: "Track the status of a Strelva site request.",
 };
 
 export default async function DeliveryStatusPage({
@@ -41,7 +41,7 @@ export default async function DeliveryStatusPage({
           className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
         >
           <ArrowLeft className="size-4" />
-          Scaffold Web
+          Strelva
         </Link>
 
         <section className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">

@@ -12,7 +12,7 @@ Hi [Name],
 
 I set up a simple payment page for the website work. You can choose the amount that feels right anywhere from $300 to $1,000 and pay securely here:
 
-https://scaffoldweb.com/pay/rohlax
+https://strelva.com/pay/rohlax
 
 I wanted to keep this flexible instead of sending a fixed invoice. There is no default or expected amount, and the top of the range is only a ceiling, not a target.
 
@@ -26,5 +26,5 @@ Jacob
 ## Pre-Send Checklist
 
 - Replace `[Name]`.
-- Open `https://scaffoldweb.com/pay/rohlax` and confirm it allows a one-time custom payment from `$300` to `$1,000`.
+- Open `https://strelva.com/pay/rohlax` and confirm it allows a one-time custom payment from `$300` to `$1,000`.
 - Confirm the email tone still feels right for the relationship before sending.

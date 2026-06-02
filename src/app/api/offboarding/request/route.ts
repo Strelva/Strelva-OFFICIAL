@@ -7,8 +7,8 @@ const OFFBOARDING_STEPS = [
   "Export content JSON and asset manifest.",
   "Move DNS to the next provider after the new site is ready.",
   "Open billing portal and cancel the subscription when handoff timing is confirmed.",
-  "Remove Scaffold Web custom domains after traffic points away.",
-  "Revoke Scaffold Web admin access in domain registrar, Google Business Profile, booking, social, and email tools.",
+  "Remove Strelva custom domains after traffic points away.",
+  "Revoke Strelva admin access in domain registrar, Google Business Profile, booking, social, and email tools.",
 ];
 
 export async function POST(request: Request) {

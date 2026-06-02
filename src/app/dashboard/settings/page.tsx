@@ -1159,7 +1159,7 @@ function DependencyHealthSection() {
                 A custom repo dependency needs attention before the client site depends on it.
               </p>
               <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
-                Scaffold Web is showing this here so paused services are caught before they look like a storefront or AI issue.
+                Strelva is showing this here so paused services are caught before they look like a storefront or AI issue.
               </p>
             </div>
           </div>
@@ -1293,7 +1293,7 @@ function BillingSection() {
               if (!res.ok) {
                 setBillingError(
                   res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "Billing is not connected yet. Ask Scaffold Web to turn on the billing portal."
+                    ? "Billing is not connected yet. Ask Strelva to turn on the billing portal."
                     : body?.error || "Couldn't open the billing portal. Try again.",
                 );
                 return;
@@ -1392,7 +1392,7 @@ function PublishingSection() {
         <p className="text-[13px] text-gray-muted leading-relaxed">
           {autoPublish
             ? "AI changes go live immediately when you confirm them in chat."
-            : "AI changes are saved for Scaffold Web to check before going live."}
+            : "AI changes are saved for Strelva to check before going live."}
         </p>
         {error && <p className="mt-3 text-[12px] text-amber-300">{error}</p>}
         {saved && <p className="mt-3 text-[12px] text-emerald-300">Publishing mode saved.</p>}
@@ -1440,7 +1440,7 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
   },
   ownership: {
     title: "Ownership and handoff",
-    description: "Know what the business owns, what Scaffold Web manages, and how to leave cleanly.",
+    description: "Know what the business owns, what Strelva manages, and how to leave cleanly.",
   },
   domains: {
     title: "Domain health",

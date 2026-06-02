@@ -1,5 +1,5 @@
 /**
- * Scaffold Web ↔ custom-repo contract.
+ * Strelva ↔ custom-repo contract.
  *
  * Stable wire format consumed by client repos (Rohlax, GLDF, future
  * custom repos). The version constant is exported as both the canonical

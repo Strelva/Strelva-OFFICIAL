@@ -11,7 +11,7 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 
 export const metadata: Metadata = {
   title: "Create dashboard access",
-  description: "Create an invited Scaffold Web dashboard account, or create an account for self-serve setup.",
+  description: "Create an invited Strelva dashboard account, or create an account for self-serve setup.",
 };
 
 export const dynamic = "force-dynamic";
@@ -97,7 +97,7 @@ export default async function SignUpPage({
               className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
             >
               <ArrowLeft className="size-4" />
-              Scaffold Web
+              Strelva
             </Link>
             <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
               Dashboard invite confirmed
@@ -107,7 +107,7 @@ export default async function SignUpPage({
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
               Use <strong>{invite.email}</strong> to connect this account to
-              the dashboard Jacob prepared. After signup, Scaffold Web will
+              the dashboard Jacob prepared. After signup, Strelva will
               open the site dashboard automatically.
             </p>
           </section>
@@ -143,7 +143,7 @@ export default async function SignUpPage({
               className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
             >
               <ArrowLeft className="size-4" />
-              Scaffold Web
+              Strelva
             </Link>
             <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
               Client dashboard
@@ -153,7 +153,7 @@ export default async function SignUpPage({
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
               Use the email Jacob connected to this site. After signup,
-              Scaffold Web will open the dashboard for {tenantAuth.siteName}.
+              Strelva will open the dashboard for {tenantAuth.siteName}.
             </p>
           </section>
 
@@ -179,7 +179,7 @@ export default async function SignUpPage({
 
     return (
       <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title="Create your Scaffold Web account" />
+        <AuthDocumentTitle title="Create your Strelva account" />
         <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
           <section>
             <Link
@@ -187,7 +187,7 @@ export default async function SignUpPage({
               className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
             >
               <ArrowLeft className="size-4" />
-              Scaffold Web
+              Strelva
             </Link>
             <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
               Self-serve setup
@@ -197,7 +197,7 @@ export default async function SignUpPage({
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
               After signup, you will return to the business setup you started.
-              Scaffold Web will use those details to create your dashboard,
+              Strelva will use those details to create your dashboard,
               starter content, and subdomain.
             </p>
           </section>
@@ -227,7 +227,7 @@ export default async function SignUpPage({
           className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
         >
           <ArrowLeft className="size-4" />
-          Scaffold Web
+          Strelva
         </Link>
 
         <section className="mt-12 overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
@@ -253,7 +253,7 @@ export default async function SignUpPage({
               <ArrowRight className="size-4" />
             </Link>
             <a
-              href="mailto:jacob@scaffoldweb.com?subject=Scaffold%20Web%20signup"
+              href="mailto:jacob@strelva.com?subject=Strelva%20signup"
               className="marketing-button-secondary h-11 px-5 text-[14px]"
             >
               Email Jacob

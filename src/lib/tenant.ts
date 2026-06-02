@@ -12,8 +12,8 @@ export function getTenantFromHost(host: string): string | null {
     return subdomain || null;
   }
 
-  if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
-    const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
+  if (hostWithoutPort.endsWith(".strelva.com")) {
+    const subdomain = hostWithoutPort.replace(".strelva.com", "");
     if (subdomain.startsWith("admin.")) {
       return subdomain.replace(/^admin\./, "") || null;
     }

@@ -7,17 +7,17 @@ import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 export { isMarketingHost } from "./lib/marketing-hosts";
 
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
-  "gldf.scaffoldweb.com": "https://greatlakesdriedfruit.com",
+  "gldf.strelva.com": "https://greatlakesdriedfruit.com",
 };
 
 const cspBaseDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://va.vercel-scripts.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.strelva.com https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.strelva.com",
   "font-src 'self' data:",
   "frame-src 'self' https: http://localhost:* http://*.localhost:*",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.strelva.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
   "worker-src 'self' blob:",
   "base-uri 'self'",
   "form-action 'self'",
@@ -51,7 +51,7 @@ export function shouldResolveCustomDomain(host: string): boolean {
   return (
     !isMarketingHost(host) &&
     !hostWithoutPort.endsWith(".localhost") &&
-    !hostWithoutPort.endsWith(".scaffoldweb.com") &&
+    !hostWithoutPort.endsWith(".strelva.com") &&
     !hostWithoutPort.endsWith(".vercel.app")
   );
 }
@@ -64,9 +64,9 @@ export function extractTenantFromHost(host: string): { tenant: string | null; is
     return { tenant: null, isAdminSubdomain: false };
   }
 
-  // Production: tenant.scaffoldweb.com
-  if (hostWithoutPort.endsWith(".scaffoldweb.com")) {
-    const subdomain = hostWithoutPort.replace(".scaffoldweb.com", "");
+  // Production: tenant.strelva.com
+  if (hostWithoutPort.endsWith(".strelva.com")) {
+    const subdomain = hostWithoutPort.replace(".strelva.com", "");
     if (subdomain.startsWith("admin.")) {
       const tenant = subdomain.replace(/^admin\./, "");
       return tenant
@@ -153,7 +153,7 @@ export function shouldUseFallbackAuthForAdminHost(host: string, isAdminSubdomain
 }
 
 function buildTenantFallbackUrl(req: NextRequest, tenantId: string, path: string): URL {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://scaffoldweb.com";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
   const url = new URL(`/client/${tenantId}${path}`, base);
   url.search = req.nextUrl.search;
   return url;
@@ -205,14 +205,14 @@ function isLivePreviewRequest(req: NextRequest): boolean {
 function getPreviewFrameAncestors(host: string, protocol: string): string[] {
   const ancestors = new Set([
     "'self'",
-    "https://scaffoldweb.com",
-    "https://www.scaffoldweb.com",
-    "https://admin.scaffoldweb.com",
+    "https://strelva.com",
+    "https://www.strelva.com",
+    "https://admin.strelva.com",
     "http://localhost:3000",
     "http://localhost:3001",
   ]);
 
-  if (host && !MARKETING_HOSTS.has(host) && !host.endsWith(".scaffoldweb.com")) {
+  if (host && !MARKETING_HOSTS.has(host) && !host.endsWith(".strelva.com")) {
     const bare = host.replace(/^(www|admin)\./, "");
     ancestors.add(`${protocol}//${bare}`);
     ancestors.add(`${protocol}//www.${bare}`);
@@ -239,7 +239,7 @@ export function buildContentSecurityPolicy(params: {
       "frame-src 'self' https: http://localhost:* http://*.localhost:*",
       "base-uri 'self' https:",
       "form-action 'self'",
-      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://scaffoldweb.com https://admin.scaffoldweb.com",
+      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://strelva.com https://admin.strelva.com",
     ].join("; ");
   }
 

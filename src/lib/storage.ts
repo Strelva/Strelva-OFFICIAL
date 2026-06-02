@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * Scaffold Web storage - re-export module
+ * Strelva storage - re-export module
  * =============================================================================
  *
  * This file re-exports all storage functions from modular domain files.
