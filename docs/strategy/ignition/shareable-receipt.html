@@ -1,0 +1,65 @@
+<!--
+  shareable-receipt — the AnswerRank scorecard as a forwardable share-card / OG image.
+  This is the Phase-C1 proof loop wired BEFORE the first user: every scan produces a
+  re-shareable artifact, and every artifact carries "scan your own" so each share
+  recruits the next scan. Render server-side per result (1200x630 for OG) and host the
+  public result at strelva.com/ai/<slug>. Tokens below match the marketing globals.css.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta property="og:title" content="{{business}} scored {{grade}} on AI Visibility" />
+    <meta property="og:description" content="{{verdict}}" />
+    <meta property="og:image" content="https://strelva.com/ai/{{slug}}/card.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <style>
+      :root { --bg:#0b0b0c; --panel:#141416; --rule:#26262b; --text:#ededef; --text2:#a1a1aa; --accent:#7c9cff; --a:#34d399; --c:#fbbf24; --f:#f87171; }
+      * { box-sizing:border-box; margin:0; }
+      body { background:var(--bg); color:var(--text); font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Inter,sans-serif; }
+      .card { width:600px; margin:24px auto; background:var(--panel); border:1px solid var(--rule); border-radius:16px; overflow:hidden; }
+      .head { display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--rule); }
+      .brand { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+      .body { padding:24px 22px; }
+      .biz { font-size:18px; font-weight:600; }
+      .url { font-size:12px; color:var(--text2); margin-top:2px; }
+      .grade { display:flex; align-items:baseline; gap:14px; margin:18px 0 10px; }
+      .g { font-size:64px; font-weight:700; line-height:1; }
+      .g.A,.g.B { color:var(--a); } .g.C,.g.D { color:var(--c); } .g.F { color:var(--f); }
+      .score { font-size:18px; color:var(--text2); }
+      .verdict { font-size:17px; font-weight:600; margin:6px 0 18px; }
+      .sig { display:flex; gap:10px; padding:7px 0; border-top:1px solid var(--rule); font-size:13px; }
+      .sig .m { width:16px; } .pass{color:var(--a);} .fail{color:var(--f);}
+      .fix { margin-top:16px; padding:12px 14px; background:rgba(124,156,255,.08); border:1px solid rgba(124,156,255,.25); border-radius:10px; font-size:13px; }
+      .cta { display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-top:1px solid var(--rule); }
+      .btn { background:var(--accent); color:#0b0b0c; font-weight:600; font-size:13px; padding:9px 14px; border-radius:8px; text-decoration:none; }
+      .pb { font-size:11px; color:var(--text2); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="head">
+        <span class="brand">Strelva · AI Visibility Score</span>
+        <span class="pb">strelva.com/ai</span>
+      </div>
+      <div class="body">
+        <div class="biz">{{business}}</div>
+        <div class="url">{{url}}</div>
+        <div class="grade">
+          <span class="g {{grade}}">{{grade}}</span>
+          <span class="score">{{score}}/100</span>
+        </div>
+        <div class="verdict">{{verdict}}</div>
+
+        <!-- repeat per signal -->
+        <div class="sig"><span class="m {{passClass}}">{{passMark}}</span><span>{{signalLabel}} — <span style="color:var(--text2)">{{signalDetail}}</span></span></div>
+
+        <div class="fix"><strong>Top fix:</strong> {{topFix}}</div>
+      </div>
+      <div class="cta">
+        <a class="btn" href="https://strelva.com/ai">Scan your own business →</a>
+        <span class="pb">Free · no signup · powered by Strelva</span>
+      </div>
+    </div>
+  </body>
+</html>
