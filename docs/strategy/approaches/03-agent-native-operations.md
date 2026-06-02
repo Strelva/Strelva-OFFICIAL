@@ -1,0 +1,75 @@
+# Agent-Native Operations — The Governed Operator
+
+**One-liner** — Strelva stops selling websites and software and starts selling one thing: a governed AI operations employee that runs the boring, recurring parts of a Buffalo small business — with a human (Noah or Jacob) standing behind every change as the approver of record.
+
+## The bet
+The consensus sells artifacts (a website, an automation, a dashboard) and bolts AI on as a feature. The non-consensus wager is that the *governance layer itself is the product* — a three-tier "auto-publish / review / block" engine that lets an AI act on a live business without breaking it. Strelva already runs this in production on real client sites (`src/lib/ai-governance.ts`), which is the single hardest and rarest thing to ship in agentic automation. If we reframe the entire company as "we install a supervised AI operator into your business and a real Buffalo human owns the bar," then the website and the workflow app become *delivery surfaces for the operator*, not the thing being sold — and the operator is the recurring-revenue asset that no 30-second site builder or n8n reseller can match.
+
+## Jobs-To-Be-Done served
+The functional job is **"keep my business running on the recurring tasks I keep dropping"** — the website hours that are six months stale, the unanswered review, the quote that never got followed up, the intake form that piles up in an inbox. Owners are not hiring "AI" and not hiring "software"; they are hiring *someone to hold the recurring stuff so they can do the billable work.* This is the abdication job from the websites JTBD ("get me customers without me thinking about the website") fused with the autonomy job from the software JTBD ("make my business run without me being the bottleneck") into one hire.
+
+The **emotional job** is removing the low-grade dread that something is silently rotting — the site is broken on mobile, a one-star review sat unanswered for two weeks, a lead went cold. The governance layer answers the dominant *blocking* anxiety directly: every owner's first fear is "what if the AI changes something wrong?" The product's literal answer is the review tier — high-risk facts (prices, hours, booking links, addresses; see `HIGH_RISK_FACTUAL_FIELD_HINTS` in the governance code) and all new marketing copy route to a human before they go live; only safe factual edits auto-publish; structural/code changes are blocked outright. We are not asking for trust — we are showing the guardrail.
+
+The **social job** is looking like a real, in-control, staffed business — to customers (a current, responsive web presence and answered reviews signal "still in business, still cares") and to employees (the place runs on a system, not on the owner's memory).
+
+The **trigger / struggling moments** are loss-aversion events, never aspiration: leads quietly halve year over year and the owner can't say why; a customer mentions the site looks broken; a competitor appears in Google or ChatGPT that didn't exist six months ago; a key employee leaves with tribal knowledge in their head. The operator is hired in the moment of "I almost dropped something that mattered," not "I want to modernize."
+
+## What Strelva becomes
+Strelva becomes **a supervised-AI staffing studio**: you hire an operator, Buffalo humans own its judgment. The product shape is one operator with two installable surfaces and a shared governance spine, event store, and weekly receipt.
+
+- **Wedge — Noah / Websites division installs the operator on the web presence.** The managed website remains the free acquisition surface, but the *sale* is the operator: it watches the site and the connected channels (Google Business, Search Console, Yelp, Instagram, Calendly — all already wired in `src/lib/integration-registry.ts`), drafts the hours update, drafts the review reply, drafts the blog post, and routes each through governance. Noah is the named approver. The weekly receipt (`src/lib/weekly-brief.ts`) reframes from "here's your analytics" to **"here's what your operator did this week and what it's waiting on you to approve"** — proof-of-work, not proof-of-traffic. The operator's existing tools (`read_section`, `update_section`, `create_suggestion`, `create_blog_post` in `src/lib/agent-executor.ts`) already are the operator's hands.
+
+- **Expansion — Jacob / Custom Software division installs the operator on a recurring back-office workflow.** This is where the recurring revenue compounds. The exact same governance engine (auto / review / block) wraps a *non-website* process: intake routing, quote-to-invoice follow-up, job-status confirmations, scheduling reminders. The Discovery → Build → Retainer motion becomes "map your highest-volume recurring task → install the operator on it → Jacob owns the approval bar on retainer." The retainer is honest and defensible because someone is *actually standing behind the agent's output every week*, not because a one-time app was delivered and abandoned (the failure mode that has already killed the generic "AI automation agency").
+
+The unifying claim across both divisions: **one operator, one governance spine, one weekly receipt, two installation points.** A client who starts with the website operator is pre-sold on the workflow operator because they already trust the guardrail and already know the approver by name.
+
+## Novel Q4-2026 capability exploited
+The specific newly-possible thing is **safe, supervised autonomy on live business systems with no clean API — via computer-use / browser agents (Claude Computer Use, Operator, Stagehand, browser-use), which only reached production-grade between late-2024 and May 2026.** Twelve months ago an operator could only touch systems with a real API; the recurring tasks that actually bury a Buffalo trades or wellness owner live in *no-API* legacy tools — franchise portals, old booking systems, a county permitting site, a scheduling platform with no integration. Computer-use agents now let the operator act inside those UIs the way a staff member would.
+
+This is feasible *for Strelva specifically* — and not for a vibe-coder — only because Strelva already owns the missing half: the production governance engine. Computer-use without a guardrail is exactly how you get the "45% of AI-generated actions are unsafe" failure the research flags. The combination — *production-proven three-tier governance* + *now-production-grade computer-use* — is what makes "an AI operator that can safely touch your no-API tools under a human approver" a Q4-2026 product rather than a 2025 demo. Two capabilities crossed the line independently; Strelva is one of the few 2-person teams holding both halves at once.
+
+## Organic GTM motion
+The flywheel is **proof-of-operator, not proof-of-pitch**, run entirely through Buffalo's dense referral graph with zero cold outbound.
+
+The mechanic: the audit engine (`/api/audit/scan`) is the door-opener, but reframed. Instead of "here's your SEO score," it becomes **"here's what an operator would have already handled on your site this month"** — every audit finding is recast as a task the operator does, not a problem the owner now owns. The Phase-2 stubs (GBP completeness, NAP consistency, review presence — `stubGBPCompleteness`, `stubNAPConsistency`, `stubReviewPresence` in `src/lib/audit/checks.ts`) become the operator's first visible to-do list. The audit doesn't sell a fix; it previews the employee.
+
+Buffalo/WNY angle: the "City of Good Neighbors" trust contract makes *named-human-stands-behind-the-AI* land harder here than anywhere. "An AI runs it, Noah/Jacob signs off" is the anti-transactional promise the market culturally rewards, and the referral penalty for a bad intro means a working operator gets forwarded aggressively. The weekly receipt is engineered to be shareable specifically so it travels through BNI chapters and neighborhood associations.
+
+First three concrete distribution acts (no cold outbound):
+1. **Take the open "web/AI" seat at one BNI WNY chapter** (one-seat-per-category rule) and bring a single client's real weekly receipt as the show-and-tell — "this is what my client's operator did last week."
+2. **Run the operator live for one Hertel or Elmwood Village Association member** ($150/year corridors, dense 1–10-person ICP), then publish the before/after as founder LinkedIn content (7x reach of company pages) framed as "we installed an AI operator for a Buffalo [vertical] business — here's its first week."
+3. **Publish one anonymized vertical benchmark as AEO content** ("Buffalo wellness studios answer reviews in a median of 9 days; an operator does it in 1") — pulls prospects, feeds AI-answer citation, and seeds the cross-tenant moat as public proof.
+
+## Moat / where value compounds
+Three compounding layers, each harder to copy per unit of use:
+
+1. **Governance precedent data.** Every approve/edit/reject decision Noah and Jacob make is labeled training signal for what *this owner* and *this vertical* consider safe to auto-publish. The longer the operator runs, the more it pre-clears correctly and the less the human has to touch — so the marginal cost of operating each client *falls* over time while the trust *rises*. A competitor starting today has zero precedent data and must re-earn the guardrail's calibration from scratch.
+
+2. **Cross-tenant operator benchmark.** Because every operator runs on the same event schema and integration registry, Strelva accumulates "what the operator does and what moves the needle across N Buffalo businesses" — proprietary intelligence no single-tenant tool and no first-week competitor can produce.
+
+3. **Switching cost as installed staff.** An operator that has run a business's recurring tasks for six months *is* a staff member with institutional memory. Firing it is firing an employee who knows the hours, the booking flow, the review voice, the intake routing — far stickier than canceling a website subscription.
+
+## Why competitors will not (or cannot) copy this
+The consensus playbook sells the *artifact* and treats AI as a content feature ("AI employee for content," Durable/Wix/Duda) or sells the *automation* with no one standing behind it (the n8n/Make "AI automation agency" model, already declared broken). Two things the consensus structurally misses:
+
+- **They can't ship the guardrail, so they oscillate between "AI does everything" (unsafe, breaks live businesses, the 45%-bad-code problem) and "AI suggests, you do it" (no abdication, fails the actual job).** Strelva's three-tier engine is the narrow path between, and it is *already in production on paying client data* — that's a proof claim a 30-second site builder or a generic dev shop cannot make without rebuilding the hardest part.
+
+- **They can't combine governance + computer-use + a named local human.** A national platform can add computer-use but can't add Buffalo trust; a Buffalo agency can be local but can't ship a production governance engine; a vibe-coder can move fast but explicitly cannot own the quality bar. Strelva sits at the one intersection of all three. The consensus is structurally geo-agnostic and structurally artifact-priced; the operator framing is neither.
+
+## Redesign implication
+The marketing surface stops being a website-builder/agency homepage and becomes **"Hire your operator."** The hero is not "See what's working" but "An AI runs the recurring stuff. A Buffalo human signs off on every change." The proof element is a live operator activity feed and a real shareable weekly receipt, not a feature grid. The audit becomes "preview your operator's first to-do list," not a scorecard.
+
+The product surface reorients around the operator as the protagonist: the dashboard's primary object is the **approval queue** (what the operator did, what it's waiting on you to approve — drawn from the event store), the weekly receipt leads with *operator actions taken* before traffic, and the two divisions appear as two *installation surfaces for the same operator* rather than two product lines. The governance tiers become visible, branded UI — the guardrail is the thing the customer is buying, so the customer should *see* it working. Critically: any surface that implies the operator is acting on no-API systems must honestly reflect computer-use as early-stage / piloted until it is proven per client — no claiming autonomy that isn't governed and live.
+
+## Risks & kill signal
+The bet is wrong if **the human approval load does not fall as governance precedent accumulates** — if Noah and Jacob have to review essentially everything forever, the operator is just expensive labor with extra steps and the economics never compound. Early signal: track the auto-publish-vs-review ratio per tenant over the first 8 weeks; if the share of changes the human must touch isn't trending down, the precedent moat is fiction. Second kill signal: if owners *want* to review everything and never grant auto-publish (anxiety wins permanently), the abdication job isn't being served and we're back to a suggestion tool. Watch the rate at which clients opt into raising the auto-publish tier — refusal to ever loosen the guardrail means the trust transfer failed. Third risk: computer-use reliability on real no-API tools is still emerging; if the first workflow pilot needs constant human rescue, the expansion (Jacob's division) stalls and only the websites wedge survives.
+
+## First proof step
+**This week, solo, in Buffalo:** take one existing client (Rohlax or GLDF) and run the operator end-to-end on a real recurring task for one week, then generate a *reframed* weekly receipt that leads with "Your operator this week: drafted X, published Y safe factual updates, waiting on your approval for Z" — built entirely from the existing event store and `weekly-brief.ts`, no new infrastructure. Send it to that one client and to one BNI/Elmwood contact as the show-and-tell artifact. This proves three things at once with assets already in the repo: the operator acts, the governance routes correctly, and the receipt is forwardable — the whole flywheel in one email.
+
+## Open questions
+- At what auto-publish-share threshold does an operator become profitable to run for a free-website client — i.e., how much human approval time can each tenant absorb before the model breaks?
+- Which single recurring workflow (intake routing? quote follow-up? review response?) is the highest-frequency, lowest-risk first install for Jacob's division — the one most owners feel and most safely governed?
+- How much of the no-API computer-use surface is reliable enough to *sell* in Q4 2026 vs. only pilot — what's the honest line between "operator handles your booking portal" and "we're testing that"?
+- Does "hire an operator, a human signs off" out-convert "managed website + AI" with real Buffalo owners, or does the staffing framing trigger a different (higher?) price expectation we haven't tested?
+- What's the smallest governance-precedent dataset that visibly reduces human review load — i.e., how many client-weeks before the compounding moat is demonstrable to a prospect?
