@@ -27,14 +27,14 @@ const STATUS_COLORS: Record<string, string> = {
   trialing: "bg-emerald-500/20 text-emerald-400",
   past_due: "bg-yellow-500/20 text-yellow-400",
   cancelled: "bg-red-500/20 text-red-400",
-  none: "bg-zinc-700/40 text-zinc-400",
+  none: "bg-gray-bg text-gray-muted",
 };
 
 const READINESS_COLORS: Record<string, string> = {
   ok: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
   warn: "bg-amber-500/15 text-amber-300 border-amber-500/20",
   fail: "bg-red-500/15 text-red-300 border-red-500/20",
-  skip: "bg-zinc-700/40 text-zinc-400 border-zinc-700",
+  skip: "bg-gray-bg text-gray-muted border-glass-border",
 };
 
 const LAUNCH_STATUS_COLORS: Record<LaunchReadinessStatus, string> = {
@@ -111,8 +111,8 @@ export default async function AdminPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-white">Client Overview</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <h1 className="text-2xl font-semibold text-warm-white">Client Overview</h1>
+        <p className="text-sm text-gray-muted mt-1">
           {TENANTS.length} active client{TENANTS.length !== 1 ? "s" : ""} across your
           portfolio{archivedTenantCount ? ` · ${archivedTenantCount} archived hidden` : ""}
         </p>
@@ -120,55 +120,55 @@ export default async function AdminPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-6">
-          <p className="text-sm text-zinc-500">Active Tenants</p>
-          <p className="text-3xl font-semibold text-white mt-1">
+        <div className="rounded-xl bg-glass border border-glass-border p-6">
+          <p className="text-sm text-gray-muted">Active Tenants</p>
+          <p className="text-3xl font-semibold text-warm-white mt-1">
             {activeTenants}
           </p>
         </div>
-        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-6">
-          <p className="text-sm text-zinc-500">MRR</p>
-          <p className="text-3xl font-semibold text-white mt-1">
+        <div className="rounded-xl bg-glass border border-glass-border p-6">
+          <p className="text-sm text-gray-muted">MRR</p>
+          <p className="text-3xl font-semibold text-warm-white mt-1">
             ${mrr.toLocaleString()}
           </p>
-          <p className="text-xs text-zinc-600 mt-1">
+          <p className="text-xs text-gray-faint mt-1">
             {activeSubscriptions} active subscription
             {activeSubscriptions !== 1 ? "s" : ""} x ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS}
           </p>
         </div>
         <Link
           href="/admin/drafts"
-          className="rounded-xl bg-zinc-900 border border-zinc-800 p-6 hover:border-zinc-700 transition-colors"
+          className="rounded-xl bg-glass border border-glass-border p-6 hover:border-gray-border transition-colors"
         >
-          <p className="text-sm text-zinc-500">Pending Drafts</p>
-          <p className="text-3xl font-semibold text-white mt-1">
+          <p className="text-sm text-gray-muted">Pending Drafts</p>
+          <p className="text-3xl font-semibold text-warm-white mt-1">
             {totalDrafts}
           </p>
           {totalDrafts > 0 && (
             <p className="text-xs text-amber-400 mt-1">Review needed</p>
           )}
         </Link>
-        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-6">
-          <p className="text-sm text-zinc-500">Custom Repos</p>
-          <p className="text-3xl font-semibold text-white mt-1">
+        <div className="rounded-xl bg-glass border border-glass-border p-6">
+          <p className="text-sm text-gray-muted">Custom Repos</p>
+          <p className="text-3xl font-semibold text-warm-white mt-1">
             {customRepoCount}
           </p>
-          <p className="text-xs text-zinc-600 mt-1">
+          <p className="text-xs text-gray-faint mt-1">
             Default paid-client delivery path
           </p>
         </div>
       </div>
 
-      <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <section className="rounded-xl border border-glass-border bg-glass p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-300">
               Launch command center
             </p>
-            <h2 className="mt-2 text-lg font-semibold text-white">
+            <h2 className="mt-2 text-lg font-semibold text-warm-white">
               Controlled platform launch proof loop
             </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-muted">
               Launch readiness now tracks the three things that matter before a wider push:
               custom-repo delivery, trustworthy AI action receipts, and first-week owner activation.
             </p>
@@ -203,11 +203,11 @@ export default async function AdminPage() {
       </div>
 
       {/* Tenant table */}
-      <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500 text-left">
+              <tr className="border-b border-glass-border text-gray-muted text-left">
                 <th className="px-6 py-3 font-medium">Client</th>
                 <th className="px-6 py-3 font-medium">Access</th>
                 <th className="px-6 py-3 font-medium">Operations</th>
@@ -215,7 +215,7 @@ export default async function AdminPage() {
                 <th className="px-6 py-3 font-medium sr-only">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/50">
+            <tbody className="divide-y divide-glass-border/50">
               {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness }) => {
                 const fallbackUrl = getTenantDashboardFallbackUrl(t);
                 const customAdminUrl = getTenantDashboardUrl(t);
@@ -229,20 +229,20 @@ export default async function AdminPage() {
                 return (
                   <tr
                     key={t.id}
-                    className="hover:bg-zinc-800/30 transition-colors align-top"
+                    className="hover:bg-gray-bg transition-colors align-top"
                   >
                     <td className="px-6 py-5">
                       <div>
-                        <p className="font-medium text-white">{t.siteName}</p>
-                        <p className="mt-1 text-xs text-zinc-500">{t.ownerName}</p>
-                        <p className="mt-2 text-xs text-zinc-600">
+                        <p className="font-medium text-warm-white">{t.siteName}</p>
+                        <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
+                        <p className="mt-2 text-xs text-gray-faint">
                           {t.industry} · {t.template}
                         </p>
                         <span
                           className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                             t.active
                               ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-zinc-700/40 text-zinc-500"
+                              : "bg-gray-bg text-gray-muted"
                           }`}
                         >
                           {t.active ? "Active tenant" : "Inactive tenant"}
@@ -250,7 +250,7 @@ export default async function AdminPage() {
                         <span className={`ml-2 mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                           deliveryModel === "custom_repo"
                             ? "bg-amber-500/15 text-amber-300"
-                            : "bg-zinc-700/40 text-zinc-400"
+                            : "bg-gray-bg text-gray-muted"
                         }`}>
                           {deliveryModel === "custom_repo" ? "Custom repo" : "Platform template"}
                         </span>
@@ -262,22 +262,22 @@ export default async function AdminPage() {
                     <td className="px-6 py-5">
                       <div className="space-y-3">
                         <div>
-                          <p className="text-xs font-medium text-zinc-300">
+                          <p className="text-xs font-medium text-warm-white">
                             {t.ownerEmail ? t.ownerEmail : "No owner email"}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-600">
+                          <p className="mt-1 text-xs text-gray-faint">
                             Invite state: {t.ownerEmail ? "ready to invite" : "needs owner email"}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-600">Fallback dashboard</p>
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-gray-faint">Fallback dashboard</p>
                           <Link href={fallbackUrl} className="mt-1 block max-w-[260px] truncate font-mono text-xs text-amber-300 hover:text-amber-200">
                             {fallbackUrl.replace(/^https?:\/\//, "")}
                           </Link>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-600">Custom admin</p>
-                          <a href={customAdminUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block max-w-[260px] truncate font-mono text-xs text-zinc-400 hover:text-white">
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-gray-faint">Custom admin</p>
+                          <a href={customAdminUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block max-w-[260px] truncate font-mono text-xs text-gray-muted hover:text-warm-white">
                             {customAdminUrl.replace(/^https?:\/\//, "")}
                           </a>
                         </div>
@@ -313,18 +313,18 @@ export default async function AdminPage() {
                             {draftCount} pending draft{draftCount === 1 ? "" : "s"}
                           </span>
                         ) : (
-                          <span className="inline-flex rounded-full bg-zinc-700/40 px-2 py-1 text-xs font-medium text-zinc-500">
+                          <span className="inline-flex rounded-full bg-gray-bg px-2 py-1 text-xs font-medium text-gray-muted">
                             No drafts
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-zinc-500">
+                    <td className="px-6 py-5 text-gray-muted">
                       <p>{lastActivity ? formatTime(lastActivity) : "No activity"}</p>
-                      <p className="mt-2 text-xs text-zinc-600">
+                      <p className="mt-2 text-xs text-gray-faint">
                         {threadCount} chat thread{threadCount === 1 ? "" : "s"} · {launchReadiness.completed}/{launchReadiness.total} launch checks
                       </p>
-                      <p className="mt-2 max-w-[220px] truncate text-xs text-zinc-600">
+                      <p className="mt-2 max-w-[220px] truncate text-xs text-gray-faint">
                         Public: {publicUrl.replace(/^https?:\/\//, "")}
                       </p>
                       {deliveryModel === "custom_repo" && (
@@ -334,7 +334,7 @@ export default async function AdminPage() {
                       )}
                     </td>
                     <td className="px-6 py-5">
-                      <div className="flex min-w-[280px] flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
+                      <div className="flex min-w-[280px] flex-wrap items-center gap-2 rounded-lg border border-glass-border bg-surface-base/40 p-2">
                         <InviteButton
                           tenantId={t.id}
                           siteName={t.siteName}
@@ -342,7 +342,7 @@ export default async function AdminPage() {
                         />
                         <Link
                           href={fallbackUrl}
-                          className="rounded-md px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                          className="rounded-md px-2 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg hover:text-warm-white"
                         >
                           Dashboard
                         </Link>
@@ -350,7 +350,7 @@ export default async function AdminPage() {
                           href={customAdminUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
                         >
                           Custom admin
                         </a>
@@ -358,7 +358,7 @@ export default async function AdminPage() {
                           href={publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-md px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                          className="rounded-md px-2 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg hover:text-warm-white"
                         >
                           Site
                         </a>

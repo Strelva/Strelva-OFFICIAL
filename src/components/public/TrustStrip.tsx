@@ -43,7 +43,7 @@ export function TrustStrip({ settings, contact }: { settings: SiteSettings; cont
         >
           <span data-trust-item>{settings.ownerTitle || "Owner-Operated"}</span>
           <span data-trust-item style={{ color: "var(--cream-mid)" }}>|</span>
-          <span data-trust-item>Personalized Sessions</span>
+          <span data-trust-item>{settings.trustBadge || "Personalized Sessions"}</span>
           <span data-trust-item style={{ color: "var(--cream-mid)" }}>|</span>
           <span data-trust-item>
             {contact.address

@@ -3,6 +3,8 @@ import type { TestimonialsContent } from "@/lib/types";
 export function Testimonials({ testimonials }: { testimonials: TestimonialsContent }) {
   const items = testimonials.testimonials;
 
+  if (!items || items.length === 0) return null;
+
   return (
     <section className="py-10 md:py-14" style={{ background: "var(--cream-dark)" }}>
       <div className="container-main">
@@ -47,7 +49,7 @@ export function Testimonials({ testimonials }: { testimonials: TestimonialsConte
             className="grid md:grid-cols-3 gap-8 md:gap-12 pt-8 md:pt-10"
             style={{ borderTop: "1px solid var(--cream-mid)" }}
           >
-            {items.slice(1, 4).map((item, idx) => (
+            {items.slice(1).map((item, idx) => (
               <div key={item.id}>
                 <blockquote
                   className="text-base md:text-lg leading-relaxed"

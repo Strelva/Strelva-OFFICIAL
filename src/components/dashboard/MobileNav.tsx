@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, LayoutPanelLeft, MessageCircle, Link2 } from "lucide-react";
+import { House, LayoutPanelLeft, MessageCircle, Link2, BarChart3, CheckCircle2 } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useDashboard } from "./DashboardContext";
 
@@ -11,9 +11,11 @@ const NAV_ITEMS = [
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Sources", icon: Link2 },
+  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/review", label: "Review", icon: CheckCircle2 },
 ];
 
-export function MobileNav({ pendingCount: _pendingCount = 0 }: { pendingCount?: number }) {
+export function MobileNav() {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const effectivePathname =
@@ -83,7 +85,7 @@ export function MobileNav({ pendingCount: _pendingCount = 0 }: { pendingCount?: 
               <div className="relative">
                 <Icon className="w-5 h-5" strokeWidth={1.5} />
               </div>
-              <span className="max-w-[54px] truncate text-[9px] font-medium">{item.label}</span>
+              <span className="max-w-[54px] truncate text-[10px] font-medium">{item.label}</span>
             </Link>
           );
         })}

@@ -149,9 +149,11 @@ export function Header({
       {menuOpen && (
         <div
           className="fixed inset-0 z-[39] md:hidden"
+          role="dialog"
+          aria-modal="true"
           style={{ background: "rgba(250,249,247,0.98)", backdropFilter: "blur(12px)" }}
         >
-          <nav className="flex flex-col items-center justify-center h-full gap-8">
+          <nav aria-label="Main navigation" className="flex flex-col items-center justify-center h-full gap-8">
             {configuredLinks.map((link) => (
               <Link
                 key={link.href}

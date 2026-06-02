@@ -9,8 +9,8 @@ function RiskBadge({ risk }: { risk: OwnerRetentionSignals["churnRisk"] }) {
     risk === "healthy"
       ? "border-success/20 bg-success-dim text-success"
       : risk === "watch"
-        ? "border-amber-500/30 bg-amber-500/10 text-amber-800"
-        : "border-red-500/30 bg-red-500/10 text-red-700";
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+        : "border-red-500/30 bg-red-500/10 text-red-300";
 
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${className}`}>

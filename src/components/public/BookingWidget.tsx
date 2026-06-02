@@ -281,8 +281,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                 </p>
                 <div className="space-y-3 text-left">
                   <div>
-                    <label className="text-xs font-medium" style={{ color: "var(--bark)" }}>Name *</label>
+                    <label htmlFor="booking-name" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Name *</label>
                     <input
+                      id="booking-name"
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -292,8 +293,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium" style={{ color: "var(--bark)" }}>Email *</label>
+                    <label htmlFor="booking-email" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Email *</label>
                     <input
+                      id="booking-email"
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -303,8 +305,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium" style={{ color: "var(--bark)" }}>Phone</label>
+                    <label htmlFor="booking-phone" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Phone</label>
                     <input
+                      id="booking-phone"
                       type="tel"
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -314,8 +317,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium" style={{ color: "var(--bark)" }}>Notes</label>
+                    <label htmlFor="booking-notes" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Notes</label>
                     <textarea
+                      id="booking-notes"
                       value={form.notes}
                       onChange={(e) => setForm({ ...form, notes: e.target.value })}
                       className="w-full mt-1 px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2"

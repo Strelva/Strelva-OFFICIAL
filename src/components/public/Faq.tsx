@@ -58,8 +58,9 @@ export function Faq({ faq }: { faq: FaqContent }) {
           )}
 
           <div className="max-w-3xl">
-            {faq.faqs.map((item) => {
+            {faq.faqs.map((item, index) => {
               const isOpen = openId === item.id;
+              const btnId = `faq-btn-${index}`;
               return (
                 <div
                   key={item.id}
@@ -67,6 +68,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
                   style={{ borderBottom: "1px solid var(--cream-mid)" }}
                 >
                   <button
+                    id={btnId}
                     onClick={() => setOpenId(isOpen ? null : item.id)}
                     className="w-full flex items-center justify-between py-6 text-left group"
                     aria-expanded={isOpen}
@@ -74,7 +76,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
                     <span
                       className="font-display text-lg md:text-xl tracking-tight pr-8"
                       style={{ color: "var(--bark)" }}
-                      data-reb-field={`faqs[${faq.faqs.indexOf(item)}].question`}
+                      data-reb-field={`faqs[${index}].question`}
                     >
                       {item.question}
                     </span>
@@ -89,6 +91,8 @@ export function Faq({ faq }: { faq: FaqContent }) {
                     </span>
                   </button>
                   <div
+                    role="region"
+                    aria-labelledby={btnId}
                     className="overflow-hidden transition-all duration-300"
                     style={{
                       maxHeight: isOpen ? "2000px" : "0",
@@ -98,7 +102,7 @@ export function Faq({ faq }: { faq: FaqContent }) {
                     <p
                       className="text-sm leading-relaxed pb-6"
                       style={{ color: "var(--bark-light)" }}
-                      data-reb-field={`faqs[${faq.faqs.indexOf(item)}].answer`}
+                      data-reb-field={`faqs[${index}].answer`}
                     >
                       {item.answer}
                     </p>

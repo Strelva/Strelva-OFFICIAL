@@ -232,9 +232,6 @@ export function SitePreview() {
       return isLivePreview ? "live site" : "unpublished Scaffold copy";
     }
   })();
-  // Cross-origin tenant preview hosts are expected: they still communicate
-  // selection events to the dashboard through postMessage.
-  const showExternalPreviewNotice = false;
   const activeSectionLabel = activeSection
     ? SECTION_LABELS[activeSection] || activeSection
     : null;
@@ -707,44 +704,6 @@ export function SitePreview() {
                   >
                     Open live site
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewErrorDismissed(true)}
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
-                  >
-                    Continue editing
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {previewStatus === "ready" && showExternalPreviewNotice && !previewErrorDismissed && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt/95 p-6">
-              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
-                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-warm-white">Live site preview opens separately</p>
-                <p className="mt-2 text-xs leading-5 text-gray-muted">
-                  This tenant uses the public site as the source of truth, and the browser may block embedding it here. Keep editing the selected section on the right or open the live site in a new tab.
-                </p>
-                <p className="mt-3 truncate rounded-md bg-surface-base px-3 py-2 font-mono text-[10px] text-gray-faint">
-                  {liveTargetUrl}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                  <a
-                    href={liveTargetUrl || siteUrl || "/"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-on-warm-white hover:bg-warm-white/90"
-                  >
-                    Open live site
-                  </a>
-                  <button
-                    type="button"
-                    onClick={retryPreview}
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
-                  >
-                    Retry preview
-                  </button>
                   <button
                     type="button"
                     onClick={() => setPreviewErrorDismissed(true)}
