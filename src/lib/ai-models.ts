@@ -10,13 +10,13 @@
  */
 
 import { google } from "@ai-sdk/google";
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel } from "ai";
 import { logger } from "./logger";
 
 const PRIMARY_MODEL_ID = "gemini-2.5-flash";
 
 export interface ModelConfig {
-  model: LanguageModelV1;
+  model: LanguageModel;
   label: string;
 }
 

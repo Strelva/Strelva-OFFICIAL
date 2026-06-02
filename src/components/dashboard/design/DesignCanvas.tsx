@@ -28,7 +28,9 @@ export function DesignCanvas({
 }: DesignCanvasProps) {
   const scale = zoom / 100;
   const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [rectFromMessage, setRectFromMessage] = useState<{ id: string; rect: NodeRect } | null>(null);
   const [hoveredSection, setHoveredSection] = useState<{ id: string; rect: NodeRect } | null>(null);

@@ -521,7 +521,7 @@ function AITab({
   const [prompt, setPrompt] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [response, setResponse] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [response, setResponse] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [traceSteps, setTraceSteps] = useState<TraceStep[]>([]);
   const [pendingPreview, setPendingPreview] = useState<{
     section: string;
@@ -705,7 +705,9 @@ function AITab({
             className={`p-3 rounded-lg text-[11px] leading-relaxed ${
               response.type === "success"
                 ? "bg-emerald-950/30 text-emerald-300 border border-emerald-800/50"
-                : "bg-red-950/30 text-red-300 border border-red-800/50"
+                : response.type === "info"
+                  ? "bg-sky-950/30 text-sky-300 border border-sky-800/50"
+                  : "bg-red-950/30 text-red-300 border border-red-800/50"
             }`}
           >
             {response.message.slice(0, 300)}
