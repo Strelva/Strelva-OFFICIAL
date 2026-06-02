@@ -74,3 +74,4 @@ dev-*.json
 /.clerk/
 *.shape/
 .claude/scheduled_tasks.lock
+supabase/

@@ -121,6 +121,8 @@ export interface ShopContent {
 }
 
 export interface ContactContent {
+  headline?: string;
+  description?: string;
   email: string;
   phone?: string;
   address?: string;
@@ -139,6 +141,7 @@ export interface SiteSettings {
   siteKeywords?: string;
   ownerName?: string;
   ownerTitle?: string;
+  trustBadge?: string;
   footerTagline: string;
   copyrightText: string;
   bookingUrl?: string;

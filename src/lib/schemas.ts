@@ -152,6 +152,8 @@ export const shopSchema = z.object({
 });
 
 export const contactSchema = z.object({
+  headline: z.string().optional().default(""),
+  description: z.string().optional().default(""),
   email: z.string().email(),
   phone: z.string().optional().default(""),
   address: z.string().optional().default(""),

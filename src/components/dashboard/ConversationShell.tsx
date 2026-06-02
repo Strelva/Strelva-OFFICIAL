@@ -67,7 +67,7 @@ export function ConversationShell({
       </main>
 
       {/* Mobile bottom tab bar */}
-      <MobileNav pendingCount={pendingCount} />
+      <MobileNav />
     </div>
   );
 }

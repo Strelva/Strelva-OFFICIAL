@@ -43,14 +43,14 @@ export function Contact({ contact }: { contact: ContactContent }) {
             {/* Left */}
             <div data-contact-animate>
               <h2 className="font-display text-4xl md:text-5xl tracking-tight mb-4" data-reb-field="headline">
-                Get in touch.
+                {contact.headline || "Get in touch."}
               </h2>
               <p
                 className="text-base leading-relaxed max-w-sm mb-10"
                 style={{ color: "var(--bark-light)" }}
                 data-reb-field="description"
               >
-                Have questions? Want to learn more before booking? We&apos;d love to hear from you.
+                {contact.description || "Have questions? Want to learn more before booking? We'd love to hear from you."}
               </p>
 
               {/* Email */}
