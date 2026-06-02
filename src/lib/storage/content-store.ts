@@ -13,6 +13,7 @@ import {
   invalidateCachedContent,
   setCachedContent,
 } from "./content-cache";
+import { addSentryBreadcrumb } from "../sentry-context";
 
 export { DEFAULT_TENANT };
 
@@ -150,6 +151,7 @@ export async function setContent<K extends ContentSection>(
   data: ContentMap[K],
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
+  addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
   try {
     if (hasSanity) {
       const type = SECTION_TO_TYPE[section];

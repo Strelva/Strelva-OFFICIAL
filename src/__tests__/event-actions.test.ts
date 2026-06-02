@@ -38,6 +38,11 @@ vi.mock("../lib/revalidate-client", () => ({
   revalidateClientSite: (...args: unknown[]) => mockRevalidateClientSite(...args),
 }));
 
+vi.mock("../lib/ai-auto-approve", () => ({
+  recordApproval: vi.fn(() => Promise.resolve(0)),
+  recordRejection: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));

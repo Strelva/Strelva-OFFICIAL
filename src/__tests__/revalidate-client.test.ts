@@ -18,6 +18,11 @@ vi.mock("@/lib/redis", () => ({
   getRedis: vi.fn(() => null),
 }));
 
+vi.mock("@/lib/sentry-context", () => ({
+  addSentryBreadcrumb: vi.fn(),
+  setSentryContext: vi.fn(),
+}));
+
 describe("revalidateClientSite", () => {
   beforeEach(() => {
     vi.clearAllMocks();

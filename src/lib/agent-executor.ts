@@ -1,5 +1,4 @@
 import { generateText, tool, stepCountIs } from "ai";
-import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { getContent, getClickCounts, getSectionTimestamps } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
@@ -13,6 +12,9 @@ import type { ContentSection } from "@/lib/types";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
+import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
+import { logger } from "@/lib/logger";
+import { addSentryBreadcrumb } from "@/lib/sentry-context";
 
 export interface AgentExecutionToolTrace {
   name: string;
@@ -36,6 +38,8 @@ export interface AgentExecutionTrace {
   agentResult: AgentResultContract;
   /** Aggregated token usage across all model calls in this run. */
   usage?: AgentExecutionUsage;
+  /** Which AI model produced this response (e.g. "google/gemini-2.5-flash"). */
+  modelUsed: string;
 }
 
 // Cache built system prompts per tenant. Keyed on a signature derived from
@@ -219,6 +223,7 @@ export async function executeAgentPromptDetailed(
   tenantId: string,
   userMessage: string
 ): Promise<AgentExecutionTrace> {
+  addSentryBreadcrumb("agent", "Agent execution started", { tenantId, messageLength: userMessage.length });
   const template = await getTemplateForTenant(tenantId);
   const tenantConfig = await getTenantConfig(tenantId);
   const capFragment = capabilityPromptFragment();
@@ -283,9 +288,12 @@ export async function executeAgentPromptDetailed(
           }
         }
 
-        const governance = decideAiContentGovernance(section as ContentSection, parsed.data, {
+        const baseGovernance = decideAiContentGovernance(section as ContentSection, parsed.data, {
           tenantAutoPublish: tenantConfig?.autoPublish,
         });
+
+        const { maybeAutoApprove } = await import("@/lib/ai-auto-approve");
+        const governance = await maybeAutoApprove(tenantConfig, section as ContentSection, baseGovernance);
 
         if (governance.action === "block") {
           return {
@@ -495,13 +503,34 @@ export async function executeAgentPromptDetailed(
     });
   }
 
-  const result = await generateText({
-    model: google("gemini-2.5-flash"),
+  const primary = getPrimaryModel();
+  const fallback = getFallbackModel();
+  let modelUsed = primary.label;
+
+  const generateOptions = {
     system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+    messages: [{ role: "user" as const, content: userMessage }],
     tools,
     stopWhen: stepCountIs(8),
-  });
+  };
+
+  let result;
+  try {
+    result = await generateText({ ...generateOptions, model: primary.model });
+  } catch (primaryErr) {
+    if (fallback && isTransientModelError(primaryErr)) {
+      logger.warn("[agent] Primary model failed, trying fallback", {
+        primary: primary.label,
+        fallback: fallback.label,
+        error: primaryErr instanceof Error ? primaryErr.message : "unknown",
+        tenantId,
+      });
+      modelUsed = fallback.label;
+      result = await generateText({ ...generateOptions, model: fallback.model });
+    } else {
+      throw primaryErr;
+    }
+  }
 
   const toolCalls: AgentExecutionToolTrace[] = result.steps.flatMap((step) => {
     const okCalls = step.toolResults.map((toolResult) => ({
@@ -545,5 +574,6 @@ export async function executeAgentPromptDetailed(
     toolCalls,
     agentResult: buildAgentResultContract(actionResults),
     usage,
+    modelUsed,
   };
 }
