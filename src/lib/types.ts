@@ -425,7 +425,7 @@ export interface BlogPost {
 
 export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "professional" | (string & {});
 
-export type TenantFeature = "commerce" | "booking" | "newsletter";
+export type TenantFeature = "commerce" | "booking" | "newsletter" | "blog" | "events" | "shop" | "products" | "rewards" | "providers" | "instagram" | "reviews";
 
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 

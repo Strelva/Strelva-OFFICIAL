@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+
+function isValidSectionId(s: unknown): s is string {
+  return typeof s === "string" && /^[a-zA-Z0-9_-]+$/.test(s);
+}
+
+function postToParent(trustedOrigin: string | null, message: unknown) {
+  if (!trustedOrigin) return;
+  try { window.parent.postMessage(message, trustedOrigin); } catch {}
+}
 
 export function EditModeOverlay() {
   const [editMode, setEditMode] = useState(() => {
@@ -9,11 +18,19 @@ export function EditModeOverlay() {
   });
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [labelPos, setLabelPos] = useState<{ top: number; left: number } | null>(null);
+  const trustedOriginRef = useRef<string | null>(null);
 
-  // Listen for dashboard-driven edit mode toggles
+  // Listen for the first reb-edit-mode message to establish trusted origin (handshake).
+  // All subsequent messages are validated against this origin.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      if (!event.origin || event.origin === "null") return;
+
       if (event.data?.type === "reb-edit-mode") {
+        if (!trustedOriginRef.current) {
+          trustedOriginRef.current = event.origin;
+        }
+        if (event.origin !== trustedOriginRef.current) return;
         setEditMode(event.data.enabled);
       }
     }
@@ -26,13 +43,15 @@ export function EditModeOverlay() {
     if (!editMode) return;
 
     function handleMessage(event: MessageEvent) {
+      if (!trustedOriginRef.current || event.origin !== trustedOriginRef.current) return;
+
       if (event.data?.type === "reb-highlight-section") {
         // Remove previous highlight
         document.querySelectorAll(".reb-highlighted").forEach((el) => {
           el.classList.remove("reb-highlighted");
         });
         // Apply new highlight
-        if (event.data.section) {
+        if (isValidSectionId(event.data.section)) {
           const target =
             document.querySelector(`[data-reb-section="${event.data.section}"]`) ||
             document.querySelector(`[data-reb-editable="${event.data.section}"]`);
@@ -46,11 +65,12 @@ export function EditModeOverlay() {
       // Handle rect request from parent
       if (event.data?.type === "reb-request-rect") {
         const section = event.data.section;
+        if (!isValidSectionId(section)) return;
         const el = document.querySelector(`[data-reb-section="${section}"]`) ||
                    document.querySelector(`[data-reb-editable="${section}"]`);
         if (el) {
           const rect = el.getBoundingClientRect();
-          window.parent.postMessage({
+          postToParent(trustedOriginRef.current, {
             type: "reb-node-rect",
             section,
             rect: {
@@ -59,7 +79,7 @@ export function EditModeOverlay() {
               width: rect.width,
               height: rect.height,
             },
-          }, "*");
+          });
         }
       }
     }
@@ -80,13 +100,22 @@ export function EditModeOverlay() {
       setHoveredSection(sectionType);
       const rect = el.getBoundingClientRect();
       setLabelPos({ top: rect.top + window.scrollY, left: rect.left });
-      window.parent.postMessage({ type: "reb-section-hovered", section: sectionType }, "*");
+      postToParent(trustedOriginRef.current, {
+        type: "reb-section-hovered",
+        section: sectionType,
+        rect: {
+          top: rect.top + window.scrollY,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+      });
     }
 
     function handleMouseLeave() {
       setHoveredSection(null);
       setLabelPos(null);
-      window.parent.postMessage({ type: "reb-section-hovered", section: null }, "*");
+      postToParent(trustedOriginRef.current, { type: "reb-section-hovered", section: null });
     }
 
     function handleClick(e: Event) {
@@ -105,7 +134,7 @@ export function EditModeOverlay() {
         const rect = el.getBoundingClientRect();
 
         // Send enhanced message with DOM rect
-        window.parent.postMessage({
+        postToParent(trustedOriginRef.current, {
           type: "reb-node-selected",
           section: editable || sectionType,
           label,
@@ -116,13 +145,12 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        });
 
-        // Also send legacy message for backwards compat
-        window.parent.postMessage({
+        postToParent(trustedOriginRef.current, {
           type: "reb-section-clicked",
           section: editable || sectionType,
-        }, "*");
+        });
       }
     }
 
@@ -136,13 +164,13 @@ export function EditModeOverlay() {
         me.preventDefault();
         me.stopPropagation();
         // Send position relative to viewport so parent can position the menu
-        window.parent.postMessage({
+        postToParent(trustedOriginRef.current, {
           type: "reb-context-menu",
           section: editable || sectionType,
           label,
           x: me.clientX,
           y: me.clientY,
-        }, "*");
+        });
       }
     }
 
@@ -186,6 +214,7 @@ export function EditModeOverlay() {
 
     function handleFocus(e: Event) {
       const el = e.target as HTMLElement;
+      el.dataset.rebOriginal = el.textContent || "";
       el.style.outline = "2px solid var(--sage)";
       el.style.outlineOffset = "2px";
       el.style.borderRadius = "2px";
@@ -193,6 +222,7 @@ export function EditModeOverlay() {
 
     function handleBlur(e: Event) {
       const el = e.target as HTMLElement;
+      delete el.dataset.rebOriginal;
       el.style.outline = "";
       el.style.outlineOffset = "";
       el.style.borderRadius = "";
@@ -204,12 +234,12 @@ export function EditModeOverlay() {
       const value = el.textContent || "";
 
       if (section && field) {
-        window.parent.postMessage({
+        postToParent(trustedOriginRef.current, {
           type: "reb-inline-edit",
           section,
           field,
           value,
-        }, "*");
+        });
       }
     }
 
@@ -217,6 +247,12 @@ export function EditModeOverlay() {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         (e.target as HTMLElement).blur();
+      }
+      if (e.key === "Escape") {
+        const el = e.target as HTMLElement;
+        el.textContent = el.dataset.rebOriginal ?? el.textContent;
+        delete el.dataset.rebOriginal;
+        el.blur();
       }
     }
 
@@ -237,7 +273,7 @@ export function EditModeOverlay() {
 
         const rect = el.getBoundingClientRect();
 
-        window.parent.postMessage({
+        postToParent(trustedOriginRef.current, {
           type: "reb-node-selected",
           section,
           field,
@@ -249,7 +285,7 @@ export function EditModeOverlay() {
             width: rect.width,
             height: rect.height,
           },
-        }, "*");
+        });
       }
     }
 
@@ -284,7 +320,7 @@ export function EditModeOverlay() {
 
   if (!editMode) return null;
 
-  const label = hoveredSection
+  const label = hoveredSection && isValidSectionId(hoveredSection)
     ? document.querySelector(`[data-reb-section="${hoveredSection}"]`)?.getAttribute("data-reb-label") || hoveredSection
     : null;
 
