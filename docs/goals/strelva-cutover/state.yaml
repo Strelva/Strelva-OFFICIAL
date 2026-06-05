@@ -33,12 +33,13 @@ rules:
   no_completion_without_green_builds_and_live_cutover: true
 
 # 2026-06-05: All agent-executable work is complete (T001, T002, T003, T006 done).
-# The goal is now gated ENTIRELY on Jacob's operator work that no code agent can
-# run: T004 (Vercel/Clerk/Resend/Stripe/DNS infra cutover). T005 (tenant flip)
-# unblocks automatically once T004 puts the control plane live on app.strelva.com.
-# Fresh DNS check 2026-06-05: strelva.com still on Cloudflare NS w/ no A record,
-# app.strelva.com unconfigured -> T004 not started. (Rohlax tenant DNS now resolves,
-# 200 OK -- that launch-blocker looks cleared; Jacob should rerun `pnpm check:prod`.)
+# T004 is GROUNDED-blocked on external account access no code agent in this repo
+# can reach: strelva.com is on Cloudflare nameservers + not in Vercel (DNS flip is a
+# Cloudflare-dashboard action; no CF access here), and Clerk/Resend/Stripe are
+# dashboard/secret work. Vercel CLI IS authed but can't bridge the Cloudflare gap, and
+# pre-staging env vars early would regress the live scaffoldweb.com site. T005 (tenant
+# flip) auto-unblocks once T004 puts the control plane live on app.strelva.com.
+# Runbook A0 now carries the exact Vercel project/team inventory for a turnkey run.
 active_task: T004
 
 tasks:
@@ -106,8 +107,8 @@ tasks:
       - "scaffoldweb.com 301s to strelva.com"
       - "email + Stripe round-trip on the new domain"
     receipt:
-      result: pending
-      note: "Executable step-by-step runbook drafted: docs/goals/strelva-cutover/runbook.md (Part A = this infra cutover, ordered with landmines; Part B = the exact per-tenant edits for T005, pre-staged). This is Jacob's account work; nothing here a code agent can execute."
+      result: blocked-external
+      note: "Executable runbook at docs/goals/strelva-cutover/runbook.md (Part A infra, ordered w/ landmines; Part B per-tenant edits). GROUNDED 2026-06-05 (not assumed): `vercel` CLI IS authed (rhinehart514-5576) + `gh` authed + Vercel MCP live, so Vercel-side is reachable. BUT the binding constraint is NOT Vercel: (1) strelva.com is on CLOUDFLARE nameservers (cleo.ns/teresa.ns) and is NOT added to Vercel -- making app.strelva.com resolve is a Cloudflare action; NO cloudflare/wrangler/CF-token access from here. (2) Clerk session-domain, Resend SPF/DKIM, Stripe webhook are dashboard/secret work, not CLI-reachable. (3) Pre-setting Vercel env vars early would make the LIVE scaffoldweb.com emit non-resolving strelva.com canonical/sitemap URLs -- a regression -- so it must NOT be done ahead of the coordinated DNS flip. Inventory baked into runbook A0 (real project/team names). Conclusion: genuinely blocked on external account access (Cloudflare DNS + Clerk/Resend/Stripe dashboards) that no code agent in this repo can reach."
   - id: T005
     type: implementation
     assignee: Claude/Codex+Jacob

@@ -12,9 +12,22 @@ the wire-level **names** (`REB_*` env vars, `reb:` Redis prefixes, `x-reb-*` hea
 ## Part A — Infra cutover (T004, Jacob, in order)
 
 ### A0. Prep
-- [ ] Inventory current Vercel env vars for the `scaffold-web` project (copy them).
-- [ ] Confirm `strelva.com` is owned and DNS is reachable.
-- [ ] Decide: marketing (`strelva-marketing`) and app (`~/REB`) are separate Vercel projects.
+**Grounded inventory (verified 2026-06-05 via authed `vercel` CLI):**
+- Vercel team = **`scaffold-web`**. Projects there: **`scaffold-web`** (control plane,
+  currently serves `scaffoldweb.com` → this is the project that gets `app.strelva.com`),
+  **`rohlax-wellness`** (live, rohlaxwellness.com), **`greatlakesdriedfruits`**
+  (greatlakesdriedfruit.com), `rhm-innovations`.
+- Domain *registrations* sit under the **personal** team (`rhinehart514-gmailcoms-projects`):
+  `scaffoldweb.com`, `rohlaxwellness.com`, `greatlakesdriedfruit.com` (Vercel NS), etc.
+- ⛔ **`strelva.com` is NOT in Vercel at all**, and it's on **Cloudflare nameservers**
+  (`cleo.ns.cloudflare.com` / `teresa.ns.cloudflare.com`). **The gating action is at
+  Cloudflare, not Vercel** — point `strelva.com` records at Vercel (or move NS to Vercel).
+  No CLI/agent path to this from the repo; it needs the Cloudflare dashboard.
+- ❓ **`strelva-marketing` is not a project under the `scaffold-web` team** — confirm
+  whether it's under the personal team or still needs creating/connecting on Vercel.
+- [ ] Inventory current Vercel env vars for the `scaffold-web` project (`vercel link` then
+      `vercel env ls --scope scaffold-web`) and copy them.
+- [ ] Decide: marketing (`strelva-marketing`) and app (`scaffold-web`) are separate Vercel projects.
 
 ### A1. Vercel
 - [ ] Marketing project (`strelva-marketing`): assign `strelva.com` + `www.strelva.com`.
