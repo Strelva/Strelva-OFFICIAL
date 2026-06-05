@@ -119,13 +119,13 @@ test("signed-out dashboard customers get the sign-in flow instead of a broken pa
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
   await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
   await expect(page.getByText("Temporary access handoff")).toBeVisible();
   await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
   await expect(page.getByRole("link", { name: /email jacob/i })).toHaveAttribute(
     "href",
-    /mailto:jacob@scaffoldweb\.com/,
+    /mailto:jacob@strelva\.com/,
   );
 });
 
@@ -135,7 +135,7 @@ test("signed-out account handoff returns users to sign-in", async ({ page }) => 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
   await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 
@@ -146,7 +146,7 @@ test("admin tenant host starts at the dashboard sign-in flow", async ({ page }) 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
   await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
   await expect(page.getByText("Temporary access handoff")).toBeVisible();
 });
@@ -157,7 +157,7 @@ test("admin tenant host sign-in keeps the invited email context", async ({ page 
 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in\?email=owner%40example\.com/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
   await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 
@@ -168,7 +168,7 @@ test("admin tenant host sign-up uses the tenant invite context", async ({ page }
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-up/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Strelva/);
   await expect(page.getByRole("heading", { name: /dashboard signup is paused/i })).toBeVisible();
   await expect(page.getByText("Free-site requests stay email-first")).toBeVisible();
   await expect(page.getByRole("link", { name: /request free site/i })).toHaveAttribute(
@@ -183,7 +183,7 @@ test("signed-out no-access recovery returns users to sign-in", async ({ page }) 
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Scaffold Web/);
+  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
   await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
 });
 

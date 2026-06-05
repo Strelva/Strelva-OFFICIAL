@@ -48,7 +48,9 @@ tasks:
     verify:
       - "Exactly one control-plane working copy (the one with brand.ts) is the working repo."
       - "No risk of edits landing in a stale scaffold-web copy."
-    receipt: {result: pending}
+    receipt:
+      result: assessed
+      note: "Canonical = ~/REB (redesign/strelva-two-division, has brand.ts, newest). websites/reb = SAME REB origin on old branch codex/rohlax-payment-handoff with 94 UNCOMMITTED files — review before archiving, do not delete. websites/reb-launch-readiness-clean is not a git repo. NEEDS JACOB: pick the canonical home + review the 94 files, then archive the stale copies."
   - id: T002
     type: implementation
     assignee: Claude/Codex
@@ -63,7 +65,9 @@ tasks:
       - "pnpm check green"
       - "no 'Scaffold Web' in src/ or tests/"
       - "smoke suite passes"
-    receipt: {result: pending}
+    receipt:
+      result: partial
+      note: "Fixed 7 stale title assertions ('Scaffold Web' -> 'Strelva') + the jacob@scaffoldweb -> jacob@strelva mailto in tests/. typecheck green. Deferred: wiring brand.ts (currently dead; a scoped proxy/CSP refactor) and running the full Playwright smoke suite (needs built app + browsers)."
   - id: T003
     type: implementation
     assignee: Jacob
@@ -76,7 +80,9 @@ tasks:
     verify:
       - "strelva-marketing has no uncommitted design work"
       - "build green"
-    receipt: {result: pending}
+    receipt:
+      result: done
+      note: "Committed + pushed: strelva-marketing 835fb24 on main (dark-glass redesign + fork IA + DESIGN-KIT v3 + hero-dusk.jpg)."
   - id: T004
     type: operator
     assignee: Jacob
