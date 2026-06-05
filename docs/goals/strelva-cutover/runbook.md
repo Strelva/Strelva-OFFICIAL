@@ -1,0 +1,95 @@
+# Strelva Cutover Runbook (T004 + T005)
+
+Executable checklist for the two gated tasks. Part A is Jacob's account work; Part B
+is the exact per-tenant edits, pre-staged so they're mechanical once Part A is verified.
+Strategy/context: `docs/strelva-migration-plan.md`. Sequencing/state: `state.yaml`.
+
+**Golden rule:** change env/CSP/routing **values** (point at `app.strelva.com`), never
+the wire-level **names** (`REB_*` env vars, `reb:` Redis prefixes, `x-reb-*` headers).
+
+---
+
+## Part A — Infra cutover (T004, Jacob, in order)
+
+### A0. Prep
+- [ ] Inventory current Vercel env vars for the `scaffold-web` project (copy them).
+- [ ] Confirm `strelva.com` is owned and DNS is reachable.
+- [ ] Decide: marketing (`strelva-marketing`) and app (`~/REB`) are separate Vercel projects.
+
+### A1. Vercel
+- [ ] Marketing project (`strelva-marketing`): assign `strelva.com` + `www.strelva.com`.
+- [ ] App project (`~/REB`): assign `app.strelva.com`, `*.strelva.com`, `admin.*.strelva.com`.
+- [ ] Set per-project env vars (`NEXT_PUBLIC_SITE_URL=https://strelva.com`,
+      `NEXT_PUBLIC_APP_URL=https://app.strelva.com`, `RESEND_DOMAIN=updates.strelva.com`, etc.).
+- Verify: both projects build + resolve on their new hosts.
+
+### A2. Clerk  ⚠️ session-domain change logs EVERYONE out
+- [ ] Add `strelva.com` + `app.strelva.com` to allowed origins.
+- [ ] Set `clerk.strelva.com` CNAME; update OAuth redirect URLs.
+- [ ] **Do this BEFORE giving Chelsea dashboard access** (else she gets logged out / re-invited).
+- Verify: sign-in/sign-up works on `app.strelva.com`.
+
+### A3. Resend
+- [ ] Verify `strelva.com` / `updates.strelva.com` (SPF + DKIM); warm the domain.
+- Verify: a transactional email sends and lands (not spam) from the new domain.
+
+### A4. Stripe + OAuth providers
+- [ ] Stripe webhook endpoint → `https://app.strelva.com/api/...`; update branding.
+- [ ] Google / Yelp / Calendly / Instagram / Vegaro: update redirect/callback URLs to `app.strelva.com`.
+- Verify: a Stripe checkout + webhook round-trips on the new domain; each OAuth login succeeds.
+
+### A5. DNS cutover + redirects
+- [ ] Point `strelva.com`/`www` → marketing project; `app.` + `<tenant>.` → app project.
+- [ ] Add **301s**: `scaffoldweb.com/*` → `strelva.com/*`, `<tenant>.scaffoldweb.com` → `<tenant>.strelva.com`.
+- [ ] Keep `scaffoldweb.com` alive purely to redirect (≥30 days for SEO/email).
+- Verify: `scaffoldweb.com/x` 301s to `strelva.com/x`.
+
+### A6. Search Console
+- [ ] Verify `strelva.com`; submit the new sitemap (marketing repo owns SEO).
+
+### A7. Acceptance (Part A done when all true)
+- [ ] Marketing loads at `strelva.com`; app sign-in works at `app.strelva.com`.
+- [ ] `scaffoldweb.com/*` 301s; email + Stripe round-trip on new domain; OAuth logins succeed.
+- [ ] Cron + agent runs still fire; Sentry receiving events.
+- [ ] `app.strelva.com/api/v1/*` serves the contract (tenants depend on this for Part B).
+
+---
+
+## Part B — Tenant flip (T005, ONLY after Part A is verified)
+
+For each tenant in `/Users/laneyfraass/websites/`: stash/commit any pre-existing work
+first (gldf had 3, rohlax had 35 uncommitted files), branch `redesign/strelva-cutover`,
+make the edits below, `build` green, redeploy, confirm on the client domain.
+
+### B1. gldf  (greatlakesdriedfruit.com, pnpm)
+- [ ] `next.config.ts` CSP: `https://scaffoldweb.com` → `https://app.strelva.com` in
+      both `img-src` (line ~8) and `connect-src` (line ~10). (Leave `reb-studio.vercel.app`
+      unless the Sanity studio also moves.)
+- [ ] `.env` (Vercel): `REB_API_URL` value → `https://app.strelva.com` (keep the var name).
+- [ ] `release-manifest.json` / `production-checklist.ts`: update `REB_API_URL` value refs.
+- Verify: `pnpm build` green; site loads on greatlakesdriedfruit.com; images + content fetch (no CSP blocks in console); admin redirect works.
+
+### B2. rohlax-wellness  (rohlaxwellness.com, npm)
+- [ ] `src/proxy.ts`: `CANONICAL_REB_DASHBOARD_URL` (line ~5) and the `url.hostname ===
+      "scaffoldweb.com"` check (line ~18) → `app.strelva.com`.
+- [ ] `.env` (Vercel): `REB_API_URL` / `SCAFFOLD_API_URL` and `REB_DASHBOARD_URL` values
+      → `https://app.strelva.com` / `https://app.strelva.com/client/rohlax/dashboard`.
+- [ ] `.env.example` + README/AGENTS/CLAUDE: update the example values and "Scaffold Web"
+      → "Strelva" brand mentions (cosmetic, do with the functional flip).
+- Verify: `npm run build` green; site loads on rohlaxwellness.com; content fetch + dashboard redirect work.
+
+### B3. Any other client repos in `websites/`
+- [ ] Repeat B-pattern (search `scaffoldweb` / `REB_API_URL` value, flip to `app.strelva.com`, build, deploy).
+
+### B4. Tenant acceptance
+- [ ] Each tenant: build green, loads on its own domain, fetches content from
+      `app.strelva.com` with no CSP/console errors, admin/dashboard handoff works.
+
+---
+
+## Goal completion (strelva-cutover done when)
+- [ ] One canonical control plane; stale `reb` copies archived (T001).
+- [ ] Control plane live on `app.strelva.com`; `scaffoldweb.com` 301s (A).
+- [ ] `gldf` + `rohlax-wellness` (+ others) on `app.strelva.com`, building, live on their domains (B).
+- [ ] `strelva-marketing` deployed at `strelva.com`.
+- [ ] A tenant redesign trialed end-to-end per `docs/tenant-redesign.md`.

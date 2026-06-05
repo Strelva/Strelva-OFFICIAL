@@ -98,7 +98,9 @@ tasks:
       - "sign-in works on app.strelva.com"
       - "scaffoldweb.com 301s to strelva.com"
       - "email + Stripe round-trip on the new domain"
-    receipt: {result: pending}
+    receipt:
+      result: pending
+      note: "Executable step-by-step runbook drafted: docs/goals/strelva-cutover/runbook.md (Part A = this infra cutover, ordered with landmines; Part B = the exact per-tenant edits for T005, pre-staged). This is Jacob's account work; nothing here a code agent can execute."
   - id: T005
     type: implementation
     assignee: Claude/Codex+Jacob
