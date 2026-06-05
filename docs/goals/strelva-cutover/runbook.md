@@ -52,10 +52,24 @@ the wire-level **names** (`REB_*` env vars, `reb:` Redis prefixes, `x-reb-*` hea
 - Verify: a Stripe checkout + webhook round-trips on the new domain; each OAuth login succeeds.
 
 ### A5. DNS cutover + redirects
-- [ ] Point `strelva.com`/`www` → marketing project; `app.` + `<tenant>.` → app project.
+**Cloudflare records for `strelva.com`** (Vercel's standard records — the same `76.76.21.21`
+apex IP this repo already cites in `docs/launch-blockers.md`; confirm against what Vercel
+shows after you add each domain to the project, and set Cloudflare proxy to **DNS-only/grey-cloud**):
+
+```text
+# After adding strelva.com (marketing) + app.strelva.com / *.strelva.com (app project) in Vercel:
+A      @       76.76.21.21              ; strelva.com apex  -> marketing project
+CNAME  www     cname.vercel-dns.com     ; www.strelva.com   -> marketing project
+CNAME  app     cname.vercel-dns.com     ; app.strelva.com   -> control plane (scaffold-web project)
+CNAME  *       cname.vercel-dns.com     ; <tenant>.strelva.com wildcard -> control plane
+```
+
+- [ ] Add the records above in Cloudflare (grey-cloud / DNS-only so Vercel terminates TLS).
+- [ ] Add the domains in Vercel first (`strelva.com`+`www` → marketing project; `app.strelva.com`
+      + `*.strelva.com` → `scaffold-web` project) so Vercel issues certs once DNS resolves.
 - [ ] Add **301s**: `scaffoldweb.com/*` → `strelva.com/*`, `<tenant>.scaffoldweb.com` → `<tenant>.strelva.com`.
 - [ ] Keep `scaffoldweb.com` alive purely to redirect (≥30 days for SEO/email).
-- Verify: `scaffoldweb.com/x` 301s to `strelva.com/x`.
+- Verify: `dig +short app.strelva.com` returns a Vercel target; `scaffoldweb.com/x` 301s to `strelva.com/x`.
 
 ### A6. Search Console
 - [ ] Verify `strelva.com`; submit the new sitemap (marketing repo owns SEO).
