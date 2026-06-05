@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex when working with code in this repository.
+Canonical repo guidance for all coding agents (Claude Code, Codex). `CLAUDE.md` imports this file so there is one source of truth.
 
 **Naming**: Product is "Strelva". Repo folder path is legacy lowercase `reb` (internal). Package name is `scaffold-web`.
 
@@ -36,7 +36,7 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 
 Strelva is the **control plane**. Each paid client site is a separate **custom repo** that pulls content/config from the control plane over a versioned API.
 
-**Naming note:** the project rename from "reb" → "scaffoldweb" is ongoing. New code uses `SCAFFOLD_*` env vars, `SCAFFOLD_CONTRACT_VERSION`, `scaffoldRoutes`, etc. Legacy `REB_*` names are kept as deprecated aliases so deployed custom repos (Rohlax, GLDF) keep working. HMAC headers (`x-reb-timestamp`/`x-reb-signature`) and Redis key prefixes (`reb:`) are intentionally **not** renamed — those are wire-level or persistent-data details that require coordinated rollout to change.
+**Naming note:** the project rename from "reb" → "scaffoldweb" is ongoing. New code uses `SCAFFOLD_*` env vars, `SCAFFOLD_CONTRACT_VERSION`, `scaffoldRoutes`, etc. Legacy `REB_*` names are kept as deprecated aliases so deployed custom repos (Rohlax, GLDF) keep working. HMAC headers (`x-reb-timestamp`/`x-reb-signature`) and Redis key prefixes (`reb:`) are intentionally **not** renamed — those are wire-level or persistent-data details that require coordinated rollout to change. The full `scaffoldweb.com` → `strelva.com` rebrand + split into two repos (`strelva-marketing` + `strelva-app`) is planned, not yet executed — see `docs/strelva-migration-plan.md`.
 
 - Host → tenant resolution in `src/proxy.ts`: subdomain (`gldf.strelva.com`, `admin.gldf.strelva.com`), then `/client/{tenant}/...` path fallback, then custom-domain map (Redis/Sanity-backed via `/api/internal/domain-map`), then `?tenant=` query.
 - The public storefront contract is **`/api/v1/*`** — owned directly (no `@/app/api/public/*` re-export layer). The v1 routes are the canonical wire shape consumed by client repos. Change them only by versioning (add a v2 sibling).
@@ -45,7 +45,7 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 
 ## Content system
 
-- Typed schemas in `src/lib/types.ts` and Zod validators in `src/lib/schemas.ts`.
+- Typed schemas in `src/lib/types.ts` (`HeroContent`, `ServicesContent`, …) and Zod validators in `src/lib/schemas.ts`.
 - Authenticated CRUD via `/api/content/[section]` (PUT validates with Zod, writes versions + activity).
 - Public reads via `/api/v1/content/[tenant]/[section]` — goes Redis cache first, falls through to Sanity (prod) or dev file (local). Writes are write-through: `setContent` updates the source of truth, then populates Redis.
 - Templates in `src/components/templates/` define which sections each tenant type uses.
@@ -55,12 +55,12 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 - `src/lib/agent-executor.ts` uses Vercel AI SDK + `gemini-2.5-flash`.
 - Tools: `read_section`, `update_section`, `get_suggestions`, `create_suggestion`, `create_blog_post`, `list_blog_posts`.
 - Governance: `src/lib/ai-governance.ts` decides publish vs review-queue vs block.
-- The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt`) — prevents thundering-herd Redis reads on concurrent chat turns.
+- The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
 
 ## Operational systems
 
-- Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers dashboard review queue, weekly brief, activity log.
+- Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log.
 - Crons in `src/app/api/cron/` (see `vercel.json`): maintenance, weekly-report, staleness, search-console, daily-summary, poll-yelp, poll-google-reviews, poll-instagram.
 - Integrations registry: `src/lib/integration-registry.ts` (UI metadata) + `src/lib/connections.ts` (live API access).
 - Weekly brief: `src/lib/weekly-brief.ts` + `src/lib/reports.ts`.
@@ -78,45 +78,66 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 
 # Strelva — AI Website Management Platform
 
+## Brand structure (founder decision, 2026-06-01)
+Strelva is **one brand with two divisions**, not a single product:
+- **Websites** — the managed-website product described in this doc (free client site + monetized owner dashboard + AI agent). Well-defined; **this repo is its control plane.**
+- **Custom Software** — workflow software / custom apps / automations built for businesses (the higher-ACV arm). Its definition, ICP, naming, offering, and proof model are **not finalized** (founder: "workflows, and we're gonna need to do research") — do **not** ship hard claims for this division.
+
+Everything below describes the **Websites** division.
+
 ## What This Is
-A control plane for local-business websites. Owners see a dashboard with what's happening on their site and chat with an AI that handles updates. The public website lives in a separate **custom repo** that pulls content from Strelva's `/api/v1/*` contract.
+A control plane for local-business websites. Owners see a dashboard with what's happening on their site (visitors, clicks, reviews) and chat with an AI that handles updates. The public website lives in a separate **custom repo** (a per-client Vercel project) that pulls content from Strelva's `/api/v1/*` contract.
 
 ## One-Liner
 "See what's working. Tell the AI what to change."
 
 ## The Model
-- **Client sites are free for now.** They're the acquisition wedge.
-- **The admin/dashboard side is what gets monetized.** Price is undecided. `STRIPE_SCAFFOLD_PRICE_ID` is intentionally unpinned; `check:prod` validates only the shape when set.
+- **Client sites are free for now.** They're the acquisition wedge — Jacob builds the site, the client gets a working public website at no cost.
+- **The admin/dashboard side is what gets monetized.** Price is undecided. `STRIPE_SCAFFOLD_PRICE_ID` is intentionally unpinned; `check:prod` validates only the shape (recurring monthly USD) when set.
 - **Subscription gating short-circuits while billing is off.** `isBillingEnabled()` in `src/lib/subscription.ts` returns false when no Stripe price is configured, and the gate treats every tenant as active.
+- Agency channel (wholesale resell) is a future option, not built.
+
+## Value Hypothesis
+Local-business owners will pay for a dashboard that proves their website is working + an AI that handles updates — IF the dashboard shows clear value, the AI actually makes changes when asked, and the weekly report lands before the bill recurs.
 
 ## ICP
-- Local businesses (1–10 people) with a website problem they've stopped trying to solve.
+- Local businesses with 1–10 people who have a website problem they've stopped trying to solve.
+- Has a bad website, uses LinkTree + booking platform, or just left an agency.
+- Wants more clients, not a dashboard (but the dashboard proves value).
+- Talks to the AI like texting a person: "add my new yoga class on Saturdays."
 - Templates cover: wellness, food-brand, restaurant, trades, professional, fashion-stylist.
 
 ## What The Client Sees
-1. Custom website built by Jacob, hosted in a separate per-client repo, on the client's domain.
-2. Business OS Dashboard at `admin.{client-domain}` — Overview, AI Chat, Site preview, Content map, Reports.
-3. AI agent that manages site updates, blog, social drafts.
-4. Weekly report by email.
+1. **Custom website** built by Jacob, hosted in a separate per-client repo, served on the client's own domain.
+2. **Business OS Dashboard** at `admin.{client-domain}` (dark monochrome).
+   - Overview: "People who found you" / "Booking clicks" / "Site health"
+   - AI Chat: "Update my hours" / "Write a blog post" / "How's my site doing?"
+   - My Site: live preview iframe
+   - Content: visual map of what's on the site
+   - Reports: weekly plain-English performance summary
+3. **AI Agent** that manages the site ongoing (updates, blog, social drafts).
+4. **Weekly report** by email.
 
 ## What You See (Jacob)
 - Slack notifications for every AI change
-- Admin dashboard: clients, draft queue, launch readiness, DNS health
-- Override capability + escalation system (`src/lib/ai-governance.ts`)
+- Admin dashboard: all clients, draft queue, launch readiness, DNS health
+- Override capability on any AI change
+- Escalation system: auto-approve factual changes, review new copy, block structural/code changes (see `src/lib/ai-governance.ts`)
 
 ## Customer Language (USE THIS)
 - "See what's working" NOT "analytics dashboard"
 - "Tell the AI what to change" NOT "conversational CMS"
 - "47 people found you this week" NOT "unique visitors: 47"
+- "Your weekly report" NOT "automated insights"
 
 ## Do NOT Build
-- Drag-and-drop visual editor.
-- Client-facing code editor.
-- E-commerce / checkout.
+- Drag-and-drop visual editor (AI handles content; Jacob handles quality).
+- Client-facing code editor (never).
+- E-commerce / checkout (booking platforms handle this).
 - Tiered pricing UI.
-- A `/api/public/*` re-export shell of the v1 contract.
+- A `/api/public/*` re-export shell of the v1 contract (v1 owns the contract directly now).
 
 ## Execution Rules
 - NEVER add "Co-Authored-By" lines to commits.
-- The user and project owner is Jacob Rhinehart. Address the user as Jacob when a name is needed; do not use any other personal name for the user.
-- Promote a feature from "custom repo" to the platform only when at least two repos prove the same need.
+- The user and project owner is Jacob Rhinehart. Address the user as Jacob when a name is needed.
+- Promote a feature from "custom repo" to the platform only when at least two repos prove the same need (per `docs/future-codebase-integration.md`).

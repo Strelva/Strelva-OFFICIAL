@@ -1,0 +1,126 @@
+version: 2
+
+goal:
+  title: "Complete the Strelva Cutover: Tenant-Redesign Ready"
+  slug: "strelva-cutover"
+  kind: multi_repo_migration_goal
+  tranche: "Move control plane + marketing + every tenant site onto Strelva; leave tenant repos redesign-ready."
+  status: ready
+  intake:
+    original_request: "we have a web folder for repos and i want you to create a /goal of getting everything completed over to strelva so im set up to easily redesign tenant sites"
+    interpreted_outcome: "One canonical Strelva control plane, marketing committed, and every tenant repo migrated to app.strelva.com and clean of scaffoldweb, building green, so redesigning a tenant is a fast repeatable task."
+    input_shape: multi_repo_migration
+    audience: "Jacob (operator) + coding agents"
+    authority: requested
+    proof_type: builds_green_and_live
+    completion_proof: "Canonical control plane live on app.strelva.com; tenant repos build, point at app.strelva.com, and load on their own domains; redesign workflow documented."
+    likely_misfire: "Renaming wire-level REB_*/reb:/x-reb-* (back-compat by design), or working in a stale reb copy."
+    local_facts:
+      - "Web folder: /Users/laneyfraass/websites/."
+      - "Canonical control plane = ~/REB (has src/lib/brand.ts, Strelva rebrand, newest 2026-06-02, branch redesign/strelva-two-division); NOT inside the web folder."
+      - "Stale duplicates: websites/reb (scaffold-web, no brand.ts, 43 scaffoldweb refs) and websites/reb-launch-readiness-clean."
+      - "websites/reb-contracts = @reb/contracts shared package."
+      - "Tenants websites/gldf + websites/rohlax-wellness still use REB_API_URL/reb-contracts, zero strelva refs (gldf all REB_; rohlax partial REB_+SCAFFOLD_)."
+      - "~/strelva-marketing redesign builds green but is uncommitted."
+      - "Control-plane rename ~done; remnants: 7 stale smoke assertions + dead brand.ts. Infra cutover (Clerk/Resend/Stripe/DNS) not done. Plan: docs/strelva-migration-plan.md."
+      - "Keep wire-level REB_* names / reb: prefixes / x-reb-* headers (intentional back-compat); change values + brand copy only."
+
+rules:
+  preserve_existing_work: true
+  verify_each_repo_builds_before_moving_on: true
+  do_not_rename_wire_level_reb_symbols: true
+  one_active_task: true
+  no_completion_without_green_builds_and_live_cutover: true
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: decision+implementation
+    assignee: Jacob+Claude
+    status: ready
+    objective: "Establish ONE canonical Strelva control plane in the web folder; archive stale reb copies."
+    steps:
+      - "Confirm ~/REB is canonical (brand.ts present, newest commit)."
+      - "Jacob's call: move ~/REB into /Users/laneyfraass/websites/, or keep it at root as the working repo."
+      - "Confirm no unmerged work in websites/reb or websites/reb-launch-readiness-clean, then archive/remove them."
+      - "Keep websites/reb-contracts if it's the shared contracts package the tenants use."
+    verify:
+      - "Exactly one control-plane working copy (the one with brand.ts) is the working repo."
+      - "No risk of edits landing in a stale scaffold-web copy."
+    receipt: {result: pending}
+  - id: T002
+    type: implementation
+    assignee: Claude/Codex
+    status: blocked
+    blocked_by: T001
+    objective: "Finish + verify the control-plane Strelva rename."
+    steps:
+      - "Fix the 7 stale Playwright assertions: 'Scaffold Web' -> 'Strelva' in tests/."
+      - "Wire src/lib/brand.ts into proxy/metadata, or delete it (currently dead code)."
+      - "Run pnpm typecheck && pnpm smoke."
+    verify:
+      - "pnpm check green"
+      - "no 'Scaffold Web' in src/ or tests/"
+      - "smoke suite passes"
+    receipt: {result: pending}
+  - id: T003
+    type: implementation
+    assignee: Jacob
+    status: ready
+    objective: "Commit the strelva-marketing design pass so it isn't lost; confirm it builds."
+    steps:
+      - "Review the dark-glass + hero-photo + two-division fork + DESIGN-KIT v3 changes."
+      - "Commit (and optionally push)."
+      - "npm run build green."
+    verify:
+      - "strelva-marketing has no uncommitted design work"
+      - "build green"
+    receipt: {result: pending}
+  - id: T004
+    type: operator
+    assignee: Jacob
+    status: blocked
+    blocked_by: T002
+    objective: "External cutover so the control plane is live on app.strelva.com (migration plan section 5-6)."
+    steps:
+      - "Vercel: assign strelva.com / app.strelva.com / *.strelva.com + per-project env vars."
+      - "Clerk: clerk.strelva.com + allowed origins/redirects. WARNING: session-domain change logs everyone out; do BEFORE onboarding Chelsea."
+      - "Resend: verify strelva.com SPF/DKIM. Stripe: webhook -> app.strelva.com. OAuth: update redirect URLs."
+      - "DNS flip + 301 scaffoldweb.com/* -> strelva.com/*. Verify in Google Search Console."
+    verify:
+      - "sign-in works on app.strelva.com"
+      - "scaffoldweb.com 301s to strelva.com"
+      - "email + Stripe round-trip on the new domain"
+    receipt: {result: pending}
+  - id: T005
+    type: implementation
+    assignee: Claude/Codex+Jacob
+    status: blocked
+    blocked_by: T004
+    objective: "Migrate each tenant repo over to Strelva."
+    steps:
+      - "Per tenant (gldf, rohlax-wellness, + any others in websites/): set REB_API_URL value -> https://app.strelva.com."
+      - "Clean scaffoldweb / 'Scaffold Web' brand-copy refs (keep wire-level REB_* names)."
+      - "Confirm CONTRACT_VERSION matches the live control plane."
+      - "pnpm build green; redeploy; load on the client domain."
+    verify:
+      - "each tenant builds green"
+      - "points at app.strelva.com"
+      - "loads on its own domain (greatlakesdriedfruit.com, rohlaxwellness.com)"
+      - "no scaffoldweb brand refs"
+    receipt: {result: pending}
+  - id: T006
+    type: implementation
+    assignee: Claude
+    status: blocked
+    blocked_by: T005
+    objective: "Make tenant redesign easy and repeatable."
+    steps:
+      - "Confirm the storefront structure (SectionRenderer + templates) + DESIGN-KIT cover a full redesign."
+      - "Write docs/tenant-redesign.md: how to redesign a tenant site end-to-end."
+      - "Trial it on one tenant to prove the path."
+    verify:
+      - "a tenant redesign is a scoped, documented task"
+      - "one tenant redesign trialed end-to-end"
+    receipt: {result: pending}
