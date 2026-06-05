@@ -164,7 +164,7 @@ function readinessSignals(html: string, robots: string | null, input: ScoreInput
   const ldBlocks = $('script[type="application/ld+json"]')
     .map((_, el) => $(el).contents().text())
     .get();
-  let schemaTypes: string[] = [];
+  const schemaTypes: string[] = [];
   for (const block of ldBlocks) {
     try {
       const parsed = JSON.parse(block);

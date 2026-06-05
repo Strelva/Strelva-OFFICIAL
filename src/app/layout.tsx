@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
+import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -28,17 +29,17 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://strelva.com")
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : MARKETING_URL)
   ),
-  applicationName: "Strelva",
+  applicationName: BRAND_NAME,
   title: {
-    default: "Strelva",
-    template: "%s | Strelva",
+    default: BRAND_NAME,
+    template: `%s | ${BRAND_NAME}`,
   },
   description: "AI website management, reporting, and content operations for small businesses.",
   category: "technology",
   openGraph: {
-    siteName: "Strelva",
+    siteName: BRAND_NAME,
     type: "website",
   },
 };

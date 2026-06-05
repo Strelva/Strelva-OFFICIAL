@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateAllReports } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
+import { EMAIL_DOMAIN } from "@/lib/brand";
 
 function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
   const paragraphs = summary
@@ -69,7 +70,7 @@ export async function GET() {
       if (process.env.RESEND_API_KEY) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
-        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || "updates.strelva.com";
+        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
 
         await resend.emails.send({
           from: `${report.tenant.siteName} <report@${domain}>`,

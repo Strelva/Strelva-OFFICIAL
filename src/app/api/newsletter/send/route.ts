@@ -5,6 +5,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
+import { EMAIL_DOMAIN } from "@/lib/brand";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
         const batch = emails.slice(i, i + batchSize);
         await resend.batch.send(
           batch.map((to) => ({
-            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || "updates.strelva.com"}>`,
+            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || EMAIL_DOMAIN}>`,
             to,
             subject,
             html: body,

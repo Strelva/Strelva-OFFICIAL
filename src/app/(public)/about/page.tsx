@@ -2,13 +2,14 @@ import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { SectionRenderer } from "@/components/public/SectionRenderer";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
+import { MARKETING_URL } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || MARKETING_URL;
   const description = `Learn about ${settings.ownerName || settings.siteName} and our approach.`;
   return {
     title: `About | ${settings.siteName}`,

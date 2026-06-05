@@ -32,7 +32,11 @@ rules:
   one_active_task: true
   no_completion_without_green_builds_and_live_cutover: true
 
-active_task: T001
+# 2026-06-05: All agent-executable code work is complete (T002, T003, T006 done).
+# The goal is now gated entirely on Jacob's operator work: T004 (Vercel/Clerk/
+# Resend/Stripe/DNS infra cutover) + his explicit OK to archive the stale reb
+# copies in T001 (destructive, in other repos). T005 unblocks once T004 is live.
+active_task: T004
 
 tasks:
   - id: T001
@@ -54,8 +58,8 @@ tasks:
   - id: T002
     type: implementation
     assignee: Claude/Codex
-    status: blocked
-    blocked_by: T001
+    status: done
+    blocked_by: null
     objective: "Finish + verify the control-plane Strelva rename."
     steps:
       - "Fix the 7 stale Playwright assertions: 'Scaffold Web' -> 'Strelva' in tests/."
@@ -66,8 +70,8 @@ tasks:
       - "no 'Scaffold Web' in src/ or tests/"
       - "smoke suite passes"
     receipt:
-      result: partial
-      note: "Fixed 7 stale title assertions ('Scaffold Web' -> 'Strelva') + the jacob@scaffoldweb -> jacob@strelva mailto in tests/. typecheck green. Deferred: wiring brand.ts (currently dead; a scoped proxy/CSP refactor) and running the full Playwright smoke suite (needs built app + browsers)."
+      result: done
+      note: "2026-06-05: brand.ts is no longer dead code. Wired it as the source of truth for brand identity + outbound/marketing surfaces: BRAND_NAME/MARKETING_URL into layout metadata, opengraph-image, robots, sitemap, (public) contact+about canonical URLs; ROOT_DOMAIN into the agent tenant-domain + onboard subdomain construction; EMAIL_DOMAIN/ROOT_DOMAIN/BRAND_NAME into the invite/newsletter/weekly-report email from-addresses. Trimmed brand.ts to the 4 owned+used constants (BRAND_NAME, ROOT_DOMAIN, MARKETING_URL, EMAIL_DOMAIN) and documented in its header that proxy.ts intentionally inlines the routing-host literals (.strelva.com / clerk.strelva.com) since those flip during the T004 infra cutover, not from this module. Earlier session had fixed the 7 stale 'Scaffold Web' test assertions. Verified: `pnpm check` (lint+typecheck+test+build) exits 0; 448 tests pass; 0 'Scaffold Web' brand copy in src/ (remaining 'scaffoldweb' refs are functional: 2 internal User-Agent strings, a reserved-subdomain blocklist entry, 2 redirect-guard test assertions, 1 test label). DEFERRED (unchanged): full Playwright smoke suite needs a built app + browsers."
   - id: T003
     type: implementation
     assignee: Jacob

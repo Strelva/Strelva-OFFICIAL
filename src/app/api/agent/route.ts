@@ -9,6 +9,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
+import { ROOT_DOMAIN } from "@/lib/brand";
 import {
   DISCOVERABLE_INTEGRATIONS,
   deriveIntelligenceStatus,
@@ -1382,7 +1383,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
           const settings = await getContent("settings", tenant);
 
           // Build the site URL
-          const domain = config?.productionDomain || `${tenant}.strelva.com`;
+          const domain = config?.productionDomain || `${tenant}.${ROOT_DOMAIN}`;
           const url = `https://${domain}`;
 
           return {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
+import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
 import { clerkClient } from "@clerk/nextjs/server";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
       const resend = new Resend(process.env.RESEND_API_KEY);
 
       const result = await resend.emails.send({
-        from: `Strelva <hello@${process.env.RESEND_DOMAIN || "strelva.com"}>`,
+        from: `${BRAND_NAME} <hello@${process.env.RESEND_DOMAIN || ROOT_DOMAIN}>`,
         to: email,
         subject: `You're invited to manage ${siteNameText}`,
         html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
+import { ROOT_DOMAIN } from "@/lib/brand";
 
 type FormState = {
   businessName: string;
@@ -251,7 +252,7 @@ function OnboardExperience() {
                     className="onboard-input"
                   />
                 </Field>
-                <Field label="Strelva subdomain" required hint={`${slugify(form.requestedSlug || "your-business")}.strelva.com`}>
+                <Field label="Strelva subdomain" required hint={`${slugify(form.requestedSlug || "your-business")}.${ROOT_DOMAIN}`}>
                   <input
                     value={form.requestedSlug}
                     onChange={(event) => updateField("requestedSlug", slugify(event.target.value))}

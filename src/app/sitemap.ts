@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { MARKETING_URL } from "@/lib/brand";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || MARKETING_URL;
 
   return [
     { url: base, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
