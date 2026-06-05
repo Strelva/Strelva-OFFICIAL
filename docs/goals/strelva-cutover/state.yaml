@@ -32,17 +32,20 @@ rules:
   one_active_task: true
   no_completion_without_green_builds_and_live_cutover: true
 
-# 2026-06-05: All agent-executable code work is complete (T002, T003, T006 done).
-# The goal is now gated entirely on Jacob's operator work: T004 (Vercel/Clerk/
-# Resend/Stripe/DNS infra cutover) + his explicit OK to archive the stale reb
-# copies in T001 (destructive, in other repos). T005 unblocks once T004 is live.
+# 2026-06-05: All agent-executable work is complete (T001, T002, T003, T006 done).
+# The goal is now gated ENTIRELY on Jacob's operator work that no code agent can
+# run: T004 (Vercel/Clerk/Resend/Stripe/DNS infra cutover). T005 (tenant flip)
+# unblocks automatically once T004 puts the control plane live on app.strelva.com.
+# Fresh DNS check 2026-06-05: strelva.com still on Cloudflare NS w/ no A record,
+# app.strelva.com unconfigured -> T004 not started. (Rohlax tenant DNS now resolves,
+# 200 OK -- that launch-blocker looks cleared; Jacob should rerun `pnpm check:prod`.)
 active_task: T004
 
 tasks:
   - id: T001
     type: decision+implementation
     assignee: Jacob+Claude
-    status: ready
+    status: done
     objective: "Establish ONE canonical Strelva control plane in the web folder; archive stale reb copies."
     steps:
       - "Confirm ~/REB is canonical (brand.ts present, newest commit)."
@@ -53,8 +56,8 @@ tasks:
       - "Exactly one control-plane working copy (the one with brand.ts) is the working repo."
       - "No risk of edits landing in a stale scaffold-web copy."
     receipt:
-      result: decision-ready
-      note: "Canonical = ~/REB (has brand.ts, newest). websites/reb's COMMITTED HEAD (92f4a32 'Add Rohlax flexible payment handoff') is already an ancestor of ~/REB HEAD -> archiving loses NO committed work. Its 94 uncommitted files are working-tree changes on a SUPERSEDED architecture (they still contain the /api/public/* layer that ~/REB removed) -> almost certainly stale experiments, not worth keeping. websites/reb-launch-readiness-clean is not a git repo. RECOMMEND: `git -C websites/reb stash` as a safety net, then archive both stale copies; keep ~/REB canonical (move into the web folder or leave at root, Jacob's call). Deletion needs Jacob's explicit OK."
+      result: done
+      note: "2026-06-05: Jacob approved 'stash + archive both'. EXECUTED (non-lossy MOVE, not delete): stashed websites/reb's 94 uncommitted files ('pre-archive safety net 2026-06-05'), then moved both websites/reb + websites/reb-launch-readiness-clean to ~/websites/archived/, then `git worktree repair`. ~/websites top level is now clean of stale control planes (kept reb-contracts shared pkg + gldf/rohlax-wellness tenants); ~/REB remains canonical. TWO PRIOR-RECEIPT CORRECTIONS found on inspection: (1) websites/reb HEAD 92f4a32 is NOT literally an ancestor of ~/REB (divergent clones) -- but the same committed work IS preserved in ~/REB as 5a9048b (identical 10-file/674-insertion changeset; pay/rohlax files present), so no committed work lost; (2) reb-launch-readiness-clean was NOT a non-git dir -- it is a linked git WORKTREE of websites/reb (branch codex/launch-readiness-clean-deploy @ c4bf7e3), so it was moved + worktree-repaired rather than rm'd. All branches/stash/history preserved inside the archive (reversible)."
   - id: T002
     type: implementation
     assignee: Claude/Codex
