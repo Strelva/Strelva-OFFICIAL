@@ -49,8 +49,8 @@ tasks:
       - "Exactly one control-plane working copy (the one with brand.ts) is the working repo."
       - "No risk of edits landing in a stale scaffold-web copy."
     receipt:
-      result: assessed
-      note: "Canonical = ~/REB (redesign/strelva-two-division, has brand.ts, newest). websites/reb = SAME REB origin on old branch codex/rohlax-payment-handoff with 94 UNCOMMITTED files — review before archiving, do not delete. websites/reb-launch-readiness-clean is not a git repo. NEEDS JACOB: pick the canonical home + review the 94 files, then archive the stale copies."
+      result: decision-ready
+      note: "Canonical = ~/REB (has brand.ts, newest). websites/reb's COMMITTED HEAD (92f4a32 'Add Rohlax flexible payment handoff') is already an ancestor of ~/REB HEAD -> archiving loses NO committed work. Its 94 uncommitted files are working-tree changes on a SUPERSEDED architecture (they still contain the /api/public/* layer that ~/REB removed) -> almost certainly stale experiments, not worth keeping. websites/reb-launch-readiness-clean is not a git repo. RECOMMEND: `git -C websites/reb stash` as a safety net, then archive both stale copies; keep ~/REB canonical (move into the web folder or leave at root, Jacob's call). Deletion needs Jacob's explicit OK."
   - id: T002
     type: implementation
     assignee: Claude/Codex
