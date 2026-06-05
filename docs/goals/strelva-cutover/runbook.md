@@ -79,7 +79,13 @@ make the edits below, `build` green, redeploy, confirm on the client domain.
 - Verify: `npm run build` green; site loads on rohlaxwellness.com; content fetch + dashboard redirect work.
 
 ### B3. Any other client repos in `websites/`
-- [ ] Repeat B-pattern (search `scaffoldweb` / `REB_API_URL` value, flip to `app.strelva.com`, build, deploy).
+- Verified 2026-06-05: scanned every repo in `~/websites/` for control-plane refs
+  (`REB_API_URL` / `SCAFFOLD_API_URL` / `scaffoldweb` / `reb-contracts` / `app.strelva`).
+  **Only `gldf` and `rohlax-wellness` are tenants** — `federal-meats-website`,
+  `dropintools`, `nhlgame`, etc. are NOT control-plane tenants. So B1 + B2 are the
+  complete tenant set; nothing else to flip today.
+- [ ] If a new tenant repo is added later, repeat the B-pattern (search `scaffoldweb` /
+      `REB_API_URL` value, flip to `app.strelva.com`, build, deploy).
 
 ### B4. Tenant acceptance
 - [ ] Each tenant: build green, loads on its own domain, fetches content from
