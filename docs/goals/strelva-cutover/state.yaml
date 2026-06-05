@@ -115,7 +115,9 @@ tasks:
       - "points at app.strelva.com"
       - "loads on its own domain (greatlakesdriedfruit.com, rohlaxwellness.com)"
       - "no scaffoldweb brand refs"
-    receipt: {result: pending}
+    receipt:
+      result: blocked
+      note: "Reassessed 2026-06-04: the tenant scaffoldweb refs are FUNCTIONAL, not brand copy. gldf = next.config.ts CSP (img-src/connect-src -> https://scaffoldweb.com, the live content/image origin). rohlax = src/proxy.ts runtime routing + .env API/dashboard target. They can only flip once the control plane is live on app.strelva.com (T004); flipping early breaks the live tenants. No safe brand-copy-only subset worth the risk. Both repos also carry pre-existing uncommitted work (gldf 3, rohlax 35) to handle first. Fully gated on T004; no code change made."
   - id: T006
     type: implementation
     assignee: Claude
@@ -129,4 +131,6 @@ tasks:
     verify:
       - "a tenant redesign is a scoped, documented task"
       - "one tenant redesign trialed end-to-end"
-    receipt: {result: pending}
+    receipt:
+      result: done
+      note: "Wrote docs/tenant-redesign.md: the model (control plane owns content, tenant owns presentation), web-folder map, repo anatomy, what a redesign touches vs leaves alone, prereqs, step-by-step workflow, Strelva-craft-vs-client-identity, checklist, gotchas. Live end-to-end trial waits on T004 (control plane reachable on app.strelva.com)."
