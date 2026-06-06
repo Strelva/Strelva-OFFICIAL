@@ -58,6 +58,10 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
 
+## Operating conventions
+
+Repo map, the starter-first rule, client lifecycle, access policy, and the quarterly entropy pass live in **[docs/operations.md](./docs/operations.md)**. Two rules agents enforce in any change: (1) reusable client-site code goes to `custom-repo-starter` first, never patched into one client's repo; (2) every tenant-data read/write is scoped by a tenant id derived from auth or trusted config, never from request input.
+
 ## Operational systems
 
 - Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log.
