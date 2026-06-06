@@ -1,8 +1,8 @@
 export const ROHLAX_PAYMENT_TENANT = "rohlax";
 export const ROHLAX_PAYMENT_TITLE = "Website payment";
-export const ROHLAX_PAYMENT_MIN_CENTS = 30_000;
+export const ROHLAX_PAYMENT_MIN_CENTS = 50_000;
 export const ROHLAX_PAYMENT_MAX_CENTS = 100_000;
-export const ROHLAX_PAYMENT_INITIAL_CENTS = 60_000;
+export const ROHLAX_PAYMENT_INITIAL_CENTS = 50_000;
 
 export function formatRohlaxPaymentAmount(cents: number): string {
   return new Intl.NumberFormat("en-US", {

@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { RohlaxPaymentForm } from "./RohlaxPaymentForm";
 import { formatRohlaxPaymentAmount, parseRohlaxPaymentAmount } from "@/lib/rohlax-payment";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Flexible website payment",
+    absolute: "Your Rohlax Wellness website",
   },
-  description: "Choose and pay a one-time website payment.",
+  description: "Your new Rohlax Wellness website — a one-time payment, no subscription.",
 };
 
 interface PageProps {
@@ -24,65 +23,89 @@ export default async function RohlaxPaymentPage({ searchParams }: PageProps) {
   const amountCents = parseRohlaxPaymentAmount(params?.amount);
 
   return (
-    <main className="min-h-screen bg-[#f4f6f1] px-5 py-8 text-[#172117] sm:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-[1120px] flex-col">
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/pay/rohlax" className="text-[15px] font-semibold text-[#172117]">
-            Website payment
-          </Link>
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#f5f6f9] to-[#e7eaf1] text-[#1d1d1f]">
+      {/* Entrance motion — staggered rise. Honors reduced-motion. */}
+      <style>{`
+        @keyframes reb-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .reb-rise { animation: reb-rise .65s cubic-bezier(.22,.61,.36,1) both; }
+        @media (prefers-reduced-motion: reduce) { .reb-rise { animation: none; } }
+      `}</style>
+
+      {/* Ambient backdrop — gives the glass something to refract. Restrained, low-saturation. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -left-24 -top-32 h-[440px] w-[440px] rounded-full bg-[#f7dcc6] opacity-55 blur-[130px]" />
+        <div className="absolute -bottom-40 -right-24 h-[480px] w-[480px] rounded-full bg-[#c6d6f1] opacity-55 blur-[140px]" />
+        <div className="absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#dfe6ee] opacity-50 blur-[150px]" />
+      </div>
+
+      <div className="mx-auto flex min-h-screen w-full max-w-[540px] flex-col px-5 py-10 sm:py-14">
+        {/* Top bar — comes from the Rohlax Wellness site, built by Jacob */}
+        <div className="reb-rise flex items-center justify-between" style={{ animationDelay: "0ms" }}>
           <a
-            href="mailto:jacob@strelva.com"
-            className="text-[13px] font-medium text-[#5f7667] hover:text-[#172117]"
+            href="https://rohlaxwellness.com"
+            className="group inline-flex items-center gap-1.5 text-[14px] font-medium text-[#52525b] transition-colors hover:text-[#1d1d1f]"
           >
-            Contact Jacob
+            <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
+            Rohlax Wellness
           </a>
-        </header>
+          <span className="rounded-full border border-white/70 bg-white/55 px-3 py-1 text-[12px] font-medium text-[#52525b] backdrop-blur-md">
+            One-time · no subscription
+          </span>
+        </div>
 
-        <section className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[1fr_430px] lg:py-16">
-          <div className="max-w-[650px]">
-            {payment === "success" && (
-              <div className="mb-6 inline-flex items-center gap-2 rounded-[6px] border border-[#bbd7bd] bg-[#edf8ee] px-3 py-2 text-[13px] font-medium text-[#315f37]">
-                <CheckCircle2 size={16} />
-                Payment received{amountCents ? ` for ${formatRohlaxPaymentAmount(amountCents)}` : ""}
-              </div>
-            )}
-            {payment === "cancelled" && (
-              <div className="mb-6 rounded-[6px] border border-[#e4d2b7] bg-[#fff8ea] px-3 py-2 text-[13px] font-medium text-[#76551c]">
-                Payment was cancelled. You can choose an amount and try again below.
-              </div>
-            )}
-
-            <h1 className="text-[42px] font-semibold leading-[1.02] tracking-normal text-[#172117] sm:text-[58px] lg:text-[64px]">
-              Flexible website payment
-            </h1>
-            <p className="mt-5 max-w-[560px] text-[17px] leading-8 text-[#4f6154] sm:text-[18px]">
-              There is no default or expected amount. Choose what feels right for the website work,
-              anywhere from $300 up to $1,000. The top of the range is just a ceiling, not a target.
-            </p>
-            <p className="mt-4 max-w-[560px] text-[15px] leading-7 text-[#5f7667]">
-              Admin site access is guaranteed free for life. This is a courtesy payment only; it
-              will not change future response times, and it does not add extra coverage at this
-              moment. All website requests still fall within the normal 3-5 day response window.
-            </p>
-
-            <div className="mt-9 grid max-w-[580px] gap-3 sm:grid-cols-3">
-              <div className="border-l border-[#cfd8cc] pl-4">
-                <p className="text-[12px] font-medium uppercase text-[#758579]">Minimum</p>
-                <p className="mt-1 text-[18px] font-semibold">$300</p>
-              </div>
-              <div className="border-l border-[#cfd8cc] pl-4">
-                <p className="text-[12px] font-medium uppercase text-[#758579]">Flexible</p>
-                <p className="mt-1 text-[18px] font-semibold">No default</p>
-              </div>
-              <div className="border-l border-[#cfd8cc] pl-4">
-                <p className="text-[12px] font-medium uppercase text-[#758579]">Maximum</p>
-                <p className="mt-1 text-[18px] font-semibold">$1,000 cap</p>
-              </div>
+        <div className="flex flex-1 flex-col justify-center py-10">
+          {payment === "success" && (
+            <div className="reb-rise mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-[#bfe3c4] bg-[#eafaec]/80 px-4 py-2 text-[13px] font-medium text-[#1f7a32] backdrop-blur-md">
+              <CheckCircle2 size={16} />
+              Thank you{amountCents ? ` — payment received for ${formatRohlaxPaymentAmount(amountCents)}` : " — payment received"}
             </div>
+          )}
+          {payment === "cancelled" && (
+            <div className="reb-rise mx-auto mb-7 rounded-full border border-[#ecd9b6] bg-[#fff7e8]/80 px-4 py-2 text-[13px] font-medium text-[#8a6516] backdrop-blur-md">
+              No charge made. You can choose an amount and try again below.
+            </div>
+          )}
+
+          {/* Headline — free message leads, in Jacob's voice */}
+          <div className="mb-8 text-center">
+            <span
+              className="reb-rise inline-flex items-center rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium tracking-wide text-white"
+              style={{ animationDelay: "60ms" }}
+            >
+              Built by Jacob · Strelva
+            </span>
+            <h1
+              className="reb-rise mx-auto mt-5 max-w-[460px] text-[34px] font-semibold leading-[1.06] tracking-[-0.025em] text-[#1d1d1f] sm:text-[42px]"
+              style={{ animationDelay: "120ms" }}
+            >
+              Your new Rohlax Wellness website.
+            </h1>
+            <p
+              className="reb-rise mx-auto mt-4 max-w-[440px] text-[16px] leading-7 text-[#56565c]"
+              style={{ animationDelay: "180ms" }}
+            >
+              Hey Chelsea — your new site is built and ready. This is the one-time payment for it: no
+              subscription, no monthly fees, ever. Choose anywhere from $500 to $1,000 below and
+              you&rsquo;re all set.{" "}
+              <span className="font-medium text-[#1d1d1f]">— Jacob</span>
+            </p>
           </div>
 
           <RohlaxPaymentForm />
-        </section>
+        </div>
+
+        <p
+          className="reb-rise text-center text-[13px] text-[#86868b]"
+          style={{ animationDelay: "320ms" }}
+        >
+          Questions?{" "}
+          <a
+            href="mailto:jacob@strelva.com"
+            className="font-medium text-[#52525b] underline-offset-2 hover:underline"
+          >
+            Contact Jacob
+          </a>
+        </p>
       </div>
     </main>
   );
