@@ -140,23 +140,25 @@ Implementation rules:
 - Avoid layout shifts from late-loading media, banners, and embedded widgets.
 - Use skeletons only where they preserve layout and task context.
 
-## Template Expansion Rules
+## Per-Site Build Requirements
 
-Every tenant template must include:
+**Delivery model: every client site is a separate hand-built custom repo** (see `AGENTS.md` — `DEFAULT_DELIVERY_MODEL = custom_repo`; each paid client gets its own repo in `~/websites/`). This kit is the **craft standard each custom site is built against** — it is **not** a spec for the legacy platform-template system in `src/components/templates/`, which is **deferred** and must not be used as the model for new client work.
+
+Every custom client site should cover:
 
 - Header, footer, hero, trust/proof, service/product, story/about, contact, and final CTA patterns.
-- `themeVars` with a full color set and accessible text/background pairs.
-- `defaultPageConfig` and editable section labels.
+- A full color set with accessible text/background pairs.
+- Strong first-viewport signal showing the real business, with a visible next-section hint.
 - Mobile-first behavior for hero, navigation, forms, and booking/contact flows.
-- Visual asset strategy for the business category.
+- A visual asset strategy grounded in the real business (see "Tenant Storefronts" above).
 
-Current template categories:
+Business-type design references (starting points for a custom build, **not** platform templates):
 
-- `wellness`: calm editorial service businesses.
-- `food-brand`: product-led commerce and packaged goods.
-- `restaurant`: menu, location, events, and reservations.
-- `trades`: urgent conversion, service areas, proof, and contact.
-- `professional`: trust, credentials, cases, and consultation.
+- wellness / service: calm editorial, booking-led, owner-forward.
+- food / DTC: product-led commerce, packaging, social proof.
+- restaurant: menu, location, events, reservations.
+- trades: urgent conversion, service areas, proof, contact.
+- professional: trust, credentials, cases, consultation.
 
 ## Launch Acceptance
 
