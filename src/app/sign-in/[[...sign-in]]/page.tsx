@@ -11,7 +11,7 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 
 export const metadata: Metadata = {
   title: "Dashboard access",
-  description: "Sign in to a delivered Strelva dashboard, or request a free site first.",
+  description: "Sign in to a delivered Strelva dashboard, or request your build first.",
 };
 
 export const dynamic = "force-dynamic";
@@ -201,7 +201,7 @@ export default async function SignInPage({
               href="/access-request"
               className="marketing-button-secondary h-11 px-5 text-[14px]"
             >
-              Request a free site
+              Request your build
             </Link>
           </div>
         </section>

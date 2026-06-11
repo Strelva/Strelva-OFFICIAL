@@ -14,6 +14,12 @@ const requestOptions = [
   "Make updates easier",
 ];
 
+const planOptions = [
+  { value: "", label: "Not sure yet" },
+  { value: "one-time", label: "One-time build" },
+  { value: "monthly", label: "Monthly plan" },
+] as const;
+
 const nextSteps = [
   "We read the business and site request.",
   "We email the next step when the request is reviewed.",
@@ -33,8 +39,10 @@ function AccessRequestForm() {
   const ref = searchParams.get("ref") || "";
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [currentWebsite, setCurrentWebsite] = useState("");
+  const [plan, setPlan] = useState("");
   const [request, setRequest] = useState("");
   const [state, setState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
@@ -46,6 +54,7 @@ function AccessRequestForm() {
 
     const cleanBusinessName = businessName.trim();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
     const cleanLocation = location.trim();
     const cleanWebsite = currentWebsite.trim();
     const cleanRequest = request.trim();
@@ -73,8 +82,10 @@ function AccessRequestForm() {
         body: JSON.stringify({
           businessName: cleanBusinessName,
           email: cleanEmail,
+          phone: cleanPhone,
           currentWebsite: cleanWebsite,
-          description: cleanRequest ? `Free site signup. Site request: ${cleanRequest}` : "Free site signup.",
+          plan,
+          description: cleanRequest ? `Build request: ${cleanRequest}` : "Build request.",
           location: cleanLocation,
           referredBy: ref || "access-request",
         }),
@@ -120,14 +131,14 @@ function AccessRequestForm() {
           </Link>
 
           <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
-            Free site signup
+            Done-for-you website build
           </p>
           <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-6xl md:text-7xl">
-            Request your free site.
+            Request your build.
           </h1>
           <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
-            Tell us the business, where to send updates, and what the site should help customers do. We will follow up
-            after review.
+            We build your site, manage it for you, and send a weekly plain-English report. You own everything. Tell us
+            the business, how to reach you, and what the site should help customers do. We will follow up after review.
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-label="Common site goals">
@@ -173,7 +184,7 @@ function AccessRequestForm() {
                 Request received.
               </h2>
               <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-                {message || "We will email next steps for the free site after review."}
+                {message || "We will email next steps for your build after review."}
               </p>
               <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
                 Sent to {email.trim().toLowerCase()}
@@ -201,7 +212,7 @@ function AccessRequestForm() {
               <div className="border-b border-[var(--m-rule-soft)] pb-5">
                 <p className="text-[13px] text-[color:var(--m-text-3)]">Takes one minute</p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--m-text)]">
-                  Sign up for a free site.
+                  Request your build.
                 </h2>
               </div>
 
@@ -244,6 +255,21 @@ function AccessRequestForm() {
                   />
                 </Field>
 
+                <Field label="Phone" htmlFor="phone">
+                  <input
+                    id="phone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="(555) 555-5555"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    className={fieldClassName}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Current site" htmlFor="current-website">
                   <input
                     id="current-website"
@@ -254,6 +280,21 @@ function AccessRequestForm() {
                     inputMode="url"
                     className={fieldClassName}
                   />
+                </Field>
+
+                <Field label="Which fits best?" htmlFor="plan">
+                  <select
+                    id="plan"
+                    value={plan}
+                    onChange={(event) => setPlan(event.target.value)}
+                    className={fieldClassName}
+                  >
+                    {planOptions.map((option) => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </div>
 
@@ -273,11 +314,11 @@ function AccessRequestForm() {
                   disabled={state === "submitting"}
                   className="marketing-button-primary h-13 px-6 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-65"
                 >
-                  {state === "submitting" ? "Sending..." : "Request free site"}
+                  {state === "submitting" ? "Sending..." : "Request your build"}
                   <ArrowRight className="size-4" />
                 </button>
                 <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">
-                  No payment. No long form. We will follow up after review.
+                  No long form. We will follow up after review with the fit and next steps.
                 </p>
               </div>
 

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { AccessRequestPage } from "@/components/marketing/AccessRequestPage";
 
 export const metadata: Metadata = {
-  title: "Request your free site",
-  description: "Tell Strelva where to send updates and what your local business needs online.",
+  title: "Request your build",
+  description:
+    "Strelva builds your site, manages it for you, and sends a weekly plain-English report. You own everything.",
 };
 
 export default function Page() {

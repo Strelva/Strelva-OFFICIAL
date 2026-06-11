@@ -590,7 +590,7 @@ function checkAuthAccessPages(
     account.includes("No invited sites on this account") &&
     account.includes("UseInvitedEmailButton") &&
     account.includes("signs you out so you can choose that account") &&
-    account.includes("Request a free site") &&
+    account.includes("Request your build") &&
     account.includes("mailto:jacob@strelva.com") &&
     account.includes("!tenantConfigs.some(({ config }) => config)") &&
     account.includes("return <NoAccessState />");
@@ -1247,6 +1247,105 @@ async function checkStripe() {
   }
 }
 
+/**
+ * The 402 cliff guard. The moment STRIPE_SCAFFOLD_PRICE_ID is set, billing turns
+ * on (isBillingEnabled() in src/lib/subscription.ts) and requireActiveSubscription
+ * starts returning HTTP 402 for every tenant whose effective status is not
+ * active/trialing. Existing free tenants have subscriptionStatus "none", so unless
+ * they are grandfathered (STRIPE_BILLING_GRANDFATHER_TENANTS) or carry a
+ * planOverride/active subscriptionStatus, they get locked out of their dashboard
+ * the instant this env var ships.
+ *
+ * So: if the price id is set, require that either the grandfather list is
+ * non-empty, OR every active Sanity tenant already has planOverride==="founder_comp"
+ * or an active/trialing subscriptionStatus. Otherwise fail with a remediation that
+ * names the cliff.
+ */
+async function checkBillingGrandfathering() {
+  const priceId = process.env.STRIPE_SCAFFOLD_PRICE_ID;
+  if (!priceId) {
+    // Billing is off; the gate short-circuits to "active" so there is no cliff.
+    return;
+  }
+
+  const grandfathered = (process.env.STRIPE_BILLING_GRANDFATHER_TENANTS || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (grandfathered.length > 0) {
+    log({
+      name: "Billing grandfathering",
+      status: "ok",
+      message: `STRIPE_BILLING_GRANDFATHER_TENANTS lists ${grandfathered.length} tenant(s) — no 402 cliff on billing flip`,
+    });
+    return;
+  }
+
+  // No grandfather list. The only safe alternative is that every active tenant
+  // already covers itself via planOverride or an active/trialing subscription.
+  if (!hasSanityProject || !hasSanityToken) {
+    failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
+    log({
+      name: "Billing grandfathering",
+      status: "fail",
+      message:
+        "STRIPE_SCAFFOLD_PRICE_ID is set but STRIPE_BILLING_GRANDFATHER_TENANTS is empty and Sanity is not configured to verify tenant coverage. Every existing tenant gets a 402 the moment billing turns on — set STRIPE_BILLING_GRANDFATHER_TENANTS to a comma-separated list of all existing tenant ids in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID.",
+    });
+    return;
+  }
+
+  try {
+    const client = createClient({
+      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
+      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
+      apiVersion: "2024-01-01",
+      useCdn: false,
+      token: process.env.SANITY_API_TOKEN,
+    });
+
+    const tenants = await client.fetch<Array<{
+      id: string;
+      active?: boolean;
+      planOverride?: string;
+      subscriptionStatus?: string;
+    }>>(`*[_type == "tenant"]{ id, active, planOverride, subscriptionStatus }`);
+
+    const activeTenants = tenants.filter((t) => t.active !== false);
+    const uncovered = activeTenants.filter(
+      (t) =>
+        t.planOverride !== "founder_comp" &&
+        t.subscriptionStatus !== "active" &&
+        t.subscriptionStatus !== "trialing"
+    );
+
+    if (uncovered.length > 0) {
+      failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
+      log({
+        name: "Billing grandfathering",
+        status: "fail",
+        message: `STRIPE_SCAFFOLD_PRICE_ID is set but ${uncovered.length} active tenant(s) (${uncovered
+          .map((t) => t.id)
+          .join(", ")}) have neither planOverride nor an active/trialing subscription. They would get a 402 the moment billing turns on — add them to STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated) in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID, or set their planOverride/subscriptionStatus in Sanity first.`,
+      });
+      return;
+    }
+
+    log({
+      name: "Billing grandfathering",
+      status: "ok",
+      message: `All ${activeTenants.length} active tenant(s) are covered by planOverride/subscriptionStatus — no 402 cliff`,
+    });
+  } catch (err) {
+    failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
+    log({
+      name: "Billing grandfathering",
+      status: "fail",
+      message: `STRIPE_SCAFFOLD_PRICE_ID is set but could not verify tenant billing coverage (${(err as Error).message}). Set STRIPE_BILLING_GRANDFATHER_TENANTS to avoid 402'ing existing tenants when billing turns on.`,
+    });
+  }
+}
+
 async function checkProductionSiteUrl() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (!baseUrl || validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", baseUrl)) {
@@ -1665,6 +1764,7 @@ async function run() {
   await checkSanity();
   await checkRedis();
   await checkStripe();
+  await checkBillingGrandfathering();
   await checkProductionSiteUrl();
   await checkVercelAppFreshness();
 

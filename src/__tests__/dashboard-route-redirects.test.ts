@@ -141,7 +141,7 @@ describe("dashboard route redirects", () => {
 
     expect(source).toContain("No invited sites on this account");
     expect(source).toContain("UseInvitedEmailButton");
-    expect(source).toContain("Request a free site");
+    expect(source).toContain("Request your build");
     expect(source).toContain("mailto:jacob@strelva.com");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("return <NoAccessState />");

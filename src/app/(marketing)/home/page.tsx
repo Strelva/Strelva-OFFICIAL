@@ -55,7 +55,7 @@ export default function HomePage() {
               </p>
               <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
                 <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
-                  Get my free first site
+                  Request your build
                   <ArrowRight className="size-4" />
                 </Link>
               </div>

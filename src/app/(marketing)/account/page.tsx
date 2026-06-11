@@ -111,7 +111,7 @@ function NoAccessState() {
               color: "var(--m-text-2)",
             }}
           >
-            Request a free site
+            Request your build
           </Link>
         </div>
       </div>

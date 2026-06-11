@@ -388,7 +388,7 @@ export function AuditPage() {
                   href="/access-request?ref=audit"
                   className="marketing-button-primary h-12 px-6"
                 >
-                  Get a free site
+                  Request your build
                   <ArrowRight className="size-4" />
                 </Link>
                 <button

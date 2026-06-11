@@ -42,30 +42,25 @@ describe("owner journey copy and links", () => {
     expect(dashboardPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat"))');
   });
 
-  it("keeps self-serve onboarding focused on instant setup", () => {
+  it("retires the self-serve onboarding flow in favor of done-for-you builds", () => {
     const onboardPage = readRepoFile("src/app/onboard/page.tsx");
     const signUpPage = readRepoFile("src/app/sign-up/[[...sign-up]]/page.tsx");
 
-    expect(onboardPage).toContain("/api/self-serve/tenant");
-    expect(onboardPage).toContain("Tell us about the business. We prepare the site.");
-    expect(onboardPage).toContain("Create starter site");
-    expect(onboardPage).toContain("AI to pre-fill useful first content");
-    expect(onboardPage).toContain("Update hours or booking details before publishing.");
-    expect(onboardPage).not.toContain('redirect(`/access-request${suffix}`)');
+    // /onboard now redirects to the build-request intake (query forwarded).
+    expect(onboardPage).toContain('redirect(query ? `/access-request?${query}` : "/access-request")');
+    expect(onboardPage).not.toContain("/api/self-serve/tenant");
+    expect(onboardPage).not.toContain("Create starter site");
 
-    expect(signUpPage).toContain("isSelfServeSignup");
-    expect(signUpPage).toContain('redirectUrl?.startsWith("/onboard")');
-    expect(signUpPage).toContain("Create the account. Then we prepare the site.");
+    // The sign-up page no longer carries the dead self-serve signup branch.
+    expect(signUpPage).not.toContain("isSelfServeSignup");
+    expect(signUpPage).not.toContain('redirectUrl?.startsWith("/onboard")');
     expect(signUpPage).toContain('const title = "Dashboard signup is paused.";');
+    expect(signUpPage).toContain("Request your build");
   });
 
-  it("lands new self-serve owners on first-run quick wins", () => {
-    const selfServe = readRepoFile("src/lib/self-serve.ts");
-    const selfServeRoute = readRepoFile("src/app/api/self-serve/tenant/route.ts");
+  it("lands welcomed owners on first-run quick wins", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
 
-    expect(selfServe).toContain('getTenantDashboardUrl(tenant, "/dashboard?welcome=1")');
-    expect(selfServeRoute).toContain("successUrl: result.dashboardUrl");
     expect(dashboardPage).toContain("searchValue(params.welcome) === \"1\"");
     expect(dashboardPage).toContain("Your starter site is ready. Make the first useful wins.");
     expect(dashboardPage).toContain("Update hours");

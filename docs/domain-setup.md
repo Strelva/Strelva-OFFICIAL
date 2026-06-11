@@ -1,8 +1,18 @@
 # Domain Setup Checklist
 
+## Step 0 — The domain belongs to the client, from day one
+
+This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the domain is in YOUR name from day one, and you leave with everything." Do not register a client's domain inside Strelva's registrar or Cloudflare account.
+
+1. **Buy the domain in the client's own account.** The client creates (or already has) their own registrar / Cloudflare account and purchases the domain there. If they're not comfortable doing it solo, do a ~10-minute screen-share and walk them through it — but it stays under *their* login and *their* payment method.
+2. **Strelva gets a member role, not ownership.** The client invites Strelva to their Cloudflare account with a **DNS-edit member role only** (Cloudflare: Members → Invite → role "DNS"). That's enough to add the Vercel records below and manage routing; it is not account ownership and is trivially revoked at handoff.
+3. **Record who owns what.** Note in the tenant record / handoff notes that the registrar + DNS account is client-owned and Strelva is a delegated member. This is what makes the repo-transfer runbook's "DNS is already theirs" step true.
+
+> **Existing clients — confirm and migrate.** Some early domains were set up before this rule. **Rohlax (`rohlaxwellness.com`) DNS lives in Cloudflare** — confirm whether that Cloudflare account is the client's or Strelva's. If it's in a Strelva-owned account, migrate the zone to a client-owned Cloudflare account (or transfer the registrar to the client) and re-add Strelva as a DNS-edit member. Until that's done, the ownership promise isn't actually backed by access reality.
+
 ## Adding a new tenant's custom domain
 
-1. Purchase domain (Porkbun, Namecheap, Google Domains, etc.)
+1. Confirm the domain was purchased in the **client's** account per Step 0, and that Strelva has the DNS-edit member role.
 2. Add to the Vercel project (`scaffold-web`):
    ```
    vercel domains add yourbusiness.com

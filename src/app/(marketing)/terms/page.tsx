@@ -1,5 +1,3 @@
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
-
 export default function TermsPage() {
   return (
     <div className="max-w-[720px] mx-auto px-6 py-16">
@@ -45,11 +43,12 @@ export default function TermsPage() {
         </h2>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            The service costs ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS} per month, billed monthly via Stripe.
+            Fees are set out in your order form or service agreement. Recurring
+            management fees are billed on the cadence stated there via Stripe.
           </li>
           <li>
-            Custom website builds are quoted separately and billed as one-time
-            fees.
+            Custom website builds are quoted separately and billed per your
+            order form or service agreement.
           </li>
           <li>
             You may cancel at any time. Cancellation takes effect at the end of
@@ -138,8 +137,8 @@ export default function TermsPage() {
         <ul className="list-disc pl-6 space-y-2">
           <li>Your website will be taken offline</li>
           <li>
-            You may request an export of your content within 30 days of
-            cancellation
+            You can export your content at any time, before or after
+            cancellation — you leave with everything.
           </li>
           <li>We will delete your data within 90 days unless legally required to retain it</li>
         </ul>

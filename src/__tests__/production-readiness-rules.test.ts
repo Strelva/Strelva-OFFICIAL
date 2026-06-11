@@ -587,7 +587,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("signs you out so you can choose that account");
     expect(source).toContain('href="/account"');
     expect(source).toContain("Choose another site");
-    expect(source).toContain("Request a free site");
+    expect(source).toContain("Request your build");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("{button}</SignOutButton>");
     expect(source).toContain("Sign-in, sign-up, and no-access recovery are aligned with invite-focused metadata");

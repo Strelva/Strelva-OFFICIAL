@@ -10,13 +10,13 @@
 
 ## API Contract
 
-- `src/lib/reb-contracts.ts` is the source of truth for route builders, tenant constants, revalidation payloads, and HMAC signing in this repo.
+- `src/lib/scaffold-contracts.ts` is the source of truth for route builders, tenant constants, revalidation payloads, and HMAC signing in this repo.
 - GLDF vendors the same contract helpers so both repos build independently without a sibling package dependency.
 - Rohlax Wellness vendors the same v1 contract helpers and exposes the same signed `/api/v1/revalidate` endpoint.
 - Versioned public storefront endpoints:
   - `GET /api/v1/content/:tenant/:section`
   - `GET /api/v1/page-config/:tenant`
-- Legacy public aliases currently exist under `/api/public/*`; new storefronts should use `/api/v1/*`.
+- The legacy `/api/public/*` aliases were removed; all storefronts use `/api/v1/*` directly.
 - Storefront revalidation targets should prefer `/api/v1/revalidate`.
 
 ## Tenant Deployment Checklist
@@ -27,7 +27,7 @@
   `SUPER_ADMIN_EMAILS`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`,
   `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
-  `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `REB_CUSTOM_REQUEST_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
+  `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `SCAFFOLD_CUSTOM_REQUEST_SECRET` (legacy alias `REB_CUSTOM_REQUEST_SECRET`), `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth connections are enabled.
 - Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $149/month. The checkout route and customer-facing pricing copy assume this plan price.

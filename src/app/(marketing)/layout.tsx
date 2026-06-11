@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Strelva - Free sites for local businesses",
-  description: "Request a free public site built around calls, bookings, and trust.",
+  title: "Strelva - Done-for-you managed websites for local businesses",
+  description:
+    "We build your site, manage it for you, and send a weekly plain-English report. You own everything.",
 };
 
 export default function MarketingLayout({
@@ -27,7 +28,7 @@ export default function MarketingLayout({
               href="/access-request"
               className="inline-flex h-8 items-center justify-center rounded-full bg-[var(--m-button)] px-4 text-[13px] font-medium text-[var(--m-button-text)] transition-transform duration-300 hover:-translate-y-0.5"
             >
-              Request free site
+              Request your build
             </Link>
           </nav>
         </div>

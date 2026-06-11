@@ -73,7 +73,7 @@ describe("auth access pages", () => {
     }));
 
     expect(html).toContain("Dashboard signup is paused.");
-    expect(html).toContain("Request free site");
+    expect(html).toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });
 

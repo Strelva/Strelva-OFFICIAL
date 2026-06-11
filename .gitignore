@@ -43,6 +43,7 @@ next-env.d.ts
 # content
 /public/uploads/
 .claude/sessions/
+.claude/settings.local.json
 .claude/rules/
 .claude/commands/
 .claude/settings.json
