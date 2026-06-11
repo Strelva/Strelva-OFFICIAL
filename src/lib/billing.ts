@@ -15,6 +15,10 @@ export interface TenantSubscriptionCheckoutInput {
   customerName?: string;
   successUrl?: string;
   cancelUrl?: string;
+  /** Override the recurring price. Defaults to STRIPE_SCAFFOLD_PRICE_ID. */
+  priceId?: string;
+  /** Free trial length in days, wired to subscription_data.trial_period_days (e.g. Door 1's 3 months included). */
+  trialPeriodDays?: number;
 }
 
 export interface TenantSubscriptionCheckoutResult {
@@ -32,7 +36,7 @@ export class BillingConfigurationError extends Error {
 export async function createTenantSubscriptionCheckout(
   input: TenantSubscriptionCheckoutInput,
 ): Promise<TenantSubscriptionCheckoutResult> {
-  const priceId = process.env.STRIPE_SCAFFOLD_PRICE_ID;
+  const priceId = input.priceId || process.env.STRIPE_SCAFFOLD_PRICE_ID;
   if (!process.env.STRIPE_SECRET_KEY || !priceId) {
     throw new BillingConfigurationError(
       "Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_SCAFFOLD_PRICE_ID.",
@@ -65,6 +69,9 @@ export async function createTenantSubscriptionCheckout(
     metadata: { tenantId: tenant.id },
     subscription_data: {
       metadata: { tenantId: tenant.id },
+      ...(input.trialPeriodDays && input.trialPeriodDays > 0
+        ? { trial_period_days: input.trialPeriodDays }
+        : {}),
     },
     allow_promotion_codes: true,
   });

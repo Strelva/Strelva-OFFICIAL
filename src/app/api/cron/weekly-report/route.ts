@@ -41,16 +41,33 @@ function reportToText(summary: string, dashboardUrl: string): string {
 export async function GET() {
   // Auth handled by proxy (CRON_SECRET check)
 
-  const allReports = await generateAllReports();
-  const reports = allReports.filter((r) => r.tenant.subscriptionStatus !== "cancelled");
+  const { reports: allReports, skipped: generationSkips } = await generateAllReports();
+
+  // Track skipped tenants with a reason so "why did X never get a receipt?" is
+  // answerable from this response. Seed with tenants skipped during generation
+  // (missing owner email, inactive, generation failure).
+  const skippedReasons: { tenantId: string; reason: string; detail?: string }[] = generationSkips.map(
+    (s) => ({ tenantId: s.tenantId, reason: s.reason, detail: s.detail }),
+  );
+
+  const reports = allReports.filter((r) => {
+    if (r.tenant.subscriptionStatus === "cancelled") {
+      skippedReasons.push({ tenantId: r.tenant.id, reason: "subscription_cancelled" });
+      return false;
+    }
+    return true;
+  });
+
   const sent: string[] = [];
-  const skipped = allReports.length - reports.length;
   const errors: string[] = [];
 
   for (const report of reports) {
     try {
       const email = report.tenant.ownerEmail;
-      if (!email) continue;
+      if (!email) {
+        skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
+        continue;
+      }
 
       const subject = report.pageViews.thisWeek > 0
         ? `${report.pageViews.thisWeek} people found you this week`
@@ -72,13 +89,22 @@ export async function GET() {
         const resend = new Resend(process.env.RESEND_API_KEY);
         const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
 
-        await resend.emails.send({
+        // Resend v6 returns { data, error } and does NOT throw on a failed send
+        // (e.g. unverified from-domain). Check error so failures aren't silently
+        // counted as successes.
+        const { error } = await resend.emails.send({
           from: `${report.tenant.siteName} <report@${domain}>`,
           to: email,
           subject,
           html,
           text,
         });
+        if (error) {
+          const reason = error.message || error.name || "Unknown Resend error";
+          console.error(`[weekly-report] Resend rejected send for tenant ${report.tenant.id}:`, error);
+          errors.push(`${report.tenant.id}: ${reason}`);
+          continue;
+        }
         sent.push(report.tenant.id);
       } else {
         console.log(`[Weekly report dev] "${subject}" -> ${email}`);
@@ -86,9 +112,11 @@ export async function GET() {
         sent.push(report.tenant.id);
       }
 
-      // Slack notification
+      // Slack notification. Await it: on Vercel the serverless function can
+      // freeze the moment the response is returned, so a fire-and-forget fetch
+      // may never flush. Failure here must never fail the route, so swallow.
       if (process.env.SLACK_WEBHOOK_URL) {
-        fetch(process.env.SLACK_WEBHOOK_URL, {
+        await fetch(process.env.SLACK_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -103,16 +131,40 @@ export async function GET() {
     }
   }
 
-  // Notify Slack if any tenants failed
-  if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
-    fetch(process.env.SLACK_WEBHOOK_URL, {
+  // Notify Slack if any tenants failed or were skipped for a reportable reason.
+  // Surfacing skips (e.g. missing owner email) makes "why didn't X get a
+  // receipt?" answerable without digging through logs.
+  const reportableSkips = skippedReasons.filter((s) => s.reason !== "inactive");
+  if ((errors.length > 0 || reportableSkips.length > 0) && process.env.SLACK_WEBHOOK_URL) {
+    const lines: string[] = [];
+    if (errors.length > 0) {
+      lines.push(`${errors.length} tenant(s) failed — ${errors.join(", ")}`);
+    }
+    if (reportableSkips.length > 0) {
+      lines.push(
+        `${reportableSkips.length} skipped — ${reportableSkips
+          .map((s) => `${s.tenantId} (${s.reason}${s.detail ? `: ${s.detail}` : ""})`)
+          .join(", ")}`,
+      );
+    }
+    // Await so the summary actually flushes before the function freezes on
+    // Vercel. Failure must not fail the route, so swallow.
+    await fetch(process.env.SLACK_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `⚠ Weekly report cron: ${errors.length} tenant(s) failed — ${errors.join(", ")}`,
+        text: `⚠ Weekly report cron: ${lines.join(" | ")}`,
       }),
     }).catch(() => {});
   }
 
-  return NextResponse.json({ processed: sent.length, failed: errors.length, sent, errors, skipped, total: allReports.length });
+  return NextResponse.json({
+    processed: sent.length,
+    failed: errors.length,
+    skipped: skippedReasons.length,
+    sent,
+    errors,
+    skippedReasons,
+    total: sent.length + errors.length + skippedReasons.length,
+  });
 }

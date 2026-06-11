@@ -8,6 +8,7 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | File | Purpose |
 |------|---------|
 | `scaffold-client.ts` | Typed fetch client for Scaffold Web's `/api/v1/*` contract |
+| `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (powers the weekly report) |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
 | `README.md` | This file |
@@ -36,14 +37,23 @@ EOF
 ## Required Environment
 
 ```bash
-TENANT_ID=client-slug                           # Required
-SCAFFOLD_API_URL=https://scaffoldweb.com         # Required (or legacy REB_API_URL)
-REVALIDATION_SECRET=shared-secret-from-scaffold  # Required
+TENANT_ID=client-slug                              # Required (server-side content fetch)
+SCAFFOLD_API_URL=https://scaffoldweb.com            # Required (or legacy REB_API_URL)
+REVALIDATION_SECRET=shared-secret-from-scaffold     # Required
+
+# Tracking beacon (browser) — required only if you mount <ScaffoldTracker />:
+NEXT_PUBLIC_TENANT_ID=client-slug                   # Same slug as TENANT_ID
+NEXT_PUBLIC_SCAFFOLD_API_URL=https://scaffoldweb.com # Same URL as SCAFFOLD_API_URL
 ```
 
 `scaffold-client.ts` also accepts the legacy `REB_API_URL` env var. New repos
 should set `SCAFFOLD_API_URL`; existing repos can migrate without breakage by
 setting both during cutover.
+
+The two `NEXT_PUBLIC_*` vars exist because the tracking beacon runs in the
+browser, where Next.js only inlines `NEXT_PUBLIC_*` env vars. They mirror the
+server-side `TENANT_ID` / `SCAFFOLD_API_URL`. If they are unset, the tracker
+fails silent (no events) and the site still renders normally.
 
 ## Usage
 
@@ -79,9 +89,60 @@ The revalidation route handler at `/api/v1/revalidate`:
 4. Calls `revalidatePath()` and `revalidateTag()` to bust Next.js cache
 5. Ignores payloads where `tenant` doesn't match this repo's `TENANT_ID`
 
+### Analytics tracking (powers the weekly report)
+
+The owner's weekly report ("47 people found you this week", booking clicks,
+top services) is driven by events this site sends to the control plane's public
+`POST /api/v1/track/{tenant}` contract. Without this, a real client site reports
+near-zero, because the legacy in-platform tracker only runs on the control
+plane's own preview — not on the deployed client repo.
+
+Copy `ScaffoldTracker.tsx` into the repo and mount it once in the root layout:
+
+```bash
+cp ScaffoldTracker.tsx my-client-site/components/ScaffoldTracker.tsx
+```
+
+```tsx
+// app/layout.tsx
+import { ScaffoldTracker } from "@/components/ScaffoldTracker";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <ScaffoldTracker />
+      </body>
+    </html>
+  );
+}
+```
+
+Record booking-CTA clicks from the button itself (pass the service id when the
+click maps to a specific service so the report's "top services" breakdown
+fills in):
+
+```tsx
+import { trackBookingClick } from "@/components/ScaffoldTracker";
+
+<a href={bookingUrl} onClick={() => trackBookingClick(service.id)}>Book</a>
+// generic CTA with no service:
+<a href={bookingUrl} onClick={() => trackBookingClick()}>Book now</a>
+```
+
+The tracker fails silent, is non-blocking (`sendBeacon` / `keepalive` fetch),
+skips in development, and respects `prefers-reduced-data`. It never throws, so a
+network error or missing env var can never break the client site.
+
+See `docs/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
+roll this into the live GLDF and Rohlax repos plus how to verify the report
+picks it up.
+
 ## Required Contract
 
 - Use `fetchScaffoldContent`, `fetchScaffoldPageConfig`, and `fetchScaffoldSiteCapabilities` to read tenant data.
+- Mount `<ScaffoldTracker />` and wire `trackBookingClick` so the weekly report has real numbers.
 - Expose `POST /api/v1/revalidate` and verify `x-reb-timestamp` + `x-reb-signature` headers.
 - Keep local defaults (via `content-defaults.ts`) so the site renders when Scaffold Web is unavailable.
 
@@ -113,8 +174,10 @@ The revalidation route handler at `/api/v1/revalidate`:
 - [ ] `?preview=true` fetches draft content/page config without caching
 - [ ] Signed revalidation rejects invalid signatures
 - [ ] Signed revalidation accepts a valid request for this `TENANT_ID`
+- [ ] `<ScaffoldTracker />` mounted in the root layout; a production page load posts a `page-view` to `/api/v1/track/{tenant}`
+- [ ] Booking CTA calls `trackBookingClick(serviceId)`
 - [ ] DNS configured: production domain, www subdomain, admin subdomain
-- [ ] Vercel env vars set: `TENANT_ID`, `SCAFFOLD_API_URL`, `REVALIDATION_SECRET`
+- [ ] Vercel env vars set: `TENANT_ID`, `SCAFFOLD_API_URL`, `REVALIDATION_SECRET`, `NEXT_PUBLIC_TENANT_ID`, `NEXT_PUBLIC_SCAFFOLD_API_URL`
 
 ## Full Documentation
 

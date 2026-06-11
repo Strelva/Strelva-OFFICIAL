@@ -1,16 +1,13 @@
 import type { ComponentType } from "react";
-import { Activity, AlertCircle, Bot, Eye, MousePointerClick } from "lucide-react";
+import { Activity, Bot, Eye, MousePointerClick } from "lucide-react";
 import type { OwnerRetentionSignals } from "@/lib/retention";
 
-function RiskBadge({ risk }: { risk: OwnerRetentionSignals["churnRisk"] }) {
-  const label =
-    risk === "healthy" ? "Active" : risk === "watch" ? "Needs a quick win" : "Quiet 14+ days";
-  const className =
-    risk === "healthy"
-      ? "border-success/20 bg-success-dim text-success"
-      : risk === "watch"
-        ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-        : "border-red-500/30 bg-red-500/10 text-red-300";
+function StatusBadge({ aiChangesThisWeek }: { aiChangesThisWeek: number }) {
+  const isFresh = aiChangesThisWeek > 0;
+  const label = isFresh ? "Fresh this week" : "Time for a quick update";
+  const className = isFresh
+    ? "border-success/20 bg-success-dim text-success"
+    : "border-glass-border bg-glass text-gray-muted";
 
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${className}`}>
@@ -64,7 +61,7 @@ export function RetentionPanel({ signals }: { signals: OwnerRetentionSignals }) 
             See what the AI changed, how many people found you after fresh work, and which proof signals are active.
           </p>
         </div>
-        <RiskBadge risk={signals.churnRisk} />
+        <StatusBadge aiChangesThisWeek={signals.aiChangesThisWeek} />
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -90,15 +87,11 @@ export function RetentionPanel({ signals }: { signals: OwnerRetentionSignals }) 
 
       <div className="mt-4 rounded-xl border border-gray-border/70 bg-surface-raised p-4">
         <div className="flex items-start gap-3">
-          {signals.churnRisk === "reengage" ? (
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" strokeWidth={1.6} />
-          ) : (
-            <Activity className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.6} />
-          )}
+          <Activity className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.6} />
           <div>
-            <p className="text-[13px] font-medium text-warm-black">{signals.riskReason}</p>
+            <p className="text-[13px] font-medium text-warm-black">Your next useful move</p>
             <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-              {signals.ownerNextAction} Dashboard visits: {formatDays(signals.noDashboardOpenDays)}.
+              {signals.ownerNextAction}
             </p>
           </div>
         </div>

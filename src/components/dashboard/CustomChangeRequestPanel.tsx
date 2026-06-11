@@ -23,6 +23,7 @@ export function CustomChangeRequestPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const section = selectedNode?.section || activeSection || undefined;
   const label = selectedNode?.label || section || activePage;
@@ -31,6 +32,7 @@ export function CustomChangeRequestPanel() {
     if (!prompt.trim()) return;
     setSubmitting(true);
     setError(false);
+    setErrorMessage(null);
     try {
       const res = await fetch(dashboardHref("/api/change-requests"), {
         method: "POST",
@@ -47,12 +49,33 @@ export function CustomChangeRequestPanel() {
           rect: selectedNode?.rect,
         }),
       });
-      if (!res.ok) throw new Error("Request failed");
+      if (!res.ok) {
+        // The one-active-request wall returns 409 with a friendly message that
+        // names what's already in flight — surface that instead of the generic
+        // "try again" so the owner knows why this didn't go through.
+        if (res.status === 409) {
+          const body = await res.json().catch(() => null);
+          const title =
+            body && typeof body.activeRequest?.title === "string"
+              ? body.activeRequest.title
+              : null;
+          const message =
+            body && typeof body.message === "string"
+              ? body.message
+              : "You already have a custom request in progress.";
+          setErrorMessage(title ? `${message} (in progress: "${title}")` : message);
+          setError(true);
+          setTimeout(() => setError(false), 8000);
+          return;
+        }
+        throw new Error("Request failed");
+      }
       setPrompt("");
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } catch {
       setError(true);
+      setErrorMessage(null);
       setTimeout(() => setError(false), 4000);
     } finally {
       setSubmitting(false);
@@ -67,6 +90,9 @@ export function CustomChangeRequestPanel() {
         </p>
         <p className="mt-1 text-[12px] leading-5 text-gray-faint">
           Code, animation, custom component, and deeper layout changes go to the Strelva team.
+        </p>
+        <p className="mt-2 text-[12px] leading-5 text-gray-muted">
+          Design, template, and code changes are quoted separately — they&apos;re not part of your care plan.
         </p>
       </div>
 
@@ -115,13 +141,13 @@ export function CustomChangeRequestPanel() {
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           rows={7}
-          placeholder="Example: Make this section feel more premium with a different layout and a softer entrance animation."
+          placeholder="Example: Update this section's text to mention our new Saturday hours."
           className="mt-1 w-full resize-none rounded-xl border border-gray-border bg-surface-inset px-3 py-2 text-[13px] leading-5 text-warm-white outline-none transition-colors placeholder:text-gray-subtle focus:border-accent/45"
         />
 
         {error && (
           <p className="mt-2 text-[11px] text-red-400">
-            Could not send the request. Try again.
+            {errorMessage ?? "Could not send the request. Try again."}
           </p>
         )}
         {sent && (

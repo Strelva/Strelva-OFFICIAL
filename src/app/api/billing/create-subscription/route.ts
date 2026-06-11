@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { isSuperAdmin } from "@/lib/auth";
 import { readJsonObject } from "@/lib/request-body";
-import { getTenantConfig, updateTenant } from "@/lib/tenants";
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-03-31.basil" as Stripe.LatestApiVersion,
-  });
-}
+import { getTenantConfig } from "@/lib/tenants";
+import {
+  BillingConfigurationError,
+  createTenantSubscriptionCheckout,
+} from "@/lib/billing";
 
 function getRequestOrigin(req: Request): string {
   const url = new URL(req.url);
@@ -29,15 +26,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const SCAFFOLD_MONTHLY_PRICE = process.env.STRIPE_SCAFFOLD_PRICE_ID;
-  if (!process.env.STRIPE_SECRET_KEY || !SCAFFOLD_MONTHLY_PRICE) {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_SCAFFOLD_PRICE_ID) {
     return NextResponse.json(
       { error: "Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_SCAFFOLD_PRICE_ID." },
       { status: 500 }
     );
   }
 
-  const stripe = getStripe();
   const body = await readJsonObject(req);
   if (!body) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -60,32 +55,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unknown tenant: ${normalizedTenantId}` }, { status: 400 });
   }
 
-  // Reuse existing Stripe customer or create one
-  let customerId = tenantConfig.stripeCustomerId;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: customerEmail,
-      name: normalizedCustomerName || tenantConfig.ownerName,
-      metadata: { tenantId: normalizedTenantId },
-    });
-    customerId = customer.id;
-    // Persist the new Stripe customer ID to tenant config
-    await updateTenant(normalizedTenantId, { stripeCustomerId: customerId });
-  }
-
   const origin = getRequestOrigin(req);
 
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: "subscription",
-    line_items: [{ price: SCAFFOLD_MONTHLY_PRICE, quantity: 1 }],
-    success_url: `${origin}/admin?subscription=success&tenant=${normalizedTenantId}`,
-    cancel_url: `${origin}/admin?subscription=cancelled&tenant=${normalizedTenantId}`,
-    metadata: { tenantId: normalizedTenantId },
-  });
+  try {
+    const result = await createTenantSubscriptionCheckout({
+      tenant: tenantConfig,
+      customerEmail,
+      customerName: normalizedCustomerName || undefined,
+      successUrl: `${origin}/admin?subscription=success&tenant=${normalizedTenantId}`,
+      cancelUrl: `${origin}/admin?subscription=cancelled&tenant=${normalizedTenantId}`,
+    });
 
-  return NextResponse.json({
-    checkoutUrl: session.url,
-    stripeCustomerId: customerId,
-  });
+    return NextResponse.json({
+      checkoutUrl: result.checkoutUrl,
+      stripeCustomerId: result.stripeCustomerId,
+    });
+  } catch (err) {
+    if (err instanceof BillingConfigurationError) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+    throw err;
+  }
 }

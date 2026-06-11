@@ -14,6 +14,8 @@ import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
+import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
+import { getTenantConfig } from "@/lib/tenants";
 import type { Connection } from "@/lib/types";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -159,22 +161,69 @@ async function pollTenant(tenantId: string): Promise<number> {
   // Find new reviews
   const newReviews = reviews.filter((r) => !lastReviewIds.has(r.reviewId));
 
-  // Emit events for new reviews
+  // Get tenant config for reply drafting (best-effort; drafting degrades gracefully)
+  const tenantConfig = await getTenantConfig(tenantId).catch(() => null);
+
+  // Emit events for new reviews and queue drafted replies for human approval.
+  // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
   for (const review of newReviews) {
+    const rating = starRatingToNumber(review.starRating);
+
     await addEvent({
       tenantId,
       source: "google",
       type: "review",
-      title: `New ${starRatingToNumber(review.starRating)}-star Google review from ${review.reviewer.displayName}`,
+      title: `New ${rating}-star Google review from ${review.reviewer.displayName}`,
       body: review.comment || "(no comment)",
       status: "pending",
       metadata: {
         reviewId: review.reviewId,
-        rating: starRatingToNumber(review.starRating),
+        rating,
         author: review.reviewer.displayName,
         createdAt: review.createTime,
       },
     });
+
+    // Draft a filter-safe reply and queue it for human approval.
+    // This is fire-and-recover: a draft failure must not block the review event.
+    try {
+      const draftConfig = tenantConfig ?? { id: tenantId, siteName: tenantId };
+      const draftedReply = await draftReviewReply(
+        {
+          reviewId: review.reviewId,
+          reviewerName: review.reviewer.displayName,
+          rating,
+          comment: review.comment,
+        },
+        draftConfig
+      );
+
+      await addEvent({
+        tenantId,
+        source: "ai",
+        type: "review",
+        title: `Drafted reply for ${review.reviewer.displayName}'s ${rating}-star review`,
+        body: draftedReply,
+        // Always pending — human must approve before publish
+        status: "pending",
+        metadata: {
+          kind: "review_reply_draft",
+          reviewId: review.reviewId,
+          rating,
+          author: review.reviewer.displayName,
+          draftedReply,
+          reviewCreatedAt: review.createTime,
+        },
+      });
+
+      // Store in recent-replies for near-duplicate detection on future drafts.
+      await storeRecentReply(tenantId, draftedReply);
+    } catch (err) {
+      console.error(
+        `[poll-google-reviews] Reply drafting failed for ${tenantId} reviewId=${review.reviewId}:`,
+        err
+      );
+    }
   }
 
   // Update cache with all current review IDs

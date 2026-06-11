@@ -102,6 +102,7 @@ async function DashboardHome({
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
   const showWelcome =
     searchValue(params.welcome) === "1" || searchValue(params.checkout) === "success";
+  const briefHeadline = brief?.highlights?.find((line) => line.trim().length > 0) || brief?.summary?.trim() || null;
   const nextAction = brief?.nextAction?.title || (pendingCount > 0 ? "Review what needs you" : "Make one useful site update");
   const nextActionDetail = brief?.nextAction?.description ||
     (pendingCount > 0
@@ -127,21 +128,42 @@ async function DashboardHome({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              href={dashboardHref("/dashboard/site")}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
-            >
-              <Wand2 className="h-4 w-4" strokeWidth={1.5} />
-              Edit site
-            </Link>
-            <Link
               href={dashboardHref("/dashboard/chat")}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-4 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
               Ask AI
             </Link>
+            <Link
+              href={dashboardHref("/dashboard/site")}
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-4 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
+            >
+              <Wand2 className="h-4 w-4" strokeWidth={1.5} />
+              Edit site
+            </Link>
           </div>
         </header>
+
+          {briefHeadline ? (
+          <Link
+            href={dashboardHref("/dashboard/reports")}
+            className="group flex items-start justify-between gap-4 rounded-2xl border border-accent/25 bg-accent-dim/30 p-4 transition-colors hover:bg-accent-dim/45"
+          >
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
+                Latest weekly report
+              </p>
+              <p className="mt-2 text-[15px] font-medium leading-snug text-warm-black">
+                {briefHeadline}
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-accent">
+                See your full report
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
+              </span>
+            </div>
+            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-accent" strokeWidth={1.5} />
+          </Link>
+          ) : null}
 
           <section className="grid gap-3 md:grid-cols-3">
           <StatTile
@@ -162,6 +184,20 @@ async function DashboardHome({
             detail={pendingCount > 0 ? "Review before anything goes live" : "Nothing is waiting on approval"}
             icon={ShieldCheck}
           />
+          </section>
+
+          <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-glass-border bg-glass px-4 py-3">
+            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">
+              Since launch
+            </span>
+            <span className="text-[13px] text-warm-black">
+              <span className="font-semibold">{pageViews.total.toLocaleString()}</span>{" "}
+              <span className="text-gray-muted">people found you</span>
+            </span>
+            <span className="text-[13px] text-warm-black">
+              <span className="font-semibold">{customerActions.total.toLocaleString()}</span>{" "}
+              <span className="text-gray-muted">customer actions</span>
+            </span>
           </section>
 
           <RetentionPanel signals={retentionSignals} />

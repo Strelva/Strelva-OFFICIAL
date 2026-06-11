@@ -13,12 +13,16 @@ export type DeliveryStatus =
   | "launched"
   | "paused";
 
+export type DeliveryPlan = "one-time" | "monthly";
+
 export interface DeliveryLead {
   businessName: string;
   description?: string | null;
   location?: string | null;
   email: string;
+  phone?: string | null;
   currentWebsite?: string | null;
+  plan?: DeliveryPlan | null;
   referredBy?: string | null;
   statusToken: string;
   deliveryStatus: DeliveryStatus;
@@ -34,17 +38,17 @@ export const deliverySteps: Array<{
   {
     id: "received",
     label: "Request received",
-    detail: "Your business, current site, and free-site request are in the queue. We will follow up after review.",
+    detail: "Your business, current site, and build request are in the queue. We will follow up after review.",
   },
   {
     id: "reviewing",
     label: "Fit review",
-    detail: "We check the business, the customer path, and what the first site should prove.",
+    detail: "We check the business, the customer path, and what the site should prove.",
   },
   {
     id: "drafting",
-    label: "First site draft",
-    detail: "The first version gets shaped around calls, bookings, trust, and easy updates.",
+    label: "Site draft",
+    detail: "Your site gets built around calls, bookings, trust, and easy updates.",
   },
   {
     id: "owner_review",
@@ -140,7 +144,7 @@ export function buildDeliveryStatusEmailHtml(params: {
       <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
       <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Your site request is in the queue.</h1>
       <p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px;">
-        We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and what the free site should help customers do. We will follow up after review.
+        We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.
       </p>
       <a href="${statusUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
         Track site delivery
@@ -161,7 +165,7 @@ export function buildDeliveryStatusEmailText(params: {
     "Your site request is in the queue.",
     "",
     `We received the request for ${businessName}.`,
-    "The first status is request received. Next we review the business, the current site, and what the free site should help customers do. We will follow up after review.",
+    "The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.",
     "",
     `Track site delivery: ${params.statusUrl}`,
     "",
@@ -180,12 +184,15 @@ function coerceLead(value: unknown): DeliveryLead | null {
   if (typeof record.statusToken !== "string") return null;
 
   const now = new Date().toISOString();
+  const planValue = record.plan === "one-time" || record.plan === "monthly" ? record.plan : null;
   return {
     businessName: record.businessName,
     description: typeof record.description === "string" ? record.description : null,
     location: typeof record.location === "string" ? record.location : null,
     email: record.email,
+    phone: typeof record.phone === "string" ? record.phone : null,
     currentWebsite: typeof record.currentWebsite === "string" ? record.currentWebsite : null,
+    plan: planValue,
     referredBy: typeof record.referredBy === "string" ? record.referredBy : null,
     statusToken: record.statusToken,
     deliveryStatus: normalizeDeliveryStatus(record.deliveryStatus ?? record.status),
@@ -217,7 +224,9 @@ export async function getDeliveryLeadByToken(token: string): Promise<DeliveryLea
         description,
         location,
         email,
+        phone,
         currentWebsite,
+        plan,
         referredBy,
         status,
         deliveryStatus,

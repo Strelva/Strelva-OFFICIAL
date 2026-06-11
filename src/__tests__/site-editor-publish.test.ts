@@ -33,10 +33,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+const mockIsSuperAdmin = vi.fn(() => Promise.resolve(false));
+
 vi.mock("@/lib/auth", () => ({
   verifyAuth: vi.fn(() => Promise.resolve(true)),
   requireTenantAccess: vi.fn(() => Promise.resolve(null)),
   requireTenantPermission: vi.fn(() => Promise.resolve(null)),
+  isSuperAdmin: () => mockIsSuperAdmin(),
   getActorContext: vi.fn(() =>
     Promise.resolve({ isImpersonating: false, email: "owner@example.com" })
   ),
@@ -77,8 +80,13 @@ vi.mock("@/lib/revalidate-client", () => ({
   revalidateClientSite: (...args: unknown[]) => mockRevalidateClientSite(...args),
 }));
 
+const mockGetOpenChangeRequest = vi.fn<() => Promise<unknown>>(() =>
+  Promise.resolve(null)
+);
+
 vi.mock("@/lib/events", () => ({
   addEvent: (...args: unknown[]) => mockAddEvent(...args),
+  getOpenChangeRequest: () => mockGetOpenChangeRequest(),
 }));
 
 const PAGE_CONFIG = {
@@ -117,6 +125,8 @@ describe("site editor publish routes", () => {
     mockClearDraft.mockResolvedValue(undefined);
     mockAddEvent.mockResolvedValue({ id: "evt_1" });
     mockRevalidateClientSite.mockResolvedValue({ success: true, skipped: true });
+    mockIsSuperAdmin.mockResolvedValue(false);
+    mockGetOpenChangeRequest.mockResolvedValue(null);
   });
 
   it("GET /api/page-config?draft=true returns the draft page config when present", async () => {
@@ -241,6 +251,84 @@ describe("site editor publish routes", () => {
         metadata: expect.objectContaining({
           requestKind: "template",
         }),
+      })
+    );
+  });
+
+  it("POST /api/change-requests returns 409 when the tenant already has an open request", async () => {
+    mockGetOpenChangeRequest.mockResolvedValue({
+      id: "evt_open",
+      title: "Requested custom change: New booking flow",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      metadata: { requestedAt: "2026-06-01T00:00:00.000Z" },
+    });
+    const { POST } = await import("@/app/api/change-requests/route");
+    const request = new Request("http://localhost/api/change-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "Also redesign the homepage" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(409);
+    const json = await response.json();
+    expect(json.error).toBe("active_request_exists");
+    expect(json.activeRequest).toMatchObject({
+      id: "evt_open",
+      title: "Requested custom change: New booking flow",
+    });
+    // The wall must not create a second change request.
+    expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/change-requests lets super-admins past the one-request wall", async () => {
+    mockIsSuperAdmin.mockResolvedValue(true);
+    mockGetOpenChangeRequest.mockResolvedValue({
+      id: "evt_open",
+      title: "Requested custom change: New booking flow",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      metadata: {},
+    });
+    const { POST } = await import("@/app/api/change-requests/route");
+    const request = new Request("http://localhost/api/change-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "Admin-created change" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    // Super-admin path skips the wall entirely — never even checks for an open request.
+    expect(mockGetOpenChangeRequest).not.toHaveBeenCalled();
+    expect(mockAddEvent).toHaveBeenCalled();
+  });
+
+  it("POST /api/change-requests does NOT 409 when only an offboarding handoff is in flight", async () => {
+    // getOpenChangeRequest scopes to actual custom builds and excludes
+    // offboarding_handoff_request events (proven in open-change-request.test.ts),
+    // so with only a handoff pending it returns null — the change-request route
+    // must let the new custom request through, not block it with the one-at-a-time
+    // wall. This guards against the regression where any pending change_request
+    // (including a handoff) blocked custom changes with a nonsense message.
+    mockGetOpenChangeRequest.mockResolvedValue(null);
+    const { POST } = await import("@/app/api/change-requests/route");
+    const request = new Request("http://localhost/api/change-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "Add a Saturday class to the schedule" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mockGetOpenChangeRequest).toHaveBeenCalled();
+    expect(mockAddEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "change_request",
+        status: "pending",
+        metadata: expect.objectContaining({ kind: "custom_code_or_design_request" }),
       })
     );
   });

@@ -1,7 +1,8 @@
 import { streamText, tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
-import { google } from "@ai-sdk/google";
 import { z } from "zod";
+import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
+import { logger } from "@/lib/logger";
 import { auth } from "@clerk/nextjs/server";
 import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
@@ -284,6 +285,11 @@ Available sections: ${sectionNames}.`;
 - When you use a connected or built-in source, include one compact proof line such as "Source: Search Console, last updated May 9", "Source: Site activity, 14-day window", or "Source: Reviews stored in dashboard".
 - If the user asks for an @Source that is not connected or has no data, say that plainly before giving a fallback recommendation.
 - Never imply live posting, calendar sync, Google listing updates, or newsletter sending unless a tool result shows that exact approval-gated action is available. Use "draft", "suggest", or "queue for review" for incomplete action paths.`;
+
+  prompt += `\n\nWHAT THE PLAN COVERS (commercial scope):
+- Included and handled by you right now: content, text, and image updates; hours, services, and menu changes; blog posts; small copy tweaks. Make these changes directly — that is what the owner pays for, and they should never wonder whether it happened. Confirm clearly once it's done or queued.
+- Quoted separately (NOT included): redesigns, brand-new sections beyond the one-per-quarter allowance, e-commerce/checkout, integrations, custom features, and workflows. These are structural or custom-software work.
+- When the owner asks for something in the quoted-separately list, do NOT attempt it as a content edit and do NOT promise it. Use the request_custom_change tool to route it, and explain it warmly in one line: "That's a bigger change than your plan's content updates — I'll send this to Jacob for a quote." Then continue helping with anything that IS in scope.`;
 
   prompt += `\n\n${capFragment}`;
 
@@ -661,6 +667,33 @@ Only use tools for manifest-supported sections and actions. If the user requests
             return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
           }
 
+          // Care-plan rule: one active custom request at a time. If the owner
+          // already has a request in flight, don't stack a second — tell them
+          // what's pending and let them choose to fold this in or wait.
+          const { getOpenChangeRequest } = await import("@/lib/events");
+          const openRequest = await getOpenChangeRequest(tenant);
+          if (openRequest) {
+            const requestedAt =
+              (openRequest.metadata?.requestedAt as string | undefined) ?? openRequest.createdAt;
+            const message =
+              `You already have a custom request in progress ("${openRequest.title}"), ` +
+              "and we keep it to one at a time so nothing falls through the cracks. " +
+              "Want me to add this to that one, or hold it until the first wraps up?";
+            recordActionResult({
+              status: "blocked",
+              eventIds: [openRequest.id],
+              message,
+            });
+            return {
+              success: false,
+              blocked: true,
+              reason: "active_request_exists",
+              activeRequest: { id: openRequest.id, title: openRequest.title, requestedAt },
+              message,
+              agentResultStatus: "blocked" as const,
+            };
+          }
+
           const requestUrl = getCustomRequestUrl(
             tenantConfig?.customRepo?.productionUrl || tenantConfig?.siteUrl,
             siteManifest.customRequestEndpoint
@@ -696,12 +729,66 @@ Only use tools for manifest-supported sections and actions. If the user requests
               return { success: false, error: message, agentResultStatus: "failed" as const };
             }
 
+            // Mirror the dashboard change-request route: record a pending
+            // `change_request` event so both the chat path and the dashboard
+            // panel share one queue state and the one-active-request wall trips
+            // on either path. Event creation is best-effort — the custom repo
+            // already accepted the request, so a queue-write failure must not
+            // fail the tool.
+            let queuedEventId: string | undefined;
+            try {
+              const { addEvent } = await import("@/lib/events");
+              const { getCustomRepoMetadata, getTenantDeliveryModel, getTriageDueAt } =
+                await import("@/lib/custom-repos");
+              const deliveryModel = getTenantDeliveryModel(tenantConfig);
+              const customRepo = getCustomRepoMetadata(tenantConfig);
+              const requestedAt = new Date();
+              const queued = await addEvent({
+                tenantId: tenant,
+                source: "ai",
+                type: "change_request",
+                title: `Requested custom ${normalizedFeature} change`,
+                body: cleanSummary,
+                status: "pending",
+                metadata: {
+                  feature: normalizedFeature,
+                  kind: "custom_code_or_design_request",
+                  requestKind: "custom_design",
+                  workflowStatus: "requested",
+                  requestedAt: requestedAt.toISOString(),
+                  triageDueAt: getTriageDueAt(requestedAt),
+                  deliveryModel,
+                  customRepo: deliveryModel === "custom_repo" ? {
+                    repoName: customRepo.repoName,
+                    repoUrl: customRepo.repoUrl,
+                    localPath: customRepo.localPath,
+                    productionUrl: customRepo.productionUrl,
+                    contractVersion: customRepo.contractVersion,
+                  } : undefined,
+                  complexity: "unclear",
+                  quoteRequired: true,
+                  requestedVia: "ai_agent",
+                },
+              });
+              queuedEventId = queued.id;
+            } catch (err) {
+              logger.error("[agent request_custom_change] failed to queue change_request event", {
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+
             const message = `Custom ${normalizedFeature} request sent for review.`;
-            recordActionResult({ status: "queued", message });
+            recordActionResult({
+              status: "queued",
+              eventIds: queuedEventId ? [queuedEventId] : undefined,
+              message,
+            });
             return {
               success: true,
               feature: normalizedFeature,
               requestUrl,
+              eventId: queuedEventId,
+              eventIds: queuedEventId ? [queuedEventId] : undefined,
               agentResultStatus: "queued" as const,
               message,
             };
@@ -1403,21 +1490,38 @@ Only use tools for manifest-supported sections and actions. If the user requests
     tools[name] = def;
   }
 
-  const result = streamText({
-    model: google("gemini-2.5-flash"),
-    system: systemPrompt,
-    messages,
-    tools,
-    stopWhen: stepCountIs(8),
-  });
+  // Primary/fallback model resilience: chat survives a Gemini outage by
+  // retrying the whole turn on the configured fallback model — but only when
+  // the primary fails *before* any content reached the client, so we never
+  // duplicate a half-streamed answer. Mirrors src/lib/agent-executor.ts.
+  const primaryModel = getPrimaryModel();
+  const fallbackModel = getFallbackModel();
+
+  const startStream = (model: typeof primaryModel.model) =>
+    streamText({
+      model,
+      system: systemPrompt,
+      messages,
+      tools,
+      stopWhen: stepCountIs(8),
+    });
 
   // Stream text + tool-call status events as SSE-like lines
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
-      try {
+      // Tracks whether anything visible has been emitted on THIS request, so
+      // the fallback only fires when retrying is still safe (no partial output).
+      let emittedToClient = false;
+
+      const runModel = async (model: typeof primaryModel.model): Promise<void> => {
+        const result = startStream(model);
         for await (const part of result.fullStream) {
-          if (part.type === "tool-call") {
+          if (part.type === "error") {
+            // Surface as a thrown error so the catch below can decide on fallback.
+            throw part.error;
+          } else if (part.type === "tool-call") {
+            emittedToClient = true;
             const toolName = part.toolName;
             const input = ("args" in part ? part.args : "input" in part ? part.input : undefined) as Record<string, unknown> | undefined;
             const section = input?.section as string | undefined;
@@ -1458,11 +1562,49 @@ Only use tools for manifest-supported sections and actions. If the user requests
             const actionResult = agentResultFromToolOutput(output);
             if (actionResult) recordActionResult(actionResult);
           } else if (part.type === "text-delta") {
-            controller.enqueue(encoder.encode("text" in part ? part.text : ""));
+            const text = "text" in part ? part.text : "";
+            if (text) emittedToClient = true;
+            controller.enqueue(encoder.encode(text));
           }
         }
-      } catch {
-        // Stream closed by client
+      };
+
+      try {
+        try {
+          await runModel(primaryModel.model);
+        } catch (primaryErr) {
+          // Retry on the fallback model only when it's safe (nothing streamed
+          // yet) and the failure looks transient (outage / rate limit / 5xx).
+          if (fallbackModel && !emittedToClient && isTransientModelError(primaryErr)) {
+            logger.warn("[agent-chat] Primary model failed, trying fallback", {
+              primary: primaryModel.label,
+              fallback: fallbackModel.label,
+              tenant,
+              error: primaryErr instanceof Error ? primaryErr.message : "unknown",
+            });
+            await runModel(fallbackModel.model);
+          } else {
+            throw primaryErr;
+          }
+        }
+      } catch (err) {
+        // Both models failed (or the client disconnected). If nothing was
+        // streamed, send a plain-English line so the chat doesn't go silent.
+        if (!emittedToClient) {
+          logger.error("[agent-chat] Chat turn failed with no fallback recovery", {
+            tenant,
+            error: err instanceof Error ? err.message : "unknown",
+          });
+          try {
+            controller.enqueue(
+              encoder.encode(
+                "Sorry — I'm having trouble reaching the AI right now. Please try that again in a moment."
+              )
+            );
+          } catch {
+            // Client already gone.
+          }
+        }
       } finally {
         try {
           controller.enqueue(encoder.encode(`\n__RESULT__${JSON.stringify(buildAgentResultContract(actionResults))}\n`));

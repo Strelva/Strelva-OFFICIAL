@@ -58,7 +58,7 @@ describe("access request delivery flow", () => {
         email: "Owner@Example.com",
         location: "Buffalo, NY",
         currentWebsite: "https://example.com",
-        description: "Free site signup. Site request: weekly proof",
+        description: "Build request: weekly proof",
         referredBy: "test",
       }),
     }));
@@ -83,6 +83,42 @@ describe("access request delivery flow", () => {
     }));
   });
 
+  it("forwards phone and the door qualifier into the Slack build alert", async () => {
+    process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.test/abc";
+    const slackFetch = vi.fn(
+      (_url: string, _init: { method: string; body: string }) =>
+        Promise.resolve(new Response(null, { status: 200 })),
+    );
+    vi.stubGlobal("fetch", slackFetch);
+
+    const { POST } = await import("@/app/api/access-request/intake/route");
+
+    const response = await POST(new Request("http://localhost/api/access-request/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessName: "Demo Studio",
+        email: "owner@example.com",
+        phone: "(716) 555-0100",
+        plan: "one-time",
+        description: "Build request: weekly proof",
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(slackFetch).toHaveBeenCalledWith(
+      "https://hooks.slack.test/abc",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const slackInit = slackFetch.mock.calls[0]?.[1];
+    const slackBody = JSON.parse(slackInit?.body ?? "{}");
+    expect(slackBody.text).toContain("New website build request");
+    expect(slackBody.text).toContain("Phone: (716) 555-0100");
+    expect(slackBody.text).toContain("Wants: One-time build");
+
+    vi.unstubAllGlobals();
+  });
+
   it("does not report email delivery when Resend returns an API error", async () => {
     mockSendEmail.mockResolvedValueOnce({
       data: null,
@@ -97,7 +133,7 @@ describe("access request delivery flow", () => {
       body: JSON.stringify({
         businessName: "Demo Studio",
         email: "owner@example.com",
-        description: "Free site signup. Site request: weekly proof",
+        description: "Build request: weekly proof",
       }),
     }));
 
@@ -119,7 +155,7 @@ describe("access request delivery flow", () => {
       body: JSON.stringify({
         businessName: "Demo Studio",
         email: "owner@example.com",
-        description: "Free site signup. Site request: weekly proof",
+        description: "Build request: weekly proof",
       }),
     }));
     const firstBody = await firstResponse.json();
@@ -132,7 +168,7 @@ describe("access request delivery flow", () => {
       body: JSON.stringify({
         businessName: "Second Studio",
         email: "Owner@Example.com",
-        description: "Free site signup. Site request: another site",
+        description: "Build request: another site",
       }),
     }));
 

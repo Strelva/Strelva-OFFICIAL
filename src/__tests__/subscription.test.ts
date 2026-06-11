@@ -24,14 +24,21 @@ vi.mock("../lib/tenants", () => ({
 }));
 
 const ORIGINAL_STRIPE_PRICE = process.env.STRIPE_SCAFFOLD_PRICE_ID;
+const ORIGINAL_GRANDFATHER = process.env.STRIPE_BILLING_GRANDFATHER_TENANTS;
 beforeEach(() => {
   process.env.STRIPE_SCAFFOLD_PRICE_ID = "price_test_billing_on";
+  delete process.env.STRIPE_BILLING_GRANDFATHER_TENANTS;
 });
 afterEach(() => {
   if (ORIGINAL_STRIPE_PRICE === undefined) {
     delete process.env.STRIPE_SCAFFOLD_PRICE_ID;
   } else {
     process.env.STRIPE_SCAFFOLD_PRICE_ID = ORIGINAL_STRIPE_PRICE;
+  }
+  if (ORIGINAL_GRANDFATHER === undefined) {
+    delete process.env.STRIPE_BILLING_GRANDFATHER_TENANTS;
+  } else {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = ORIGINAL_GRANDFATHER;
   }
 });
 
@@ -89,6 +96,54 @@ describe("getEffectiveSubscriptionStatus", () => {
     mockGetTenantConfig.mockResolvedValue(undefined);
     const status = await getEffectiveSubscriptionStatus("ghost");
     expect(status).toBe("none");
+  });
+});
+
+describe("STRIPE_BILLING_GRANDFATHER_TENANTS (billing on)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("treats a grandfathered tenant as active even with no subscriptionStatus", async () => {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = "gldf,rohlax";
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ id: "gldf", subscriptionStatus: undefined }));
+    const status = await getEffectiveSubscriptionStatus("gldf");
+    expect(status).toBe("active");
+  });
+
+  it("trims whitespace and skips empty entries in the list", async () => {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = " gldf , , rohlax ,";
+    mockGetTenantConfig.mockResolvedValue(undefined);
+    expect(await getEffectiveSubscriptionStatus("gldf")).toBe("active");
+    expect(await getEffectiveSubscriptionStatus("rohlax")).toBe("active");
+  });
+
+  it("does not grandfather tenants missing from the list", async () => {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = "gldf,rohlax";
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ id: "other", subscriptionStatus: undefined }));
+    const status = await getEffectiveSubscriptionStatus("other");
+    expect(status).toBe("none");
+  });
+
+  it("with the var unset, tenants without subscriptionStatus get 'none' (the billing-on cliff)", async () => {
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ subscriptionStatus: undefined }));
+    const status = await getEffectiveSubscriptionStatus("gldf");
+    expect(status).toBe("none");
+  });
+
+  it("requireActiveSubscription allows a grandfathered tenant (returns null)", async () => {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = "gldf";
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ id: "gldf", subscriptionStatus: undefined }));
+    const result = await requireActiveSubscription("gldf");
+    expect(result).toBeNull();
+  });
+
+  it("requireActiveSubscription still 402s a non-grandfathered tenant without status", async () => {
+    process.env.STRIPE_BILLING_GRANDFATHER_TENANTS = "gldf";
+    mockGetTenantConfig.mockResolvedValue(makeTenantConfig({ id: "other", subscriptionStatus: undefined }));
+    const result = await requireActiveSubscription("other");
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(402);
   });
 });
 

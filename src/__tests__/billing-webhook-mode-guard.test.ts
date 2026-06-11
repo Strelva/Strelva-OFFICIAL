@@ -1,0 +1,289 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+/**
+ * Billing webhook: checkout.session.completed mode guard.
+ *
+ * The bug: the handler used to flip subscriptionStatus="active" for ANY
+ * checkout.session.completed carrying tenantId metadata — including one-time
+ * mode:"payment" sessions (the Rohlax build payment does exactly this).
+ *
+ * Fixed behavior:
+ *  - mode:"subscription" -> updateTenant(..., subscriptionStatus:"active", ...)
+ *  - mode:"payment"      -> NO subscription flip; record a build_payment event
+ *
+ * We mock stripe.webhooks.constructEvent so we don't need a real signature,
+ * and mock Redis to null (non-prod => idempotency short-circuits to "claimed").
+ */
+
+const mockUpdateTenant = vi.fn();
+const mockAddEvent = vi.fn();
+const mockConstructEvent = vi.fn();
+const mockRedisSet = vi.fn();
+const mockRedisGet = vi.fn();
+
+// A mutable handle so individual tests can opt into a fake Redis (to assert the
+// durable build-payment record) while the default stays null (non-prod =>
+// idempotency short-circuits to "claimed").
+let redisHandle: unknown = null;
+
+vi.mock("@/lib/tenants", () => ({
+  updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+}));
+
+vi.mock("@/lib/events", () => ({
+  addEvent: (...args: unknown[]) => mockAddEvent(...args),
+}));
+
+vi.mock("@/lib/redis", () => ({
+  getRedis: () => redisHandle,
+}));
+
+vi.mock("@/lib/production-guard", () => ({
+  isProductionEnv: vi.fn(() => false),
+}));
+
+vi.mock("stripe", () => {
+  class FakeStripe {
+    webhooks = { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) };
+  }
+  return { default: FakeStripe };
+});
+
+const ORIGINAL_SECRET = process.env.STRIPE_SECRET_KEY;
+const ORIGINAL_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  process.env.STRIPE_SECRET_KEY = "sk_test_fake";
+  process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
+  mockUpdateTenant.mockResolvedValue(undefined);
+  mockAddEvent.mockResolvedValue({ id: "evt_fake" });
+  mockRedisSet.mockResolvedValue("OK");
+  // Default: no Redis (matches non-prod idempotency short-circuit).
+  redisHandle = null;
+});
+
+/** Opt a test into a fake Redis that records `.set` calls. `.get` returns null
+ *  so the idempotency claim path short-circuits to "claimed". */
+function useFakeRedis() {
+  mockRedisGet.mockResolvedValue(null);
+  redisHandle = {
+    set: (...args: unknown[]) => mockRedisSet(...args),
+    get: (...args: unknown[]) => mockRedisGet(...args),
+  };
+}
+
+afterEach(() => {
+  if (ORIGINAL_SECRET === undefined) delete process.env.STRIPE_SECRET_KEY;
+  else process.env.STRIPE_SECRET_KEY = ORIGINAL_SECRET;
+  if (ORIGINAL_WEBHOOK_SECRET === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
+  else process.env.STRIPE_WEBHOOK_SECRET = ORIGINAL_WEBHOOK_SECRET;
+});
+
+async function postEvent(event: unknown) {
+  mockConstructEvent.mockReturnValue(event);
+  const { POST } = await import("@/app/api/billing/webhook/route");
+  const req = new Request("https://admin.strelva.com/api/billing/webhook", {
+    method: "POST",
+    headers: { "stripe-signature": "t=1,v1=fake" },
+    body: JSON.stringify(event),
+  });
+  return POST(req);
+}
+
+describe("billing webhook checkout.session.completed mode guard", () => {
+  it("subscription mode flips subscriptionStatus to active and records subscription id", async () => {
+    const res = await postEvent({
+      id: "evt_sub",
+      type: "checkout.session.completed",
+      created: 1_700_000_000,
+      data: {
+        object: {
+          id: "cs_sub_1",
+          mode: "subscription",
+          subscription: "sub_123",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledTimes(1);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_123",
+        subscriptionStartedAt: new Date(1_700_000_000 * 1000).toISOString(),
+      })
+    );
+    expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("payment mode does NOT flip subscription status and records a build_payment event", async () => {
+    const res = await postEvent({
+      id: "evt_pay",
+      type: "checkout.session.completed",
+      created: 1_700_000_500,
+      data: {
+        object: {
+          id: "cs_pay_1",
+          mode: "payment",
+          amount_total: 50000,
+          currency: "usd",
+          payment_intent: "pi_456",
+          customer_details: { email: "chelsea@example.com" },
+          metadata: { tenantId: "rohlax" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    // The bug would have called updateTenant here — it must not.
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+
+    expect(mockAddEvent).toHaveBeenCalledTimes(1);
+    const [eventArg] = mockAddEvent.mock.calls[0];
+    expect(eventArg).toMatchObject({
+      tenantId: "rohlax",
+      source: "stripe",
+      type: "build_payment",
+      status: "auto_approved",
+    });
+    expect(eventArg.metadata).toMatchObject({
+      stripeSessionId: "cs_pay_1",
+      amountTotal: 50000,
+      currency: "USD",
+      paymentIntentId: "pi_456",
+    });
+  });
+
+  it("payment mode without tenantId records no event and no tenant update (no throw)", async () => {
+    const res = await postEvent({
+      id: "evt_pay_no_tenant",
+      type: "checkout.session.completed",
+      created: 1_700_000_900,
+      data: {
+        object: {
+          id: "cs_pay_2",
+          mode: "payment",
+          amount_total: 9900,
+          currency: "usd",
+          metadata: {},
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("setup mode moves no money: no tenant update, no event, no durable record", async () => {
+    useFakeRedis();
+    const res = await postEvent({
+      id: "evt_setup",
+      type: "checkout.session.completed",
+      created: 1_700_001_000,
+      data: {
+        object: {
+          id: "cs_setup_1",
+          mode: "setup",
+          // setup sessions carry no amount_total — they collect a payment
+          // method, they don't charge. Must never be logged as a payment.
+          amount_total: null,
+          currency: "usd",
+          metadata: { tenantId: "rohlax" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockAddEvent).not.toHaveBeenCalled();
+    // No build-payment durable record should be written for a setup session.
+    const buildPaymentWrites = mockRedisSet.mock.calls.filter(
+      ([key]) => typeof key === "string" && key.startsWith("reb:build-payment:")
+    );
+    expect(buildPaymentWrites).toHaveLength(0);
+  });
+
+  it("payment mode with tenantId writes a durable, never-expiring Redis record", async () => {
+    useFakeRedis();
+    const res = await postEvent({
+      id: "evt_pay_durable",
+      type: "checkout.session.completed",
+      created: 1_700_002_000,
+      data: {
+        object: {
+          id: "cs_pay_durable",
+          mode: "payment",
+          amount_total: 50000,
+          currency: "usd",
+          payment_intent: "pi_dur",
+          customer_details: { email: "chelsea@example.com" },
+          metadata: { tenantId: "rohlax", paySlug: "rohlax" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+
+    const buildPaymentWrites = mockRedisSet.mock.calls.filter(
+      ([key]) => typeof key === "string" && key.startsWith("reb:build-payment:")
+    );
+    expect(buildPaymentWrites).toHaveLength(1);
+    const [key, value, opts] = buildPaymentWrites[0];
+    expect(key).toBe("reb:build-payment:cs_pay_durable");
+    // No TTL: the durable record must outlive the 90-day event prune.
+    expect(opts).toBeUndefined();
+    expect(value).toMatchObject({
+      sessionId: "cs_pay_durable",
+      paySlug: "rohlax",
+      tenantId: "rohlax",
+      amountCents: 50000,
+      currency: "USD",
+      paymentIntentId: "pi_dur",
+    });
+    // Tenant event still written for tenant-scoped payments.
+    expect(mockAddEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("pre-tenant lead-slug-only payment still leaves a durable money trail", async () => {
+    useFakeRedis();
+    const res = await postEvent({
+      id: "evt_pay_lead",
+      type: "checkout.session.completed",
+      created: 1_700_003_000,
+      data: {
+        object: {
+          id: "cs_pay_lead",
+          mode: "payment",
+          amount_total: 75000,
+          currency: "usd",
+          // No tenantId yet — only a lead slug. The old code left NO trail here.
+          metadata: { leadSlug: "new-lead", paySlug: "rohlax" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    // No tenant => no tenant event, but the durable record must exist.
+    expect(mockAddEvent).not.toHaveBeenCalled();
+
+    const buildPaymentWrites = mockRedisSet.mock.calls.filter(
+      ([key]) => typeof key === "string" && key.startsWith("reb:build-payment:")
+    );
+    expect(buildPaymentWrites).toHaveLength(1);
+    const [key, value] = buildPaymentWrites[0];
+    expect(key).toBe("reb:build-payment:cs_pay_lead");
+    expect(value).toMatchObject({
+      sessionId: "cs_pay_lead",
+      leadSlug: "new-lead",
+      paySlug: "rohlax",
+      tenantId: null,
+      amountCents: 75000,
+      currency: "USD",
+    });
+  });
+});

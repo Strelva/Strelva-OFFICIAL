@@ -53,7 +53,7 @@ export default async function DeliveryStatusPage({
               {lead.businessName}
             </h1>
             <p className="mt-5 max-w-[560px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
-              This is the no-login tracking page for your free first site request. Keep the link from your email; it is private to the request.
+              This is the no-login tracking page for your website build request. Keep the link from your email; it is private to the request.
             </p>
 
             <dl className="mt-8 grid gap-3 text-[14px] sm:grid-cols-2 lg:grid-cols-1">

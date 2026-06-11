@@ -21,6 +21,7 @@ import { revalidateClientSite } from "@/lib/revalidate-client";
 import { readJsonObject } from "@/lib/request-body";
 import { sectionSchemas } from "@/lib/schemas";
 import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
+import { scheduleVerification } from "@/lib/verify-live";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateForTenant(tenant);
@@ -144,6 +145,10 @@ export async function PUT(
     revalidateClientSite(tenant, clientRevalidationTargetForSections([s])).catch((err) => {
       console.error("[content PUT] Failed to revalidate client site:", err);
     });
+
+    // Fire-and-forget verification: confirms the change is live on the public
+    // read path and emits a change_verified / change_verify_failed event.
+    scheduleVerification(tenant, s, parsed.data as Record<string, unknown>);
 
     return NextResponse.json({ success: true });
   } catch (err) {

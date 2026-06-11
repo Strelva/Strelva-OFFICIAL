@@ -22,43 +22,41 @@ type Domain = { domain: string; status: "connected" | "pending"; isApex: boolean
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 const OWNED_ITEMS = [
-  "Business name, copy, services, pricing, hours, FAQs, testimonials, blog content, and customer-facing text.",
-  "Uploaded photos, logos, product images, provider photos, and public image URLs used on the site.",
-  "Your domain name, registrar account, booking account, social profiles, Google Business Profile, and email list.",
-  "Exported site content and asset manifests from this dashboard.",
+  "Your domain — registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
+  "All your content — business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
+  "On the monthly plan: the full site repo and source files, which transfer to you at month 12 or earlier via buyout. Your domain is already yours either way.",
 ];
 
 const MANAGED_ITEMS = [
-  "Hosting, deployment pipeline, uptime monitoring, SSL, and production build configuration.",
-  "Dashboard software, AI tools, review workflow, analytics presentation, and weekly report generation.",
-  "Integration tokens, webhook plumbing, cache/revalidation setup, and platform maintenance.",
-  "Strelva platform source code, deployment credentials, and admin operations.",
+  "Hosting and deployment — the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
+  "The platform — dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
+  "Strelva platform source code and deployment credentials. (The platform itself stays with Strelva; your site repo is what transfers to you.)",
 ];
 
 const HANDOFF_STEPS = [
   {
     title: "Export content",
-    body: "Download the structured JSON before any DNS or billing changes. It includes page sections, settings, theme, navigation, footer, and page configuration.",
+    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration — everything Strelva renders from.",
   },
   {
     title: "Export assets",
-    body: "Download the asset manifest and save originals from every listed URL. Confirm logo, hero, service, provider, product, and story images are present.",
+    body: "Download the asset manifest and save the originals from every listed URL. Confirm logo, hero, service, provider, product, and story images are present.",
   },
   {
-    title: "Prepare DNS handoff",
-    body: "Point the domain to the next provider only after their replacement site is ready. Keep existing records until the new provider confirms the cutover.",
+    title: "Repo + files transfer",
+    body: "On the monthly plan, the site repo and source files transfer to you at month 12 — or earlier via buyout. Strelva bakes your exported content in so the repo runs on its own, then hands you ownership.",
+  },
+  {
+    title: "DNS is already yours",
+    body: "Your domain has been in your name since day one. There's nothing to move — Strelva just steps off the DNS-edit access once your deploy is live on your own account.",
   },
   {
     title: "Cancel billing",
-    body: "Use the billing portal when the handoff date is confirmed. Canceling billing does not move the domain or export files by itself.",
+    body: "Use the billing portal when handoff timing is confirmed. Canceling billing doesn't move the repo or export files by itself — do the exports and transfer first.",
   },
   {
-    title: "Remove domains",
-    body: "After traffic points away, ask Strelva to remove connected custom domains so no stale routing remains.",
-  },
-  {
-    title: "Revoke admin access",
-    body: "Remove Strelva from registrar, Google Business Profile, booking, social, email, and analytics accounts after handoff verification.",
+    title: "Revoke access",
+    body: "After the transfer, remove Strelva's DNS-edit role and any repo/deploy access, plus connected Google Business, booking, social, and email tools.",
   },
 ];
 

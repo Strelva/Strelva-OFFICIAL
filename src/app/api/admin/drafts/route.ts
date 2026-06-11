@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getActorContext, isSuperAdmin } from "@/lib/auth";
-import { getAllTenants, isActiveTenant } from "@/lib/tenants";
+import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
+import { sendUpdateLiveEmail } from "@/lib/delivery-email";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
+import { ROOT_DOMAIN } from "@/lib/brand";
 import {
   listDrafts,
   getDraftContent,
@@ -127,7 +130,68 @@ export async function POST(request: Request) {
     });
     await clearDraft(typedSection, tenant);
     revalidatePath("/");
-    revalidateClientSite(tenant, clientRevalidationTargetForSections([typedSection])).catch(() => {});
+
+    // Await revalidation so we know whether the change actually reached the live
+    // client site BEFORE we tell the owner "it's live". A failed revalidation
+    // means the published content is sitting in the control plane but the client
+    // repo may still be serving the old copy — so we soften the email and ping
+    // Jacob instead of silently swallowing the failure. Revalidation/email
+    // problems must never fail a publish that already succeeded above.
+    let revalidationFailed = false;
+    try {
+      const result = await revalidateClientSite(
+        tenant,
+        clientRevalidationTargetForSections([typedSection])
+      );
+      // `skipped` = no client site configured, so nothing to roll out to and
+      // "live" is the honest claim. Only a real failure softens the message.
+      revalidationFailed = !result.success && !result.skipped;
+      if (revalidationFailed) {
+        console.error(
+          `[admin/drafts] Revalidation failed for ${tenant}/${typedSection}: ${result.error ?? "unknown error"}`
+        );
+        if (process.env.SLACK_WEBHOOK_URL) {
+          await fetch(process.env.SLACK_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `⚠️ Revalidation failed for *${tenant}* (${typedSection}) after approving a draft — the change is published in the control plane but may not be live on the client site yet. Error: ${result.error ?? "unknown"}`,
+            }),
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      revalidationFailed = true;
+      console.error("[admin/drafts] Revalidation threw:", err);
+    }
+
+    // Close the abdication loop: tell the owner, in plain English, that their
+    // update is live (or rolling out, if revalidation didn't confirm). Fail
+    // soft — a notification problem must never block a publish that already
+    // succeeded above.
+    try {
+      const tenantConfig = await getTenantConfig(tenant);
+      const ownerEmail = tenantConfig?.ownerEmail;
+      if (ownerEmail) {
+        const siteName = tenantConfig?.siteName || tenant;
+        const sectionLabel = SECTION_LABELS[typedSection] || typedSection;
+        const whatChanged = `your ${sectionLabel.toLowerCase()}`;
+        const domain = tenantConfig?.productionDomain || `${tenant}.${ROOT_DOMAIN}`;
+        const siteUrl =
+          tenantConfig?.siteUrl ||
+          (domain.startsWith("http") ? domain : `https://${domain}`);
+        await sendUpdateLiveEmail({
+          email: ownerEmail,
+          siteName,
+          whatChanged,
+          siteUrl,
+          rollingOut: revalidationFailed,
+          logPrefix: "[admin/drafts]",
+        });
+      }
+    } catch (err) {
+      console.error("[admin/drafts] Owner update-live email failed:", err);
+    }
   } else {
     await clearDraft(typedSection, tenant);
     await logAuditEvent({

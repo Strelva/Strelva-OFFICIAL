@@ -23,6 +23,8 @@ interface TokenResponse {
   refresh_token?: string;
   expires_in: number;
   token_type: string;
+  /** Space-delimited list of scopes granted by the user. */
+  scope?: string;
 }
 
 interface GoogleAccount {
@@ -149,6 +151,11 @@ export async function GET(req: Request) {
       }
     }
 
+    // Parse granted scopes from the token response (space-delimited string).
+    const scopes = tokens.scope
+      ? tokens.scope.split(" ").filter(Boolean)
+      : undefined;
+
     // Save connection
     await saveConnection({
       provider: "google",
@@ -158,6 +165,7 @@ export async function GET(req: Request) {
       expiresAt,
       status: "connected",
       lastSyncedAt: new Date().toISOString(),
+      scopes,
     });
 
     // Store account/location metadata for review polling

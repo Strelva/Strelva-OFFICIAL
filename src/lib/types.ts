@@ -498,6 +498,8 @@ export interface Connection {
   apiKey?: string;
   lastSyncedAt?: string;
   status: "connected" | "disconnected" | "error";
+  /** OAuth scopes granted at connection time. Used to detect missing write scopes. */
+  scopes?: string[];
 }
 
 // --- Social Media Types ---
@@ -539,6 +541,12 @@ export interface TenantConfig {
   adminDomain?: string;
   stripeCustomerId?: string;
   subscriptionStatus?: "active" | "trialing" | "past_due" | "cancelled" | "none";
+  /** Stripe subscription ID for the active recurring plan (set by the billing webhook). */
+  stripeSubscriptionId?: string;
+  /** When the recurring subscription first started (ISO date). Set by the billing webhook. */
+  subscriptionStartedAt?: string;
+  /** End of a contractual minimum commitment (ISO date), e.g. Door 2's 12-month minimum. Set manually/by admin. */
+  commitmentEndsAt?: string;
   /** Special billing presentation/access override for early customers or internal accounts. */
   planOverride?: "founder_comp";
   /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation. */
@@ -567,12 +575,6 @@ export interface TenantConfig {
   businessHours?: BusinessHours;
   /** Client's Slack webhook for AI change notifications */
   slackWebhookUrl?: string;
-  /** Client's Twilio config for SMS notifications */
-  twilioConfig?: {
-    accountSid: string;
-    authToken: string;
-    phoneNumber: string;
-  };
   /** Client's Google Search Console service account key (JSON string) */
   googleSearchConsoleKey?: string;
   /** Client's Instagram access token (if not using Behold.so) */
@@ -589,6 +591,26 @@ export interface TenantConfig {
     accentColor?: string;
     fgColor?: string;
   };
+  /** Weekly visibility tracker config. No config → cron skips this tenant. */
+  visibility?: TenantVisibilityConfig;
+}
+
+export interface TenantVisibilityCompetitor {
+  name: string;
+  domain?: string;
+}
+
+export interface TenantVisibilityConfig {
+  /** e.g. "plumber", "HVAC", "electrician" */
+  trade: string;
+  /** Service towns to check, e.g. ["Cheektowaga, NY", "Buffalo, NY"] */
+  towns: string[];
+  /** Up to 3 named local competitors */
+  competitors: TenantVisibilityCompetitor[];
+  /** Maximum SERP queries per week for this tenant. Default: 3 */
+  queriesPerWeek?: number;
+  /** Set false to skip this tenant during cron runs */
+  enabled?: boolean;
 }
 
 export type DomainClaimRole = "production" | "admin" | "additional";
@@ -641,8 +663,8 @@ export interface BusinessHours {
 export interface UnifiedEvent {
   id: string;
   tenantId: string;
-  source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai';
-  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request';
+  source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai' | 'stripe';
+  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request' | 'build_payment' | 'change_verified' | 'change_verify_failed' | 'visibility_snapshot';
   title: string;
   body: string;
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';

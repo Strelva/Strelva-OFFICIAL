@@ -15,6 +15,7 @@ import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultCo
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
 import { addSentryBreadcrumb } from "@/lib/sentry-context";
+import { scheduleVerification } from "@/lib/verify-live";
 
 export interface AgentExecutionToolTrace {
   name: string;
@@ -334,6 +335,14 @@ export async function executeAgentPromptDetailed(
           ).catch((err) => {
             console.error("[agent] Failed to revalidate client site:", err);
           });
+
+          // Fire-and-forget verification: confirms the change is live on the
+          // public read path and emits change_verified / change_verify_failed.
+          scheduleVerification(
+            tenantId,
+            section as ContentSection,
+            parsed.data as Record<string, unknown>
+          );
         } else {
           const event = await queueAiContentReview({
             tenantId,
@@ -499,6 +508,170 @@ export async function executeAgentPromptDetailed(
         const { getBlogPosts } = await import("@/lib/blog");
         const posts = await getBlogPosts(tenantId, { status: "published", limit: 20 });
         return posts.map((p) => ({ title: p.title, slug: p.slug, publishedAt: p.publishedAt, tags: p.tags }));
+      },
+    });
+  }
+
+  // ── GBP tools — only wired when the tenant has a connected Google account ──
+  {
+    // update_business_hours: factual change → auto-approved (hours/address/
+    // contact are FACTUAL_FIELD_HINTS in ai-governance). The AI should read
+    // current hours from the `contact` section first, then issue this tool to
+    // push the same change to the Google listing.
+    tools.update_business_hours = tool({
+      description:
+        "Update the business hours on the client's Google Business Profile listing. " +
+        "Provide regularHours (weekly schedule) and/or specialHours (holiday overrides). " +
+        "This is a factual change — it publishes automatically without review. " +
+        "Always confirm with the owner what the correct hours are before calling this.",
+      inputSchema: z.object({
+        regularHours: z
+          .object({
+            periods: z.array(
+              z.object({
+                openDay: z.enum([
+                  "MONDAY",
+                  "TUESDAY",
+                  "WEDNESDAY",
+                  "THURSDAY",
+                  "FRIDAY",
+                  "SATURDAY",
+                  "SUNDAY",
+                ]),
+                openTime: z.object({ hours: z.number(), minutes: z.number() }),
+                closeDay: z.enum([
+                  "MONDAY",
+                  "TUESDAY",
+                  "WEDNESDAY",
+                  "THURSDAY",
+                  "FRIDAY",
+                  "SATURDAY",
+                  "SUNDAY",
+                ]),
+                closeTime: z.object({ hours: z.number(), minutes: z.number() }),
+              })
+            ),
+          })
+          .optional()
+          .describe("Regular weekly hours"),
+        specialHours: z
+          .object({
+            specialHourPeriods: z.array(
+              z.object({
+                startDate: z.object({
+                  year: z.number(),
+                  month: z.number(),
+                  day: z.number(),
+                }),
+                endDate: z.object({
+                  year: z.number(),
+                  month: z.number(),
+                  day: z.number(),
+                }),
+                openTime: z
+                  .object({ hours: z.number(), minutes: z.number() })
+                  .optional(),
+                closeTime: z
+                  .object({ hours: z.number(), minutes: z.number() })
+                  .optional(),
+                isClosed: z.boolean().optional(),
+              })
+            ),
+          })
+          .optional()
+          .describe("Holiday or special-event hours overrides"),
+      }),
+      execute: async ({ regularHours, specialHours }) => {
+        const { updateBusinessHours } = await import("@/lib/gbp-management");
+        const result = await updateBusinessHours(tenantId, {
+          regularHours,
+          specialHours,
+        });
+
+        sendSlackNotification(
+          {
+            text: result.success
+              ? `GBP hours updated for *${tenantId}* — verified=${result.verified}`
+              : `GBP hours update FAILED for *${tenantId}* — ${result.evidence}`,
+          },
+          "tenant",
+          tenantConfig
+        ).catch(() => {});
+
+        return {
+          success: result.success,
+          verified: result.verified,
+          evidence: result.evidence,
+          agentResultStatus: result.success
+            ? ("published" as const)
+            : ("failed" as const),
+          message: result.success
+            ? `Google Business Profile hours updated${result.verified ? " and confirmed live" : " (verification pending)"}`
+            : `Failed to update GBP hours: ${result.evidence}`,
+        };
+      },
+    });
+
+    // create_gbp_post: new copy → always queued as pending (review required).
+    // The governance classification below mirrors `queueAiContentReview` for
+    // the "hero"/"story" review path — new marketing copy goes to the queue.
+    tools.create_gbp_post = tool({
+      description:
+        "Create a Google Post on the client's Google Business Profile. " +
+        "Google Posts appear in search results next to the listing. " +
+        "Posts are ALWAYS queued for owner review before publishing — never auto-published. " +
+        "Keep the summary under 1500 characters. Optionally include a CTA URL.",
+      inputSchema: z.object({
+        summary: z
+          .string()
+          .max(1500)
+          .describe("Post text (up to 1500 characters)"),
+        ctaUrl: z
+          .string()
+          .url()
+          .optional()
+          .describe("Optional call-to-action URL (book, learn more, etc.)"),
+        photoUrl: z
+          .string()
+          .url()
+          .optional()
+          .describe("Optional public photo URL to include with the post"),
+      }),
+      execute: async ({ summary, ctaUrl, photoUrl }) => {
+        // Governance: new copy is always review queue, never auto-approved.
+        // We queue an event first; the actual GBP API call happens when Jacob
+        // approves in the dashboard (this matches the site-content pattern
+        // where proposed data goes to the review queue rather than live).
+        const { addEvent: addEvt } = await import("@/lib/events");
+        const event = await addEvt({
+          tenantId,
+          source: "ai",
+          type: "content_update",
+          title: `Google Post draft: "${summary.slice(0, 60)}${summary.length > 60 ? "…" : ""}"`,
+          body: `AI drafted a Google Post for review.\n\nSummary: ${summary}${ctaUrl ? `\nCTA: ${ctaUrl}` : ""}${photoUrl ? `\nPhoto: ${photoUrl}` : ""}`,
+          status: "pending",
+          metadata: {
+            kind: "gbp_post_draft",
+            summary,
+            ctaUrl,
+            photoUrl,
+          },
+        });
+
+        sendSlackNotification(
+          {
+            text: `AI drafted a Google Post for *${tenantId}* — needs admin review (eventId=${event.id})`,
+          },
+          "tenant",
+          tenantConfig
+        ).catch(() => {});
+
+        return {
+          success: true,
+          eventId: event.id,
+          agentResultStatus: "queued" as const,
+          message: `Google Post draft queued for your review. Once you approve it in the dashboard, it will be published to your Google listing.`,
+        };
       },
     });
   }

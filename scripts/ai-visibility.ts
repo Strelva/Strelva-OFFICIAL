@@ -6,12 +6,23 @@
  * Prints an A-F "AI Visibility Score" scorecard — the shareable wow.
  * Runs with zero config (readiness mode); set GOOGLE_GENERATIVE_AI_API_KEY for the
  * live "does AI actually recommend you?" citation probe.
+ *
+ * Pass --html to ALSO write a clean, self-contained one-page HTML artifact
+ * (./ai-visibility-{slug}.html) that Jacob can send to a prospect. ANSI terminal
+ * output is unchanged.
  */
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { scoreAiVisibility, type Grade } from "../src/lib/ai-visibility/score";
+import { renderAiVisibilityHtml, slugify } from "../src/lib/ai-visibility/html";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.split("=").slice(1).join("=").replace(/^["']|["']$/g, "") : undefined;
+}
+
+function flag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
 }
 
 const GRADE_COLOR: Record<Grade, string> = { A: "\x1b[32m", B: "\x1b[32m", C: "\x1b[33m", D: "\x1b[33m", F: "\x1b[31m" };
@@ -54,6 +65,14 @@ async function main() {
   console.log(`  ${bar}`);
   console.log(`  ${DIM}Powered by Strelva · strelva.com/ai${R}`);
   console.log("");
+
+  if (flag("html")) {
+    const html = renderAiVisibilityHtml(result);
+    const outPath = resolve(process.cwd(), `ai-visibility-${slugify(result.business)}.html`);
+    writeFileSync(outPath, html, "utf8");
+    console.log(`  ${BOLD}HTML artifact:${R} ${outPath}`);
+    console.log("");
+  }
 }
 
 main().catch((e) => {

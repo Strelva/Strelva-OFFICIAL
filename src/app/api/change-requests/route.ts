@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { addEvent } from "@/lib/events";
+import { addEvent, getOpenChangeRequest } from "@/lib/events";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, verifyAuth, isSuperAdmin } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";
@@ -46,6 +46,31 @@ export async function POST(request: Request) {
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     if (!prompt) {
       return NextResponse.json({ error: "Describe the requested change" }, { status: 400 });
+    }
+
+    // Care-plan rule: one active custom request at a time. Super-admins (Jacob)
+    // are never blocked — they manage the queue. For owners, surface a friendly
+    // 409 that names what's already in flight so the AI can offer to fold this
+    // in or wait, rather than silently stacking a second job.
+    if (!(await isSuperAdmin())) {
+      const open = await getOpenChangeRequest(tenant);
+      if (open) {
+        return NextResponse.json(
+          {
+            error: "active_request_exists",
+            message:
+              "You already have a custom request in progress, so I'm keeping it to one at a time. " +
+              "Want me to add this to that one, or hold it until the first wraps up?",
+            activeRequest: {
+              id: open.id,
+              title: open.title,
+              requestedAt:
+                (open.metadata?.requestedAt as string | undefined) ?? open.createdAt,
+            },
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const section = typeof body.section === "string" ? body.section : undefined;

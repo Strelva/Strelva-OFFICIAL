@@ -6,6 +6,7 @@ import {
   createDeliveryStatusToken,
   getExistingLeadToken,
   saveDeliveryLead,
+  type DeliveryPlan,
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail } from "@/lib/delivery-email";
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { businessName, description, location, email, currentWebsite, referredBy } = body;
+  const { businessName, description, location, email, phone, currentWebsite, plan, referredBy } = body;
 
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   const normalizedBusinessName = typeof businessName === "string" ? businessName.trim().slice(0, 160) : "";
@@ -33,8 +34,11 @@ export async function POST(req: Request) {
 
   const safeDescription = typeof description === "string" ? description.trim().slice(0, 2000) : "";
   const safeLocation = typeof location === "string" ? location.trim().slice(0, 200) : "";
+  const safePhone = typeof phone === "string" ? phone.trim().slice(0, 40) : "";
   const safeCurrentWebsite = typeof currentWebsite === "string" ? currentWebsite.trim().slice(0, 300) : "";
   const safeReferredBy = typeof referredBy === "string" ? referredBy.trim().slice(0, 200) : "";
+  const planValue: DeliveryPlan | null = plan === "one-time" || plan === "monthly" ? plan : null;
+  const planLabel = planValue === "one-time" ? "One-time build" : planValue === "monthly" ? "Monthly plan" : "Not sure";
   const now = new Date().toISOString();
   const existingStatusToken = await getExistingLeadToken(normalizedEmail);
   const statusToken = existingStatusToken || createDeliveryStatusToken();
@@ -64,7 +68,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `New free-site signup request:\n*${normalizedBusinessName}*\n${safeDescription || "No description"}\n${safeLocation || "No location"}\n${normalizedEmail}\nCurrent site: ${safeCurrentWebsite || "None"}\nReferred by: ${safeReferredBy || "Direct"}`,
+          text: `New website build request:\n*${normalizedBusinessName}*\n${safeDescription || "No description"}\n${safeLocation || "No location"}\n${normalizedEmail}\nPhone: ${safePhone || "None"}\nWants: ${planLabel}\nCurrent site: ${safeCurrentWebsite || "None"}\nReferred by: ${safeReferredBy || "Direct"}`,
         }),
       });
     } catch {
@@ -77,7 +81,9 @@ export async function POST(req: Request) {
     description: safeDescription || null,
     location: safeLocation || null,
     email: normalizedEmail,
+    phone: safePhone || null,
     currentWebsite: safeCurrentWebsite || null,
+    plan: planValue,
     referredBy: safeReferredBy || null,
     statusToken,
     deliveryStatus: "received" as const,

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { updateTenant } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
+import { addEvent } from "@/lib/events";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -119,6 +120,16 @@ function extractTenantId(object: unknown): string | null {
   );
 }
 
+/**
+ * Pull the subscription id off an invoice. In Stripe API v21 the top-level
+ * `invoice.subscription` field was removed; it now lives on the invoice parent's
+ * subscription_details. Returns undefined for one-off invoices.
+ */
+function extractInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefined {
+  const sub = invoice.parent?.subscription_details?.subscription;
+  return typeof sub === "string" ? sub : sub?.id;
+}
+
 async function applyTenantSubscriptionStatus(
   tenantId: string | null,
   patch: Parameters<typeof updateTenant>[1],
@@ -153,6 +164,103 @@ async function applyTenantSubscriptionStatus(
   }
 
   await updateTenant(tenantId, patch);
+}
+
+/**
+ * Record a one-time build payment (mode: "payment" checkout). One-time payments
+ * must NOT flip subscriptionStatus — that gate is for recurring billing only.
+ * The Rohlax build payment (/pay/rohlax) lands here.
+ *
+ * Two trails are written:
+ *   1. A durable, never-expiring Redis record keyed by session id
+ *      (`reb:build-payment:{sessionId}`). This is the canonical money trail —
+ *      it captures EVERY completed payment, including pre-tenant lead-slug-only
+ *      checkouts that have no tenantId yet, and it never prunes (unlike the
+ *      90-day tenant event queue).
+ *   2. When a tenantId is present, the existing tenant event so the payment
+ *      shows on that tenant's activity log.
+ * Plus a Slack ping so a real charge is never silent.
+ */
+async function recordBuildPayment(
+  tenantId: string | null,
+  session: Stripe.Checkout.Session,
+  event: Stripe.Event
+) {
+  const amountTotal = typeof session.amount_total === "number" ? session.amount_total : null;
+  const currency = (session.currency || "usd").toUpperCase();
+  const amountLabel =
+    amountTotal !== null
+      ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amountTotal / 100)
+      : "unknown amount";
+  const paySlug =
+    session.metadata?.paySlug ?? session.metadata?.payLink ?? session.metadata?.slug ?? null;
+  const leadSlug = session.metadata?.leadSlug ?? null;
+
+  // 1. Durable money trail — written for EVERY completed payment session,
+  // tenant or not, with no TTL so it outlives the event queue's 90-day prune.
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.set(`reb:build-payment:${session.id}`, {
+        sessionId: session.id,
+        stripeEventId: event.id,
+        paySlug,
+        leadSlug,
+        tenantId,
+        amountCents: amountTotal,
+        currency,
+        paymentIntentId:
+          typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+        customerEmail: session.customer_details?.email ?? undefined,
+        createdAt: new Date(event.created * 1000).toISOString(),
+      });
+    } catch (err) {
+      // The trail is best-effort; never fail the webhook over it. The payment
+      // itself already succeeded in Stripe.
+      console.error(`[billing webhook] Failed to persist build-payment record for ${session.id}: ${err}`);
+    }
+  }
+
+  // 2. Slack ping so a live charge is never silent — even pre-tenant ones.
+  if (process.env.SLACK_WEBHOOK_URL) {
+    const who = tenantId ?? paySlug ?? leadSlug ?? "unknown payer";
+    fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `💸 Build payment received — ${amountLabel} (${who}). Session ${session.id}.`,
+      }),
+    }).catch(() => {});
+  }
+
+  // 3. Tenant event (only when we know the tenant) for the activity log.
+  if (tenantId) {
+    try {
+      await addEvent({
+        tenantId,
+        source: "stripe",
+        type: "build_payment",
+        title: `Build payment received — ${amountLabel}`,
+        body: `One-time payment of ${amountLabel} completed for ${tenantId}.`,
+        status: "auto_approved",
+        metadata: {
+          stripeSessionId: session.id,
+          stripeEventId: event.id,
+          amountTotal,
+          currency,
+          paymentIntentId:
+            typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+          customerEmail: session.customer_details?.email ?? undefined,
+        },
+      });
+    } catch (err) {
+      console.error(`[billing webhook] Failed to record build-payment event for ${tenantId}: ${err}`);
+    }
+  } else {
+    console.warn(
+      `[billing webhook] ${event.type} one-time payment has no tenantId yet — durable record written under reb:build-payment:${session.id}`
+    );
+  }
 }
 
 export async function POST(req: Request) {
@@ -192,16 +300,39 @@ export async function POST(req: Request) {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "active" }, event);
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === "subscription") {
+          const subscriptionId =
+            typeof session.subscription === "string" ? session.subscription : undefined;
+          await applyTenantSubscriptionStatus(
+            tenantId,
+            {
+              subscriptionStatus: "active",
+              ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
+              subscriptionStartedAt: new Date(event.created * 1000).toISOString(),
+            },
+            event
+          );
+        } else if (session.mode === "payment") {
+          // One-time charge, e.g. the Rohlax build payment. Do NOT flip
+          // subscription status; record a build-payment trail. A mode:"setup"
+          // session moves no money (amount_total is null), so it must NOT be
+          // logged as a payment — skip it.
+          await recordBuildPayment(tenantId, session, event);
+        }
         break;
       }
 
-      case "invoice.paid":
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = extractInvoiceSubscriptionId(invoice);
         await applyTenantSubscriptionStatus(tenantId, {
           subscriptionStatus: "active",
           subscriptionPastDueSince: undefined,
+          ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
         }, event);
         break;
+      }
 
       case "invoice.payment_failed":
         await applyTenantSubscriptionStatus(tenantId, {

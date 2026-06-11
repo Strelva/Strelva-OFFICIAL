@@ -134,7 +134,7 @@ function aiCrawlersBlocked(robots: string): { blocked: boolean; who: string[] } 
   return { blocked: uniq.length > 0, who: uniq };
 }
 
-function readinessSignals(html: string, robots: string | null, input: ScoreInput): Signal[] {
+function readinessSignals(html: string, robots: string | null, _input: ScoreInput): Signal[] {
   const $ = cheerio.load(html);
   const signals: Signal[] = [];
 

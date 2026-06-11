@@ -17,12 +17,33 @@ export function isBillingEnabled(): boolean {
   return Boolean(process.env.STRIPE_SCAFFOLD_PRICE_ID);
 }
 
+/**
+ * Tenants grandfathered past the subscription gate, from
+ * STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated tenant ids).
+ * Inert while billing is off (the gate short-circuits before this is read).
+ * Set it in the SAME deploy that sets STRIPE_SCAFFOLD_PRICE_ID, listing all
+ * existing tenants, so nobody gets 402'd the moment billing flips on.
+ */
+function getGrandfatheredTenants(): Set<string> {
+  const raw = process.env.STRIPE_BILLING_GRANDFATHER_TENANTS || "";
+  return new Set(
+    raw
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+  );
+}
+
 export async function getEffectiveSubscriptionStatus(tenant: string): Promise<SubscriptionStatus> {
   if (isDevAccessBypassEnabled()) return "active";
   if (!isBillingEnabled()) return "active";
 
+  if (getGrandfatheredTenants().has(tenant)) {
+    return "active";
+  }
+
   const config = await getTenantConfig(tenant);
-  if (config?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax") {
+  if (config?.planOverride === "founder_comp") {
     return "active";
   }
   return config?.subscriptionStatus ?? "none";

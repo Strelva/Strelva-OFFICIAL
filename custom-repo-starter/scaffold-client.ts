@@ -93,6 +93,33 @@ export function getScaffoldBaseUrl(): string | null {
 /** @deprecated Use getScaffoldBaseUrl. */
 export const getRebBaseUrl = getScaffoldBaseUrl;
 
+/**
+ * Browser-safe control-plane base URL for the tracking beacon.
+ *
+ * The content fetchers above run on the server, so they read the server-only
+ * `SCAFFOLD_API_URL`. The tracking beacon runs in the browser, where only
+ * `NEXT_PUBLIC_*` env vars are inlined, so it needs its own public var.
+ * `NEXT_PUBLIC_SCAFFOLD_API_URL` is preferred; the build-time value of
+ * `SCAFFOLD_API_URL` is a server-side fallback for server-rendered usage.
+ */
+export function getPublicScaffoldBaseUrl(): string | null {
+  const url =
+    process.env.NEXT_PUBLIC_SCAFFOLD_API_URL ??
+    process.env.SCAFFOLD_API_URL ??
+    process.env.REB_API_URL;
+  return url?.replace(/\/$/, "") || null;
+}
+
+/**
+ * Browser-safe tenant id for the tracking beacon. Mirrors `getTenantId()` but
+ * never throws — the beacon must fail silent so a missing env var can never
+ * break a client site render. Reads `NEXT_PUBLIC_TENANT_ID` first (inlined in
+ * the browser bundle), then the build-time `TENANT_ID`.
+ */
+export function getPublicTenantId(): string | null {
+  return process.env.NEXT_PUBLIC_TENANT_ID ?? process.env.TENANT_ID ?? null;
+}
+
 export const scaffoldRoutes = {
   publicContent: (tenant: string, section: string) =>
     `/api/${SCAFFOLD_CONTRACT_VERSION}/content/${tenant}/${section}`,
@@ -100,6 +127,8 @@ export const scaffoldRoutes = {
     `/api/${SCAFFOLD_CONTRACT_VERSION}/page-config/${tenant}`,
   publicSiteCapabilities: (tenant: string) =>
     `/api/${SCAFFOLD_CONTRACT_VERSION}/site-capabilities/${tenant}`,
+  publicTrack: (tenant: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/track/${tenant}`,
 } as const;
 
 /** @deprecated Use scaffoldRoutes. */

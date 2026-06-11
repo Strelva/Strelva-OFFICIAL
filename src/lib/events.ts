@@ -86,7 +86,11 @@ export async function getEvents(
   if (!redis) return [];
 
   const limit = opts?.limit ?? 50;
-  // Get recent events (highest scores = most recent)
+  // Window note: we only scan the `limit * 2` most-recent zset entries (newest
+  // first) before status-filtering down to `limit`. This is bounded for the
+  // dashboard feed, but it means a status-filtered read can miss matching
+  // events older than that window. Callers that must not miss an old match
+  // (e.g. getOpenChangeRequest gating) pass a large `limit` to widen it.
   const raw = await redis.zrange(eventsKey(tenantId), 0, limit * 2, {
     rev: true,
   });
@@ -111,6 +115,48 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   const redis = getRedis();
   if (!redis) return null;
   return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+}
+
+/**
+ * Event kinds (metadata.kind) that are `change_request` events but are NOT
+ * custom-build requests, so they must not trip the one-active-request gate.
+ * Offboarding handoffs reuse the `change_request` type for the review queue
+ * but are an entirely different workflow.
+ */
+const NON_CUSTOM_CHANGE_REQUEST_KINDS = new Set(["offboarding_handoff_request"]);
+
+/**
+ * True for a pending `change_request` event that represents an actual custom
+ * code/design build (the kind the care-plan one-at-a-time rule governs).
+ * Legacy events created before `metadata.kind` was set are treated as custom
+ * requests for back-compat; only explicitly non-custom kinds (e.g. offboarding
+ * handoffs) are excluded.
+ */
+function isCustomBuildChangeRequest(event: UnifiedEvent): boolean {
+  if (event.type !== "change_request") return false;
+  const kind = event.metadata?.kind;
+  if (typeof kind === "string" && NON_CUSTOM_CHANGE_REQUEST_KINDS.has(kind)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Care-plan rule: one active custom change request at a time per tenant.
+ * Returns the tenant's currently-open (pending) custom change request, if any.
+ * Used to gate new change-request creation so the owner never has two custom
+ * jobs racing — the AI tells them what's already in flight instead.
+ *
+ * NOTE: `getEvents` only scans the most-recent slice of the zset (see its
+ * window note), so we ask for a large limit here. A pending custom request is
+ * resolved as soon as the build wraps, so it lives near the top of the recency
+ * window in practice; 1000 covers any realistic backlog of recent events.
+ */
+export async function getOpenChangeRequest(
+  tenantId: string
+): Promise<UnifiedEvent | null> {
+  const pending = await getEvents(tenantId, { status: "pending", limit: 1000 });
+  return pending.find(isCustomBuildChangeRequest) ?? null;
 }
 
 export async function updateEvent(
