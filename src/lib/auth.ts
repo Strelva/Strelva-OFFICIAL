@@ -157,17 +157,22 @@ export async function getCurrentUserEmail(): Promise<string | null> {
   return getUserEmailAddresses(user)[0] || null;
 }
 
-/** Check if current user is a super admin */
+/** Check if current user is a super admin.
+ *  Matches the allowlist against ALL of the user's Clerk emails, not just the
+ *  primary — a founder whose primary Clerk email isn't the allowlisted one would
+ *  otherwise silently lose admin. Consistent with the invite-claim path, which
+ *  also iterates every email. */
 export async function isSuperAdmin(): Promise<boolean> {
   if (isDevAccessBypassEnabled()) return true;
 
-  const email = await getCurrentUserEmail();
-  if (!email) return false;
+  const user = await currentUser();
+  const emails = getUserEmailAddresses(user).map((e) => e.toLowerCase());
+  if (emails.length === 0) return false;
   const adminEmails = (process.env.SUPER_ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return adminEmails.includes(email.toLowerCase());
+  return emails.some((email) => adminEmails.includes(email));
 }
 
 /** Resolve the current request actor for UI warnings and audit logs. */
