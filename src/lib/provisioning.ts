@@ -60,9 +60,14 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-// The control-plane API base the client repo pulls content from. Wire-level
-// REB_*/SCAFFOLD env names are frozen; the value flips at the strelva cutover.
-const CONTROL_PLANE_API = "https://strelva.com";
+// The control-plane host the client repo pulls /api/v1/* from. Verified live:
+// the control plane serves on scaffoldweb.com (strelva.com is now the marketing
+// site and does NOT serve the v1 contract). Flips to app.strelva.com at the
+// cutover (T004) — env-driven so that flip needs no code change. Wire-level
+// REB_*/SCAFFOLD env *names* stay frozen; only this value moves.
+// NOTE: scripts/provision-tenant.ts still prints the stale strelva.com value.
+const CONTROL_PLANE_API =
+  process.env.CONTROL_PLANE_API_URL || "https://scaffoldweb.com";
 
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: ProvisionStep[] = [];

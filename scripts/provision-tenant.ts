@@ -391,7 +391,7 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
 
   console.log(`\n--- Environment Variables for Client Site ---\n`);
   console.log(`TENANT_ID=${tenant.id}`);
-  console.log(`SCAFFOLD_API_URL=https://strelva.com`);
+  console.log(`SCAFFOLD_API_URL=https://scaffoldweb.com`);
   console.log(`NEXT_PUBLIC_SITE_NAME=${tenant.siteName}`);
   console.log(`NEXT_PUBLIC_SITE_URL=${tenant.siteUrl}`);
   console.log(`REVALIDATION_SECRET=${tenant.revalidationSecret}`);
@@ -400,7 +400,7 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
 
   console.log(`\n--- Vercel CLI Commands ---\n`);
   console.log(`vercel env add TENANT_ID production <<< '${tenant.id}'`);
-  console.log(`vercel env add SCAFFOLD_API_URL production <<< 'https://strelva.com'`);
+  console.log(`vercel env add SCAFFOLD_API_URL production <<< 'https://scaffoldweb.com'`);
   console.log(`vercel env add NEXT_PUBLIC_SITE_NAME production <<< '${shellEscape(tenant.siteName)}'`);
   console.log(`vercel env add NEXT_PUBLIC_SITE_URL production <<< '${tenant.siteUrl}'`);
   console.log(`vercel env add REVALIDATION_SECRET production <<< '${tenant.revalidationSecret}'`);
