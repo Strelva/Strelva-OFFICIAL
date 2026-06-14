@@ -21,6 +21,7 @@ import {
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary } from "@/lib/portfolio";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
+import { buildRevenueSummary } from "@/lib/revenue";
 import { OperatorConsole } from "./OperatorConsole";
 
 export const dynamic = "force-dynamic";
@@ -120,6 +121,8 @@ export default async function AdminPage() {
     .filter((i) => i.severity !== "low")
     .slice(0, 6);
 
+  const revenue = await buildRevenueSummary();
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -160,11 +163,20 @@ export default async function AdminPage() {
       )}
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="rounded-xl bg-glass border border-glass-border p-6">
           <p className="text-sm text-gray-muted">Active Tenants</p>
           <p className="text-3xl font-semibold text-warm-white mt-1">
             {activeTenants}
+          </p>
+        </div>
+        <div className="rounded-xl bg-glass border border-glass-border p-6">
+          <p className="text-sm text-gray-muted">Collected</p>
+          <p className="text-3xl font-semibold text-warm-white mt-1">
+            ${Math.round(revenue.totalCents / 100).toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-faint mt-1">
+            {revenue.count} build payment{revenue.count !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="rounded-xl bg-glass border border-glass-border p-6">
