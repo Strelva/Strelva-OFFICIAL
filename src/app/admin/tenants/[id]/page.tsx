@@ -74,6 +74,25 @@ export default async function TenantDetailPage({
           hasRevalidationSecret: Boolean(tenant.revalidationSecret),
         }}
       />
+
+      {activity.length > 0 && (
+        <div className="rounded-xl bg-glass border border-glass-border p-5">
+          <h2 className="text-sm font-semibold text-warm-white mb-3">Recent activity</h2>
+          <ul className="space-y-2">
+            {activity.slice(0, 8).map((a, i) => (
+              <li key={i} className="flex items-start justify-between gap-4 text-sm">
+                <span className="text-gray-muted">
+                  <span className="mr-2 text-xs uppercase tracking-wide text-gray-faint">
+                    {a.actor ?? a.type}
+                  </span>
+                  {a.text}
+                </span>
+                <span className="shrink-0 text-xs text-gray-faint">{ago(a.time)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
