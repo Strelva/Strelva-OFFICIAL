@@ -23,6 +23,9 @@ export default async function AdminLayout({
               <Link href="/admin" className="hover:text-warm-white transition-colors">
                 Overview
               </Link>
+              <Link href="/admin/onboard" className="hover:text-warm-white transition-colors">
+                Onboard
+              </Link>
               <Link href="/admin/pay-links" className="hover:text-warm-white transition-colors">
                 Pay Links
               </Link>
