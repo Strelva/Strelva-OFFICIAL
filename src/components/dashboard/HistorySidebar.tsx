@@ -13,6 +13,7 @@ import {
   LogOut,
   LayoutPanelLeft,
   BarChart3,
+  ShieldCheck,
   Plus,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
@@ -35,6 +36,7 @@ interface HistorySidebarProps {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Today", icon: House },
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
+  { href: "/dashboard/review", label: "Needs You", icon: ShieldCheck },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Sources", icon: Link2 },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
@@ -47,7 +49,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Site",
-    items: NAV_ITEMS.slice(2, 5),
+    items: NAV_ITEMS.slice(2, 6),
   },
 ];
 
@@ -55,7 +57,7 @@ export function HistorySidebar({
   ownerName,
   isOpen = true,
   onClose,
-  pendingCount: _pendingCount = 0,
+  pendingCount = 0,
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
@@ -188,6 +190,11 @@ export function HistorySidebar({
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
+                        {item.href === "/dashboard/review" && pendingCount > 0 && (
+                          <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-white">
+                            {pendingCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                   );
