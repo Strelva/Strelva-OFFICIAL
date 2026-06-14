@@ -12,7 +12,10 @@ import {
 } from "./portfolio";
 
 export type AttentionSeverity = "high" | "medium" | "low";
-export type AttentionKind = "launch" | "ops" | "drafts";
+export type AttentionKind = "launch" | "ops" | "drafts" | "stale";
+
+/** A tenant with no activity in this many days is flagged as quiet. */
+const STALE_TENANT_DAYS = 21;
 
 export interface AttentionItem {
   severity: AttentionSeverity;
@@ -58,6 +61,23 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
     items.push({ severity: "medium", kind: "ops", message: `${m.staleSmsApprovals} stale SMS approval(s)`, href: "/admin/ops" });
   if (m.tenantDomainDrift.length > 0)
     items.push({ severity: "medium", kind: "ops", message: `${m.tenantDomainDrift.length} tenant domain drift`, href: "/admin/ops" });
+
+  // Quiet tenants — no activity in a while (a check-in / churn signal).
+  const now = Date.now();
+  for (const t of s.tenants) {
+    if (t.lastActivity) {
+      const days = Math.floor((now - new Date(t.lastActivity).getTime()) / 86_400_000);
+      if (days >= STALE_TENANT_DAYS) {
+        items.push({
+          severity: "low",
+          kind: "stale",
+          tenant: t.id,
+          message: `No activity in ${days}d — ${t.siteName}`,
+          href: `/admin/tenants/${t.id}`,
+        });
+      }
+    }
+  }
 
   // Drafts waiting on review.
   for (const t of s.tenants) {

@@ -94,6 +94,23 @@ describe("buildAttentionFromSnapshot", () => {
     expect(b.items[b.items.length - 1].severity).toBe("medium");
   });
 
+  it("flags a tenant with no recent activity as low (stale)", () => {
+    const b = buildAttentionFromSnapshot(
+      snapshot({ tenants: [tenant({ id: "quiet", siteName: "Quiet", lastActivity: "2026-01-01T00:00:00Z" })] })
+    );
+    const stale = b.items.find((i) => i.kind === "stale");
+    expect(stale).toBeDefined();
+    expect(stale?.severity).toBe("low");
+  });
+
+  it("does not flag a tenant with recent activity", () => {
+    const recent = new Date().toISOString();
+    const b = buildAttentionFromSnapshot(
+      snapshot({ tenants: [tenant({ id: "active", lastActivity: recent })] })
+    );
+    expect(b.items.find((i) => i.kind === "stale")).toBeUndefined();
+  });
+
   it("rates draft backlogs by size (>=3 medium, else low)", () => {
     const b = buildAttentionFromSnapshot(
       snapshot({
