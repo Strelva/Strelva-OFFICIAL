@@ -12,7 +12,10 @@
 import { randomBytes } from "node:crypto";
 import { createTenant } from "./tenants";
 import { createInvite } from "./invites";
+import { setContent } from "./storage";
+import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
+import type { ContentSection } from "./types";
 import {
   createVercelProject,
   setVercelEnv,
@@ -114,7 +117,30 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     return { tenantId, siteUrl, steps, manualNext: [] };
   }
 
-  // 2. Owner invite (createTenant already assigns if they exist in Clerk).
+  // 2. Seed an editable content baseline so the dashboard starts from real
+  //    documents (versions/edits/AI agent all work from a known base) instead
+  //    of read-time fallback defaults.
+  const SEED_SECTIONS: ContentSection[] = [
+    "hero", "services", "story", "testimonials", "events",
+    "providers", "contact", "settings", "faq",
+  ];
+  let seeded = 0;
+  for (const section of SEED_SECTIONS) {
+    try {
+      await setContent(section, defaults[section], tenantId);
+      seeded++;
+    } catch {
+      // best-effort; a failed section just falls back to read-time defaults
+    }
+  }
+  steps.push({
+    key: "seed",
+    label: "Seed starter content",
+    status: seeded > 0 ? "ok" : "failed",
+    detail: `${seeded}/${SEED_SECTIONS.length} sections`,
+  });
+
+  // 3. Owner invite (createTenant already assigns if they exist in Clerk).
   if (input.ownerEmail) {
     try {
       await createInvite(input.ownerEmail, tenantId, "operator-onboard", "owner");
@@ -136,7 +162,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     steps.push({ key: "invite", label: "Create owner invite", status: "skipped", detail: "No owner email" });
   }
 
-  // 3. Vercel project.
+  // 4. Vercel project.
   let projectId: string | null = null;
   if (!isVercelConfigured()) {
     steps.push({
@@ -155,7 +181,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     }
   }
 
-  // 4. Vercel env (needs the project).
+  // 5. Vercel env (needs the project).
   if (projectId) {
     const r = await setVercelEnv(projectId, {
       TENANT_ID: tenantId,
@@ -176,7 +202,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     steps.push({ key: "vercel_env", label: "Set Vercel env vars", status: "skipped", detail: "No Vercel project" });
   }
 
-  // 5. Vercel domain (needs the project + a production domain).
+  // 6. Vercel domain (needs the project + a production domain).
   if (projectId && productionDomain) {
     const r = await addVercelDomain(projectId, productionDomain);
     steps.push(
@@ -198,7 +224,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       ? `Point ${productionDomain} DNS at Vercel (A 76.76.21.21, or CNAME cname.vercel-dns.com) and verify`
       : `${subdomain}.strelva.com routes automatically once the control plane is live`,
     `Connect the hand-built ${tenantId} repo to the "${tenantId}-site" Vercel project (git integration) and deploy`,
-    `Curate content in the dashboard — fallback defaults render until edited`,
+    `Customize the seeded starter content in the dashboard or via the AI agent`,
     input.ownerEmail
       ? `Send the owner invite email from /admin/tenants/${tenantId}`
       : `Add an owner email + invite from /admin/tenants/${tenantId}`,
