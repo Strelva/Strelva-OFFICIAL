@@ -80,6 +80,29 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
     }
   }
 
+  async function resendOwnerInvite() {
+    if (!form.ownerEmail.trim()) {
+      setAssignNote("Add an owner email first (save it above).");
+      return;
+    }
+    setAssignNote(null);
+    setAssigning(true);
+    try {
+      const res = await fetch("/api/admin/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.ownerEmail.trim(), tenant: form.id, role: "owner" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setAssignNote(data.emailSent === false ? `✓ Invite created — email failed, share: ${data.signUpUrl}` : `✓ ${data.message || "Invite sent"}`);
+    } catch (err) {
+      setAssignNote(err instanceof Error ? err.message : "Invite failed");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
@@ -160,6 +183,21 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <p className="text-xs text-gray-faint">
           The user must already have a Clerk account (signed up with this exact email).
         </p>
+
+        <div className="pt-3 mt-1 border-t border-glass-border">
+          <p className="text-xs text-gray-muted mb-2">
+            Or (re)send the owner invite to{" "}
+            <span className="text-warm-white">{form.ownerEmail || "—"}</span>. Works whether or
+            not they have an account yet.
+          </p>
+          <button
+            onClick={() => void resendOwnerInvite()}
+            disabled={assigning || !form.ownerEmail.trim()}
+            className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40"
+          >
+            {assigning ? "Sending…" : "Resend owner invite"}
+          </button>
+        </div>
       </div>
     </div>
   );
