@@ -24,7 +24,8 @@ import {
 } from "@/lib/portfolio";
 import { buildOpsReport } from "@/lib/ops";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
-import { listDrafts } from "@/lib/storage";
+import { listDrafts, getAllAuditEvents } from "@/lib/storage";
+import { listPayLinks } from "@/lib/pay-links";
 
 export const maxDuration = 60;
 
@@ -163,6 +164,39 @@ export async function POST(req: Request) {
         return { tenantsWithDrafts: out, total: out.reduce((n, d) => n + d.sections.length, 0) };
       },
     }),
+    read_audit: tool({
+      description:
+        "Read the recent operator audit trail across the portfolio (tenant changes, assigns, pay links, provisioning). Use to answer 'what changed recently / who did X'.",
+      inputSchema: z.object({ limit: z.number().int().positive().max(100).optional() }),
+      execute: async ({ limit }) => {
+        const events = await getAllAuditEvents(limit ?? 25);
+        return {
+          events: events.map((e) => ({
+            time: e.time,
+            action: e.action,
+            target: `${e.targetType}:${e.targetId ?? ""}`,
+            actor: e.actor.email,
+            tenant: e.tenant,
+          })),
+        };
+      },
+    }),
+    read_pay_links: tool({
+      description: "List outstanding pay links (slug, client, door, amount).",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const payLinks = await listPayLinks().catch(() => []);
+        return {
+          payLinks: payLinks.map((p) => ({
+            slug: p.slug,
+            clientName: p.clientName,
+            door: p.door,
+            amountCents: p.amountCents,
+          })),
+          count: payLinks.length,
+        };
+      },
+    }),
     propose_pay_link: tool({
       description:
         "Propose minting a per-client pay link. Returns a confirmation card; it does NOT create the link. amountDollars is whole dollars.",
@@ -234,6 +268,8 @@ export async function POST(req: Request) {
               part.toolName === "read_ops" ? "Checking operational health..." :
               part.toolName === "read_tenant" ? "Looking up the tenant..." :
               part.toolName === "list_drafts" ? "Checking pending drafts..." :
+              part.toolName === "read_audit" ? "Reading the audit trail..." :
+              part.toolName === "read_pay_links" ? "Checking pay links..." :
               part.toolName === "propose_pay_link" ? "Preparing a pay link..." :
               part.toolName === "propose_assign_user" ? "Preparing an access grant..." :
               "Working on it...";

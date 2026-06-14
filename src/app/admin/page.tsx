@@ -19,6 +19,7 @@ import {
   type LaunchReadinessStatus,
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
+import { getPortfolioSummary } from "@/lib/portfolio";
 import { OperatorConsole } from "./OperatorConsole";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +109,17 @@ export default async function AdminPage() {
   const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;
   const launchBlockedCount = tenantData.filter((d) => d.launchReadiness.status === "blocked").length;
 
+  // Surface operational breakage at a glance from the cached portfolio brain.
+  const portfolio = await getPortfolioSummary();
+  const opsMetrics = portfolio?.ops.metrics;
+  const breakage = opsMetrics
+    ? opsMetrics.webhookFailures +
+      opsMetrics.revalidationFailures +
+      opsMetrics.failedAiWrites +
+      opsMetrics.staleSmsApprovals +
+      opsMetrics.tenantDomainDrift.length
+    : 0;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -120,6 +132,15 @@ export default async function AdminPage() {
       </div>
 
       <OperatorConsole />
+
+      {breakage > 0 && (
+        <Link
+          href="/admin/ops"
+          className="block rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-3 text-sm text-amber-100 hover:bg-amber-500/15 transition-colors"
+        >
+          {breakage} operational {breakage === 1 ? "issue" : "issues"} need attention — open the ops board →
+        </Link>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
