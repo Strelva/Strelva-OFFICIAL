@@ -31,6 +31,27 @@ function getInviteSignUpUrl(baseSignUpUrl: string, email: string): string {
   }
 }
 
+/**
+ * Alert when an invite was created but the email did NOT go out, so the client
+ * never silently goes un-invited. Awaited (flushes before the function freezes
+ * on Vercel); failure must not fail the route.
+ */
+async function alertInviteEmailGap(params: {
+  email: string;
+  tenantId: string;
+  signUpUrl: string;
+  reason: string;
+}): Promise<void> {
+  if (!process.env.SLACK_WEBHOOK_URL) return;
+  await fetch(process.env.SLACK_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: `⚠ Invite email NOT sent to ${params.email} (${params.tenantId}): ${params.reason}. Share manually: ${params.signUpUrl}`,
+    }),
+  }).catch(() => {});
+}
+
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -125,6 +146,12 @@ export async function POST(req: Request) {
       });
     } catch (err) {
       console.error("[invite] Email send failed:", err);
+      await alertInviteEmailGap({
+        email,
+        tenantId,
+        signUpUrl,
+        reason: err instanceof Error ? err.message : "Resend send failed",
+      });
       return NextResponse.json({
         success: true,
         emailSent: false,
@@ -134,6 +161,12 @@ export async function POST(req: Request) {
     }
   }
 
+  await alertInviteEmailGap({
+    email,
+    tenantId,
+    signUpUrl,
+    reason: "RESEND_API_KEY not configured",
+  });
   return NextResponse.json({
     success: true,
     emailSent: false,

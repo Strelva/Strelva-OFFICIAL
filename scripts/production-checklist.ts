@@ -170,6 +170,21 @@ checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_IN_URL", true, false);
 checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_UP_URL", true, false);
 checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
 
+// Dev-access bypass must never be enabled on a deployed environment: when
+// REB_DEV_UNGATED_ACCESS=1 (and NODE_ENV!=="production"), isSuperAdmin /
+// verifyAuth / hasTenantAccess all return true — a fully ungated preview deploy.
+{
+  const devBypass = process.env.REB_DEV_UNGATED_ACCESS;
+  const enabled = Boolean(devBypass) && devBypass !== "0";
+  log({
+    name: "ENV: REB_DEV_UNGATED_ACCESS",
+    status: enabled ? "fail" : "ok",
+    message: enabled
+      ? `Set to "${devBypass}" — this ungates auth and super-admin. It MUST be unset (or 0) on every preview/production deploy.`
+      : "Not set — auth is enforced.",
+  });
+}
+
 console.log("\n─── Launch Governance ───────────────────────────────────────────");
 function checkFileContains(path: string, name: string, requiredTerms: string[]) {
   if (!existsSync(path)) {
