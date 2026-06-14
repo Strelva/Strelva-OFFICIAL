@@ -1,9 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTenantConfig } from "@/lib/tenants";
+import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
 import { TenantEditor } from "./TenantEditor";
 
 export const dynamic = "force-dynamic";
+
+function Pulse({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div className="rounded-xl bg-glass border border-glass-border p-4">
+      <p className="text-xs text-gray-muted">{label}</p>
+      <p className="text-2xl font-semibold text-warm-white mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-faint mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+function ago(iso: string | null): string {
+  if (!iso) return "never";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days === 0) return "today";
+  if (days === 1) return "1d ago";
+  return `${days}d ago`;
+}
 
 export default async function TenantDetailPage({
   params,
@@ -13,6 +32,13 @@ export default async function TenantDetailPage({
   const { id } = await params;
   const tenant = await getTenantConfig(id);
   if (!tenant) notFound();
+
+  const [pageViews, bookingClicks, drafts, activity] = await Promise.all([
+    getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
+    getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
+    listDrafts(id).catch(() => ({} as Record<string, boolean>)),
+    getActivity(id).catch(() => []),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -25,6 +51,13 @@ export default async function TenantDetailPage({
           {tenant.id} · {tenant.deliveryModel ?? "custom_repo"} ·{" "}
           {tenant.active ? "active" : "archived"}
         </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} />
+        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} />
+        <Pulse label="Drafts waiting" value={Object.keys(drafts).length} />
+        <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
       <TenantEditor
