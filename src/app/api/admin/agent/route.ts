@@ -23,6 +23,7 @@ import {
   type PortfolioSnapshot,
 } from "@/lib/portfolio";
 import { buildOpsReport } from "@/lib/ops";
+import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
@@ -129,6 +130,12 @@ export async function POST(req: Request) {
         "Read live operational health: webhook failures, revalidation failures, stale SMS approvals, pending event queues, failed AI writes, and tenant domain drift.",
       inputSchema: z.object({}),
       execute: async () => await buildOpsReport(),
+    }),
+    read_attention: tool({
+      description:
+        "Read the prioritized 'what needs attention' briefing (launch-blocked tenants, ops breakage, drafts waiting), severity-ranked. Best tool for 'what should I work on' / 'what needs attention'.",
+      inputSchema: z.object({}),
+      execute: async () => await buildAttentionBriefing(),
     }),
     read_tenant: tool({
       description: "Read one tenant's config and key launch fields by tenant id.",
@@ -321,6 +328,7 @@ export async function POST(req: Request) {
             const label =
               part.toolName === "read_portfolio" ? "Reading the portfolio..." :
               part.toolName === "read_ops" ? "Checking operational health..." :
+              part.toolName === "read_attention" ? "Building the attention briefing..." :
               part.toolName === "read_tenant" ? "Looking up the tenant..." :
               part.toolName === "list_drafts" ? "Checking pending drafts..." :
               part.toolName === "read_audit" ? "Reading the audit trail..." :

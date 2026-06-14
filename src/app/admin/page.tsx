@@ -20,6 +20,7 @@ import {
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary } from "@/lib/portfolio";
+import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { OperatorConsole } from "./OperatorConsole";
 
 export const dynamic = "force-dynamic";
@@ -109,16 +110,15 @@ export default async function AdminPage() {
   const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;
   const launchBlockedCount = tenantData.filter((d) => d.launchReadiness.status === "blocked").length;
 
-  // Surface operational breakage at a glance from the cached portfolio brain.
+  // Prioritized "needs attention" briefing from the cached portfolio brain
+  // (reuse the already-fetched snapshot to avoid a second aggregation).
   const portfolio = await getPortfolioSummary();
-  const opsMetrics = portfolio?.ops.metrics;
-  const breakage = opsMetrics
-    ? opsMetrics.webhookFailures +
-      opsMetrics.revalidationFailures +
-      opsMetrics.failedAiWrites +
-      opsMetrics.staleSmsApprovals +
-      opsMetrics.tenantDomainDrift.length
-    : 0;
+  const attention = portfolio
+    ? buildAttentionFromSnapshot(portfolio)
+    : await buildAttentionBriefing();
+  const topAttention = attention.items
+    .filter((i) => i.severity !== "low")
+    .slice(0, 6);
 
   return (
     <div className="space-y-8">
@@ -133,13 +133,30 @@ export default async function AdminPage() {
 
       <OperatorConsole />
 
-      {breakage > 0 && (
-        <Link
-          href="/admin/ops"
-          className="block rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-3 text-sm text-amber-100 hover:bg-amber-500/15 transition-colors"
-        >
-          {breakage} operational {breakage === 1 ? "issue" : "issues"} need attention — open the ops board →
-        </Link>
+      {topAttention.length > 0 && (
+        <div className="rounded-xl border border-glass-border bg-glass overflow-hidden">
+          <div className="px-5 py-3 border-b border-glass-border flex items-center gap-2">
+            <span className="text-sm font-semibold text-warm-white">Needs attention</span>
+            <span className="text-xs text-gray-muted">
+              {attention.counts.high} high · {attention.counts.medium} medium
+            </span>
+          </div>
+          <ul className="divide-y divide-glass-border">
+            {topAttention.map((item, i) => (
+              <li key={i}>
+                <Link
+                  href={item.href ?? "/admin"}
+                  className="flex items-center gap-3 px-5 py-2.5 text-sm hover:bg-gray-bg transition-colors"
+                >
+                  <span className={item.severity === "high" ? "text-red-300" : "text-amber-300"}>
+                    {item.severity === "high" ? "🔴" : "🟠"}
+                  </span>
+                  <span className="text-warm-white">{item.message}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* Summary cards */}
