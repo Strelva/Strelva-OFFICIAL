@@ -20,6 +20,7 @@ import { getPrimaryModel } from "@/lib/ai-models";
 import {
   buildPortfolioSnapshot,
   getPortfolioSummary,
+  setPortfolioSummary,
   type PortfolioSnapshot,
 } from "@/lib/portfolio";
 import { buildOpsReport } from "@/lib/ops";
@@ -137,6 +138,16 @@ export async function POST(req: Request) {
         "Read the prioritized 'what needs attention' briefing (launch-blocked tenants, ops breakage, drafts waiting), severity-ranked. Best tool for 'what should I work on' / 'what needs attention'.",
       inputSchema: z.object({}),
       execute: async () => await buildAttentionBriefing(),
+    }),
+    refresh_portfolio: tool({
+      description:
+        "Rebuild the portfolio brain from source and warm the cache. Use when the data looks stale or right after a change. Low-risk: only refreshes cached data, never touches a client site.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const snapshot = await buildPortfolioSnapshot();
+        await setPortfolioSummary(snapshot);
+        return { refreshed: true, snapshotAt: snapshot.snapshotAt, tenantCount: snapshot.tenantCount };
+      },
     }),
     read_tenant: tool({
       description: "Read one tenant's config and key launch fields by tenant id.",
@@ -336,6 +347,7 @@ export async function POST(req: Request) {
               part.toolName === "read_portfolio" ? "Reading the portfolio..." :
               part.toolName === "read_ops" ? "Checking operational health..." :
               part.toolName === "read_attention" ? "Building the attention briefing..." :
+              part.toolName === "refresh_portfolio" ? "Refreshing the data..." :
               part.toolName === "read_tenant" ? "Looking up the tenant..." :
               part.toolName === "list_drafts" ? "Checking pending drafts..." :
               part.toolName === "read_audit" ? "Reading the audit trail..." :
