@@ -1,6 +1,7 @@
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
-import { listDrafts, getDraftContent } from "@/lib/storage";
+import { listDrafts, getDraftContent, getContent } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
+import { generatePreviewDiffs, type PreviewDiff } from "@/lib/agent-risk";
 import { DraftActions } from "./DraftActions";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ interface DraftItem {
   tenantName: string;
   section: string;
   data: Record<string, unknown>;
+  diffs: PreviewDiff[];
 }
 
 export default async function AdminDraftsPage() {
@@ -24,16 +26,19 @@ export default async function AdminDraftsPage() {
 
         await Promise.all(
           sections.map(async (section) => {
-            const data = await getDraftContent(
-              section as ContentSection,
-              t.id
-            );
+            const [data, current] = await Promise.all([
+              getDraftContent(section as ContentSection, t.id),
+              getContent(section as ContentSection, t.id).catch(() => null),
+            ]);
             if (data) {
+              const draftRecord = data as unknown as Record<string, unknown>;
+              const currentRecord = (current ?? {}) as unknown as Record<string, unknown>;
               allDrafts.push({
                 tenantId: t.id,
                 tenantName: t.siteName,
                 section,
-                data: data as unknown as Record<string, unknown>,
+                data: draftRecord,
+                diffs: generatePreviewDiffs(currentRecord, draftRecord),
               });
             }
           })
@@ -85,22 +90,43 @@ export default async function AdminDraftsPage() {
                         <span className="text-[10px] text-gray-faint">{new Date(draft.data._updatedAt as string).toLocaleString()}</span>
                       )}
                     </div>
-                    {Object.entries(draft.data)
-                      .filter(([key]) => !key.startsWith("_"))
-                      .map(([key, value]) => (
-                        <div key={key} className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-muted">{key}</span>
-                          <span className="text-xs text-warm-white break-words">
-                            {typeof value === "string"
-                              ? value.length > 200 ? `${value.slice(0, 200)}...` : value
-                              : Array.isArray(value)
-                                ? `${value.length} item${value.length === 1 ? "" : "s"}`
-                                : value && typeof value === "object"
-                                  ? Object.keys(value as Record<string, unknown>).slice(0, 4).join(", ") + (Object.keys(value as Record<string, unknown>).length > 4 ? " ..." : "")
-                                  : String(value)}
+                    {draft.diffs.length > 0 ? (
+                      draft.diffs.map((d) => (
+                        <div key={d.field} className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-muted">
+                            {d.field}
+                            <span className="ml-1 text-gray-faint normal-case tracking-normal">({d.type})</span>
                           </span>
+                          {d.type !== "added" && d.before && (
+                            <span className="text-xs text-red-300/80 line-through break-words">
+                              {d.before.length > 200 ? `${d.before.slice(0, 200)}...` : d.before}
+                            </span>
+                          )}
+                          {d.type !== "removed" && d.after && (
+                            <span className="text-xs text-emerald-200 break-words">
+                              {d.after.length > 200 ? `${d.after.slice(0, 200)}...` : d.after}
+                            </span>
+                          )}
                         </div>
-                      ))}
+                      ))
+                    ) : (
+                      Object.entries(draft.data)
+                        .filter(([key]) => !key.startsWith("_"))
+                        .map(([key, value]) => (
+                          <div key={key} className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-muted">{key}</span>
+                            <span className="text-xs text-warm-white break-words">
+                              {typeof value === "string"
+                                ? value.length > 200 ? `${value.slice(0, 200)}...` : value
+                                : Array.isArray(value)
+                                  ? `${value.length} item${value.length === 1 ? "" : "s"}`
+                                  : value && typeof value === "object"
+                                    ? Object.keys(value as Record<string, unknown>).slice(0, 4).join(", ") + (Object.keys(value as Record<string, unknown>).length > 4 ? " ..." : "")
+                                    : String(value)}
+                            </span>
+                          </div>
+                        ))
+                    )}
                   </div>
                 </div>
                 <DraftActions
