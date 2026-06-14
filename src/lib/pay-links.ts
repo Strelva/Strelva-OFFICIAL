@@ -372,3 +372,20 @@ export async function listPayLinks(): Promise<PayLinkConfig[]> {
 
   return links.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+/**
+ * Revoke a pay link: delete its record and drop it from the index. Returns true
+ * if a record was removed. Idempotent — revoking an already-gone slug is a no-op
+ * that still cleans the index.
+ */
+export async function deletePayLink(slug: string): Promise<boolean> {
+  const normalized = normalizePayLinkSlug(slug);
+  if (!normalized) return false;
+  const redis = getRedis();
+  if (!redis) {
+    throw new PayLinkStorageError("Redis is not configured for pay-link storage.");
+  }
+  const removed = await redis.del(`${PAY_LINK_PREFIX}${normalized}`);
+  await redis.srem(PAY_LINK_INDEX_KEY, normalized);
+  return removed > 0;
+}

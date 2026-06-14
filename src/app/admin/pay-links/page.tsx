@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 
+type Door = "build" | "managed_start";
+
 interface PayLink {
   slug: string;
   clientName: string;
-  door: "build" | "managed";
+  door: Door;
   leadSlug?: string;
   amountCents?: number;
   createdAt?: string;
@@ -15,7 +17,7 @@ interface PayLink {
 const blankForm = {
   slug: "",
   clientName: "",
-  door: "build" as "build" | "managed",
+  door: "build" as Door,
   leadSlug: "",
   amountDollars: "",
 };
@@ -83,6 +85,23 @@ export default function PayLinksPage() {
     setTimeout(() => setCopied(null), 1500);
   }
 
+  async function revoke(slug: string) {
+    if (!window.confirm(`Revoke /pay/${slug}? The URL will stop working.`)) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/pay-links?slug=${encodeURIComponent(slug)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Failed (${res.status})`);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Revoke failed");
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -101,11 +120,11 @@ export default function PayLinksPage() {
             <label className="block text-xs text-gray-muted mb-1">Door</label>
             <select
               value={form.door}
-              onChange={(e) => setForm({ ...form, door: e.target.value as "build" | "managed" })}
+              onChange={(e) => setForm({ ...form, door: e.target.value as Door })}
               className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
             >
               <option value="build">Build (one-time)</option>
-              <option value="managed">Managed (start fee)</option>
+              <option value="managed_start">Managed (start fee)</option>
             </select>
           </div>
           <Field label="Amount (USD)" value={form.amountDollars} onChange={(v) => setForm({ ...form, amountDollars: v })} placeholder="1500" type="number" />
@@ -147,12 +166,20 @@ export default function PayLinksPage() {
                       : ""}
                   </p>
                 </div>
-                <button
-                  onClick={() => copyLink(l.slug)}
-                  className="shrink-0 rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
-                >
-                  {copied === l.slug ? "Copied" : "Copy URL"}
-                </button>
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    onClick={() => copyLink(l.slug)}
+                    className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
+                  >
+                    {copied === l.slug ? "Copied" : "Copy URL"}
+                  </button>
+                  <button
+                    onClick={() => void revoke(l.slug)}
+                    className="rounded-md border border-red-500/25 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                  >
+                    Revoke
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

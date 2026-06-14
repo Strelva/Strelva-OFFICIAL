@@ -9,6 +9,7 @@ const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockSavePayLink = vi.hoisted(() => vi.fn());
 const mockGetPayLink = vi.hoisted(() => vi.fn());
 const mockListPayLinks = vi.hoisted(() => vi.fn());
+const mockDeletePayLink = vi.hoisted(() => vi.fn());
 const mockIsRateLimitedAsync = vi.hoisted(() => vi.fn());
 const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 
@@ -32,6 +33,7 @@ vi.mock("@/lib/pay-links", async () => {
     savePayLink: mockSavePayLink,
     getPayLink: mockGetPayLink,
     listPayLinks: mockListPayLinks,
+    deletePayLink: mockDeletePayLink,
   };
 });
 
@@ -64,6 +66,7 @@ beforeEach(() => {
   mockLogAuditEvent.mockResolvedValue(undefined);
   mockSavePayLink.mockResolvedValue(undefined);
   mockListPayLinks.mockResolvedValue([]);
+  mockDeletePayLink.mockResolvedValue(true);
   mockIsRateLimitedAsync.mockResolvedValue(false);
   mockCheckoutCreate.mockResolvedValue({ url: "https://checkout.stripe.com/c/pay/cs_test_123" });
 });
@@ -209,6 +212,40 @@ describe("GET /api/admin/pay-links", () => {
       createdAt: "2026-06-09T00:00:00.000Z",
       createdBy: "jacob@strelva.com",
     });
+  });
+});
+
+describe("DELETE /api/admin/pay-links", () => {
+  function delReq(slug?: string) {
+    const url = slug
+      ? `http://localhost/api/admin/pay-links?slug=${encodeURIComponent(slug)}`
+      : "http://localhost/api/admin/pay-links";
+    return new NextRequest(url, { method: "DELETE" });
+  }
+
+  it("rejects a non-super-admin with 403", async () => {
+    mockIsSuperAdmin.mockResolvedValue(false);
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq("acme-coffee"));
+    expect(res.status).toBe(403);
+    expect(mockDeletePayLink).not.toHaveBeenCalled();
+  });
+
+  it("400s without a slug", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq());
+    expect(res.status).toBe(400);
+    expect(mockDeletePayLink).not.toHaveBeenCalled();
+  });
+
+  it("revokes a slug and audits it", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq("acme-coffee"));
+    expect(res.status).toBe(200);
+    expect(mockDeletePayLink).toHaveBeenCalledWith("acme-coffee");
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true, removed: true });
   });
 });
 

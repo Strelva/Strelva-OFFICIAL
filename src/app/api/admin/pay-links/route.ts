@@ -6,6 +6,7 @@ import {
   buildPayLinkConfig,
   savePayLink,
   listPayLinks,
+  deletePayLink,
   PayLinkValidationError,
   PayLinkStorageError,
   PayLinkConflictError,
@@ -101,4 +102,40 @@ export async function GET() {
   }
 
   return NextResponse.json({ payLinks, count: payLinks.length });
+}
+
+/**
+ * Super-admin only. Revoke a pay link by slug: DELETE /api/admin/pay-links?slug=acme.
+ * Idempotent — revoking an already-gone slug still returns ok.
+ */
+export async function DELETE(req: Request) {
+  if (!(await isSuperAdmin())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const slug = new URL(req.url).searchParams.get("slug")?.trim();
+  if (!slug) {
+    return NextResponse.json({ error: "Missing slug" }, { status: 400 });
+  }
+
+  let removed: boolean;
+  try {
+    removed = await deletePayLink(slug);
+  } catch (err) {
+    if (err instanceof PayLinkStorageError) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+    throw err;
+  }
+
+  await logAuditEvent({
+    tenant: slug,
+    action: "paylink.revoke",
+    targetType: "pay_link",
+    targetId: slug,
+    actor: await getActorContext(),
+    metadata: { removed },
+  });
+
+  return NextResponse.json({ ok: true, removed });
 }

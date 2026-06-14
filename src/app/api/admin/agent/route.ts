@@ -203,7 +203,7 @@ export async function POST(req: Request) {
       inputSchema: z.object({
         slug: z.string().describe("URL slug, e.g. acme-coffee"),
         clientName: z.string(),
-        door: z.enum(["build", "managed"]),
+        door: z.enum(["build", "managed_start"]),
         leadSlug: z.string(),
         amountDollars: z.number().positive(),
       }),
