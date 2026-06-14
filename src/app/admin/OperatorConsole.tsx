@@ -7,14 +7,31 @@ interface Message {
   content: string;
 }
 
+type ProposalAction =
+  | "mint_pay_link"
+  | "assign_user"
+  | "approve_draft"
+  | "reject_draft"
+  | "update_tenant";
+
 interface Proposal {
   id: string;
-  action: "mint_pay_link" | "assign_user";
+  action: ProposalAction;
   summary: string;
   params: Record<string, unknown>;
 }
 
 type ProposalState = "pending" | "committing" | "done" | "error";
+
+// The console — not the LLM — owns the action→endpoint mapping, so the agent
+// can never target an arbitrary endpoint. Every endpoint gates + audits.
+const COMMIT_MAP: Record<ProposalAction, { endpoint: string; method: string }> = {
+  mint_pay_link: { endpoint: "/api/admin/pay-links", method: "POST" },
+  assign_user: { endpoint: "/api/admin/tenants/assign", method: "POST" },
+  approve_draft: { endpoint: "/api/admin/drafts", method: "POST" },
+  reject_draft: { endpoint: "/api/admin/drafts", method: "POST" },
+  update_tenant: { endpoint: "/api/admin/tenants", method: "PATCH" },
+};
 
 /**
  * Mission Control command bar. Chats with the read-only operator agent
@@ -142,13 +159,10 @@ export function OperatorConsole() {
 
   async function commit(proposal: Proposal) {
     setProposalState((s) => ({ ...s, [proposal.id]: { state: "committing" } }));
-    const endpoint =
-      proposal.action === "mint_pay_link"
-        ? "/api/admin/pay-links"
-        : "/api/admin/tenants/assign";
+    const { endpoint, method } = COMMIT_MAP[proposal.action];
     try {
       const res = await fetch(endpoint, {
-        method: "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposal.params),
       });

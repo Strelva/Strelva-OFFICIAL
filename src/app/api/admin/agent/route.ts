@@ -51,7 +51,7 @@ function isIncomingMessages(value: unknown): value is IncomingMessage[] {
 interface Proposal {
   id: string;
   /** Maps to the existing endpoint the console calls on confirm. */
-  action: "mint_pay_link" | "assign_user";
+  action: "mint_pay_link" | "assign_user" | "approve_draft" | "reject_draft" | "update_tenant";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -85,7 +85,7 @@ const SYSTEM_PROMPT = `You are the Strelva operator agent — the assistant the 
 
 You can READ the whole portfolio: every tenant's launch readiness, revenue, drafts, and operational health (failed webhooks, revalidation failures, pending queues, domain drift). Use read_portfolio for the overview, read_ops for live breakage, read_tenant for one client, list_drafts for what's waiting on review.
 
-For consequential actions — minting a pay link or assigning a user to a tenant — you do NOT perform them. You call the propose_* tool, which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets so they can verify before confirming.
+For consequential actions — minting a pay link, assigning a user, approving/rejecting a draft, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool, which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
 
 Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Dollar amounts: pay links are quoted in whole dollars.`;
 
@@ -243,6 +243,61 @@ export async function POST(req: Request) {
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
       },
     }),
+    propose_approve_draft: tool({
+      description:
+        "Propose approving a pending AI draft for a tenant section (publishes it live). Returns a confirmation card; does NOT approve.",
+      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
+      execute: async (p) => {
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "approve_draft",
+          summary: `Approve & publish the ${p.section} draft for ${p.tenant}`,
+          params: { tenant: p.tenant, section: p.section, action: "approve" },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
+    propose_reject_draft: tool({
+      description:
+        "Propose rejecting a pending AI draft for a tenant section (discards it). Returns a confirmation card; does NOT reject.",
+      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
+      execute: async (p) => {
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "reject_draft",
+          summary: `Reject the ${p.section} draft for ${p.tenant}`,
+          params: { tenant: p.tenant, section: p.section, action: "reject" },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
+    propose_update_tenant: tool({
+      description:
+        "Propose a tenant config change (e.g. owner email, subscription status, founder-comp, active). Returns a confirmation card; does NOT apply. Only include the fields to change.",
+      inputSchema: z.object({
+        tenantId: z.string(),
+        ownerEmail: z.string().email().optional(),
+        subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]).optional(),
+        planOverride: z.enum(["founder_comp", ""]).optional(),
+        active: z.boolean().optional(),
+      }),
+      execute: async ({ tenantId, ...changes }) => {
+        const fields = Object.entries(changes).filter(([, v]) => v !== undefined);
+        if (fields.length === 0) {
+          return { error: "No fields to change." };
+        }
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "update_tenant",
+          summary: `Update ${tenantId}: ${fields.map(([k, v]) => `${k}=${v}`).join(", ")}`,
+          params: { id: tenantId, ...Object.fromEntries(fields) },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
   };
 
   const encoder = new TextEncoder();
@@ -272,6 +327,9 @@ export async function POST(req: Request) {
               part.toolName === "read_pay_links" ? "Checking pay links..." :
               part.toolName === "propose_pay_link" ? "Preparing a pay link..." :
               part.toolName === "propose_assign_user" ? "Preparing an access grant..." :
+              part.toolName === "propose_approve_draft" ? "Preparing a draft approval..." :
+              part.toolName === "propose_reject_draft" ? "Preparing a draft rejection..." :
+              part.toolName === "propose_update_tenant" ? "Preparing a tenant change..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "text-delta") {
