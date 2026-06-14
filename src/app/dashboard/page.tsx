@@ -16,6 +16,7 @@ import { getOwnerRetentionSignals } from "@/lib/retention";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
 import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 
 function StatTile({
   label,
@@ -143,6 +144,8 @@ async function DashboardHome({
             </Link>
           </div>
         </header>
+
+          <OnboardingChecklist tenant={tenant} />
 
           {briefHeadline ? (
           <Link
