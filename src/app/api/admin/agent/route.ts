@@ -27,6 +27,7 @@ import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
+import { buildRevenueSummary } from "@/lib/revenue";
 
 export const maxDuration = 60;
 
@@ -204,6 +205,12 @@ export async function POST(req: Request) {
         };
       },
     }),
+    read_revenue: tool({
+      description:
+        "Read collected one-time build/managed payments: total cents, count, and the most recent payments. Use for 'how much have we collected'.",
+      inputSchema: z.object({}),
+      execute: async () => await buildRevenueSummary(),
+    }),
     propose_pay_link: tool({
       description:
         "Propose minting a per-client pay link. Returns a confirmation card; it does NOT create the link. amountDollars is whole dollars.",
@@ -333,6 +340,7 @@ export async function POST(req: Request) {
               part.toolName === "list_drafts" ? "Checking pending drafts..." :
               part.toolName === "read_audit" ? "Reading the audit trail..." :
               part.toolName === "read_pay_links" ? "Checking pay links..." :
+              part.toolName === "read_revenue" ? "Tallying collected payments..." :
               part.toolName === "propose_pay_link" ? "Preparing a pay link..." :
               part.toolName === "propose_assign_user" ? "Preparing an access grant..." :
               part.toolName === "propose_approve_draft" ? "Preparing a draft approval..." :
