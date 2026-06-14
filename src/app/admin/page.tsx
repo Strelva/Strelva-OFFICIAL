@@ -286,7 +286,12 @@ export default async function AdminPage() {
                   >
                     <td className="px-6 py-5">
                       <div>
-                        <p className="font-medium text-warm-white">{t.siteName}</p>
+                        <Link
+                          href={`/admin/tenants/${t.id}`}
+                          className="font-medium text-warm-white hover:text-accent transition-colors"
+                        >
+                          {t.siteName}
+                        </Link>
                         <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
                         <p className="mt-2 text-xs text-gray-faint">
                           {t.industry} · {t.template}
