@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getCurrentUserEmail } from "@/lib/auth";
+import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import {
   buildPayLinkConfig,
@@ -55,6 +56,22 @@ export async function POST(req: Request) {
     }
     throw err;
   }
+
+  // Pay links aren't tenant-scoped; key the audit entry on the slug so it's
+  // traceable in the global operator feed.
+  await logAuditEvent({
+    tenant: config.slug,
+    action: "paylink.create",
+    targetType: "pay_link",
+    targetId: config.slug,
+    actor: await getActorContext(),
+    metadata: {
+      clientName: config.clientName,
+      door: config.door,
+      amountCents: config.amountCents,
+      overwrite,
+    },
+  });
 
   return NextResponse.json({
     success: true,

@@ -4,6 +4,8 @@ import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
+const mockGetActorContext = vi.hoisted(() => vi.fn());
+const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockSavePayLink = vi.hoisted(() => vi.fn());
 const mockGetPayLink = vi.hoisted(() => vi.fn());
 const mockListPayLinks = vi.hoisted(() => vi.fn());
@@ -13,7 +15,13 @@ const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getCurrentUserEmail: mockGetCurrentUserEmail,
+  getActorContext: mockGetActorContext,
 }));
+
+vi.mock("@/lib/storage", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage");
+  return { ...actual, logAuditEvent: mockLogAuditEvent };
+});
 
 // The admin route persists; the public route reads. Keep the pure helpers real
 // (validation/format) and only stub the Redis-backed save/get.
@@ -46,6 +54,14 @@ beforeEach(() => {
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   mockIsSuperAdmin.mockResolvedValue(true);
   mockGetCurrentUserEmail.mockResolvedValue("jacob@strelva.com");
+  mockGetActorContext.mockResolvedValue({
+    userId: "u_test",
+    email: "jacob@strelva.com",
+    type: "super_admin",
+    isSuperAdmin: true,
+    isImpersonating: false,
+  });
+  mockLogAuditEvent.mockResolvedValue(undefined);
   mockSavePayLink.mockResolvedValue(undefined);
   mockListPayLinks.mockResolvedValue([]);
   mockIsRateLimitedAsync.mockResolvedValue(false);

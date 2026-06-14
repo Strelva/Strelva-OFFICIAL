@@ -25,7 +25,7 @@ export { logActivity, getActivity } from "./activity-store";
 export type { ActivityEntry } from "./activity-store";
 
 // Admin Audit
-export { logAuditEvent, getAuditLog } from "./audit-store";
+export { logAuditEvent, getAuditLog, getAllAuditEvents } from "./audit-store";
 export type { AuditLogEntry } from "./audit-store";
 
 // Chat

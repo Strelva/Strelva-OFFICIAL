@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
@@ -107,6 +108,14 @@ export async function POST(req: Request) {
         revalidationHealth: "unknown",
       } : undefined,
     });
+    await logAuditEvent({
+      tenant: tenant.id,
+      action: "tenant.create",
+      targetType: "tenant",
+      targetId: tenant.id,
+      actor: await getActorContext(tenant.id),
+      metadata: { siteName: tenant.siteName, deliveryModel: tenant.deliveryModel },
+    });
     return NextResponse.json(tenant, { status: 201 });
   } catch (err) {
     return NextResponse.json(
@@ -137,6 +146,15 @@ export async function PATCH(req: Request) {
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
+
+  await logAuditEvent({
+    tenant: id,
+    action: "tenant.update",
+    targetType: "tenant",
+    targetId: id,
+    actor: await getActorContext(id),
+    metadata: { fields: Object.keys(updates) },
+  });
 
   return NextResponse.json(updated);
 }
