@@ -35,6 +35,9 @@ export default async function AdminLayout({
               <Link href="/admin/drafts" className="hover:text-warm-white transition-colors">
                 Drafts
               </Link>
+              <Link href="/admin/audit" className="hover:text-warm-white transition-colors">
+                Audit
+              </Link>
             </div>
           </div>
           <Link
