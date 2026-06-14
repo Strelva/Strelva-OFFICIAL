@@ -1,0 +1,89 @@
+# Mission Control — test checklist
+
+QA script for the `feat/platform-solidify` branch (PR rhinehart514/REB#55). Work
+top to bottom; each item says what to do and what "right" looks like.
+
+## Setup
+1. `cd ~/strelva-platform && git checkout feat/platform-solidify && git pull`
+2. `pnpm install`
+3. `vercel env pull .env.local` (scope scaffold-web) — needed for real data.
+4. `pnpm dev` → open `http://localhost:3000`. Sign in as a super-admin email
+   (one in `SUPER_ADMIN_EMAILS`).
+5. Sanity: `pnpm typecheck`, `pnpm test` (expect 688 passing), `pnpm build` all green.
+
+## Admin overview (`/admin`)
+- [ ] Loads with the nav: Overview · Onboard · Pay Links · Ops · Drafts · Audit.
+- [ ] **Mission Control console** (command bar) renders at the top.
+- [ ] If anything's wrong in the portfolio, a **"Needs attention"** panel appears
+      (high = red, medium = amber), each row links to the right screen.
+- [ ] Summary cards include **Collected** (build payments) next to MRR.
+- [ ] The tenant table still renders (launch readiness, access, ops, activity).
+
+## The operator agent (the marquee)
+Type these into the command bar:
+- [ ] "What needs attention across the portfolio?" → reads + summarizes blocked
+      tenants, breakage, drafts. No errors; a status line flashes while it works.
+- [ ] "What broke overnight?" → reads ops, lists failures (or says it's clean).
+- [ ] "How much have we collected?" → reads revenue, gives a total.
+- [ ] "Show recent operator actions" → reads the audit trail.
+- [ ] **Confirm flow:** "Mint a $1,500 build link for Acme Coffee, slug acme-coffee"
+      → it does NOT create it; a **confirmation card** appears. Click **Confirm** →
+      it commits and shows the `/pay/acme-coffee` URL. Verify the link exists on
+      `/admin/pay-links`.
+- [ ] "Approve the hero draft for <tenant>" (pick a tenant with a draft) →
+      confirmation card → Confirm → draft clears.
+- [ ] Sanity: the agent never mutates without a confirm click.
+
+## Pay links (`/admin/pay-links`)
+- [ ] Mint a fixed link (slug, client, **door = Build or Managed**, amount). It
+      appears in the list. **Door "Managed" must work** (the old `managed` bug).
+- [ ] **Copy URL** copies `/pay/<slug>`.
+- [ ] **Revoke** removes it (confirm dialog → gone from the list).
+
+## Ops board (`/admin/ops`)
+- [ ] Six metric cards (webhook/revalidation/AI-write failures, stale SMS,
+      pending queue, domain drift). Non-zero bad counts render red.
+- [ ] Revalidation-failure + domain-drift lists render (or "None").
+
+## Onboarding (`/admin/onboard`) — the big one
+- [ ] Fill a **throwaway** subdomain (e.g. `qa-test-1`), site name, owner name,
+      industry; leave production domain blank first.
+- [ ] Run it. The **live checklist** shows: tenant created, content seeded
+      (9 sections), owner invite (skipped if no email), Vercel project + env
+      created (**should be real — VERCEL_API_TOKEN is set**), domain skipped.
+- [ ] The "Still needs a human" list shows DNS + connect-the-repo steps.
+- [ ] Open the tenant → it exists with a revalidation secret. Check the created
+      Vercel project (`qa-test-1-site`) and that its env vars point at
+      **scaffoldweb.com** (the control plane), not strelva.com.
+- [ ] Clean up the throwaway tenant after.
+
+## Tenant detail (`/admin/tenants/[id]`)
+- [ ] Edit owner email / subscription / founder-comp / active → **Save** → "Saved ✓".
+- [ ] **Grant access** (assign an existing user) and **Resend owner invite** both work.
+
+## Drafts (`/admin/drafts`)
+- [ ] Pending drafts show a **before/after diff** (red strikethrough → green),
+      falling back to a field dump for brand-new sections.
+
+## Audit (`/admin/audit`)
+- [ ] Every action you just took (pay link, revoke, tenant edit, provision) shows
+      newest-first, action-tinted, with actor + tenant.
+
+## Client dashboard (owner view)
+- [ ] As an owner (or via a tenant subdomain), the **first-run onboarding
+      checklist** appears with real progress (connect a source / make an AI change
+      / see a report). Dismiss persists; it auto-hides once all three are done.
+
+## Demo (when ready)
+- [ ] Run `npx tsx scripts/seed-demo-engagement.ts` against the demo tenant so
+      `demo.strelva.com`'s dashboard shows live activity + a receipt.
+
+## Config to confirm
+- [ ] `CONTROL_PLANE_API_URL` — onboarding defaults to scaffoldweb.com; set this
+      env to flip to app.strelva.com once the cutover (T004) lands.
+- [ ] `VERCEL_API_TOKEN` set (confirmed) → onboarding's Vercel steps run for real.
+
+## Known not-done (don't flag as bugs)
+- app.strelva.com cutover (T004) — still Jacob's dashboard work.
+- Agent unification (3 surfaces), template archival (pending Jacob's renderer
+  check), dead-code deletion — all deliberately deferred.
