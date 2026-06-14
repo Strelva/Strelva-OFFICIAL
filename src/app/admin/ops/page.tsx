@@ -1,0 +1,106 @@
+import { buildOpsReport } from "@/lib/ops";
+
+export const dynamic = "force-dynamic";
+
+function MetricCard({
+  label,
+  value,
+  bad,
+}: {
+  label: string;
+  value: number;
+  bad?: boolean;
+}) {
+  return (
+    <div className="rounded-xl bg-glass border border-glass-border p-5">
+      <p className="text-sm text-gray-muted">{label}</p>
+      <p
+        className={`text-3xl font-semibold mt-1 ${
+          bad && value > 0 ? "text-red-300" : "text-warm-white"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+export default async function OpsPage() {
+  const report = await buildOpsReport();
+  const m = report.metrics;
+  const pendingByTenant = Object.entries(m.pendingEvents).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-warm-white">Operational Health</h1>
+        <p className="text-sm text-gray-muted mt-1">
+          {report.activeTenants} active tenants · refreshed{" "}
+          {new Date(report.timestamp).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <MetricCard label="Webhook failures" value={m.webhookFailures} bad />
+        <MetricCard label="Revalidation failures" value={m.revalidationFailures} bad />
+        <MetricCard label="Failed AI writes" value={m.failedAiWrites} bad />
+        <MetricCard label="Stale SMS approvals" value={m.staleSmsApprovals} bad />
+        <MetricCard label="Pending queue" value={m.totalPendingEvents} />
+        <MetricCard label="Domain drift" value={m.tenantDomainDrift.length} bad />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-xl bg-glass border border-glass-border p-5">
+          <h2 className="text-sm font-semibold text-warm-white mb-3">
+            Recent revalidation failures
+          </h2>
+          {report.revalidationFailures.length === 0 ? (
+            <p className="text-sm text-gray-muted">None.</p>
+          ) : (
+            <ul className="space-y-2">
+              {report.revalidationFailures.map((f, i) => (
+                <li key={i} className="text-sm text-gray-muted">
+                  <span className="text-warm-white">{f.tenantId}</span>
+                  {f.url ? ` · ${f.url}` : ""} — {f.error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-xl bg-glass border border-glass-border p-5">
+          <h2 className="text-sm font-semibold text-warm-white mb-3">Domain drift</h2>
+          {m.tenantDomainDrift.length === 0 ? (
+            <p className="text-sm text-gray-muted">No drift detected.</p>
+          ) : (
+            <ul className="space-y-2">
+              {m.tenantDomainDrift.map((d, i) => (
+                <li key={i} className="text-sm text-amber-200">
+                  {d}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {pendingByTenant.length > 0 && (
+        <div className="rounded-xl bg-glass border border-glass-border p-5">
+          <h2 className="text-sm font-semibold text-warm-white mb-3">
+            Pending review queue by tenant
+          </h2>
+          <ul className="space-y-1">
+            {pendingByTenant.map(([tenant, count]) => (
+              <li key={tenant} className="text-sm text-gray-muted">
+                <span className="text-warm-white">{tenant}</span> — {count} pending
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

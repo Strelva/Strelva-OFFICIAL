@@ -19,6 +19,7 @@ import {
   type LaunchReadinessStatus,
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
+import { OperatorConsole } from "./OperatorConsole";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,8 @@ export default async function AdminPage() {
           portfolio{archivedTenantCount ? ` · ${archivedTenantCount} archived hidden` : ""}
         </p>
       </div>
+
+      <OperatorConsole />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

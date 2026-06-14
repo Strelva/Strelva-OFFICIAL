@@ -11,26 +11,32 @@ export default async function AdminLayout({
   if (!isAdmin) redirect("/");
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div data-dashboard className="min-h-screen bg-surface-base text-warm-white">
       {/* Top nav */}
-      <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-50">
+      <nav className="border-b border-glass-border bg-surface-base/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold tracking-wide text-white">
-              Strelva Admin
+            <span className="text-sm font-semibold tracking-wide text-warm-white">
+              Mission Control
             </span>
-            <div className="flex items-center gap-4 text-sm text-zinc-400">
-              <Link href="/admin" className="hover:text-white transition-colors">
+            <div className="flex items-center gap-4 text-sm text-gray-muted">
+              <Link href="/admin" className="hover:text-warm-white transition-colors">
                 Overview
               </Link>
-              <Link href="/admin/drafts" className="hover:text-white transition-colors">
+              <Link href="/admin/pay-links" className="hover:text-warm-white transition-colors">
+                Pay Links
+              </Link>
+              <Link href="/admin/ops" className="hover:text-warm-white transition-colors">
+                Ops
+              </Link>
+              <Link href="/admin/drafts" className="hover:text-warm-white transition-colors">
                 Drafts
               </Link>
             </div>
           </div>
           <Link
             href="/account"
-            className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-sm text-gray-faint hover:text-gray-muted transition-colors"
           >
             Client dashboards
           </Link>
