@@ -52,6 +52,9 @@ Type these into the command bar:
       (9 sections), owner invite (skipped if no email), Vercel project + env
       created (**should be real — VERCEL_API_TOKEN is set**), domain skipped.
 - [ ] The "Still needs a human" list shows DNS + connect-the-repo steps.
+- [ ] A **"Client repo env"** block appears with copy-all — confirm
+      `SCAFFOLD_API_URL=https://scaffoldweb.com` and a 64-char `REVALIDATION_SECRET`
+      (this is what Jacob pastes into the hand-built repo).
 - [ ] Open the tenant → it exists with a revalidation secret. Check the created
       Vercel project (`qa-test-1-site`) and that its env vars point at
       **scaffoldweb.com** (the control plane), not strelva.com.
