@@ -28,7 +28,7 @@ import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
-import { buildRevenueSummary } from "@/lib/revenue";
+import { buildRevenueSummary, listBuildPayments } from "@/lib/revenue";
 
 export const maxDuration = 60;
 
@@ -210,16 +210,21 @@ export async function POST(req: Request) {
       },
     }),
     read_pay_links: tool({
-      description: "List outstanding pay links (slug, client, door, amount).",
+      description: "List pay links (slug, client, door, amount) and whether each has been paid.",
       inputSchema: z.object({}),
       execute: async () => {
-        const payLinks = await listPayLinks().catch(() => []);
+        const [payLinks, payments] = await Promise.all([
+          listPayLinks().catch(() => []),
+          listBuildPayments().catch(() => []),
+        ]);
+        const paid = new Set(payments.map((p) => p.paySlug).filter(Boolean));
         return {
           payLinks: payLinks.map((p) => ({
             slug: p.slug,
             clientName: p.clientName,
             door: p.door,
             amountCents: p.amountCents,
+            paid: paid.has(p.slug),
           })),
           count: payLinks.length,
         };
