@@ -1,0 +1,85 @@
+# Strelva — AI-managed website platform
+
+Strelva is a **multi-tenant control plane** for local-business websites. Owners get a
+dashboard that proves their site is working and an AI agent that handles updates in plain
+language ("add my new Saturday class"); the founders run the whole portfolio from an
+AI-driven operator console. Each client's public site is a separate hand-built repo that
+pulls content from Strelva over a versioned contract.
+
+> Internal note: the repo's legacy name is `reb`; wire-level `x-reb-*` headers and `reb:`
+> Redis prefixes are intentionally frozen for back-compat. Product name is Strelva.
+
+## Architecture
+
+```
+ Marketing site (separate repo)
+        │ lead
+        ▼
+ CONTROL PLANE  (this repo)
+   proxy.ts ── host → tenant routing, Clerk auth, CSP
+   /dashboard (owner) · /admin "Mission Control" (operator)
+   AI agents + governance + risk engine
+   /api/v1/*  ── frozen, additive-only contract
+        │ pull (ISR 60s)        ▲ push (HMAC-signed revalidate)
+        ▼                       │
+ Sanity (source of truth) + Redis (cache + operational data)
+        │
+        ▼
+ CUSTOM CLIENT REPOS — one per paid client, own domain, own Vercel project
+```
+
+- **Source of truth:** Sanity for content/config; Upstash Redis as a write-through cache
+  and the operational store (events, clicks, bookings, reviews, pay-links, rewards).
+- **Sync contract (`/api/v1/*`):** client repos pull content (ISR) and receive
+  HMAC-signed revalidation pushes. The contract is versioned (`v1`) and changed only
+  additively — deployed client sites can't break.
+- **Stack:** Next.js 16 (App Router, `proxy.ts` routing), React 19, TypeScript, Tailwind 4,
+  Clerk (multi-host auth), Vercel AI SDK + Gemini, Stripe, Resend, Vercel Blob.
+
+## The AI systems
+
+Two agents, both governed — this is the applied-AI core of the product.
+
+**Tenant content agent** (`/api/agent`) — the owner chats; the agent edits the site. Every
+proposed change runs through:
+- **Governance** (`ai-governance.ts`) — `publish` (factual fields) vs `review` (marketing
+  copy / high-risk facts like prices, hours) vs `block` (structural).
+- **Risk assessment** (`agent-risk.ts`) — classifies the operation (rewrite/add/delete/
+  reorder/structural) and scores it; only low-risk minor edits auto-apply, everything else
+  routes to human review.
+- On publish: write to Sanity → write-through Redis → HMAC revalidate the client repo →
+  verify the change is actually live before claiming it.
+
+**Operator agent** ("Mission Control", `/api/admin/agent`) — the founders run the business
+by talking to it. **Safe by construction:** it reads the entire portfolio (health,
+revenue, ops, attention briefing, audit, pay links) but has **no mutation path** — for
+consequential actions it returns a *confirmation proposal*; the console commits it by
+calling the existing gated, audited endpoints on an explicit click. The LLM can never
+target an arbitrary endpoint or mutate state on its own.
+
+## Mission Control (operator layer)
+
+- **Portfolio brain** — one cached cross-tenant aggregate of health, MRR, launch readiness.
+- **Needs-Attention briefing** — prioritized "where to spend founder hours" (launch-blocked
+  tenants, ops breakage, drafts, quiet tenants), on the overview + a daily Slack digest.
+- **Guided onboarding** — provisions a tenant end to end (record + revalidation secret +
+  seeded content + owner invite + Vercel project/env/domain) and hands back the client-repo
+  env to paste; the site stays a hand-built repo.
+- **Operator screens** — ops board (with live platform-dependency health), pay-links (mint +
+  revoke, with paid tracking), tenant detail (live pulse + activity + edit + access), draft
+  diff review, and a portfolio-wide audit trail.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev            # local dev (localhost:3000); gldf.localhost:3000 routes a tenant
+pnpm typecheck      # tsc --noEmit
+pnpm test           # vitest (700+ tests)
+pnpm build          # production build
+pnpm check:prod     # production-readiness checklist
+pnpm provision-tenant   # CLI tenant provisioning
+```
+
+Agent guidance for contributors lives in [`AGENTS.md`](./AGENTS.md); the canonical operating
+model and roadmap in [`docs/operating-model.md`](./docs/operating-model.md).
