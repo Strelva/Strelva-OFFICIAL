@@ -1,6 +1,13 @@
 import { buildOpsReport } from "@/lib/ops";
+import { getServiceHealth, type ServiceStatus } from "@/lib/health";
 
 export const dynamic = "force-dynamic";
+
+const SERVICE_DOT: Record<ServiceStatus, string> = {
+  ok: "bg-emerald-400",
+  "not configured": "bg-gray-faint",
+  error: "bg-red-400",
+};
 
 function MetricCard({
   label,
@@ -26,9 +33,15 @@ function MetricCard({
 }
 
 export default async function OpsPage() {
-  const report = await buildOpsReport();
+  const [report, health] = await Promise.all([buildOpsReport(), getServiceHealth()]);
   const m = report.metrics;
   const pendingByTenant = Object.entries(m.pendingEvents).sort((a, b) => b[1] - a[1]);
+  const healthTint =
+    health.status === "down"
+      ? "text-red-300"
+      : health.status === "degraded"
+        ? "text-amber-300"
+        : "text-emerald-300";
 
   return (
     <div className="space-y-8">
@@ -41,6 +54,26 @@ export default async function OpsPage() {
             minute: "2-digit",
           })}
         </p>
+      </div>
+
+      <div className="rounded-xl bg-glass border border-glass-border p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-warm-white">Platform health</h2>
+          <span className={`text-xs font-medium uppercase tracking-wide ${healthTint}`}>
+            {health.status}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          {Object.entries(health.checks).map(([name, c]) => (
+            <div key={name} className="flex items-center gap-2 text-sm">
+              <span className={`h-2 w-2 rounded-full ${SERVICE_DOT[c.status]}`} />
+              <span className="text-warm-white capitalize">{name}</span>
+              <span className="text-xs text-gray-faint">
+                {c.status === "ok" ? `${c.responseMs}ms` : c.status}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">

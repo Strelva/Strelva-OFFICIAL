@@ -24,6 +24,7 @@ import {
   type PortfolioSnapshot,
 } from "@/lib/portfolio";
 import { buildOpsReport } from "@/lib/ops";
+import { getServiceHealth } from "@/lib/health";
 import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
@@ -141,6 +142,12 @@ export async function POST(req: Request) {
         "Read live operational health: webhook failures, revalidation failures, stale SMS approvals, pending event queues, failed AI writes, and tenant domain drift.",
       inputSchema: z.object({}),
       execute: async () => await buildOpsReport(),
+    }),
+    read_health: tool({
+      description:
+        "Check platform dependency health (Redis, Sanity, Clerk, Stripe, Gemini) — overall status + per-service. Use for 'is the platform up / are services healthy'.",
+      inputSchema: z.object({}),
+      execute: async () => await getServiceHealth(),
     }),
     read_attention: tool({
       description:
@@ -360,6 +367,7 @@ export async function POST(req: Request) {
             const label =
               part.toolName === "read_portfolio" ? "Reading the portfolio..." :
               part.toolName === "read_ops" ? "Checking operational health..." :
+              part.toolName === "read_health" ? "Checking platform health..." :
               part.toolName === "read_attention" ? "Building the attention briefing..." :
               part.toolName === "refresh_portfolio" ? "Refreshing the data..." :
               part.toolName === "read_tenant" ? "Looking up the tenant..." :
