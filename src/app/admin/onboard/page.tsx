@@ -15,6 +15,7 @@ interface ProvisionResult {
   siteUrl: string;
   steps: ProvisionStep[];
   manualNext: string[];
+  clientEnv: Record<string, string>;
 }
 
 const INDUSTRIES = ["wellness", "food-brand", "restaurant", "trades", "professional", "fashion-stylist"];
@@ -44,6 +45,20 @@ export default function OnboardPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionResult | null>(null);
+  const [copiedEnv, setCopiedEnv] = useState(false);
+
+  function envText(env: Record<string, string>): string {
+    return Object.entries(env)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("\n");
+  }
+
+  function copyEnv() {
+    if (!result) return;
+    void navigator.clipboard.writeText(envText(result.clientEnv));
+    setCopiedEnv(true);
+    setTimeout(() => setCopiedEnv(false), 1500);
+  }
 
   async function run() {
     setError(null);
@@ -136,6 +151,27 @@ export default function OnboardPage() {
               ))}
             </ul>
           </div>
+
+          {Object.keys(result.clientEnv).length > 0 && (
+            <div className="rounded-xl bg-glass border border-glass-border p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-warm-white">Client repo env</h2>
+                <button
+                  onClick={copyEnv}
+                  className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
+                >
+                  {copiedEnv ? "Copied" : "Copy all"}
+                </button>
+              </div>
+              <pre className="text-xs text-gray-muted overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-surface-base p-3">
+                {envText(result.clientEnv)}
+              </pre>
+              <p className="text-xs text-gray-faint mt-2">
+                Paste into the hand-built {result.tenantId} repo — REVALIDATION_SECRET is the
+                load-bearing one. (Already set on the Vercel project too.)
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <Link

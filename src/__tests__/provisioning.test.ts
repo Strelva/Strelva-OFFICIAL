@@ -68,6 +68,12 @@ describe("provisionTenant", () => {
     expect(mockCreateVercelProject).toHaveBeenCalledWith("acme-site");
     expect(mockAddVercelDomain).toHaveBeenCalledWith("prj_1", "acmehvac.com");
     expect(result.manualNext.length).toBeGreaterThan(0);
+
+    // The client-repo env is returned (incl. the secret) for the operator to paste,
+    // and points at the live control plane (scaffoldweb.com, not the marketing host).
+    expect(result.clientEnv.REVALIDATION_SECRET).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.clientEnv.SCAFFOLD_API_URL).toBe("https://scaffoldweb.com");
+    expect(result.clientEnv.TENANT_ID).toBe("acme");
   });
 
   it("skips Vercel steps when no token is configured", async () => {

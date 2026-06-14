@@ -48,6 +48,9 @@ export interface ProvisionResult {
   siteUrl: string;
   steps: ProvisionStep[];
   manualNext: string[];
+  /** The env vars the hand-built client repo needs (incl. the revalidation
+   *  secret). Shown to the operator so Jacob can paste them into the repo. */
+  clientEnv: Record<string, string>;
 }
 
 function initials(name: string): string {
@@ -82,6 +85,20 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   const revalidationSecret = randomBytes(32).toString("hex");
 
   let tenantId = subdomain;
+
+  // The env the client repo (and its Vercel project) needs. Computed up front so
+  // it's returned even if a later step fails — the secret is the load-bearing
+  // value Jacob pastes into the hand-built repo.
+  const clientEnv: Record<string, string> = {
+    TENANT_ID: subdomain,
+    SCAFFOLD_API_URL: CONTROL_PLANE_API,
+    NEXT_PUBLIC_SCAFFOLD_API_URL: CONTROL_PLANE_API,
+    NEXT_PUBLIC_TENANT_ID: subdomain,
+    REVALIDATION_SECRET: revalidationSecret,
+    NEXT_PUBLIC_SITE_NAME: input.siteName,
+    NEXT_PUBLIC_SITE_URL: siteUrl,
+    OWNER_EMAIL: input.ownerEmail || "",
+  };
 
   // 1. Tenant record — the hard prerequisite. Bail if it fails.
   try {
@@ -119,7 +136,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       status: "failed",
       detail: err instanceof Error ? err.message : "Unknown error",
     });
-    return { tenantId, siteUrl, steps, manualNext: [] };
+    return { tenantId, siteUrl, steps, manualNext: [], clientEnv };
   }
 
   // 2. Seed an editable content baseline so the dashboard starts from real
@@ -188,16 +205,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // 5. Vercel env (needs the project).
   if (projectId) {
-    const r = await setVercelEnv(projectId, {
-      TENANT_ID: tenantId,
-      SCAFFOLD_API_URL: CONTROL_PLANE_API,
-      NEXT_PUBLIC_SCAFFOLD_API_URL: CONTROL_PLANE_API,
-      NEXT_PUBLIC_TENANT_ID: tenantId,
-      REVALIDATION_SECRET: revalidationSecret,
-      NEXT_PUBLIC_SITE_NAME: input.siteName,
-      NEXT_PUBLIC_SITE_URL: siteUrl,
-      OWNER_EMAIL: input.ownerEmail || "",
-    });
+    const r = await setVercelEnv(projectId, clientEnv);
     steps.push(
       r.ok
         ? { key: "vercel_env", label: "Set Vercel env vars", status: "ok", detail: `${r.data.set.length} vars set` }
@@ -235,5 +243,5 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       : `Add an owner email + invite from /admin/tenants/${tenantId}`,
   ];
 
-  return { tenantId, siteUrl, steps, manualNext };
+  return { tenantId, siteUrl, steps, manualNext, clientEnv };
 }
