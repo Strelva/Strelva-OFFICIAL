@@ -65,6 +65,39 @@ Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-
 `src/lib/storage/content-{cache,store}.ts`, `src/lib/tenants.ts`, `src/lib/events.ts`,
 `src/lib/auth.ts`, `src/app/api/v1/**`, `src/app/api/cron/**`, `custom-repo-starter/`.
 
+## Progress (updated 2026-06-14)
+
+**Mission Control — the operator layer — is built** on `feat/platform-solidify`
+(typecheck clean, ~690 tests). New since this doc was written:
+
+- **Operator agent** (`/api/admin/agent`) — super-admin-gated, reads the whole
+  portfolio (portfolio brain, ops, attention briefing, audit, pay links, revenue,
+  per-tenant) and *proposes* consequential actions (pay link, assign, draft
+  approve/reject, tenant update). It never mutates; the console commits a proposal
+  to the existing gated+audited endpoints. Tested gate + the console action map.
+- **Portfolio brain** (`src/lib/portfolio.ts`) — cached cross-tenant aggregate,
+  off-peak refresh cron, `GET /api/admin/portfolio`.
+- **Needs-Attention briefing** (`src/lib/attention.ts`) — prioritized "where to
+  spend founder hours," surfaced on the overview, as an agent tool, and a daily
+  Slack digest cron.
+- **Operator screens** (off curl) — Mission Control console, ops board, pay-links
+  (mint + **revoke**), tenant detail/edit + assign, draft diff, **audit trail**.
+- **Guided onboarding** (`/admin/onboard`) — tenant + revalidation secret +
+  **seeded content baseline** + owner invite + Vercel project/env/domain, live
+  checklist + manual remainder. Tested orchestrator + route.
+- **Revenue reader** (`src/lib/revenue.ts`) — the build-payment money trail now
+  has a reader + agent tool.
+- **Client onboarding** — first-run checklist on the owner dashboard driven by
+  real progress (replaces the dead `?welcome=1` banner).
+- **Hardening** — done from the list below: super-admin all-emails, dev-bypass
+  `check:prod` guard, operator audit logging, admin error/loading boundaries,
+  loud Slack alerts on invite-email failure, pay-link door bug fixed.
+
+**Still open (the honest remainder):** agent unification (B), delivery-model
+cleanup + dead-code deletion (C — has a test, needs a deliberate call),
+owner-notification on async approval (D), email-mismatch hard stop (A),
+durability backup + cron de-stampede (G), and the cutover (H, Jacob's).
+
 ## 4. Solidification punch list
 
 ### A. Correctness / security (do first)
