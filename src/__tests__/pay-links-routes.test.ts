@@ -10,6 +10,7 @@ const mockSavePayLink = vi.hoisted(() => vi.fn());
 const mockGetPayLink = vi.hoisted(() => vi.fn());
 const mockListPayLinks = vi.hoisted(() => vi.fn());
 const mockDeletePayLink = vi.hoisted(() => vi.fn());
+const mockListBuildPayments = vi.hoisted(() => vi.fn());
 const mockIsRateLimitedAsync = vi.hoisted(() => vi.fn());
 const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 
@@ -36,6 +37,8 @@ vi.mock("@/lib/pay-links", async () => {
     deletePayLink: mockDeletePayLink,
   };
 });
+
+vi.mock("@/lib/revenue", () => ({ listBuildPayments: mockListBuildPayments }));
 
 vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedAsync: mockIsRateLimitedAsync,
@@ -67,6 +70,7 @@ beforeEach(() => {
   mockSavePayLink.mockResolvedValue(undefined);
   mockListPayLinks.mockResolvedValue([]);
   mockDeletePayLink.mockResolvedValue(true);
+  mockListBuildPayments.mockResolvedValue([]);
   mockIsRateLimitedAsync.mockResolvedValue(false);
   mockCheckoutCreate.mockResolvedValue({ url: "https://checkout.stripe.com/c/pay/cs_test_123" });
 });
@@ -212,6 +216,19 @@ describe("GET /api/admin/pay-links", () => {
       createdAt: "2026-06-09T00:00:00.000Z",
       createdBy: "jacob@strelva.com",
     });
+  });
+
+  it("marks links paid by cross-referencing the build-payment trail", async () => {
+    mockListPayLinks.mockResolvedValue([
+      { slug: "acme-coffee", clientName: "Acme", door: "build", amountCents: 200_000, createdAt: "2026-06-09T00:00:00.000Z" },
+      { slug: "unpaid", clientName: "Nobody", door: "build", amountCents: 150_000, createdAt: "2026-06-08T00:00:00.000Z" },
+    ] as PayLinkConfig[]);
+    mockListBuildPayments.mockResolvedValue([
+      { sessionId: "s1", paySlug: "acme-coffee", amountCents: 200_000, currency: "usd", createdAt: "2026-06-10T00:00:00.000Z" },
+    ]);
+    const { GET } = await import("@/app/api/admin/pay-links/route");
+    const payload = await (await GET()).json();
+    expect(payload.paidSlugs).toEqual(["acme-coffee"]);
   });
 });
 

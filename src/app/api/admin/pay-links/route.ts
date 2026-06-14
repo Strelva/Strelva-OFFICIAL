@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
+import { listBuildPayments } from "@/lib/revenue";
 import {
   buildPayLinkConfig,
   savePayLink,
@@ -101,7 +102,12 @@ export async function GET() {
     throw err;
   }
 
-  return NextResponse.json({ payLinks, count: payLinks.length });
+  // Cross-reference the build-payment money trail so the UI can show which links
+  // actually converted (a payment whose paySlug matches the link's slug).
+  const payments = await listBuildPayments().catch(() => []);
+  const paidSlugs = [...new Set(payments.map((p) => p.paySlug).filter((s): s is string => Boolean(s)))];
+
+  return NextResponse.json({ payLinks, count: payLinks.length, paidSlugs });
 }
 
 /**

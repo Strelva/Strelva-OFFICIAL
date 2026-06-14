@@ -24,6 +24,7 @@ const blankForm = {
 
 export default function PayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
+  const [paidSlugs, setPaidSlugs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(blankForm);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +37,7 @@ export default function PayLinksPage() {
       const res = await fetch("/api/admin/pay-links");
       const data = await res.json();
       setLinks(data.payLinks ?? []);
+      setPaidSlugs(new Set<string>(data.paidSlugs ?? []));
     } catch {
       setError("Failed to load pay links");
     } finally {
@@ -158,6 +160,11 @@ export default function PayLinksPage() {
                   <p className="text-sm text-warm-white truncate">
                     {l.clientName}{" "}
                     <span className="text-gray-faint">· {l.door}</span>
+                    {paidSlugs.has(l.slug) && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                        Paid
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-muted truncate">
                     /pay/{l.slug}
