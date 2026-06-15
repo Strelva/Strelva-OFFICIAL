@@ -68,7 +68,8 @@ Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-
 ## Progress (updated 2026-06-14)
 
 **Mission Control — the operator layer — is built** on `feat/platform-solidify`
-(typecheck clean, ~690 tests). New since this doc was written:
+(typecheck + prod build green, 725 tests, PR rhinehart514/REB#55). New since this
+doc was written:
 
 - **Operator agent** (`/api/admin/agent`) — super-admin-gated, reads the whole
   portfolio (portfolio brain, ops, attention briefing, audit, pay links, revenue,
@@ -92,6 +93,17 @@ Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-
 - **Hardening** — done from the list below: super-admin all-emails, dev-bypass
   `check:prod` guard, operator audit logging, admin error/loading boundaries,
   loud Slack alerts on invite-email failure, pay-link door bug fixed.
+- **Platform health** — `src/lib/health.ts` (Redis/Sanity/Clerk/Stripe/Gemini)
+  surfaced on the ops board + a `read_health` agent tool.
+- **Rich tenant pages** — live pulse (visits/clicks/drafts) + activity history,
+  linked from the overview.
+- **Pay-link paid tracking** — cross-references the build-payment trail (badge +
+  agent), plus revoke.
+- **Control-plane URL fix** — onboarding baked `strelva.com` (now marketing);
+  fixed to `scaffoldweb.com`, env-driven via `CONTROL_PLANE_API_URL`.
+- **Test hardening** — locked the AI auto-publish safety gate (`agent-risk`, was
+  zero coverage), input validation (`request-body`), offer-terms copy, and the
+  portfolio/ops/attention/revenue/provisioning logic. Added a `README`.
 
 **Still open (the honest remainder):** agent unification (B), delivery-model
 cleanup + dead-code deletion (C — has a test, needs a deliberate call),
