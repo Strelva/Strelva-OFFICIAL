@@ -326,19 +326,25 @@ export async function POST(req: Request) {
         tenantId: z.string(),
         ownerEmail: z.string().email().optional(),
         subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]).optional(),
-        planOverride: z.enum(["founder_comp", ""]).optional(),
+        founderComp: z.boolean().optional().describe("true sets founder-comp (free access), false clears it"),
         active: z.boolean().optional(),
       }),
-      execute: async ({ tenantId, ...changes }) => {
+      execute: async ({ tenantId, founderComp, ...changes }) => {
         const fields = Object.entries(changes).filter(([, v]) => v !== undefined);
-        if (fields.length === 0) {
+        const params: Record<string, unknown> = { id: tenantId, ...Object.fromEntries(fields) };
+        // founderComp maps to the tenant's planOverride field ("founder_comp" or
+        // "" to clear). Kept out of the Gemini schema as a boolean — an empty
+        // enum value is rejected by the model's function-calling validation.
+        if (founderComp !== undefined) params.planOverride = founderComp ? "founder_comp" : "";
+        const changedKeys = Object.keys(params).filter((k) => k !== "id");
+        if (changedKeys.length === 0) {
           return { error: "No fields to change." };
         }
         const proposal: Proposal = {
           id: nextProposalId(),
           action: "update_tenant",
-          summary: `Update ${tenantId}: ${fields.map(([k, v]) => `${k}=${v}`).join(", ")}`,
-          params: { id: tenantId, ...Object.fromEntries(fields) },
+          summary: `Update ${tenantId}: ${changedKeys.map((k) => `${k}=${params[k]}`).join(", ")}`,
+          params,
         };
         proposals.push(proposal);
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
