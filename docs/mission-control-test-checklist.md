@@ -90,3 +90,26 @@ Type these into the command bar:
 - app.strelva.com cutover (T004) — still Jacob's dashboard work.
 - Agent unification (3 surfaces), template archival (pending Jacob's renderer
   check), dead-code deletion — all deliberately deferred.
+
+## Decisions to make this session (not just QA)
+1. **Template-renderer check (with Jacob)** — which live tenants still render via
+   the in-repo template registry (jada?). Unblocks the approved archival.
+2. **Agent unification** — go/no-go on collapsing the 3 agent surfaces into one
+   core. It's a refactor of the live tenant-facing chat, so decide to do it
+   together (and when).
+3. **Dead-code deletion** — the `design/` visual-editor subtree (has a test).
+   Delete + drop the test, or keep.
+4. **Merge plan for PR #55** — after QA passes: Jacob reviews then merge to main,
+   or merge now and iterate.
+
+## After QA passes
+- Merge `feat/platform-solidify` → main (and `strelva-marketing#1`).
+- Run the demo seed against the prod demo tenant.
+- Nudge Jacob on the T004 cutover; once app.strelva.com is live, set
+  `CONTROL_PLANE_API_URL` and re-onboard / re-point.
+
+## Troubleshooting
+- Empty data everywhere → `.env.local` not pulled. `vercel env pull` (scope scaffold-web).
+- Onboarding Vercel steps "skipped" → `VERCEL_API_TOKEN` missing in the pulled env.
+- Operator agent errors on every message → `GOOGLE_GENERATIVE_AI_API_KEY` missing.
+- 403 on `/admin/*` → your signed-in email isn't in `SUPER_ADMIN_EMAILS`.
