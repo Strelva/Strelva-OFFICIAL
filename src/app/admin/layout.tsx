@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isSuperAdmin } from "@/lib/auth";
+import { getAllTenants } from "@/lib/tenants";
 import { NavLinks } from "./NavLinks";
+import { CommandPalette } from "./CommandPalette";
+import { CommandTrigger } from "./CommandTrigger";
 
 export default async function AdminLayout({
   children,
@@ -10,6 +13,11 @@ export default async function AdminLayout({
 }) {
   const isAdmin = await isSuperAdmin();
   if (!isAdmin) redirect("/");
+
+  const tenants = (await getAllTenants().catch(() => [])).map((t) => ({
+    id: t.id,
+    siteName: t.siteName,
+  }));
 
   return (
     <div data-dashboard className="min-h-screen bg-surface-base text-warm-white">
@@ -35,12 +43,15 @@ export default async function AdminLayout({
               <NavLinks />
             </div>
           </div>
-          <Link
-            href="/account"
-            className="text-sm text-gray-faint hover:text-warm-white transition-colors"
-          >
-            Client dashboards →
-          </Link>
+          <div className="flex items-center gap-3">
+            <CommandTrigger />
+            <Link
+              href="/account"
+              className="text-sm text-gray-faint hover:text-warm-white transition-colors"
+            >
+              Client dashboards →
+            </Link>
+          </div>
         </div>
         <div className="md:hidden border-t border-glass-border px-4 py-2 overflow-x-auto">
           <NavLinks />
@@ -49,6 +60,8 @@ export default async function AdminLayout({
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+
+      <CommandPalette tenants={tenants} />
     </div>
   );
 }
