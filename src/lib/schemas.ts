@@ -29,6 +29,28 @@ const safeImageUrl = z.string().refine(
   { message: "Invalid image URL" }
 );
 
+// Theme values are interpolated into inline CSS custom properties on the public
+// site. Constrain them so a content value can't carry CSS-injection/defacement
+// payloads (hex, rgb/hsl, named colors, or a CSS var reference only).
+const cssColor = z
+  .string()
+  .max(64)
+  .refine(
+    (v) =>
+      v.trim() === "" ||
+      /^#[0-9a-fA-F]{3,8}$/.test(v) ||
+      /^(rgb|rgba|hsl|hsla)\([0-9.,%\s/]+\)$/.test(v) ||
+      /^[a-zA-Z]+$/.test(v) ||
+      /^var\(--[a-zA-Z0-9-]+\)$/.test(v),
+    { message: "Invalid color value" }
+  );
+const cssFont = z
+  .string()
+  .max(120)
+  .refine((v) => v.trim() === "" || /^[a-zA-Z0-9\s,"'._-]+$/.test(v), {
+    message: "Invalid font value",
+  });
+
 export const heroSchema = z.object({
   headline: z.string().min(1),
   subheadline: z.string(),
@@ -197,29 +219,29 @@ export const siteSettingsSchema = z.object({
   copyrightText: z.string(),
   bookingUrl: safeUrl.optional().default(""),
   instagramHandle: z.string().optional().default(""),
-  vagaro_embed_id: z.string().optional().default(""),
+  vagaro_embed_id: z.string().regex(/^[A-Za-z0-9/_-]*$/, "Invalid embed id").optional().default(""),
   logoUrl: safeImageUrl.optional().default(""),
   marqueeText: z.string().optional().default(""),
 });
 
 export const themeSchema = z.object({
   colors: z.object({
-    cream: z.string(),
-    creamDark: z.string(),
-    creamMid: z.string(),
-    sage: z.string(),
-    sageLight: z.string(),
-    sageDark: z.string(),
-    bark: z.string(),
-    barkLight: z.string(),
-    barkFaded: z.string(),
-    wheat: z.string(),
-    wheatLight: z.string(),
-    terra: z.string(),
-    terraLight: z.string(),
+    cream: cssColor,
+    creamDark: cssColor,
+    creamMid: cssColor,
+    sage: cssColor,
+    sageLight: cssColor,
+    sageDark: cssColor,
+    bark: cssColor,
+    barkLight: cssColor,
+    barkFaded: cssColor,
+    wheat: cssColor,
+    wheatLight: cssColor,
+    terra: cssColor,
+    terraLight: cssColor,
   }),
-  fontDisplay: z.string(),
-  fontBody: z.string(),
+  fontDisplay: cssFont,
+  fontBody: cssFont,
 });
 
 export const rewardsConfigSchema = z.object({
@@ -231,20 +253,22 @@ export const rewardsConfigSchema = z.object({
   tierThresholdSuper: z.number(),
 });
 
+// Every href is safeUrl-validated so a `javascript:`/`data:` scheme can't be
+// stored and rendered into an <a href> on the client's public site (stored XSS).
 export const navMenuItemSchema = z.object({
   label: z.string(),
-  href: z.string(),
+  href: safeUrl,
 });
 
 export const navigationSchema = z.object({
   menuItems: z.array(navMenuItemSchema),
   ctaLabel: z.string(),
-  ctaHref: z.string(),
+  ctaHref: safeUrl,
 });
 
 export const footerColumnLinkSchema = z.object({
   label: z.string(),
-  href: z.string(),
+  href: safeUrl,
 });
 
 export const footerColumnSchema = z.object({
@@ -255,7 +279,7 @@ export const footerColumnSchema = z.object({
 export const footerSchema = z.object({
   tagline: z.string(),
   columns: z.array(footerColumnSchema),
-  socialLinks: z.array(z.object({ label: z.string(), href: z.string() })),
+  socialLinks: z.array(z.object({ label: z.string(), href: safeUrl })),
   copyrightText: z.string(),
 });
 

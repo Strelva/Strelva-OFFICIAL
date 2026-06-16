@@ -153,10 +153,19 @@ async function LocalBusinessSchema() {
       : {}),
   };
 
+  // Escape HTML-significant sequences so tenant content (siteName, description,
+  // address, etc.) can't break out of the <script> tag. JSON.stringify escapes
+  // quotes but NOT `<` — a value like `</script><script>…` would otherwise close
+  // the JSON-LD element and execute injected script (stored XSS on every page).
+  const json = JSON.stringify(schema)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: json }}
     />
   );
 }
