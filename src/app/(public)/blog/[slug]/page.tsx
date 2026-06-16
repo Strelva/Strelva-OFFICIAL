@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBlogPost } from "@/lib/blog";
 import { getContent } from "@/lib/storage";
+import { defaults } from "@/lib/defaults";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
 
@@ -15,8 +16,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const tenant = await getTenantFromHeaders();
-  const post = await getBlogPost(tenant, slug);
-  const settings = await getContent("settings", tenant);
+  const post = await getBlogPost(tenant, slug).catch(() => null);
+  const settings = await getContent("settings", tenant).catch(() => defaults.settings);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
 
   if (!post) {
@@ -46,8 +47,11 @@ export default async function BlogPostPage({
   const { slug } = await params;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
-  // In preview mode, allow viewing draft posts
-  const post = await getBlogPost(tenant, slug, preview ? { includeDrafts: true } : undefined);
+  // In preview mode, allow viewing draft posts. A transient backend error must
+  // become a clean 404 (via notFound below), not a 500 that bypasses it.
+  const post = await getBlogPost(tenant, slug, preview ? { includeDrafts: true } : undefined).catch(
+    () => null
+  );
 
   if (!post) notFound();
 
