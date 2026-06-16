@@ -1,5 +1,6 @@
 import { createRevalidationBody, signRevalidationBody } from "./scaffold-contracts";
 import { getTenantConfig, getActiveTenants } from "./tenants";
+import { getTenantDeliveryModel } from "./custom-repos";
 import { getRedis } from "./redis";
 import { alert } from "./monitoring";
 import { getSectionTimestamps } from "./storage";
@@ -81,6 +82,20 @@ export async function revalidateClientSite(
   const config = await getTenantConfig(tenantId);
 
   if (!config?.revalidateUrl) {
+    // A custom-repo tenant with no revalidateUrl can't be revalidated — its
+    // site would silently go stale. Record it as a failure so it shows on the
+    // ops board instead of being a silent skip. A legacy template tenant
+    // legitimately has no revalidateUrl, so only flag custom-repo tenants.
+    if (config && getTenantDeliveryModel(config) === "custom_repo") {
+      await recordFailure({
+        tenantId,
+        url: "(missing revalidateUrl)",
+        error: "Custom-repo tenant has no revalidateUrl configured",
+        timestamp: new Date().toISOString(),
+        attempts: 0,
+      });
+      return { success: false, error: "Missing revalidateUrl" };
+    }
     return { success: true, skipped: true };
   }
 
@@ -209,8 +224,11 @@ export async function reconcileRevalidations(): Promise<ReconciliationResult[]> 
 
       const lastRevalidatedAt = await getLastSuccessfulRevalidation(tenant.id);
 
-      // If we have no record of successful revalidation, or content is newer
-      if (!lastRevalidatedAt || latestContentAt > lastRevalidatedAt) {
+      // If we have no record of successful revalidation, or content is newer.
+      // Compare as parsed timestamps, not raw strings — a lexicographic ISO
+      // compare silently mis-orders if the two values ever differ in zone/format
+      // (e.g. "+00:00" vs "Z"), which would report a stale site as up_to_date.
+      if (!lastRevalidatedAt || Date.parse(latestContentAt) > Date.parse(lastRevalidatedAt)) {
         logger.info("[reconcile] Stale repo detected, re-firing revalidation", {
           tenantId: tenant.id,
           latestContentAt,

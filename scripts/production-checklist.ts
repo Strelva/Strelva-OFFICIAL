@@ -1288,18 +1288,21 @@ async function checkBillingGrandfathering() {
     .map((t) => t.trim())
     .filter(Boolean);
 
-  if (grandfathered.length > 0) {
-    log({
-      name: "Billing grandfathering",
-      status: "ok",
-      message: `STRIPE_BILLING_GRANDFATHER_TENANTS lists ${grandfathered.length} tenant(s) — no 402 cliff on billing flip`,
-    });
-    return;
-  }
-
-  // No grandfather list. The only safe alternative is that every active tenant
-  // already covers itself via planOverride or an active/trialing subscription.
+  // Coverage MUST be verified against the live tenant list — a non-empty
+  // grandfather env var is NOT proof of safety (it can be incomplete or have a
+  // typo'd id, leaving a real active tenant to get 402'd the moment billing
+  // flips). So always cross-check Sanity: a tenant is "covered" if it is in the
+  // grandfather set OR has planOverride=founder_comp OR an active/trialing sub.
   if (!hasSanityProject || !hasSanityToken) {
+    // Can't verify against the source of truth.
+    if (grandfathered.length > 0) {
+      log({
+        name: "Billing grandfathering",
+        status: "warn",
+        message: `STRIPE_BILLING_GRANDFATHER_TENANTS lists ${grandfathered.length} tenant(s), but Sanity is not configured to verify the list covers EVERY active tenant. Double-check the list is complete (no missing/typo'd ids) before flipping billing on.`,
+      });
+      return;
+    }
     failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
     log({
       name: "Billing grandfathering",
@@ -1326,9 +1329,11 @@ async function checkBillingGrandfathering() {
       subscriptionStatus?: string;
     }>>(`*[_type == "tenant"]{ id, active, planOverride, subscriptionStatus }`);
 
+    const grandfatheredSet = new Set(grandfathered);
     const activeTenants = tenants.filter((t) => t.active !== false);
     const uncovered = activeTenants.filter(
       (t) =>
+        !grandfatheredSet.has(t.id) &&
         t.planOverride !== "founder_comp" &&
         t.subscriptionStatus !== "active" &&
         t.subscriptionStatus !== "trialing"
@@ -1341,7 +1346,7 @@ async function checkBillingGrandfathering() {
         status: "fail",
         message: `STRIPE_SCAFFOLD_PRICE_ID is set but ${uncovered.length} active tenant(s) (${uncovered
           .map((t) => t.id)
-          .join(", ")}) have neither planOverride nor an active/trialing subscription. They would get a 402 the moment billing turns on — add them to STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated) in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID, or set their planOverride/subscriptionStatus in Sanity first.`,
+          .join(", ")}) are not in STRIPE_BILLING_GRANDFATHER_TENANTS and have neither planOverride nor an active/trialing subscription. They would get a 402 the moment billing turns on — add them to STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated) in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID, or set their planOverride/subscriptionStatus in Sanity first.`,
       });
       return;
     }
@@ -1349,7 +1354,7 @@ async function checkBillingGrandfathering() {
     log({
       name: "Billing grandfathering",
       status: "ok",
-      message: `All ${activeTenants.length} active tenant(s) are covered by planOverride/subscriptionStatus — no 402 cliff`,
+      message: `All ${activeTenants.length} active tenant(s) are covered (grandfather list + planOverride/subscriptionStatus) — no 402 cliff`,
     });
   } catch (err) {
     failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");

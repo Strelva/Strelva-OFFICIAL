@@ -4,6 +4,7 @@ import { updateTenant } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
+import { logger } from "@/lib/logger";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -101,7 +102,10 @@ async function markEventFailed(eventId: string, error: string): Promise<void> {
     const record: EventRecord = { status: "failed" };
     await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
     await redis.set(errorKey, error, { ex: PROCESSED_EVENT_TTL_SECONDS });
-  } catch {}
+  } catch (err) {
+    // Don't let a Redis hiccup silently erase the payment-failure trail.
+    logger.error("[billing/webhook] failed to record event failure", { eventId, err });
+  }
 }
 
 function extractTenantId(object: unknown): string | null {
