@@ -115,15 +115,6 @@ async function redisStatus(key: string, max: number, windowSeconds: number): Pro
   }
 }
 
-/**
- * @deprecated Use isRateLimitedAsync() for proper Redis-backed distributed rate limiting.
- * This sync version only uses in-memory checks and resets on cold start.
- */
-export function isRateLimited(key: string, maxPerMinute: number): boolean {
-  console.warn("[rate-limit] isRateLimited() is deprecated — use isRateLimitedAsync()");
-  return memCheck(key, maxPerMinute, windowMs);
-}
-
 /** Async rate limit check — uses Redis when available, in-memory otherwise.
  *  Preferred over isRateLimited for API routes that can await. */
 export async function isRateLimitedAsync(key: string, maxPerMinute: number): Promise<boolean> {
