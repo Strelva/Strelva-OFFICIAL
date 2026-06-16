@@ -20,6 +20,7 @@ import {
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary } from "@/lib/portfolio";
+import { getScanSummary, type ScanSummary } from "@/lib/scan-store";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { buildRevenueSummary } from "@/lib/revenue";
 import { OperatorConsole } from "./OperatorConsole";
@@ -47,6 +48,14 @@ const LAUNCH_STATUS_COLORS: Record<LaunchReadinessStatus, string> = {
   blocked: "border-red-500/25 bg-red-500/10 text-red-200",
 };
 
+const SCAN_GRADE_COLORS: Record<ScanSummary["grade"], string> = {
+  A: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
+  B: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
+  C: "border-amber-500/25 bg-amber-500/10 text-amber-200",
+  D: "border-red-500/25 bg-red-500/10 text-red-200",
+  F: "border-red-500/25 bg-red-500/10 text-red-200",
+};
+
 function formatTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -67,12 +76,13 @@ export default async function AdminPage() {
 
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
-      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus] = await Promise.all([
+      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, scan] = await Promise.all([
         getActivity(t.id).catch(() => []),
         listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
         listThreads(t.id).catch(() => []),
         getWeeklyBrief(t.id).catch(() => null),
         getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
+        getScanSummary(t.id).catch(() => null),
       ]);
       const readiness = getTenantLaunchReadinessResults(t);
       const launchReadiness = buildTenantLaunchReadiness({
@@ -97,6 +107,7 @@ export default async function AdminPage() {
         effectiveSubscriptionStatus,
         readiness,
         launchReadiness,
+        scan,
       };
     })
   );
@@ -271,7 +282,7 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-glass-border/50">
-              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness }) => {
+              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness, scan }) => {
                 const fallbackUrl = getTenantDashboardFallbackUrl(t);
                 const customAdminUrl = getTenantDashboardUrl(t);
                 const publicUrl = getTenantPublicUrl(t);
@@ -295,10 +306,18 @@ export default async function AdminPage() {
                           {t.siteName}
                         </Link>
                         <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
-                        <div className="mt-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${LAUNCH_STATUS_COLORS[launchReadiness.status]}`}>
                             <span className="capitalize">{launchReadiness.status}</span> · {launchReadiness.score}%
                           </span>
+                          {scan && (
+                            <span
+                              title={`SEO + site health ${scan.overallScore}/100 · scanned ${formatTime(scan.scannedAt)}`}
+                              className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${SCAN_GRADE_COLORS[scan.grade]}`}
+                            >
+                              SEO {scan.grade}
+                            </span>
+                          )}
                         </div>
                         <p className="mt-2 text-[11px] text-gray-faint">
                           {t.industry} · {deliveryModel === "custom_repo" ? "custom repo" : "template"}

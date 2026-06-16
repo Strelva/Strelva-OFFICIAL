@@ -30,6 +30,7 @@ import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
 import { buildRevenueSummary, listBuildPayments } from "@/lib/revenue";
+import { getScanSummary, getScanSummaries } from "@/lib/scan-store";
 
 export const maxDuration = 60;
 
@@ -95,6 +96,7 @@ You can READ the whole business. Pick the right tool:
 - read_pay_links — outstanding pay links.
 - read_audit — recent operator actions ("what changed / who did X").
 - read_tenant — one tenant's config and launch fields.
+- read_scan — latest SEO + site-health grade for one tenant or ranked across the portfolio ("which client has the worst SEO / best site health").
 - list_drafts — AI drafts waiting on review.
 - refresh_portfolio — rebuild the cached data when it looks stale (low-risk; runs without confirmation).
 
@@ -183,6 +185,27 @@ export async function POST(req: Request) {
           revalidateUrl: config.revalidateUrl,
           hasRevalidationSecret: Boolean(config.revalidationSecret),
         };
+      },
+    }),
+    read_scan: tool({
+      description:
+        "Read the latest SEO + site-health scan grade for one tenant (pass tenantId) or across the whole portfolio (omit tenantId). Use to answer 'which client has the worst SEO', 'what's the site health of X', or 'who hasn't been scanned'. Scans are run from the tenant detail page.",
+      inputSchema: z.object({ tenantId: z.string().optional() }),
+      execute: async ({ tenantId }) => {
+        if (tenantId) {
+          const scan = await getScanSummary(tenantId);
+          if (!scan) return { tenantId, scanned: false, note: "No scan on record. Run one from the tenant detail page." };
+          return { tenantId, scanned: true, grade: scan.grade, overallScore: scan.overallScore, scannedAt: scan.scannedAt, categories: scan.categories };
+        }
+        const tenants = await getAllTenants();
+        const summaries = await getScanSummaries(tenants.map((t) => t.id));
+        const scanned = tenants
+          .map((t) => ({ tenant: t.id, siteName: t.siteName, scan: summaries[t.id] }))
+          .filter((r) => r.scan)
+          .map((r) => ({ tenant: r.tenant, siteName: r.siteName, grade: r.scan!.grade, overallScore: r.scan!.overallScore, scannedAt: r.scan!.scannedAt }))
+          .sort((a, b) => a.overallScore - b.overallScore);
+        const notScanned = tenants.filter((t) => !summaries[t.id]).map((t) => t.id);
+        return { scanned, notScanned, worst: scanned[0] ?? null };
       },
     }),
     list_drafts: tool({
@@ -377,6 +400,7 @@ export async function POST(req: Request) {
               part.toolName === "read_attention" ? "Building the attention briefing..." :
               part.toolName === "refresh_portfolio" ? "Refreshing the data..." :
               part.toolName === "read_tenant" ? "Looking up the tenant..." :
+              part.toolName === "read_scan" ? "Reading site-health scans..." :
               part.toolName === "list_drafts" ? "Checking pending drafts..." :
               part.toolName === "read_audit" ? "Reading the audit trail..." :
               part.toolName === "read_pay_links" ? "Checking pay links..." :

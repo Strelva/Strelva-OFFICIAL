@@ -5,6 +5,7 @@ import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import { readJsonObject } from "@/lib/request-body";
+import { saveScanSummary } from "@/lib/scan-store";
 
 export const maxDuration = 60;
 
@@ -34,13 +35,19 @@ export async function POST(req: Request) {
   try {
     const categories = await runAudit(url);
     const overallScore = computeOverallScore(categories);
-    return NextResponse.json({
+    const grade = scoreToGrade(overallScore);
+    const scannedAt = new Date().toISOString();
+
+    // Persist a compact summary so the overview + agent can read it later.
+    await saveScanSummary(tenantId, {
       url,
-      scannedAt: new Date().toISOString(),
+      scannedAt,
       overallScore,
-      grade: scoreToGrade(overallScore),
-      categories,
+      grade,
+      categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
     });
+
+    return NextResponse.json({ url, scannedAt, overallScore, grade, categories });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Scan failed", url },
