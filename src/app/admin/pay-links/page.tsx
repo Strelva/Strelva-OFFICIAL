@@ -30,6 +30,7 @@ export default function PayLinksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -88,7 +89,7 @@ export default function PayLinksPage() {
   }
 
   async function revoke(slug: string) {
-    if (!window.confirm(`Revoke /pay/${slug}? The URL will stop working.`)) return;
+    setConfirmingRevoke(null);
     setError(null);
     try {
       const res = await fetch(`/api/admin/pay-links?slug=${encodeURIComponent(slug)}`, {
@@ -180,12 +181,29 @@ export default function PayLinksPage() {
                   >
                     {copied === l.slug ? "Copied" : "Copy URL"}
                   </button>
-                  <button
-                    onClick={() => void revoke(l.slug)}
-                    className="rounded-md border border-red-500/25 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10"
-                  >
-                    Revoke
-                  </button>
+                  {confirmingRevoke === l.slug ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <button
+                        onClick={() => void revoke(l.slug)}
+                        className="rounded-md border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200 hover:bg-red-500/20"
+                      >
+                        Confirm revoke
+                      </button>
+                      <button
+                        onClick={() => setConfirmingRevoke(null)}
+                        className="rounded-md px-2 py-1 text-xs text-gray-muted hover:text-warm-white"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingRevoke(l.slug)}
+                      className="rounded-md border border-red-500/25 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                    >
+                      Revoke
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

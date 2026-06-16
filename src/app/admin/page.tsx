@@ -241,6 +241,15 @@ export default async function AdminPage() {
       </div>
 
       {/* Tenant table */}
+      {tenantData.length === 0 ? (
+        <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
+          <p className="text-sm font-medium text-warm-white">No active clients yet</p>
+          <p className="mt-1 text-xs text-gray-muted">
+            Use <span className="text-warm-white">+ New Client</span> above or the{" "}
+            <Link href="/admin/onboard" className="text-accent hover:underline">guided onboarding</Link> to add your first client.
+          </p>
+        </div>
+      ) : (
       <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -414,6 +423,7 @@ export default async function AdminPage() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }
