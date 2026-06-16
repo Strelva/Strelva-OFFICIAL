@@ -67,9 +67,12 @@ export async function pushScanHistory(tenant: string, point: ScanHistoryPoint): 
   if (!redis) return;
   try {
     const key = scanHistoryKey(tenant);
-    await redis.lpush(key, JSON.stringify(point));
-    await redis.ltrim(key, 0, SCAN_HISTORY_MAX - 1);
-    await redis.expire(key, SCAN_TTL_SECONDS);
+    // One pipelined round trip instead of three sequential writes.
+    const pipe = redis.pipeline();
+    pipe.lpush(key, JSON.stringify(point));
+    pipe.ltrim(key, 0, SCAN_HISTORY_MAX - 1);
+    pipe.expire(key, SCAN_TTL_SECONDS);
+    await pipe.exec();
   } catch (err) {
     console.warn("[scan-store] history push failed", tenant, err);
   }
@@ -104,12 +107,18 @@ export async function getScanSummary(tenant: string): Promise<ScanSummary | null
   }
 }
 
-/** Read the latest scan summaries for many tenants in parallel. */
+/** Read the latest scan summaries for many tenants in one MGET round trip. */
 export async function getScanSummaries(
   tenants: string[]
 ): Promise<Record<string, ScanSummary | null>> {
-  const entries = await Promise.all(
-    tenants.map(async (t) => [t, await getScanSummary(t)] as const)
-  );
-  return Object.fromEntries(entries);
+  if (tenants.length === 0) return {};
+  const redis = getRedis();
+  if (!redis) return Object.fromEntries(tenants.map((t) => [t, null]));
+  try {
+    const values = await redis.mget<(ScanSummary | null)[]>(...tenants.map(scanKey));
+    return Object.fromEntries(tenants.map((t, i) => [t, values[i] ?? null]));
+  } catch (err) {
+    console.warn("[scan-store] summaries mget failed", err);
+    return Object.fromEntries(tenants.map((t) => [t, null]));
+  }
 }

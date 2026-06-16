@@ -52,20 +52,38 @@ export interface PortfolioScanOutcome {
   failed: { tenant: string; error: string }[];
 }
 
-/** Scan every active tenant, isolating per-tenant failures (e.g. broken DNS). */
-export async function scanAllTenants(): Promise<PortfolioScanOutcome> {
+/**
+ * Scan every active tenant, isolating per-tenant failures (e.g. broken DNS).
+ *
+ * Bounded-parallel: each scan does an external page fetch + PageSpeed call
+ * (up to ~35s), so a sequential loop would exhaust the cron's function budget
+ * and silently drop the tenants at the end of the list. A worker pool keeps a
+ * fixed number of scans in flight at once. Concurrency is capped (not unbounded)
+ * because PageSpeed has its own rate quota.
+ */
+export async function scanAllTenants(concurrency = 6): Promise<PortfolioScanOutcome> {
   const tenants = (await getAllTenants()).filter((t) => t.active);
   const scanned: PortfolioScanOutcome["scanned"] = [];
   const failed: PortfolioScanOutcome["failed"] = [];
 
-  for (const t of tenants) {
-    try {
-      const r = await scanTenant(t.id);
-      scanned.push({ tenant: t.id, grade: r.grade, score: r.overallScore });
-    } catch (err) {
-      failed.push({ tenant: t.id, error: err instanceof Error ? err.message : "Unknown" });
+  let next = 0;
+  async function worker() {
+    while (next < tenants.length) {
+      const t = tenants[next++];
+      try {
+        const r = await scanTenant(t.id);
+        scanned.push({ tenant: t.id, grade: r.grade, score: r.overallScore });
+      } catch (err) {
+        failed.push({ tenant: t.id, error: err instanceof Error ? err.message : "Unknown" });
+      }
     }
   }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, tenants.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
 
   return { scanned, failed };
 }
