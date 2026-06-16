@@ -65,7 +65,12 @@
     "overrides": {
       "brace-expansion@<2": "1.1.13",
       "brace-expansion@>=4 <5.0.5": "5.0.5",
-      "dompurify": "3.4.0",
+      "dompurify": "3.4.8",
+      "esbuild@<0.28.1": "0.28.1",
+      "form-data@>=4 <4.0.6": "4.0.6",
+      "js-cookie@<=3.0.5": "3.0.7",
+      "vite@>=7 <7.3.5": "7.3.5",
+      "ws@>=8 <8.21.0": "8.21.0",
       "fast-uri": "3.1.2",
       "flatted": "3.4.2",
       "js-yaml@<4": "3.14.2",

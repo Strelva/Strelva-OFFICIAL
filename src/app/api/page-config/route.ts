@@ -8,7 +8,7 @@ import {
   setDraftPageConfig,
   setPageConfig,
 } from "@/lib/storage";
-import { getTenantFromHeaders, requireTenantFromHeaders } from "@/lib/tenant";
+import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";

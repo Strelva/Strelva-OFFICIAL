@@ -7,7 +7,7 @@
  * 3. Report rendering — formatVerificationLines and extractVerificationData
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "../lib/types";
 
 // ---- Mock the storage layer ----

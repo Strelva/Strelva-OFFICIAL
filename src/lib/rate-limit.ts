@@ -5,8 +5,6 @@
 import { getRedis } from "./redis";
 import { isProductionEnv } from "./production-guard";
 
-const windowMs = 60_000; // 1-minute window
-
 // --- In-memory fallback store ---
 
 interface Entry {

@@ -52,10 +52,17 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        setOpen((prev) => {
+          if (prev) return false;
+          setQuery("");
+          setActive(0);
+          return true;
+        });
       }
     }
     function onOpen() {
+      setQuery("");
+      setActive(0);
       setOpen(true);
     }
     window.addEventListener("keydown", onKey);
@@ -66,17 +73,11 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
     };
   }, []);
 
+  // Focus the input when the palette opens. Only a DOM call (no setState), so
+  // this is a legitimate effect (resets live in the open/onChange handlers).
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActive(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (open) requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
-
-  useEffect(() => {
-    setActive(0);
-  }, [query]);
 
   if (!open) return null;
 
@@ -101,7 +102,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
         <input
           ref={inputRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setActive(0); }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();

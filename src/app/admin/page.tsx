@@ -16,11 +16,10 @@ import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import {
   buildTenantLaunchReadiness,
   tenantHasOwnerMessage,
-  type LaunchReadinessStatus,
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary } from "@/lib/portfolio";
-import { getScanSummary, getScanHistory, type ScanSummary } from "@/lib/scan-store";
+import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { Sparkline } from "./Sparkline";
 import { ScanAllButton } from "./ScanAllButton";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
@@ -273,11 +272,10 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-glass-border/50">
-              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness, scan, scanHistory }) => {
+              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, effectiveSubscriptionStatus, launchReadiness, scan, scanHistory }) => {
                 const fallbackUrl = getTenantDashboardFallbackUrl(t);
                 const customAdminUrl = getTenantDashboardUrl(t);
                 const publicUrl = getTenantPublicUrl(t);
-                const adminReadiness = readiness.find((r) => r.name.endsWith("admin domain"));
                 const clientReadiness = readiness.find((r) => r.name.endsWith("client domain"));
                 const revalidationReadiness = readiness.find((r) => r.name.endsWith("revalidation"));
                 const deliveryModel = getTenantDeliveryModel(t);
