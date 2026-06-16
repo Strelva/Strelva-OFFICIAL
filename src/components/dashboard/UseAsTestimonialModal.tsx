@@ -100,6 +100,15 @@ export function UseAsTestimonialModal({
     }
   }, [dashboardHref, quote, author, location, review, onClose, onSuccess]);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open || !review) return null;
 
   return (
@@ -108,6 +117,9 @@ export function UseAsTestimonialModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Use review as testimonial"
         className="relative w-full max-w-lg overflow-hidden rounded-xl bg-surface-raised shadow-xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >

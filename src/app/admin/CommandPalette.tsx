@@ -92,6 +92,9 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
       onClick={() => setOpen(false)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="w-full max-w-lg overflow-hidden rounded-xl border border-glass-border bg-surface-raised shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
