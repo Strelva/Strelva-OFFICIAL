@@ -331,40 +331,45 @@ export default async function AdminPage() {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <div className="flex max-w-md flex-wrap gap-2">
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[clientReadiness?.status ?? "skip"]}`}>
-                          Site DNS: {clientReadiness?.status ?? "skip"}
-                        </span>
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[adminReadiness?.status ?? "skip"]}`}>
-                          Admin DNS: {adminReadiness?.status ?? "skip"}
-                        </span>
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${READINESS_COLORS[revalidationReadiness?.status ?? "skip"]}`}>
-                          Revalidation: {revalidationReadiness?.status ?? "skip"}
-                        </span>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[effectiveSubscriptionStatus ?? "none"]}`}>
-                          Subscription: {effectiveSubscriptionStatus ?? "none"}
-                        </span>
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${hasOwnerMessage ? READINESS_COLORS.ok : READINESS_COLORS.fail}`}>
-                          Owner AI: {hasOwnerMessage ? "used" : "missing"}
-                        </span>
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${hasWeeklyBrief ? READINESS_COLORS.ok : READINESS_COLORS.warn}`}>
-                          Weekly proof: {hasWeeklyBrief ? "ready" : "pending"}
-                        </span>
-                        {deliveryModel === "custom_repo" && (
-                          <span className="inline-flex rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
-                            Repo: {customRepo.revalidationHealth ?? "unknown"}
-                          </span>
-                        )}
-                        {draftCount > 0 ? (
-                          <span className="inline-flex rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-400">
-                            {draftCount} pending draft{draftCount === 1 ? "" : "s"}
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-gray-bg px-2 py-1 text-xs font-medium text-gray-muted">
-                            No drafts
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const dnsBad =
+                          clientReadiness?.status === "fail" || revalidationReadiness?.status === "fail";
+                        const dnsWatch =
+                          clientReadiness?.status === "warn" || revalidationReadiness?.status === "warn";
+                        return (
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  dnsBad ? "bg-red-400" : dnsWatch ? "bg-amber-400" : "bg-emerald-400"
+                                }`}
+                              />
+                              <span className="text-gray-muted">
+                                {dnsBad
+                                  ? "DNS / revalidation issue"
+                                  : dnsWatch
+                                    ? "Watch DNS / revalidation"
+                                    : "DNS + revalidation OK"}
+                              </span>
+                            </div>
+                            <p className="text-gray-muted">
+                              Subscription{" "}
+                              <span className="text-warm-white">{effectiveSubscriptionStatus ?? "none"}</span>
+                            </p>
+                            {draftCount > 0 && (
+                              <p className="text-amber-300">
+                                {draftCount} draft{draftCount === 1 ? "" : "s"} waiting
+                              </p>
+                            )}
+                            <Link
+                              href={`/admin/tenants/${t.id}`}
+                              className="inline-block text-gray-faint hover:text-warm-white"
+                            >
+                              Full detail →
+                            </Link>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-5 text-gray-muted">
                       <p>{lastActivity ? formatTime(lastActivity) : "No activity"}</p>
