@@ -36,7 +36,7 @@ const SOURCE_CONFIG: Record<OperationSource, { icon: React.ReactNode; label: str
   system: {
     icon: <Cog className="w-3.5 h-3.5" strokeWidth={1.5} />,
     label: "System",
-    color: "bg-gray-500/15 text-gray-400",
+    color: "bg-gray-bg text-gray-muted",
   },
 };
 

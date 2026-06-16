@@ -105,7 +105,7 @@ export function DomainManager({
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
-                  onClick={() => void call("refresh", {
+                  onClick={() => void call(`refresh:${d.domain}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ domain: d.domain }),
@@ -113,16 +113,16 @@ export function DomainManager({
                   disabled={busy !== null}
                   className="rounded-md border border-glass-border px-2.5 py-1 text-xs text-gray-muted hover:text-warm-white disabled:opacity-40"
                 >
-                  {busy === "refresh" ? "…" : "Refresh"}
+                  {busy === `refresh:${d.domain}` ? "…" : "Refresh"}
                 </button>
                 {confirmingRemove === d.domain ? (
                   <>
                     <button
-                      onClick={() => void call("remove", { method: "DELETE" }, `${base}?domain=${encodeURIComponent(d.domain)}`).then(() => setConfirmingRemove(null))}
+                      onClick={() => void call(`remove:${d.domain}`, { method: "DELETE" }, `${base}?domain=${encodeURIComponent(d.domain)}`).then(() => setConfirmingRemove(null))}
                       disabled={busy !== null}
                       className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-40"
                     >
-                      Confirm
+                      {busy === `remove:${d.domain}` ? "…" : "Confirm"}
                     </button>
                     <button onClick={() => setConfirmingRemove(null)} className="rounded-md px-2 py-1 text-xs text-gray-muted hover:text-warm-white">
                       Cancel

@@ -334,6 +334,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={thinkMode ? "Ask for the best next move..." : placeholder}
+          aria-label="Message the AI about your site"
           rows={1}
           className="block max-h-[180px] min-h-[42px] w-full resize-none overflow-y-auto rounded-2xl border-0 bg-transparent px-3 py-2.5 text-[14px] leading-relaxed text-warm-black caret-warm-black placeholder:text-gray-subtle outline-none ring-0 transition-none focus:bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-transparent"
         />

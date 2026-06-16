@@ -16,9 +16,11 @@ export default async function ReportsPage() {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
 
+  // Degrade to the empty state on a transient backend error rather than
+  // escalating a recoverable null into the full error boundary.
   const [brief, history] = await Promise.all([
-    getWeeklyBrief(tenant),
-    getWeeklyBriefs(tenant),
+    getWeeklyBrief(tenant).catch(() => null),
+    getWeeklyBriefs(tenant).catch(() => []),
   ]);
 
   return (

@@ -371,7 +371,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleMoveSection(section.type, "up"); }}
                           disabled={i === 0}
-                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-20"
+                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-40"
                           title="Move up"
                         >
                           ↑
@@ -381,7 +381,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleMoveSection(section.type, "down"); }}
                           disabled={i === visibleSections.length - 1}
-                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-20"
+                          className="text-[11px] text-gray-muted hover:bg-gray-bg-hover disabled:opacity-40"
                           title="Move down"
                         >
                           ↓
