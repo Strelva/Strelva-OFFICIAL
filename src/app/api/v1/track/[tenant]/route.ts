@@ -70,8 +70,17 @@ export async function POST(
   try {
     // Per-IP + per-tenant rate limit, same helper the internal beacon uses.
     // Generous ceiling: a single visitor legitimately fires a handful of events
-    // per page, but this still caps scripted floods.
-    if (await isRateLimitedAsync(rateLimitKey(req, `v1-track:${tenant}`), 120)) {
+    // per page, but this still caps scripted floods. Fail OPEN on a rate-limiter
+    // error (e.g. a Redis blip) — a dropped/duplicated analytics event is far
+    // cheaper than 500-storming the beacon, and the limiter throws in prod when
+    // Redis is unavailable.
+    let limited = false;
+    try {
+      limited = await isRateLimitedAsync(rateLimitKey(req, `v1-track:${tenant}`), 120);
+    } catch {
+      limited = false;
+    }
+    if (limited) {
       return corsJson({ error: "Too many requests" }, 429);
     }
 

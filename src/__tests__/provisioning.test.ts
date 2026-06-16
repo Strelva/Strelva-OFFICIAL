@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCreateTenant = vi.hoisted(() => vi.fn());
+const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockCreateInvite = vi.hoisted(() => vi.fn());
 const mockSetContent = vi.hoisted(() => vi.fn());
 const mockIsVercelConfigured = vi.hoisted(() => vi.fn());
@@ -8,7 +9,10 @@ const mockCreateVercelProject = vi.hoisted(() => vi.fn());
 const mockSetVercelEnv = vi.hoisted(() => vi.fn());
 const mockAddVercelDomain = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/tenants", () => ({ createTenant: mockCreateTenant }));
+vi.mock("@/lib/tenants", () => ({
+  createTenant: mockCreateTenant,
+  getTenantConfig: mockGetTenantConfig,
+}));
 vi.mock("@/lib/invites", () => ({ createInvite: mockCreateInvite }));
 vi.mock("@/lib/storage", () => ({ setContent: mockSetContent }));
 vi.mock("@/lib/vercel", () => ({
@@ -36,6 +40,7 @@ const baseInput = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateTenant.mockResolvedValue({ id: "acme", siteName: "Acme HVAC" });
+  mockGetTenantConfig.mockResolvedValue(null);
   mockCreateInvite.mockResolvedValue(true);
   mockSetContent.mockResolvedValue(undefined);
   mockIsVercelConfigured.mockReturnValue(true);
@@ -87,8 +92,8 @@ describe("provisionTenant", () => {
     expect(mockCreateVercelProject).not.toHaveBeenCalled();
   });
 
-  it("bails when the tenant record cannot be created", async () => {
-    mockCreateTenant.mockRejectedValue(new Error("Tenant \"acme\" already exists"));
+  it("bails when the tenant record cannot be created (genuine failure)", async () => {
+    mockCreateTenant.mockRejectedValue(new Error("Sanity write failed"));
     const result = await provisionTenant(baseInput);
 
     expect(result.steps).toHaveLength(1);
@@ -97,6 +102,20 @@ describe("provisionTenant", () => {
     expect(mockSetContent).not.toHaveBeenCalled();
     expect(mockCreateInvite).not.toHaveBeenCalled();
     expect(mockCreateVercelProject).not.toHaveBeenCalled();
+  });
+
+  it("resumes the remaining steps when the tenant already exists", async () => {
+    // A prior partial run created the record but failed later. Re-running must
+    // continue (not bail) so the operator can complete provisioning.
+    mockCreateTenant.mockRejectedValue(new Error("Tenant \"acme\" already exists"));
+    mockGetTenantConfig.mockResolvedValue({ id: "acme", siteName: "Acme HVAC" });
+
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "tenant")).toBe("skipped");
+    expect(result.steps.length).toBeGreaterThan(1);
+    // It actually proceeds to the later steps instead of bailing.
+    expect(mockCreateVercelProject).toHaveBeenCalled();
   });
 
   it("skips the invite when there is no owner email", async () => {

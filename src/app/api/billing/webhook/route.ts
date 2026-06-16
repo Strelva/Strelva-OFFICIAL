@@ -5,6 +5,7 @@ import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
 import { logger } from "@/lib/logger";
+import { alert } from "@/lib/monitoring";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -167,7 +168,18 @@ async function applyTenantSubscriptionStatus(
     }
   }
 
-  await updateTenant(tenantId, patch);
+  const updated = await updateTenant(tenantId, patch);
+  if (!updated) {
+    // updateTenant returns null for an unknown id. A legitimate, signed event
+    // whose tenant was renamed/deleted would otherwise silently no-op here —
+    // e.g. an invoice.paid that fails to keep a paying client active. This
+    // won't self-heal on retry, so alert loudly (not just console) and let the
+    // caller ack the event rather than triggering a 3-day Stripe retry storm.
+    alert("billing_webhook_unknown_tenant", "high", {
+      tenantId,
+      eventType: event.type,
+    });
+  }
 }
 
 /**
@@ -289,6 +301,19 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[billing webhook] Signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  // Mode guard: never let a test-mode event mutate live tenant data (or vice
+  // versa). The signature only proves the event matches STRIPE_WEBHOOK_SECRET;
+  // it does NOT prove live vs test. Without this, a test-mode
+  // subscription.deleted / payment_failed could 402 a real paying client.
+  // Ack (200) so Stripe doesn't retry a deliberately-ignored event.
+  const expectLive = (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_live");
+  if (event.livemode !== expectLive) {
+    console.warn(
+      `[billing webhook] Ignoring ${event.livemode ? "live" : "test"}-mode event in ${expectLive ? "live" : "test"} deploy: ${event.type}`
+    );
+    return NextResponse.json({ received: true, ignored: "mode-mismatch" });
   }
 
   const claimResult = await claimStripeEvent(event.id);

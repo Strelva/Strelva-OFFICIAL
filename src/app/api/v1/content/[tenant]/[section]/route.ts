@@ -9,16 +9,6 @@ import { NextResponse } from "next/server";
 import type { ContentMap, ContentSection } from "@/lib/types";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
-import {
-  getSiteCapabilityManifest,
-  manifestSupportsContentSection,
-} from "@/lib/site-capabilities";
-
-async function isValidSection(section: string, tenant: string): Promise<boolean> {
-  if (!(section in SECTION_TO_TYPE)) return false;
-  const manifest = await getSiteCapabilityManifest(tenant);
-  return manifestSupportsContentSection(manifest, section as ContentSection);
-}
 
 export async function GET(
   request: Request,
@@ -36,7 +26,13 @@ export async function GET(
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
-    if (!(await isValidSection(section, tenant))) {
+    // Only reject a TRULY unknown section. We intentionally do NOT gate public
+    // reads on the capability manifest: the manifest gates the editing UI, not
+    // what a deployed client repo can fetch. A known section that's been dropped
+    // from the manifest must still return its stored content (or typed default)
+    // — returning 400 here would make the client fetcher fall back to empty and
+    // silently wipe live content from the client's site.
+    if (!(section in SECTION_TO_TYPE)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
 

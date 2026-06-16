@@ -10,7 +10,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { createTenant } from "./tenants";
+import { createTenant, getTenantConfig } from "./tenants";
 import { createInvite } from "./invites";
 import { setContent } from "./storage";
 import { defaults } from "./defaults";
@@ -130,13 +130,31 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       detail: `Revalidation secret generated · ${siteUrl}`,
     });
   } catch (err) {
-    steps.push({
-      key: "tenant",
-      label: "Create tenant record",
-      status: "failed",
-      detail: err instanceof Error ? err.message : "Unknown error",
-    });
-    return { tenantId, siteUrl, steps, manualNext: [], clientEnv };
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    // Resume-safe: if the tenant record already exists (a prior run that failed
+    // AFTER creating the record but before finishing Vercel/domain/assign),
+    // continue with the remaining steps instead of bailing — otherwise a
+    // half-provisioned tenant can never be completed by re-running provision.
+    const existing = /already exists/i.test(msg)
+      ? await getTenantConfig(subdomain).catch(() => null)
+      : null;
+    if (existing) {
+      tenantId = existing.id;
+      steps.push({
+        key: "tenant",
+        label: "Create tenant record",
+        status: "skipped",
+        detail: "Tenant already exists — resuming the remaining steps",
+      });
+    } else {
+      steps.push({
+        key: "tenant",
+        label: "Create tenant record",
+        status: "failed",
+        detail: msg,
+      });
+      return { tenantId, siteUrl, steps, manualNext: [], clientEnv };
+    }
   }
 
   // 2. Seed an editable content baseline so the dashboard starts from real
