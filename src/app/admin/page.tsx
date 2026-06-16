@@ -405,7 +405,7 @@ export default async function AdminPage() {
                       )}
                     </td>
                     <td className="px-6 py-5">
-                      <div className="flex min-w-[280px] flex-wrap items-center gap-2 rounded-lg border border-glass-border bg-surface-base/40 p-2">
+                      <div className="grid w-[260px] grid-cols-2 gap-1.5 rounded-lg border border-glass-border bg-surface-base/40 p-2">
                         <InviteButton
                           tenantId={t.id}
                           siteName={t.siteName}
@@ -413,7 +413,7 @@ export default async function AdminPage() {
                         />
                         <Link
                           href={fallbackUrl}
-                          className="rounded-md px-2 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg hover:text-warm-white"
+                          className="rounded-md px-2 py-1.5 text-center text-xs text-warm-white transition-colors hover:bg-gray-bg"
                         >
                           Dashboard
                         </Link>
@@ -421,7 +421,7 @@ export default async function AdminPage() {
                           href={customAdminUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+                          className="rounded-md px-2 py-1.5 text-center text-xs text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
                         >
                           Custom admin
                         </a>
@@ -429,7 +429,7 @@ export default async function AdminPage() {
                           href={publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-md px-2 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg hover:text-warm-white"
+                          className="rounded-md px-2 py-1.5 text-center text-xs text-warm-white transition-colors hover:bg-gray-bg"
                         >
                           Site
                         </a>

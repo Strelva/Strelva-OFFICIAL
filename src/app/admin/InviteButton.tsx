@@ -57,7 +57,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md px-2 py-1 text-xs text-amber-300 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
+        className="w-full rounded-md px-2 py-1.5 text-center text-xs text-amber-300 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
       >
         Invite
       </button>
