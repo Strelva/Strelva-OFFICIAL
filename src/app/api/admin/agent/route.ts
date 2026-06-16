@@ -56,7 +56,15 @@ function isIncomingMessages(value: unknown): value is IncomingMessage[] {
 interface Proposal {
   id: string;
   /** Maps to the existing endpoint the console calls on confirm. */
-  action: "mint_pay_link" | "assign_user" | "approve_draft" | "reject_draft" | "update_tenant";
+  action:
+    | "mint_pay_link"
+    | "assign_user"
+    | "approve_draft"
+    | "reject_draft"
+    | "update_tenant"
+    | "run_scan"
+    | "revoke_pay_link"
+    | "send_invite";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -100,7 +108,7 @@ You can READ the whole business. Pick the right tool:
 - list_drafts — AI drafts waiting on review.
 - refresh_portfolio — rebuild the cached data when it looks stale (low-risk; runs without confirmation).
 
-For consequential actions — minting a pay link, assigning a user, approving/rejecting a draft, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool, which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
+For consequential actions — minting or revoking a pay link, assigning a user, sending an invite, approving/rejecting a draft, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_pay_link, propose_revoke_pay_link, propose_assign_user, propose_send_invite, propose_approve_draft, propose_reject_draft, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
 
 Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Dollar amounts: pay links are quoted in whole dollars.`;
 
@@ -373,6 +381,55 @@ export async function POST(req: Request) {
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
       },
     }),
+    propose_run_scan: tool({
+      description:
+        "Propose running a fresh SEO + site-health scan on a tenant's live site (updates the stored grade). Returns a confirmation card; does NOT run the scan.",
+      inputSchema: z.object({ tenant: z.string() }),
+      execute: async ({ tenant }) => {
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "run_scan",
+          summary: `Run a fresh SEO + site-health scan on ${tenant}`,
+          params: { tenant },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
+    propose_revoke_pay_link: tool({
+      description:
+        "Propose revoking (deleting) a pay link by slug — the /pay/{slug} URL stops working. Returns a confirmation card; does NOT revoke.",
+      inputSchema: z.object({ slug: z.string() }),
+      execute: async ({ slug }) => {
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "revoke_pay_link",
+          summary: `Revoke pay link /pay/${slug}`,
+          params: { slug },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
+    propose_send_invite: tool({
+      description:
+        "Propose sending an owner/admin invite to an email for a tenant (works whether or not they already have an account). Returns a confirmation card; does NOT send.",
+      inputSchema: z.object({
+        email: z.string().email(),
+        tenant: z.string(),
+        role: z.enum(["owner", "admin", "editor", "viewer"]).optional(),
+      }),
+      execute: async (p) => {
+        const proposal: Proposal = {
+          id: nextProposalId(),
+          action: "send_invite",
+          summary: `Send a ${p.role ?? "owner"} invite to ${p.email} for ${p.tenant}`,
+          params: { email: p.email, tenant: p.tenant, role: p.role ?? "owner" },
+        };
+        proposals.push(proposal);
+        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
+      },
+    }),
   };
 
   const encoder = new TextEncoder();
@@ -410,6 +467,9 @@ export async function POST(req: Request) {
               part.toolName === "propose_approve_draft" ? "Preparing a draft approval..." :
               part.toolName === "propose_reject_draft" ? "Preparing a draft rejection..." :
               part.toolName === "propose_update_tenant" ? "Preparing a tenant change..." :
+              part.toolName === "propose_run_scan" ? "Preparing a scan..." :
+              part.toolName === "propose_revoke_pay_link" ? "Preparing a pay-link revoke..." :
+              part.toolName === "propose_send_invite" ? "Preparing an invite..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "text-delta") {

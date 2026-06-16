@@ -119,7 +119,13 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const slug = new URL(req.url).searchParams.get("slug")?.trim();
+  // slug may arrive as a query param (UI revoke) or in the JSON body (operator
+  // agent commit, which always posts proposal params as a body).
+  let slug = new URL(req.url).searchParams.get("slug")?.trim();
+  if (!slug) {
+    const body = await req.json().catch(() => null);
+    if (body && typeof body.slug === "string") slug = body.slug.trim();
+  }
   if (!slug) {
     return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }

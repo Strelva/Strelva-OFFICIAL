@@ -12,7 +12,10 @@ type ProposalAction =
   | "assign_user"
   | "approve_draft"
   | "reject_draft"
-  | "update_tenant";
+  | "update_tenant"
+  | "run_scan"
+  | "revoke_pay_link"
+  | "send_invite";
 
 interface Proposal {
   id: string;
@@ -31,6 +34,9 @@ const COMMIT_MAP: Record<ProposalAction, { endpoint: string; method: string }> =
   approve_draft: { endpoint: "/api/admin/drafts", method: "POST" },
   reject_draft: { endpoint: "/api/admin/drafts", method: "POST" },
   update_tenant: { endpoint: "/api/admin/tenants", method: "PATCH" },
+  run_scan: { endpoint: "/api/admin/scan", method: "POST" },
+  revoke_pay_link: { endpoint: "/api/admin/pay-links", method: "DELETE" },
+  send_invite: { endpoint: "/api/admin/invites", method: "POST" },
 };
 
 /**
