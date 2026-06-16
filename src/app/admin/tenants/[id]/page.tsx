@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
 import { TenantEditor } from "./TenantEditor";
+import { SiteScan } from "./SiteScan";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,8 @@ export default async function TenantDetailPage({
         <Pulse label="Drafts waiting" value={Object.keys(drafts).length} />
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
+
+      <SiteScan tenantId={tenant.id} />
 
       <TenantEditor
         tenant={{
