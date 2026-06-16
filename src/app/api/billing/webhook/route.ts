@@ -368,28 +368,17 @@ export async function POST(req: Request) {
           subscriptionStatus: "past_due",
           subscriptionPastDueSince: new Date().toISOString(),
         }, event);
-        if (process.env.SLACK_WEBHOOK_URL) {
-          fetch(process.env.SLACK_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
-            }),
-          }).catch(() => {});
-        }
+        // alert() now routes to Slack AND Sentry — a failed customer payment
+        // must not be invisible if Sentry is unconfigured (it usually is).
+        alert("billing_payment_failed", "critical", {
+          tenantId: tenantId ?? "unknown",
+          hint: "Check the Stripe dashboard.",
+        });
         break;
 
       case "customer.subscription.deleted":
         await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);
-        if (process.env.SLACK_WEBHOOK_URL) {
-          fetch(process.env.SLACK_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `Subscription cancelled for tenant *${tenantId}*.`,
-            }),
-          }).catch(() => {});
-        }
+        alert("billing_subscription_cancelled", "high", { tenantId: tenantId ?? "unknown" });
         break;
 
       default:

@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
+import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import type { Connection } from "@/lib/types";
@@ -109,10 +110,15 @@ async function pollTenant(tenantId: string): Promise<number> {
   // Get valid access token (refresh if needed)
   const accessToken = await getValidAccessToken(connection);
   if (!accessToken) {
-    // Mark connection as error
+    // Transition connected -> error; alert once so a client's Instagram sync
+    // can't die silently.
     await saveConnection({
       ...connection,
       status: "error",
+    });
+    alert("instagram_token_refresh_failed", "high", {
+      tenantId,
+      hint: "Client's Instagram connection needs re-auth — posts sync is stopped.",
     });
     return 0;
   }
