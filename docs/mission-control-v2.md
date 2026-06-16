@@ -22,10 +22,10 @@ agent is missing obvious action-tools (run scan, revoke pay link, send invite).
 
 ## Phase 2 — Make the operator act
 
-- Domain-management panel on tenant detail (consumes `/api/admin/domains` CRUD).
-- Revalidation-status panel on Ops (`/api/admin/revalidation-status`).
+- Domain-management panel on tenant detail (new super-admin `/api/admin/tenants/[id]/domains`).
+- ~~Revalidation-status panel on Ops~~ — SKIPPED: the Ops page already surfaces the same `getRecentFailures()` data; a separate panel would be redundant UI.
 - Agent action-tools: `propose_run_scan`, `propose_revoke_pay_link`, `propose_send_invite`.
-- Audit filters (tenant / actor / action).
+- Audit filters (tenant / actor / action) — client-side over the fetched events.
 
 ## Phase 3 — Fun / alive
 
