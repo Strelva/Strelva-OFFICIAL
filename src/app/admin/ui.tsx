@@ -6,7 +6,7 @@
  * label+input. These are the canonical, token-clean building blocks.
  */
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 const inputClass =
   "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 transition-colors";
@@ -28,10 +28,12 @@ export function Field({
   type?: string;
   hint?: string;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className={labelClass}>{label}</label>
+      <label htmlFor={id} className={labelClass}>{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -54,10 +56,12 @@ export function SelectField({
   onChange: (v: string) => void;
   children: ReactNode;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className={labelClass}>{label}</label>
+      <label htmlFor={id} className={labelClass}>{label}</label>
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={inputClass}

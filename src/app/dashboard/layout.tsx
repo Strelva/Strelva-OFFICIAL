@@ -105,6 +105,12 @@ export default async function DashboardLayout({
       }}
     >
       <CapabilityProvider>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200] focus:rounded-md focus:bg-warm-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-surface-base"
+        >
+          Skip to content
+        </a>
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationLayoutClient
           ownerName={ownerName || siteName}

@@ -21,6 +21,12 @@ export default async function AdminLayout({
 
   return (
     <div data-dashboard className="min-h-screen bg-surface-base text-warm-white">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200] focus:rounded-md focus:bg-warm-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-surface-base"
+      >
+        Skip to content
+      </a>
       {/* Top nav */}
       <nav className="border-b border-glass-border bg-surface-base/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -59,7 +65,7 @@ export default async function AdminLayout({
       </nav>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+      <main id="main-content" className="max-w-7xl mx-auto px-6 py-8">{children}</main>
 
       <CommandPalette tenants={tenants} />
     </div>

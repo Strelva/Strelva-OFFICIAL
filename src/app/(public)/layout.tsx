@@ -196,13 +196,19 @@ export default async function TenantPublicLayout({
   const content = (
     <>
       <HeaderComponent settings={settings} navigation={navigation} />
-      {children}
+      <main id="main-content">{children}</main>
       <FooterComponent settings={settings} contact={contact} navigation={navigation} footer={footer} />
     </>
   );
 
   return (
     <div style={{ ...template.themeVars, ...themeContentToCssVars(theme) } as React.CSSProperties}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200] focus:rounded-md focus:bg-black focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
       <SmoothScrollProvider>
         <LocalBusinessSchema />
         <IframeScrollListener />
