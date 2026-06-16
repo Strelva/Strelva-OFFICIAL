@@ -32,8 +32,22 @@ export interface ScanSummary {
   categories: ScanCategorySummary[];
 }
 
+/** Trailing scan history (a small ring buffer) for trend lines. */
+const SCAN_HISTORY_PREFIX = "reb:scan:hist:";
+const SCAN_HISTORY_MAX = 12;
+
+export interface ScanHistoryPoint {
+  scannedAt: string;
+  overallScore: number;
+  grade: ScanSummary["grade"];
+}
+
 function scanKey(tenant: string): string {
   return `${SCAN_PREFIX}${tenant}`;
+}
+
+function scanHistoryKey(tenant: string): string {
+  return `${SCAN_HISTORY_PREFIX}${tenant}`;
 }
 
 /** Persist the latest scan summary for a tenant. Null-safe (no-op without Redis). */
@@ -44,6 +58,36 @@ export async function saveScanSummary(tenant: string, summary: ScanSummary): Pro
     await redis.set(scanKey(tenant), summary, { ex: SCAN_TTL_SECONDS });
   } catch (err) {
     console.warn("[scan-store] write failed", tenant, err);
+  }
+}
+
+/** Append a point to a tenant's scan-history ring buffer (newest first). */
+export async function pushScanHistory(tenant: string, point: ScanHistoryPoint): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const key = scanHistoryKey(tenant);
+    await redis.lpush(key, JSON.stringify(point));
+    await redis.ltrim(key, 0, SCAN_HISTORY_MAX - 1);
+    await redis.expire(key, SCAN_TTL_SECONDS);
+  } catch (err) {
+    console.warn("[scan-store] history push failed", tenant, err);
+  }
+}
+
+/** Read a tenant's scan history, oldest-to-newest (for a left-to-right sparkline). */
+export async function getScanHistory(tenant: string): Promise<ScanHistoryPoint[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const raw = await redis.lrange(scanHistoryKey(tenant), 0, SCAN_HISTORY_MAX - 1);
+    const points = raw.map((item) =>
+      (typeof item === "string" ? JSON.parse(item) : item) as ScanHistoryPoint
+    );
+    return points.reverse();
+  } catch (err) {
+    console.warn("[scan-store] history read failed", tenant, err);
+    return [];
   }
 }
 

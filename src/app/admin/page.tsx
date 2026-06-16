@@ -20,7 +20,9 @@ import {
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary } from "@/lib/portfolio";
-import { getScanSummary, type ScanSummary } from "@/lib/scan-store";
+import { getScanSummary, getScanHistory, type ScanSummary } from "@/lib/scan-store";
+import { Sparkline } from "./Sparkline";
+import { ScanAllButton } from "./ScanAllButton";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { buildRevenueSummary } from "@/lib/revenue";
 import { OperatorConsole } from "./OperatorConsole";
@@ -48,13 +50,14 @@ export default async function AdminPage() {
 
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
-      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, scan] = await Promise.all([
+      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, scan, scanHistory] = await Promise.all([
         getActivity(t.id).catch(() => []),
         listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
         listThreads(t.id).catch(() => []),
         getWeeklyBrief(t.id).catch(() => null),
         getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
         getScanSummary(t.id).catch(() => null),
+        getScanHistory(t.id).catch(() => []),
       ]);
       const readiness = getTenantLaunchReadinessResults(t);
       const launchReadiness = buildTenantLaunchReadiness({
@@ -80,6 +83,7 @@ export default async function AdminPage() {
         readiness,
         launchReadiness,
         scan,
+        scanHistory,
       };
     })
   );
@@ -241,6 +245,12 @@ export default async function AdminPage() {
       </div>
 
       {/* Tenant table */}
+      {tenantData.length > 0 && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-warm-white">Clients</h2>
+          <ScanAllButton />
+        </div>
+      )}
       {tenantData.length === 0 ? (
         <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
           <p className="text-sm font-medium text-warm-white">No active clients yet</p>
@@ -263,7 +273,7 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-glass-border/50">
-              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness, scan }) => {
+              {tenantData.map(({ tenant: t, lastActivity, draftCount, readiness, threadCount, hasOwnerMessage, hasWeeklyBrief, effectiveSubscriptionStatus, launchReadiness, scan, scanHistory }) => {
                 const fallbackUrl = getTenantDashboardFallbackUrl(t);
                 const customAdminUrl = getTenantDashboardUrl(t);
                 const publicUrl = getTenantPublicUrl(t);
@@ -298,6 +308,19 @@ export default async function AdminPage() {
                             >
                               SEO {scan.grade}
                             </span>
+                          )}
+                          {scan && scanHistory.length >= 2 && (() => {
+                            const prev = scanHistory[scanHistory.length - 2].overallScore;
+                            const delta = scan.overallScore - prev;
+                            if (delta === 0) return null;
+                            return (
+                              <span className={`text-[11px] font-medium ${delta > 0 ? "text-emerald-300" : "text-red-300"}`}>
+                                {delta > 0 ? "▲" : "▼"}{Math.abs(delta)}
+                              </span>
+                            );
+                          })()}
+                          {scanHistory.length >= 2 && (
+                            <Sparkline values={scanHistory.map((p) => p.overallScore)} width={64} height={18} />
                           )}
                         </div>
                         <p className="mt-2 text-[11px] text-gray-faint">

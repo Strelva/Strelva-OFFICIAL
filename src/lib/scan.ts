@@ -10,7 +10,7 @@ import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { runAudit } from "@/lib/audit/checks";
 import type { CategoryResult } from "@/lib/audit/types";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
-import { saveScanSummary, type ScanSummary } from "@/lib/scan-store";
+import { saveScanSummary, pushScanHistory, type ScanSummary } from "@/lib/scan-store";
 
 export interface ScanResult extends ScanSummary {
   /** Full per-category detail (not persisted; returned for the live UI). */
@@ -42,6 +42,7 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
     categories: detail.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
   };
   await saveScanSummary(tenantId, summary);
+  await pushScanHistory(tenantId, { scannedAt, overallScore, grade });
 
   return { ...summary, detail };
 }

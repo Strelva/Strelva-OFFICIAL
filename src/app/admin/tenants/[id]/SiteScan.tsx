@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ScanSummary } from "@/lib/scan-store";
 import { TONE_PILL, TONE_DOT, gradeTone, scoreTone } from "@/lib/status-colors";
+import { Sparkline } from "../../Sparkline";
 
 interface FreshCheck {
   name: string;
@@ -27,9 +28,11 @@ function ago(iso: string): string {
 export function SiteScan({
   tenantId,
   initialScan,
+  history = [],
 }: {
   tenantId: string;
   initialScan: ScanSummary | null;
+  history?: number[];
 }) {
   // `scan` is the displayed summary (grade + per-category scores); `detail` holds
   // the full per-check breakdown, available only after a fresh in-session scan.
@@ -107,6 +110,12 @@ export function SiteScan({
                 {detail ? "fresh scan" : "last stored result"}
               </p>
             </div>
+            {history.length >= 2 && (
+              <div className="ml-auto flex flex-col items-end">
+                <Sparkline values={history} width={120} height={28} />
+                <span className="mt-1 text-[10px] text-gray-faint">{history.length} scans</span>
+              </div>
+            )}
           </div>
 
           <div className="mt-5 space-y-3">

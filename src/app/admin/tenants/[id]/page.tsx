@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
-import { getScanSummary } from "@/lib/scan-store";
+import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { listTenantDomainClaims, serializeDomainClaim } from "@/lib/domains";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
@@ -37,13 +37,14 @@ export default async function TenantDetailPage({
   const tenant = await getTenantConfig(id);
   if (!tenant) notFound();
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims] = await Promise.all([
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory] = await Promise.all([
     getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
     listDrafts(id).catch(() => ({} as Record<string, boolean>)),
     getActivity(id).catch(() => []),
     getScanSummary(id).catch(() => null),
     listTenantDomainClaims(id).catch(() => []),
+    getScanHistory(id).catch(() => []),
   ]);
 
   return (
@@ -66,7 +67,7 @@ export default async function TenantDetailPage({
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
-      <SiteScan tenantId={tenant.id} initialScan={lastScan} />
+      <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
 
       <DomainManager
         tenantId={tenant.id}
