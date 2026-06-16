@@ -78,7 +78,7 @@ export const servicesSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string().min(1),
   description: z.string(),
-  services: z.array(serviceItemSchema),
+  services: z.array(serviceItemSchema).max(500),
 });
 
 export const storySchema = z.object({
@@ -86,8 +86,8 @@ export const storySchema = z.object({
   headline: z.string().min(1),
   accentText: z.string(),
   statement: z.string().min(1),
-  paragraphs: z.array(z.string()),
-  stats: z.array(z.object({ value: z.string(), label: z.string() })),
+  paragraphs: z.array(z.string().max(20000)).max(200),
+  stats: z.array(z.object({ value: z.string(), label: z.string() })).max(50),
   quote: z.string(),
   quoteAttribution: z.string(),
   imageUrl: safeImageUrl,
@@ -104,7 +104,7 @@ export const testimonialItemSchema = z.object({
 export const testimonialsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
-  testimonials: z.array(testimonialItemSchema),
+  testimonials: z.array(testimonialItemSchema).max(500),
 });
 
 export const eventItemSchema = z.object({
@@ -122,7 +122,7 @@ export const eventItemSchema = z.object({
 export const eventsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
-  events: z.array(eventItemSchema),
+  events: z.array(eventItemSchema).max(500),
 });
 
 export const providerItemSchema = z.object({
@@ -140,7 +140,7 @@ export const providersSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  providers: z.array(providerItemSchema),
+  providers: z.array(providerItemSchema).max(200),
 });
 
 export const faqItemSchema = z.object({
@@ -153,7 +153,7 @@ export const faqSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  faqs: z.array(faqItemSchema),
+  faqs: z.array(faqItemSchema).max(200),
 });
 
 export const shopItemSchema = z.object({
@@ -170,7 +170,7 @@ export const shopSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  items: z.array(shopItemSchema),
+  items: z.array(shopItemSchema).max(500),
 });
 
 export const contactSchema = z.object({
@@ -204,7 +204,7 @@ export const productsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string().min(1),
   description: z.string(),
-  products: z.array(productItemSchema),
+  products: z.array(productItemSchema).max(500),
   bottomNote: z.string(),
 });
 
@@ -244,6 +244,26 @@ export const themeSchema = z.object({
   fontBody: cssFont,
 });
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const bookingConfigSchema = z.object({
+  timezone: z.string().max(64),
+  weeklySchedule: z
+    .array(
+      z.object({
+        day: z.number().int().min(0).max(6),
+        start: z.string().regex(HHMM, "Invalid time"),
+        end: z.string().regex(HHMM, "Invalid time"),
+        enabled: z.boolean(),
+      })
+    )
+    .max(14),
+  slotDuration: z.number().int().min(1).max(1440),
+  bufferTime: z.number().int().min(0).max(1440),
+  bookingLeadTime: z.number().int().min(0).max(525600),
+  maxAdvanceBooking: z.number().int().min(0).max(525600),
+  requirePayment: z.boolean(),
+});
+
 export const rewardsConfigSchema = z.object({
   starsPerBag: z.number(),
   starsToRedeem: z.number(),
@@ -261,7 +281,7 @@ export const navMenuItemSchema = z.object({
 });
 
 export const navigationSchema = z.object({
-  menuItems: z.array(navMenuItemSchema),
+  menuItems: z.array(navMenuItemSchema).max(50),
   ctaLabel: z.string(),
   ctaHref: safeUrl,
 });

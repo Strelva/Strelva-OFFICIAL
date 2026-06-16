@@ -17,7 +17,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status") as "pending" | "approved" | "dismissed" | null;
-  const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+  // Clamp: `?limit=abc` -> NaN would flow into redis.zrange(0, NaN). Bound it.
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "50", 10) || 50, 1), 500);
   if (status && !["pending", "approved", "dismissed"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }

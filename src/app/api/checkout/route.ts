@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
 
   const tenant = await getTenantFromHeaders();
   const productsContent = await getContent("products", tenant);
-  const productById = new Map(productsContent.products.map((product) => [product.id, product]));
+  const productList = Array.isArray(productsContent.products) ? productsContent.products : [];
+  const productById = new Map(productList.map((product) => [product.id, product]));
   const origin = getRequestOrigin(req);
 
   // Separate one-time and subscription items
