@@ -388,8 +388,9 @@ export function DesignMode() {
       if (UNSAFE_KEYS.has(parts[parts.length - 1])) return;
       obj[parts[parts.length - 1]] = value;
 
-      // Save
-      await fetch(dashboardHref(`/api/content/${section}${isDraft ? "?draft=true" : ""}`), {
+      // Save — only flip draft/refresh state if the write actually succeeded,
+      // otherwise the UI claims a draft the server rejected.
+      const saveRes = await fetch(dashboardHref(`/api/content/${section}${isDraft ? "?draft=true" : ""}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -397,6 +398,7 @@ export function DesignMode() {
         },
         body: JSON.stringify(updated),
       });
+      if (!saveRes.ok) return;
 
       if (isDraft) {
         setHasDraft(prev => ({ ...prev, [section]: true }));

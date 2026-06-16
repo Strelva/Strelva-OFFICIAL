@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
+import { timeAgo } from "@/lib/utils";
 import { CheckCircle2, AlertCircle, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { IntegrationStatus, IntelligenceStatus } from "@/lib/integration-registry";
@@ -132,10 +132,7 @@ export function SourceHealthBadge({
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
 
-  const syncTime = lastSync ? new Date(lastSync) : null;
-  const syncLabel = syncTime
-    ? `Last sync ${formatDistanceToNow(syncTime, { addSuffix: true })}`
-    : null;
+  const syncLabel = lastSync ? `Last sync ${timeAgo(new Date(lastSync).getTime())}` : null;
 
   if (compact) {
     return (
