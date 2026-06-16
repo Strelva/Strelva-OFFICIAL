@@ -320,10 +320,15 @@ export async function savePayLink(
   const key = `${PAY_LINK_PREFIX}${config.slug}`;
 
   if (!options.overwrite) {
-    const existing = await redis.get<PayLinkConfig>(key);
-    if (existing) {
+    // Atomic create: SET NX so two concurrent mints of the same slug can't both
+    // pass a get()-check and clobber each other (the prior get-then-set was a
+    // TOCTOU — the conflict guard was illusory under concurrency).
+    const created: unknown = await redis.set(key, config, { ex: PAY_LINK_TTL_SECONDS, nx: true });
+    if (created === null || created === undefined || created === false) {
       throw new PayLinkConflictError(config.slug);
     }
+    await redis.sadd(PAY_LINK_INDEX_KEY, config.slug);
+    return;
   }
 
   const result: unknown = await redis.set(key, config, { ex: PAY_LINK_TTL_SECONDS });
