@@ -60,7 +60,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns false when user has no tenants", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
 
@@ -72,7 +72,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns false when user has different tenant", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["other-tenant"] },
     });
 
@@ -84,7 +84,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns true when user has matching tenant", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["test-tenant", "other-tenant"] },
     });
 
@@ -99,7 +99,7 @@ describe("Content API - Tenant Access Checks", () => {
 
     mockCurrentUser.mockResolvedValue({
       id: "admin_123",
-      emailAddresses: [{ emailAddress: "superadmin@example.com" }],
+      emailAddresses: [{ emailAddress: "superadmin@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
 
@@ -113,7 +113,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("requireTenantAccess returns 403 response when access denied", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
 
@@ -130,7 +130,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("requireTenantAccess returns null when access allowed", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["test-tenant"] },
     });
 
@@ -320,7 +320,7 @@ describe("Tenant Access Denial (403)", () => {
   it("returns 403 for multiple tenants but not the requested one", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com" }],
+      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["tenant-a", "tenant-b", "tenant-c"] },
     });
 
@@ -337,7 +337,7 @@ describe("Tenant Access Denial (403)", () => {
 
     mockCurrentUser.mockResolvedValue({
       id: "admin_123",
-      emailAddresses: [{ emailAddress: "admin2@example.com" }],
+      emailAddresses: [{ emailAddress: "admin2@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
 

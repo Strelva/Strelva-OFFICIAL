@@ -75,9 +75,22 @@ function normalizeEmailAddress(value: unknown): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
-function getUserEmailAddresses(user: { emailAddresses?: Array<{ emailAddress?: string | null }> } | null): string[] {
+function getUserEmailAddresses(
+  user: {
+    emailAddresses?: Array<{
+      emailAddress?: string | null;
+      verification?: { status?: string | null } | null;
+    }>;
+  } | null
+): string[] {
   const emails = new Set<string>();
   for (const emailRecord of user?.emailAddresses || []) {
+    // CRITICAL: only trust VERIFIED emails. This set is used to claim pending
+    // invites and to match the super-admin allowlist — if unverified emails
+    // counted, an attacker could add victim@client.com (or an admin's email)
+    // as an unverified secondary address and claim their tenant access /
+    // super-admin. Clerk lets a user add an email before verifying it.
+    if (emailRecord.verification?.status !== "verified") continue;
     const email = normalizeEmailAddress(emailRecord.emailAddress);
     if (email) emails.add(email);
   }
@@ -189,7 +202,9 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
 
   const { userId } = await auth();
   const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress || null;
+  // Use the verified-primary email for audit attribution (not the raw [0],
+  // which a user could influence by reordering/adding unverified addresses).
+  const email = getUserEmailAddresses(user)[0] || null;
   const admin = email ? await isSuperAdmin() : false;
 
   return {
