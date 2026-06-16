@@ -24,37 +24,9 @@ import { getScanSummary, type ScanSummary } from "@/lib/scan-store";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { buildRevenueSummary } from "@/lib/revenue";
 import { OperatorConsole } from "./OperatorConsole";
+import { TONE_PILL, launchTone, gradeTone } from "@/lib/status-colors";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-emerald-500/20 text-emerald-400",
-  trialing: "bg-emerald-500/20 text-emerald-400",
-  past_due: "bg-yellow-500/20 text-yellow-400",
-  cancelled: "bg-red-500/20 text-red-400",
-  none: "bg-gray-bg text-gray-muted",
-};
-
-const READINESS_COLORS: Record<string, string> = {
-  ok: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
-  warn: "bg-amber-500/15 text-amber-300 border-amber-500/20",
-  fail: "bg-red-500/15 text-red-300 border-red-500/20",
-  skip: "bg-gray-bg text-gray-muted border-glass-border",
-};
-
-const LAUNCH_STATUS_COLORS: Record<LaunchReadinessStatus, string> = {
-  ready: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-  watch: "border-amber-500/25 bg-amber-500/10 text-amber-200",
-  blocked: "border-red-500/25 bg-red-500/10 text-red-200",
-};
-
-const SCAN_GRADE_COLORS: Record<ScanSummary["grade"], string> = {
-  A: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-  B: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-  C: "border-amber-500/25 bg-amber-500/10 text-amber-200",
-  D: "border-red-500/25 bg-red-500/10 text-red-200",
-  F: "border-red-500/25 bg-red-500/10 text-red-200",
-};
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -307,13 +279,13 @@ export default async function AdminPage() {
                         </Link>
                         <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${LAUNCH_STATUS_COLORS[launchReadiness.status]}`}>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${TONE_PILL[launchTone(launchReadiness.status)]}`}>
                             <span className="capitalize">{launchReadiness.status}</span> · {launchReadiness.score}%
                           </span>
                           {scan && (
                             <span
                               title={`SEO + site health ${scan.overallScore}/100 · scanned ${formatTime(scan.scannedAt)}`}
-                              className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${SCAN_GRADE_COLORS[scan.grade]}`}
+                              className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${TONE_PILL[gradeTone(scan.grade)]}`}
                             >
                               SEO {scan.grade}
                             </span>
