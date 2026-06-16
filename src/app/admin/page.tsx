@@ -151,9 +151,11 @@ export default async function AdminPage() {
                   href={item.href ?? "/admin"}
                   className="flex items-center gap-3 px-5 py-2.5 text-sm hover:bg-gray-bg transition-colors"
                 >
-                  <span className={item.severity === "high" ? "text-red-300" : "text-amber-300"}>
-                    {item.severity === "high" ? "🔴" : "🟠"}
-                  </span>
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                      item.severity === "high" ? "bg-red-400" : "bg-amber-400"
+                    }`}
+                  />
                   <span className="text-warm-white">{item.message}</span>
                 </Link>
               </li>
@@ -293,28 +295,15 @@ export default async function AdminPage() {
                           {t.siteName}
                         </Link>
                         <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
-                        <p className="mt-2 text-xs text-gray-faint">
-                          {t.industry} · {t.template}
+                        <div className="mt-3">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${LAUNCH_STATUS_COLORS[launchReadiness.status]}`}>
+                            <span className="capitalize">{launchReadiness.status}</span> · {launchReadiness.score}%
+                          </span>
+                        </div>
+                        <p className="mt-2 text-[11px] text-gray-faint">
+                          {t.industry} · {deliveryModel === "custom_repo" ? "custom repo" : "template"}
+                          {!t.active && " · archived"}
                         </p>
-                        <span
-                          className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            t.active
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-gray-bg text-gray-muted"
-                          }`}
-                        >
-                          {t.active ? "Active tenant" : "Inactive tenant"}
-                        </span>
-                        <span className={`ml-2 mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          deliveryModel === "custom_repo"
-                            ? "bg-amber-500/15 text-amber-300"
-                            : "bg-gray-bg text-gray-muted"
-                        }`}>
-                          {deliveryModel === "custom_repo" ? "Custom repo" : "Platform template"}
-                        </span>
-                        <span className={`mt-3 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${LAUNCH_STATUS_COLORS[launchReadiness.status]}`}>
-                          Launch: {launchReadiness.status} · {launchReadiness.score}%
-                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-5">
