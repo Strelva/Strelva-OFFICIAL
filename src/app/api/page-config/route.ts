@@ -18,7 +18,12 @@ import { clientRevalidationTargetForSections } from "@/lib/content-revalidation"
 
 export async function GET(request: Request) {
   try {
-    const tenant = await getTenantFromHeaders();
+    // Authenticated dashboard read — gate on tenant access so one tenant's user
+    // cannot read another tenant's page config or draft. The public storefront
+    // reads page config via the separate tenant-in-path /api/v1/page-config route.
+    const tenant = await requireTenantFromHeaders();
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
     const config = isDraft

@@ -457,6 +457,13 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     }
 
     const headers = new Headers(req.headers);
+    // Strip client-supplied trust headers before the proxy sets them, so a
+    // caller can't smuggle x-preview-mode (serve drafts) or x-client-fallback-root
+    // (redirect target) past the conditional sets below. x-tenant is always
+    // overwritten next, but delete it here too for a single clean rule.
+    headers.delete("x-tenant");
+    headers.delete("x-preview-mode");
+    headers.delete("x-client-fallback-root");
     headers.set("x-tenant", tenantId);
     if (tenantFromClientPath) {
       headers.set("x-client-fallback-root", `/client/${tenantId}`);
@@ -512,7 +519,17 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     });
   }
 
-  return applySecurityHeaders(NextResponse.next(), req);
+  // No tenant resolved (apex/marketing host). Strip client-supplied trust
+  // headers so a request to an apex host can't smuggle x-tenant/x-preview-mode
+  // to a header-trusting route. Tenant-scoped routes also re-check access.
+  const fallbackHeaders = new Headers(req.headers);
+  fallbackHeaders.delete("x-tenant");
+  fallbackHeaders.delete("x-preview-mode");
+  fallbackHeaders.delete("x-client-fallback-root");
+  return applySecurityHeaders(
+    NextResponse.next({ request: { headers: fallbackHeaders } }),
+    req
+  );
 });
 
 export const config = {

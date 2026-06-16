@@ -36,6 +36,11 @@ export async function GET(
 
   try {
     const tenant = await requireTenantFromHeaders();
+    // Authenticated content read — gate on tenant access so a logged-in user of
+    // one tenant cannot read another tenant's content or unpublished drafts.
+    // (The public storefront read is the separate, tenant-in-path /api/v1/* route.)
+    const denied = await requireTenantAccess(tenant);
+    if (denied) return denied;
 
     if (!(await isValidSection(section, tenant))) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
