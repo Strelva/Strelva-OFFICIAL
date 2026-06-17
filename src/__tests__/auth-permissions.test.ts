@@ -5,6 +5,7 @@ const mockAuth = vi.fn();
 const mockConsumeInvite = vi.fn();
 const mockGetInvite = vi.fn();
 const mockGetUser = vi.fn();
+const mockGetUserList = vi.fn();
 const mockUpdateUserMetadata = vi.fn();
 const mockGetTenantConfig = vi.fn();
 
@@ -15,6 +16,7 @@ vi.mock("@clerk/nextjs/server", () => ({
     Promise.resolve({
       users: {
         getUser: mockGetUser,
+        getUserList: mockGetUserList,
         updateUserMetadata: mockUpdateUserMetadata,
       },
     })
@@ -42,6 +44,7 @@ describe("auth permission helpers", () => {
     mockGetInvite.mockResolvedValue(null);
     mockConsumeInvite.mockResolvedValue(null);
     mockGetTenantConfig.mockResolvedValue({ id: "gldf" });
+    mockGetUserList.mockResolvedValue({ data: [] });
   });
 
   it("parses legacy tenant arrays as owner access", async () => {
@@ -154,6 +157,80 @@ describe("auth permission helpers", () => {
       publicMetadata: {
         tenants: ["gldf"],
         tenantRoles: { gldf: "admin" },
+      },
+    });
+  });
+
+  it("returns the user ids that own a tenant via getTenantOwnerUserIds", async () => {
+    mockGetUserList.mockResolvedValue({
+      data: [
+        { id: "owner_1", publicMetadata: { tenantRoles: { gldf: "owner" } } },
+        { id: "editor_1", publicMetadata: { tenantRoles: { gldf: "editor" } } },
+        { id: "owner_other", publicMetadata: { tenantRoles: { rohlax: "owner" } } },
+        { id: "owner_2", publicMetadata: { tenants: ["gldf"] } },
+      ],
+    });
+
+    const { getTenantOwnerUserIds } = await import("../lib/auth");
+    const owners = await getTenantOwnerUserIds("gldf");
+
+    expect(owners).toEqual(["owner_1", "owner_2"]);
+  });
+
+  it("blocks demoting the SOLE owner of a tenant", async () => {
+    mockGetUser.mockResolvedValue({
+      publicMetadata: { tenants: ["gldf"], tenantRoles: { gldf: "owner" } },
+    });
+    mockGetUserList.mockResolvedValue({
+      data: [{ id: "user_123", publicMetadata: { tenantRoles: { gldf: "owner" } } }],
+    });
+
+    const { assignUserToTenant, LastOwnerError } = await import("../lib/auth");
+
+    await expect(assignUserToTenant("user_123", "gldf", "viewer")).rejects.toBeInstanceOf(
+      LastOwnerError
+    );
+    expect(mockUpdateUserMetadata).not.toHaveBeenCalled();
+  });
+
+  it("allows demoting an owner when another owner exists", async () => {
+    mockGetUser.mockResolvedValue({
+      publicMetadata: { tenants: ["gldf"], tenantRoles: { gldf: "owner" } },
+    });
+    mockGetUserList.mockResolvedValue({
+      data: [
+        { id: "user_123", publicMetadata: { tenantRoles: { gldf: "owner" } } },
+        { id: "co_owner", publicMetadata: { tenantRoles: { gldf: "owner" } } },
+      ],
+    });
+
+    const { assignUserToTenant } = await import("../lib/auth");
+    const assigned = await assignUserToTenant("user_123", "gldf", "editor");
+
+    expect(assigned).toBe(true);
+    expect(mockUpdateUserMetadata).toHaveBeenCalledWith("user_123", {
+      publicMetadata: {
+        tenants: ["gldf"],
+        tenantRoles: { gldf: "editor" },
+      },
+    });
+  });
+
+  it("does not run the last-owner check when promoting (sole owner unaffected)", async () => {
+    mockGetUser.mockResolvedValue({
+      publicMetadata: { tenants: ["gldf"], tenantRoles: { gldf: "editor" } },
+    });
+
+    const { assignUserToTenant } = await import("../lib/auth");
+    const assigned = await assignUserToTenant("user_123", "gldf", "owner");
+
+    expect(assigned).toBe(true);
+    // Promotion must never touch the (paginated) owner list.
+    expect(mockGetUserList).not.toHaveBeenCalled();
+    expect(mockUpdateUserMetadata).toHaveBeenCalledWith("user_123", {
+      publicMetadata: {
+        tenants: ["gldf"],
+        tenantRoles: { gldf: "owner" },
       },
     });
   });

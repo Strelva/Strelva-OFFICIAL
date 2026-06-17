@@ -5,6 +5,7 @@ import {
   assignUserToTenant,
   requireTenantPermission,
   getActorContext,
+  LastOwnerError,
   type ClientRole,
 } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
@@ -58,7 +59,18 @@ export async function POST(req: Request) {
     }
 
     const userId = users.data[0].id;
-    const assigned = await assignUserToTenant(userId, tenantId, role);
+    let assigned: boolean;
+    try {
+      assigned = await assignUserToTenant(userId, tenantId, role);
+    } catch (assignErr) {
+      if (assignErr instanceof LastOwnerError) {
+        return NextResponse.json(
+          { error: "Cannot demote the last owner of this tenant" },
+          { status: 409 }
+        );
+      }
+      throw assignErr;
+    }
 
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign user - tenant may not exist" }, { status: 400 });
