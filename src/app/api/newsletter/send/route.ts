@@ -7,6 +7,7 @@ import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { sanitizeEmailHtml, htmlToPlainText } from "@/lib/email-html";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -60,11 +61,17 @@ export async function POST(req: Request) {
     const settings = await getContent("settings", tenant);
     const fromName = sanitizeEmailSubjectText(settings.siteName || "Newsletter");
 
+    // Sanitize the editor-supplied HTML once before it fans out to every
+    // subscriber — strips <script>, event handlers, javascript:/data: URLs.
+    const safeHtml = sanitizeEmailHtml(body);
+    const safeText = htmlToPlainText(body);
+
     // Use Resend if configured, otherwise log to console (dev mode)
     if (process.env.RESEND_API_KEY) {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
 
+      const emailDomain = process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
       const emails = activeSubscribers.map((s) => s.email);
 
       // Send via Resend batch (up to 100 per batch)
@@ -73,12 +80,19 @@ export async function POST(req: Request) {
         const batch = emails.slice(i, i + batchSize);
         await resend.batch.send(
           batch.map((to) => ({
-            from: `${fromName} <newsletter@${process.env.RESEND_DOMAIN || EMAIL_DOMAIN}>`,
+            from: `${fromName} <newsletter@${emailDomain}>`,
             to,
             subject: sanitizeEmailSubjectText(subject),
-            html: body,
-            text: body.replace(/<[^>]*>/g, ""),
-            ...(previewText ? { headers: { "X-Preview-Text": previewText } } : {}),
+            html: safeHtml,
+            text: safeText,
+            // Bulk-sender requirement: every campaign email carries an
+            // unsubscribe affordance the mail client can surface.
+            headers: {
+              "List-Unsubscribe": `<mailto:unsubscribe@${emailDomain}?subject=unsubscribe%20${encodeURIComponent(
+                tenant
+              )}%20${encodeURIComponent(to)}>`,
+              ...(previewText ? { "X-Preview-Text": previewText } : {}),
+            },
           }))
         );
       }
