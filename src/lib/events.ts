@@ -193,6 +193,36 @@ export async function resolveEvent(
   const redis = getRedis();
   if (!redis) return { event: null, changed: false };
 
+  // Atomic claim: the status==='pending' guard below is a read-check-write, so
+  // two concurrent resolves (e.g. an owner clicking approve while a cron
+  // dismisses) could both read 'pending' and both apply — doubling side effects
+  // and the resolutionHistory entry. Take a short per-event lock first; whoever
+  // loses the SET NX backs out cleanly.
+  const lockKey = `event-resolve-lock:${id}`;
+  const lock: unknown = await redis.set(lockKey, opts?.actor || "system", {
+    nx: true,
+    ex: 30,
+  });
+  // SET NX returns "OK" on the real client; the test mock may return true.
+  // Failure to claim is null/undefined/false (matches the pay-links idiom).
+  if (lock === null || lock === undefined || lock === false) {
+    const current = await redis.get<UnifiedEvent>(eventKey(id));
+    return { event: current, changed: false };
+  }
+
+  try {
+    return await resolveEventLocked(redis, id, status, opts);
+  } finally {
+    await redis.del(lockKey);
+  }
+}
+
+async function resolveEventLocked(
+  redis: NonNullable<ReturnType<typeof getRedis>>,
+  id: string,
+  status: "approved" | "dismissed",
+  opts?: { actor?: string }
+): Promise<{ event: UnifiedEvent | null; changed: boolean }> {
   const existing = await redis.get<UnifiedEvent>(eventKey(id));
   if (!existing) return { event: null, changed: false };
 
