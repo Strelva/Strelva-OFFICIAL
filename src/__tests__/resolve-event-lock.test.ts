@@ -44,7 +44,7 @@ describe("resolveEvent atomic lock", () => {
 
     expect(result.changed).toBe(true);
     expect(result.event?.status).toBe("approved");
-    expect(mockRedis.del).toHaveBeenCalledWith("event-resolve-lock:evt_1");
+    expect(mockRedis.del).toHaveBeenCalledWith("event-lock:evt_1");
   });
 
   it("backs out without writing when another resolver holds the lock", async () => {

@@ -21,7 +21,7 @@ import {
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
-import { sniffRasterImageType } from "@/lib/image-sniff";
+import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
@@ -831,7 +831,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             // Defense in depth: verify the bytes are actually a raster image of
             // an allowed type (mirrors the /api/media allowlist) so a mislabeled
             // data URL — e.g. an SVG smuggled as image/png — can't slip through.
-            const sniffed = sniffRasterImageType(buffer);
+            const sniffed = sniffImageType(buffer);
             if (!sniffed) {
               return { success: false, error: "Invalid image. Allowed: JPEG, PNG, WebP, GIF, AVIF." };
             }

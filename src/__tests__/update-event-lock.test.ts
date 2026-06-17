@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "../lib/types";
 
 // In-memory Redis stand-in that models SET NX semantics for the
-// `event-update-lock:{id}` key plus get/set/zrem/zadd for the event record.
+// `event-lock:{id}` key plus get/set/zrem/zadd for the event record.
 // The lock is the contention point updateEvent serializes on.
 const store = new Map<string, unknown>();
 const locks = new Set<string>();
@@ -65,18 +65,18 @@ describe("updateEvent lock", () => {
     expect(result.event?.title).toBe("after");
     // Lock acquired then released.
     expect(mockRedis.set).toHaveBeenCalledWith(
-      "event-update-lock:evt_1",
+      "event-lock:evt_1",
       "1",
       expect.objectContaining({ nx: true })
     );
-    expect(mockRedis.del).toHaveBeenCalledWith("event-update-lock:evt_1");
-    expect(locks.has("event-update-lock:evt_1")).toBe(false);
+    expect(mockRedis.del).toHaveBeenCalledWith("event-lock:evt_1");
+    expect(locks.has("event-lock:evt_1")).toBe(false);
   });
 
   it("loser re-reads and returns current event without mutating", async () => {
     seedEvent({ id: "evt_1", title: "current" });
     // Simulate a concurrent holder already owning the lock.
-    locks.add("event-update-lock:evt_1");
+    locks.add("event-lock:evt_1");
 
     const updater = vi.fn((e: UnifiedEvent) => ({ ...e, title: "should-not-apply" }));
     const result = await updateEvent("evt_1", updater);
@@ -97,8 +97,8 @@ describe("updateEvent lock", () => {
       })
     ).rejects.toThrow("boom");
 
-    expect(mockRedis.del).toHaveBeenCalledWith("event-update-lock:evt_1");
-    expect(locks.has("event-update-lock:evt_1")).toBe(false);
+    expect(mockRedis.del).toHaveBeenCalledWith("event-lock:evt_1");
+    expect(locks.has("event-lock:evt_1")).toBe(false);
   });
 
   it("returns {event:null,changed:false} when redis is unavailable", async () => {
@@ -115,6 +115,6 @@ describe("updateEvent lock", () => {
   it("returns null event when the event does not exist (lock still released)", async () => {
     const result = await updateEvent("evt_absent", (e) => e);
     expect(result).toEqual({ event: null, changed: false });
-    expect(mockRedis.del).toHaveBeenCalledWith("event-update-lock:evt_absent");
+    expect(mockRedis.del).toHaveBeenCalledWith("event-lock:evt_absent");
   });
 });

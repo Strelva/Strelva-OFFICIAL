@@ -173,7 +173,7 @@ export async function updateEvent(
   // re-read) leaving the zset diverged from the event:{id} record. A SET NX
   // lock serializes them; the loser re-reads and returns the current event
   // without mutating. TTL bounds a crashed holder.
-  const lockKey = `event-update-lock:${id}`;
+  const lockKey = `event-lock:${id}`;
   const lock = await redis.set(lockKey, "1", { nx: true, ex: 10 });
   if (!lock) {
     const current = await redis.get<UnifiedEvent>(eventKey(id));
@@ -216,7 +216,7 @@ export async function resolveEvent(
   // dismisses) could both read 'pending' and both apply — doubling side effects
   // and the resolutionHistory entry. Take a short per-event lock first; whoever
   // loses the SET NX backs out cleanly.
-  const lockKey = `event-resolve-lock:${id}`;
+  const lockKey = `event-lock:${id}`;
   const lock: unknown = await redis.set(lockKey, opts?.actor || "system", {
     nx: true,
     ex: 30,
