@@ -5,6 +5,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import type { MediaAsset } from "@/lib/media";
+import { verifyRasterImage } from "@/lib/image-signature";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -100,6 +101,13 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // `file.type` is client-supplied — sniff the real bytes so a declared
+  // image/png can't smuggle an SVG/HTML/script payload (stored XSS).
+  const verified = verifyRasterImage(buffer, ALLOWED);
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.reason }, { status: 400 });
+  }
   const asset = await getSanityClient().assets.upload("image", buffer, {
     filename: file.name,
     contentType: file.type,
