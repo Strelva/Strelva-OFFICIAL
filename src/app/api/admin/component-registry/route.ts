@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
 import { customComponentCapabilitySchema } from "@/lib/schemas";
+import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import type { CustomComponentCapability } from "@/lib/types";
 
@@ -69,6 +70,15 @@ export async function PUT(req: Request) {
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
+
+  await logAuditEvent({
+    tenant,
+    action: "tenant.update_components",
+    targetType: "tenant",
+    targetId: tenant,
+    actor: await getActorContext(tenant),
+    metadata: { componentCount: components.length },
+  });
 
   return NextResponse.json({ tenant, components });
 }
