@@ -166,20 +166,38 @@ export async function updateEvent(
   const redis = getRedis();
   if (!redis) return { event: null, changed: false };
 
-  const existing = await redis.get<UnifiedEvent>(eventKey(id));
-  if (!existing) return { event: null, changed: false };
+  // Guard the read-modify-write (get -> zrem(old) -> zadd(new)) against a
+  // concurrent updateEvent/resolveEvent on the same event: two racers could
+  // both read the same `existing`, and the loser's stale `zrem(JSON.stringify
+  // (existing))` would no-op (or worse, remove the winner's new member if it
+  // re-read) leaving the zset diverged from the event:{id} record. A SET NX
+  // lock serializes them; the loser re-reads and returns the current event
+  // without mutating. TTL bounds a crashed holder.
+  const lockKey = `event-update-lock:${id}`;
+  const lock = await redis.set(lockKey, "1", { nx: true, ex: 10 });
+  if (!lock) {
+    const current = await redis.get<UnifiedEvent>(eventKey(id));
+    return { event: current ?? null, changed: false };
+  }
 
-  const updated = updater(existing);
-  await redis.set(eventKey(id), updated);
+  try {
+    const existing = await redis.get<UnifiedEvent>(eventKey(id));
+    if (!existing) return { event: null, changed: false };
 
-  const key = eventsKey(existing.tenantId);
-  await redis.zrem(key, JSON.stringify(existing));
-  await redis.zadd(key, {
-    score: new Date(existing.createdAt).getTime(),
-    member: JSON.stringify(updated),
-  });
+    const updated = updater(existing);
+    await redis.set(eventKey(id), updated);
 
-  return { event: updated, changed: true };
+    const key = eventsKey(existing.tenantId);
+    await redis.zrem(key, JSON.stringify(existing));
+    await redis.zadd(key, {
+      score: new Date(existing.createdAt).getTime(),
+      member: JSON.stringify(updated),
+    });
+
+    return { event: updated, changed: true };
+  } finally {
+    await redis.del(lockKey);
+  }
 }
 
 /**
