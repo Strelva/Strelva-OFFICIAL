@@ -14,7 +14,11 @@ const cspBaseDirectives = [
   "default-src 'self'",
   // Clerk's live frontend API is still served from clerk.scaffoldweb.com (CLERK_DOMAIN=scaffoldweb.com);
   // clerk.strelva.com is kept for when the rebrand cutover completes. Allow both so clerk.browser.js loads.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://va.vercel-scripts.com",
+  // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
+  // that's a Turbopack/HMR dev artifact; Clerk's remote SDK, Sentry, and Vercel Analytics contain no
+  // eval/new Function). The looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now
+  // (Next bootstrap + JSON-LD + Clerk inline); removing it needs a nonce rollout.
+  "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com",
   "font-src 'self' data:",
