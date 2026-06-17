@@ -102,29 +102,98 @@ export async function getBookings(
 }
 
 /**
- * Atomically claim a booking slot using Redis SETNX.
- * Returns true if the slot was claimed, false if already taken.
- * The lock expires after 10 minutes to prevent stuck slots.
+ * Granularity (minutes) of the Redis slot-lock grid.
+ *
+ * Bookings have variable durations, so locking only the exact start-time key
+ * would let two overlapping bookings (e.g. a 90-min at 10:00 and a 60-min at
+ * 10:30) both succeed because their start keys differ. Instead we lock every
+ * grid cell the booking *spans*. 5 minutes is fine enough to catch any realistic
+ * overlap while keeping the number of keys per booking small.
+ */
+const SLOT_GRID_MINUTES = 5;
+
+function slotTimeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function slotMinutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Compute every grid key a booking occupies, from startTime (inclusive) through
+ * endTime + bufferTime (exclusive) at SLOT_GRID_MINUTES granularity. This mirrors
+ * generateSlots, which reserves endTime + bufferTime against future bookings.
+ *
+ * The grid cell for a span point is floor(minute / grid) * grid, so a span and
+ * any other span that overlaps it (even at a different start time) share at least
+ * one key and therefore collide on SET NX.
+ *
+ * Keys are intentionally NOT scoped by serviceId: getAvailableSlots treats the
+ * calendar as a single shared resource (it blocks slots that overlap ANY existing
+ * booking on the date, regardless of service), so the lock must do the same or two
+ * different services could be double-booked into the same window.
+ */
+function spanSlotKeys(
+  tenant: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+  bufferTime: number
+): string[] {
+  const startMinutes = slotTimeToMinutes(startTime);
+  const endMinutes = slotTimeToMinutes(endTime) + Math.max(0, bufferTime);
+
+  const keys: string[] = [];
+  const firstCell = Math.floor(startMinutes / SLOT_GRID_MINUTES) * SLOT_GRID_MINUTES;
+  for (let cell = firstCell; cell < endMinutes; cell += SLOT_GRID_MINUTES) {
+    keys.push(`reb:booking:slot:${tenant}:${date}:${slotMinutesToTime(cell)}`);
+  }
+  // Always lock at least the start cell (handles zero/invalid durations).
+  if (keys.length === 0) {
+    keys.push(`reb:booking:slot:${tenant}:${date}:${slotMinutesToTime(firstCell)}`);
+  }
+  return keys;
+}
+
+/**
+ * Atomically claim every grid cell a booking spans using Redis SET NX.
+ * Returns claimed=true only if ALL cells were free; if any cell is already
+ * taken, the cells claimed so far are released and claimed=false is returned.
+ * Locks expire after 10 minutes to prevent stuck slots.
  */
 async function claimBookingSlot(
   tenant: string,
   date: string,
   startTime: string,
-  serviceId: string
+  endTime: string,
+  bufferTime: number
 ): Promise<{ claimed: boolean; release: () => Promise<void> }> {
   const redis = getRedis();
-  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
   const lockTTL = 600; // 10 minutes
 
   if (redis) {
-    // SETNX with expiry - atomic slot claim
-    const claimed = await redis.set(slotKey, "pending", { nx: true, ex: lockTTL });
-    return {
-      claimed: !!claimed,
-      release: async () => {
-        await redis.del(slotKey);
-      },
+    const keys = spanSlotKeys(tenant, date, startTime, endTime, bufferTime);
+    const claimedKeys: string[] = [];
+    const release = async () => {
+      await Promise.all(claimedKeys.map((key) => redis.del(key)));
     };
+
+    for (const key of keys) {
+      // SET NX with expiry - atomic per-cell claim
+      const ok = await redis.set(key, "pending", { nx: true, ex: lockTTL });
+      if (!ok) {
+        // Another booking already holds an overlapping cell - back out.
+        await release();
+        return { claimed: false, release: async () => {} };
+      }
+      claimedKeys.push(key);
+    }
+
+    return { claimed: true, release };
   }
 
   // No Redis - fall back to non-atomic behavior (acceptable for dev)
@@ -132,38 +201,42 @@ async function claimBookingSlot(
 }
 
 /**
- * Mark a slot as permanently booked (after successful booking creation).
- * The slot key remains with a longer TTL so getAvailableSlots can check it.
+ * Mark every grid cell a booking spans as booked (after successful creation).
+ * Keys remain with a longer TTL so future overlap claims collide on them.
  */
 async function confirmBookingSlot(
   tenant: string,
   date: string,
   startTime: string,
-  serviceId: string
+  endTime: string,
+  bufferTime: number
 ): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
 
-  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
-  // Keep slot marked as booked for 48 hours (covers day-of and next-day edge cases)
-  await redis.set(slotKey, "confirmed", { ex: 172800 });
+  const keys = spanSlotKeys(tenant, date, startTime, endTime, bufferTime);
+  // Keep slots marked as booked for 48 hours (covers day-of and next-day edge cases)
+  await Promise.all(
+    keys.map((key) => redis.set(key, "confirmed", { ex: 172800 }))
+  );
 }
 
 /**
- * Check if a slot is already claimed/booked in Redis.
+ * Check if any grid cell a booking would span is already claimed/booked in Redis.
  */
 export async function isSlotClaimed(
   tenant: string,
   date: string,
   startTime: string,
-  serviceId: string
+  endTime: string,
+  bufferTime: number
 ): Promise<boolean> {
   const redis = getRedis();
   if (!redis) return false;
 
-  const slotKey = `reb:booking:slot:${tenant}:${date}:${startTime}:${serviceId}`;
-  const value = await redis.get(slotKey);
-  return !!value;
+  const keys = spanSlotKeys(tenant, date, startTime, endTime, bufferTime);
+  const values = await Promise.all(keys.map((key) => redis.get(key)));
+  return values.some((value) => !!value);
 }
 
 export async function createBooking(
@@ -171,6 +244,7 @@ export async function createBooking(
   tenant: string = DEFAULT_TENANT
 ): Promise<Booking> {
   const bookingId = generateBookingId();
+  const { bufferTime } = await getBookingConfig(tenant);
 
   if (hasSanity) {
     const doc = await getSanityClient().create({
@@ -181,8 +255,14 @@ export async function createBooking(
       status: "confirmed",
     });
 
-    // Mark slot as confirmed in Redis after successful DB write
-    await confirmBookingSlot(tenant, booking.date, booking.startTime, booking.serviceId);
+    // Mark the full booked span as confirmed in Redis after successful DB write
+    await confirmBookingSlot(
+      tenant,
+      booking.date,
+      booking.startTime,
+      booking.endTime,
+      bufferTime
+    );
 
     return {
       ...booking,
@@ -205,8 +285,14 @@ export async function createBooking(
   store[`__bookings_${tenant}`] = bookings;
   await writeDevContent(store, tenant);
 
-  // Mark slot as confirmed in Redis after successful write
-  await confirmBookingSlot(tenant, booking.date, booking.startTime, booking.serviceId);
+  // Mark the full booked span as confirmed in Redis after successful write
+  await confirmBookingSlot(
+    tenant,
+    booking.date,
+    booking.startTime,
+    booking.endTime,
+    bufferTime
+  );
 
   return newBooking;
 }
@@ -219,12 +305,16 @@ export async function createBookingAtomic(
   booking: Omit<Booking, "id" | "createdAt" | "status">,
   tenant: string = DEFAULT_TENANT
 ): Promise<{ success: true; booking: Booking } | { success: false; error: string }> {
-  // Step 1: Atomically claim the slot
+  // Step 1: Atomically claim every grid cell the booking spans. For
+  // variable-duration services this prevents two overlapping bookings (whose
+  // start times differ) from both succeeding.
+  const { bufferTime } = await getBookingConfig(tenant);
   const { claimed, release } = await claimBookingSlot(
     tenant,
     booking.date,
     booking.startTime,
-    booking.serviceId
+    booking.endTime,
+    bufferTime
   );
 
   if (!claimed) {
