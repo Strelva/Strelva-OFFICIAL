@@ -3,9 +3,9 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import {
-  getMember,
+  adjustStars,
+  InsufficientStarsError,
   logTransaction,
-  saveMember,
 } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
 import { readJsonObject } from "@/lib/request-body";
@@ -44,18 +44,21 @@ export async function POST(
       return NextResponse.json({ error: "note is required" }, { status: 422 });
     }
 
-    const existing = await getMember(tenant, email);
-    if (!existing) {
+    let updated;
+    try {
+      updated = await adjustStars(tenant, email, delta);
+    } catch (adjustErr) {
+      if (adjustErr instanceof InsufficientStarsError) {
+        return NextResponse.json(
+          { error: "Insufficient stars balance" },
+          { status: 422 }
+        );
+      }
+      throw adjustErr;
+    }
+    if (!updated) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
-
-    const updated = {
-      ...existing,
-      starsAvailable: Math.max(0, existing.starsAvailable + delta),
-      starsLifetime:
-        delta > 0 ? existing.starsLifetime + delta : existing.starsLifetime,
-    };
-    await saveMember(tenant, updated);
 
     const txn = await logTransaction(
       tenant,

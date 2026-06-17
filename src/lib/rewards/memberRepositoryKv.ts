@@ -8,12 +8,34 @@
  */
 
 import { getKv, keys, KvNotConfiguredError } from "./kv";
+import { DEFAULT_REWARDS_CONFIG } from "./types";
 import type {
   Badge,
   Member,
+  RewardsConfig,
   StarsTransaction,
+  Tier,
   TransactionType,
 } from "./types";
+
+/**
+ * Thrown by adjustStars when a debit would drive starsAvailable below zero.
+ * The atomic decrement is rolled back before this is raised, so the stored
+ * balance is unchanged. Callers should surface this as a 422 (insufficient
+ * balance), not a 500.
+ */
+export class InsufficientStarsError extends Error {
+  readonly available: number;
+  readonly requested: number;
+  constructor(available: number, requested: number) {
+    super(
+      `insufficient stars: have ${available}, tried to spend ${requested}`
+    );
+    this.name = "InsufficientStarsError";
+    this.available = available;
+    this.requested = requested;
+  }
+}
 
 type MemberHash = Record<string, string>;
 
@@ -96,6 +118,87 @@ export async function getMember(
   const data = await kv.hgetall<Record<string, unknown>>(keys.member(tenant, email));
   if (!data) return null;
   return hashToMember(data);
+}
+
+/**
+ * Resolve a member's effective tier. A manual tierOverride always wins;
+ * otherwise the tier is derived from lifetime stars against the configured
+ * super threshold. Pure — callers pass the post-mutation lifetime value.
+ */
+export function resolveTier(
+  starsLifetime: number,
+  tierOverride: Tier | null,
+  config: RewardsConfig = DEFAULT_REWARDS_CONFIG
+): Tier {
+  if (tierOverride) return tierOverride;
+  return starsLifetime >= config.tierThresholdSuper ? "super-snapper" : "snapper";
+}
+
+/**
+ * Atomically adjust a member's stars and return the refreshed member.
+ *
+ * This replaces the prior read-modify-write (getMember -> mutate -> saveMember),
+ * which lost concurrent updates and could oversell a balance under races. Stars
+ * are mutated with HINCRBY so concurrent earn/redeem are serialized by Redis:
+ *
+ *   - delta > 0 (earn / admin-credit): HINCRBY starsAvailable +delta and
+ *     HINCRBY starsLifetime +delta.
+ *   - delta < 0 (redeem / admin-debit): HINCRBY starsAvailable +delta first; if
+ *     the returned balance is negative the decrement is rolled back (HINCRBY
+ *     +amount) and InsufficientStarsError is thrown. starsLifetime is never
+ *     reduced.
+ *
+ * Tier is recomputed from the authoritative post-mutation lifetime value (with
+ * tierOverride honored) and persisted. Returns null if the member does not
+ * exist. Does NOT log the transaction — the caller owns logTransaction so the
+ * existing audit/reason wiring is preserved.
+ */
+export async function adjustStars(
+  tenant: string,
+  email: string,
+  delta: number,
+  config: RewardsConfig = DEFAULT_REWARDS_CONFIG
+): Promise<Member | null> {
+  const kv = assertKv();
+  const normalizedEmail = email.trim().toLowerCase();
+  const memberKey = keys.member(tenant, normalizedEmail);
+
+  // Load the existing member up front so we can (a) 404 on missing members and
+  // (b) carry forward non-stars fields (tierOverride, badges, etc.) into the
+  // returned object. The HINCRBY results below are the source of truth for the
+  // stars fields, so a stale read here cannot corrupt balances.
+  const existing = await getMember(tenant, normalizedEmail);
+  if (!existing) return null;
+
+  let starsAvailable: number;
+  if (delta >= 0) {
+    starsAvailable = await kv.hincrby(memberKey, "starsAvailable", delta);
+  } else {
+    const spend = -delta;
+    const after = await kv.hincrby(memberKey, "starsAvailable", delta);
+    if (after < 0) {
+      // Roll back the overspend, then reject. The rollback restores the exact
+      // amount we removed, regardless of other concurrent ops in flight.
+      await kv.hincrby(memberKey, "starsAvailable", spend);
+      throw new InsufficientStarsError(after + spend, spend);
+    }
+    starsAvailable = after;
+  }
+
+  // starsLifetime only grows, and only on credits.
+  const starsLifetime =
+    delta > 0
+      ? await kv.hincrby(memberKey, "starsLifetime", delta)
+      : existing.starsLifetime;
+
+  // Recompute tier from the authoritative lifetime value and persist if it
+  // changed, so reads stay consistent without rewriting the whole hash.
+  const tier = resolveTier(starsLifetime, existing.tierOverride, config);
+  if (tier !== existing.tier) {
+    await kv.hset(memberKey, { tier });
+  }
+
+  return { ...existing, starsAvailable, starsLifetime, tier };
 }
 
 export async function listMembers(tenant: string): Promise<Member[]> {
