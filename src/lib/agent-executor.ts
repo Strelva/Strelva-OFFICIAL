@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getContent, getClickCounts, getSectionTimestamps } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
-import { capabilityPromptFragment } from "@/lib/capabilities";
+import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
 import { sendSlackNotification } from "@/lib/slack";
 import { detectStaleSections } from "@/lib/reports";
 import { decideAiContentGovernance } from "@/lib/ai-governance";
@@ -111,29 +111,31 @@ async function buildSystemPrompt(
   const hero = content.hero || {};
   const story = content.story || {};
 
-  const ownerName = (settings.ownerName as string) || "the owner";
-  const ownerTitle = (settings.ownerTitle as string) || "";
+  // Tenant content is attacker-controllable; sanitize every value that lands in
+  // the system prompt so a field can't inject a fake instruction line.
+  const ownerName = sanitizePromptValue(settings.ownerName) || "the owner";
+  const ownerTitle = sanitizePromptValue(settings.ownerTitle);
 
   const sectionSummaries: string[] = [];
 
   sectionSummaries.push(`ABOUT THE BUSINESS:
 - Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
-- Phone: ${contact.phone || "(not set)"}
-- Email: ${contact.email || "(not set)"}
-- Address: ${contact.address || "(not set)"}
-- Hours: ${contact.hours || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${settings.bookingUrl}` : ""}`);
+- Phone: ${sanitizePromptValue(contact.phone) || "(not set)"}
+- Email: ${sanitizePromptValue(contact.email) || "(not set)"}
+- Address: ${sanitizePromptValue(contact.address) || "(not set)"}
+- Hours: ${sanitizePromptValue(contact.hours) || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${sanitizePromptValue(settings.bookingUrl)}` : ""}`);
 
   if (sections.includes("hero")) {
     sectionSummaries.push(`HERO SECTION:
-- Headline: ${hero.headline || "(not set)"}
-- Subheadline: ${hero.subheadline || "(not set)"}
-- CTA: ${hero.ctaText || "(not set)"}`);
+- Headline: ${sanitizePromptValue(hero.headline) || "(not set)"}
+- Subheadline: ${sanitizePromptValue(hero.subheadline) || "(not set)"}
+- CTA: ${sanitizePromptValue(hero.ctaText) || "(not set)"}`);
   }
 
   if (sections.includes("story")) {
     sectionSummaries.push(`ABOUT/STORY:
-- Headline: ${story.headline || "(not set)"}
-- Statement: ${story.statement || "(not set)"}
+- Headline: ${sanitizePromptValue(story.headline) || "(not set)"}
+- Statement: ${sanitizePromptValue(story.statement) || "(not set)"}
 - ${(story.paragraphs as string[])?.length || 0} paragraphs, ${(story.stats as unknown[])?.length || 0} stats`);
   }
 
@@ -188,7 +190,7 @@ async function buildSystemPrompt(
 
   const sectionNames = sections.join(", ");
 
-  let prompt = `You are the website assistant for ${(settings.siteName as string) || "this business"}.
+  let prompt = `You are the website assistant for ${sanitizePromptValue(settings.siteName) || "this business"}.
 
 ${sectionSummaries.join("\n\n")}
 
@@ -200,8 +202,8 @@ Available sections: ${sectionNames}.`;
 
   if (settings.bookingUrl) {
     const tenantConfig = await getTenantConfig(tenant);
-    const provider = tenantConfig?.bookingProvider || "their booking platform";
-    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there.`;
+    const provider = sanitizePromptValue(tenantConfig?.bookingProvider) || "their booking platform";
+    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${sanitizePromptValue(settings.bookingUrl)}. When someone asks about booking, direct them there.`;
   }
 
   prompt += `\n\n${capFragment}`;

@@ -20,7 +20,8 @@ import {
   type RawTenantConnectionSettings,
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { capabilityPromptFragment } from "@/lib/capabilities";
+import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
+import { sniffRasterImageType } from "@/lib/image-sniff";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
@@ -125,30 +126,32 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
   const hero = content.hero || {};
   const story = content.story || {};
 
-  const ownerName = (settings.ownerName as string) || "the owner";
-  const ownerTitle = (settings.ownerTitle as string) || "";
+  // Tenant content is attacker-controllable; sanitize every value that lands in
+  // the system prompt so a field can't inject a fake instruction line.
+  const ownerName = sanitizePromptValue(settings.ownerName) || "the owner";
+  const ownerTitle = sanitizePromptValue(settings.ownerTitle);
 
   // Build dynamic section summaries
   const sectionSummaries: string[] = [];
 
   sectionSummaries.push(`ABOUT THE BUSINESS:
 - Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
-- Phone: ${contact.phone || "(not set)"}
-- Email: ${contact.email || "(not set)"}
-- Address: ${contact.address || "(not set)"}
-- Hours: ${contact.hours || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${settings.bookingUrl}` : ""}`);
+- Phone: ${sanitizePromptValue(contact.phone) || "(not set)"}
+- Email: ${sanitizePromptValue(contact.email) || "(not set)"}
+- Address: ${sanitizePromptValue(contact.address) || "(not set)"}
+- Hours: ${sanitizePromptValue(contact.hours) || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${sanitizePromptValue(settings.bookingUrl)}` : ""}`);
 
   if (sections.includes("hero")) {
     sectionSummaries.push(`HERO SECTION:
-- Headline: ${hero.headline || "(not set)"}
-- Subheadline: ${hero.subheadline || "(not set)"}
-- CTA: ${hero.ctaText || "(not set)"}`);
+- Headline: ${sanitizePromptValue(hero.headline) || "(not set)"}
+- Subheadline: ${sanitizePromptValue(hero.subheadline) || "(not set)"}
+- CTA: ${sanitizePromptValue(hero.ctaText) || "(not set)"}`);
   }
 
   if (sections.includes("story")) {
     sectionSummaries.push(`ABOUT/STORY:
-- Headline: ${story.headline || "(not set)"}
-- Statement: ${story.statement || "(not set)"}
+- Headline: ${sanitizePromptValue(story.headline) || "(not set)"}
+- Statement: ${sanitizePromptValue(story.statement) || "(not set)"}
 - ${(story.paragraphs as string[])?.length || 0} paragraphs, ${(story.stats as unknown[])?.length || 0} stats`);
   }
 
@@ -266,7 +269,7 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
 
   const sectionNames = sections.join(", ");
 
-  let prompt = `You are the website assistant for ${(settings.siteName as string) || "this business"}.
+  let prompt = `You are the website assistant for ${sanitizePromptValue(settings.siteName) || "this business"}.
 
 ${sectionSummaries.join("\n\n")}
 
@@ -278,8 +281,8 @@ Available sections: ${sectionNames}.`;
 
   if (settings.bookingUrl) {
     const tenantConfig = await getTenantConfig(tenant);
-    const provider = tenantConfig?.bookingProvider || "their booking platform";
-    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${settings.bookingUrl}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
+    const provider = sanitizePromptValue(tenantConfig?.bookingProvider) || "their booking platform";
+    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${sanitizePromptValue(settings.bookingUrl)}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
   }
 
   prompt += `\n\nSOURCE-PROOF RULES:
@@ -297,7 +300,7 @@ Available sections: ${sectionNames}.`;
   // Inject tenant-level AI personality and rules
   const tenantCfg = await getTenantConfig(tenant);
 
-  const personalityDesc = tenantCfg?.personality || "conversational, warm, and helpful";
+  const personalityDesc = sanitizePromptValue(tenantCfg?.personality) || "conversational, warm, and helpful";
   prompt += `\n\nBe ${personalityDesc} — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.`;
 
   if (tenantCfg?.businessRules) {
@@ -816,6 +819,23 @@ Only use tools for manifest-supported sections and actions. If the user requests
               return { success: false, error: "Invalid image data. Expected a base64-encoded data URL (data:image/type;base64,...)." };
             }
             const buffer = Buffer.from(match[2], "base64");
+
+            // Size cap: a base64 string from the model is unbounded, so cap the
+            // decoded buffer at 5MB (parity with MAX_FILE_SIZE in upload-store
+            // and MAX_SIZE in /api/media). Reject cleanly instead of throwing.
+            const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+            if (buffer.byteLength > MAX_UPLOAD_SIZE) {
+              return { success: false, error: "Image too large (max 5MB)." };
+            }
+
+            // Defense in depth: verify the bytes are actually a raster image of
+            // an allowed type (mirrors the /api/media allowlist) so a mislabeled
+            // data URL — e.g. an SVG smuggled as image/png — can't slip through.
+            const sniffed = sniffRasterImageType(buffer);
+            if (!sniffed) {
+              return { success: false, error: "Invalid image. Allowed: JPEG, PNG, WebP, GIF, AVIF." };
+            }
+
             const ext = match[1].split("/")[1] || "png";
             const finalFilename = filename || `upload-${Date.now()}.${ext}`;
             const blob = new Blob([buffer], { type: match[1] });

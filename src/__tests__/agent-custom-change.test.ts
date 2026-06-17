@@ -117,6 +117,7 @@ vi.mock("@/lib/proof-signals", () => ({
 
 vi.mock("@/lib/capabilities", () => ({
   capabilityPromptFragment: () => "",
+  sanitizePromptValue: (v: unknown) => (typeof v === "string" ? v : ""),
 }));
 
 vi.mock("@/lib/dev-access", () => ({
