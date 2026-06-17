@@ -3,6 +3,7 @@ import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
+import { trackError } from "@/lib/monitoring";
 import { auth } from "@clerk/nextjs/server";
 import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getContent, getClickCounts } from "@/lib/storage";
@@ -1595,6 +1596,9 @@ Only use tools for manifest-supported sections and actions. If the user requests
             tenant,
             error: err instanceof Error ? err.message : "unknown",
           });
+          // Surface to Sentry — a total AI-turn failure (both models down) is
+          // otherwise console-only and invisible in production.
+          trackError(err, { tenant, op: "agent.chat" });
           try {
             controller.enqueue(
               encoder.encode(

@@ -62,11 +62,6 @@ export function getTemplateRegistry(): Record<string, TemplateDefinition> {
   return _registry;
 }
 
-export function registerTemplate(template: TemplateDefinition) {
-  const registry = getTemplateRegistry();
-  registry[template.id] = template;
-}
-
 export async function getTemplateForTenant(tenant: string): Promise<TemplateDefinition> {
   const { getTenantConfig } = await import("@/lib/tenants");
   const config = await getTenantConfig(tenant);

@@ -33,4 +33,22 @@ export function alert(event: string, severity: Severity, context: Context = {}):
       extra: context,
     });
   }
+
+  // Slack is where the team actually watches — post high/critical alerts there
+  // too, not just Sentry (which may be unconfigured). Fire-and-forget.
+  if (
+    process.env.SLACK_WEBHOOK_URL &&
+    (severity === "high" || severity === "critical")
+  ) {
+    const detail = Object.entries(context)
+      .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+      .join(" · ");
+    fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `:rotating_light: *[${severity.toUpperCase()}] ${event}*${detail ? `\n${detail}` : ""}`,
+      }),
+    }).catch(() => {});
+  }
 }

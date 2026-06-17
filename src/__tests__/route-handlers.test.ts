@@ -37,7 +37,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   currentUser: vi.fn(() =>
     Promise.resolve({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "test@example.com" }],
+      emailAddresses: [{ emailAddress: "test@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["test-tenant"] },
     })
   ),

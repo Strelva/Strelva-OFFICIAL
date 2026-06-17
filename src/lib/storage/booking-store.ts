@@ -300,7 +300,8 @@ export async function getAvailableSlots(
     getContent("services", tenant),
   ]);
 
-  const service = services.services.find((s) => s.id === serviceId);
+  const serviceList = Array.isArray(services.services) ? services.services : [];
+  const service = serviceList.find((s) => s.id === serviceId);
   const duration = service ? parseInt(service.duration) || config.slotDuration : config.slotDuration;
 
   return generateSlots(config, date, duration, bookings, overrides);

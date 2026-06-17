@@ -5,8 +5,6 @@
 import { getRedis } from "./redis";
 import { isProductionEnv } from "./production-guard";
 
-const windowMs = 60_000; // 1-minute window
-
 // --- In-memory fallback store ---
 
 interface Entry {
@@ -113,15 +111,6 @@ async function redisStatus(key: string, max: number, windowSeconds: number): Pro
     }
     return memStatus(key, max, windowSeconds * 1000);
   }
-}
-
-/**
- * @deprecated Use isRateLimitedAsync() for proper Redis-backed distributed rate limiting.
- * This sync version only uses in-memory checks and resets on cold start.
- */
-export function isRateLimited(key: string, maxPerMinute: number): boolean {
-  console.warn("[rate-limit] isRateLimited() is deprecated — use isRateLimitedAsync()");
-  return memCheck(key, maxPerMinute, windowMs);
 }
 
 /** Async rate limit check — uses Redis when available, in-memory otherwise.

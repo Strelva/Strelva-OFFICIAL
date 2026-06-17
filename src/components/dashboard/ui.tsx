@@ -2,8 +2,12 @@
 
 import {
   forwardRef,
+  useId,
+  isValidElement,
+  cloneElement,
   type SelectHTMLAttributes,
   type ReactNode,
+  type ReactElement,
 } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -58,6 +62,17 @@ export function FormRow({
   children: ReactNode;
   last?: boolean;
 }) {
+  // Associate the visible label with the field for screen readers: when the
+  // child is a single element without its own id, inject a generated one and
+  // point the <label htmlFor> at it. Falls back to a plain label otherwise.
+  const fieldId = useId();
+  const canLabel =
+    isValidElement(children) &&
+    (children as ReactElement<{ id?: string }>).props.id === undefined;
+  const field = canLabel
+    ? cloneElement(children as ReactElement<{ id?: string }>, { id: fieldId })
+    : children;
+
   return (
     <div
       className={cn(
@@ -66,10 +81,12 @@ export function FormRow({
       )}
     >
       <div className="md:w-[180px] shrink-0 md:pt-1.5">
-        <div className="text-[13px] text-warm-white">{label}</div>
+        <label htmlFor={canLabel ? fieldId : undefined} className="block text-[13px] text-warm-white">
+          {label}
+        </label>
         <div className="text-[11px] text-gray-faint mt-0.5">{description}</div>
       </div>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">{field}</div>
     </div>
   );
 }

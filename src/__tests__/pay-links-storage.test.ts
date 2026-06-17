@@ -51,10 +51,15 @@ describe("savePayLink", () => {
 
   it("refuses to overwrite an existing slug by default", async () => {
     const redis = fakeRedis();
-    redis.get.mockResolvedValue(config); // slug already present
+    redis.set.mockResolvedValue(null); // SET NX returns null when the key exists
     mockGetRedis.mockReturnValue(redis);
     await expect(savePayLink(config)).rejects.toBeInstanceOf(PayLinkConflictError);
-    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.set).toHaveBeenCalledWith(
+      `${PAY_LINK_PREFIX}acme-coffee`,
+      config,
+      expect.objectContaining({ nx: true }),
+    );
+    expect(redis.sadd).not.toHaveBeenCalled();
   });
 
   it("writes the record and indexes the slug for a new link", async () => {
@@ -79,12 +84,11 @@ describe("savePayLink", () => {
     expect(redis.sadd).toHaveBeenCalledWith(PAY_LINK_INDEX_KEY, "acme-coffee");
   });
 
-  it("throws when Redis does not confirm the write", async () => {
+  it("throws when Redis does not confirm an overwrite write", async () => {
     const redis = fakeRedis();
-    redis.get.mockResolvedValue(null);
     redis.set.mockResolvedValue(null);
     mockGetRedis.mockReturnValue(redis);
-    await expect(savePayLink(config)).rejects.toBeInstanceOf(PayLinkStorageError);
+    await expect(savePayLink(config, { overwrite: true })).rejects.toBeInstanceOf(PayLinkStorageError);
     expect(redis.sadd).not.toHaveBeenCalled();
   });
 });

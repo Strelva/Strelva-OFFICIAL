@@ -12,12 +12,14 @@ const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
 
 const cspBaseDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.strelva.com https://va.vercel-scripts.com",
+  // Clerk's live frontend API is still served from clerk.scaffoldweb.com (CLERK_DOMAIN=scaffoldweb.com);
+  // clerk.strelva.com is kept for when the rebrand cutover completes. Allow both so clerk.browser.js loads.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.strelva.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com",
   "font-src 'self' data:",
   "frame-src 'self' https: http://localhost:* http://*.localhost:*",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.strelva.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
   "worker-src 'self' blob:",
   "base-uri 'self'",
   "form-action 'self'",
@@ -455,6 +457,13 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     }
 
     const headers = new Headers(req.headers);
+    // Strip client-supplied trust headers before the proxy sets them, so a
+    // caller can't smuggle x-preview-mode (serve drafts) or x-client-fallback-root
+    // (redirect target) past the conditional sets below. x-tenant is always
+    // overwritten next, but delete it here too for a single clean rule.
+    headers.delete("x-tenant");
+    headers.delete("x-preview-mode");
+    headers.delete("x-client-fallback-root");
     headers.set("x-tenant", tenantId);
     if (tenantFromClientPath) {
       headers.set("x-client-fallback-root", `/client/${tenantId}`);
@@ -510,7 +519,17 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     });
   }
 
-  return applySecurityHeaders(NextResponse.next(), req);
+  // No tenant resolved (apex/marketing host). Strip client-supplied trust
+  // headers so a request to an apex host can't smuggle x-tenant/x-preview-mode
+  // to a header-trusting route. Tenant-scoped routes also re-check access.
+  const fallbackHeaders = new Headers(req.headers);
+  fallbackHeaders.delete("x-tenant");
+  fallbackHeaders.delete("x-preview-mode");
+  fallbackHeaders.delete("x-client-fallback-root");
+  return applySecurityHeaders(
+    NextResponse.next({ request: { headers: fallbackHeaders } }),
+    req
+  );
 });
 
 export const config = {

@@ -4,16 +4,26 @@ import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
+const mockGetActorContext = vi.hoisted(() => vi.fn());
+const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockSavePayLink = vi.hoisted(() => vi.fn());
 const mockGetPayLink = vi.hoisted(() => vi.fn());
 const mockListPayLinks = vi.hoisted(() => vi.fn());
+const mockDeletePayLink = vi.hoisted(() => vi.fn());
+const mockListBuildPayments = vi.hoisted(() => vi.fn());
 const mockIsRateLimitedAsync = vi.hoisted(() => vi.fn());
 const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getCurrentUserEmail: mockGetCurrentUserEmail,
+  getActorContext: mockGetActorContext,
 }));
+
+vi.mock("@/lib/storage", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage");
+  return { ...actual, logAuditEvent: mockLogAuditEvent };
+});
 
 // The admin route persists; the public route reads. Keep the pure helpers real
 // (validation/format) and only stub the Redis-backed save/get.
@@ -24,8 +34,11 @@ vi.mock("@/lib/pay-links", async () => {
     savePayLink: mockSavePayLink,
     getPayLink: mockGetPayLink,
     listPayLinks: mockListPayLinks,
+    deletePayLink: mockDeletePayLink,
   };
 });
+
+vi.mock("@/lib/revenue", () => ({ listBuildPayments: mockListBuildPayments }));
 
 vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedAsync: mockIsRateLimitedAsync,
@@ -46,8 +59,18 @@ beforeEach(() => {
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   mockIsSuperAdmin.mockResolvedValue(true);
   mockGetCurrentUserEmail.mockResolvedValue("jacob@strelva.com");
+  mockGetActorContext.mockResolvedValue({
+    userId: "u_test",
+    email: "jacob@strelva.com",
+    type: "super_admin",
+    isSuperAdmin: true,
+    isImpersonating: false,
+  });
+  mockLogAuditEvent.mockResolvedValue(undefined);
   mockSavePayLink.mockResolvedValue(undefined);
   mockListPayLinks.mockResolvedValue([]);
+  mockDeletePayLink.mockResolvedValue(true);
+  mockListBuildPayments.mockResolvedValue([]);
   mockIsRateLimitedAsync.mockResolvedValue(false);
   mockCheckoutCreate.mockResolvedValue({ url: "https://checkout.stripe.com/c/pay/cs_test_123" });
 });
@@ -193,6 +216,53 @@ describe("GET /api/admin/pay-links", () => {
       createdAt: "2026-06-09T00:00:00.000Z",
       createdBy: "jacob@strelva.com",
     });
+  });
+
+  it("marks links paid by cross-referencing the build-payment trail", async () => {
+    mockListPayLinks.mockResolvedValue([
+      { slug: "acme-coffee", clientName: "Acme", door: "build", amountCents: 200_000, createdAt: "2026-06-09T00:00:00.000Z" },
+      { slug: "unpaid", clientName: "Nobody", door: "build", amountCents: 150_000, createdAt: "2026-06-08T00:00:00.000Z" },
+    ] as PayLinkConfig[]);
+    mockListBuildPayments.mockResolvedValue([
+      { sessionId: "s1", paySlug: "acme-coffee", amountCents: 200_000, currency: "usd", createdAt: "2026-06-10T00:00:00.000Z" },
+    ]);
+    const { GET } = await import("@/app/api/admin/pay-links/route");
+    const payload = await (await GET()).json();
+    expect(payload.paidSlugs).toEqual(["acme-coffee"]);
+  });
+});
+
+describe("DELETE /api/admin/pay-links", () => {
+  function delReq(slug?: string) {
+    const url = slug
+      ? `http://localhost/api/admin/pay-links?slug=${encodeURIComponent(slug)}`
+      : "http://localhost/api/admin/pay-links";
+    return new NextRequest(url, { method: "DELETE" });
+  }
+
+  it("rejects a non-super-admin with 403", async () => {
+    mockIsSuperAdmin.mockResolvedValue(false);
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq("acme-coffee"));
+    expect(res.status).toBe(403);
+    expect(mockDeletePayLink).not.toHaveBeenCalled();
+  });
+
+  it("400s without a slug", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq());
+    expect(res.status).toBe(400);
+    expect(mockDeletePayLink).not.toHaveBeenCalled();
+  });
+
+  it("revokes a slug and audits it", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    const res = await DELETE(delReq("acme-coffee"));
+    expect(res.status).toBe(200);
+    expect(mockDeletePayLink).toHaveBeenCalledWith("acme-coffee");
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true, removed: true });
   });
 });
 

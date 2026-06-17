@@ -32,13 +32,17 @@ export default async function ChatPage({
     ownerName = settings.ownerName || ownerName;
   } catch {}
   const siteModel = await getTemplateForTenant(tenant);
+  // The AI chat is the product's core surface — never let a transient backend
+  // blip on the activity sidebars replace the whole chat with an error page.
   const [pending, resolved, pendingCount, timestamps] = await Promise.all([
-    getEvents(tenant, { status: "pending", limit: 50 }),
-    getEvents(tenant, { limit: 30 }).then((events) =>
-      events.filter((e) => e.status === "approved" || e.status === "dismissed" || e.status === "auto_approved")
-    ),
-    getQueueCount(tenant),
-    getSectionTimestamps(tenant),
+    getEvents(tenant, { status: "pending", limit: 50 }).catch(() => []),
+    getEvents(tenant, { limit: 30 })
+      .then((events) =>
+        events.filter((e) => e.status === "approved" || e.status === "dismissed" || e.status === "auto_approved")
+      )
+      .catch(() => []),
+    getQueueCount(tenant).catch(() => 0),
+    getSectionTimestamps(tenant).catch(() => ({})),
   ]);
   const staleSectionCount = detectStaleSections(
     timestamps,

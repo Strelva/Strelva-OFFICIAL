@@ -1,0 +1,118 @@
+import { describe, expect, it } from "vitest";
+import {
+  assessRisk,
+  classifyOperation,
+  generatePreviewDiffs,
+  type AgentOperation,
+} from "@/lib/agent-risk";
+
+describe("assessRisk", () => {
+  it("blocks auto-apply for structural / visibility / delete (high)", () => {
+    for (const type of ["structural", "visibility", "delete"] as const) {
+      const r = assessRisk({ type, section: "hero" });
+      expect(r.level).toBe("high");
+      expect(r.autoApply).toBe(false);
+      expect(r.requiresPreview).toBe(true);
+    }
+  });
+
+  it("treats reorder as medium, no auto-apply", () => {
+    const r = assessRisk({ type: "reorder", section: "services" });
+    expect(r).toMatchObject({ level: "medium", autoApply: false });
+  });
+
+  it("flags removing more than half the items as high", () => {
+    const r = assessRisk({ type: "update", section: "services", itemCount: { before: 10, after: 4 } });
+    expect(r.level).toBe("high");
+    expect(r.reason).toContain("6 of 10");
+  });
+
+  it("flags adding many items at once as medium", () => {
+    const r = assessRisk({ type: "update", section: "services", itemCount: { before: 2, after: 8 } });
+    expect(r.level).toBe("medium");
+    expect(r.reason).toContain("6 new items");
+  });
+
+  it("treats new content (add) as medium", () => {
+    expect(assessRisk({ type: "add", section: "services" }).level).toBe("medium");
+  });
+
+  it("treats a >50% length rewrite as medium", () => {
+    const r = assessRisk({
+      type: "rewrite",
+      section: "hero",
+      before: "hi",
+      after: "a far longer headline that more than doubles the original length",
+    });
+    expect(r.level).toBe("medium");
+  });
+
+  it("auto-applies a minor text edit (low)", () => {
+    const r = assessRisk({ type: "rewrite", section: "hero", before: "Hello there", after: "Hello world" });
+    expect(r).toMatchObject({ level: "low", autoApply: true, requiresPreview: false });
+  });
+
+  it("treats a structureless update (no string diff) as a low-risk no-op", () => {
+    // classifyOperation only emits a bare "update" when nothing meaningful
+    // changed, so auto-applying it is safe.
+    const r = assessRisk({ type: "update", section: "contact" });
+    expect(r).toMatchObject({ level: "low", autoApply: true });
+  });
+
+  it("defaults a truly-unknown operation type to medium review", () => {
+    const r = assessRisk({
+      type: "mystery" as unknown as AgentOperation["type"],
+      section: "contact",
+    });
+    expect(r).toMatchObject({ level: "medium", autoApply: false });
+  });
+});
+
+describe("classifyOperation", () => {
+  it("classifies structural sections", () => {
+    for (const section of ["theme", "navigation", "footer"] as const) {
+      expect(classifyOperation(section, {}, {}).type).toBe("structural");
+    }
+  });
+
+  it("detects array shrink as delete and growth as add (with counts)", () => {
+    expect(classifyOperation("services", { services: [1, 2, 3] }, { services: [1] })).toMatchObject({
+      type: "delete",
+      itemCount: { before: 3, after: 1 },
+    });
+    expect(classifyOperation("services", { services: [1] }, { services: [1, 2, 3] })).toMatchObject({
+      type: "add",
+      itemCount: { before: 1, after: 3 },
+    });
+  });
+
+  it("detects field add / delete / rewrite / no-op", () => {
+    expect(classifyOperation("hero", { headline: "x" }, { headline: "x", tagline: "new" }).type).toBe("add");
+    expect(classifyOperation("hero", { headline: "x", tagline: "old" }, { headline: "x" }).type).toBe("delete");
+    expect(classifyOperation("hero", { headline: "old" }, { headline: "new" })).toMatchObject({
+      type: "rewrite",
+      field: "headline",
+    });
+    expect(classifyOperation("hero", { headline: "same" }, { headline: "same" }).type).toBe("update");
+  });
+});
+
+describe("generatePreviewDiffs", () => {
+  it("reports added / removed / changed and skips unchanged", () => {
+    const diffs = generatePreviewDiffs({ a: "old", b: "keep" }, { b: "keep", c: "new" });
+    expect(diffs.find((d) => d.field === "a")?.type).toBe("removed");
+    expect(diffs.find((d) => d.field === "c")?.type).toBe("added");
+    expect(diffs.find((d) => d.field === "b")).toBeUndefined();
+  });
+
+  it("formats a changed scalar field", () => {
+    const [d] = generatePreviewDiffs({ x: "old" }, { x: "new" });
+    expect(d).toMatchObject({ field: "x", before: "old", after: "new", type: "changed" });
+  });
+
+  it("summarizes array values as item counts", () => {
+    const [d] = generatePreviewDiffs({ items: [1, 2, 3] }, { items: [1, 2] });
+    expect(d.before).toBe("[3 items]");
+    expect(d.after).toBe("[2 items]");
+  });
+});

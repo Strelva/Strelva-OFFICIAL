@@ -29,6 +29,28 @@ const safeImageUrl = z.string().refine(
   { message: "Invalid image URL" }
 );
 
+// Theme values are interpolated into inline CSS custom properties on the public
+// site. Constrain them so a content value can't carry CSS-injection/defacement
+// payloads (hex, rgb/hsl, named colors, or a CSS var reference only).
+const cssColor = z
+  .string()
+  .max(64)
+  .refine(
+    (v) =>
+      v.trim() === "" ||
+      /^#[0-9a-fA-F]{3,8}$/.test(v) ||
+      /^(rgb|rgba|hsl|hsla)\([0-9.,%\s/]+\)$/.test(v) ||
+      /^[a-zA-Z]+$/.test(v) ||
+      /^var\(--[a-zA-Z0-9-]+\)$/.test(v),
+    { message: "Invalid color value" }
+  );
+const cssFont = z
+  .string()
+  .max(120)
+  .refine((v) => v.trim() === "" || /^[a-zA-Z0-9\s,"'._-]+$/.test(v), {
+    message: "Invalid font value",
+  });
+
 export const heroSchema = z.object({
   headline: z.string().min(1),
   subheadline: z.string(),
@@ -56,7 +78,7 @@ export const servicesSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string().min(1),
   description: z.string(),
-  services: z.array(serviceItemSchema),
+  services: z.array(serviceItemSchema).max(500),
 });
 
 export const storySchema = z.object({
@@ -64,8 +86,8 @@ export const storySchema = z.object({
   headline: z.string().min(1),
   accentText: z.string(),
   statement: z.string().min(1),
-  paragraphs: z.array(z.string()),
-  stats: z.array(z.object({ value: z.string(), label: z.string() })),
+  paragraphs: z.array(z.string().max(20000)).max(200),
+  stats: z.array(z.object({ value: z.string(), label: z.string() })).max(50),
   quote: z.string(),
   quoteAttribution: z.string(),
   imageUrl: safeImageUrl,
@@ -82,7 +104,7 @@ export const testimonialItemSchema = z.object({
 export const testimonialsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
-  testimonials: z.array(testimonialItemSchema),
+  testimonials: z.array(testimonialItemSchema).max(500),
 });
 
 export const eventItemSchema = z.object({
@@ -100,7 +122,7 @@ export const eventItemSchema = z.object({
 export const eventsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
-  events: z.array(eventItemSchema),
+  events: z.array(eventItemSchema).max(500),
 });
 
 export const providerItemSchema = z.object({
@@ -118,7 +140,7 @@ export const providersSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  providers: z.array(providerItemSchema),
+  providers: z.array(providerItemSchema).max(200),
 });
 
 export const faqItemSchema = z.object({
@@ -131,7 +153,7 @@ export const faqSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  faqs: z.array(faqItemSchema),
+  faqs: z.array(faqItemSchema).max(200),
 });
 
 export const shopItemSchema = z.object({
@@ -148,7 +170,7 @@ export const shopSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string(),
   description: z.string(),
-  items: z.array(shopItemSchema),
+  items: z.array(shopItemSchema).max(500),
 });
 
 export const contactSchema = z.object({
@@ -182,7 +204,7 @@ export const productsSchema = z.object({
   sectionLabel: z.string(),
   headline: z.string().min(1),
   description: z.string(),
-  products: z.array(productItemSchema),
+  products: z.array(productItemSchema).max(500),
   bottomNote: z.string(),
 });
 
@@ -197,29 +219,49 @@ export const siteSettingsSchema = z.object({
   copyrightText: z.string(),
   bookingUrl: safeUrl.optional().default(""),
   instagramHandle: z.string().optional().default(""),
-  vagaro_embed_id: z.string().optional().default(""),
+  vagaro_embed_id: z.string().regex(/^[A-Za-z0-9/_-]*$/, "Invalid embed id").optional().default(""),
   logoUrl: safeImageUrl.optional().default(""),
   marqueeText: z.string().optional().default(""),
 });
 
 export const themeSchema = z.object({
   colors: z.object({
-    cream: z.string(),
-    creamDark: z.string(),
-    creamMid: z.string(),
-    sage: z.string(),
-    sageLight: z.string(),
-    sageDark: z.string(),
-    bark: z.string(),
-    barkLight: z.string(),
-    barkFaded: z.string(),
-    wheat: z.string(),
-    wheatLight: z.string(),
-    terra: z.string(),
-    terraLight: z.string(),
+    cream: cssColor,
+    creamDark: cssColor,
+    creamMid: cssColor,
+    sage: cssColor,
+    sageLight: cssColor,
+    sageDark: cssColor,
+    bark: cssColor,
+    barkLight: cssColor,
+    barkFaded: cssColor,
+    wheat: cssColor,
+    wheatLight: cssColor,
+    terra: cssColor,
+    terraLight: cssColor,
   }),
-  fontDisplay: z.string(),
-  fontBody: z.string(),
+  fontDisplay: cssFont,
+  fontBody: cssFont,
+});
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const bookingConfigSchema = z.object({
+  timezone: z.string().max(64),
+  weeklySchedule: z
+    .array(
+      z.object({
+        day: z.number().int().min(0).max(6),
+        start: z.string().regex(HHMM, "Invalid time"),
+        end: z.string().regex(HHMM, "Invalid time"),
+        enabled: z.boolean(),
+      })
+    )
+    .max(14),
+  slotDuration: z.number().int().min(1).max(1440),
+  bufferTime: z.number().int().min(0).max(1440),
+  bookingLeadTime: z.number().int().min(0).max(525600),
+  maxAdvanceBooking: z.number().int().min(0).max(525600),
+  requirePayment: z.boolean(),
 });
 
 export const rewardsConfigSchema = z.object({
@@ -231,20 +273,22 @@ export const rewardsConfigSchema = z.object({
   tierThresholdSuper: z.number(),
 });
 
+// Every href is safeUrl-validated so a `javascript:`/`data:` scheme can't be
+// stored and rendered into an <a href> on the client's public site (stored XSS).
 export const navMenuItemSchema = z.object({
   label: z.string(),
-  href: z.string(),
+  href: safeUrl,
 });
 
 export const navigationSchema = z.object({
-  menuItems: z.array(navMenuItemSchema),
+  menuItems: z.array(navMenuItemSchema).max(50),
   ctaLabel: z.string(),
-  ctaHref: z.string(),
+  ctaHref: safeUrl,
 });
 
 export const footerColumnLinkSchema = z.object({
   label: z.string(),
-  href: z.string(),
+  href: safeUrl,
 });
 
 export const footerColumnSchema = z.object({
@@ -255,7 +299,7 @@ export const footerColumnSchema = z.object({
 export const footerSchema = z.object({
   tagline: z.string(),
   columns: z.array(footerColumnSchema),
-  socialLinks: z.array(z.object({ label: z.string(), href: z.string() })),
+  socialLinks: z.array(z.object({ label: z.string(), href: safeUrl })),
   copyrightText: z.string(),
 });
 

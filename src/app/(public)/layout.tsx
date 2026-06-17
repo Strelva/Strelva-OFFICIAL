@@ -6,6 +6,7 @@ import { IframeScrollListener } from "@/components/public/IframeScrollListener";
 import { EditModeOverlay } from "@/components/public/EditModeOverlay";
 import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
+import { defaults } from "@/lib/defaults";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { themeContentToCssVars } from "@/lib/design-tokens";
@@ -19,8 +20,8 @@ async function isAdminDomain(): Promise<boolean> {
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
   const [settings, hero] = await Promise.all([
-    getContent("settings", tenant),
-    getContent("hero", tenant),
+    getContent("settings", tenant).catch(() => defaults.settings),
+    getContent("hero", tenant).catch(() => defaults.hero),
   ]);
   return {
     title: `${settings.siteName} | ${settings.siteTagline}`,
@@ -51,9 +52,9 @@ export async function generateMetadata(): Promise<Metadata> {
 async function LocalBusinessSchema() {
   const tenant = await getTenantFromHeaders();
   const [contact, settings, hero] = await Promise.all([
-    getContent("contact", tenant),
-    getContent("settings", tenant),
-    getContent("hero", tenant),
+    getContent("contact", tenant).catch(() => defaults.contact),
+    getContent("settings", tenant).catch(() => defaults.settings),
+    getContent("hero", tenant).catch(() => defaults.hero),
   ]);
 
   const dayMap: Record<string, string> = {
@@ -152,10 +153,19 @@ async function LocalBusinessSchema() {
       : {}),
   };
 
+  // Escape HTML-significant sequences so tenant content (siteName, description,
+  // address, etc.) can't break out of the <script> tag. JSON.stringify escapes
+  // quotes but NOT `<` — a value like `</script><script>…` would otherwise close
+  // the JSON-LD element and execute injected script (stored XSS on every page).
+  const json = JSON.stringify(schema)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: json }}
     />
   );
 }
@@ -181,11 +191,11 @@ export default async function TenantPublicLayout({
 
   const fetchOptions = isPreview ? { preview: true } : undefined;
   const [settings, contact, navigation, footer, theme] = await Promise.all([
-    getContent("settings", tenant, fetchOptions),
-    getContent("contact", tenant, fetchOptions),
-    getContent("navigation", tenant, fetchOptions),
-    getContent("footer", tenant, fetchOptions),
-    getContent("theme", tenant, fetchOptions),
+    getContent("settings", tenant, fetchOptions).catch(() => defaults.settings),
+    getContent("contact", tenant, fetchOptions).catch(() => defaults.contact),
+    getContent("navigation", tenant, fetchOptions).catch(() => defaults.navigation),
+    getContent("footer", tenant, fetchOptions).catch(() => defaults.footer),
+    getContent("theme", tenant, fetchOptions).catch(() => defaults.theme),
   ]);
 
   const HeaderComponent = template.Header;
@@ -195,13 +205,19 @@ export default async function TenantPublicLayout({
   const content = (
     <>
       <HeaderComponent settings={settings} navigation={navigation} />
-      {children}
+      <main id="main-content">{children}</main>
       <FooterComponent settings={settings} contact={contact} navigation={navigation} footer={footer} />
     </>
   );
 
   return (
     <div style={{ ...template.themeVars, ...themeContentToCssVars(theme) } as React.CSSProperties}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200] focus:rounded-md focus:bg-black focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
       <SmoothScrollProvider>
         <LocalBusinessSchema />
         <IframeScrollListener />

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { getContent, getPageConfig, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import type { ContentSection } from "@/lib/types";
@@ -25,6 +25,10 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  // "Leave with everything" is an owner action — a viewer/editor collaborator
+  // should not be able to download the full content export.
+  const blocked = await requireTenantPermission(tenant, "billing:manage");
+  if (blocked) return blocked;
 
   const [tenantConfig, pageConfig, entries] = await Promise.all([
     getTenantConfig(tenant),

@@ -3,6 +3,7 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/
 import { getSanityClient, getSanityReadClient } from "@/lib/sanity";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import type { MediaAsset } from "@/lib/media";
 
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -70,6 +71,12 @@ export async function POST(request: Request) {
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
 
+  // Cap uploads per tenant (parity with /api/upload) — each writes a 5MB file
+  // to the shared dataset, so an authed editor shouldn't be able to hammer it.
+  if (await isRateLimitedAsync(rateLimitKey(request, `media:${tenant}`), 20)) {
+    return NextResponse.json({ error: "Too many uploads, slow down" }, { status: 429 });
+  }
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
 
@@ -81,9 +88,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
   }
 
-  if (!file.type.startsWith("image/")) {
+  // Allowlist raster image types only. `startsWith("image/")` would accept
+  // image/svg+xml — an SVG can carry inline script, so it's a stored-XSS vector
+  // when served from a tenant's domain. Block SVG (and anything non-raster).
+  const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+  if (!ALLOWED.has(file.type)) {
     return NextResponse.json(
-      { error: "Invalid file type. Only images are allowed." },
+      { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF." },
       { status: 400 }
     );
   }

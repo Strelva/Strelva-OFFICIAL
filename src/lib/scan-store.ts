@@ -1,0 +1,124 @@
+/**
+ * Scan store — persists the latest operator SEO + site-health scan per tenant.
+ *
+ * The scan engine (src/lib/audit/checks.ts) is point-in-time; this keeps the
+ * most recent result per tenant in Redis so the Mission Control overview can
+ * show every client's grade at a glance and the operator agent can reason over
+ * it ("which client has the worst SEO?") without re-running a live scan.
+ *
+ * We store a compact summary (overall grade/score + per-category scores), not
+ * the full per-check detail, to keep the record small. The full breakdown is
+ * always available by re-running the scan on the tenant detail page.
+ */
+
+import { getRedis } from "./redis";
+
+/** `reb:` persistent-data prefix per AGENTS.md (wire/persistent prefixes unchanged). */
+const SCAN_PREFIX = "reb:scan:";
+/** Scans are point-in-time signals; keep the latest for 30 days. */
+const SCAN_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+export interface ScanCategorySummary {
+  name: string;
+  slug: string;
+  score: number;
+}
+
+export interface ScanSummary {
+  url: string;
+  scannedAt: string;
+  overallScore: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  categories: ScanCategorySummary[];
+}
+
+/** Trailing scan history (a small ring buffer) for trend lines. */
+const SCAN_HISTORY_PREFIX = "reb:scan:hist:";
+const SCAN_HISTORY_MAX = 12;
+
+export interface ScanHistoryPoint {
+  scannedAt: string;
+  overallScore: number;
+  grade: ScanSummary["grade"];
+}
+
+function scanKey(tenant: string): string {
+  return `${SCAN_PREFIX}${tenant}`;
+}
+
+function scanHistoryKey(tenant: string): string {
+  return `${SCAN_HISTORY_PREFIX}${tenant}`;
+}
+
+/** Persist the latest scan summary for a tenant. Null-safe (no-op without Redis). */
+export async function saveScanSummary(tenant: string, summary: ScanSummary): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(scanKey(tenant), summary, { ex: SCAN_TTL_SECONDS });
+  } catch (err) {
+    console.warn("[scan-store] write failed", tenant, err);
+  }
+}
+
+/** Append a point to a tenant's scan-history ring buffer (newest first). */
+export async function pushScanHistory(tenant: string, point: ScanHistoryPoint): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const key = scanHistoryKey(tenant);
+    // One pipelined round trip instead of three sequential writes.
+    const pipe = redis.pipeline();
+    pipe.lpush(key, JSON.stringify(point));
+    pipe.ltrim(key, 0, SCAN_HISTORY_MAX - 1);
+    pipe.expire(key, SCAN_TTL_SECONDS);
+    await pipe.exec();
+  } catch (err) {
+    console.warn("[scan-store] history push failed", tenant, err);
+  }
+}
+
+/** Read a tenant's scan history, oldest-to-newest (for a left-to-right sparkline). */
+export async function getScanHistory(tenant: string): Promise<ScanHistoryPoint[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const raw = await redis.lrange(scanHistoryKey(tenant), 0, SCAN_HISTORY_MAX - 1);
+    const points = raw.map((item) =>
+      (typeof item === "string" ? JSON.parse(item) : item) as ScanHistoryPoint
+    );
+    return points.reverse();
+  } catch (err) {
+    console.warn("[scan-store] history read failed", tenant, err);
+    return [];
+  }
+}
+
+/** Read the latest scan summary for a tenant, or null if never scanned. */
+export async function getScanSummary(tenant: string): Promise<ScanSummary | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const cached = await redis.get<ScanSummary>(scanKey(tenant));
+    return cached ?? null;
+  } catch (err) {
+    console.warn("[scan-store] read failed", tenant, err);
+    return null;
+  }
+}
+
+/** Read the latest scan summaries for many tenants in one MGET round trip. */
+export async function getScanSummaries(
+  tenants: string[]
+): Promise<Record<string, ScanSummary | null>> {
+  if (tenants.length === 0) return {};
+  const redis = getRedis();
+  if (!redis) return Object.fromEntries(tenants.map((t) => [t, null]));
+  try {
+    const values = await redis.mget<(ScanSummary | null)[]>(...tenants.map(scanKey));
+    return Object.fromEntries(tenants.map((t, i) => [t, values[i] ?? null]));
+  } catch (err) {
+    console.warn("[scan-store] summaries mget failed", err);
+    return Object.fromEntries(tenants.map((t) => [t, null]));
+  }
+}

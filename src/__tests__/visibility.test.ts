@@ -31,7 +31,6 @@ import { buildVisibilityQueries, probeAiAnswer } from "../lib/visibility/ai-answ
 
 import {
   diffSnapshots,
-  getLatestSnapshots,
   saveVisibilitySnapshot,
 } from "../lib/visibility/snapshots";
 import type { VisibilitySnapshot } from "../lib/visibility/snapshots";

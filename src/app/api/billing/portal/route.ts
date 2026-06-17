@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
+import { trackError } from "@/lib/monitoring";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -44,10 +45,15 @@ export async function POST(req: Request) {
   const stripe = getStripe();
   const origin = getRequestOrigin(req);
 
-  const session = await stripe.billingPortal.sessions.create({
-    customer: config.stripeCustomerId,
-    return_url: `${origin}/dashboard`,
-  });
-
-  return NextResponse.json({ portalUrl: session.url });
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: config.stripeCustomerId,
+      return_url: `${origin}/dashboard`,
+    });
+    return NextResponse.json({ portalUrl: session.url });
+  } catch (err) {
+    // Don't let a Stripe error throw unhandled (500 + stack leak) on an authed request.
+    trackError(err, { op: "billing.portal" });
+    return NextResponse.json({ error: "Could not open the billing portal" }, { status: 502 });
+  }
 }

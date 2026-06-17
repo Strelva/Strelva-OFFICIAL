@@ -86,10 +86,15 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
     }
   }
 
-  // Fetch all content in parallel (with preview mode if enabled)
+  // Fetch all content in parallel (with preview mode if enabled). A transient
+  // backend error on any section must not 500 the whole client site — each
+  // section sits in a <SectionErrorBoundary>, so a missing section degrades
+  // gracefully instead of taking the visitor's page down.
   const contentKeys = Array.from(contentKeysSet);
   const fetchOptions = preview ? { preview: true } : undefined;
-  const results = await Promise.all(contentKeys.map((k) => getContent(k, tenant, fetchOptions)));
+  const results = await Promise.all(
+    contentKeys.map((k) => getContent(k, tenant, fetchOptions).catch(() => undefined))
+  );
   const content: Record<string, unknown> = {};
   contentKeys.forEach((k, i) => {
     content[k] = results[i];

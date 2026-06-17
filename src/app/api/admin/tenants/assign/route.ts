@@ -4,8 +4,10 @@ import {
   isSuperAdmin,
   assignUserToTenant,
   requireTenantPermission,
+  getActorContext,
   type ClientRole,
 } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/storage";
 import { clerkClient } from "@clerk/nextjs/server";
 
 function normalizeEmail(value: unknown): string | null {
@@ -61,6 +63,15 @@ export async function POST(req: Request) {
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign user - tenant may not exist" }, { status: 400 });
     }
+
+    await logAuditEvent({
+      tenant: tenantId,
+      action: "tenant.assign_user",
+      targetType: "user",
+      targetId: userId,
+      actor: await getActorContext(tenantId),
+      metadata: { email, role },
+    });
 
     return NextResponse.json({ success: true, userId, tenant: tenantId, role });
   } catch (err) {

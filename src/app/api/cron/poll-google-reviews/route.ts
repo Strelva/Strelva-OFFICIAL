@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
+import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
@@ -126,10 +127,15 @@ async function pollTenant(tenantId: string): Promise<number> {
   // Get valid access token (refresh if needed)
   const accessToken = await getValidAccessToken(connection);
   if (!accessToken) {
-    // Mark connection as error
+    // Transition from connected -> error (we only get here if it was connected).
+    // Alert once on the transition so a client's review sync can't die silently.
     await saveConnection({
       ...connection,
       status: "error",
+    });
+    alert("google_reviews_token_refresh_failed", "high", {
+      tenantId,
+      hint: "Client's Google connection needs re-auth — reviews sync is stopped.",
     });
     return 0;
   }

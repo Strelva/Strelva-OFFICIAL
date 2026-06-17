@@ -150,6 +150,9 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose from library"
         className="relative w-full max-w-3xl max-h-[80vh] overflow-hidden rounded-xl bg-surface-raised shadow-xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >

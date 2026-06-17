@@ -40,9 +40,11 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   const handleResolve = useCallback(async (id: string, action: QueueAction) => {
-    setProcessingIds((prev) => new Set(prev).add(id));
     const event = pending.find((e) => e.id === id);
     if (!event) return;
+    // Add to processing AFTER the not-found guard — otherwise a missing event
+    // left the id in processingIds forever, permanently disabling that card.
+    setProcessingIds((prev) => new Set(prev).add(id));
 
     const terminal = action === "approved" || action === "dismissed" || action === "shipped" || action === "declined";
     const resolvedStatus = action === "shipped"

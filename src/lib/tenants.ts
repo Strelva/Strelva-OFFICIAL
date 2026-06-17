@@ -176,6 +176,11 @@ async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAd
     }
 
     for (const claim of tenant.domainClaims ?? []) {
+      // Only route a domain whose ownership is VERIFIED. A self-service claim
+      // starts as "pending"; mapping it before verification would let a tenant
+      // claim someone else's domain (or a lapsed one) and receive that host's
+      // traffic/auth context on the control plane (domain takeover).
+      if (claim.status !== "verified") continue;
       const d = normalizeTenantDomain(claim.domain);
       if (!d) continue;
       map[d] = { tenantId: tenant.id, isAdmin: claim.role === "admin" || d.startsWith("admin.") };

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { z } from "zod";
+import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
@@ -107,6 +109,14 @@ export async function POST(req: Request) {
         revalidationHealth: "unknown",
       } : undefined,
     });
+    await logAuditEvent({
+      tenant: tenant.id,
+      action: "tenant.create",
+      targetType: "tenant",
+      targetId: tenant.id,
+      actor: await getActorContext(tenant.id),
+      metadata: { siteName: tenant.siteName, deliveryModel: tenant.deliveryModel },
+    });
     return NextResponse.json(tenant, { status: 201 });
   } catch (err) {
     return NextResponse.json(
@@ -133,10 +143,46 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Missing tenant id" }, { status: 400 });
   }
 
-  const updated = await updateTenant(id, updates as Partial<TenantConfig>);
+  // Whitelist + type-check the mutable fields. Without this, an arbitrary
+  // (super-admin) body wrote unchecked keys/types straight into the tenant
+  // source-of-truth in Sanity.
+  const updateSchema = z
+    .object({
+      siteName: z.string().max(200),
+      ownerName: z.string().max(200),
+      ownerEmail: z.string().email(),
+      productionDomain: z.string().max(253),
+      adminDomain: z.string().max(253),
+      revalidateUrl: z.string().max(2048),
+      active: z.boolean(),
+      subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
+      planOverride: z.enum(["", "founder_comp"]),
+    })
+    .partial();
+  // Non-strict: unknown keys are stripped (not rejected) so this can't break a
+  // caller that sends an extra field, while still keeping arbitrary keys/types
+  // out of the tenant doc.
+  const parsedUpdates = updateSchema.safeParse(updates);
+  if (!parsedUpdates.success) {
+    return NextResponse.json(
+      { error: "Invalid tenant update", details: parsedUpdates.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const updated = await updateTenant(id, parsedUpdates.data as Partial<TenantConfig>);
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
+
+  await logAuditEvent({
+    tenant: id,
+    action: "tenant.update",
+    targetType: "tenant",
+    targetId: id,
+    actor: await getActorContext(id),
+    metadata: { fields: Object.keys(updates) },
+  });
 
   return NextResponse.json(updated);
 }

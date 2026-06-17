@@ -51,7 +51,8 @@ export async function POST(request: Request) {
 
     // Calculate end time (parse service duration or default 60)
     const services = await getContent("services", tenant);
-    const service = services.services.find((s) => s.id === serviceId);
+    const serviceList = Array.isArray(services.services) ? services.services : [];
+    const service = serviceList.find((s) => s.id === serviceId);
     if (!service || service.comingSoon) {
       return NextResponse.json({ error: "Invalid service" }, { status: 400 });
     }

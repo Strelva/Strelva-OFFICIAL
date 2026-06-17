@@ -72,7 +72,7 @@ describe("auth permission helpers", () => {
   it("allows viewers to read tenant access but blocks write permissions", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "viewer@example.com" }],
+      emailAddresses: [{ emailAddress: "viewer@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: ["gldf"], tenantRoles: { gldf: "viewer" } },
     });
 
@@ -104,7 +104,7 @@ describe("auth permission helpers", () => {
     process.env.SUPER_ADMIN_EMAILS = "jacob@strelva.com";
     mockCurrentUser.mockResolvedValue({
       id: "admin_123",
-      emailAddresses: [{ emailAddress: "jacob@strelva.com" }],
+      emailAddresses: [{ emailAddress: "jacob@strelva.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
 
@@ -112,6 +112,23 @@ describe("auth permission helpers", () => {
 
     expect(await hasTenantPermission("any-tenant", "billing:manage")).toBe(true);
     expect(await hasTenantPermission("any-tenant", "team:manage")).toBe(true);
+  });
+
+  it("does NOT grant super admin for an UNVERIFIED allowlisted email", async () => {
+    // Account-takeover guard: an attacker adding an admin's email as an
+    // unverified secondary address must not become super-admin.
+    process.env.SUPER_ADMIN_EMAILS = "jacob@strelva.com";
+    mockCurrentUser.mockResolvedValue({
+      id: "attacker_1",
+      emailAddresses: [
+        { emailAddress: "attacker@evil.com", verification: { status: "verified" } },
+        { emailAddress: "jacob@strelva.com", verification: { status: "unverified" } },
+      ],
+      publicMetadata: { tenants: [] },
+    });
+
+    const { isSuperAdmin } = await import("../lib/auth");
+    expect(await isSuperAdmin()).toBe(false);
   });
 
   it("treats local dev access as super admin outside production", async () => {
@@ -144,7 +161,7 @@ describe("auth permission helpers", () => {
   it("claims a pending invite for the signed-in user's exact email", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "Owner@Example.com" }],
+      emailAddresses: [{ emailAddress: "Owner@Example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
     mockGetInvite.mockResolvedValue({
@@ -177,7 +194,7 @@ describe("auth permission helpers", () => {
   it("leaves other-tenant invites pending on tenant-specific recovery", async () => {
     mockCurrentUser.mockResolvedValue({
       id: "user_123",
-      emailAddresses: [{ emailAddress: "owner@example.com" }],
+      emailAddresses: [{ emailAddress: "owner@example.com", verification: { status: "verified" } }],
       publicMetadata: { tenants: [] },
     });
     mockGetInvite.mockResolvedValue({

@@ -3,6 +3,7 @@ import { generateAllReports } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
+import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 
 function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
   const paragraphs = summary
@@ -93,7 +94,7 @@ export async function GET() {
         // (e.g. unverified from-domain). Check error so failures aren't silently
         // counted as successes.
         const { error } = await resend.emails.send({
-          from: `${report.tenant.siteName} <report@${domain}>`,
+          from: `${sanitizeEmailSubjectText(report.tenant.siteName)} <report@${domain}>`,
           to: email,
           subject,
           html,

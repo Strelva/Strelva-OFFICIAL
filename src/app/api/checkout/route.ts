@@ -3,6 +3,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getContent } from "@/lib/storage";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
+import { trackError } from "@/lib/monitoring";
 
 interface CheckoutItem {
   productId: string;
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
 
   const tenant = await getTenantFromHeaders();
   const productsContent = await getContent("products", tenant);
-  const productById = new Map(productsContent.products.map((product) => [product.id, product]));
+  const productList = Array.isArray(productsContent.products) ? productsContent.products : [];
+  const productById = new Map(productList.map((product) => [product.id, product]));
   const origin = getRequestOrigin(req);
 
   // Separate one-time and subscription items
@@ -158,6 +160,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
+    // A failed Stripe checkout-session creation otherwise leaves no server trail.
+    trackError(err, { op: "checkout.createSession" });
     const message = err instanceof Error ? err.message : "Checkout failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }

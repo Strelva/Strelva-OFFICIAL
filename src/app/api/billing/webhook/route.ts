@@ -4,6 +4,8 @@ import { updateTenant } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
+import { logger } from "@/lib/logger";
+import { alert } from "@/lib/monitoring";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -101,7 +103,10 @@ async function markEventFailed(eventId: string, error: string): Promise<void> {
     const record: EventRecord = { status: "failed" };
     await redis.set(key, record, { ex: PROCESSED_EVENT_TTL_SECONDS });
     await redis.set(errorKey, error, { ex: PROCESSED_EVENT_TTL_SECONDS });
-  } catch {}
+  } catch (err) {
+    // Don't let a Redis hiccup silently erase the payment-failure trail.
+    logger.error("[billing/webhook] failed to record event failure", { eventId, err });
+  }
 }
 
 function extractTenantId(object: unknown): string | null {
@@ -163,7 +168,18 @@ async function applyTenantSubscriptionStatus(
     }
   }
 
-  await updateTenant(tenantId, patch);
+  const updated = await updateTenant(tenantId, patch);
+  if (!updated) {
+    // updateTenant returns null for an unknown id. A legitimate, signed event
+    // whose tenant was renamed/deleted would otherwise silently no-op here —
+    // e.g. an invoice.paid that fails to keep a paying client active. This
+    // won't self-heal on retry, so alert loudly (not just console) and let the
+    // caller ack the event rather than triggering a 3-day Stripe retry storm.
+    alert("billing_webhook_unknown_tenant", "high", {
+      tenantId,
+      eventType: event.type,
+    });
+  }
 }
 
 /**
@@ -287,6 +303,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Mode guard: never let a test-mode event mutate live tenant data (or vice
+  // versa). The signature only proves the event matches STRIPE_WEBHOOK_SECRET;
+  // it does NOT prove live vs test. Without this, a test-mode
+  // subscription.deleted / payment_failed could 402 a real paying client.
+  // Ack (200) so Stripe doesn't retry a deliberately-ignored event.
+  const expectLive = (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_live");
+  if (event.livemode !== expectLive) {
+    console.warn(
+      `[billing webhook] Ignoring ${event.livemode ? "live" : "test"}-mode event in ${expectLive ? "live" : "test"} deploy: ${event.type}`
+    );
+    return NextResponse.json({ received: true, ignored: "mode-mismatch" });
+  }
+
   const claimResult = await claimStripeEvent(event.id);
   if (claimResult === "duplicate") {
     return NextResponse.json({ received: true, duplicate: true });
@@ -339,28 +368,17 @@ export async function POST(req: Request) {
           subscriptionStatus: "past_due",
           subscriptionPastDueSince: new Date().toISOString(),
         }, event);
-        if (process.env.SLACK_WEBHOOK_URL) {
-          fetch(process.env.SLACK_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `Payment failed for tenant *${tenantId}*. Check Stripe dashboard.`,
-            }),
-          }).catch(() => {});
-        }
+        // alert() now routes to Slack AND Sentry — a failed customer payment
+        // must not be invisible if Sentry is unconfigured (it usually is).
+        alert("billing_payment_failed", "critical", {
+          tenantId: tenantId ?? "unknown",
+          hint: "Check the Stripe dashboard.",
+        });
         break;
 
       case "customer.subscription.deleted":
         await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);
-        if (process.env.SLACK_WEBHOOK_URL) {
-          fetch(process.env.SLACK_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `Subscription cancelled for tenant *${tenantId}*.`,
-            }),
-          }).catch(() => {});
-        }
+        alert("billing_subscription_cancelled", "high", { tenantId: tenantId ?? "unknown" });
         break;
 
       default:

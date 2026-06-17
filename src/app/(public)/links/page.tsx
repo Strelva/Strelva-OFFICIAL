@@ -1,4 +1,5 @@
 import { getContent } from "@/lib/storage";
+import { defaults } from "@/lib/defaults";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import Link from "next/link";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   const tenant = await getTenantFromHeaders();
-  const settings = await getContent("settings", tenant);
+  const settings = await getContent("settings", tenant).catch(() => defaults.settings);
   return {
     title: `Links | ${settings.siteName}`,
     description: `Quick links for ${settings.siteName}. Book a session, follow on Instagram, and more.`,
@@ -19,71 +20,45 @@ export default async function LinksPage() {
   const preview = await isPreviewMode();
   const fetchOptions = preview ? { preview: true } : undefined;
   const [settings, contact, events] = await Promise.all([
-    getContent("settings", tenant, fetchOptions),
-    getContent("contact", tenant, fetchOptions),
-    getContent("events", tenant, fetchOptions),
+    getContent("settings", tenant, fetchOptions).catch(() => defaults.settings),
+    getContent("contact", tenant, fetchOptions).catch(() => defaults.contact),
+    getContent("events", tenant, fetchOptions).catch(() => defaults.events),
   ]);
 
   const bookingUrl = settings.bookingUrl || "";
   const instagramUrl = contact.instagramUrl || (settings.instagramHandle ? `https://instagram.com/${settings.instagramHandle}` : "");
-  const upcomingEvents = events.events.filter((e) => new Date(e.date) >= new Date());
+  // Guard: a tenant with no events content (or a transient miss) must not crash
+  // the page — default to an empty list.
+  const eventList = Array.isArray(events?.events) ? events.events : [];
+  const upcomingEvents = eventList.filter((e) => new Date(e.date) >= new Date());
 
-  // Build links dynamically from content
-  const links = [
-    {
-      title: "Book a Session",
-      url: bookingUrl,
-      icon: "booking" as const,
-      featured: true,
-      external: true,
-    },
-    ...(upcomingEvents.length > 0
-      ? [{
-          title: upcomingEvents[0].title,
-          url: upcomingEvents[0].external_link || "/events",
-          icon: "calendar" as const,
-          featured: false,
-          external: !!upcomingEvents[0].external_link,
-        }]
-      : []),
-    {
-      title: "Our Services",
-      url: "/services",
-      icon: "link" as const,
-      featured: false,
-      external: false,
-    },
-    {
-      title: "Follow on Instagram",
-      url: instagramUrl,
-      icon: "instagram" as const,
-      featured: false,
-      external: true,
-    },
-    {
-      title: "View Services",
-      url: bookingUrl,
-      icon: "shop" as const,
-      featured: false,
-      external: true,
-    },
-    {
-      title: contact.email,
-      url: `mailto:${contact.email}`,
-      icon: "email" as const,
-      featured: false,
-      external: true,
-    },
-    ...(contact.phone
-      ? [{
-          title: contact.phone,
-          url: `tel:${contact.phone.replace(/[^+\d]/g, "")}`,
-          icon: "phone" as const,
-          featured: false,
-          external: true,
-        }]
-      : []),
+  // Build links from content, then drop any with no real destination so the
+  // client's page never renders a dead "Book a Session" / mailto: to nothing.
+  type LinkItem = {
+    title: string;
+    url: string;
+    icon: "booking" | "calendar" | "instagram" | "email" | "phone";
+    featured: boolean;
+    external: boolean;
+  };
+  const rawLinks: (LinkItem | null)[] = [
+    bookingUrl
+      ? { title: "Book a Session", url: bookingUrl, icon: "booking", featured: true, external: true }
+      : null,
+    upcomingEvents.length > 0 && upcomingEvents[0].external_link
+      ? { title: upcomingEvents[0].title, url: upcomingEvents[0].external_link, icon: "calendar", featured: false, external: true }
+      : null,
+    instagramUrl
+      ? { title: "Follow on Instagram", url: instagramUrl, icon: "instagram", featured: false, external: true }
+      : null,
+    contact.email
+      ? { title: contact.email, url: `mailto:${contact.email}`, icon: "email", featured: false, external: true }
+      : null,
+    contact.phone
+      ? { title: contact.phone, url: `tel:${contact.phone.replace(/[^+\d]/g, "")}`, icon: "phone", featured: false, external: true }
+      : null,
   ];
+  const links = rawLinks.filter((l): l is LinkItem => l !== null);
 
   const ICONS: Record<string, React.ReactNode> = {
     booking: (
@@ -144,7 +119,7 @@ export default async function LinksPage() {
               className="font-display text-3xl"
               style={{ color: "var(--cream)" }}
             >
-              R
+              {(settings.siteName || "•").trim().charAt(0).toUpperCase()}
             </span>
           </div>
           <h1

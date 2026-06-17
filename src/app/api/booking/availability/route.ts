@@ -27,7 +27,8 @@ export async function GET(request: Request) {
   try {
     const tenant = await getTenantFromHeaders();
     const services = await getContent("services", tenant);
-    const service = services.services.find((item) => item.id === serviceId);
+    const serviceList = Array.isArray(services.services) ? services.services : [];
+    const service = serviceList.find((item) => item.id === serviceId);
     if (!service || service.comingSoon) {
       return NextResponse.json({ error: "Invalid service" }, { status: 400 });
     }

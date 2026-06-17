@@ -320,10 +320,15 @@ export async function savePayLink(
   const key = `${PAY_LINK_PREFIX}${config.slug}`;
 
   if (!options.overwrite) {
-    const existing = await redis.get<PayLinkConfig>(key);
-    if (existing) {
+    // Atomic create: SET NX so two concurrent mints of the same slug can't both
+    // pass a get()-check and clobber each other (the prior get-then-set was a
+    // TOCTOU — the conflict guard was illusory under concurrency).
+    const created: unknown = await redis.set(key, config, { ex: PAY_LINK_TTL_SECONDS, nx: true });
+    if (created === null || created === undefined || created === false) {
       throw new PayLinkConflictError(config.slug);
     }
+    await redis.sadd(PAY_LINK_INDEX_KEY, config.slug);
+    return;
   }
 
   const result: unknown = await redis.set(key, config, { ex: PAY_LINK_TTL_SECONDS });
@@ -371,4 +376,21 @@ export async function listPayLinks(): Promise<PayLinkConfig[]> {
   }
 
   return links.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Revoke a pay link: delete its record and drop it from the index. Returns true
+ * if a record was removed. Idempotent — revoking an already-gone slug is a no-op
+ * that still cleans the index.
+ */
+export async function deletePayLink(slug: string): Promise<boolean> {
+  const normalized = normalizePayLinkSlug(slug);
+  if (!normalized) return false;
+  const redis = getRedis();
+  if (!redis) {
+    throw new PayLinkStorageError("Redis is not configured for pay-link storage.");
+  }
+  const removed = await redis.del(`${PAY_LINK_PREFIX}${normalized}`);
+  await redis.srem(PAY_LINK_INDEX_KEY, normalized);
+  return removed > 0;
 }

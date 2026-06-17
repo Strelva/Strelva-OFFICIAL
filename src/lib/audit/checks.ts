@@ -95,8 +95,11 @@ async function checkWebVitals(
     });
     return {
       name: "Core Web Vitals",
+      // Weight 0 so an uninstrumented category is EXCLUDED from the overall
+      // grade rather than injecting a 50-point participation score that
+      // distorts it (a measured 30% of the grade should not be a guess).
       slug: "web-vitals",
-      weight: WEIGHTS.webVitals,
+      weight: 0,
       score: 50,
       checks,
     };
@@ -207,8 +210,10 @@ async function checkMobile(
     });
     return {
       name: "Mobile Responsiveness",
+      // Weight 0 when uninstrumented — excluded from the grade rather than
+      // injecting a 50-point guess (see Core Web Vitals above).
       slug: "mobile",
-      weight: WEIGHTS.mobile,
+      weight: 0,
       score: 50,
       checks,
     };

@@ -56,7 +56,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
-  mockUpdateTenant.mockResolvedValue(undefined);
+  mockUpdateTenant.mockResolvedValue({ id: "acme" });
   mockAddEvent.mockResolvedValue({ id: "evt_fake" });
   mockRedisSet.mockResolvedValue("OK");
   // Default: no Redis (matches non-prod idempotency short-circuit).
@@ -80,8 +80,11 @@ afterEach(() => {
   else process.env.STRIPE_WEBHOOK_SECRET = ORIGINAL_WEBHOOK_SECRET;
 });
 
-async function postEvent(event: unknown) {
-  mockConstructEvent.mockReturnValue(event);
+async function postEvent(event: Record<string, unknown>) {
+  // Real Stripe events always carry `livemode`. The test secret is sk_test_fake,
+  // so default to test-mode (livemode:false) unless a test overrides it.
+  const withMode = { livemode: false, ...event };
+  mockConstructEvent.mockReturnValue(withMode);
   const { POST } = await import("@/app/api/billing/webhook/route");
   const req = new Request("https://admin.strelva.com/api/billing/webhook", {
     method: "POST",
@@ -92,6 +95,27 @@ async function postEvent(event: unknown) {
 }
 
 describe("billing webhook checkout.session.completed mode guard", () => {
+  it("ignores a live-mode event in a test-mode deploy without mutating tenant data", async () => {
+    const res = await postEvent({
+      id: "evt_livemode_mismatch",
+      type: "checkout.session.completed",
+      livemode: true, // live event, but STRIPE_SECRET_KEY is sk_test_fake
+      created: 1_700_000_000,
+      data: {
+        object: {
+          id: "cs_live_1",
+          mode: "subscription",
+          subscription: "sub_live",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ignored).toBe("mode-mismatch");
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
   it("subscription mode flips subscriptionStatus to active and records subscription id", async () => {
     const res = await postEvent({
       id: "evt_sub",

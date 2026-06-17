@@ -1,7 +1,7 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { consumeInvite } from "@/lib/invites";
+import { getInvite, consumeInvite } from "@/lib/invites";
 import { assignUserToTenant } from "@/lib/auth";
 
 interface WebhookEvent {
@@ -49,12 +49,24 @@ export async function POST(req: Request) {
 
     for (const emailObj of emails) {
       const email = emailObj.email_address;
-      const invite = await consumeInvite(email);
+      // Read the invite WITHOUT consuming it. Assign first; only consume the
+      // invite once assignment is confirmed. Consuming before a successful
+      // assign (the old order) permanently destroyed the invite when
+      // assignUserToTenant returned false on a transient failure (e.g. Sanity
+      // momentarily returning no tenant config) — locking a paying client out
+      // with no self-recovery. Mirrors the safe order in auth.ts's claim path.
+      const invite = await getInvite(email);
+      if (!invite) continue;
 
-      if (invite) {
-        const assigned = await assignUserToTenant(userId, invite.tenant, invite.role);
-        console.log(
-          `[clerk-webhook] Auto-assigned ${email} to tenant ${invite.tenant}: ${assigned ? "success" : "failed"}`
+      const assigned = await assignUserToTenant(userId, invite.tenant, invite.role);
+      if (assigned) {
+        await consumeInvite(email);
+        console.log(`[clerk-webhook] Auto-assigned ${email} to tenant ${invite.tenant}: success`);
+      } else {
+        // Leave the invite intact so the /account claim path or a Clerk webhook
+        // retry can still grant access later.
+        console.error(
+          `[clerk-webhook] Assign failed for ${email} -> tenant ${invite.tenant}; invite preserved for retry`
         );
       }
     }

@@ -177,6 +177,7 @@ export function DomainsClient({ initialDomains }: Props) {
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -231,7 +232,7 @@ export function DomainsClient({ initialDomains }: Props) {
   };
 
   const handleRemove = async (domain: string) => {
-    if (!confirm(`Remove ${domain}?`)) return;
+    setConfirmingRemove(null);
     setRemoving(domain);
     setError(null);
     try {
@@ -353,14 +354,31 @@ export function DomainsClient({ initialDomains }: Props) {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRemove(entry.domain)}
-                  disabled={removing === entry.domain}
-                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
-                  title={`Remove ${entry.domain}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-                </button>
+                {confirmingRemove === entry.domain ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      onClick={() => handleRemove(entry.domain)}
+                      disabled={removing === entry.domain}
+                      className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      {removing === entry.domain ? "Removing…" : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingRemove(null)}
+                      className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingRemove(entry.domain)}
+                    className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150"
+                    aria-label={`Remove ${entry.domain}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  </button>
+                )}
               </div>
             </div>
           ))
