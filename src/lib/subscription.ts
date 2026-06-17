@@ -24,21 +24,39 @@ export function isBillingEnabled(): boolean {
  * Set it in the SAME deploy that sets STRIPE_SCAFFOLD_PRICE_ID, listing all
  * existing tenants, so nobody gets 402'd the moment billing flips on.
  */
+let grandfatherCache: { raw: string; set: Set<string> } | null = null;
+
 function getGrandfatheredTenants(): Set<string> {
   const raw = process.env.STRIPE_BILLING_GRANDFATHER_TENANTS || "";
-  return new Set(
+  if (grandfatherCache && grandfatherCache.raw === raw) return grandfatherCache.set;
+  const set = new Set(
     raw
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean)
   );
+  grandfatherCache = { raw, set };
+  return set;
 }
+
+let warnedEmptyGrandfather = false;
 
 export async function getEffectiveSubscriptionStatus(tenant: string): Promise<SubscriptionStatus> {
   if (isDevAccessBypassEnabled()) return "active";
   if (!isBillingEnabled()) return "active";
 
-  if (getGrandfatheredTenants().has(tenant)) {
+  const grandfathered = getGrandfatheredTenants();
+  // Cliff foot-gun guard: billing on + an empty grandfather list means every
+  // pre-existing tenant without an active subscription gets 402'd. check:prod
+  // enforces this at deploy time; warn loudly at runtime too in case it's ever
+  // reached (e.g. the env was cleared post-deploy).
+  if (grandfathered.size === 0 && !warnedEmptyGrandfather) {
+    warnedEmptyGrandfather = true;
+    console.warn(
+      "[subscription] Billing is ENABLED but STRIPE_BILLING_GRANDFATHER_TENANTS is empty — existing tenants without an active subscription will be 402'd. Set the grandfather list in the same deploy that enables billing."
+    );
+  }
+  if (grandfathered.has(tenant)) {
     return "active";
   }
 

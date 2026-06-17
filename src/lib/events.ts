@@ -62,6 +62,14 @@ export async function addEvent(
     if (requiresPersistence) {
       throw new EventPersistenceError("Redis is required for durable event queue persistence.");
     }
+    // Not durably persisted (Redis unavailable + non-prod, so requiresPersistence
+    // is false). Warn loudly for pending items — a silently-dropped pending draft
+    // / review / change-request has masked real data loss in dev/staging before.
+    if (full.status === "pending") {
+      console.warn(
+        `[events] Redis unavailable — pending ${full.type} for tenant ${full.tenantId} was NOT persisted (in-memory only, will vanish).`
+      );
+    }
     return full;
   }
 
