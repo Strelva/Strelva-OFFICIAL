@@ -6,7 +6,6 @@ import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
 import { auth } from "@clerk/nextjs/server";
 import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
-import { getContent, getClickCounts } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
@@ -21,6 +20,17 @@ import {
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
+import {
+  logisticsGuardrail,
+  loadAgentPromptContent,
+  aboutBlock,
+  heroBlock,
+  storyBlock,
+  servicesBlock,
+  eventsBlock,
+  testimonialsBlock,
+  performanceBlock,
+} from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
@@ -91,16 +101,6 @@ function formatSourceDate(value?: string | null): string | null {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function logisticsGuardrail(sectionNames: string): string {
-  return `OPERATING BOUNDARIES:
-- You are a website/content operations assistant, not the business's order desk, fulfillment team, inventory system, payment processor, booking agent, or customer support inbox.
-- Stay inside what this platform can actually do: read current website content, draft copy, update approved content sections, queue risky changes for review, summarize available metrics/activity/reviews, draft newsletters/social posts, and point users to their configured external systems.
-- Do not invent logistics facts such as shipping timelines, delivery areas, pickup windows, stock levels, wholesale terms, refund policies, certifications, nutrition claims, event availability, booking availability, or operational commitments unless they are explicitly present in the current site content, tenant rules, or connected tool output.
-- If the user asks for something outside the platform's control, explain the boundary briefly and offer the closest supported action, such as drafting website copy, adding a FAQ, updating contact details, or creating an approval-ready draft.
-- When recommending changes, prioritize high-value website work: clearer contact/ordering path, trust proof, product/service clarity, fresh updates, conversion copy, and weekly-report-worthy proof.
-- Before changing content, read the relevant section first and preserve existing data. Available editable sections are: ${sectionNames}.`;
-}
-
 function getCustomRequestUrl(productionUrl: string | undefined, endpoint: string | undefined): string | null {
   if (!productionUrl || !endpoint) return null;
   try {
@@ -111,57 +111,18 @@ function getCustomRequestUrl(productionUrl: string | undefined, endpoint: string
 }
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
-  const template = await getTemplateForTenant(tenant);
-  const sections = template.contentSections;
+  // Shared content load + section blocks (see agent-prompt-shared.ts), with this
+  // surface's extra sections (products/providers/faq/shop) interleaved in place.
+  const ctx = await loadAgentPromptContent(tenant);
+  const { sections, content, settings, ownerName } = ctx;
 
-  // Fetch all content sections + booking clicks in parallel
-  const contentEntries = await Promise.all(
-    sections.map(async (s) => [s, await getContent(s, tenant)] as unknown as [ContentSection, Record<string, unknown>])
-  );
-  const content: Record<string, Record<string, unknown>> = Object.fromEntries(contentEntries);
-  const bookingClicks = await getClickCounts("booking-click", tenant);
-
-  const settings = content.settings || {};
-  const contact = content.contact || {};
-  const hero = content.hero || {};
-  const story = content.story || {};
-
-  // Tenant content is attacker-controllable; sanitize every value that lands in
-  // the system prompt so a field can't inject a fake instruction line.
-  const ownerName = sanitizePromptValue(settings.ownerName) || "the owner";
-  const ownerTitle = sanitizePromptValue(settings.ownerTitle);
-
-  // Build dynamic section summaries
-  const sectionSummaries: string[] = [];
-
-  sectionSummaries.push(`ABOUT THE BUSINESS:
-- Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
-- Phone: ${sanitizePromptValue(contact.phone) || "(not set)"}
-- Email: ${sanitizePromptValue(contact.email) || "(not set)"}
-- Address: ${sanitizePromptValue(contact.address) || "(not set)"}
-- Hours: ${sanitizePromptValue(contact.hours) || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${sanitizePromptValue(settings.bookingUrl)}` : ""}`);
-
-  if (sections.includes("hero")) {
-    sectionSummaries.push(`HERO SECTION:
-- Headline: ${sanitizePromptValue(hero.headline) || "(not set)"}
-- Subheadline: ${sanitizePromptValue(hero.subheadline) || "(not set)"}
-- CTA: ${sanitizePromptValue(hero.ctaText) || "(not set)"}`);
-  }
-
-  if (sections.includes("story")) {
-    sectionSummaries.push(`ABOUT/STORY:
-- Headline: ${sanitizePromptValue(story.headline) || "(not set)"}
-- Statement: ${sanitizePromptValue(story.statement) || "(not set)"}
-- ${(story.paragraphs as string[])?.length || 0} paragraphs, ${(story.stats as unknown[])?.length || 0} stats`);
-  }
-
-  if (sections.includes("services") && content.services) {
-    const svc = content.services;
-    const serviceList = ((svc.services as Array<{ name: string; duration: string; price: string; id: string }>) || [])
-      .map((s) => `- ${s.name} (${s.duration}, $${s.price}) [id: ${s.id}]`)
-      .join("\n");
-    sectionSummaries.push(`CURRENT SERVICES (${((svc.services as unknown[]) || []).length} listed):\n${serviceList}`);
-  }
+  const sectionSummaries: string[] = [aboutBlock(ctx)];
+  const heroSummary = heroBlock(ctx);
+  if (heroSummary) sectionSummaries.push(heroSummary);
+  const storySummary = storyBlock(ctx);
+  if (storySummary) sectionSummaries.push(storySummary);
+  const servicesSummary = servicesBlock(ctx);
+  if (servicesSummary) sectionSummaries.push(servicesSummary);
 
   if (sections.includes("products") && content.products) {
     const prod = content.products;
@@ -171,18 +132,10 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
     sectionSummaries.push(`PRODUCTS (${((prod.products as unknown[]) || []).length} listed):\n${productList}`);
   }
 
-  if (sections.includes("events") && content.events) {
-    const evt = content.events;
-    const futureEvents = ((evt.events as Array<{ title: string; date: string }>) || [])
-      .filter((e) => new Date(e.date) >= new Date())
-      .map((e) => `- ${e.title} (${e.date})`)
-      .join("\n");
-    sectionSummaries.push(futureEvents ? `UPCOMING EVENTS:\n${futureEvents}` : "No upcoming events listed.");
-  }
-
-  if (sections.includes("testimonials") && content.testimonials) {
-    sectionSummaries.push(`TESTIMONIALS: ${(content.testimonials.testimonials as unknown[])?.length || 0} reviews listed.`);
-  }
+  const eventsSummary = eventsBlock(ctx);
+  if (eventsSummary) sectionSummaries.push(eventsSummary);
+  const testimonialsSummary = testimonialsBlock(ctx);
+  if (testimonialsSummary) sectionSummaries.push(testimonialsSummary);
 
   if (sections.includes("providers") && content.providers) {
     const providerList = ((content.providers.providers as Array<{ name: string; service: string; category: string }>) || [])
@@ -199,7 +152,7 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
     sectionSummaries.push(`SHOP: ${(content.shop.items as unknown[])?.length || 0} products listed.`);
   }
 
-  sectionSummaries.push(`SITE PERFORMANCE:\n- Booking clicks: ${bookingClicks.total} total (${bookingClicks.thisWeek} this week)`);
+  sectionSummaries.push(performanceBlock(ctx));
 
   try {
     const { getSearchData } = await import("@/lib/storage");
