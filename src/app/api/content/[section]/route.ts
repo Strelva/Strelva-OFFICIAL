@@ -102,16 +102,14 @@ export async function PUT(
 
     if (isDraft) {
       await setDraftContent(s, parsed.data as ContentMap[typeof s], tenant);
-      if (actor.isImpersonating) {
-        await logAuditEvent({
-          tenant,
-          actor,
-          action: "content.draft_saved",
-          targetType: "content_section",
-          targetId: s,
-          metadata: { section: s },
-        });
-      }
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "content.draft_saved",
+        targetType: "content_section",
+        targetId: s,
+        metadata: { section: s },
+      });
       return NextResponse.json({ success: true, draft: true });
     }
 
@@ -130,16 +128,14 @@ export async function PUT(
       changes,
       snapshot: current,
     }, tenant);
-    if (actor.isImpersonating) {
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "content.published",
-        targetType: "content_section",
-        targetId: s,
-        metadata: { section: s, changeCount: changes.length },
-      });
-    }
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "content.published",
+      targetType: "content_section",
+      targetId: s,
+      metadata: { section: s, changeCount: changes.length },
+    });
 
     await clearDraft(s, tenant).catch(() => {});
 
@@ -188,16 +184,14 @@ export async function DELETE(
 
     if (isDraft) {
       await clearDraft(s, tenant);
-      if (actor.isImpersonating) {
-        await logAuditEvent({
-          tenant,
-          actor,
-          action: "content.draft_deleted",
-          targetType: "content_section",
-          targetId: s,
-          metadata: { section: s },
-        });
-      }
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "content.draft_deleted",
+        targetType: "content_section",
+        targetId: s,
+        metadata: { section: s },
+      });
       return NextResponse.json({ success: true });
     }
 

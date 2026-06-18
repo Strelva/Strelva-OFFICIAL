@@ -65,31 +65,27 @@ export async function PUT(request: Request) {
 
     if (isDraft) {
       await setDraftPageConfig(pageConfig, tenant);
-      if (actor.isImpersonating) {
-        await logAuditEvent({
-          tenant,
-          actor,
-          action: "page_config.draft_saved",
-          targetType: "page_config",
-          targetId: tenant,
-          metadata: { pages: Object.keys(pageConfig) },
-        });
-      }
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "page_config.draft_saved",
+        targetType: "page_config",
+        targetId: tenant,
+        metadata: { pages: Object.keys(pageConfig) },
+      });
       return NextResponse.json({ success: true, draft: true });
     }
 
     await setPageConfig(pageConfig, tenant);
     await clearDraftPageConfig(tenant).catch(() => {});
-    if (actor.isImpersonating) {
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "page_config.updated",
-        targetType: "page_config",
-        targetId: tenant,
-        metadata: { pages: Object.keys(pageConfig) },
-      });
-    }
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "page_config.updated",
+      targetType: "page_config",
+      targetId: tenant,
+      metadata: { pages: Object.keys(pageConfig) },
+    });
     revalidatePath("/");
     revalidateClientSite(
       tenant,
