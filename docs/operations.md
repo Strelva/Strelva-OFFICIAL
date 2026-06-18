@@ -92,6 +92,24 @@ touches tenant data gets that check in review.
   `alertOnce()` dedups high/critical and rolls medium/low into
   `reb:alert-count:*` counters instead of dropping them.
 
+## T004 — scaffoldweb.com → strelva.com cutover (PARKED, needs go/no-go)
+
+The full rebrand + repo split (`scaffoldweb.com` → `strelva.com`,
+`strelva-marketing` + `strelva-app`) is specced in
+`docs/strelva-migration-plan.md` — ~518 references across proxy host matching,
+the tenant subdomain pattern, Clerk/Resend domains, CSP, and copy. It is a
+rebrand, not a DNS change, and is **half-migrated** (production strelva.com
+marketing already serves from the separate repo; this control plane still
+matches `*.scaffoldweb.com` hosts).
+
+**Status: parked pending a Noah+Jacob go/no-go.** Do not execute piecemeal —
+a partial host-matching change can break live tenant routing. When it's
+greenlit: pick a date, freeze content changes during the window, follow the
+migration-plan codemod order, and verify tenant + admin + custom-domain
+routing on a preview before flipping production DNS. Until then, new code uses
+`SCAFFOLD_*` env names (with `REB_*` fallbacks) and keeps `x-reb-*` wire
+headers + `reb:` Redis prefixes frozen.
+
 ## Scale model (batch now, queue later)
 
 The per-tenant cron fan-outs (weekly-report, visibility, polls, staleness,
