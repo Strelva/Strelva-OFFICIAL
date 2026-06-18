@@ -32,13 +32,12 @@ import {
   performanceBlock,
 } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
-import { decideAiContentGovernance } from "@/lib/ai-governance";
-import { queueAiContentReview } from "@/lib/ai-review-queue";
-import { assessRisk, classifyOperation, generatePreviewDiffs, type NodeContext } from "@/lib/agent-risk";
+import { applySectionUpdate } from "@/lib/apply-section-update";
+import { postCustomChangeRequest } from "@/lib/custom-request-client";
+import { type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import {
@@ -47,7 +46,6 @@ import {
   type AgentActionResult,
 } from "@/lib/agent-results";
 import { readJsonObject } from "@/lib/request-body";
-import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 type IncomingMessagePart = { type?: string; text?: string };
 
@@ -429,154 +427,62 @@ Only use tools for manifest-supported sections and actions. If the user requests
         }),
         execute: async ({ section, data }) => {
           try {
-            if (!manifestAllowsAction(siteManifest, section, "draft")) {
-              const message = `${section} is not editable for this site's capability manifest. Send a custom request for this change.`;
-              recordActionResult({ status: "blocked", sectionIds: [section], message });
-              return { success: false, blocked: true, section, message, agentResultStatus: "blocked" as const };
-            }
-            const { sectionSchemas } = await import("@/lib/schemas");
-            const schema = sectionSchemas[section as ContentSection];
-            const parsed = schema.safeParse(data);
-            if (!parsed.success) {
-              const toolResult = { success: false, error: parsed.error.message, section, agentResultStatus: "failed" as const };
-              recordActionResult({ status: "failed", sectionIds: [section], error: parsed.error.message });
-              return toolResult;
-            }
-
-            const { getContent, setContent } = await import("@/lib/storage");
-            const current = (await getContent(section as ContentSection, tenant)) as unknown as Record<string, unknown>;
-
-            // Classify operation and assess risk
-            const operation = classifyOperation(section as ContentSection, current, data as Record<string, unknown>);
-            const risk = assessRisk(operation);
-            const diffs = generatePreviewDiffs(current, data as Record<string, unknown>);
-
-            // Legacy array reduction check (kept for backwards compatibility)
-            for (const key of Object.keys(current)) {
-              if (Array.isArray(current[key]) && Array.isArray((data as Record<string, unknown>)[key])) {
-                const oldLen = (current[key] as unknown[]).length;
-                const newLen = ((data as Record<string, unknown>)[key] as unknown[]).length;
-                if (oldLen > 0 && newLen < oldLen * 0.5) {
-                  const message = `This would remove ${oldLen - newLen} of ${oldLen} ${key}. Please confirm you want to remove these specific items.`;
-                  recordActionResult({ status: "blocked", sectionIds: [section], message });
-                  return {
-                    success: false,
-                    error: message,
-                    section,
-                    agentResultStatus: "blocked" as const,
-                    risk,
-                    diffs,
-                  };
-                }
-              }
-            }
-
-            const governance = decideAiContentGovernance(section as ContentSection, parsed.data, {
-              tenantAutoPublish: tenantConfig?.autoPublish,
+            const result = await applySectionUpdate({
+              tenantId: tenant,
+              section: section as ContentSection,
+              data: data as Record<string, unknown>,
+              tenantConfig: tenantConfig ?? null,
+              siteManifest,
             });
 
-            if (governance.action === "block") {
-              const message = "I can't make that change directly. Jacob needs to handle structural site changes.";
-              recordActionResult({ status: "blocked", sectionIds: [section], message });
+            if (result.status === "failed") {
+              recordActionResult({ status: "failed", sectionIds: [section], error: result.error });
+              return { success: false, error: result.error, section, agentResultStatus: "failed" as const };
+            }
+            if (result.status === "blocked") {
+              recordActionResult({ status: "blocked", sectionIds: [section], message: result.message });
               return {
                 success: false,
                 blocked: true,
-                reason: governance.reason,
-                message,
                 section,
+                message: result.message,
+                reason: result.reason,
                 agentResultStatus: "blocked" as const,
-                risk,
+                risk: result.risk,
+                diffs: result.diffs,
               };
             }
 
-            // Route any non-publishable AI change to the durable review queue.
-            const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
-            const autoPublish =
-              governance.action === "publish" &&
-              !shouldRouteToReview &&
-              manifestAllowsAction(siteManifest, section, "publish");
-            let queuedEventId: string | undefined;
+            const autoPublish = result.status === "published";
+            const sourceProof = "Source: Current site content, capability manifest, and AI governance rules";
+            const message = autoPublish
+              ? `Updated ${section} successfully`
+              : `I've queued these changes to ${section} for review. They'll go live after approval.`;
 
-            if (autoPublish) {
-              await setContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
-              // Record version for history
-              const { appendVersion } = await import("@/lib/storage");
-              const { diffFields } = await import("@/lib/utils");
-              await appendVersion(section as ContentSection, parsed.data, "ai", tenant, diffFields(current, data as Record<string, unknown>));
-              const { revalidatePath } = await import("next/cache");
-              revalidatePath("/");
-              const { revalidateClientSite } = await import("@/lib/revalidate-client");
-              revalidateClientSite(
-                tenant,
-                clientRevalidationTargetForSections([section as ContentSection])
-              ).catch((err) => {
-                console.error("[agent] Failed to revalidate client site:", err);
-              });
-            } else {
-              const event = await queueAiContentReview({
-                tenantId: tenant,
-                section: section as ContentSection,
-                currentData: current,
-                proposedData: parsed.data as Record<string, unknown>,
-                diffs,
-                risk,
-                governance,
-              });
-              queuedEventId = event.id;
-
-              const { setDraftContent } = await import("@/lib/storage");
-              await setDraftContent(section as ContentSection, parsed.data as Parameters<typeof setContent>[1], tenant);
-            }
-
+            // Slack (route copy): includes the risk label + a short change summary.
             if (process.env.SLACK_WEBHOOK_URL) {
-              const { diffFields } = await import("@/lib/utils");
-              const changeSummary = diffFields(current, data as Record<string, unknown>)
+              const changeSummary = result.changes
                 .slice(0, 5)
                 .map((c) => `  • ${c.field}: "${c.before}" → "${c.after}"`)
                 .join("\n");
               const tenantLabel = tenantConfig?.siteName || tenant;
-              const riskLabel = risk.level !== "low" ? ` [${risk.level.toUpperCase()} RISK]` : "";
+              const riskLabel = result.risk.level !== "low" ? ` [${result.risk.level.toUpperCase()} RISK]` : "";
               fetch(process.env.SLACK_WEBHOOK_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                text: autoPublish
-                  ? `[${tenantLabel}] AI updated *${section}*${riskLabel}\n${changeSummary}`
-                  : `[${tenantLabel}] AI drafted changes to *${section}*${riskLabel} — needs review at /admin/drafts\nReason: ${governance.reason}\n${changeSummary}`,
+                  text: autoPublish
+                    ? `[${tenantLabel}] AI updated *${section}*${riskLabel}\n${changeSummary}`
+                    : `[${tenantLabel}] AI drafted changes to *${section}*${riskLabel} — needs review at /admin/drafts\nReason: ${result.governance.reason}\n${changeSummary}`,
                 }),
               }).catch(() => {});
             }
 
-            try {
-              const { logActivity, recordSectionUpdate } = await import("@/lib/storage");
-              const { diffFields } = await import("@/lib/utils");
-              const changes = diffFields(current, data as Record<string, unknown>);
-              await logActivity({
-                text: autoPublish ? `AI updated ${section}` : `AI drafted changes to ${section} (pending review)`,
-                time: new Date().toISOString(),
-                type: "ai",
-                section,
-                actor: "ai",
-                changes,
-                eventStatus: autoPublish ? "auto_approved" : "pending",
-                governanceReason: governance.reason,
-                riskLevel: risk.level,
-                suppressEvent: !autoPublish,
-              }, tenant);
-              if (autoPublish) await recordSectionUpdate(section, tenant);
-            } catch {}
-
-            const agentResultStatus = autoPublish
-              ? "published"
-              : "queued";
-            const message = autoPublish
-              ? `Updated ${section} successfully`
-              : `I've queued these changes to ${section} for review. They'll go live after approval.`;
-            const sourceProof = "Source: Current site content, capability manifest, and AI governance rules";
+            const eventId = result.status === "queued" ? result.eventId : undefined;
             recordActionResult({
-              status: agentResultStatus,
+              status: autoPublish ? "published" : "queued",
               sectionIds: [section],
-              eventIds: queuedEventId ? [queuedEventId] : undefined,
+              eventIds: eventId ? [eventId] : undefined,
               message,
               sourceProof,
             });
@@ -585,13 +491,13 @@ Only use tools for manifest-supported sections and actions. If the user requests
               success: true,
               section,
               sectionIds: [section],
-              eventId: queuedEventId,
-              eventIds: queuedEventId ? [queuedEventId] : undefined,
-              governance,
-              risk,
-              diffs,
+              eventId,
+              eventIds: eventId ? [eventId] : undefined,
+              governance: result.governance,
+              risk: result.risk,
+              diffs: result.diffs,
               applied: autoPublish,
-              agentResultStatus,
+              agentResultStatus: autoPublish ? ("published" as const) : ("queued" as const),
               message,
               sourceProof,
             };
@@ -666,30 +572,23 @@ Only use tools for manifest-supported sections and actions. If the user requests
             recordActionResult({ status: "blocked", message });
             return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
           }
-          // SSRF guard: requestUrl derives from tenant-config productionUrl +
-          // the manifest endpoint, so refuse private/non-https targets.
-          if (!isSafeFetchUrl(requestUrl)) {
-            const message = "Custom request endpoint is not a safe external URL.";
-            recordActionResult({ status: "blocked", message });
-            return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
-          }
-
           try {
-            const response = await fetch(requestUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${secret}`,
-              },
-              body: JSON.stringify({
-                feature: normalizedFeature,
-                summary: cleanSummary,
-                requestedBy: "Strelva AI agent",
-              }),
+            const postResult = await postCustomChangeRequest({
+              url: requestUrl,
+              secret,
+              feature: normalizedFeature,
+              summary: cleanSummary,
             });
-
-            if (!response.ok) {
-              const message = `Custom request failed with ${response.status}.`;
+            if (!postResult.ok) {
+              if (postResult.reason === "unsafe_url") {
+                const message = "Custom request endpoint is not a safe external URL.";
+                recordActionResult({ status: "blocked", message });
+                return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
+              }
+              const message =
+                postResult.reason === "http_error"
+                  ? `Custom request failed with ${postResult.status}.`
+                  : `Failed to send custom request: ${postResult.error}`;
               recordActionResult({ status: "failed", message });
               return { success: false, error: message, agentResultStatus: "failed" as const };
             }

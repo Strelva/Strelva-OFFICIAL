@@ -18,11 +18,8 @@ import {
 } from "@/lib/agent-prompt-shared";
 import { sendSlackNotification } from "@/lib/slack";
 import { detectStaleSections } from "@/lib/reports";
-import { decideAiContentGovernance } from "@/lib/ai-governance";
-import { queueAiContentReview } from "@/lib/ai-review-queue";
+import { applySectionUpdate } from "@/lib/apply-section-update";
 import type { ContentSection } from "@/lib/types";
-import { revalidateClientSite } from "@/lib/revalidate-client";
-import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
@@ -219,160 +216,42 @@ export async function executeAgentPromptDetailed(
         data: z.record(z.string(), z.unknown()),
       }),
       execute: async ({ section, data }) => {
-        const { sectionSchemas } = await import("@/lib/schemas");
-        const schema = sectionSchemas[section as ContentSection];
-        const parsed = schema.safeParse(data);
-        if (!parsed.success)
-          return {
-            success: false,
-            section,
-            agentResultStatus: "failed" as const,
-            error: parsed.error.message,
-          };
-
-        const { getContent, setContent } = await import("@/lib/storage");
-        const current = (await getContent(
-          section as ContentSection,
-          tenantId
-        )) as unknown as Record<string, unknown>;
-
-        for (const key of Object.keys(current)) {
-          if (
-            Array.isArray(current[key]) &&
-            Array.isArray((data as Record<string, unknown>)[key])
-          ) {
-            const oldLen = (current[key] as unknown[]).length;
-            const newLen = (
-              (data as Record<string, unknown>)[key] as unknown[]
-            ).length;
-            if (oldLen > 0 && newLen < oldLen * 0.5) {
-              return {
-                success: false,
-                section,
-                agentResultStatus: "blocked" as const,
-                error: `Would remove ${oldLen - newLen} of ${oldLen} ${key}. Confirm first.`,
-              };
-            }
-          }
-        }
-
-        const baseGovernance = decideAiContentGovernance(section as ContentSection, parsed.data, {
-          tenantAutoPublish: tenantConfig?.autoPublish,
+        const result = await applySectionUpdate({
+          tenantId,
+          section: section as ContentSection,
+          data: data as Record<string, unknown>,
+          tenantConfig: tenantConfig ?? null,
+          // The dashboard-chat executor has no capability manifest in scope, so
+          // the manifest gate is intentionally skipped here (route enforces it).
         });
 
-        const { maybeAutoApprove } = await import("@/lib/ai-auto-approve");
-        const governance = await maybeAutoApprove(tenantConfig, section as ContentSection, baseGovernance);
-
-        if (governance.action === "block") {
+        if (result.status === "failed") {
+          return { success: false, section, agentResultStatus: "failed" as const, error: result.error };
+        }
+        if (result.status === "blocked") {
           return {
             success: false,
             blocked: true,
             section,
             agentResultStatus: "blocked" as const,
-            reason: governance.reason,
-            message: "Structural site changes require manual admin work.",
+            reason: result.reason,
+            message: result.message,
           };
         }
 
-        const { diffFields } = await import("@/lib/utils");
-        const changes = diffFields(current, data as Record<string, unknown>);
-        let queuedEventId: string | undefined;
-
-        if (governance.action === "publish") {
-          try {
-            await setContent(
-              section as ContentSection,
-              parsed.data as Parameters<typeof setContent>[1],
-              tenantId
-            );
-          } catch (err) {
-            // A Sanity/store write failure must surface as a clean tool result,
-            // not an uncaught throw that breaks the agent run.
-            return {
-              success: false,
-              section,
-              agentResultStatus: "failed" as const,
-              error: `Failed to save ${section}: ${err instanceof Error ? err.message : "write error"}`,
-            };
-          }
-          const { appendVersion } = await import("@/lib/storage");
-          await appendVersion(
-            section as ContentSection,
-            parsed.data,
-            "ai",
-            tenantId,
-            changes
-          );
-          const { revalidatePath } = await import("next/cache");
-          revalidatePath("/");
-
-          // Trigger revalidation on standalone client site
-          revalidateClientSite(
-            tenantId,
-            clientRevalidationTargetForSections([section as ContentSection])
-          ).catch((err) => {
-            console.error("[agent] Failed to revalidate client site:", err);
-          });
-
-          // Fire-and-forget verification: confirms the change is live on the
-          // public read path and emits change_verified / change_verify_failed.
+        // Published: confirm the change actually landed on the public read path.
+        if (result.status === "published") {
           scheduleVerification(
             tenantId,
             section as ContentSection,
-            parsed.data as Record<string, unknown>
+            data as Record<string, unknown>
           );
-        } else {
-          const event = await queueAiContentReview({
-            tenantId,
-            section: section as ContentSection,
-            currentData: current,
-            proposedData: parsed.data as Record<string, unknown>,
-            diffs: changes.map((change) => ({
-              field: change.field,
-              before: change.before,
-              after: change.after,
-              type: "changed" as const,
-            })),
-            governance,
-          });
-          queuedEventId = event.id;
-
-          const { setDraftContent } = await import("@/lib/storage");
-          await setDraftContent(
-            section as ContentSection,
-            parsed.data as Parameters<typeof setContent>[1],
-            tenantId
-          );
-        }
-
-        const { logActivity, recordSectionUpdate } = await import(
-          "@/lib/storage"
-        );
-        await logActivity(
-          {
-            text:
-              governance.action === "publish"
-                ? `AI updated ${section} via approved action`
-                : `AI drafted changes to ${section} via approved action`,
-            time: new Date().toISOString(),
-            type: "ai",
-            section,
-            actor: "ai",
-            changes,
-            eventStatus: governance.action === "publish" ? "auto_approved" : "pending",
-            governanceReason: governance.reason,
-            suppressEvent: governance.action !== "publish",
-          },
-          tenantId
-        );
-        if (governance.action === "publish") {
-          await recordSectionUpdate(section, tenantId);
         }
 
         sendSlackNotification(
           {
             text:
-              governance.action === "publish"
+              result.status === "published"
                 ? `Site updated *${section}* via AI approval (${tenantId})`
                 : `AI drafted *${section}* via approval (${tenantId}) — needs admin review`,
           },
@@ -384,14 +263,12 @@ export async function executeAgentPromptDetailed(
           success: true,
           section,
           sectionIds: [section],
-          eventId: queuedEventId,
-          eventIds: queuedEventId ? [queuedEventId] : undefined,
-          agentResultStatus: governance.action === "publish" ? "published" as const : "queued" as const,
-          governance,
+          eventId: result.status === "queued" ? result.eventId : undefined,
+          eventIds: result.status === "queued" ? [result.eventId] : undefined,
+          agentResultStatus: result.status === "published" ? ("published" as const) : ("queued" as const),
+          governance: result.governance,
           message:
-            governance.action === "publish"
-              ? `Updated ${section}`
-              : `Queued ${section} for admin review`,
+            result.status === "published" ? `Updated ${section}` : `Queued ${section} for admin review`,
         };
       },
     }),
