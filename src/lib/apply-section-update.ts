@@ -168,7 +168,13 @@ export async function applySectionUpdate(
         diffs,
       };
     }
-    await appendVersion(section, parsed.data, "ai", tenantId, changes);
+    // Version history is bookkeeping — the content is already durably saved, so
+    // a version-write hiccup must not turn a successful publish into a failure.
+    try {
+      await appendVersion(section, parsed.data, "ai", tenantId, changes);
+    } catch (err) {
+      console.error("[agent] appendVersion failed after publish:", err);
+    }
     const { revalidatePath } = await import("next/cache");
     revalidatePath("/");
     revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
@@ -188,25 +194,32 @@ export async function applySectionUpdate(
     await setDraftContent(section, parsed.data as Parameters<typeof setContent>[1], tenantId);
   }
 
-  await logActivity(
-    {
-      text: autoPublish
-        ? `AI updated ${section}`
-        : `AI drafted changes to ${section} (pending review)`,
-      time: new Date().toISOString(),
-      type: "ai",
-      section,
-      actor: "ai",
-      changes,
-      eventStatus: autoPublish ? "auto_approved" : "pending",
-      governanceReason: governance.reason,
-      riskLevel: risk.level,
-      suppressEvent: !autoPublish,
-    },
-    tenantId
-  );
-  if (autoPublish) {
-    await recordSectionUpdate(section, tenantId);
+  // Activity log + section-timestamp bump are best-effort: the real work
+  // (publish or queue) already landed above, so a logging failure must not be
+  // reported back as a failed update (the route used to swallow these).
+  try {
+    await logActivity(
+      {
+        text: autoPublish
+          ? `AI updated ${section}`
+          : `AI drafted changes to ${section} (pending review)`,
+        time: new Date().toISOString(),
+        type: "ai",
+        section,
+        actor: "ai",
+        changes,
+        eventStatus: autoPublish ? "auto_approved" : "pending",
+        governanceReason: governance.reason,
+        riskLevel: risk.level,
+        suppressEvent: !autoPublish,
+      },
+      tenantId
+    );
+    if (autoPublish) {
+      await recordSectionUpdate(section, tenantId);
+    }
+  } catch (err) {
+    console.error("[agent] post-update activity log failed:", err);
   }
 
   if (autoPublish) {

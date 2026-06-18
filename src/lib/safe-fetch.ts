@@ -17,12 +17,32 @@ function isProd(): boolean {
 }
 
 function isPrivateOrReservedHost(host: string): boolean {
-  const h = host.toLowerCase();
+  // URL.hostname keeps the brackets on an IPv6 literal ("[::1]"), which made
+  // every IPv6 check below silently never match. Strip them first.
+  let h = host.toLowerCase();
+  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);
+
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   if (h === "metadata.google.internal") return true;
 
-  // IPv6 loopback / link-local / unique-local
-  if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  // IPv6 literals contain a colon. Gate on that so a public hostname that
+  // merely starts with "fc"/"fd" (e.g. fd-cdn.example.com) isn't over-blocked.
+  if (h.includes(":")) {
+    if (h === "::1" || h === "::") return true; // loopback / unspecified
+    if (h.startsWith("fe80:")) return true; // link-local
+    // unique-local fc00::/7 — an IPv6 literal beginning fc or fd.
+    if (h.startsWith("fc") || h.startsWith("fd")) return true;
+    // IPv4-mapped IPv6: ::ffff:127.0.0.1 or its normalized hex ::ffff:7f00:1.
+    const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mappedDotted) return isPrivateOrReservedHost(mappedDotted[1]);
+    const mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const n = ((parseInt(mappedHex[1], 16) << 16) | parseInt(mappedHex[2], 16)) >>> 0;
+      const quad = `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
+      return isPrivateOrReservedHost(quad);
+    }
+    return false; // other global IPv6 (DNS-rebinding remains out of scope)
+  }
 
   // IPv4 literal ranges
   const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
