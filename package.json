@@ -84,7 +84,8 @@
       "postcss": "8.5.10",
       "uuid@>=11 <12": "11.1.1",
       "uuid@>=13 <13.0.1": "13.0.1",
-      "@babel/plugin-transform-modules-systemjs": "7.29.4"
+      "@babel/plugin-transform-modules-systemjs": "7.29.4",
+      "undici@>=7.23.0 <7.28.0": "7.28.0"
     }
   }
 }
