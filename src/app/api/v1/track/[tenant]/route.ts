@@ -31,6 +31,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
+import { getRedis } from "@/lib/redis";
 
 // The minimal public event vocabulary. Kept intentionally small: this is a
 // non-sensitive beacon, not the full internal event set. Maps 1:1 onto the
@@ -114,6 +115,24 @@ export async function POST(
     const config = await getTenantConfig(tenant);
     if (!config || config.active === false) {
       return corsJson({ error: "Tenant not found" }, 404);
+    }
+
+    // Best-effort dedup: collapse identical rapid-fire events (double-fires,
+    // sendBeacon retries) from the same client within a short window so weekly
+    // numbers aren't inflated. Lossy by design (a genuine repeat inside the
+    // window is dropped) and fail-open on a Redis hiccup.
+    const redis = getRedis();
+    if (redis) {
+      const ipPart = rateLimitKey(req, "x").split(":").pop() || "?";
+      const dedupKey = `track:dedup:${tenant}:${event}:${serviceId ?? ""}:${ipPart}`;
+      try {
+        const fresh = await redis.set(dedupKey, "1", { nx: true, ex: 10 });
+        if (!fresh) {
+          return corsJson({ ok: true, deduped: true }, 200);
+        }
+      } catch {
+        // fail open — better to count than to drop on infra error
+      }
     }
 
     // Write the same shapes /api/track writes. A per-service booking click also
