@@ -4,9 +4,12 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
 import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { listTenantDomainClaims, serializeDomainClaim } from "@/lib/domains";
+import { getLatestSnapshots, diffSnapshots } from "@/lib/visibility/snapshots";
+import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagnose";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
 import { DomainManager } from "./DomainManager";
+import { VisibilityPanel } from "./VisibilityPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +40,7 @@ export default async function TenantDetailPage({
   const tenant = await getTenantConfig(id);
   if (!tenant) notFound();
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory] = await Promise.all([
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots] = await Promise.all([
     getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
     listDrafts(id).catch(() => ({} as Record<string, boolean>)),
@@ -45,7 +48,13 @@ export default async function TenantDetailPage({
     getScanSummary(id).catch(() => null),
     listTenantDomainClaims(id).catch(() => []),
     getScanHistory(id).catch(() => []),
+    getLatestSnapshots(id, 2).catch(() => []),
   ]);
+
+  const latestVis = visSnapshots[0] ?? null;
+  const visSummary = latestVis ? summarizeVisibility(latestVis) : null;
+  const visFindings = latestVis ? diagnoseVisibility(latestVis) : [];
+  const visDiff = latestVis ? diffSnapshots(visSnapshots[1] ?? null, latestVis) : null;
 
   return (
     <div className="space-y-8">
@@ -68,6 +77,8 @@ export default async function TenantDetailPage({
       </div>
 
       <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
+
+      <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
 
       <DomainManager
         tenantId={tenant.id}

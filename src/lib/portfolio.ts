@@ -24,6 +24,8 @@ import { getTenantDeliveryModel } from "./custom-repos";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "./pricing";
 import { buildOpsReport, type OpsReport } from "./ops";
 import { getRedis } from "./redis";
+import { getLatestSnapshots } from "./visibility/snapshots";
+import { summarizeVisibility, type VisibilitySummary } from "./visibility/diagnose";
 
 export interface TenantSnapshot {
   id: string;
@@ -42,6 +44,8 @@ export interface TenantSnapshot {
   hasOwnerMessage: boolean;
   hasWeeklyBrief: boolean;
   lastActivity: string | null;
+  /** Latest AI-search / SERP visibility summary, if the cron has measured it. */
+  visibility?: VisibilitySummary | null;
 }
 
 export interface PortfolioSnapshot {
@@ -69,7 +73,7 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
 
   const tenants: TenantSnapshot[] = await Promise.all(
     TENANTS.map(async (t) => {
-      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus] =
+      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, visibilitySnapshots] =
         await Promise.all([
           getActivity(t.id).catch(() => []),
           listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
@@ -78,7 +82,11 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
           getEffectiveSubscriptionStatus(t.id).catch(
             () => t.subscriptionStatus ?? "none"
           ),
+          getLatestSnapshots(t.id, 1).catch(() => []),
         ]);
+      const visibility = visibilitySnapshots[0]
+        ? summarizeVisibility(visibilitySnapshots[0])
+        : null;
       const infrastructure = getTenantLaunchReadinessResults(t);
       const launch = buildTenantLaunchReadiness({
         tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
@@ -106,6 +114,7 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
         hasOwnerMessage: tenantHasOwnerMessage(threads),
         hasWeeklyBrief: Boolean(weeklyBrief),
         lastActivity: activity[0]?.time ?? null,
+        visibility,
       };
     })
   );

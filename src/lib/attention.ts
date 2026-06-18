@@ -12,7 +12,7 @@ import {
 } from "./portfolio";
 
 export type AttentionSeverity = "high" | "medium" | "low";
-export type AttentionKind = "launch" | "ops" | "drafts" | "stale";
+export type AttentionKind = "launch" | "ops" | "drafts" | "stale" | "visibility";
 
 /** A tenant with no activity in this many days is flagged as quiet. */
 const STALE_TENANT_DAYS = 21;
@@ -76,6 +76,31 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
           href: `/admin/tenants/${t.id}`,
         });
       }
+    }
+  }
+
+  // AI-search / SERP visibility gaps — the differentiated wedge. Only surfaces
+  // for tenants the visibility cron has actually measured (t.visibility set).
+  for (const t of s.tenants) {
+    const v = t.visibility;
+    if (!v) continue;
+    if (v.aiProbed > 0 && v.aiPresent === 0) {
+      // Invisible in AI answers is the highest-stakes visibility gap.
+      items.push({
+        severity: "high",
+        kind: "visibility",
+        tenant: t.id,
+        message: `Invisible in AI answers — ${t.siteName} (cited 0/${v.aiProbed})`,
+        href: `/admin/tenants/${t.id}`,
+      });
+    } else if (v.problemCount > 0) {
+      items.push({
+        severity: v.problemCount >= 3 ? "medium" : "low",
+        kind: "visibility",
+        tenant: t.id,
+        message: `${v.problemCount} visibility gap(s) — ${t.siteName}`,
+        href: `/admin/tenants/${t.id}`,
+      });
     }
   }
 

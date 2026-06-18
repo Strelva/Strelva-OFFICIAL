@@ -68,6 +68,65 @@ describe("buildAttentionFromSnapshot", () => {
     expect(b.items[0]).toMatchObject({ severity: "high", kind: "launch", tenant: "acme" });
   });
 
+  it("flags a tenant invisible in AI answers as a high visibility item", () => {
+    const b = buildAttentionFromSnapshot(
+      snapshot({
+        tenants: [
+          tenant({
+            id: "gldf",
+            siteName: "GLDF",
+            visibility: {
+              checkedAt: "2026-06-17T00:00:00Z",
+              aiProbed: 3,
+              aiPresent: 0,
+              serpChecked: 3,
+              serpRanked: 1,
+              localPackPresent: 0,
+              problemCount: 5,
+              topProblems: ["Not cited in the AI answer for \"dried fruit gift box\"."],
+            },
+          }),
+        ],
+      })
+    );
+    expect(b.counts.high).toBe(1);
+    expect(b.items[0]).toMatchObject({ severity: "high", kind: "visibility", tenant: "gldf" });
+    expect(b.items[0].message).toContain("Invisible in AI answers");
+  });
+
+  it("flags lesser visibility gaps as medium/low, and nothing when measured-clean", () => {
+    const withGaps = buildAttentionFromSnapshot(
+      snapshot({
+        tenants: [
+          tenant({
+            id: "rohlax",
+            siteName: "Rohlax",
+            visibility: {
+              checkedAt: "x", aiProbed: 3, aiPresent: 3, serpChecked: 3, serpRanked: 1,
+              localPackPresent: 1, problemCount: 3, topProblems: [],
+            },
+          }),
+        ],
+      })
+    );
+    expect(withGaps.items.find((i) => i.kind === "visibility")).toMatchObject({ severity: "medium" });
+
+    const clean = buildAttentionFromSnapshot(
+      snapshot({
+        tenants: [
+          tenant({
+            id: "x",
+            visibility: {
+              checkedAt: "x", aiProbed: 3, aiPresent: 3, serpChecked: 3, serpRanked: 3,
+              localPackPresent: 3, problemCount: 0, topProblems: [],
+            },
+          }),
+        ],
+      })
+    );
+    expect(clean.items.find((i) => i.kind === "visibility")).toBeUndefined();
+  });
+
   it("ranks ops breakage by severity and sorts high first", () => {
     const b = buildAttentionFromSnapshot(
       snapshot({

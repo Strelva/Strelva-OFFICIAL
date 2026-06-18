@@ -6,6 +6,7 @@ import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSea
 import { getEvents } from "./events";
 import { getSuggestions } from "./suggestions";
 import { detectStaleSections } from "./reports";
+import { getLatestSnapshots, diffSnapshots, type VisibilityDiff } from "./visibility/snapshots";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
@@ -80,7 +81,7 @@ export async function saveWeeklyBrief(brief: WeeklyBrief): Promise<void> {
 export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief> {
   const { weekStart, weekEnd } = getWeekBounds();
 
-  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps] = await Promise.all([
+  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots] = await Promise.all([
     getClickCounts("page-view", tenantId),
     getClickCounts("booking-click", tenantId),
     getEvents(tenantId, { limit: 100 }),
@@ -89,6 +90,7 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     getContent("services", tenantId),
     getSearchData(tenantId),
     getSectionTimestamps(tenantId),
+    getLatestSnapshots(tenantId, 2).catch(() => []),
   ]);
 
   const weekStartDate = new Date(weekStart);
@@ -140,7 +142,12 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     ["hero", "services", "story", "testimonials", "events", "providers", "contact", "settings", "faq"]
   ).slice(0, 3);
 
-  const highlights = buildHighlights(stats, weeklyEvents, activity);
+  // The "prove" of the visibility loop: lead the highlights with any AI-search /
+  // ranking wins since last week — the strongest retention proof we have.
+  const visibilityWins = visSnapshots[0]
+    ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
+    : [];
+  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity)].slice(0, 5);
   const summary = await buildSummary({
     stats,
     highlights,
@@ -167,6 +174,31 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
 
   await saveWeeklyBrief(brief);
   return brief;
+}
+
+/**
+ * Owner-facing "you got found" proof from the week-over-week visibility diff.
+ * Only positive moves (newly appearing / climbing) — losses are an operator
+ * concern surfaced in Mission Control, not something to put in the owner's
+ * weekly win column.
+ */
+export function visibilityProofHighlights(diff: VisibilityDiff): string[] {
+  const out: string[] = [];
+  for (const c of diff.changes) {
+    if (c.direction !== "appeared" && c.direction !== "improved") continue;
+    if (c.surface === "ai_answer") {
+      out.push(`You now show up in AI answers for "${c.query}"`);
+    } else if (c.surface === "serp_local_pack") {
+      out.push(`You entered the local 3-pack for "${c.query}"`);
+    } else if (c.surface === "serp_organic") {
+      out.push(
+        c.direction === "appeared"
+          ? `You reached page 1 of Google for "${c.query}"`
+          : `You climbed in Google rankings for "${c.query}"`
+      );
+    }
+  }
+  return out.slice(0, 2);
 }
 
 function buildHighlights(
