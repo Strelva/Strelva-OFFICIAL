@@ -11,6 +11,9 @@ const ctl = vi.hoisted(() => ({
   governanceAction: "publish" as "publish" | "review" | "block",
   manifestAllows: true,
   safeParseOk: true,
+  // When true, maybeAutoApprove upgrades a "review" decision to "publish"
+  // (models a trusted tenant past their autoApproveThreshold).
+  autoApproveUpgrade: false,
 }));
 
 const storage = vi.hoisted(() => ({
@@ -47,8 +50,11 @@ vi.mock("../lib/ai-governance", () => ({
   decideAiContentGovernance: () => ({ action: ctl.governanceAction, reason: "decided" }),
 }));
 vi.mock("../lib/ai-auto-approve", () => ({
-  // pass governance through unchanged (the route now gets auto-approve too)
-  maybeAutoApprove: (_cfg: unknown, _section: unknown, g: unknown) => Promise.resolve(g),
+  // The route now runs auto-approve too; model a streak upgrade of review->publish.
+  maybeAutoApprove: (_cfg: unknown, _section: unknown, g: { action: string; reason: string }) =>
+    Promise.resolve(
+      ctl.autoApproveUpgrade && g.action === "review" ? { action: "publish", reason: "auto" } : g
+    ),
 }));
 vi.mock("../lib/ai-review-queue", () => ({ queueAiContentReview }));
 vi.mock("../lib/site-capabilities", () => ({
@@ -77,6 +83,7 @@ beforeEach(() => {
   ctl.governanceAction = "publish";
   ctl.manifestAllows = true;
   ctl.safeParseOk = true;
+  ctl.autoApproveUpgrade = false;
   storage.getContent.mockResolvedValue({ title: "Old" });
   storage.setContent.mockResolvedValue(undefined);
   storage.appendVersion.mockResolvedValue(undefined);
@@ -166,5 +173,53 @@ describe("applySectionUpdate", () => {
     expect(storage.setContent).toHaveBeenCalledTimes(2);
     // each call publishes exactly once; no carried-over state inflates writes
     expect(storage.recordSectionUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  // --- best-effort bookkeeping vs fail-loud real work (locks the review fix) ---
+
+  it("still reports PUBLISHED when post-write logActivity fails (bookkeeping is best-effort)", async () => {
+    storage.logActivity.mockRejectedValue(new Error("activity log down"));
+    const res = await applySectionUpdate(baseInput());
+    expect(res.status).toBe("published"); // content was durably saved; logging hiccup must not fail it
+    expect(storage.setContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports PUBLISHED when appendVersion fails (version history is best-effort)", async () => {
+    storage.appendVersion.mockRejectedValue(new Error("version store down"));
+    const res = await applySectionUpdate(baseInput());
+    expect(res.status).toBe("published");
+  });
+
+  it("FAILS LOUD when queueAiContentReview throws (the review is real work, not bookkeeping)", async () => {
+    ctl.governanceAction = "review";
+    queueAiContentReview.mockRejectedValue(new Error("queue down"));
+    await expect(applySectionUpdate(baseInput())).rejects.toThrow("queue down");
+    expect(storage.setContent).not.toHaveBeenCalled();
+  });
+
+  it("FAILS LOUD when setDraftContent throws on the queue path", async () => {
+    ctl.governanceAction = "review";
+    storage.setDraftContent.mockRejectedValue(new Error("draft write down"));
+    await expect(applySectionUpdate(baseInput())).rejects.toThrow("draft write down");
+  });
+
+  // --- auto-approve convergence + the risk wall over it (locks decision a) ---
+
+  it("auto-approve upgrades a low-risk review to publish (route+executor converged)", async () => {
+    ctl.governanceAction = "review";
+    ctl.autoApproveUpgrade = true; // trusted tenant past threshold
+    const res = await applySectionUpdate(baseInput());
+    expect(res.status).toBe("published");
+    expect(storage.setContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("the risk wall STILL blocks an auto-approved upgrade when risk is high", async () => {
+    ctl.governanceAction = "review";
+    ctl.autoApproveUpgrade = true; // governance upgraded to publish...
+    ctl.risk = { level: "high", autoApply: false, reason: "risky", requiresPreview: true }; // ...but risk says no
+    const res = await applySectionUpdate(baseInput());
+    expect(res.status).toBe("queued"); // shouldRouteToReview overrides the upgrade
+    expect(storage.setContent).not.toHaveBeenCalled();
+    expect(queueAiContentReview).toHaveBeenCalledTimes(1);
   });
 });
