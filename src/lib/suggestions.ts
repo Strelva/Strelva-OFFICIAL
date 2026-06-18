@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
+import { sanitizePromptValue } from "./capabilities";
 import { addEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getAllTenants } from "./tenants";
@@ -285,7 +286,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
         type: "growth",
         title: `People search "${q.query}" but don't click`,
         description: `${q.impressions} people searched "${q.query}" and saw your site, but none clicked. Want me to optimize your page title and description for this search?`,
-        action: `prompt:Optimize my site for the search term "${q.query}"`,
+        action: `prompt:Optimize my site for the search term "${sanitizePromptValue(q.query)}"`,
       }));
     }
 
@@ -300,7 +301,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
         type: "growth",
         title: `People are searching "${q.query}"`,
         description: `${q.clicks} people found you searching "${q.query}" — but your site doesn't highlight this topic. Want me to add content about it?`,
-        action: `prompt:Add content about "${q.query}" to my site`,
+        action: `prompt:Add content about "${sanitizePromptValue(q.query)}" to my site`,
       }));
     }
   }

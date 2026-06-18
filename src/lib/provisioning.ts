@@ -69,9 +69,24 @@ function initials(name: string): string {
 // cutover (T004) — env-driven so that flip needs no code change. Wire-level
 // REB_*/SCAFFOLD env *names* stay frozen; only this value moves.
 // NOTE: scripts/provision-tenant.ts still prints the stale strelva.com value.
+// IMPORTANT: scaffoldweb.com is hardcoded because it is the operational wire-level
+// endpoint that existing deployed client repos expect. Do NOT change this default.
 const CONTROL_PLANE_API =
   process.env.CONTROL_PLANE_API_URL || "https://scaffoldweb.com";
 
+// FAILURE / PARTIAL-PROVISION MODEL (read before adding auto-rollback):
+// Provisioning is forward-recovery, not transactional. Steps run sequentially
+// (tenant -> content -> invite -> Vercel project -> env -> domain); each is
+// reported in the returned `steps[]` with ok/failed/skipped. On a mid-flow
+// failure earlier steps persist by design — re-running provisionTenant is
+// IDEMPOTENT (existing tenant/env/domain are treated as success), so the
+// operator recovers by fixing the cause and re-running, not by rolling back.
+// Auto-rollback is deliberately NOT done here: deleting a Vercel project / tenant
+// on any transient error is far more dangerous (it can destroy a live client's
+// resources) than leaving a resumable partial. To MANUALLY tear down a failed
+// test tenant: deactivate it in Sanity (active:false) and, if a Vercel project
+// was created, remove it via the Vercel dashboard/CLI — the returned steps[]
+// say exactly what was created.
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: ProvisionStep[] = [];
   const subdomain = input.subdomain.trim();
@@ -82,6 +97,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     ? `https://${productionDomain}`
     : `https://${subdomain}.strelva.com`;
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
+  // Generate a high-entropy secret for signed revalidation requests from the custom repo.
+  // Rotate this secret if a client repo key material is suspected compromised; see
+  // `src/lib/scaffold-contracts.ts` for the verification/signing contract.
   const revalidationSecret = randomBytes(32).toString("hex");
 
   let tenantId = subdomain;

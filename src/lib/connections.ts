@@ -24,14 +24,18 @@ export async function getConnections(tenantId: string): Promise<Connection[]> {
   const redis = getRedis();
   if (!redis) return [];
 
-  const keys = await redis.keys(tenantConnectionsPattern(tenantId));
-  if (keys.length === 0) return [];
-
   const connections: Connection[] = [];
-  for (const key of keys) {
-    const data = await redis.get<Connection>(key);
-    if (data) connections.push(data);
-  }
+  let cursor = "0";
+  const pattern = tenantConnectionsPattern(tenantId);
+  
+  do {
+    const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
+    cursor = String(next);
+    for (const key of keys) {
+      const data = await redis.get<Connection>(key);
+      if (data) connections.push(data);
+    }
+  } while (cursor !== "0");
 
   return connections;
 }

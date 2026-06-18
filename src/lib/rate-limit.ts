@@ -69,12 +69,17 @@ async function redisCheck(key: string, max: number, windowSeconds: number): Prom
   const redisKey = `reb:ratelimit:${key}`;
   try {
     const count = await redis.incr(redisKey);
-    // Set TTL on first increment only (when count is 1)
-    if (count === 1) {
-      await redis.expire(redisKey, windowSeconds);
-    }
+    // Assert the TTL with NX on EVERY increment — not just count===1. The old
+    // count===1-only EXPIRE could orphan a key with no TTL (lives forever, so
+    // the limiter stays tripped forever) if the count===1 request died between
+    // INCR and EXPIRE, or two concurrent first hits raced. NX means once a TTL
+    // is set it isn't extended, preserving the fixed window.
+    await redis.expire(redisKey, windowSeconds, "NX");
     return count > max;
   } catch (err) {
+    // Fail CLOSED in production: a rate-limit infra failure throws (the caller
+    // either 500s = denied, or — only the analytics beacon — explicitly catches
+    // to fail open). Never silently allow unlimited requests here.
     if (isProductionEnv()) {
       throw new Error(`[PRODUCTION] Redis rate limit failed: ${err}`);
     }

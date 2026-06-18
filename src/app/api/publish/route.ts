@@ -123,6 +123,14 @@ export async function POST() {
         changes,
         snapshot: current,
       }, tenant);
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "content.published",
+        targetType: "content_section",
+        targetId: draft.section,
+        metadata: { section: draft.section, changeCount: changes.length },
+      });
       await clearDraft(draft.section, tenant);
       publishedSections.push(draft.section);
     }
@@ -132,16 +140,14 @@ export async function POST() {
       await setPageConfig(validatedPageConfig, tenant);
       await clearDraftPageConfig(tenant);
       publishedPageConfig = true;
-      if (actor.isImpersonating) {
-        await logAuditEvent({
-          tenant,
-          actor,
-          action: "page_config.published",
-          targetType: "page_config",
-          targetId: tenant,
-          metadata: { pages: Object.keys(validatedPageConfig) },
-        });
-      }
+      await logAuditEvent({
+        tenant,
+        actor,
+        action: "page_config.published",
+        targetType: "page_config",
+        targetId: tenant,
+        metadata: { pages: Object.keys(validatedPageConfig) },
+      });
     }
 
     revalidatePath("/");

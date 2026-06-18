@@ -211,7 +211,7 @@ export function OperatorConsole() {
         )}
         {messages.map((m, i) => (
           <div
-            key={i}
+            key={`msg-${i}`}
             className={
               m.role === "user"
                 ? "text-sm text-warm-white"
@@ -225,7 +225,7 @@ export function OperatorConsole() {
           </div>
         ))}
         {toolStatus && (
-          <div className="text-xs text-accent animate-pulse">{toolStatus}</div>
+          <div role="status" aria-live="polite" className="text-xs text-accent animate-pulse">{toolStatus}</div>
         )}
 
         {proposals.map((p) => {

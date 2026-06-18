@@ -3,7 +3,7 @@ import type { ContentSection } from "./types";
 
 const SAFE_URL_PROTOCOLS = ["http:", "https:", "mailto:", "tel:"];
 
-const safeUrl = z.string().refine(
+const safeUrl = z.string().max(10000).refine(
   (val) => {
     if (!val || val.trim() === "") return true;
     try {
@@ -16,7 +16,7 @@ const safeUrl = z.string().refine(
   { message: "Invalid URL or unsafe protocol" }
 );
 
-const safeImageUrl = z.string().refine(
+const safeImageUrl = z.string().max(10000).refine(
   (val) => {
     if (!val || val.trim() === "") return true;
     try {
@@ -52,176 +52,176 @@ const cssFont = z
   });
 
 export const heroSchema = z.object({
-  headline: z.string().min(1),
-  subheadline: z.string(),
-  tagline: z.string(),
-  ctaText: z.string().min(1),
+  headline: z.string().max(10000).min(1),
+  subheadline: z.string().max(10000),
+  tagline: z.string().max(10000),
+  ctaText: z.string().max(10000).min(1),
   ctaLink: safeUrl,
   backgroundImageUrl: safeImageUrl,
   logoUrl: safeImageUrl.optional(),
 });
 
 export const serviceItemSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string(),
-  duration: z.string(),
-  price: z.string(),
+  id: z.string().max(10000).min(1),
+  name: z.string().max(10000).min(1),
+  description: z.string().max(10000),
+  duration: z.string().max(10000),
+  price: z.string().max(10000),
   featured: z.boolean(),
-  who_its_for: z.string(),
+  who_its_for: z.string().max(10000),
   booking_link: safeUrl,
   comingSoon: z.boolean(),
   image_url: safeImageUrl.optional().default(""),
 });
 
 export const servicesSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string().min(1),
-  description: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000).min(1),
+  description: z.string().max(10000),
   services: z.array(serviceItemSchema).max(500),
 });
 
 export const storySchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string().min(1),
-  accentText: z.string(),
-  statement: z.string().min(1),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000).min(1),
+  accentText: z.string().max(10000),
+  statement: z.string().max(10000).min(1),
   paragraphs: z.array(z.string().max(20000)).max(200),
-  stats: z.array(z.object({ value: z.string(), label: z.string() })).max(50),
-  quote: z.string(),
-  quoteAttribution: z.string(),
+  stats: z.array(z.object({ value: z.string().max(10000), label: z.string() })).max(50),
+  quote: z.string().max(10000),
+  quoteAttribution: z.string().max(10000),
   imageUrl: safeImageUrl,
   secondaryImageUrl: safeImageUrl.optional(),
 });
 
 export const testimonialItemSchema = z.object({
-  id: z.string().min(1),
-  quote: z.string().min(1),
-  author: z.string(),
-  location: z.string(),
+  id: z.string().max(10000).min(1),
+  quote: z.string().max(10000).min(1),
+  author: z.string().max(10000),
+  location: z.string().max(10000),
 });
 
 export const testimonialsSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000),
   testimonials: z.array(testimonialItemSchema).max(500),
 });
 
 export const eventItemSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  date: z.string(),
-  time: z.string(),
-  location: z.string(),
-  description: z.string(),
-  hosted_by: z.string(),
+  id: z.string().max(10000).min(1),
+  title: z.string().max(10000).min(1),
+  date: z.string().max(10000),
+  time: z.string().max(10000),
+  location: z.string().max(10000),
+  description: z.string().max(10000),
+  hosted_by: z.string().max(10000),
   external_link: safeUrl,
   image_url: safeImageUrl.optional().default(""),
 });
 
 export const eventsSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000),
   events: z.array(eventItemSchema).max(500),
 });
 
 export const providerItemSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  category: z.string(),
-  service: z.string(),
-  why_i_recommend: z.string(),
+  id: z.string().max(10000).min(1),
+  name: z.string().max(10000).min(1),
+  category: z.string().max(10000),
+  service: z.string().max(10000),
+  why_i_recommend: z.string().max(10000),
   booking_link: safeUrl,
-  phone: z.string(),
+  phone: z.string().max(10000),
   photo_url: safeImageUrl,
 });
 
 export const providersSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string(),
-  description: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000),
+  description: z.string().max(10000),
   providers: z.array(providerItemSchema).max(200),
 });
 
 export const faqItemSchema = z.object({
-  id: z.string().min(1),
-  question: z.string().min(1),
-  answer: z.string().min(1),
+  id: z.string().max(10000).min(1),
+  question: z.string().max(10000).min(1),
+  answer: z.string().max(10000).min(1),
 });
 
 export const faqSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string(),
-  description: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000),
+  description: z.string().max(10000),
   faqs: z.array(faqItemSchema).max(200),
 });
 
 export const shopItemSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string(),
-  category: z.string(),
-  price: z.string(),
+  id: z.string().max(10000).min(1),
+  name: z.string().max(10000).min(1),
+  description: z.string().max(10000),
+  category: z.string().max(10000),
+  price: z.string().max(10000),
   external_link: safeUrl,
   image_url: safeImageUrl,
 });
 
 export const shopSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string(),
-  description: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000),
+  description: z.string().max(10000),
   items: z.array(shopItemSchema).max(500),
 });
 
 export const contactSchema = z.object({
-  headline: z.string().optional().default(""),
-  description: z.string().optional().default(""),
-  email: z.string().email(),
-  phone: z.string().optional().default(""),
-  address: z.string().optional().default(""),
-  hours: z.string().optional().default(""),
-  locationTitle: z.string(),
-  locationDescription: z.string(),
+  headline: z.string().max(10000).optional().default(""),
+  description: z.string().max(10000).optional().default(""),
+  email: z.string().max(10000).email(),
+  phone: z.string().max(10000).optional().default(""),
+  address: z.string().max(10000).optional().default(""),
+  hours: z.string().max(10000).optional().default(""),
+  locationTitle: z.string().max(10000),
+  locationDescription: z.string().max(10000),
   instagramUrl: safeUrl,
   facebookUrl: safeUrl,
   googleMapsUrl: safeUrl.optional().default(""),
 });
 
 export const productItemSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string(),
-  ingredients: z.string(),
+  id: z.string().max(10000).min(1),
+  name: z.string().max(10000).min(1),
+  description: z.string().max(10000),
+  ingredients: z.string().max(10000),
   imageUrl: safeImageUrl,
-  badge: z.string(),
+  badge: z.string().max(10000),
   featured: z.boolean(),
-  price: z.string(),
+  price: z.string().max(10000),
   stripePaymentLink: safeUrl,
   comingSoon: z.boolean(),
 });
 
 export const productsSchema = z.object({
-  sectionLabel: z.string(),
-  headline: z.string().min(1),
-  description: z.string(),
+  sectionLabel: z.string().max(10000),
+  headline: z.string().max(10000).min(1),
+  description: z.string().max(10000),
   products: z.array(productItemSchema).max(500),
-  bottomNote: z.string(),
+  bottomNote: z.string().max(10000),
 });
 
 export const siteSettingsSchema = z.object({
-  siteName: z.string().min(1),
-  siteTagline: z.string(),
-  siteDescription: z.string(),
-  siteKeywords: z.string().optional().default(""),
-  ownerName: z.string().optional().default(""),
-  ownerTitle: z.string().optional().default(""),
-  footerTagline: z.string(),
-  copyrightText: z.string(),
+  siteName: z.string().max(10000).min(1),
+  siteTagline: z.string().max(10000),
+  siteDescription: z.string().max(10000),
+  siteKeywords: z.string().max(10000).optional().default(""),
+  ownerName: z.string().max(10000).optional().default(""),
+  ownerTitle: z.string().max(10000).optional().default(""),
+  footerTagline: z.string().max(10000),
+  copyrightText: z.string().max(10000),
   bookingUrl: safeUrl.optional().default(""),
-  instagramHandle: z.string().optional().default(""),
-  vagaro_embed_id: z.string().regex(/^[A-Za-z0-9/_-]*$/, "Invalid embed id").optional().default(""),
+  instagramHandle: z.string().max(10000).optional().default(""),
+  vagaro_embed_id: z.string().max(10000).regex(/^[A-Za-z0-9/_-]*$/, "Invalid embed id").optional().default(""),
   logoUrl: safeImageUrl.optional().default(""),
-  marqueeText: z.string().optional().default(""),
+  marqueeText: z.string().max(10000).optional().default(""),
 });
 
 export const themeSchema = z.object({
@@ -251,8 +251,8 @@ export const bookingConfigSchema = z.object({
     .array(
       z.object({
         day: z.number().int().min(0).max(6),
-        start: z.string().regex(HHMM, "Invalid time"),
-        end: z.string().regex(HHMM, "Invalid time"),
+        start: z.string().max(10000).regex(HHMM, "Invalid time"),
+        end: z.string().max(10000).regex(HHMM, "Invalid time"),
         enabled: z.boolean(),
       })
     )
@@ -276,45 +276,45 @@ export const rewardsConfigSchema = z.object({
 // Every href is safeUrl-validated so a `javascript:`/`data:` scheme can't be
 // stored and rendered into an <a href> on the client's public site (stored XSS).
 export const navMenuItemSchema = z.object({
-  label: z.string(),
+  label: z.string().max(10000),
   href: safeUrl,
 });
 
 export const navigationSchema = z.object({
   menuItems: z.array(navMenuItemSchema).max(50),
-  ctaLabel: z.string(),
+  ctaLabel: z.string().max(10000),
   ctaHref: safeUrl,
 });
 
 export const footerColumnLinkSchema = z.object({
-  label: z.string(),
+  label: z.string().max(10000),
   href: safeUrl,
 });
 
 export const footerColumnSchema = z.object({
-  heading: z.string(),
+  heading: z.string().max(10000),
   links: z.array(footerColumnLinkSchema),
 });
 
 export const footerSchema = z.object({
-  tagline: z.string(),
+  tagline: z.string().max(10000),
   columns: z.array(footerColumnSchema),
-  socialLinks: z.array(z.object({ label: z.string(), href: safeUrl })),
-  copyrightText: z.string(),
+  socialLinks: z.array(z.object({ label: z.string().max(10000), href: safeUrl })),
+  copyrightText: z.string().max(10000),
 });
 
 export const seoMetaSchema = z.object({
-  title: z.string().optional(),
-  description: z.string().optional(),
-  ogImage: z.string().optional(),
+  title: z.string().max(10000).optional(),
+  description: z.string().max(10000).optional(),
+  ogImage: z.string().max(10000).optional(),
 });
 
 export const pageSectionConfigBaseSchema = z.object({
-  type: z.string(),
+  type: z.string().max(10000),
   visible: z.boolean(),
   order: z.number(),
-  props: z.record(z.string(), z.unknown()).optional(),
-  variant: z.string().optional(),
+  props: z.record(z.string().max(10000), z.unknown()).optional(),
+  variant: z.string().max(10000).optional(),
   layout: z.object({
     gap: z.enum(["tight", "normal", "loose"]).optional(),
     padding: z.enum(["none", "normal", "spacious"]).optional(),
@@ -333,7 +333,7 @@ export const pageConfigSchema = z.object({
   seo: seoMetaSchema.optional(),
 });
 
-export const sitePageConfigSchema = z.record(z.string(), pageConfigSchema);
+export const sitePageConfigSchema = z.record(z.string().max(10000), pageConfigSchema);
 
 export const designTokenScopeSchema = z.enum([
   "colors",
@@ -346,33 +346,33 @@ export const designTokenScopeSchema = z.enum([
 ]);
 
 export const sectionCapabilitySchema = z.object({
-  variants: z.array(z.string()),
-  editableFields: z.array(z.string()),
-  styleProps: z.array(z.string()),
+  variants: z.array(z.string().max(10000)),
+  editableFields: z.array(z.string().max(10000)),
+  styleProps: z.array(z.string().max(10000)),
   allowedActions: z.array(z.enum(["read", "draft", "publish", "request_custom"])).optional(),
 });
 
 export const customComponentCapabilitySchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  description: z.string().optional(),
+  id: z.string().max(10000),
+  label: z.string().max(10000),
+  description: z.string().max(10000).optional(),
   adminOnly: z.boolean(),
   exposure: z.enum(["inline", "custom_request"]).optional(),
-  supportedProps: z.array(z.string()).optional(),
-  requestableChanges: z.array(z.string()).optional(),
+  supportedProps: z.array(z.string().max(10000)).optional(),
+  requestableChanges: z.array(z.string().max(10000)).optional(),
 });
 
 export const siteCapabilityManifestSchema = z.object({
-  contractVersion: z.string(),
-  sections: z.record(z.string(), sectionCapabilitySchema),
+  contractVersion: z.string().max(10000),
+  sections: z.record(z.string().max(10000), sectionCapabilitySchema),
   designTokens: z.array(designTokenScopeSchema),
   supportsPageConfig: z.boolean(),
   supportsNavigationConfig: z.boolean(),
   supportsFooterConfig: z.boolean(),
   supportsDraftPreview: z.boolean(),
   supportsInlineEditing: z.boolean(),
-  customOnlyFeatures: z.array(z.string()),
-  customRequestEndpoint: z.string().optional(),
+  customOnlyFeatures: z.array(z.string().max(10000)),
+  customRequestEndpoint: z.string().max(10000).optional(),
   customComponents: z.array(customComponentCapabilitySchema),
 });
 

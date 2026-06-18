@@ -87,15 +87,15 @@ export function recordAgentToolCall(args: NotifyArgs): void {
   const redis = getRedis();
   if (redis) {
     const key = counterKey(tenantId, todayKey(), source);
-    // incr then expire — Upstash doesn't have atomic INCRBYEX.
+    // incr then expire with NX — Upstash doesn't have atomic INCRBYEX.
     redis
       .incr(key)
       .then(async (value) => {
         if (value === 1) {
           try {
-            await redis.expire(key, COUNTER_TTL_SECONDS);
-          } catch {
-            /* ignore */
+            await redis.expire(key, COUNTER_TTL_SECONDS, "NX");
+          } catch (err) {
+            console.warn("[proof-signals] Redis expire failed:", err instanceof Error ? err.message : err);
           }
         }
       })

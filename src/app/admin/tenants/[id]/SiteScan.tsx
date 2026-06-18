@@ -88,6 +88,7 @@ export function SiteScan({
         <button
           onClick={() => void runScan()}
           disabled={scanning}
+          aria-busy={scanning}
           className="shrink-0 rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {scanning ? "Scanning…" : scan ? "Re-scan" : "Run scan"}

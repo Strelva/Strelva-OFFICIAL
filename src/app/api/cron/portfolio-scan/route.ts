@@ -13,7 +13,7 @@ export async function GET() {
   const { scanned, failed } = await scanAllTenants();
 
   if (failed.length > 0 && process.env.SLACK_WEBHOOK_URL) {
-    fetch(process.env.SLACK_WEBHOOK_URL, {
+    await fetch(process.env.SLACK_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

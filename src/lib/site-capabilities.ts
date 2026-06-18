@@ -2,6 +2,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { CUSTOM_REPO_CONTRACT_VERSION, getCustomRepoMetadata } from "@/lib/custom-repos";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteCapabilityManifestSchema } from "@/lib/schemas";
+import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import type {
   ContentSection,
   SectionCapability,
@@ -101,6 +102,9 @@ export async function getSiteCapabilityManifest(tenant: string): Promise<SiteCap
 
   const manifestUrl = tenantConfig?.customRepo?.capabilityManifestUrl;
   if (!manifestUrl) return local;
+  // SSRF guard: manifestUrl is tenant-config; refuse private/non-https targets
+  // and fall back to the local manifest rather than fetching them.
+  if (!isSafeFetchUrl(manifestUrl)) return local;
 
   try {
     const res = await fetch(manifestUrl, {

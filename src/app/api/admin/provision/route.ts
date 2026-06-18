@@ -3,6 +3,7 @@ import { getActorContext, isSuperAdmin } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { provisionTenant } from "@/lib/provisioning";
+import { getTenantConfig } from "@/lib/tenants";
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -34,6 +35,20 @@ export async function POST(req: Request) {
       { error: "subdomain must be 2-63 lowercase letters, numbers, or hyphens" },
       { status: 400 }
     );
+  }
+
+  // Check subdomain uniqueness before provisioning.
+  try {
+    const existing = await getTenantConfig(subdomain);
+    if (existing) {
+      return NextResponse.json(
+        { error: "subdomain already in use" },
+        { status: 409 }
+      );
+    }
+  } catch {
+    // getTenantConfig throws on not found; that's the happy path. Other
+    // errors (Redis down, storage fail) will surface when provisionTenant runs.
   }
 
   const result = await provisionTenant({

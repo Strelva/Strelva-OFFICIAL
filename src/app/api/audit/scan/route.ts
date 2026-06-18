@@ -1,26 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { Redis } from "@upstash/redis";
 import { getRedis } from "@/lib/redis";
+import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult } from "@/lib/audit/types";
-
-const redis = Redis.fromEnv();
 
 const MAX_SCANS_PER_DAY = 3;
 
 async function checkRateLimit(
   ip: string
 ): Promise<{ allowed: boolean; remaining: number }> {
-  const key = `reb:audit-ratelimit:${ip}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 86400); // 24 hours
+  const key = `audit-scan:${ip}`;
+  const redis = getRedis();
+  if (!redis) {
+    return { allowed: true, remaining: MAX_SCANS_PER_DAY };
+  }
+  const limited = await isRateLimitedWindowedAsync(key, MAX_SCANS_PER_DAY, 86400000); // 24 hours in ms
+  let remaining = MAX_SCANS_PER_DAY;
+  if (!limited) {
+    const count = await redis.get<number>(`reb:ratelimit:${key}`);
+    const used = typeof count === "number" ? count : (typeof count === "string" ? parseInt(count, 10) : 0);
+    remaining = Math.max(0, MAX_SCANS_PER_DAY - used);
   }
   return {
-    allowed: count <= MAX_SCANS_PER_DAY,
-    remaining: Math.max(0, MAX_SCANS_PER_DAY - count),
+    allowed: !limited,
+    remaining,
   };
 }
 

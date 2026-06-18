@@ -6,6 +6,7 @@ import { alert } from "./monitoring";
 import { getSectionTimestamps } from "./storage";
 import { logger } from "./logger";
 import { addSentryBreadcrumb } from "./sentry-context";
+import { isSafeFetchUrl } from "./safe-fetch";
 
 export interface RevalidationFailure {
   tenantId: string;
@@ -97,6 +98,20 @@ export async function revalidateClientSite(
       return { success: false, error: "Missing revalidateUrl" };
     }
     return { success: true, skipped: true };
+  }
+
+  // SSRF guard: revalidateUrl is tenant-config (admin-set), so refuse to fetch
+  // private/reserved/non-https targets before signing + sending.
+  if (!isSafeFetchUrl(config.revalidateUrl)) {
+    const error = "revalidateUrl is not a safe external URL";
+    await recordFailure({
+      tenantId,
+      url: config.revalidateUrl,
+      error,
+      timestamp: new Date().toISOString(),
+      attempts: 0,
+    });
+    return { success: false, error };
   }
 
   const secret = config.revalidationSecret;

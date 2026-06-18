@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isDevAccessBypassEnabled } from "./dev-access";
 import { consumeInvite, getInvite } from "./invites";
 import { getTenantConfig } from "./tenants";
+import { getRedis } from "./redis";
 
 export const CLIENT_ROLES = ["viewer", "editor", "admin", "owner"] as const;
 export type ClientRole = (typeof CLIENT_ROLES)[number];
@@ -277,6 +278,8 @@ export async function assignUserToTenant(
 ): Promise<boolean> {
   if (!(await getTenantConfig(tenant))) return false;
 
+  const redis = getRedis();
+  let ownerLockKey: string | null = null;
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
@@ -286,6 +289,18 @@ export async function assignUserToTenant(
     // owner, so skip the (paginated) owner count for them.
     const currentRole = getRoleForTenantFromMetadata(user.publicMetadata, tenant);
     if (currentRole === "owner" && role !== "owner") {
+      // Serialize concurrent owner-demotions per tenant: without this, two
+      // simultaneous demotions of different owners both read 2 owners, both pass
+      // the not-sole check, and both apply — zeroing the tenant's owners (TOCTOU).
+      // The loser of the lock is refused (retry-able) rather than risk a lockout.
+      if (redis) {
+        ownerLockKey = `tenant-owner-lock:${tenant}`;
+        const got: unknown = await redis.set(ownerLockKey, userId, { nx: true, ex: 15 });
+        if (got === null || got === undefined || got === false) {
+          ownerLockKey = null;
+          throw new LastOwnerError(tenant);
+        }
+      }
       const ownerIds = await getTenantOwnerUserIds(tenant);
       const isSoleOwner =
         ownerIds.length === 0 ||
@@ -314,6 +329,8 @@ export async function assignUserToTenant(
     // still degrades to a boolean false.
     if (err instanceof LastOwnerError) throw err;
     return false;
+  } finally {
+    if (ownerLockKey && redis) await redis.del(ownerLockKey);
   }
 }
 

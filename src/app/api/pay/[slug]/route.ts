@@ -115,8 +115,8 @@ export async function POST(
       ],
       ...(customerEmail ? { customer_email: customerEmail } : {}),
       ...(config.tenantId ? { client_reference_id: config.tenantId } : {}),
-      success_url: `${origin}/pay/${config.slug}?payment=success&amount=${amountCents}`,
-      cancel_url: `${origin}/pay/${config.slug}?payment=cancelled&amount=${amountCents}`,
+      success_url: `${origin}/pay/${config.slug}?payment=success`,
+      cancel_url: `${origin}/pay/${config.slug}?payment=cancelled`,
       metadata,
       payment_intent_data: { metadata },
     });

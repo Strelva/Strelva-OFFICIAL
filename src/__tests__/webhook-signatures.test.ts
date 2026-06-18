@@ -115,6 +115,14 @@ describe("billing webhook signature verification", () => {
     expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
 
+  it("(a2) rejects a request with empty stripe-signature header", async () => {
+    const res = await post({ "stripe-signature": "", "content-type": "application/json" }, validEvent);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
   it("(b) rejects a forged/invalid signature", async () => {
     const res = await post(
       { "stripe-signature": "t=9999999999,v1=deadbeef", "content-type": "application/json" },

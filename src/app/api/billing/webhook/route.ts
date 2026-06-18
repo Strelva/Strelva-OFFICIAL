@@ -163,8 +163,15 @@ async function applyTenantSubscriptionStatus(
         return;
       }
       await redis.set(key, event.created);
-    } catch {
-      // Redis ordering guard failure should not block Stripe processing.
+    } catch (err) {
+      // The ordering guard is best-effort and must not block Stripe processing,
+      // but a Redis failure on the money path should never be silent. (Double-
+      // apply is still bounded by event idempotency.)
+      alert("billing_webhook_ordering_guard_failed", "medium", {
+        tenantId,
+        eventType: event.type,
+        error: String(err),
+      });
     }
   }
 
@@ -231,8 +238,14 @@ async function recordBuildPayment(
         createdAt: new Date(event.created * 1000).toISOString(),
       });
     } catch (err) {
-      // The trail is best-effort; never fail the webhook over it. The payment
-      // itself already succeeded in Stripe.
+      // Never fail the webhook over the trail (the payment already succeeded in
+      // Stripe), but a LOST money record must be loud, not just a console line —
+      // it's the canonical record reconciliation depends on.
+      alert("billing_build_payment_trail_failed", "high", {
+        sessionId: session.id,
+        stripeEventId: event.id,
+        error: String(err),
+      });
       console.error(`[billing webhook] Failed to persist build-payment record for ${session.id}: ${err}`);
     }
   }

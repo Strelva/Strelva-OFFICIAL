@@ -27,15 +27,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    const emailTrimmed = email.trim().toLowerCase().slice(0, 320);
+
     // Basic email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(emailTrimmed)) {
       return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
     }
 
     const tenant = await getTenantFromHeaders();
     const result = await addSubscriber(
-      email.trim().toLowerCase(),
+      emailTrimmed,
       cleanText(name, 160),
       tenant
     );

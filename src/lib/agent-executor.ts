@@ -244,11 +244,22 @@ export async function executeAgentPromptDetailed(
         let queuedEventId: string | undefined;
 
         if (governance.action === "publish") {
-          await setContent(
-            section as ContentSection,
-            parsed.data as Parameters<typeof setContent>[1],
-            tenantId
-          );
+          try {
+            await setContent(
+              section as ContentSection,
+              parsed.data as Parameters<typeof setContent>[1],
+              tenantId
+            );
+          } catch (err) {
+            // A Sanity/store write failure must surface as a clean tool result,
+            // not an uncaught throw that breaks the agent run.
+            return {
+              success: false,
+              section,
+              agentResultStatus: "failed" as const,
+              error: `Failed to save ${section}: ${err instanceof Error ? err.message : "write error"}`,
+            };
+          }
           const { appendVersion } = await import("@/lib/storage");
           await appendVersion(
             section as ContentSection,

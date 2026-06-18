@@ -52,7 +52,7 @@ export function DraftActions({
       >
         {loading === "reject" ? "Rejecting…" : "Reject"}
       </button>
-      {error && <p className="text-[11px] text-red-300 max-w-28 text-right">{error}</p>}
+      {error && <p role="status" aria-live="polite" className="text-[11px] text-red-300 max-w-28 text-right">{error}</p>}
     </div>
   );
 }

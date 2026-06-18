@@ -62,6 +62,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const actor = await getActorContext();
+  const { setSentryContext } = await import("@/lib/sentry-context");
+  setSentryContext({ tenantId: undefined, userId: actor?.userId, route: "/api/admin/drafts" });
 
   const body = await readJsonObject(request);
   if (!body) {

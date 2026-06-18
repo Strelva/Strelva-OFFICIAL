@@ -73,6 +73,8 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
 
   const tenants: TenantSnapshot[] = await Promise.all(
     TENANTS.map(async (t) => {
+      // Per-tenant reads are cache-bounded: getActivity, listDrafts, listThreads use time-limited
+      // Redis keys; getWeeklyBrief, visibility snapshots use stored metadata. No unbounded SCAN.
       const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, visibilitySnapshots] =
         await Promise.all([
           getActivity(t.id).catch(() => []),
