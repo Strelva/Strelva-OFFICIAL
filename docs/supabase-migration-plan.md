@@ -1,8 +1,15 @@
 # Strelva → Supabase Migration Plan
 
-**Status:** Draft for Noah + Jacob alignment. No code moved yet.
+**Status:** **Phase 0 DONE** (schema applied) — building from here. Pending Jacob alignment on the auth + Sanity decisions before Phase 3/4.
 **Decision (Noah, 2026-06-18):** move the platform's data + auth backbone onto Supabase while it's cheap to do (3 clients, billing off).
 **Author:** mapped from a full read of `main` (the live control plane).
+
+## Progress (2026-06-18)
+
+- **Target project:** `scaffold-web` / `zthifbnrtsirdekzzlxs` in the `websites` Supabase org (was a near-empty stub — one `reb_json_documents` table). Resolves Decision 4.
+- **Schema APPLIED:** `supabase/migrations/0001` (initial, 26 tables) + `0002` (completeness, +10 tables) → **36 tables live**, migration history reconciled, both committed (`feat/supabase-foundation` branch). Tables only — **no RLS yet** (it's `0003`, pending the auth decision below).
+- **How it's applied:** migration file → Supabase Management API query endpoint with a PAT (the CLI `db push` was blocked by Docker-not-running + a `.env.local` parse bug; the MCP couldn't see the `websites` org). That's the working loop until proper MCP/CLI access is sorted.
+- **NOT yet done:** RLS (`0003`), the app data-access layer, dual-write of any subsystem, the Clerk→Supabase-Auth migration. The app does NOT connect to Supabase yet — nothing runtime has changed.
 
 ## Why (the two smells this fixes)
 
@@ -210,4 +217,4 @@ The order matters: **data first, auth last** (auth is the riskiest because it to
 1. **Sanity: keep or kill?** Content could move fully into Postgres JSONB (one less vendor, content under RLS), or Sanity stays for its editing/versioning UX (the AI agent is built around it). Recommend: move it to Postgres for the consolidation win, *unless* Jacob is relying on Sanity Studio for manual edits.
 2. **Auth: Supabase Auth vs keep Clerk.** Supabase Auth + RLS is the tight combo and one less vendor. Clerk's multi-host login (tenant subdomains, custom admin domains) is genuinely slicker and already built. This is the one swap worth debating — if the multi-host auth is painful to replicate, keep Clerk and still move data to Postgres (RLS then keys off a Clerk-JWT claim instead of `auth.uid()`).
 3. **Token encryption.** `integrations` holds OAuth access/refresh tokens. Encrypt at rest (pgcrypto or app-level) — don't store them plaintext in Postgres.
-4. **The orphaned Supabase project** (`zthifbnrtsirdekzzlxs`): use it as the target, or start a fresh project in an org Noah owns? Check what's in it first.
+4. ~~**The orphaned Supabase project** (`zthifbnrtsirdekzzlxs`): use it or start fresh?~~ **RESOLVED:** it was a near-empty stub; it's now the target with the schema applied. (Still worth deciding long-term home — the `websites` org is shared with Jacob's other projects; fine, or move to a dedicated Strelva org both fully own.)

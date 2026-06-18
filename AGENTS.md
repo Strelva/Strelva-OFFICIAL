@@ -34,6 +34,8 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 - Stripe for billing (currently off — see "The Model" below for the two-door offer and the billing-on cliff)
 - Resend for email (weekly reports, invites)
 
+> **Migration in progress (2026-06-18):** a move of the data + auth backbone to **Supabase Postgres** has begun — see `docs/supabase-migration-plan.md`. The schema is applied (`supabase/migrations/*`) but **the live app still runs on Clerk + Sanity + Redis as described above** (nothing is wired to Supabase yet). Don't assume Postgres in code until a subsystem is explicitly migrated. RLS + the auth decision (Supabase Auth vs keep Clerk) are still open.
+
 ## Multi-tenant architecture
 
 Strelva is the **control plane**. Each paid client site is a separate **custom repo** that pulls content/config from the control plane over a versioned API.
