@@ -14,6 +14,29 @@ import { getTenantPrimaryDomain } from "./tenant-urls";
 import { getRecentFailures } from "./revalidate-client";
 import { getEvents, getQueueCount } from "./events";
 
+/**
+ * Count keys matching a pattern without the blocking `KEYS` command. KEYS scans
+ * the whole keyspace in one shot and can stall Redis once a prefix accumulates
+ * thousands of entries (the failed-webhook prefix has a 30d TTL). SCAN iterates
+ * in bounded chunks; cap the work so a runaway prefix can't make this unbounded.
+ */
+async function scanKeyCount(
+  redis: NonNullable<ReturnType<typeof getRedis>>,
+  pattern: string,
+  cap = 10000
+): Promise<number> {
+  let cursor = "0";
+  let count = 0;
+  let iterations = 0;
+  do {
+    const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
+    cursor = String(next);
+    count += keys.length;
+    if (++iterations >= 100 || count >= cap) break;
+  } while (cursor !== "0");
+  return count;
+}
+
 export interface OpsMetrics {
   webhookFailures: number;
   revalidationFailures: number;
@@ -57,8 +80,7 @@ export async function buildOpsReport(): Promise<OpsReport> {
   metrics.revalidationFailures = revalidationFailures.length;
 
   if (redis) {
-    const failedWebhooks = await redis.keys("stripe:event:error:*");
-    metrics.webhookFailures = failedWebhooks.length;
+    metrics.webhookFailures = await scanKeyCount(redis, "stripe:event:error:*");
 
     const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
     for (const tenant of active) {
