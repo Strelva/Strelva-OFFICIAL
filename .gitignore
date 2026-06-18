@@ -75,5 +75,9 @@ dev-*.json
 /.clerk/
 *.shape/
 .claude/scheduled_tasks.lock
-supabase/
+# Supabase: track config + migrations (schema source of truth); ignore local/secret state.
+supabase/.branches
+supabase/.temp
+supabase/.env
+supabase/.env.*
 coverage
