@@ -32,6 +32,7 @@ import {
   performanceBlock,
 } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
+import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
@@ -662,6 +663,13 @@ Only use tools for manifest-supported sections and actions. If the user requests
             process.env.REB_CUSTOM_REQUEST_SECRET;
           if (!requestUrl || !secret) {
             const message = "Custom requests are not fully configured for this site yet.";
+            recordActionResult({ status: "blocked", message });
+            return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
+          }
+          // SSRF guard: requestUrl derives from tenant-config productionUrl +
+          // the manifest endpoint, so refuse private/non-https targets.
+          if (!isSafeFetchUrl(requestUrl)) {
+            const message = "Custom request endpoint is not a safe external URL.";
             recordActionResult({ status: "blocked", message });
             return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
           }
