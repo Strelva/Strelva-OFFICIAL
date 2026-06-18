@@ -5,6 +5,7 @@ import { logAuditEvent } from "@/lib/storage";
 import { getLatestSnapshots, diffSnapshots } from "@/lib/visibility/snapshots";
 import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagnose";
 import { executeAgentPrompt } from "@/lib/agent-executor";
+import { sanitizePromptValue } from "@/lib/capabilities";
 
 /**
  * GET  — the operator's visibility view: latest summary, findings, and the
@@ -54,10 +55,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const query = body && typeof body === "object" ? (body as { query?: unknown }).query : null;
-  if (typeof query !== "string" || !query.trim()) {
+  // Sanitize before it goes anywhere near the LLM prompt — strips CR/LF/control
+  // chars + caps length so the query can't inject a fake instruction line.
+  const cleanQuery = sanitizePromptValue(query);
+  if (!cleanQuery) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
-  const cleanQuery = query.trim().slice(0, 200);
 
   // Run the tenant agent to draft an on-site improvement. Content changes route
   // through governance to the review queue, so this proposes — it never goes live
