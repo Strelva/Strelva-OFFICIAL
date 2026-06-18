@@ -6,6 +6,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { getSanityClient, sanityImageUrl } from "../sanity";
 import { hasSanity } from "./core";
+import { verifyRasterImage } from "../image-signature";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = new Set([
@@ -27,10 +28,17 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
     throw new Error("Invalid file type. Allowed: JPEG, PNG, WebP, GIF");
   }
 
+  // `file.type` is client-supplied — verify the real bytes match a raster
+  // image so a declared image/png can't smuggle an SVG/HTML/script payload.
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const verified = verifyRasterImage(buffer, ALLOWED_MIME_TYPES);
+  if (!verified.ok) {
+    throw new Error(verified.reason);
+  }
+
   const safeName = sanitizeFilename(file.name);
 
   if (hasSanity) {
-    const buffer = Buffer.from(await file.arrayBuffer());
     const asset = await getSanityClient().assets.upload("image", buffer, {
       filename: safeName,
       contentType: file.type,
@@ -41,14 +49,16 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (hasBlob) {
     const { put } = await import("@vercel/blob");
-    const blob = await put(safeName, file, { access: "public" });
+    const blob = await put(safeName, buffer, {
+      access: "public",
+      contentType: file.type,
+    });
     return { url: blob.url };
   }
 
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const filename = `${Date.now()}-${safeName}`;
   const filePath = path.join(uploadsDir, filename);
   await fs.writeFile(filePath, buffer);

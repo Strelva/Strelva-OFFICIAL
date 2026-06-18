@@ -1,5 +1,23 @@
 // --- Capability definitions ---
 
+/**
+ * Sanitize a tenant-controlled string before interpolating it into the agent
+ * system prompt. Tenant content (owner name, contact fields, headlines, etc.)
+ * is attacker-controllable, so a raw multiline value could inject fake
+ * instruction lines into the prompt. Collapse CR/LF/tab and any other C0
+ * control char (plus DEL) to a space, squash runs of whitespace, and cap the
+ * length so a single field can't blow up the prompt or smuggle in a directive
+ * on its own line.
+ */
+export function sanitizePromptValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\x00-\x1f\x7f]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 400);
+}
+
 export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social";
 
 const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social"];

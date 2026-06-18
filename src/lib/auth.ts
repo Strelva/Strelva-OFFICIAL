@@ -55,6 +55,15 @@ export interface ActorContext {
   isImpersonating: boolean;
 }
 
+/** Thrown when an assignment would leave a tenant with zero owners.
+ *  Callers (e.g. the admin assign route) catch this to return a clear 409. */
+export class LastOwnerError extends Error {
+  constructor(public readonly tenant: string) {
+    super(`Cannot demote the last owner of tenant "${tenant}"`);
+    this.name = "LastOwnerError";
+  }
+}
+
 function isClientRole(value: unknown): value is ClientRole {
   return typeof value === "string" && CLIENT_ROLES.includes(value as ClientRole);
 }
@@ -216,8 +225,51 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
   };
 }
 
+/** Page size and hard cap for paginating Clerk's user list. The cap bounds the
+ *  number of round-trips so a corrupted/runaway list can never loop forever;
+ *  500 pages * 100 = 50k users, comfortably above any realistic tenant. */
+const CLERK_USER_PAGE_SIZE = 100;
+const CLERK_USER_PAGE_CAP = 500;
+
+/** Return the Clerk user ids whose tenantRoles[tenant] === "owner".
+ *  Paginates the full Clerk user list (super-admins are NOT owners and are
+ *  intentionally excluded — the last-owner invariant is about tenant owners).
+ *  Used to guard against demoting the final owner of a tenant. */
+export async function getTenantOwnerUserIds(tenant: string): Promise<string[]> {
+  const normalizedTenant = normalizeTenant(tenant);
+  if (!normalizedTenant) return [];
+
+  const client = await clerkClient();
+  const ownerIds: string[] = [];
+
+  for (let page = 0; page < CLERK_USER_PAGE_CAP; page += 1) {
+    const offset = page * CLERK_USER_PAGE_SIZE;
+    const result = await client.users.getUserList({
+      limit: CLERK_USER_PAGE_SIZE,
+      offset,
+    });
+    const users = result?.data ?? [];
+
+    for (const user of users) {
+      if (getRoleForTenantFromMetadata(user.publicMetadata, normalizedTenant) === "owner") {
+        ownerIds.push(user.id);
+      }
+    }
+
+    // Stop once a short page (or empty page) signals the list is exhausted.
+    if (users.length < CLERK_USER_PAGE_SIZE) break;
+  }
+
+  return ownerIds;
+}
+
 /** Assign a user to a tenant. Call this from admin or access provisioning flows only.
- *  Do NOT call from hasTenantAccess — that creates a security hole. */
+ *  Do NOT call from hasTenantAccess — that creates a security hole.
+ *
+ *  Last-owner guard: refuses (throws LastOwnerError) when the assignment would
+ *  demote the SOLE owner of {tenant} to a non-owner role, which would otherwise
+ *  lock the tenant out of owner-only functions (billing/team/domains). Promoting
+ *  or assigning additional owners is unaffected. */
 export async function assignUserToTenant(
   userId: string,
   tenant: string,
@@ -228,6 +280,21 @@ export async function assignUserToTenant(
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
+
+    // Last-owner guard: only relevant when DEMOTING a current owner to a
+    // non-owner role. Promotions and adding owners can never remove the last
+    // owner, so skip the (paginated) owner count for them.
+    const currentRole = getRoleForTenantFromMetadata(user.publicMetadata, tenant);
+    if (currentRole === "owner" && role !== "owner") {
+      const ownerIds = await getTenantOwnerUserIds(tenant);
+      const isSoleOwner =
+        ownerIds.length === 0 ||
+        (ownerIds.length === 1 && ownerIds[0] === userId);
+      if (isSoleOwner) {
+        throw new LastOwnerError(tenant);
+      }
+    }
+
     const existingTenants = parseTenantAccessMetadata(user.publicMetadata).map((grant) => grant.tenant);
     const existingRoles =
       user.publicMetadata?.tenantRoles &&
@@ -242,7 +309,10 @@ export async function assignUserToTenant(
       publicMetadata: { tenants, tenantRoles },
     });
     return true;
-  } catch {
+  } catch (err) {
+    // Surface the last-owner refusal to callers; the generic Clerk-failure path
+    // still degrades to a boolean false.
+    if (err instanceof LastOwnerError) throw err;
     return false;
   }
 }

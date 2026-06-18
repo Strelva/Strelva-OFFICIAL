@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { scanTenant } from "@/lib/scan";
+import { logAuditEvent } from "@/lib/storage";
 
 export const maxDuration = 60;
 
@@ -23,6 +24,16 @@ export async function POST(req: Request) {
 
   try {
     const { detail, ...summary } = await scanTenant(tenantId);
+
+    await logAuditEvent({
+      tenant: tenantId,
+      action: "scan.run",
+      targetType: "tenant",
+      targetId: tenantId,
+      actor: await getActorContext(tenantId),
+      metadata: { grade: summary.grade, overallScore: summary.overallScore },
+    });
+
     return NextResponse.json({ ...summary, categories: detail });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Scan failed";

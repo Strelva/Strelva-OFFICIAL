@@ -8,13 +8,20 @@ const mockGetTenantDashboardUrl = vi.hoisted(() => vi.fn());
 const mockGetUserList = vi.hoisted(() => vi.fn());
 const mockRequireTenantPermission = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
+const mockGetActorContext = vi.hoisted(() => vi.fn());
+const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth", () => ({
   CLIENT_ROLES: ["viewer", "editor", "admin", "owner"],
   assignUserToTenant: mockAssignUserToTenant,
   getCurrentUserEmail: mockGetCurrentUserEmail,
+  getActorContext: mockGetActorContext,
   isSuperAdmin: vi.fn(() => Promise.resolve(true)),
   requireTenantPermission: mockRequireTenantPermission,
+}));
+
+vi.mock("@/lib/storage", () => ({
+  logAuditEvent: mockLogAuditEvent,
 }));
 
 vi.mock("@/lib/invites", () => ({
@@ -65,6 +72,13 @@ describe("admin invites route", () => {
     mockCreateInvite.mockResolvedValue(true);
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
+    mockGetActorContext.mockResolvedValue({
+      userId: "admin_1",
+      email: "admin@example.com",
+      type: "super_admin",
+      isSuperAdmin: true,
+    });
+    mockLogAuditEvent.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -113,5 +127,42 @@ describe("admin invites route", () => {
         "Use owner@example.com when signing up so your dashboard access connects automatically.",
       ),
     }));
+    expect(mockGetActorContext).toHaveBeenCalledWith("gldf");
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogAuditEvent).toHaveBeenCalledWith({
+      tenant: "gldf",
+      action: "invite.send",
+      targetType: "user",
+      targetId: "owner@example.com",
+      actor: expect.objectContaining({ email: "admin@example.com" }),
+      metadata: { role: "owner", emailSent: true },
+    });
+  });
+
+  it("audits assigning an already-existing user to the tenant", async () => {
+    mockGetUserList.mockResolvedValue({ data: [{ id: "user_existing" }] });
+    mockAssignUserToTenant.mockResolvedValue(true);
+
+    const { POST } = await import("@/app/api/admin/invites/route");
+
+    const response = await POST(new Request("http://localhost/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "Owner@Example.com ", tenant: " gldf ", role: "editor" }),
+    }));
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toMatchObject({ success: true, existingUser: true });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogAuditEvent).toHaveBeenCalledWith({
+      tenant: "gldf",
+      action: "invite.send",
+      targetType: "user",
+      targetId: "owner@example.com",
+      actor: expect.objectContaining({ email: "admin@example.com" }),
+      metadata: { role: "editor", emailSent: false },
+    });
   });
 });

@@ -7,6 +7,9 @@ let zsetMembers: string[] = [];
 
 const mockRedis = {
   zrange: vi.fn(async () => zsetMembers),
+  // getEvents resolves each member id via mget against event:{id}; returning
+  // nulls makes it fall back to the embedded legacy JSON we feed via zrange.
+  mget: vi.fn(async (...keys: string[]) => keys.map(() => null)),
 };
 
 vi.mock("../lib/redis", () => ({

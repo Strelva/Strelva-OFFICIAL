@@ -23,10 +23,41 @@ type AddEventOptions = {
 
 /**
  * Redis key for tenant event sorted set.
- * Score = timestamp (ms), Member = JSON-encoded event
+ * Score = timestamp (ms). Member = event id (current format). The event body
+ * lives at event:{id}. Legacy rows hold a JSON-encoded event as the member;
+ * the read path handles both (see getEvents).
+ *
+ * Storing the id (not the JSON) means a mutate only rewrites event:{id} and
+ * never has to zrem-old/zadd-new on the set — which is what made update/resolve
+ * race-prone (a stale `zrem(JSON.stringify(existing))` could orphan or drop the
+ * wrong member). With a stable id member there is no zset divergence to guard.
  */
 function eventsKey(tenantId: string): string {
   return `events:${tenantId}`;
+}
+
+/**
+ * Derive an event id (and any embedded legacy body) from a raw zset member.
+ * Current rows are the bare id string; legacy rows are JSON; the Upstash client
+ * may also hand back an already-parsed object.
+ */
+function memberToRef(item: unknown): { id: string | null; embedded: UnifiedEvent | null } {
+  if (item && typeof item === "object") {
+    const obj = item as UnifiedEvent;
+    return { id: obj.id ?? null, embedded: obj.id ? obj : null };
+  }
+  if (typeof item === "string") {
+    if (item.startsWith("{")) {
+      try {
+        const obj = JSON.parse(item) as UnifiedEvent;
+        return { id: obj.id ?? null, embedded: obj.id ? obj : null };
+      } catch {
+        return { id: null, embedded: null };
+      }
+    }
+    return { id: item, embedded: null };
+  }
+  return { id: null, embedded: null };
 }
 
 /**
@@ -62,15 +93,23 @@ export async function addEvent(
     if (requiresPersistence) {
       throw new EventPersistenceError("Redis is required for durable event queue persistence.");
     }
+    // Not durably persisted (Redis unavailable + non-prod, so requiresPersistence
+    // is false). Warn loudly for pending items — a silently-dropped pending draft
+    // / review / change-request has masked real data loss in dev/staging before.
+    if (full.status === "pending") {
+      console.warn(
+        `[events] Redis unavailable — pending ${full.type} for tenant ${full.tenantId} was NOT persisted (in-memory only, will vanish).`
+      );
+    }
     return full;
   }
 
   const score = Date.now();
-  await redis.zadd(eventsKey(event.tenantId), {
-    score,
-    member: JSON.stringify(full),
-  });
+  // event:{id} is the source of truth for the body; the zset member is just the
+  // id (an index entry). Write the record first so a reader that sees the id can
+  // always resolve it.
   await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
+  await redis.zadd(eventsKey(event.tenantId), { score, member: id });
 
   return full;
 }
@@ -95,16 +134,26 @@ export async function getEvents(
     rev: true,
   });
 
+  // Members are event ids (current) or legacy JSON. Resolve every member to the
+  // authoritative event:{id} record so a row that was mutated after the id-member
+  // migration reflects its CURRENT status (a legacy JSON member is frozen at add
+  // time and would otherwise show a resolved item as still pending). Fall back to
+  // the embedded legacy body only if the record has aged out. One mget batches it.
+  const refs = raw.map(memberToRef);
+  const ids = refs.map((r) => r.id).filter((id): id is string => Boolean(id));
+  const records = ids.length
+    ? await redis.mget<UnifiedEvent[]>(...ids.map(eventKey))
+    : [];
+  const byId = new Map<string, UnifiedEvent | null>();
+  ids.forEach((id, i) => byId.set(id, records[i] ?? null));
+
   const events: UnifiedEvent[] = [];
-  for (const item of raw) {
-    try {
-      const parsed = typeof item === "string" ? JSON.parse(item) : item;
-      if (!opts?.status || parsed.status === opts.status) {
-        events.push(parsed);
-        if (events.length >= limit) break;
-      }
-    } catch {
-      // Skip malformed entries
+  for (const ref of refs) {
+    const event = (ref.id ? byId.get(ref.id) : null) ?? ref.embedded;
+    if (!event) continue;
+    if (!opts?.status || event.status === opts.status) {
+      events.push(event);
+      if (events.length >= limit) break;
     }
   }
 
@@ -166,20 +215,28 @@ export async function updateEvent(
   const redis = getRedis();
   if (!redis) return { event: null, changed: false };
 
-  const existing = await redis.get<UnifiedEvent>(eventKey(id));
-  if (!existing) return { event: null, changed: false };
+  // The zset member is the stable id, so a mutate only rewrites event:{id} — no
+  // zrem/zadd, no zset divergence. The remaining race is the get->updater->set
+  // read-modify-write itself (two concurrent updaters could lose one update), so
+  // a short SET NX lock still serializes them; the loser re-reads and returns the
+  // current event without mutating. TTL bounds a crashed holder.
+  const lockKey = `event-lock:${id}`;
+  const lock = await redis.set(lockKey, "1", { nx: true, ex: 10 });
+  if (!lock) {
+    const current = await redis.get<UnifiedEvent>(eventKey(id));
+    return { event: current ?? null, changed: false };
+  }
 
-  const updated = updater(existing);
-  await redis.set(eventKey(id), updated);
+  try {
+    const existing = await redis.get<UnifiedEvent>(eventKey(id));
+    if (!existing) return { event: null, changed: false };
 
-  const key = eventsKey(existing.tenantId);
-  await redis.zrem(key, JSON.stringify(existing));
-  await redis.zadd(key, {
-    score: new Date(existing.createdAt).getTime(),
-    member: JSON.stringify(updated),
-  });
-
-  return { event: updated, changed: true };
+    const updated = updater(existing);
+    await redis.set(eventKey(id), updated);
+    return { event: updated, changed: true };
+  } finally {
+    await redis.del(lockKey);
+  }
 }
 
 /**
@@ -193,6 +250,36 @@ export async function resolveEvent(
   const redis = getRedis();
   if (!redis) return { event: null, changed: false };
 
+  // Atomic claim: the status==='pending' guard below is a read-check-write, so
+  // two concurrent resolves (e.g. an owner clicking approve while a cron
+  // dismisses) could both read 'pending' and both apply — doubling side effects
+  // and the resolutionHistory entry. Take a short per-event lock first; whoever
+  // loses the SET NX backs out cleanly.
+  const lockKey = `event-lock:${id}`;
+  const lock: unknown = await redis.set(lockKey, opts?.actor || "system", {
+    nx: true,
+    ex: 30,
+  });
+  // SET NX returns "OK" on the real client; the test mock may return true.
+  // Failure to claim is null/undefined/false (matches the pay-links idiom).
+  if (lock === null || lock === undefined || lock === false) {
+    const current = await redis.get<UnifiedEvent>(eventKey(id));
+    return { event: current, changed: false };
+  }
+
+  try {
+    return await resolveEventLocked(redis, id, status, opts);
+  } finally {
+    await redis.del(lockKey);
+  }
+}
+
+async function resolveEventLocked(
+  redis: NonNullable<ReturnType<typeof getRedis>>,
+  id: string,
+  status: "approved" | "dismissed",
+  opts?: { actor?: string }
+): Promise<{ event: UnifiedEvent | null; changed: boolean }> {
   const existing = await redis.get<UnifiedEvent>(eventKey(id));
   if (!existing) return { event: null, changed: false };
 
@@ -221,17 +308,8 @@ export async function resolveEvent(
     },
   };
 
-  // Update individual event
+  // The zset member is the stable id; only the event:{id} record changes.
   await redis.set(eventKey(id), updated);
-
-  // Update in sorted set - remove old, add new
-  const key = eventsKey(existing.tenantId);
-  await redis.zrem(key, JSON.stringify(existing));
-  await redis.zadd(key, {
-    score: new Date(existing.createdAt).getTime(),
-    member: JSON.stringify(updated),
-  });
-
   return { event: updated, changed: true };
 }
 

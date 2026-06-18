@@ -5,8 +5,10 @@ import {
   getCurrentUserEmail,
   assignUserToTenant,
   requireTenantPermission,
+  getActorContext,
   type ClientRole,
 } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
@@ -98,6 +100,14 @@ export async function POST(req: Request) {
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign existing user" }, { status: 500 });
     }
+    await logAuditEvent({
+      tenant: tenantId,
+      action: "invite.send",
+      targetType: "user",
+      targetId: email,
+      actor: await getActorContext(tenantId),
+      metadata: { role, emailSent: false },
+    });
     return NextResponse.json({
       success: true,
       existingUser: true,
@@ -138,6 +148,15 @@ export async function POST(req: Request) {
         throw new Error(result.error?.message || "Resend did not return an email id.");
       }
 
+      await logAuditEvent({
+        tenant: tenantId,
+        action: "invite.send",
+        targetType: "user",
+        targetId: email,
+        actor: await getActorContext(tenantId),
+        metadata: { role, emailSent: true },
+      });
+
       return NextResponse.json({
         success: true,
         emailSent: true,
@@ -151,6 +170,14 @@ export async function POST(req: Request) {
         tenantId,
         signUpUrl,
         reason: err instanceof Error ? err.message : "Resend send failed",
+      });
+      await logAuditEvent({
+        tenant: tenantId,
+        action: "invite.send",
+        targetType: "user",
+        targetId: email,
+        actor: await getActorContext(tenantId),
+        metadata: { role, emailSent: false },
       });
       return NextResponse.json({
         success: true,
@@ -166,6 +193,14 @@ export async function POST(req: Request) {
     tenantId,
     signUpUrl,
     reason: "RESEND_API_KEY not configured",
+  });
+  await logAuditEvent({
+    tenant: tenantId,
+    action: "invite.send",
+    targetType: "user",
+    targetId: email,
+    actor: await getActorContext(tenantId),
+    metadata: { role, emailSent: false },
   });
   return NextResponse.json({
     success: true,
