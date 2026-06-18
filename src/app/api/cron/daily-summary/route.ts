@@ -11,6 +11,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { postSlack, readAndResetDailyCounts } from "@/lib/proof-signals";
 
@@ -31,15 +33,15 @@ export async function GET() {
   let totalOwner = 0;
   let totalJacob = 0;
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     const { owner, jacob } = await readAndResetDailyCounts(tenant.id, day);
     totalOwner += owner;
     totalJacob += jacob;
     // Only report tenants with any activity — a zero line per tenant
     // would nuke the Slack channel once we have more than a few clients.
-    if (owner === 0 && jacob === 0) continue;
+    if (owner === 0 && jacob === 0) return;
     lines.push(`• *${tenant.siteName}* — ${owner} by owner, ${jacob} by Jacob`);
-  }
+  });
 
   if (lines.length === 0) {
     postSlack(`[Daily agent rollup ${day}] No agent activity across ${active.length} active tenants.`);
@@ -47,6 +49,8 @@ export async function GET() {
     const header = `[Daily agent rollup ${day}] ${totalOwner} owner calls, ${totalJacob} Jacob calls across ${lines.length} tenant(s):`;
     postSlack([header, ...lines].join("\n"));
   }
+
+  await recordHeartbeat("daily-summary", { ok: true, processed: active.length });
 
   return NextResponse.json({
     day,

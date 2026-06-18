@@ -283,6 +283,16 @@ export async function restoreSiteSnapshot(
     throw new Error("Site snapshot not found.");
   }
 
+  // The sections we will write. Snapshots can legitimately hold partial
+  // content (a section never filled in), so we restore whatever is present —
+  // same truthiness gate the non-atomic version used.
+  const toWrite: { section: ContentSection; data: ContentMap[ContentSection] }[] = [];
+  for (const section of snapshot.sections) {
+    const data = snapshot.data[section];
+    if (!data) continue;
+    toWrite.push({ section, data: data as ContentMap[ContentSection] });
+  }
+
   const preRestore = await createSiteSnapshot(tenantId, {
     reason: "pre_restore",
     label: `Before restoring ${snapshot.label}`,
@@ -290,11 +300,35 @@ export async function restoreSiteSnapshot(
     actor: options.actor,
   });
 
-  for (const section of snapshot.sections) {
-    const data = snapshot.data[section];
-    if (data) {
+  // Capture current content for each section we are about to overwrite, so a
+  // mid-write failure can roll the site back to its pre-restore state rather
+  // than leaving it partially restored.
+  const previous = new Map<ContentSection, ContentMap[ContentSection] | null>();
+  for (const { section } of toWrite) {
+    previous.set(section, await getContent(section, tenantId).catch(() => null));
+  }
+
+  const written: ContentSection[] = [];
+  try {
+    for (const { section, data } of toWrite) {
       await setContent(section, data as ContentMap[typeof section], tenantId);
+      written.push(section);
     }
+  } catch (err) {
+    // Roll back the sections that already landed.
+    for (const section of written) {
+      const prev = previous.get(section);
+      if (prev) {
+        try {
+          await setContent(section, prev as ContentMap[typeof section], tenantId);
+        } catch {
+          // best-effort rollback; the throw below surfaces the original failure
+        }
+      }
+    }
+    throw new Error(
+      `Restore failed on a section write and was rolled back: ${err instanceof Error ? err.message : "unknown error"}`,
+    );
   }
 
   const restoredAt = new Date().toISOString();

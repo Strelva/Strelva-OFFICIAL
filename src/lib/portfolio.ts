@@ -10,6 +10,7 @@
  */
 
 import { getAllTenants, isActiveTenant } from "./tenants";
+import { mapPool } from "./concurrency";
 import { getActivity, listDrafts } from "./storage";
 import { listThreads } from "./threads";
 import { getWeeklyBrief } from "./weekly-brief";
@@ -71,8 +72,10 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
   const TENANTS = ALL_TENANTS.filter(isActiveTenant);
   const archivedTenantCount = ALL_TENANTS.length - TENANTS.length;
 
-  const tenants: TenantSnapshot[] = await Promise.all(
-    TENANTS.map(async (t) => {
+  // Bounded fan-out: a plain Promise.all over all tenants opens ~6 reads per
+  // tenant at once (6N connections). mapPool caps tenants-in-flight so the
+  // snapshot scales without a connection storm.
+  const tenants: TenantSnapshot[] = await mapPool(TENANTS, 8, async (t) => {
       // Per-tenant reads are cache-bounded: getActivity, listDrafts, listThreads use time-limited
       // Redis keys; getWeeklyBrief, visibility snapshots use stored metadata. No unbounded SCAN.
       const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, visibilitySnapshots] =
@@ -118,7 +121,7 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
         lastActivity: activity[0]?.time ?? null,
         visibility,
       };
-    })
+    }
   );
 
   const activeSubscriptions = TENANTS.filter(

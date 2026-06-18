@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
@@ -43,17 +45,17 @@ export async function GET() {
   const results: { tenant: string; newReviews: number }[] = [];
   const errors: string[] = [];
 
-  for (const tenant of active) {
+await mapPool(active, 8, async (tenant) => {
     try {
       const connection = await getConnection(tenant.id, "yelp");
-      if (!connection || connection.status !== "connected") continue;
+      if (!connection || connection.status !== "connected") return;
 
       const apiKey = connection.accessToken;
       const businessId = connection.apiKey;
-      if (!apiKey || !businessId) continue;
+      if (!apiKey || !businessId) return;
 
       const reviews = await fetchYelpReviews(apiKey, businessId);
-      if (reviews.length === 0) continue;
+      if (reviews.length === 0) return;
 
       const lastSeenId = redis ? await redis.get<string>(lastReviewKey(tenant.id)) : null;
       const newReviews: YelpReview[] = [];
@@ -93,7 +95,7 @@ export async function GET() {
       console.error(`[poll-yelp] Failed for tenant ${tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
     await fetch(process.env.SLACK_WEBHOOK_URL, {
@@ -104,6 +106,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("poll-yelp", { ok: errors.length === 0, processed: results.length, failed: errors.length });
 
   return NextResponse.json({ processed: results.length, totalNew, failed: errors.length, results, errors });
 }

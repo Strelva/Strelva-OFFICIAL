@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
+import { getServiceHealth } from "@/lib/health";
+import { alertOnce } from "@/lib/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { pruneOldEvents } from "@/lib/events";
 import { createDailySiteSnapshot } from "@/lib/storage";
@@ -15,7 +19,7 @@ export async function GET() {
   let reengagementQueued = 0;
   const errors: string[] = [];
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     try {
       const pruned = await pruneOldEvents(tenant.id);
       totalPruned += pruned;
@@ -26,7 +30,7 @@ export async function GET() {
     } catch (err) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "Unknown"}`);
     }
-  }
+  });
 
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
     await fetch(process.env.SLACK_WEBHOOK_URL, {
@@ -38,8 +42,33 @@ export async function GET() {
     }).catch(() => {});
   }
 
+  // Daily dependency probe. The maintenance cron is the one guaranteed daily
+  // touchpoint, so use it to confirm Redis/Sanity/Clerk are reachable and page
+  // (deduped) if a core dependency is down or degraded.
+  let healthStatus = "unknown";
+  try {
+    const health = await getServiceHealth();
+    healthStatus = health.status;
+    if (health.status !== "healthy") {
+      const broken = Object.entries(health.checks)
+        .filter(([, c]) => c.status === "error")
+        .map(([name]) => name);
+      await alertOnce(
+        "dependency_health_degraded",
+        health.status === "down" ? "critical" : "high",
+        { overall: health.status, failing: broken },
+        3600
+      );
+    }
+  } catch (err) {
+    console.error("[cron maintenance] health probe failed:", err);
+  }
+
+  await recordHeartbeat("maintenance", { ok: errors.length === 0, processed: active.length, failed: errors.length });
+
   return NextResponse.json({
     tenants: active.length,
+    health: healthStatus,
     eventsPruned: totalPruned,
     snapshotsCreated,
     reengagementQueued,

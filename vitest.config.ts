@@ -7,6 +7,27 @@ export default defineConfig({
     globals: true,
     include: ["src/__tests__/**/*.test.ts"],
     exclude: ["node_modules"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "json-summary"],
+      // Ratchet floor: set just below current measured coverage so it guards
+      // against regression without going red today. Raise as the spine gains
+      // tests — never lower these to make a PR pass.
+      thresholds: {
+        statements: 48,
+        branches: 40,
+        functions: 45,
+        lines: 50,
+      },
+      exclude: [
+        "node_modules/**",
+        "src/__tests__/**",
+        "**/*.config.*",
+        "**/*.d.ts",
+        ".next/**",
+        "scripts/**",
+      ],
+    },
   },
   resolve: {
     alias: {

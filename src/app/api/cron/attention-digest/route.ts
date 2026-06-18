@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildAttentionBriefing } from "@/lib/attention";
 
 /**
@@ -25,6 +26,7 @@ export async function GET() {
       }).catch(() => {});
     }
 
+    await recordHeartbeat("attention-digest", { ok: true });
     return NextResponse.json({ ok: true, counts: briefing.counts });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

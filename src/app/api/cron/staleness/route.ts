@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { generateSuggestionsForTenant } from "@/lib/suggestions";
 
@@ -10,7 +12,7 @@ export async function GET() {
   const processed: string[] = [];
   const errors: string[] = [];
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     try {
       await generateSuggestionsForTenant(tenant.id);
       processed.push(tenant.id);
@@ -19,7 +21,7 @@ export async function GET() {
       console.error(`[staleness] Failed for tenant ${tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   // Notify Slack if any tenants failed
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
@@ -31,6 +33,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("staleness", { ok: errors.length === 0, processed: processed.length, failed: errors.length });
 
   return NextResponse.json({ processed: processed.length, failed: errors.length, errors });
 }

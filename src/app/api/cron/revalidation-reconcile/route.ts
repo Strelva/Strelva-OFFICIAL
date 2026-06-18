@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { reconcileRevalidations } from "@/lib/revalidate-client";
 
 export async function GET(request: Request) {
@@ -28,6 +29,8 @@ export async function GET(request: Request) {
   }
 
   const status = failed === results.length && results.length > 0 ? 500 : 200;
+
+  await recordHeartbeat("revalidation-reconcile", { ok: failed === 0, processed: results.length, failed });
 
   return NextResponse.json({
     total: results.length,

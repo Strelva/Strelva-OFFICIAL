@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { scanAllTenants } from "@/lib/scan";
 
 export const maxDuration = 300;
@@ -23,6 +24,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("portfolio-scan", { ok: failed.length === 0, processed: scanned.length, failed: failed.length });
 
   return NextResponse.json({ scanned: scanned.length, failed, results: scanned });
 }

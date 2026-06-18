@@ -197,10 +197,32 @@ async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAd
  * Look up tenant by custom domain. Returns null if no match.
  * Uses Redis cache when available, falls back to in-memory cache.
  */
+/**
+ * Static last-resort domain map from the CUSTOM_DOMAIN_MAP env var
+ * (domain -> tenantId JSON). Depends on neither Redis nor Sanity, so it keeps
+ * custom-domain routing alive when both are down. Mirrors getEnvDomainMap in
+ * proxy.ts (kept local to avoid a proxy<->tenants import cycle).
+ */
+function envDomainLookup(
+  normalized: string,
+  lower: string
+): { tenantId: string; isAdmin: boolean } | null {
+  let parsed: Record<string, string>;
+  try {
+    parsed = JSON.parse(process.env.CUSTOM_DOMAIN_MAP || "{}");
+  } catch {
+    return null;
+  }
+  const tenantId = parsed[normalized] || parsed[lower];
+  if (!tenantId) return null;
+  return { tenantId, isAdmin: lower.startsWith("admin.") };
+}
+
 export async function getTenantByDomain(
   domain: string
 ): Promise<{ tenantId: string; isAdmin: boolean } | null> {
   const normalized = domain.toLowerCase().replace(/^www\./, "");
+  const lower = domain.toLowerCase();
   const redis = getRedis();
 
   // Try Redis cache
@@ -208,7 +230,7 @@ export async function getTenantByDomain(
     try {
       const cached = await redis.get<Record<string, { tenantId: string; isAdmin: boolean }>>(DOMAIN_CACHE_KEY);
       if (cached) {
-        return cached[normalized] || cached[domain.toLowerCase()] || null;
+        return cached[normalized] || cached[lower] || null;
       }
     } catch {
       // Redis failed, continue to rebuild
@@ -218,11 +240,24 @@ export async function getTenantByDomain(
   // Check in-memory cache
   const now = Date.now();
   if (_domainMapCache && now - _domainMapCacheTime < DOMAIN_CACHE_TTL * 1000) {
-    return _domainMapCache[normalized] || _domainMapCache[domain.toLowerCase()] || null;
+    return _domainMapCache[normalized] || _domainMapCache[lower] || null;
   }
 
-  // Rebuild map
-  const map = await buildDomainMap();
+  // Rebuild map from the source of truth (Sanity/dev via loadTenants). If that
+  // ALSO fails (Sanity down at the same time as Redis), do NOT throw and break
+  // all custom-domain routing — serve the last-known-good in-memory map even if
+  // stale, then fall back to the static env map.
+  let map: Record<string, { tenantId: string; isAdmin: boolean }>;
+  try {
+    map = await buildDomainMap();
+  } catch (err) {
+    console.error("[tenants] domain-map rebuild failed; serving stale/env fallback:", err);
+    if (_domainMapCache) {
+      const stale = _domainMapCache[normalized] || _domainMapCache[lower];
+      if (stale) return stale;
+    }
+    return envDomainLookup(normalized, lower);
+  }
 
   // Write to Redis
   if (redis) {
@@ -237,7 +272,9 @@ export async function getTenantByDomain(
   _domainMapCache = map;
   _domainMapCacheTime = Date.now();
 
-  return map[normalized] || map[domain.toLowerCase()] || null;
+  // A domain present only in the static env map (e.g. a freshly-pointed domain
+  // not yet in Sanity) still resolves.
+  return map[normalized] || map[lower] || envDomainLookup(normalized, lower);
 }
 
 /**

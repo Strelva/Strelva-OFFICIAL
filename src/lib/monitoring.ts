@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "./logger";
+import { getRedis } from "./redis";
 
 type Severity = "low" | "medium" | "high" | "critical";
 
@@ -50,5 +51,42 @@ export function alert(event: string, severity: Severity, context: Context = {}):
         text: `:rotating_light: *[${severity.toUpperCase()}] ${event}*${detail ? `\n${detail}` : ""}`,
       }),
     }).catch(() => {});
+  }
+}
+
+/**
+ * Like alert(), but deduplicated: the same (event+context) won't re-fire within
+ * `windowSeconds`, so one repeating failure across many crons/tenants doesn't
+ * spam Slack. Medium-severity events (which alert() only logs) are rolled into a
+ * rolling Redis counter so they're not dropped silently. Falls through to a
+ * plain alert() if Redis is unavailable. Best-effort; never throws.
+ */
+export async function alertOnce(
+  event: string,
+  severity: Severity,
+  context: Context = {},
+  windowSeconds = 3600
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) {
+    alert(event, severity, context);
+    return;
+  }
+  try {
+    if (severity === "medium" || severity === "low") {
+      // Don't page on these, but keep a visible tally instead of dropping them.
+      const counterKey = `reb:alert-count:${severity}:${event}`;
+      await redis.incr(counterKey);
+      await redis.expire(counterKey, 24 * 3600, "NX");
+      logger.warn(`[ALERT:${severity.toUpperCase()}] ${event}`, { alert: true, severity, ...context });
+      return;
+    }
+    const hash = `${event}:${Object.keys(context).sort().map((k) => `${k}=${String(context[k])}`).join("|")}`;
+    const dedupKey = `reb:alert-dedup:${hash}`;
+    const fresh = await redis.set(dedupKey, "1", { nx: true, ex: windowSeconds });
+    if (!fresh) return; // already alerted within the window
+    alert(event, severity, context);
+  } catch {
+    alert(event, severity, context);
   }
 }

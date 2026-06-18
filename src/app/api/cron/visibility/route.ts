@@ -14,6 +14,9 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { alertOnce } from "@/lib/monitoring";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { buildSerpProvider, DEFAULT_QUERIES_PER_WEEK, computeMonthlyCost } from "@/lib/visibility/serp";
 import type { SerpResult } from "@/lib/visibility/serp";
@@ -42,25 +45,52 @@ export async function GET() {
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);
 
+  // Budget guard: visibility cost scales per-tenant (serper.dev + Gemini per
+  // query). Cap how many tenants a single weekly run will probe so an
+  // unexpected tenant spike can't run up an unbounded external bill. Past this
+  // ceiling, move to a queue (QStash) — see docs/operations.md.
+  //
+  // The cap ROTATES by week so a tenant past the cap isn't starved forever —
+  // every tenant is covered over ceil(n/cap) weeks — and a deferred run pages
+  // (deduped) so the cap can never silently drop tenants.
+  const MAX_TENANTS_PER_RUN = Number(process.env.VISIBILITY_MAX_TENANTS_PER_RUN || 50);
+  const windowCount = Math.max(1, Math.ceil(active.length / MAX_TENANTS_PER_RUN));
+  const weekIndex = Math.floor(Date.now() / (7 * 24 * 3600 * 1000));
+  const offset = (weekIndex % windowCount) * MAX_TENANTS_PER_RUN;
+  const toRun = active.slice(offset, offset + MAX_TENANTS_PER_RUN);
+  const deferred = active.length - toRun.length;
+  if (deferred > 0) {
+    console.warn(
+      `[visibility-cron] tenant cap hit: probing ${toRun.length}/${active.length} ` +
+      `(window ${(weekIndex % windowCount) + 1}/${windowCount}), ${deferred} deferred this week`
+    );
+    await alertOnce(
+      "visibility_tenant_cap_hit",
+      "medium",
+      { active: active.length, perRun: MAX_TENANTS_PER_RUN, windows: windowCount },
+      7 * 24 * 3600
+    );
+  }
+
   const results: TenantVisibilityResult[] = [];
   let totalEstimatedCostUsd = 0;
 
-  for (const tenant of active) {
+  await mapPool(toRun, 4, async (tenant) => {
     const cfg = tenant.visibility;
 
     if (!cfg) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "no_visibility_config" });
-      continue;
+      return;
     }
 
     if (cfg.enabled === false) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "disabled_in_config" });
-      continue;
+      return;
     }
 
     if (!cfg.trade || !cfg.towns?.length) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "missing_trade_or_towns" });
-      continue;
+      return;
     }
 
     try {
@@ -134,7 +164,7 @@ export async function GET() {
       console.error(`[visibility-cron] Failed for tenant ${tenant.id}:`, err);
       results.push({ tenantId: tenant.id, status: "error", reason: msg });
     }
-  }
+  });
 
   const ok = results.filter((r) => r.status === "ok").length;
   const skipped = results.filter((r) => r.status === "skipped").length;
@@ -160,8 +190,11 @@ export async function GET() {
     }).catch(() => {});
   }
 
+  await recordHeartbeat("visibility", { ok: errors === 0, processed: ok, failed: errors });
+
   return NextResponse.json({
     ok,
+    deferred,
     skipped,
     errors,
     totalEstimatedMonthlyCostUsd: parseFloat(totalEstimatedCostUsd.toFixed(4)),

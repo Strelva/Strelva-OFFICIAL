@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # Run on EVERY pull request, not just those targeting main. Stacked PRs
+  # (e.g. harden/* based on another harden/*) otherwise get zero CI — the gate
+  # only fired once the whole stack reached main, so the intermediate PRs were
+  # never enforced. No branch filter = every PR runs lint/typecheck/test/
+  # coverage/build/audit/smoke before it can merge.
   pull_request:
-    branches: [main]
 
 jobs:
   build:
@@ -31,8 +35,8 @@ jobs:
       - name: Typecheck
         run: pnpm tsc --noEmit
 
-      - name: Test
-        run: pnpm test
+      - name: Test (with coverage gate)
+        run: pnpm test:coverage
 
       - name: Audit dependencies
         # Fail only on actionable HIGH+ advisories. Plain `pnpm audit` fails on
@@ -51,4 +55,5 @@ jobs:
         run: pnpm smoke
         env:
           CI: true
+          SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"

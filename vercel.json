@@ -52,6 +52,10 @@
     {
       "path": "/api/cron/attention-digest",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/heartbeat",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

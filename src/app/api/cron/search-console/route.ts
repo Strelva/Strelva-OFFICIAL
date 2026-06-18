@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { fetchSearchData } from "@/lib/search-console";
 import { setSearchData } from "@/lib/storage";
@@ -12,7 +14,7 @@ export async function GET() {
   const results: { tenant: string; clicks: number; queries: number }[] = [];
   const errors: string[] = [];
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     try {
       const data = await fetchSearchData(tenant.siteUrl!);
       await setSearchData(tenant.id, data);
@@ -31,7 +33,7 @@ export async function GET() {
       console.error(`[search-console] Failed for tenant ${tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   // Notify Slack if any tenants failed
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
@@ -43,6 +45,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("search-console", { ok: errors.length === 0, processed: results.length, failed: errors.length });
 
   return NextResponse.json({ processed: results.length, failed: errors.length, results, errors });
 }

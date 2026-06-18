@@ -76,3 +76,4 @@ dev-*.json
 *.shape/
 .claude/scheduled_tasks.lock
 supabase/
+coverage

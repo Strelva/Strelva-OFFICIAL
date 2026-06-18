@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
+import { recordMailSend } from "@/lib/storage/mail-log";
+import { alertOnce } from "@/lib/monitoring";
 import { generateAllReports } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
@@ -62,12 +66,12 @@ export async function GET() {
   const sent: string[] = [];
   const errors: string[] = [];
 
-  for (const report of reports) {
+await mapPool(reports, 8, async (report) => {
     try {
       const email = report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
-        continue;
+        return;
       }
 
       const subject = report.pageViews.thisWeek > 0
@@ -93,7 +97,7 @@ export async function GET() {
         // Resend v6 returns { data, error } and does NOT throw on a failed send
         // (e.g. unverified from-domain). Check error so failures aren't silently
         // counted as successes.
-        const { error } = await resend.emails.send({
+        const { data, error } = await resend.emails.send({
           from: `${sanitizeEmailSubjectText(report.tenant.siteName)} <report@${domain}>`,
           to: email,
           subject,
@@ -104,13 +108,16 @@ export async function GET() {
           const reason = error.message || error.name || "Unknown Resend error";
           console.error(`[weekly-report] Resend rejected send for tenant ${report.tenant.id}:`, error);
           errors.push(`${report.tenant.id}: ${reason}`);
-          continue;
+          await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: reason, to: email });
+          return;
         }
         sent.push(report.tenant.id);
+        await recordMailSend(report.tenant.id, "weekly_report", { ok: true, messageId: data?.id, to: email });
       } else {
         console.log(`[Weekly report dev] "${subject}" -> ${email}`);
         console.log(report.summary);
         sent.push(report.tenant.id);
+        await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
       }
 
       // Slack notification. Await it: on Vercel the serverless function can
@@ -130,7 +137,7 @@ export async function GET() {
       console.error(`[weekly-report] Failed for tenant ${report.tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   // Notify Slack if any tenants failed or were skipped for a reportable reason.
   // Surfacing skips (e.g. missing owner email) makes "why didn't X get a
@@ -158,6 +165,22 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  // The weekly report is the retention engine. If a large share of the
+  // tenants we attempted to email failed, that is a systemic problem
+  // (Resend key/domain reputation) — alert loudly rather than let it show
+  // up as an angry "I never got my report" weeks later.
+  const attempted = sent.length + errors.length;
+  if (attempted >= 3 && errors.length / attempted > 0.2) {
+    await alertOnce(
+      "weekly_report_high_unsent_rate",
+      "high",
+      { attempted, failed: errors.length, sent: sent.length, sample: errors.slice(0, 5) },
+      6 * 3600
+    );
+  }
+
+  await recordHeartbeat("weekly-report", { ok: errors.length === 0, processed: sent.length, failed: errors.length });
 
   return NextResponse.json({
     processed: sent.length,

@@ -174,10 +174,11 @@ checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
 // REB_DEV_UNGATED_ACCESS=1 (and NODE_ENV!=="production"), isSuperAdmin /
 // verifyAuth / hasTenantAccess all return true — a fully ungated preview deploy.
 {
-  const devBypass = process.env.REB_DEV_UNGATED_ACCESS;
+  const devBypass =
+    process.env.SCAFFOLD_DEV_UNGATED_ACCESS ?? process.env.REB_DEV_UNGATED_ACCESS;
   const enabled = Boolean(devBypass) && devBypass !== "0";
   log({
-    name: "ENV: REB_DEV_UNGATED_ACCESS",
+    name: "ENV: SCAFFOLD_DEV_UNGATED_ACCESS (or legacy REB_DEV_UNGATED_ACCESS)",
     status: enabled ? "fail" : "ok",
     message: enabled
       ? `Set to "${devBypass}" — this ungates auth and super-admin. It MUST be unset (or 0) on every preview/production deploy.`
