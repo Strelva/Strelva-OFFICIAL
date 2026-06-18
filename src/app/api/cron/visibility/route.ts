@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { buildSerpProvider, DEFAULT_QUERIES_PER_WEEK, computeMonthlyCost } from "@/lib/visibility/serp";
 import type { SerpResult } from "@/lib/visibility/serp";
@@ -159,6 +160,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("visibility", { ok: errors === 0, processed: ok, failed: errors });
 
   return NextResponse.json({
     ok,

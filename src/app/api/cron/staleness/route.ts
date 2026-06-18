@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { generateSuggestionsForTenant } from "@/lib/suggestions";
 
@@ -31,6 +32,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("staleness", { ok: errors.length === 0, processed: processed.length, failed: errors.length });
 
   return NextResponse.json({ processed: processed.length, failed: errors.length, errors });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
@@ -104,6 +105,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("poll-yelp", { ok: errors.length === 0, processed: results.length, failed: errors.length });
 
   return NextResponse.json({ processed: results.length, totalNew, failed: errors.length, results, errors });
 }

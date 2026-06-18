@@ -10,6 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
 import { alert } from "@/lib/monitoring";
@@ -281,6 +282,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("poll-google-reviews", { ok: errors.length === 0, processed: processed.length, failed: errors.length });
 
   return NextResponse.json({
     newReviews: totalNewReviews,

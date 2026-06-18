@@ -11,6 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { postSlack, readAndResetDailyCounts } from "@/lib/proof-signals";
 
@@ -47,6 +48,8 @@ export async function GET() {
     const header = `[Daily agent rollup ${day}] ${totalOwner} owner calls, ${totalJacob} Jacob calls across ${lines.length} tenant(s):`;
     postSlack([header, ...lines].join("\n"));
   }
+
+  await recordHeartbeat("daily-summary", { ok: true, processed: active.length });
 
   return NextResponse.json({
     day,

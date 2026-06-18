@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildPortfolioSnapshot, setPortfolioSummary } from "@/lib/portfolio";
 
 /**
@@ -11,6 +12,7 @@ export async function GET() {
   try {
     const snapshot = await buildPortfolioSnapshot();
     await setPortfolioSummary(snapshot);
+    await recordHeartbeat("portfolio-snapshot", { ok: true, processed: snapshot.tenantCount });
     return NextResponse.json({
       ok: true,
       snapshotAt: snapshot.snapshotAt,

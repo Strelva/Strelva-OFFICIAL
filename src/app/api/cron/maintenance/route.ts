@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { pruneOldEvents } from "@/lib/events";
 import { createDailySiteSnapshot } from "@/lib/storage";
@@ -37,6 +38,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("maintenance", { ok: errors.length === 0, processed: active.length, failed: errors.length });
 
   return NextResponse.json({
     tenants: active.length,

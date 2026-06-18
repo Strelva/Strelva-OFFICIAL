@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@/lib/heartbeat";
 import { getAllTenants } from "@/lib/tenants";
 import { fetchSearchData } from "@/lib/search-console";
 import { setSearchData } from "@/lib/storage";
@@ -43,6 +44,8 @@ export async function GET() {
       }),
     }).catch(() => {});
   }
+
+  await recordHeartbeat("search-console", { ok: errors.length === 0, processed: results.length, failed: errors.length });
 
   return NextResponse.json({ processed: results.length, failed: errors.length, results, errors });
 }
