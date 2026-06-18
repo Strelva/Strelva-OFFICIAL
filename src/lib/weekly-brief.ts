@@ -81,15 +81,21 @@ export async function saveWeeklyBrief(brief: WeeklyBrief): Promise<void> {
 export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief> {
   const { weekStart, weekEnd } = getWeekBounds();
 
+  // Each source is independently .catch-guarded so one dependency blip (a Redis
+  // timeout, a Sanity hiccup) degrades the brief to partial data instead of
+  // throwing the whole report away.
+  const zeroClicks = { total: 0, today: 0, thisWeek: 0, lastWeek: 0 };
   const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots] = await Promise.all([
-    getClickCounts("page-view", tenantId),
-    getClickCounts("booking-click", tenantId),
-    getEvents(tenantId, { limit: 100 }),
-    getActivity(tenantId),
-    getClickCountsByPrefix("booking-click:", tenantId),
-    getContent("services", tenantId),
-    getSearchData(tenantId),
-    getSectionTimestamps(tenantId),
+    getClickCounts("page-view", tenantId).catch(() => zeroClicks),
+    getClickCounts("booking-click", tenantId).catch(() => zeroClicks),
+    getEvents(tenantId, { limit: 100 }).catch(() => []),
+    getActivity(tenantId).catch(() => []),
+    getClickCountsByPrefix("booking-click:", tenantId).catch(() => ({})),
+    getContent("services", tenantId).catch(
+      () => ({ services: [] }) as unknown as Extract<Awaited<ReturnType<typeof getContent>>, { services: unknown }>
+    ),
+    getSearchData(tenantId).catch(() => null),
+    getSectionTimestamps(tenantId).catch(() => ({})),
     getLatestSnapshots(tenantId, 2).catch(() => []),
   ]);
 
