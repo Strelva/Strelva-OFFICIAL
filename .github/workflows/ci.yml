@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # Run on EVERY pull request, not just those targeting main. Stacked PRs
+  # (e.g. harden/* based on another harden/*) otherwise get zero CI — the gate
+  # only fired once the whole stack reached main, so the intermediate PRs were
+  # never enforced. No branch filter = every PR runs lint/typecheck/test/
+  # coverage/build/audit/smoke before it can merge.
   pull_request:
-    branches: [main]
 
 jobs:
   build:
