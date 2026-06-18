@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
 import { alert } from "@/lib/monitoring";
@@ -185,7 +186,7 @@ export async function GET() {
   const processed: string[] = [];
   const errors: string[] = [];
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     try {
       const newCount = await pollTenant(tenant.id);
       if (newCount > 0) {
@@ -197,7 +198,7 @@ export async function GET() {
       console.error(`[poll-instagram] Failed for tenant ${tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   // Notify Slack on errors
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {

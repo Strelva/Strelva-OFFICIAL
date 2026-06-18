@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getServiceHealth } from "@/lib/health";
 import { alertOnce } from "@/lib/monitoring";
 import { getAllTenants } from "@/lib/tenants";
@@ -18,7 +19,7 @@ export async function GET() {
   let reengagementQueued = 0;
   const errors: string[] = [];
 
-  for (const tenant of active) {
+  await mapPool(active, 8, async (tenant) => {
     try {
       const pruned = await pruneOldEvents(tenant.id);
       totalPruned += pruned;
@@ -29,7 +30,7 @@ export async function GET() {
     } catch (err) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "Unknown"}`);
     }
-  }
+  });
 
   if (errors.length > 0 && process.env.SLACK_WEBHOOK_URL) {
     await fetch(process.env.SLACK_WEBHOOK_URL, {

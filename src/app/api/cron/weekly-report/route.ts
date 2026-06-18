@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
 import { alertOnce } from "@/lib/monitoring";
 import { generateAllReports } from "@/lib/reports";
@@ -65,12 +66,12 @@ export async function GET() {
   const sent: string[] = [];
   const errors: string[] = [];
 
-  for (const report of reports) {
+await mapPool(reports, 8, async (report) => {
     try {
       const email = report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
-        continue;
+        return;
       }
 
       const subject = report.pageViews.thisWeek > 0
@@ -108,7 +109,7 @@ export async function GET() {
           console.error(`[weekly-report] Resend rejected send for tenant ${report.tenant.id}:`, error);
           errors.push(`${report.tenant.id}: ${reason}`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: reason, to: email });
-          continue;
+          return;
         }
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, messageId: data?.id, to: email });
@@ -136,7 +137,7 @@ export async function GET() {
       console.error(`[weekly-report] Failed for tenant ${report.tenant.id}:`, err);
       errors.push(msg);
     }
-  }
+  });
 
   // Notify Slack if any tenants failed or were skipped for a reportable reason.
   // Surfacing skips (e.g. missing owner email) makes "why didn't X get a

@@ -15,6 +15,7 @@
 
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
+import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { buildSerpProvider, DEFAULT_QUERIES_PER_WEEK, computeMonthlyCost } from "@/lib/visibility/serp";
 import type { SerpResult } from "@/lib/visibility/serp";
@@ -43,25 +44,40 @@ export async function GET() {
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);
 
+  // Budget guard: visibility cost scales per-tenant (serper.dev + Gemini per
+  // query). Cap how many tenants a single weekly run will probe so an
+  // unexpected tenant spike can't run up an unbounded external bill. Past this
+  // ceiling, move to a queue (QStash) — see docs/operations.md. Never truncate
+  // silently: log what was deferred.
+  const MAX_TENANTS_PER_RUN = Number(process.env.VISIBILITY_MAX_TENANTS_PER_RUN || 50);
+  const toRun = active.slice(0, MAX_TENANTS_PER_RUN);
+  const deferred = active.length - toRun.length;
+  if (deferred > 0) {
+    console.warn(
+      `[visibility-cron] tenant cap hit: probing ${toRun.length}/${active.length}, ${deferred} deferred ` +
+      `(raise VISIBILITY_MAX_TENANTS_PER_RUN or move to a queue)`
+    );
+  }
+
   const results: TenantVisibilityResult[] = [];
   let totalEstimatedCostUsd = 0;
 
-  for (const tenant of active) {
+  await mapPool(toRun, 4, async (tenant) => {
     const cfg = tenant.visibility;
 
     if (!cfg) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "no_visibility_config" });
-      continue;
+      return;
     }
 
     if (cfg.enabled === false) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "disabled_in_config" });
-      continue;
+      return;
     }
 
     if (!cfg.trade || !cfg.towns?.length) {
       results.push({ tenantId: tenant.id, status: "skipped", reason: "missing_trade_or_towns" });
-      continue;
+      return;
     }
 
     try {
@@ -135,7 +151,7 @@ export async function GET() {
       console.error(`[visibility-cron] Failed for tenant ${tenant.id}:`, err);
       results.push({ tenantId: tenant.id, status: "error", reason: msg });
     }
-  }
+  });
 
   const ok = results.filter((r) => r.status === "ok").length;
   const skipped = results.filter((r) => r.status === "skipped").length;
@@ -165,6 +181,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok,
+    deferred,
     skipped,
     errors,
     totalEstimatedMonthlyCostUsd: parseFloat(totalEstimatedCostUsd.toFixed(4)),

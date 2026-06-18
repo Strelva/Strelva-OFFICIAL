@@ -92,6 +92,26 @@ touches tenant data gets that check in review.
   `alertOnce()` dedups high/critical and rolls medium/low into
   `reb:alert-count:*` counters instead of dropping them.
 
+## Scale model (batch now, queue later)
+
+The per-tenant cron fan-outs (weekly-report, visibility, polls, staleness,
+maintenance) and `buildPortfolioSnapshot` run through `mapPool` (bounded
+concurrency, `src/lib/concurrency.ts`) instead of a serial loop or an unbounded
+`Promise.all`. This holds well into the low hundreds of tenants without new
+infra. Two ceilings remain and the move at each is known:
+
+- **Vercel 300s function timeout.** A cron that can't finish all tenants within
+  300s even at concurrency 8 has outgrown in-process fan-out. The visibility
+  cron already has a per-run tenant cap (`VISIBILITY_MAX_TENANTS_PER_RUN`,
+  default 50) as a cost+time guard.
+- **The queue-later move (~20+ paying clients / when a cron nears the timeout):**
+  switch the heavy crons from "loop over tenants in one invocation" to
+  **Upstash QStash** — the cron enqueues one message per tenant, and a worker
+  route processes one tenant per invocation. This removes the single-function
+  time ceiling entirely and gives per-tenant retries. Not built yet (no infra
+  at this scale); `mapPool` is the bridge until then. Redis prefix stays `reb:`;
+  the worker route would live under `/api/jobs/*`.
+
 ## Outage runbooks
 
 Each dependency, what breaks, and the move.

@@ -1,6 +1,7 @@
 import { generateText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
+import { getRedis } from "@/lib/redis";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
@@ -66,11 +67,23 @@ interface PromptCacheEntry {
 }
 const promptCache = new Map<string, PromptCacheEntry>();
 const PROMPT_CACHE_TTL_MS = 60_000;
+const PROMPT_CACHE_TTL_SECONDS = 60;
+// Shared across serverless instances: a cold instance (or the dashboard-chat
+// route, which builds its own prompt) skips the N section reads on a Redis hit.
+const promptCacheKey = (tenant: string) => `reb:prompt-cache:${tenant}`;
 
 /** Test/manual hook to drop cached prompts. */
-export function clearAgentPromptCache(tenant?: string): void {
+export async function clearAgentPromptCache(tenant?: string): Promise<void> {
   if (tenant) promptCache.delete(tenant);
   else promptCache.clear();
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    if (tenant) await redis.del(promptCacheKey(tenant));
+    // No wildcard delete: per-tenant keys expire on their own 60s TTL.
+  } catch {
+    // best-effort cache clear
+  }
 }
 
 async function buildSystemPrompt(
@@ -89,6 +102,21 @@ async function buildSystemPrompt(
     Date.now() - cached.cachedAt < PROMPT_CACHE_TTL_MS
   ) {
     return cached.prompt;
+  }
+
+  // Cross-instance hit: another instance may have already built this exact
+  // prompt (same signature). Adopt it and warm the local cache.
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const shared = await redis.get<{ signature: string; prompt: string }>(promptCacheKey(tenant));
+      if (shared && shared.signature === signature) {
+        promptCache.set(tenant, { signature, prompt: shared.prompt, cachedAt: Date.now() });
+        return shared.prompt;
+      }
+    } catch {
+      // Redis unavailable — fall through to a local rebuild.
+    }
   }
 
   // Shared content load + section blocks (see agent-prompt-shared.ts) — identical
@@ -141,6 +169,13 @@ Available sections: ${sectionNames}.`;
   prompt += `\n\nBe conversational, warm, and helpful. Confirm changes after making them. Never remove content unless explicitly asked. For array items, preserve all existing items unless told to remove specific ones.`;
 
   promptCache.set(tenant, { signature, prompt, cachedAt: Date.now() });
+  if (redis) {
+    try {
+      await redis.set(promptCacheKey(tenant), { signature, prompt }, { ex: PROMPT_CACHE_TTL_SECONDS });
+    } catch {
+      // best-effort shared cache; the in-memory entry still serves this instance
+    }
+  }
   return prompt;
 }
 
