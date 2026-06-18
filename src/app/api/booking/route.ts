@@ -3,6 +3,7 @@ import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
+import { requireActiveSubscription } from "@/lib/subscription";
 
 function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
     }
 
     const tenant = await getTenantFromHeaders();
+    const blocked = await requireActiveSubscription(tenant);
+    if (blocked) return blocked;
 
     // Calculate end time (parse service duration or default 60)
     const services = await getContent("services", tenant);

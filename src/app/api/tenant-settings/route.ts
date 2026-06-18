@@ -180,16 +180,14 @@ export async function PUT(req: Request) {
     if (domainsTouched) {
       invalidateDomainMapCache();
     }
-    if (actor.isImpersonating) {
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "tenant_settings.updated",
-        targetType: "tenant",
-        targetId: tenant,
-        metadata: { fields: Object.keys(updates) },
-      });
-    }
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "tenant_settings.updated",
+      targetType: "tenant",
+      targetId: tenant,
+      metadata: { fields: Object.keys(updates) },
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -28,7 +28,7 @@ export function ScanAllButton() {
 
   return (
     <div className="flex items-center gap-2">
-      {result && <span className="text-xs text-gray-faint">{result}</span>}
+      {result && <span className="text-xs text-gray-faint" role="status" aria-live="polite">{result}</span>}
       <button
         onClick={() => void scanAll()}
         disabled={scanning}

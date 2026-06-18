@@ -122,9 +122,11 @@ export async function storeRecentReply(
   if (!redis) return;
 
   const key = recentRepliesKey(tenantId);
-  await redis.lpush(key, replyText);
-  await redis.ltrim(key, 0, RECENT_REPLIES_MAX - 1);
-  await redis.expire(key, 90 * 24 * 60 * 60);
+  const pipeline = redis.pipeline();
+  pipeline.lpush(key, replyText);
+  pipeline.ltrim(key, 0, RECENT_REPLIES_MAX - 1);
+  pipeline.expire(key, 90 * 24 * 60 * 60);
+  await pipeline.exec();
 }
 
 /**

@@ -50,7 +50,7 @@ export function getFallbackModel(): ModelConfig | null {
         return null;
     }
   } catch (err) {
-    logger.warn("[ai-models] Failed to initialize fallback model", {
+    logger.error("[ai-models] Failed to initialize fallback model", {
       provider,
       modelId,
       error: err instanceof Error ? err.message : "unknown",

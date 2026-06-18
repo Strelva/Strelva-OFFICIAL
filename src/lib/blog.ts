@@ -46,7 +46,10 @@ export async function getBlogPosts(
     }
     query += `] | order(publishedAt desc)`;
     if (options?.limit) {
-      query += `[0...${options.limit}]`;
+      if (typeof options.limit !== "number" || options.limit < 1) {
+        throw new Error("Invalid options.limit: must be a positive integer");
+      }
+      query += `[0...${Math.floor(options.limit)}]`;
     }
     query += `{ "id": _id, slug, title, excerpt, content, author, publishedAt, status, tags }`;
     return getSanityReadClient().fetch(query, params);
@@ -58,7 +61,10 @@ export async function getBlogPosts(
   }
   posts.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
   if (options?.limit) {
-    posts = posts.slice(0, options.limit);
+    if (typeof options.limit !== "number" || options.limit < 1) {
+      throw new Error("Invalid options.limit: must be a positive integer");
+    }
+    posts = posts.slice(0, Math.floor(options.limit));
   }
   return posts;
 }

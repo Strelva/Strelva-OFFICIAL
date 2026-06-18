@@ -309,7 +309,7 @@ export async function updateBusinessHours(
   // field will be present and recent if the update landed.
   const readUrl = `${BUSINESS_INFORMATION_V1}/${locationName}?readMask=${masks.join(",")}`;
   let verified = false;
-  let evidence: string;
+  let evidence = `tenant=${tenantId} operation=update_hours written=true readback_error=unknown`;
 
   try {
     const readRes = await fetch(readUrl, {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { scanAllTenants } from "@/lib/scan";
+import { logAuditEvent } from "@/lib/storage";
 
 export const maxDuration = 300;
 
@@ -13,5 +14,13 @@ export async function POST() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const outcome = await scanAllTenants();
+  const actor = await getActorContext();
+  await logAuditEvent({
+    tenant: "*",
+    action: "scan.run_all",
+    targetType: "portfolio",
+    targetId: "all",
+    actor,
+  });
   return NextResponse.json(outcome);
 }

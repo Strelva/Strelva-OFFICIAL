@@ -6,6 +6,7 @@ import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
+import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import type { DesignTokenScope, TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
 
 const TENANT_FEATURES = new Set<TenantFeature>(["commerce", "booking", "newsletter"]);
@@ -73,6 +74,15 @@ export async function POST(req: Request) {
   const cleanCustomRepo = customRepo && typeof customRepo === "object" && !Array.isArray(customRepo)
     ? customRepo as Record<string, unknown>
     : {};
+  
+  // Light validation: if a repoUrl is provided, ensure it's a valid HTTPS URL.
+  const repoUrl = cleanString(cleanCustomRepo.repoUrl);
+  if (repoUrl && !isSafeFetchUrl(repoUrl)) {
+    return NextResponse.json(
+      { error: "Invalid customRepo.repoUrl: must be a valid HTTPS URL" },
+      { status: 400 }
+    );
+  }
 
   if (!siteName || !ownerName || !industry || !template || !subdomain) {
     return NextResponse.json(

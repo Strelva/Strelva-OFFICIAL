@@ -52,7 +52,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
 
   if (!summary) {
     return (
-      <div className="rounded-xl bg-glass border border-glass-border p-5">
+      <div role="status" className="rounded-xl bg-glass border border-glass-border p-5">
         <h2 className="text-sm font-semibold text-warm-white mb-1">AI-search visibility</h2>
         <p className="text-sm text-gray-muted">
           No visibility data yet. The weekly visibility cron measures this once the tenant has a

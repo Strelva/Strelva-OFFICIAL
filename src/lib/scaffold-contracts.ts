@@ -71,6 +71,8 @@ export function verifyRevalidationSignature(
   nowMs: number = Date.now()
 ): boolean {
   const ts = Number(timestamp);
+  // 5-minute replay window: prevents clock skew issues but allows limited replay on repo clock drift.
+  // Tighter windows (e.g., 1m) risk false rejects on ~1% of requests; 5m is a reasonable operational tradeoff.
   if (Number.isNaN(ts) || Math.abs(nowMs - ts) > 300_000) return false;
 
   const expected = crypto

@@ -22,7 +22,9 @@ const cspBaseDirectives = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com",
   "font-src 'self' data:",
-  "frame-src 'self' https: http://localhost:* http://*.localhost:*",
+  // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
+  // kept in the looser variant below).
+  "frame-src 'self' https:",
   "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
   "worker-src 'self' blob:",
   "base-uri 'self'",
@@ -426,7 +428,9 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     isAdminSubdomain = customDomainResult.isAdminSubdomain;
   }
 
-  // Fallback: extract tenant from ?tenant= query param (for super admin access only)
+  // Fallback: extract tenant from ?tenant= query param (for super admin access only).
+  // PRIVILEGE ISOLATION: ?tenant= is super-admin impersonation only and requires valid auth.
+  // This is not for multi-tenant routing — use subdomain or /client/{tenant} path instead.
   // This requires authentication to prevent tenant spoofing
   let tenantFromQueryParam = false;
   if (!tenantId) {

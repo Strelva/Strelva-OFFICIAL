@@ -42,6 +42,7 @@ export function CreateTenantForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
 
@@ -91,7 +92,7 @@ export function CreateTenantForm() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
           {error}
         </div>
       )}
@@ -152,6 +153,7 @@ export function CreateTenantForm() {
         <div>
           <label className={labelCls}>Template</label>
           <select
+            aria-label="Template"
             value={form.template}
             onChange={(e) => setForm({ ...form, template: e.target.value })}
             className={inputCls}
@@ -165,6 +167,7 @@ export function CreateTenantForm() {
         <div>
           <label className={labelCls}>Industry</label>
           <select
+            aria-label="Industry"
             value={form.industry}
             onChange={(e) => setForm({ ...form, industry: e.target.value })}
             className={inputCls}
@@ -178,6 +181,7 @@ export function CreateTenantForm() {
         <div>
           <label className={labelCls}>Delivery Model</label>
           <select
+            aria-label="Delivery Model"
             value={form.deliveryModel}
             onChange={(e) => setForm({ ...form, deliveryModel: e.target.value })}
             className={inputCls}
@@ -262,26 +266,29 @@ export function CreateTenantForm() {
               />
             </div>
 
-            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                ["supportsPageConfig", "Page config"],
-                ["supportsDraftPreview", "Draft preview"],
-                ["supportsInlineEditing", "Inline editing"],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 rounded-md border border-glass-border bg-gray-bg px-3 py-2 text-xs text-gray-muted cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.customRepo[key as keyof typeof form.customRepo])}
-                    onChange={(e) => setForm({
-                      ...form,
-                      customRepo: { ...form.customRepo, [key]: e.target.checked },
-                    })}
-                    className="accent-[#6da3ff]"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
+            <fieldset className="sm:col-span-2">
+              <legend className={labelCls}>Supported Features</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  ["supportsPageConfig", "Page config"],
+                  ["supportsDraftPreview", "Draft preview"],
+                  ["supportsInlineEditing", "Inline editing"],
+                ].map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 rounded-md border border-glass-border bg-gray-bg px-3 py-2 text-xs text-gray-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.customRepo[key as keyof typeof form.customRepo])}
+                      onChange={(e) => setForm({
+                        ...form,
+                        customRepo: { ...form.customRepo, [key]: e.target.checked },
+                      })}
+                      className="accent-[#6da3ff]"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </>
         )}
 

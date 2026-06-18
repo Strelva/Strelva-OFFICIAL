@@ -118,7 +118,10 @@ export function DomainManager({
                 {confirmingRemove === d.domain ? (
                   <>
                     <button
-                      onClick={() => void call(`remove:${d.domain}`, { method: "DELETE" }, `${base}?domain=${encodeURIComponent(d.domain)}`).then(() => setConfirmingRemove(null))}
+                      onClick={() => {
+                        setConfirmingRemove(null);
+                        void call(`remove:${d.domain}`, { method: "DELETE" }, `${base}?domain=${encodeURIComponent(d.domain)}`);
+                      }}
                       disabled={busy !== null}
                       className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-40"
                     >
@@ -163,6 +166,7 @@ export function DomainManager({
         <select
           value={newRole}
           onChange={(e) => setNewRole(e.target.value)}
+          aria-label="Domain role"
           className="rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
         >
           {ROLES.map((r) => (

@@ -248,9 +248,20 @@ export function buildPayLinkConfig(input: PayLinkConfigInput): PayLinkConfig {
     if (minCents === undefined || maxCents === undefined) {
       throw new PayLinkValidationError("A range link requires both minCents and maxCents.");
     }
-    if (minCents < PAY_LINK_MIN_CENTS || maxCents > PAY_LINK_MAX_CENTS || minCents > maxCents) {
+    // Validate bounds before checking overlap to give clearer error messages.
+    if (minCents < PAY_LINK_MIN_CENTS || minCents > PAY_LINK_MAX_CENTS) {
       throw new PayLinkValidationError(
-        `minCents/maxCents must satisfy ${PAY_LINK_MIN_CENTS} <= minCents <= maxCents <= ${PAY_LINK_MAX_CENTS}.`,
+        `minCents must be between ${PAY_LINK_MIN_CENTS} and ${PAY_LINK_MAX_CENTS} cents.`,
+      );
+    }
+    if (maxCents < PAY_LINK_MIN_CENTS || maxCents > PAY_LINK_MAX_CENTS) {
+      throw new PayLinkValidationError(
+        `maxCents must be between ${PAY_LINK_MIN_CENTS} and ${PAY_LINK_MAX_CENTS} cents.`,
+      );
+    }
+    if (minCents > maxCents) {
+      throw new PayLinkValidationError(
+        `minCents must not exceed maxCents.`,
       );
     }
     // The slider moves in fixed $50 steps from minCents. If the span isn't a

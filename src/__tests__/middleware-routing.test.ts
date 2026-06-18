@@ -231,7 +231,9 @@ describe("proxy frame policy", () => {
       protocol: "https:",
     });
 
-    expect(csp).toContain("frame-src 'self' https: http://localhost:* http://*.localhost:*");
+    // Prod frame-src no longer includes http://localhost:* (dev-only now).
+    expect(csp).toContain("frame-src 'self' https:");
+    expect(csp).not.toContain("http://localhost:* http://*.localhost:*");
     expect(csp).toContain("frame-ancestors 'none'");
   });
 

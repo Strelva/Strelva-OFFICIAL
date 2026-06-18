@@ -72,19 +72,19 @@ export function AuditList({ events }: { events: AuditEventView[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select value={tenant} onChange={(e) => setTenant(e.target.value)} className={selectCls}>
+        <select value={tenant} onChange={(e) => setTenant(e.target.value)} className={selectCls} aria-label="Filter by tenant">
           <option value="">All tenants</option>
           {tenants.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-        <select value={verb} onChange={(e) => setVerb(e.target.value)} className={selectCls}>
+        <select value={verb} onChange={(e) => setVerb(e.target.value)} className={selectCls} aria-label="Filter by action">
           <option value="">All actions</option>
           {verbs.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <select value={actor} onChange={(e) => setActor(e.target.value)} className={selectCls}>
+        <select value={actor} onChange={(e) => setActor(e.target.value)} className={selectCls} aria-label="Filter by actor">
           <option value="">All actors</option>
           {actors.map((a) => (
             <option key={a} value={a}>{a}</option>

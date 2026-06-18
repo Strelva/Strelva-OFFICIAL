@@ -9,6 +9,10 @@ type OAuthStatePayload = {
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 function getOAuthStateSecret(): string {
+  // Fall back to INTERNAL_API_SECRET for backward compatibility. Both sign the
+  // same way (HMAC-SHA256), so either value works. verifyOAuthState() is coupled
+  // to whichever secret was used at state creation — ensure the same secret
+  // remains available across both oauth-state creation and verification flows.
   const secret = process.env.OAUTH_STATE_SECRET || process.env.INTERNAL_API_SECRET;
   if (!secret) {
     throw new Error("OAuth state secret not configured");

@@ -607,7 +607,7 @@ export interface TenantVisibilityConfig {
   towns: string[];
   /** Up to 3 named local competitors */
   competitors: TenantVisibilityCompetitor[];
-  /** Maximum SERP queries per week for this tenant. Default: 3 */
+  /** Maximum SERP queries per week for this tenant. Default: 3. Bounded: 1-52. */
   queriesPerWeek?: number;
   /** Set false to skip this tenant during cron runs */
   enabled?: boolean;

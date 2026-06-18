@@ -69,6 +69,8 @@ function initials(name: string): string {
 // cutover (T004) — env-driven so that flip needs no code change. Wire-level
 // REB_*/SCAFFOLD env *names* stay frozen; only this value moves.
 // NOTE: scripts/provision-tenant.ts still prints the stale strelva.com value.
+// IMPORTANT: scaffoldweb.com is hardcoded because it is the operational wire-level
+// endpoint that existing deployed client repos expect. Do NOT change this default.
 const CONTROL_PLANE_API =
   process.env.CONTROL_PLANE_API_URL || "https://scaffoldweb.com";
 
@@ -82,6 +84,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     ? `https://${productionDomain}`
     : `https://${subdomain}.strelva.com`;
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
+  // Generate a high-entropy secret for signed revalidation requests from the custom repo.
+  // Rotate this secret if a client repo key material is suspected compromised; see
+  // `src/lib/scaffold-contracts.ts` for the verification/signing contract.
   const revalidationSecret = randomBytes(32).toString("hex");
 
   let tenantId = subdomain;

@@ -140,12 +140,12 @@ export function Services({
                     What to expect
                   </h4>
                   <ul className="space-y-4">
-                    {((featured as unknown as Record<string, unknown>).whatToExpect as string[] || [
+                    {((Array.isArray((featured as unknown as Record<string, unknown>).whatToExpect) ? (featured as unknown as Record<string, unknown>).whatToExpect : [
                       "Brief consultation about your goals",
                       "Assessment of your needs",
                       "Guided session with hands-on support",
                       "Personalized plan for ongoing sessions",
-                    ]).map((item, i) => (
+                    ]) as string[]).map((item: string, i: number) => (
                       <li key={i} className="flex items-start gap-3">
                         <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[0.625rem] font-bold mt-0.5" style={{ background: "var(--sage)", color: "var(--pure-white)" }}>
                           {i + 1}
