@@ -1,19 +1,13 @@
 -- ===========================================================================
--- Strelva RLS — DRAFT (do NOT apply yet; this is not a numbered migration)
+-- Strelva RLS — SUPERSEDED / APPLIED (2026-06-19)
 -- ===========================================================================
--- This is the payoff of the whole migration: tenant isolation becomes a
--- DATABASE guarantee instead of a code discipline.
---
--- Auth decision is LOCKED (2026-06-19): Supabase Auth, RLS keyed off
--- auth.uid(). See docs/supabase-migration-plan.md, Decision 2 + the
--- "Auth swap (Clerk → Supabase Auth)" section. The Clerk-JWT variant (B) has
--- been deleted; the rationale that made it unnecessary — one user, Google-only,
--- zero re-onboarding risk — is recorded in the plan.
---
--- Still held out of migrations/ on purpose: per the phased plan, RLS goes on
--- LAST (Phase 5), AFTER the auth swap wires real per-user JWTs. Enabling it
--- before then would gate every request on an auth.uid() that doesn't exist yet.
--- To ship when Phase 5 arrives: `supabase migration new rls`, paste this file.
+-- This draft has been promoted to a numbered, applied migration:
+--   supabase/migrations/20260619140000_rls.sql
+-- with the Supabase performance rules folded in ((select auth.uid()) wrapping +
+-- `to authenticated` scoping). RLS is LIVE on the scaffold-web project and
+-- verified: a tenant member sees only their tenant, a no-access user sees
+-- nothing, a super-admin sees all. Kept here for the annotated rationale below;
+-- DO NOT re-apply this file — the migration is the source of truth.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
