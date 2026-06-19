@@ -1,0 +1,162 @@
+# Strelva — Auth & Tenancy Architecture (long-term)
+
+**Status:** decisions LOCKED 2026-06-19 (Noah). This is the durable architecture record the
+migration plan (`docs/supabase-migration-plan.md`, Phase 4) executes against. Goal: get the
+foundation right once so nothing here forces a rewrite as we grow from 3 → 50+ clients.
+
+Grounded in current Supabase guidance (RLS performance lint `0003_auth_rls_initplan`,
+Custom Access Token Hook, `@supabase/ssr`, multi-SSO) — verified against live docs, not memory.
+
+---
+
+## The organizing principle: three independent planes
+
+Most multi-tenant auth pain comes from tangling these. Keep them separate and each scales on
+its own — changing one never forces changing the others.
+
+1. **Identity** — *who you are.* Supabase Auth, one host.
+2. **Authorization** — *what you can touch.* `memberships` / `super_admins` in Postgres, enforced by RLS.
+3. **Routing** — *where you reach it.* Public sites on client domains; dashboard on `app.strelva.com`.
+
+---
+
+## Plane 1 — Identity (auth host)
+
+**Decision: the dashboard authenticates only on a single host, `app.strelva.com`.**
+
+- **Tenant in the path:** `app.strelva.com/{tenant}/...`. One host, one TLS cert, **host-only
+  session cookie**. No wildcard DNS, no cross-subdomain cookie, nothing two-levels deep.
+- Tenant context = path + the user's **membership** (the URL is routing, not a security
+  boundary — RLS + the membership check are). Single-tenant clients land on their one tenant;
+  super-admins switch tenant by changing the path.
+- `@supabase/ssr` `createServerClient` with the cookie adapter handles the session. Host-only
+  cookie on `app.strelva.com` is tighter than a `.strelva.com`-wide cookie — public preview
+  hosts can never carry a dashboard session.
+
+**Rejected: per-tenant subdomains** (`{tenant}.strelva.com` + `admin.{tenant}.strelva.com`).
+The two-level `admin.*.strelva.com` form needs DNS + certs provisioned two-deep per tenant
+(a single `*.strelva.com` wildcard does not cover a second label). Fine at 3 clients, miserable
+at 50. The single-host path model is the standard B2B SaaS shape (GitHub `/org`, Vercel `/team`)
+and removes proxy code rather than adding it.
+
+**Auth methods roadmap:**
+- **Now:** Google OAuth.
+- **Soon:** email magic link (most local-business owners won't have/use Google), email+password optional.
+- **Later (reserved, do not build now):** SAML SSO for the higher-ACV "Custom Software" arm —
+  Supabase supports multiple SSO providers; the membership model already doesn't preclude it.
+
+---
+
+## Plane 2 — Authorization
+
+The `memberships` / `super_admins` schema (migration 0001) is the textbook Supabase
+multi-tenant pattern — keep it as-is.
+
+**Decision: authorization source of truth is the membership table, queried inside RLS
+(always fresh) — NOT JWT claims.** Baking `tenant_ids`/roles into the token via a Custom Access
+Token Hook is faster (no per-request join) but **stale**: a revoked role keeps working until the
+token refreshes (~1h). For a trust-sensitive product where access is revoked on offboarding,
+fresh beats fast. The hook stays on the table as a *later read-path optimization* if RLS ever
+shows up in slow queries — adopted only with the staleness trade-off understood.
+
+**RLS performance rules (the part that silently rots at scale — Supabase lint 0003):**
+- Wrap `auth.uid()` as `(select auth.uid())` everywhere so Postgres evaluates it **once per
+  query** (initplan), not once per row.
+- `security definer` helper functions (`app_tenant_ids()`, `app_is_super_admin()`) — already in
+  `rls-draft.sql`; they also let the helper read `memberships` without recursive RLS.
+- `TO authenticated` on every policy so it never runs for the `anon` role.
+- Index every `tenant_id` and `user_id` FK used in a policy (the tenant-scoped tables, not just
+  `memberships_tenant_role_idx`).
+- Run `get_advisors` after enabling RLS to catch any regressed policy.
+
+**Invariants that must survive forever (today enforced in `src/lib/auth.ts`):**
+- **Verified-email gate** — never grant a role or super-admin on an unverified email.
+- **Last-owner guard** — a tenant can never reach 0 owners. In Postgres this becomes a
+  transaction (`select … for update` on the tenant's owner rows), replacing the Redis lock.
+- Role ladder `viewer(0) < editor(1) < admin(2) < owner(3)` and the permission map, unchanged.
+
+---
+
+## Plane 3 — The service-role boundary (the real long-term risk)
+
+The control-plane server code uses the **service-role client, which bypasses RLS entirely.**
+RLS is only a hard floor for paths that carry a user JWT. So tenant isolation at scale depends
+on a discipline, written here so it survives team growth:
+
+- **User-facing request paths** (dashboard reads/writes, the AI agent acting for a tenant) →
+  use the **user-JWT client**, so RLS is an enforced backstop under any bug.
+- **Service-role** → restricted to genuinely cross-tenant work: crons, provisioning,
+  super-admin actions, the public `/api/v1/*` storefront contract. Every service-role query
+  scopes `tenant_id` by hand.
+- **Guardrail:** add a lint/test that flags service-role client use inside request handlers.
+  This is the single most likely way a "RLS-protected" system still leaks at 50 clients.
+
+---
+
+## Cross-cutting
+
+- **Billing × auth stay orthogonal.** A past-due tenant still logs in; it hits a paywall.
+  Never gate the session on `subscription_status` — gate features. (Billing-on is already a
+  separate cliff: `STRIPE_BILLING_GRANDFATHER_TENANTS`.)
+- **Token encryption.** `integrations` holds OAuth access/refresh tokens — encrypt at rest
+  (pgcrypto or app-level), never plaintext. (= migration-plan Decision 3.)
+- **Cutover is a forcing function.** The Clerk→Supabase swap costs one scheduled logout at 3
+  clients; every client added before cutover is one more forced re-login. Argument for doing it
+  now, in this window.
+
+## Future roadmap: block editor + Strelva CMS (reinforces the kill-Sanity call)
+
+Roadmap (Noah, 2026-06-19): a **basic-Framer-style block editor** + a **Strelva CMS** (blogs,
+repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* right, not less:
+
+- **Sanity Studio is a form-based editor, not a visual canvas.** A Framer-like block editor is a
+  custom frontend you build either way — Sanity doesn't provide it. So the editor doesn't argue
+  for Sanity; it just needs a store. Postgres already has the shape: `page_config.sections`
+  (JSONB block array) + `draft_*` (draft layer) + `content_versions` (history) + Supabase
+  Realtime (live preview/collab).
+- **Blogs** = rich text as JSON (TipTap/Lexical) in JSONB. **Repetitive content** = relational,
+  Postgres's strength. **Ecom** = orders/inventory/variants = transactional + referential
+  integrity = Postgres only; a document store would be an anti-pattern here.
+- **Strategic:** if the editor + CMS are *Strelva products*, the data layer must be owned — you
+  can't build a CMS product on rented CMS infra, and "leave with everything" must route through
+  your own export, not Sanity's. Owning the editor means owning the store.
+- **Timing:** keep Sanity now → still migrate off it when Strelva CMS ships, but at higher client
+  count + more content + mid-build. Now (4 tenants, agent-only writes) is the cheapest it gets.
+- **Real-time co-editing — addable later, store-agnostic (not a Sanity loss).** Collab lives in
+  the sync/editor layer, not the DB: a CRDT (Yjs) holds the live shared doc, clients sync over a
+  websocket, the converged result persists to the store. Sanity's built-in collab works *only
+  inside Sanity Studio* — a custom Framer-like editor would NOT inherit it, so you'd build collab
+  yourself either way. Recipe when wanted: **Tiptap + Yjs + Supabase Realtime → persist to
+  Postgres JSONB**. Tiers: (0) presence + soft locks ("X is editing the hero", last-write-wins) —
+  days, covers ~90% of real need; (1) full Yjs co-editing — weeks, genuinely hard frontend work
+  but a known recipe. Keep-the-door-open cost now: zero (content is already structured JSON
+  blocks in `page_config.sections`, which CRDTs map onto cleanly).
+- **Middle path when the time comes:** **Payload** (OSS CMS framework on your own Postgres) gives
+  Sanity-like admin/schema tooling while keeping data owned + under RLS — the thing to evaluate
+  vs building from scratch. Either way the store stays Postgres.
+- **Do NOT build now.** The AI agent is the editing surface today (the actual differentiator).
+  This migration just lays an owned/isolated/transactional foundation so these land cleanly later.
+
+## Explicitly deferred (do NOT build now; nothing here blocks adding them later)
+
+- **White-label admin domains** (login on a client's own domain). Not a current goal. The
+  custom-admin-domain auth path is being *removed*. Re-enters later as a redirect → `app.strelva.com`
+  or a PKCE token-handoff — additive to the routing plane only.
+- **Org-above-tenant layer** (one company, many sites, one bill). Only if a real customer needs
+  it. The `tenant_id text` PK doesn't block adding it.
+- **SAML SSO**, **JWT custom claims**. As above.
+
+---
+
+## What this changes in code (Phase 4 scope)
+
+- `src/proxy.ts` — **net removal**: drop `admin.*` subdomain detection and the custom-domain
+  auth fallback (`shouldUseFallbackAuthForAdminHost`, `buildTenantFallbackUrl`). The auth gate
+  runs only on `app.strelva.com`; public hosts (`{tenant}.strelva.com`, custom client domains)
+  are unauthenticated read paths.
+- `src/lib/auth.ts` — rewrite against the Supabase server client + `memberships`/`super_admins`,
+  signatures preserved. (`getTenantOwnerUserIds` collapses from paginating Clerk's user list to a
+  single indexed query.)
+- Dashboard routing moves to `app.strelva.com/{tenant}`; any existing `admin.{client-domain}`
+  dashboard URL becomes a 301 to it.
+- Full file inventory + API mapping: `docs/supabase-migration-plan.md` → "Auth swap" section.

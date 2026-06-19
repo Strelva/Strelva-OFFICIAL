@@ -4,6 +4,35 @@ import { isDevAccessBypassEnabled } from "./dev-access";
 import { consumeInvite, getInvite } from "./invites";
 import { getTenantConfig } from "./tenants";
 import { getRedis } from "./redis";
+import { getSessionUser, isSupabaseAuthConfigured } from "./db/server-client";
+import {
+  getMembershipRole,
+  listTenantOwnerIds,
+  isSuperAdminUser,
+  upsertMembership,
+  getPendingInvite,
+  markInviteClaimed,
+} from "./db/repositories";
+
+// ---------------------------------------------------------------------------
+// AUTH-BACKEND SWITCH (migration Phase 4).
+// When Supabase Auth is configured (public env set), request-context auth runs
+// against Supabase + the memberships/super_admins/invites tables. Otherwise it
+// runs the original Clerk path UNCHANGED (the default today). Flag:
+// isSupabaseAuthConfigured(). The pure metadata parsers below are shared/Clerk-only.
+// Invariants preserved on BOTH paths: verified-email gate + last-owner guard.
+// See docs/auth-tenancy-architecture.md + docs/supabase-migration-plan.md.
+// ---------------------------------------------------------------------------
+
+/** Supabase Auth user shape we rely on (subset of @supabase/supabase-js User). */
+type SupabaseAuthUser = { id: string; email?: string | null; email_confirmed_at?: string | null };
+
+/** Verified email for a Supabase user, or null. Enforces the verified-email gate:
+ *  an unconfirmed email never grants invite-claim or super-admin matching. */
+function supabaseVerifiedEmail(user: SupabaseAuthUser): string | null {
+  if (!user.email_confirmed_at) return null;
+  return normalizeEmailAddress(user.email);
+}
 
 export const CLIENT_ROLES = ["viewer", "editor", "admin", "owner"] as const;
 export type ClientRole = (typeof CLIENT_ROLES)[number];
@@ -170,12 +199,21 @@ export function roleHasPermission(role: ClientRole, permission: TenantPermission
 export async function verifyAuth(): Promise<boolean> {
   if (isDevAccessBypassEnabled()) return true;
 
+  if (isSupabaseAuthConfigured()) {
+    return (await getSessionUser()) !== null;
+  }
+
   const { userId } = await auth();
   return !!userId;
 }
 
 /** Get the current user's email */
 export async function getCurrentUserEmail(): Promise<string | null> {
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    return user ? supabaseVerifiedEmail(user) : null;
+  }
+
   const user = await currentUser();
   return getUserEmailAddresses(user)[0] || null;
 }
@@ -187,6 +225,13 @@ export async function getCurrentUserEmail(): Promise<string | null> {
  *  also iterates every email. */
 export async function isSuperAdmin(): Promise<boolean> {
   if (isDevAccessBypassEnabled()) return true;
+
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    // Verified-email gate: an unconfirmed email never resolves to super-admin.
+    if (!user || !user.email_confirmed_at) return false;
+    return isSuperAdminUser(user.id);
+  }
 
   const user = await currentUser();
   const emails = getUserEmailAddresses(user).map((e) => e.toLowerCase());
@@ -207,6 +252,19 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
       type: "system",
       isSuperAdmin: false,
       isImpersonating: false,
+    };
+  }
+
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    const email = user ? supabaseVerifiedEmail(user) : null;
+    const admin = user?.email_confirmed_at ? await isSuperAdminUser(user.id) : false;
+    return {
+      userId: user?.id ?? null,
+      email,
+      type: admin ? "super_admin" : user ? "user" : "anonymous",
+      isSuperAdmin: admin,
+      isImpersonating: Boolean(admin && tenant),
     };
   }
 
@@ -240,6 +298,12 @@ export async function getTenantOwnerUserIds(tenant: string): Promise<string[]> {
   const normalizedTenant = normalizeTenant(tenant);
   if (!normalizedTenant) return [];
 
+  if (isSupabaseAuthConfigured()) {
+    // One indexed query (memberships_tenant_role_idx) instead of paginating the
+    // full user list — the Postgres win called out in the migration plan.
+    return listTenantOwnerIds(normalizedTenant);
+  }
+
   const client = await clerkClient();
   const ownerIds: string[] = [];
 
@@ -271,11 +335,59 @@ export async function getTenantOwnerUserIds(tenant: string): Promise<string[]> {
  *  demote the SOLE owner of {tenant} to a non-owner role, which would otherwise
  *  lock the tenant out of owner-only functions (billing/team/domains). Promoting
  *  or assigning additional owners is unaffected. */
+/** Supabase-path tenant assignment — upserts a `memberships` row. Replicates the
+ *  last-owner guard + per-tenant Redis lock from the Clerk path EXACTLY (the lock
+ *  is auth-store-agnostic). `userId` here is the `users.id` (= auth.uid). */
+async function assignUserToTenantSupabase(
+  userId: string,
+  tenant: string,
+  role: ClientRole
+): Promise<boolean> {
+  const normalizedTenant = normalizeTenant(tenant);
+  if (!normalizedTenant) return false;
+  if (!(await getTenantConfig(normalizedTenant))) return false;
+
+  const redis = getRedis();
+  let ownerLockKey: string | null = null;
+  try {
+    const currentRole = await getMembershipRole(userId, normalizedTenant);
+    // Last-owner guard: only when DEMOTING a current owner to a non-owner role.
+    if (currentRole === "owner" && role !== "owner") {
+      if (redis) {
+        ownerLockKey = `tenant-owner-lock:${normalizedTenant}`;
+        const got: unknown = await redis.set(ownerLockKey, userId, { nx: true, ex: 15 });
+        if (got === null || got === undefined || got === false) {
+          ownerLockKey = null;
+          throw new LastOwnerError(normalizedTenant);
+        }
+      }
+      const ownerIds = await listTenantOwnerIds(normalizedTenant);
+      const isSoleOwner =
+        ownerIds.length === 0 || (ownerIds.length === 1 && ownerIds[0] === userId);
+      if (isSoleOwner) {
+        throw new LastOwnerError(normalizedTenant);
+      }
+    }
+
+    await upsertMembership({ user_id: userId, tenant_id: normalizedTenant, role });
+    return true;
+  } catch (err) {
+    if (err instanceof LastOwnerError) throw err;
+    return false;
+  } finally {
+    if (ownerLockKey && redis) await redis.del(ownerLockKey);
+  }
+}
+
 export async function assignUserToTenant(
   userId: string,
   tenant: string,
   role: ClientRole = "owner"
 ): Promise<boolean> {
+  if (isSupabaseAuthConfigured()) {
+    return assignUserToTenantSupabase(userId, tenant, role);
+  }
+
   if (!(await getTenantConfig(tenant))) return false;
 
   const redis = getRedis();
@@ -345,6 +457,30 @@ export async function claimPendingInviteForCurrentUser(
 ): Promise<ClaimedInviteGrant | null> {
   if (isDevAccessBypassEnabled()) return null;
 
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    if (!user) return null;
+    const email = supabaseVerifiedEmail(user); // verified-email gate
+    if (!email) return null;
+
+    const invite = await getPendingInvite(email, targetTenant);
+    if (!invite) return null;
+
+    const role = normalizeRole(invite.role, "owner");
+    const existingRole = await getMembershipRole(user.id, invite.tenant_id);
+    const needsAssignment =
+      !existingRole || !roleMeetsMinimum(normalizeRole(existingRole), role);
+    if (needsAssignment) {
+      // Assign BEFORE marking claimed — same safe order as the Clerk path, so a
+      // failed assign leaves the invite intact for retry.
+      const assigned = await assignUserToTenant(user.id, invite.tenant_id, role);
+      if (!assigned) return null;
+    }
+
+    await markInviteClaimed(email, invite.tenant_id);
+    return { email, tenant: invite.tenant_id, role };
+  }
+
   const { userId } = await auth();
   if (!userId) return null;
 
@@ -379,6 +515,12 @@ export async function hasTenantAccess(tenant: string): Promise<boolean> {
 
   if (await isSuperAdmin()) return true;
 
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    if (!user) return false;
+    return (await getMembershipRole(user.id, tenant)) !== null;
+  }
+
   const user = await currentUser();
   if (!user) return false;
 
@@ -388,6 +530,13 @@ export async function hasTenantAccess(tenant: string): Promise<boolean> {
 export async function getTenantRole(tenant: string): Promise<ClientRole | "super_admin" | null> {
   if (isDevAccessBypassEnabled()) return "super_admin";
   if (await isSuperAdmin()) return "super_admin";
+
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    if (!user) return null;
+    const role = await getMembershipRole(user.id, tenant);
+    return role ? normalizeRole(role) : null;
+  }
 
   const user = await currentUser();
   if (!user) return null;

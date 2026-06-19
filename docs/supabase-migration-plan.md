@@ -1,7 +1,8 @@
 # Strelva → Supabase Migration Plan
 
-**Status:** **Phase 0 DONE** (schema applied) — building from here. Pending Jacob alignment on the auth + Sanity decisions before Phase 3/4.
+**Status:** **Phase 0 DONE** (schema applied) — building from here. Both big decisions now LOCKED (auth = Supabase Auth, content = Postgres/kill-Sanity); no open architecture inputs remain (Noah confirmed the AI agent is the only content editor — nobody uses Sanity Studio).
 **Decision (Noah, 2026-06-18):** move the platform's data + auth backbone onto Supabase while it's cheap to do (3 clients, billing off).
+**Decision (Noah, 2026-06-19):** auth is **Supabase Auth** (Decision 2 LOCKED). The hedge to keep Clerk was entirely about user-migration risk; a live read of the Clerk instance settled it — **one user (Jacob), Google-OAuth only, no passwords, zero orgs** → re-onboarding risk is nil. RLS keys off `auth.uid()`; `rls-draft.sql` Variant B (Clerk-JWT) deleted. See "Auth swap" below.
 **Author:** mapped from a full read of `main` (the live control plane).
 
 ## Progress (2026-06-18)
@@ -9,7 +10,16 @@
 - **Target project:** `scaffold-web` / `zthifbnrtsirdekzzlxs` in the `websites` Supabase org (was a near-empty stub — one `reb_json_documents` table). Resolves Decision 4.
 - **Schema APPLIED:** `supabase/migrations/0001` (initial, 26 tables) + `0002` (completeness, +10 tables) → **36 tables live**, migration history reconciled, both committed (`feat/supabase-foundation` branch). Tables only — **no RLS yet** (it's `0003`, pending the auth decision below).
 - **How it's applied:** migration file → Supabase Management API query endpoint with a PAT (the CLI `db push` was blocked by Docker-not-running + a `.env.local` parse bug; the MCP couldn't see the `websites` org). That's the working loop until proper MCP/CLI access is sorted.
-- **NOT yet done:** RLS (`0003`), the app data-access layer, dual-write of any subsystem, the Clerk→Supabase-Auth migration. The app does NOT connect to Supabase yet — nothing runtime has changed.
+- **Phase 4 progress (2026-06-19, build session):** auth-client foundation + identity data layer + the `auth.ts` dual-path rewrite are DONE and green (typecheck + lint + **919 tests**). All additive + flag-gated — **the live app is still 100% Clerk** (Supabase path activates only when `NEXT_PUBLIC_SUPABASE_*` env is set):
+  - `src/lib/db/server-client.ts` (request-scoped user-JWT client, `getSessionUser()`, `isSupabaseAuthConfigured()` flag) + `browser-client.ts`.
+  - `src/lib/db/repositories.ts` — identity repos (`users`/`memberships`/`super_admins`/`invites`); `listTenantOwnerIds` replaces the paginated Clerk owner scan.
+  - `src/lib/auth.ts` — every request-context fn branches on the flag → Supabase path via repos, else Clerk UNCHANGED. Invariants preserved + tested on the Supabase path (`auth-supabase-path.test.ts`, 9 tests): verified-email gate + last-owner guard.
+- **DATA + PROVISIONING DONE (2026-06-19, via Management API — verified):**
+  - **tenants** backfilled from Sanity → 4 rows (gldf, rohlax, jacobtest, demo).
+  - **content** backfilled from Sanity → 39 rows (gldf 12, demo 12, rohlax 9, jacobtest 6). 6 stale `rohlax-wellness`-slug docs skipped (FK-safe; legacy orphans to clean in Sanity). `pageConfig` docs are empty stubs — nothing to backfill.
+  - **auth-provisioning trigger** live (`supabase/migrations/20260619120000_auth_provisioning_trigger.sql`): `handle_new_user()` on `auth.users` insert → creates `public.users` (id = auth uid), bootstraps super-admins by email (`super_admin_bootstrap` seeded with rhinehart514@ + noahowsh@), claims invites → memberships. Replaces the Clerk webhook. This is the provisioning model — natural first sign-in provisions everything; no pre-created accounts, no OAuth-linking risk.
+  - `.env.local` has the service-role creds (backfill/scripts); the public/auth-flipping keys are present but COMMENTED until sign-in is wired.
+- **NOT yet done (gated on Jacob-side infra + browser — deliberately not rushed):** configure the **Google OAuth provider in Supabase** (needs Google Cloud client id/secret), the sign-in/sign-up flow swap (Clerk components → Supabase OAuth), the `proxy.ts` single-host rewrite, first real sign-in (auto-provisions Jacob via the trigger), flip the flag (one scheduled logout), then RLS (`rls-draft.sql`) + decommission. The live app still runs on Clerk+Sanity+Redis.
 
 ## Why (the two smells this fixes)
 
@@ -201,9 +211,70 @@ The order matters: **data first, auth last** (auth is the riskiest because it to
 - **Phase 0 — Schema.** Get Noah into the Supabase project. Apply the schema above as `supabase/migrations/`. Add `@supabase/supabase-js` + a server client. No app behavior change yet.
 - **Phase 1 — Backfill (read-only).** One-time scripts copy current Redis + Sanity data into Postgres. Verify counts match. App still reads/writes the old stores.
 - **Phase 2 — Dual-write the operational data.** Each durable subsystem (events, rewards, pay-links, leads, mail-log, …) writes to BOTH Redis and Postgres, reads from Postgres with a Redis fallback. Roll out subsystem by subsystem (the storage layer is already cleanly abstracted in `src/lib/storage/*` and `src/lib/events.ts`, so this is per-module, not a rewrite). Bake each for a few days, then drop the Redis write.
-- **Phase 3 — Content.** Either move content into the `content`/`page_config` tables (kills the Sanity dependency) or keep Sanity and only mirror for RLS — see Decision 1. Reuse the snapshot/restore + draft machinery as-is.
+- **Phase 3 — Content (Decision 1 LOCKED: move into Postgres, kill Sanity).** Backfill the `content`/`page_config`/`draft_content`/`content_versions`/`site_snapshots` tables from the Sanity dataset, then flip `src/lib/storage/*-store.ts` from the Sanity impl to Postgres (same dual-write-then-cut pattern as Phase 2 — the store abstraction makes it per-module, not a rewrite). Move the 10 Sanity images to Vercel Blob. Map the two non-content types (`suggestion`, `review`). Reuse snapshot/restore + draft machinery as-is. Decommission: `/studio` route, `sanity`/`next-sanity`/`@sanity/*` deps, the `api/sanity/webhook` route.
 - **Phase 4 — Auth (the careful one).** Migrate Clerk → Supabase Auth. Export Clerk users → `users`; export `publicMetadata.tenantRoles` → `memberships`; `SUPER_ADMIN_EMAILS` → `super_admins`; Redis invites → `invites`. Cut `auth.protect()` / `isSuperAdmin()` / `hasTenantAccess()` over to Supabase + the membership tables behind a flag, Clerk as fallback during rollout. **This logs users out once** (new session system) — fine at 3 clients, schedule it. Preserve the verified-email gate + last-owner guard exactly.
 - **Phase 5 — Turn on RLS + decommission.** Enable RLS policies (the payoff), confirm isolation with tests, then retire the Redis durable keys, Clerk, and (if Decision 1 says so) Sanity. Redis stays for the ephemeral layer.
+
+## Auth swap (Clerk → Supabase Auth) — Phase 4 detail
+
+Decision LOCKED 2026-06-19 (Supabase Auth, `auth.uid()`). The *data* migration is trivial — **1 Clerk user, Google-only, no password hashes to export**. The *code* swap is the real work: **21 files import `@clerk/nextjs`** (13 app + 8 tests). The identity logic itself is small and well-isolated (`src/lib/auth.ts`, 427 lines) — the cost is breadth, not depth.
+
+### Identity port (one-time, near-empty)
+- **Users:** one row. Insert Jacob into `users` (his Google email, `verified_at = now()`). `clerk_id` bridge column can even stay null — there's nothing to reconcile against.
+- **Super-admins:** today the `SUPER_ADMIN_EMAILS` env allowlist → seed `super_admins` from it (one or two rows).
+- **Memberships:** today Jacob's Clerk `publicMetadata.tenantRoles` (`{ jacobtest: "owner" }`) → one `memberships` row. Real client owners (GLDF, Rohlax, RHM) get seeded the same way from their current metadata when they're created in Postgres.
+- **Invites:** Redis `reb:invites:{email}` → `invites` table (Phase-1 backfill; likely empty/near-empty).
+
+### API mapping (what each Clerk call becomes)
+| Clerk (today) | Supabase (target) | Notes |
+|---|---|---|
+| `auth()` → `{ userId }` (server) | `createServerClient(@supabase/ssr)` + `supabase.auth.getUser()` | `getUser()` re-validates the JWT server-side (don't trust `getSession()` alone for authz). |
+| `currentUser()` + `publicMetadata` | `getUser()` for identity; **roles now come from `memberships`/`super_admins`, not the user object** | This is the conceptual shift: role data leaves the token and lives in Postgres. |
+| verified-email gate (`emailAddresses[].verification.status`) | `user.email_confirmed_at` / identity provider | Google OAuth = provider-verified. **Preserve the invariant: never grant a role/super-admin on an unverified email.** |
+| `clerkClient().users.getUserList()` paginated, in `getTenantOwnerUserIds` | `select user_id from memberships where tenant_id = $1 and role = 'owner'` | **Strictly better** — the 500-page cap + pagination loop collapses to one indexed query (`memberships_tenant_role_idx` already exists). |
+| `clerkClient().users.updateUserMetadata()` in `assignUserToTenant` | `insert into memberships ... on conflict (user_id,tenant_id) do update set role` | Last-owner guard becomes a **transaction** (`select ... for update` on the tenant's owner rows), replacing the Redis `tenant-owner-lock` TOCTOU mitigation — Postgres does this natively and more correctly. |
+| `isSuperAdmin()` (env allowlist) | `select 1 from super_admins where user_id = auth.uid() and revoked_at is null` | Same query the RLS helper uses. Runtime-editable instead of redeploy-to-change. |
+| `clerkMiddleware` + `auth.protect({ unauthenticatedUrl })` in `proxy.ts` | Supabase SSR session read in `proxy.ts` + manual redirect to sign-in when `getUser()` is null | See multi-host risk below — this is the hard part, not the protect call itself. |
+| `createRouteMatcher` (public-route list) | Keep as-is (plain matcher); just gate on the Supabase session instead of Clerk's. | No Clerk dependency in the matcher itself. |
+| Clerk React components (`<SignIn>`, `<SignUp>`, `<UserButton>`, `<ClerkProvider>`) | Custom flows via `supabase.auth.signInWithOAuth({ provider: 'google' })` + a small session context | Touches `app/layout.tsx`, `dashboard/layout.tsx`, `sign-in`, `sign-up`, `account`, `no-access`, `UseInvitedEmailButton`. |
+| `POST /api/clerk/webhook` (svix `user.created` → auto-assign invite) | **Delete.** Replace with a `handle_new_user()` trigger on `auth.users` insert (insert into `public.users`, claim any matching `invites` row → `memberships`). Keep `claimPendingInviteForCurrentUser` as the on-login safety net (mirrors today's webhook + `/account` dual path). | Removes the svix dependency entirely. |
+
+### File inventory (the 21)
+- **Core identity (1):** `src/lib/auth.ts` — rewrite against the Supabase server client + `memberships`/`super_admins`. Preserve the public function signatures (`hasTenantAccess`, `getTenantRole`, `requireTenantAccess`, `assignUserToTenant`, …) so call sites don't churn.
+- **Middleware (1):** `src/proxy.ts` — the multi-host gate (below).
+- **Tenant lib (1):** `src/lib/tenants.ts` — imports Clerk only at the edges; minimal.
+- **Routes (4):** `api/admin/invites`, `api/admin/tenants/assign`, `api/agent`, plus the webhook (`api/clerk/webhook` → deleted).
+- **Pages/components (6):** `app/layout`, `dashboard/layout`, `sign-in`, `sign-up`, `(marketing)/account`, `no-access`, `components/auth/UseInvitedEmailButton`.
+- **Tests (8):** `__tests__/{account-page,admin-invites-route,agent-custom-change,auth-access-pages,auth-permissions,middleware-routing,route-handlers,routes-integration}` — these mock Clerk today; re-point the mocks at the Supabase client. The role-model + invariant tests (verified-email gate, last-owner guard) are the regression net for the rewrite — keep them green throughout.
+
+### Multi-host sessions — RESOLVED (2026-06-19): single dashboard host
+The "one risk that could balloon Phase 4" is **deleted, not solved.** See
+`docs/auth-tenancy-architecture.md` for the full record. The dashboard authenticates only on
+**`app.strelva.com`, tenant in the path** (`app.strelva.com/{tenant}`), with a **host-only cookie**
+— no wildcard, no cross-subdomain session, nothing two-levels deep. Public client sites stay on
+their own domains as unauthenticated read paths (they never carry a dashboard cookie).
+
+Rejected: per-tenant subdomains (the `admin.*.strelva.com` two-level form needs DNS+certs
+provisioned two-deep per tenant — fine at 3, miserable at 50). Custom admin domains are dropped
+(white-label isn't a current goal; re-enters later as a redirect/PKCE handoff if ever needed).
+
+**Effect on the proxy rewrite:** net code *removal* — drop `admin.*` subdomain detection +
+`shouldUseFallbackAuthForAdminHost`/`buildTenantFallbackUrl`. The auth gate runs only on
+`app.strelva.com`.
+
+### Sequencing within Phase 4
+1. ✅ **DONE** — Supabase server/browser clients (`@supabase/ssr`) + session helper + flag, additive.
+2. ✅ **DONE** — `src/lib/auth.ts` dual-path against `memberships`/`super_admins`; signatures stable; Clerk path unchanged (19 tests) + Supabase path tested (9 tests); identity repos built.
+3. ⬜ Rewrite `proxy.ts` to the single-host model (`app.strelva.com`, tenant in path) — drops the `admin.*` + custom-domain auth paths (see `auth-tenancy-architecture.md`). **Needs app-runtime testing — don't ship blind.**
+4. ⬜ Swap the React components / sign-in flow (Clerk → Supabase `signInWithOAuth`). **Needs env + browser testing.**
+5. ✅ **DONE** — `handle_new_user()` trigger applied + super-admin bootstrap seeded; tenants + content backfilled. Provisioning model = natural first sign-in (decision resolved: no pre-create → no OAuth-linking risk). Webhook deletion happens with the sign-in swap (step 4).
+6. ⬜ Configure Google OAuth provider in Supabase (Jacob — Google Cloud creds), then flip the flag (the single scheduled logout), bake, remove Clerk deps. → unblocks Phase 5 (`rls-draft.sql`).
+
+### Open decision before step 5: identity provisioning model
+`users.id` should equal the Supabase `auth.uid()`. Two ways to seed the one real user (Jacob, Google):
+- **(A) pre-provision** via `auth.admin.createUser({ email, email_confirm: true })` → use the returned uid as `users.id`, then membership/super-admin rows. Google sign-in links by email. Clean; needs identity-linking confirmed.
+- **(B) bridge** — seed `users` now with `clerk_id` + random id; reconcile to the real `auth.uid` on first Supabase sign-in (match by email).
+At 1 user / 4 tenants this is a handful of inserts done interactively at cutover, not a script worth writing. Recommend **(A)**. Decide with creds in hand + a throwaway-tenant test (do NOT test against the live shared DB — see [[shared-db-test-on-throwaway-org]]).
 
 ## Effort / risk
 
@@ -214,7 +285,7 @@ The order matters: **data first, auth last** (auth is the riskiest because it to
 
 ## Open decisions (Noah + Jacob)
 
-1. **Sanity: keep or kill?** Content could move fully into Postgres JSONB (one less vendor, content under RLS), or Sanity stays for its editing/versioning UX (the AI agent is built around it). Recommend: move it to Postgres for the consolidation win, *unless* Jacob is relying on Sanity Studio for manual edits.
-2. **Auth: Supabase Auth vs keep Clerk.** Supabase Auth + RLS is the tight combo and one less vendor. Clerk's multi-host login (tenant subdomains, custom admin domains) is genuinely slicker and already built. This is the one swap worth debating — if the multi-host auth is painful to replicate, keep Clerk and still move data to Postgres (RLS then keys off a Clerk-JWT claim instead of `auth.uid()`).
+1. ~~**Sanity: keep or kill?**~~ **RESOLVED (2026-06-19): KILL — content moves to Postgres.** Settled by a live read of the Sanity dataset (`fcghwrak`/`production`). The only reason to keep Sanity is human editing UX, and **nobody uses it that way**: 607 docs / 31 types / 4 tenants, and every content-section write is either a provisioning/seed batch (5-8 sections written in the same ~10s) or an app/agent/cron write — **zero human Studio edits** in the history. Sanity is a programmatic doc store, which Postgres does + RLS. Surface is small and already mapped to migrations 0001/0002 (gaps: `suggestion` ×87 → small table or `unified_events`; `review` ×3 → integration-cached). Only **10 images** in Sanity's pipeline and uploads already go to Vercel Blob, so no real media migration. 62 files touch Sanity but almost all via `src/lib/storage/*-store.ts` — swap store impls, not logic. Side wins: drops the `/studio` route, `sanity`/`next-sanity`/`@sanity/*` deps (and dependabot #56). **Confirmed (Noah, 2026-06-19):** nobody hand-edits in Studio — the AI agent is the editing surface (clients request changes via the agent, which writes content). Sanity's CMS strengths are entirely in the unused column.
+2. ~~**Auth: Supabase Auth vs keep Clerk.**~~ **RESOLVED (Noah, 2026-06-19): Supabase Auth.** The only argument for keeping Clerk was migration risk, and a live read of the Clerk instance killed it — 1 user, Google-only, no passwords, 0 orgs. RLS keys off `auth.uid()`. The one genuine thing Clerk gave for free — multi-host login across custom admin domains — now becomes real Phase-4 work; see the "Auth swap" section for how it's replaced and the one risk to verify first.
 3. **Token encryption.** `integrations` holds OAuth access/refresh tokens. Encrypt at rest (pgcrypto or app-level) — don't store them plaintext in Postgres.
 4. ~~**The orphaned Supabase project** (`zthifbnrtsirdekzzlxs`): use it or start fresh?~~ **RESOLVED:** it was a near-empty stub; it's now the target with the schema applied. (Still worth deciding long-term home — the `websites` org is shared with Jacob's other projects; fine, or move to a dedicated Strelva org both fully own.)

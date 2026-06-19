@@ -177,3 +177,165 @@ export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"m
     return data ?? [];
   }, []);
 }
+
+// ---------------------------------------------------------------------------
+// IDENTITY & ACCESS — the Supabase-Auth target for src/lib/auth.ts.
+// Today these reads live in Clerk publicMetadata + the SUPER_ADMIN_EMAILS env
+// allowlist + Redis invites. These repos back the auth swap (Phase 4); they use
+// the SERVICE_ROLE client deliberately — authorization computations (owner guard,
+// super-admin check) must see across tenants, and they run server-side only.
+// See docs/auth-tenancy-architecture.md (Plane 2) + docs/supabase-migration-plan.md.
+// ---------------------------------------------------------------------------
+
+// users -----------------------------------------------------------------------
+
+export async function upsertUser(user: Insert<"users">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`upsertUser ${user.email}`, async () => {
+    const { error } = await db.from("users").upsert(user, { onConflict: "email" });
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function getUserByEmail(email: string): Promise<Row<"users"> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getUserByEmail ${email}`, async () => {
+    const { data, error } = await db.from("users").select("*").eq("email", email).maybeSingle();
+    if (error) throw error;
+    return data;
+  }, null);
+}
+
+export async function getUserByClerkId(clerkId: string): Promise<Row<"users"> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getUserByClerkId ${clerkId}`, async () => {
+    const { data, error } = await db.from("users").select("*").eq("clerk_id", clerkId).maybeSingle();
+    if (error) throw error;
+    return data;
+  }, null);
+}
+
+// memberships -----------------------------------------------------------------
+
+export async function listMembershipsForUser(userId: string): Promise<Row<"memberships">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listMembershipsForUser ${userId}`, async () => {
+    const { data, error } = await db.from("memberships").select("*").eq("user_id", userId);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+/** The user's role on a tenant, or null if they have no membership. */
+export async function getMembershipRole(userId: string, tenantId: string): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getMembershipRole ${userId}/${tenantId}`, async () => {
+    const { data, error } = await db
+      .from("memberships")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.role ?? null;
+  }, null);
+}
+
+/** User ids that are OWNER of a tenant. Replaces the paginated Clerk user-list
+ *  scan in getTenantOwnerUserIds — one indexed query (memberships_tenant_role_idx). */
+export async function listTenantOwnerIds(tenantId: string): Promise<string[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listTenantOwnerIds ${tenantId}`, async () => {
+    const { data, error } = await db
+      .from("memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("role", "owner");
+    if (error) throw error;
+    return (data ?? []).map((m) => m.user_id);
+  }, []);
+}
+
+export async function upsertMembership(membership: Insert<"memberships">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`upsertMembership ${membership.user_id}/${membership.tenant_id}`, async () => {
+    const { error } = await db
+      .from("memberships")
+      .upsert(membership, { onConflict: "user_id,tenant_id" });
+    if (error) throw error;
+  }, undefined);
+}
+
+// super_admins ----------------------------------------------------------------
+
+/** True if the user is an active super-admin (granted, not revoked). Replaces the
+ *  SUPER_ADMIN_EMAILS env allowlist — same shape as the RLS app_is_super_admin(). */
+export async function isSuperAdminUser(userId: string): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  return safe(`isSuperAdminUser ${userId}`, async () => {
+    const { data, error } = await db
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", userId)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (error) throw error;
+    return data !== null;
+  }, false);
+}
+
+// invites ---------------------------------------------------------------------
+
+/** The pending (unclaimed, unexpired) invite for an email, optionally scoped to a
+ *  tenant. Mirrors Redis reb:invites:{email}. */
+export async function getPendingInvite(
+  email: string,
+  tenant?: string
+): Promise<Row<"invites"> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getPendingInvite ${email}`, async () => {
+    let q = db
+      .from("invites")
+      .select("*")
+      .eq("email", email)
+      .is("claimed_at", null)
+      .gt("expires_at", new Date().toISOString());
+    if (tenant) q = q.eq("tenant_id", tenant);
+    const { data, error } = await q.order("invited_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    return data;
+  }, null);
+}
+
+export async function createInvite(invite: Insert<"invites">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`createInvite ${invite.email}/${invite.tenant_id}`, async () => {
+    const { error } = await db.from("invites").upsert(invite, { onConflict: "email,tenant_id" });
+    if (error) throw error;
+  }, undefined);
+}
+
+/** Mark an invite claimed once access is granted (mirrors consumeInvite). */
+export async function markInviteClaimed(email: string, tenantId: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`markInviteClaimed ${email}/${tenantId}`, async () => {
+    const { error } = await db
+      .from("invites")
+      .update({ claimed_at: new Date().toISOString() })
+      .eq("email", email)
+      .eq("tenant_id", tenantId)
+      .is("claimed_at", null);
+    if (error) throw error;
+  }, undefined);
+}

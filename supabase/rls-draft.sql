@@ -2,20 +2,22 @@
 -- Strelva RLS — DRAFT (do NOT apply yet; this is not a numbered migration)
 -- ===========================================================================
 -- This is the payoff of the whole migration: tenant isolation becomes a
--- DATABASE guarantee instead of a code discipline. It's held out of migrations/
--- because its shape depends on ONE open decision — Supabase Auth vs keep Clerk
--- (docs/supabase-migration-plan.md, Decision 2).
+-- DATABASE guarantee instead of a code discipline.
 --
--- KEY INSIGHT: only the two HELPER FUNCTIONS depend on the auth choice. The
--- POLICIES below are auth-agnostic — they call app_is_super_admin() and
--- app_tenant_ids(). So the decision swaps ~15 lines, not the whole file.
+-- Auth decision is LOCKED (2026-06-19): Supabase Auth, RLS keyed off
+-- auth.uid(). See docs/supabase-migration-plan.md, Decision 2 + the
+-- "Auth swap (Clerk → Supabase Auth)" section. The Clerk-JWT variant (B) has
+-- been deleted; the rationale that made it unnecessary — one user, Google-only,
+-- zero re-onboarding risk — is recorded in the plan.
 --
--- To ship: pick VARIANT A or B for the helpers, drop the other, then
--- `supabase migration new rls` and paste helpers + policies into it.
+-- Still held out of migrations/ on purpose: per the phased plan, RLS goes on
+-- LAST (Phase 5), AFTER the auth swap wires real per-user JWTs. Enabling it
+-- before then would gate every request on an auth.uid() that doesn't exist yet.
+-- To ship when Phase 5 arrives: `supabase migration new rls`, paste this file.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- HELPERS — VARIANT A: Supabase Auth (auth.uid() is the user id)
+-- HELPERS — Supabase Auth (auth.uid() is the user id)
 -- ---------------------------------------------------------------------------
 create or replace function app_is_super_admin() returns boolean
   language sql stable security definer set search_path = public as $$
@@ -29,33 +31,6 @@ create or replace function app_tenant_ids() returns setof text
   language sql stable security definer set search_path = public as $$
   select tenant_id from memberships where user_id = auth.uid();
 $$;
-
--- ---------------------------------------------------------------------------
--- HELPERS — VARIANT B: keep Clerk (Clerk configured as a Supabase third-party
--- auth provider; the request JWT is Clerk's, with the Clerk user id in `sub`).
--- Use these INSTEAD of Variant A if we keep Clerk. users.clerk_id bridges
--- Clerk's id to our users row.
--- ---------------------------------------------------------------------------
--- create or replace function app_clerk_user_id() returns text
---   language sql stable as $$
---   select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '');
--- $$;
---
--- create or replace function app_is_super_admin() returns boolean
---   language sql stable security definer set search_path = public as $$
---   select exists (
---     select 1 from super_admins s
---     join users u on u.id = s.user_id
---     where u.clerk_id = app_clerk_user_id() and s.revoked_at is null
---   );
--- $$;
---
--- create or replace function app_tenant_ids() returns setof text
---   language sql stable security definer set search_path = public as $$
---   select m.tenant_id from memberships m
---   join users u on u.id = m.user_id
---   where u.clerk_id = app_clerk_user_id();
--- $$;
 
 -- ---------------------------------------------------------------------------
 -- POLICIES (auth-agnostic) — the standard tenant-scoped tables.
@@ -98,7 +73,7 @@ create policy tenants_member_rw on tenants for all
 -- users: see your own row; super-admins see all
 alter table users enable row level security;
 create policy users_self on users for select
-  using (id = auth.uid() or app_is_super_admin());   -- (Variant B: clerk_id = app_clerk_user_id())
+  using (id = auth.uid() or app_is_super_admin());
 
 -- memberships: see your own; super-admins manage all
 alter table memberships enable row level security;
