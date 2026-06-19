@@ -265,8 +265,8 @@ provisioned two-deep per tenant — fine at 3, miserable at 50). Custom admin do
 ### Sequencing within Phase 4
 1. ✅ **DONE** — Supabase server/browser clients (`@supabase/ssr`) + session helper + flag, additive.
 2. ✅ **DONE** — `src/lib/auth.ts` dual-path against `memberships`/`super_admins`; signatures stable; Clerk path unchanged (19 tests) + Supabase path tested (9 tests); identity repos built.
-3. ⬜ Rewrite `proxy.ts` to the single-host model (`app.strelva.com`, tenant in path) — drops the `admin.*` + custom-domain auth paths (see `auth-tenancy-architecture.md`). **Needs app-runtime testing — don't ship blind.**
-4. ⬜ Swap the React components / sign-in flow (Clerk → Supabase `signInWithOAuth`). **Needs env + browser testing.**
+3. ✅ **DONE (gate only) + runtime-verified** — `proxy.ts` dual-paths the auth gate (`gateRequest`): Supabase session when configured, Clerk otherwise (`middleware-client.ts`). Dev-server test (Supabase on, bypass off): protected routes 307→/sign-in, public routes 200, all routing tests green. The single-host *simplification* (drop `admin.*`/custom-domain auth) is deferred to a follow-up — not required for auth to work.
+4. ✅ **DONE + runtime-verified** — `SupabaseSignIn` (Google OAuth + magic-link) + `/auth/callback` code-exchange; sign-in page swaps behind the flag. Dev server renders the Supabase UI on the tenant sign-in page. Sign-up page + `ClerkProvider` removal deferred to the Clerk-decommission step (harmless during transition).
 5. ✅ **DONE** — `handle_new_user()` trigger applied + super-admin bootstrap seeded; tenants + content backfilled. Provisioning model = natural first sign-in (decision resolved: no pre-create → no OAuth-linking risk). Webhook deletion happens with the sign-in swap (step 4).
 6. ⬜ Configure Google OAuth provider in Supabase (Jacob — Google Cloud creds), then flip the flag (the single scheduled logout), bake, remove Clerk deps. → unblocks Phase 5 (`rls-draft.sql`).
 
