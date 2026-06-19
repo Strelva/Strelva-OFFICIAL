@@ -3,6 +3,7 @@ import { Instrument_Serif, Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
+import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -49,16 +50,19 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <ClerkProvider>
-      <html lang="en">
-        <body
-          className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
-        >
-          {children}
-          <Analytics />
-        </body>
-      </html>
-    </ClerkProvider>
+  const shell = (
+    <html lang="en">
+      <body
+        className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
+      >
+        {children}
+        <Analytics />
+      </body>
+    </html>
   );
+
+  // On the Supabase auth path no Clerk client components render (sign-in/up +
+  // sign-out are all swapped behind the flag), so ClerkProvider is unnecessary.
+  // Keeping it only on the Clerk path means the provider drops cleanly at cutover.
+  return isSupabaseAuthConfigured() ? shell : <ClerkProvider>{shell}</ClerkProvider>;
 }
