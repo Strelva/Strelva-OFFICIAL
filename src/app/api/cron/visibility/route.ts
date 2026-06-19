@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { alertOnce } from "@/lib/monitoring";
+import { selectRunWindow } from "@/lib/visibility/schedule";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { buildSerpProvider, DEFAULT_QUERIES_PER_WEEK, computeMonthlyCost } from "@/lib/visibility/serp";
@@ -54,15 +55,16 @@ export async function GET() {
   // every tenant is covered over ceil(n/cap) weeks — and a deferred run pages
   // (deduped) so the cap can never silently drop tenants.
   const MAX_TENANTS_PER_RUN = Number(process.env.VISIBILITY_MAX_TENANTS_PER_RUN || 50);
-  const windowCount = Math.max(1, Math.ceil(active.length / MAX_TENANTS_PER_RUN));
   const weekIndex = Math.floor(Date.now() / (7 * 24 * 3600 * 1000));
-  const offset = (weekIndex % windowCount) * MAX_TENANTS_PER_RUN;
-  const toRun = active.slice(offset, offset + MAX_TENANTS_PER_RUN);
-  const deferred = active.length - toRun.length;
+  const { toRun, deferred, windowCount, windowIndex } = selectRunWindow(
+    active,
+    MAX_TENANTS_PER_RUN,
+    weekIndex
+  );
   if (deferred > 0) {
     console.warn(
       `[visibility-cron] tenant cap hit: probing ${toRun.length}/${active.length} ` +
-      `(window ${(weekIndex % windowCount) + 1}/${windowCount}), ${deferred} deferred this week`
+      `(window ${windowIndex}/${windowCount}), ${deferred} deferred this week`
     );
     await alertOnce(
       "visibility_tenant_cap_hit",

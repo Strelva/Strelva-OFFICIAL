@@ -1,5 +1,5 @@
 /**
- * AI Visibility Score — the AnswerRank proof-of-magic.
+ * AI Visibility Score — Strelva's proof-of-magic.
  *
  * One input (a business) -> one wow ("you're invisible to AI search", A-F).
  *
