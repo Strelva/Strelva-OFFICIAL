@@ -1,4 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { createMiddlewareSupabase } from "@/lib/db/middleware-client";
+import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
@@ -351,6 +353,32 @@ export async function resolveTenantFromCustomDomain(
   return resolveTenantFromDomainMap(normalized, envMap);
 }
 
+/**
+ * Auth gate (migration Phase 4). When Supabase Auth is configured, gate on the
+ * Supabase session; otherwise use Clerk's auth.protect(). Returns a redirect
+ * Response when the request is unauthenticated, or null when allowed. Keeping the
+ * clerkMiddleware wrapper means `auth` is always available for the Clerk path; the
+ * Supabase branch ignores it. (Single-host simplification is a separate follow-up.)
+ */
+async function gateRequest(
+  auth: { protect: (opts: { unauthenticatedUrl: string }) => Promise<unknown> },
+  req: NextRequest,
+  signInUrl: string
+): Promise<NextResponse | null> {
+  if (isSupabaseAuthConfigured()) {
+    const supabase = createMiddlewareSupabase(req);
+    if (supabase) {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
+      }
+    }
+    return null;
+  }
+  await auth.protect({ unauthenticatedUrl: signInUrl });
+  return null;
+}
+
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
@@ -500,9 +528,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       const signInUrl = tenantFromClientPath || customAdminHostUsesFallbackAuth
         ? buildTenantFallbackUrl(req, tenantId, "/sign-in")
         : new URL("/sign-in", req.url);
-      await auth.protect({
-        unauthenticatedUrl: signInUrl.toString(),
-      });
+      const denied = await gateRequest(auth, req, signInUrl.toString());
+      if (denied) return denied;
     }
 
     if (tenantFromClientPath) {
@@ -522,9 +549,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   if (!devAccessBypass && !isPublicRoute(req)) {
     const signInUrl = new URL("/sign-in", req.url);
-    await auth.protect({
-      unauthenticatedUrl: signInUrl.toString(),
-    });
+    const denied = await gateRequest(auth, req, signInUrl.toString());
+    if (denied) return denied;
   }
 
   // No tenant resolved (apex/marketing host). Strip client-supplied trust
