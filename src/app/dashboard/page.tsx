@@ -13,6 +13,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { getLatestSiteSnapshot } from "@/lib/storage";
 import { getOwnerRetentionSignals } from "@/lib/retention";
+import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
@@ -63,6 +64,11 @@ async function DashboardHome({
   if (!hasAccess) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
+
+  // Proactive nudges: turn already-cheap signals (unreplied reviews, stale site,
+  // no posts) into pending suggestions so the product feels managed. Idempotent
+  // (addSuggestion dedupes) and isolated — must never block render or throw.
+  await generateProactiveSuggestions(tenant).catch(() => {});
 
   const [
     pageViews,
