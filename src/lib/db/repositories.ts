@@ -471,3 +471,69 @@ export async function deleteEntry(tenantId: string, type: string, slug: string):
     if (error) throw error;
   }, undefined);
 }
+
+// ---------------------------------------------------------------------------
+// draft_content (unpublished section drafts — the admin override queue source)
+// ---------------------------------------------------------------------------
+
+export async function getDraftContentData(
+  tenant: string,
+  section: string
+): Promise<Record<string, unknown> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getDraftContentData ${tenant}/${section}`, async () => {
+    const { data, error } = await db
+      .from("draft_content")
+      .select("data")
+      .eq("tenant_id", tenant)
+      .eq("section", section)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.data as Record<string, unknown>) ?? null;
+  }, null);
+}
+
+export async function upsertDraftContentData(
+  tenant: string,
+  section: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`upsertDraftContentData ${tenant}/${section}`, async () => {
+    const { error } = await db
+      .from("draft_content")
+      .upsert(
+        { tenant_id: tenant, section, data: data as Insert<"draft_content">["data"], updated_at: new Date().toISOString() },
+        { onConflict: "tenant_id,section" }
+      );
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function deleteDraftContentData(tenant: string, section: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`deleteDraftContentData ${tenant}/${section}`, async () => {
+    const { error } = await db
+      .from("draft_content")
+      .delete()
+      .eq("tenant_id", tenant)
+      .eq("section", section);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listDraftSections(tenant: string): Promise<string[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listDraftSections ${tenant}`, async () => {
+    const { data, error } = await db
+      .from("draft_content")
+      .select("section")
+      .eq("tenant_id", tenant);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.section);
+  }, []);
+}
