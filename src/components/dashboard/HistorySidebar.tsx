@@ -15,6 +15,7 @@ import {
   BarChart3,
   Star,
   Plus,
+  FileText,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
   { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
   { href: "/dashboard/sources", label: "Sources", icon: Link2 },
+  { href: "/dashboard/collections", label: "Content", icon: FileText },
   { href: "/dashboard/reviews", label: "Reviews", icon: Star },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
 ];
