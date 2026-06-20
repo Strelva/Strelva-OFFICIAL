@@ -6,6 +6,7 @@ const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetTenantDashboardUrl = vi.hoisted(() => vi.fn());
 const mockGetUserList = vi.hoisted(() => vi.fn());
+const mockFindUserIdByEmail = vi.hoisted(() => vi.fn());
 const mockRequireTenantPermission = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
@@ -18,6 +19,7 @@ vi.mock("@/lib/auth", () => ({
   getActorContext: mockGetActorContext,
   isSuperAdmin: vi.fn(() => Promise.resolve(true)),
   requireTenantPermission: mockRequireTenantPermission,
+  findUserIdByEmail: mockFindUserIdByEmail,
 }));
 
 vi.mock("@/lib/storage", () => ({
@@ -69,6 +71,7 @@ describe("admin invites route", () => {
     });
     mockGetTenantDashboardUrl.mockReturnValue("https://admin.greatlakesdriedfruit.com/sign-up");
     mockGetUserList.mockResolvedValue({ data: [] });
+    mockFindUserIdByEmail.mockResolvedValue(null);
     mockCreateInvite.mockResolvedValue(true);
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
@@ -140,7 +143,7 @@ describe("admin invites route", () => {
   });
 
   it("audits assigning an already-existing user to the tenant", async () => {
-    mockGetUserList.mockResolvedValue({ data: [{ id: "user_existing" }] });
+    mockFindUserIdByEmail.mockResolvedValue("user_existing");
     mockAssignUserToTenant.mockResolvedValue(true);
 
     const { POST } = await import("@/app/api/admin/invites/route");

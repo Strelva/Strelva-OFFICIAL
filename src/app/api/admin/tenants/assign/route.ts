@@ -5,11 +5,11 @@ import {
   assignUserToTenant,
   requireTenantPermission,
   getActorContext,
+  findUserIdByEmail,
   LastOwnerError,
   type ClientRole,
 } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
-import { clerkClient } from "@clerk/nextjs/server";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -51,14 +51,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const client = await clerkClient();
-    const users = await client.users.getUserList({ emailAddress: [email] });
-
-    if (users.data.length === 0) {
-      return NextResponse.json({ error: "User not found in Clerk" }, { status: 404 });
+    const userId = await findUserIdByEmail(email);
+    if (!userId) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const userId = users.data[0].id;
     let assigned: boolean;
     try {
       assigned = await assignUserToTenant(userId, tenantId, role);

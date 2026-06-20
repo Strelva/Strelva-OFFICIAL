@@ -2,8 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { TenantConfig } from "./types";
 import { getRedis } from "./redis";
-import { assignUserToTenant } from "./auth";
-import { clerkClient } from "@clerk/nextjs/server";
+import { assignUserToTenant, findUserIdByEmail } from "./auth";
 import { isProductionEnv } from "./production-guard";
 import { getTenantPrimaryDomain, normalizeTenantDomain } from "./tenant-urls";
 
@@ -322,16 +321,15 @@ export async function createTenant(
     invalidateCache();
   }
 
-  // Auto-assign owner if they already exist in Clerk
+  // Auto-assign owner if they already have an account.
   if (config.ownerEmail) {
     try {
-      const client = await clerkClient();
-      const users = await client.users.getUserList({ emailAddress: [config.ownerEmail] });
-      if (users.data.length > 0) {
-        await assignUserToTenant(users.data[0].id, tenant.id);
+      const ownerId = await findUserIdByEmail(config.ownerEmail);
+      if (ownerId) {
+        await assignUserToTenant(ownerId, tenant.id);
       }
     } catch {
-      // Owner not in Clerk yet — will be assigned when they sign up
+      // Owner has no account yet; they'll be assigned when they sign up.
     }
   }
 

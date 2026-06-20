@@ -6,13 +6,13 @@ import {
   assignUserToTenant,
   requireTenantPermission,
   getActorContext,
+  findUserIdByEmail,
   type ClientRole,
 } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
-import { clerkClient } from "@clerk/nextjs/server";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
 
@@ -91,11 +91,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 
-  const client = await clerkClient();
-  const existingUsers = await client.users.getUserList({ emailAddress: [email] });
+  const existingUserId = await findUserIdByEmail(email);
 
-  if (existingUsers.data.length > 0) {
-    const userId = existingUsers.data[0].id;
+  if (existingUserId) {
+    const userId = existingUserId;
     const assigned = await assignUserToTenant(userId, tenantId, role);
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign existing user" }, { status: 500 });

@@ -294,8 +294,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     for (const source of [invite, assign]) {
       expect(source).toContain("normalizeEmail");
       expect(source).toContain("trim().toLowerCase()");
-      expect(source).toContain("emailAddress: [email]");
-      expect(source).not.toContain("emailAddress: [rawEmail]");
+      // user lookup goes through the dual-path findUserIdByEmail using the
+      // normalized `email`, never the raw input.
+      expect(source).toContain("findUserIdByEmail(email)");
+      expect(source).not.toContain("findUserIdByEmail(rawEmail)");
     }
 
     const inviteEmail = readFileSync(path.join(process.cwd(), "src/lib/invite-email.ts"), "utf8");

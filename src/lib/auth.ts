@@ -13,6 +13,7 @@ import {
   upsertMembership,
   getPendingInvite,
   markInviteClaimed,
+  getUserByEmail,
 } from "./db/repositories";
 
 // ---------------------------------------------------------------------------
@@ -219,6 +220,19 @@ export async function getAuthUserId(): Promise<string | null> {
   }
   const { userId } = await auth();
   return userId;
+}
+
+/** Find an existing user's id by email (Supabase users table, else Clerk lookup),
+ *  or null if no account exists yet. Used by admin assign/invite flows to decide
+ *  assign-now vs send-an-invite. Dual-path so it survives the Clerk→Supabase cutover. */
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  if (isSupabaseAuthConfigured()) {
+    const user = await getUserByEmail(email);
+    return user?.id ?? null;
+  }
+  const client = await clerkClient();
+  const users = await client.users.getUserList({ emailAddress: [email] });
+  return users.data.length > 0 ? users.data[0].id : null;
 }
 
 /** The tenants the current user has access to. Dual-path: memberships table on the
