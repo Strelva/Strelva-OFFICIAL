@@ -1,5 +1,6 @@
 import { getRedis } from "./redis";
 import type { ClientRole } from "./auth";
+import { createInvite as createInvitePg } from "./db/repositories";
 
 const INVITE_PREFIX = "reb:invites:";
 const INVITE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -41,6 +42,19 @@ export async function createInvite(
   if (result === null || result === undefined || result === false) {
     throw new InviteStorageError(`Redis did not confirm invite storage for ${email}`);
   }
+
+  // Also write the invite to Postgres. This is LOAD-BEARING on the Supabase auth
+  // path: the handle_new_user trigger + claimPendingInviteForCurrentUser grant
+  // access by reading the Postgres `invites` table, so without this a newly
+  // invited client signs in and gets no membership. Null-safe (no-op when
+  // Supabase is unconfigured); never throws into the invite flow.
+  await createInvitePg({
+    email: email.toLowerCase(),
+    tenant_id: tenant,
+    role,
+    // invited_by is a users(id) uuid FK; the Redis invitedBy is an email/string,
+    // so leave it null rather than break the FK. expires_at defaults to +30d.
+  });
 
   return true;
 }

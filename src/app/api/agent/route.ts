@@ -1263,24 +1263,28 @@ Only use tools for manifest-supported sections and actions. If the user requests
         description: "Show the photo library inline in the chat. Use when user asks 'show my photos', 'what photos do I have?', 'show my images', etc.",
         inputSchema: z.object({}),
         execute: async () => {
-          const { getSanityReadClient } = await import("@/lib/sanity");
-          const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) [0...20] {
-            _id,
-            url,
-            originalFilename
-          }`;
-          const raw = await getSanityReadClient().fetch(query, { tenant });
-          const assets = (raw || []) as Array<{ _id: string; url: string; originalFilename: string }>;
+          try {
+            const { getSanityReadClient } = await import("@/lib/sanity");
+            const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) [0...20] {
+              _id,
+              url,
+              originalFilename
+            }`;
+            const raw = await getSanityReadClient().fetch(query, { tenant });
+            const assets = (raw || []) as Array<{ _id: string; url: string; originalFilename: string }>;
 
-          return {
-            __inlineTool: "show_photos",
-            photos: assets.slice(0, 6).map((a) => ({
-              id: a._id,
-              url: a.url,
-              filename: a.originalFilename || "untitled",
-            })),
-            total: assets.length,
-          };
+            return {
+              __inlineTool: "show_photos",
+              photos: assets.slice(0, 6).map((a) => ({
+                id: a._id,
+                url: a.url,
+                filename: a.originalFilename || "untitled",
+              })),
+              total: assets.length,
+            };
+          } catch (err) {
+            return { error: `Failed to load photos: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
         },
       }),
     },
