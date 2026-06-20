@@ -20,7 +20,10 @@ export default defineConfig({
           : `PLAYWRIGHT_DIST_DIR=.next-playwright pnpm exec next dev --port ${port}`,
         url: `${baseURL}/api/health`,
         reuseExistingServer: false,
-        timeout: 120_000,
+        // Cold Turbopack `next dev` compile-on-first-request on a CI runner can
+        // exceed the old 120s; the app has grown (auth dual-path, Supabase
+        // clients). Give the readiness probe room so the job does not flake.
+        timeout: 240_000,
       },
   projects: [{ name: "desktop", use: { ...devices["Desktop Chrome"] } }],
 });
