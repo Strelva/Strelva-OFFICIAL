@@ -14,8 +14,16 @@ import {
   setCachedContent,
 } from "./content-cache";
 import { addSentryBreadcrumb } from "../sentry-context";
+import { getContentData, upsertContentData } from "../db/repositories";
 
 export { DEFAULT_TENANT };
+
+/** Phase 3: when CONTENT_SOURCE=postgres, read content sections from the Postgres
+ *  `content` table instead of Sanity. Opt-in + env-gated so the live app stays on
+ *  Sanity until the migration is flipped. */
+function contentSourceIsPostgres(): boolean {
+  return process.env.CONTENT_SOURCE === "postgres";
+}
 
 // --- Sanity document type mapping ---
 
@@ -123,7 +131,15 @@ export async function getContent<K extends ContentSection>(
   }
 
   let data: ContentMap[K];
-  if (hasSanity) {
+  // Phase 3: Postgres is the source of truth when CONTENT_SOURCE=postgres. The
+  // stored row's data mirrors the Sanity doc shape, so transformSanityImages keeps
+  // image-field parity. A miss falls through to Sanity/dev so the cutover is safe.
+  const pgRaw = contentSourceIsPostgres()
+    ? await getContentData(tenant, SECTION_TO_TYPE[section])
+    : null;
+  if (pgRaw) {
+    data = transformSanityImages(section, pgRaw);
+  } else if (hasSanity) {
     const type = SECTION_TO_TYPE[section];
     const query = `*[_type == $type && tenant == $tenant][0]`;
     const doc = await getSanityReadClient().fetch(query, { type, tenant });
@@ -153,7 +169,15 @@ export async function setContent<K extends ContentSection>(
 ): Promise<void> {
   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
   try {
-    if (hasSanity) {
+    if (contentSourceIsPostgres()) {
+      // Phase 3: Postgres is the source of truth. Store the frontend data shape as-is;
+      // transformSanityImages on read is a no-op for already-URL'd image fields.
+      await upsertContentData(
+        tenant,
+        SECTION_TO_TYPE[section],
+        data as unknown as Record<string, unknown>
+      );
+    } else if (hasSanity) {
       const type = SECTION_TO_TYPE[section];
       const query = `*[_type == $type && tenant == $tenant][0]._id`;
       const existingId = await getSanityClient().fetch(query, { type, tenant });

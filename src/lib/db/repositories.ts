@@ -339,3 +339,46 @@ export async function markInviteClaimed(email: string, tenantId: string): Promis
     if (error) throw error;
   }, undefined);
 }
+
+// ---------------------------------------------------------------------------
+// CONTENT (Phase 3 — Postgres as the content source, replacing Sanity).
+// `section` is the stored Sanity _type (= SECTION_TO_TYPE[appSection]); `data` is
+// the section JSONB. Null-safe: returns null when Supabase is unconfigured so the
+// content store falls through to Sanity.
+// ---------------------------------------------------------------------------
+
+export async function getContentData(
+  tenant: string,
+  section: string
+): Promise<Record<string, unknown> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getContentData ${tenant}/${section}`, async () => {
+    const { data, error } = await db
+      .from("content")
+      .select("data")
+      .eq("tenant_id", tenant)
+      .eq("section", section)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.data as Record<string, unknown> | undefined) ?? null;
+  }, null);
+}
+
+/** Upsert a content section's data. Throws on failure so the content store can
+ *  invalidate the cache and surface the error (matches the Sanity write path). */
+export async function upsertContentData(
+  tenant: string,
+  section: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const db = getSupabase();
+  if (!db) throw new Error("Supabase not configured");
+  const { error } = await db
+    .from("content")
+    .upsert(
+      { tenant_id: tenant, section, data: data as Insert<"content">["data"] },
+      { onConflict: "tenant_id,section" }
+    );
+  if (error) throw error;
+}
