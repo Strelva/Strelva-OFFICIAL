@@ -537,3 +537,79 @@ export async function listDraftSections(tenant: string): Promise<string[]> {
     return (data ?? []).map((r) => r.section);
   }, []);
 }
+
+// ---------------------------------------------------------------------------
+// audit_logs (super-admin action trail)
+// ---------------------------------------------------------------------------
+
+export async function insertAuditLog(entry: Insert<"audit_logs">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`insertAuditLog ${entry.id}`, async () => {
+    const { error } = await db.from("audit_logs").insert(entry);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listAuditLogs(tenant: string, limit = 100): Promise<Row<"audit_logs">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listAuditLogs ${tenant}`, async () => {
+    const { data, error } = await db
+      .from("audit_logs")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("time", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+export async function listAllAuditLogs(limit = 100): Promise<Row<"audit_logs">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe("listAllAuditLogs", async () => {
+    const { data, error } = await db
+      .from("audit_logs")
+      .select("*")
+      .order("time", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+// ---------------------------------------------------------------------------
+// activity_log (content-change trail; dashboard activity feed)
+// ---------------------------------------------------------------------------
+
+export async function insertActivity(entry: Insert<"activity_log">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`insertActivity ${entry.tenant_id}`, async () => {
+    const { error } = await db.from("activity_log").insert(entry);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listActivity(
+  tenant: string,
+  opts?: { section?: string; actor?: string; limit?: number }
+): Promise<Row<"activity_log">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listActivity ${tenant}`, async () => {
+    let q = db
+      .from("activity_log")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("time", { ascending: false })
+      .limit(opts?.limit ?? 50);
+    if (opts?.section) q = q.eq("section", opts.section);
+    if (opts?.actor) q = q.eq("actor", opts.actor);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}

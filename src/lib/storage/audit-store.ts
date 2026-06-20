@@ -5,6 +5,46 @@
 import { getSanityClient, getSanityReadClient } from "../sanity";
 import type { ActorContext } from "../auth";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { dataSourceIsPostgres } from "../db/source-flags";
+import { insertAuditLog, listAuditLogs, listAllAuditLogs } from "../db/repositories";
+import type { Row, Insert } from "../db/client";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function auditToInsert(e: AuditLogEntry): Insert<"audit_logs"> {
+  return {
+    id: e.id,
+    tenant_id: e.tenant,
+    action: e.action,
+    target_type: e.targetType,
+    target_id: e.targetId ?? null,
+    time: e.time,
+    // actor_user_id FKs users(id) (uuid); the Clerk-era id is not a uuid, so null it.
+    actor_user_id: e.actor.userId && UUID_RE.test(e.actor.userId) ? e.actor.userId : null,
+    actor_email: e.actor.email ?? null,
+    actor_type: e.actor.type ?? null,
+    actor_is_super_admin: e.actor.isSuperAdmin,
+    metadata: (e.metadata ?? null) as Insert<"audit_logs">["metadata"],
+  };
+}
+
+function mapPgAuditRow(row: Row<"audit_logs">): AuditLogEntry {
+  return {
+    id: row.id,
+    tenant: row.tenant_id,
+    action: row.action,
+    targetType: row.target_type,
+    targetId: row.target_id ?? undefined,
+    time: row.time,
+    actor: {
+      userId: row.actor_user_id,
+      email: row.actor_email,
+      type: (row.actor_type as AuditLogEntry["actor"]["type"]) || "super_admin",
+      isSuperAdmin: row.actor_is_super_admin,
+    },
+    metadata: (row.metadata as Record<string, unknown>) ?? undefined,
+  };
+}
 
 export interface AuditLogEntry {
   id: string;
@@ -35,6 +75,10 @@ export async function logAuditEvent(
     metadata: entry.metadata,
   };
 
+  if (dataSourceIsPostgres()) {
+    await insertAuditLog(auditToInsert(auditEntry));
+  }
+
   if (hasSanity) {
     await getSanityClient().create({
       _type: "auditLog",
@@ -53,11 +97,13 @@ export async function logAuditEvent(
     return auditEntry;
   }
 
-  const store = await readDevContent(auditEntry.tenant);
-  const audit = (store.__audit as AuditLogEntry[]) ?? [];
-  audit.unshift(auditEntry);
-  store.__audit = audit.slice(0, 500);
-  await writeDevContent(store, auditEntry.tenant);
+  if (!dataSourceIsPostgres()) {
+    const store = await readDevContent(auditEntry.tenant);
+    const audit = (store.__audit as AuditLogEntry[]) ?? [];
+    audit.unshift(auditEntry);
+    store.__audit = audit.slice(0, 500);
+    await writeDevContent(store, auditEntry.tenant);
+  }
   return auditEntry;
 }
 
@@ -103,6 +149,12 @@ export async function getAuditLog(
   limit = 100
 ): Promise<AuditLogEntry[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
+  if (dataSourceIsPostgres()) {
+    const rows = await listAuditLogs(tenant, safeLimit);
+    if (rows.length > 0 || !hasSanity) return rows.map(mapPgAuditRow);
+    // fall through to Sanity only if Postgres is empty and Sanity still configured
+  }
+
   if (hasSanity) {
     const raw = await getSanityReadClient().fetch<SanityAuditRow[]>(
       `*[_type == "auditLog" && tenant == $tenant] | order(time desc)[0...${safeLimit}]${AUDIT_PROJECTION}`,
@@ -124,6 +176,11 @@ export async function getAuditLog(
  */
 export async function getAllAuditEvents(limit = 100): Promise<AuditLogEntry[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
+  if (dataSourceIsPostgres()) {
+    const rows = await listAllAuditLogs(safeLimit);
+    if (rows.length > 0 || !hasSanity) return rows.map(mapPgAuditRow);
+  }
+
   if (hasSanity) {
     const raw = await getSanityReadClient().fetch<SanityAuditRow[]>(
       `*[_type == "auditLog"] | order(time desc)[0...${safeLimit}]${AUDIT_PROJECTION}`
