@@ -9,6 +9,7 @@ import { getEntryBySlug } from "@/lib/db/repositories";
 import { isCollectionType } from "@/lib/cms/collection-types";
 import { getTenantConfig } from "@/lib/tenants";
 import { toPublicEntry } from "@/lib/cms/public-entry";
+import { isAuthorizedPreview } from "@/lib/preview-auth";
 
 export async function GET(
   request: Request,
@@ -30,7 +31,7 @@ export async function GET(
     }
 
     const entry = await getEntryBySlug(tenant, type, slug);
-    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    const preview = isAuthorizedPreview(request, tenant, config.revalidationSecret);
     if (!entry || (!preview && entry.status !== "published")) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
