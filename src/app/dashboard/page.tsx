@@ -13,6 +13,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { getLatestSiteSnapshot } from "@/lib/storage";
 import { getOwnerRetentionSignals } from "@/lib/retention";
+import { getTemplateForTenant } from "@/components/templates/registry";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
 import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
@@ -71,6 +72,7 @@ async function DashboardHome({
     brief,
     tenantConfig,
     latestSnapshot,
+    template,
     retentionSignals,
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -80,6 +82,7 @@ async function DashboardHome({
     getWeeklyBrief(tenant).catch(() => null),
     getTenantConfig(tenant).catch(() => null),
     getLatestSiteSnapshot(tenant).catch(() => null),
+    getTemplateForTenant(tenant).catch(() => null),
     getOwnerRetentionSignals(tenant).catch(() => ({
       aiChangesThisWeek: 0,
       noAiUsageDays: null,
@@ -109,6 +112,26 @@ async function DashboardHome({
     (pendingCount > 0
       ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting before anything goes live.`
       : "Start with a small offer, hours, product, or homepage copy change.");
+
+  // Day-one detection: a brand-new client has no traffic, no customer actions,
+  // nothing in the review queue, no AI changes yet, and no weekly report. For
+  // them we replace the wall of zeros with positive "your site is live" framing.
+  const isFresh =
+    pageViews.total === 0 &&
+    customerActions.total === 0 &&
+    pendingCount === 0 &&
+    activity.length === 0 &&
+    !briefHeadline;
+
+  // What the site already ships, derived from its template (zero extra reads
+  // beyond the tenant config we already loaded). These are honest "it's live"
+  // counts to anchor the day-one view instead of 0 / 0 / 0.
+  const livePageCount = template ? Object.keys(template.defaultPageConfig).length : 0;
+  const liveSectionCount = template ? template.contentSections.length : 0;
+  const siteName = tenantConfig?.siteName?.trim() || null;
+  const siteDomain =
+    tenantConfig?.productionDomain?.trim() ||
+    (siteUrl ? siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") : null);
 
   return (
     <>
@@ -145,7 +168,85 @@ async function DashboardHome({
           </div>
         </header>
 
-          <OnboardingChecklist tenant={tenant} />
+          <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
+
+          {isFresh ? (
+          <section className="rounded-2xl border border-accent/25 bg-accent-dim/30 p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
+                  Your site is live
+                </p>
+                <h2 className="mt-2 text-[22px] font-semibold leading-snug text-warm-black">
+                  {siteName ? `${siteName} is up and running.` : "Your site is up and running."}
+                </h2>
+                {siteDomain ? (
+                  <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
+                    Live at{" "}
+                    {siteUrl ? (
+                      <a
+                        href={siteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-accent hover:text-accent/80"
+                      >
+                        {siteDomain}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-warm-black">{siteDomain}</span>
+                    )}
+                    {liveSectionCount > 0
+                      ? ` — ${livePageCount} page${livePageCount === 1 ? "" : "s"} and ${liveSectionCount} section${liveSectionCount === 1 ? "" : "s"} already built and ready for customers.`
+                      : " and ready for customers."}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
+                    {liveSectionCount > 0
+                      ? `${livePageCount} page${livePageCount === 1 ? "" : "s"} and ${liveSectionCount} section${liveSectionCount === 1 ? "" : "s"} are already built and ready for customers.`
+                      : "Your site is built and ready for customers."}
+                  </p>
+                )}
+                <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
+                  Visits and customer actions will show up here as people find you. Here is where to start.
+                </p>
+              </div>
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-success" strokeWidth={1.5} />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <QuickWinLink
+                href={dashboardHref("/dashboard/chat")}
+                icon={MessageCircle}
+                title="Ask AI for an update"
+                description="Tell it what changed this week and it turns it into fresh site content."
+              />
+              <QuickWinLink
+                href={dashboardHref("/dashboard/sources/google")}
+                icon={Link2}
+                title="Connect Google Business"
+                description="Bring trusted profile and review signals into your dashboard."
+              />
+              <QuickWinLink
+                href={dashboardHref("/dashboard/settings#profile")}
+                icon={Clock3}
+                title="Confirm your details"
+                description="Check phone, booking link, and the hours customers rely on."
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {siteUrl && (
+                <a
+                  href={siteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-warm-white px-4 text-[13px] font-medium text-on-warm-white transition-colors hover:bg-warm-white/90"
+                >
+                  View live site
+                  <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
+                </a>
+              )}
+            </div>
+          </section>
+          ) : null}
 
           {briefHeadline ? (
           <Link
@@ -168,6 +269,7 @@ async function DashboardHome({
           </Link>
           ) : null}
 
+          {!isFresh ? (
           <section className="grid gap-3 md:grid-cols-3">
           <StatTile
             label="People found you"
@@ -188,7 +290,9 @@ async function DashboardHome({
             icon={ShieldCheck}
           />
           </section>
+          ) : null}
 
+          {!isFresh ? (
           <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-glass-border bg-glass px-4 py-3">
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">
               Since launch
@@ -202,10 +306,11 @@ async function DashboardHome({
               <span className="text-gray-muted">customer actions</span>
             </span>
           </section>
+          ) : null}
 
           <RetentionPanel signals={retentionSignals} />
 
-          {showWelcome ? (
+          {showWelcome && !isFresh ? (
           <section className="rounded-2xl border border-accent/25 bg-accent-dim/30 p-5">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -304,7 +409,9 @@ async function DashboardHome({
             </div>
           ) : (
             <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-              No updates yet. Ask for one small update or edit the site directly, then this becomes your proof trail.
+              {isFresh
+                ? "Your site is live and ready. Ask the AI for your first update — every change you make shows up here as your proof trail."
+                : "No updates yet. Ask for one small update or edit the site directly, then this becomes your proof trail."}
             </p>
           )}
           </section>

@@ -18,29 +18,51 @@ interface Step {
  * itself once every step is done. Replaces the dead `?welcome=1` banner that
  * only fired on checkout (and billing is off).
  */
-export function OnboardingChecklist({ tenant }: { tenant: string }) {
+export function OnboardingChecklist({
+  tenant,
+  defaultOpen = false,
+}: {
+  tenant: string;
+  /**
+   * When true (a server-detected fresh/day-one client), the checklist renders
+   * a lightweight loading shell immediately instead of waiting for the status
+   * fetch — so a new owner sees their starting point up top with no flash of
+   * nothing. Dismissal and real completion still win.
+   */
+  defaultOpen?: boolean;
+}) {
   const [steps, setSteps] = useState<Step[] | null>(null);
-  const [hidden, setHidden] = useState(true);
+  const [hidden, setHidden] = useState(!defaultOpen);
+  const [loaded, setLoaded] = useState(false);
 
   const storageKey = `strelva_onboarding_dismissed_${tenant}`;
 
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem(storageKey) === "1") {
-      return; // stays hidden
+      setHidden(true); // dismissed previously — never show, even when defaultOpen
+      return;
     }
     let active = true;
     fetch("/api/dashboard/onboarding-status")
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { steps?: Step[]; complete?: boolean } | null) => {
-        if (!active || !data?.steps) return;
+        if (!active) return;
+        setLoaded(true);
+        if (!data?.steps) {
+          if (!defaultOpen) setHidden(true);
+          return;
+        }
         if (data.complete) {
           localStorage.setItem(storageKey, "1");
+          setHidden(true);
           return;
         }
         setSteps(data.steps);
         setHidden(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active && !defaultOpen) setHidden(true);
+      });
     return () => {
       active = false;
     };
@@ -52,7 +74,26 @@ export function OnboardingChecklist({ tenant }: { tenant: string }) {
     setHidden(true);
   }
 
-  if (hidden || !steps) return null;
+  if (hidden) return null;
+
+  // Day-one shell: server flagged this as a fresh client, so reserve the spot
+  // at the top of the overview while the real progress loads instead of
+  // flashing nothing.
+  if (!steps) {
+    if (!defaultOpen || loaded) return null;
+    return (
+      <div className="rounded-xl border border-glass-border bg-glass p-5">
+        <p className="text-[15px] font-semibold text-warm-black">Get set up</p>
+        <p className="mt-0.5 text-[12px] text-gray-muted">A few quick wins to start.</p>
+        <div className="mt-4 space-y-2" aria-hidden="true">
+          <div className="h-7 rounded-lg bg-gray-bg/60" />
+          <div className="h-7 rounded-lg bg-gray-bg/60" />
+          <div className="h-7 rounded-lg bg-gray-bg/60" />
+        </div>
+      </div>
+    );
+  }
+
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
