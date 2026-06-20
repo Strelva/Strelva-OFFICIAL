@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import type { ContentMap, ContentSection } from "@/lib/types";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
+import { isAuthorizedPreview } from "@/lib/preview-auth";
 
 export async function GET(
   request: Request,
@@ -36,7 +37,9 @@ export async function GET(
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
 
-    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    // Drafts require a signed preview token (tenant revalidationSecret); an
+    // unauthorized ?preview=true degrades to published. See preview-auth.ts.
+    const preview = isAuthorizedPreview(request, tenant, config.revalidationSecret);
     const data = await getContent(
       section as ContentSection,
       tenant,

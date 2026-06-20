@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { getDraftPageConfig, getPageConfig } from "@/lib/storage";
 import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
 import { getTenantConfig } from "@/lib/tenants";
+import { isAuthorizedPreview } from "@/lib/preview-auth";
 
 export async function GET(
   request: Request,
@@ -26,7 +27,7 @@ export async function GET(
     }
 
     const manifest = await getSiteCapabilityManifest(tenant);
-    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    const preview = isAuthorizedPreview(request, tenant, config.revalidationSecret);
     const pageConfig =
       preview && manifest.supportsDraftPreview
         ? (await getDraftPageConfig(tenant)) || (await getPageConfig(tenant))

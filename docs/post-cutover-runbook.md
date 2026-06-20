@@ -59,6 +59,21 @@ Leaf usages first, request entry point last. Supabase path is already live; Cler
 - Drop `users.clerk_id` before `getUserByClerkId` callers are gone.
 - Enable events dual-write without catch-and-ignore on the PG write.
 
+## v1 preview auth (shipped)
+
+`?preview=true` on the v1 public routes (content, page-config, collections) now
+serves drafts ONLY to requests carrying a valid HMAC preview token (signed with
+the tenant's `revalidationSecret`; headers `x-scaffold-preview-ts` /
+`x-scaffold-preview-sig`, 5-minute window). An unauthorized `?preview=true`
+degrades to PUBLISHED content. The internal `(public)` pages read drafts via the
+storage layer + `x-preview-mode` (proxy-set), so they are unaffected.
+
+Operational follow-up: the updated `custom-repo-starter/scaffold-client.ts` signs
+and sends the headers. Deployed client repos (GLDF, Rohlax) keep serving live
+(published) content unchanged, but their preview-via-public-URL shows PUBLISHED
+until their copy of `scaffold-client.ts` is updated and redeployed. Low urgency
+(preview is a dev/staging nicety, not production).
+
 ## Noah-gated (blockers, not executable here)
 1. Publish the Google OAuth consent screen (blocks client sign-in today).
 2. Rotate the 3 leaked keys + update Vercel. See [secret-rotation.md](./secret-rotation.md).

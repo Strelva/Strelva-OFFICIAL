@@ -85,6 +85,57 @@ export function verifyRevalidationSignature(
   return provided.length === expectedBuf.length && crypto.timingSafeEqual(provided, expectedBuf);
 }
 
+// --- Preview authorization (v1 draft reads) ---
+//
+// Public v1 reads expose PUBLISHED content. `?preview=true` returns drafts, so
+// it must be authorized — otherwise anyone who knows a tenant slug could read
+// that tenant's unpublished content. A preview request proves itself with an
+// HMAC over `${timestamp}.preview.${tenant}` using the tenant's revalidationSecret
+// (the same per-tenant shared secret the client repo already holds for
+// revalidation). Bound to the tenant + a 5-minute window like the revalidation
+// signature. Header names are x-scaffold-* (new contract surface, additive).
+
+export const PREVIEW_TIMESTAMP_HEADER = "x-scaffold-preview-ts";
+export const PREVIEW_SIGNATURE_HEADER = "x-scaffold-preview-sig";
+
+export function signPreviewToken(
+  tenant: string,
+  secret: string,
+  timestamp: string = Date.now().toString()
+): { timestamp: string; signature: string } {
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.preview.${tenant}`)
+    .digest("hex");
+  return { timestamp, signature };
+}
+
+export function verifyPreviewToken(
+  tenant: string,
+  secret: string,
+  timestamp: string | null | undefined,
+  signature: string | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (!timestamp || !signature) return false;
+  const ts = Number(timestamp);
+  // Same 5-minute replay window as the revalidation signature.
+  if (Number.isNaN(ts) || Math.abs(nowMs - ts) > 300_000) return false;
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.preview.${tenant}`)
+    .digest("hex");
+  let provided: Buffer;
+  let expectedBuf: Buffer;
+  try {
+    provided = Buffer.from(signature, "hex");
+    expectedBuf = Buffer.from(expected, "hex");
+  } catch {
+    return false;
+  }
+  return provided.length === expectedBuf.length && crypto.timingSafeEqual(provided, expectedBuf);
+}
+
 export function parseRevalidationPayload(value: unknown): RevalidationPayload | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;

@@ -10,6 +10,7 @@ import { listEntries } from "@/lib/db/repositories";
 import { isCollectionType } from "@/lib/cms/collection-types";
 import { getTenantConfig } from "@/lib/tenants";
 import { toPublicEntry } from "@/lib/cms/public-entry";
+import { isAuthorizedPreview } from "@/lib/preview-auth";
 
 export async function GET(
   request: Request,
@@ -30,9 +31,10 @@ export async function GET(
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
-    // Public reads expose published entries only, unless preview=true (used by
-    // the dashboard live preview, which is itself auth-gated upstream).
-    const preview = new URL(request.url).searchParams.get("preview") === "true";
+    // Public reads expose published entries only. Drafts require a signed
+    // preview token (tenant revalidationSecret); an unauthorized ?preview=true
+    // degrades to published. See preview-auth.ts.
+    const preview = isAuthorizedPreview(request, tenant, config.revalidationSecret);
     const rows = await listEntries(tenant, type, preview ? undefined : { status: "published" });
     return NextResponse.json({ entries: rows.map(toPublicEntry) });
   } catch (err) {

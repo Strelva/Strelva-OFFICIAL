@@ -94,6 +94,23 @@ export function getScaffoldBaseUrl(): string | null {
 export const getRebBaseUrl = getScaffoldBaseUrl;
 
 /**
+ * Signed headers that authorize a `?preview=true` draft read. The v1 contract
+ * serves drafts only to requests carrying a valid HMAC over
+ * `${timestamp}.preview.${tenant}` using the shared REVALIDATION_SECRET (the same
+ * per-tenant secret this repo already holds to verify revalidation). Without the
+ * secret, returns undefined and the control plane serves published content.
+ * Server-only; crypto is lazily imported so it never lands in a browser bundle.
+ */
+async function getPreviewHeaders(tenant: string): Promise<Record<string, string> | undefined> {
+  const secret = process.env.REVALIDATION_SECRET ?? process.env.REVALIDATE_SECRET;
+  if (!secret) return undefined;
+  const { createHmac } = await import("node:crypto");
+  const timestamp = Date.now().toString();
+  const signature = createHmac("sha256", secret).update(`${timestamp}.preview.${tenant}`).digest("hex");
+  return { "x-scaffold-preview-ts": timestamp, "x-scaffold-preview-sig": signature };
+}
+
+/**
  * Browser-safe control-plane base URL for the tracking beacon.
  *
  * The content fetchers above run on the server, so they read the server-only
@@ -152,6 +169,7 @@ export async function fetchScaffoldContent<T>(
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["content", `content:${section}`] },
       cache: opts.preview ? "no-store" : undefined,
+      headers: opts.preview ? await getPreviewHeaders(getTenantId()) : undefined,
     });
     if (!res.ok) return fallback;
     return await res.json() as T;
@@ -186,6 +204,7 @@ export async function fetchScaffoldCollection<T = Record<string, unknown>>(
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["collections", `collection:${type}`] },
       cache: opts.preview ? "no-store" : undefined,
+      headers: opts.preview ? await getPreviewHeaders(getTenantId()) : undefined,
     });
     if (!res.ok) return [];
     const json = await res.json() as { entries?: ScaffoldEntry<T>[] };
@@ -209,6 +228,7 @@ export async function fetchScaffoldEntry<T = Record<string, unknown>>(
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["collections", `collection:${type}:${slug}`] },
       cache: opts.preview ? "no-store" : undefined,
+      headers: opts.preview ? await getPreviewHeaders(getTenantId()) : undefined,
     });
     if (!res.ok) return null;
     return await res.json() as ScaffoldEntry<T>;
@@ -230,6 +250,7 @@ export async function fetchScaffoldPageConfig(
     const res = await fetch(url, {
       next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["page-config"] },
       cache: opts.preview ? "no-store" : undefined,
+      headers: opts.preview ? await getPreviewHeaders(getTenantId()) : undefined,
     });
     if (!res.ok) return fallback;
     return await res.json() as SitePageConfig;
