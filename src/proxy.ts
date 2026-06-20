@@ -400,6 +400,14 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+
+  // Public demo entry: /demo -> the demo tenant's dashboard (read-only, no auth).
+  if (pathname === "/demo" || pathname === "/demo/") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/client/demo/dashboard";
+    return applySecurityHeaders(NextResponse.redirect(url), req);
+  }
+
   const ownershipSettingsRedirectPath = getOwnershipSettingsRedirectPath(pathname);
 
   if (ownershipSettingsRedirectPath) {
@@ -535,7 +543,12 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       (clientPathTarget.startsWith("/sign-in") ||
         clientPathTarget.startsWith("/sign-up") ||
         clientPathTarget === "/no-access");
-    const needsAuth = !devAccessBypass && (
+    // Public demo: the `demo` tenant renders its dashboard read-only without a
+    // session, so prospects can see the product. Safe by construction — every
+    // write API is auth-gated (no session -> 401), so a demo viewer can read but
+    // never mutate, and only this one hardcoded tenant is exposed.
+    const isDemoTenant = tenantId === "demo";
+    const needsAuth = !devAccessBypass && !isDemoTenant && (
       (isAdminSubdomain && !routeIsPublic) ||
       (tenantFromQueryParam && !routeIsPublic) ||
       (tenantFromClientPath && !clientPathIsAuthPage)

@@ -24,15 +24,18 @@ export default async function DashboardLayout({
   const devAccessBypass = isDevAccessBypassEnabled();
   const requestHeaders = await headers();
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
+  const tenant = await getTenantFromHeaders();
+  const dashboardBasePath = clientFallbackRoot;
+  // Public read-only demo: the `demo` tenant renders without a session so prospects
+  // can see the product. Writes stay auth-gated (no session -> 401), so it's read-only.
+  const isDemo = tenant === "demo";
+
   const userId = await getAuthUserId();
-  if (!userId && !devAccessBypass) {
+  if (!userId && !devAccessBypass && !isDemo) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }
 
-  const tenant = await getTenantFromHeaders();
-  const dashboardBasePath = clientFallbackRoot;
-
-  const hasAccess = await hasTenantAccess(tenant);
+  const hasAccess = isDemo || (await hasTenantAccess(tenant));
   if (!hasAccess) {
     const claimedInvite = await claimPendingInviteForCurrentUser(tenant);
     if (claimedInvite) {
@@ -112,6 +115,14 @@ export default async function DashboardLayout({
         >
           Skip to content
         </a>
+        {isDemo && (
+          <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
+            <span className="font-medium">You&apos;re viewing a live demo.</span>
+            <a href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
+              Get your own site &rarr;
+            </a>
+          </div>
+        )}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationLayoutClient
           ownerName={ownerName || siteName}
