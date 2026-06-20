@@ -31,9 +31,9 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const statusIcon: Record<CheckStatus, React.ReactNode> = {
-  pass: <CheckCircle2 className="size-4 shrink-0 text-[color:var(--m-success)]" />,
+  pass: <CheckCircle2 className="size-4 shrink-0 text-m-success" />,
   warn: <AlertTriangle className="size-4 shrink-0 text-[#e9a23b]" />,
-  fail: <XCircle className="size-4 shrink-0 text-[color:var(--m-danger)]" />,
+  fail: <XCircle className="size-4 shrink-0 text-m-danger" />,
 };
 
 function gradeColor(grade: string): string {
@@ -63,18 +63,18 @@ function CategoryCard({ category }: { category: CategoryResult }) {
   const icon = categoryIcons[category.slug] ?? <Shield className="size-5" />;
 
   return (
-    <div className="rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] overflow-hidden">
+    <div className="rounded-2xl border border-m-rule-soft bg-m-panel overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-[var(--m-panel-strong)]"
+        className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-m-panel-strong"
       >
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--m-accent-faint)] text-[color:var(--m-accent)]">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-m-accent-faint text-m-accent">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[15px] font-medium text-[color:var(--m-text)]">
+            <h3 className="text-[15px] font-medium text-m-text">
               {category.name}
             </h3>
             <span
@@ -84,7 +84,7 @@ function CategoryCard({ category }: { category: CategoryResult }) {
               {category.score}
             </span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--m-rule-soft)]">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-m-rule-soft">
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
@@ -95,7 +95,7 @@ function CategoryCard({ category }: { category: CategoryResult }) {
           </div>
         </div>
         <svg
-          className={`size-4 shrink-0 text-[color:var(--m-text-3)] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          className={`size-4 shrink-0 text-m-text-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -106,20 +106,20 @@ function CategoryCard({ category }: { category: CategoryResult }) {
       </button>
 
       {expanded && (
-        <div className="border-t border-[var(--m-rule-soft)] px-5 py-4">
+        <div className="border-t border-m-rule-soft px-5 py-4">
           <ul className="grid gap-3">
             {category.checks.map((check) => (
               <li key={check.name} className="flex gap-3">
                 {statusIcon[check.status]}
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-[color:var(--m-text)]">
+                  <p className="text-[13px] font-medium text-m-text">
                     {check.name}
                   </p>
-                  <p className="text-[12px] text-[color:var(--m-text-3)]">
+                  <p className="text-[12px] text-m-text-3">
                     {check.message}
                   </p>
                   {check.details && (
-                    <p className="mt-1 truncate text-[11px] font-mono text-[color:var(--m-text-3)] opacity-70">
+                    <p className="mt-1 truncate text-[11px] font-mono text-m-text-3 opacity-70">
                       {check.details}
                     </p>
                   )}
@@ -222,7 +222,7 @@ export function AuditPage() {
         <div className="motion-rise mb-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+            className="inline-flex items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
           >
             <ArrowLeft className="size-4" />
             Strelva
@@ -232,13 +232,13 @@ export function AuditPage() {
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
-            <p className="text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="text-[14px] font-medium text-m-text-3">
               Free site health audit
             </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-5xl md:text-6xl">
+            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-5xl md:text-6xl">
               How healthy is your website?
             </h1>
-            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
+            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
               Enter your website URL and get an instant health score. We check
               speed, SEO, mobile experience, structured data, security, and
               accessibility.
@@ -249,7 +249,7 @@ export function AuditPage() {
               className="mt-8 flex flex-col gap-3 sm:flex-row"
             >
               <div className="relative flex-1">
-                <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[color:var(--m-text-3)]" />
+                <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-m-text-3" />
                 <input
                   type="text"
                   value={url}
@@ -257,7 +257,7 @@ export function AuditPage() {
                   placeholder="example.com"
                   autoComplete="url"
                   inputMode="url"
-                  className="h-14 w-full rounded-2xl border border-[var(--m-rule)] bg-[var(--m-surface)] pl-12 pr-4 text-[16px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] hover:border-[var(--m-rule)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)]"
+                  className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface pl-12 pr-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 hover:border-m-rule focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
                 />
               </div>
               <button
@@ -285,7 +285,7 @@ export function AuditPage() {
               </p>
             )}
 
-            <p className="mt-4 text-[13px] text-[color:var(--m-text-3)]">
+            <p className="mt-4 text-[13px] text-m-text-3">
               Free. No signup required. 3 scans per day.
             </p>
           </div>
@@ -294,17 +294,17 @@ export function AuditPage() {
         {/* Scanning state */}
         {state === "scanning" && (
           <div className="motion-rise">
-            <p className="text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="text-[14px] font-medium text-m-text-3">
               Scanning
             </p>
-            <h2 className="mt-4 text-3xl font-semibold text-[color:var(--m-text)] sm:text-4xl">
+            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
               Analyzing your site...
             </h2>
-            <p className="mt-3 text-[15px] text-[color:var(--m-text-2)]">
+            <p className="mt-3 text-[15px] text-m-text-2">
               {url}
             </p>
 
-            <div className="mt-10 grid gap-4 rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-6">
+            <div className="mt-10 grid gap-4 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
               {progressSteps.map((step, i) => (
                 <div
                   key={step}
@@ -312,13 +312,13 @@ export function AuditPage() {
                   style={{ opacity: i <= progressStep ? 1 : 0.25 }}
                 >
                   {i < progressStep ? (
-                    <CheckCircle2 className="size-5 shrink-0 text-[color:var(--m-success)]" />
+                    <CheckCircle2 className="size-5 shrink-0 text-m-success" />
                   ) : i === progressStep ? (
-                    <Loader2 className="size-5 shrink-0 animate-spin text-[color:var(--m-accent)]" />
+                    <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
                   ) : (
-                    <div className="size-5 shrink-0 rounded-full border border-[var(--m-rule-soft)]" />
+                    <div className="size-5 shrink-0 rounded-full border border-m-rule-soft" />
                   )}
-                  <span className="text-[14px] text-[color:var(--m-text-2)]">
+                  <span className="text-[14px] text-m-text-2">
                     {step}
                   </span>
                 </div>
@@ -355,13 +355,13 @@ export function AuditPage() {
                 </div>
               </div>
 
-              <h2 className="mt-6 text-3xl font-semibold text-[color:var(--m-text)] sm:text-4xl">
+              <h2 className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
                 Site Health Report
               </h2>
-              <p className="mt-2 text-[15px] text-[color:var(--m-text-2)]">
+              <p className="mt-2 text-[15px] text-m-text-2">
                 {result.url}
               </p>
-              <p className="mt-1 text-[12px] text-[color:var(--m-text-3)]">
+              <p className="mt-1 text-[12px] text-m-text-3">
                 Scanned {new Date(result.scannedAt).toLocaleString()}
               </p>
             </div>
@@ -374,11 +374,11 @@ export function AuditPage() {
             </div>
 
             {/* CTA */}
-            <div className="mt-10 rounded-2xl border border-[var(--m-accent)] bg-[var(--m-accent-faint)] p-6 text-center sm:p-8">
-              <h3 className="text-xl font-semibold text-[color:var(--m-text)] sm:text-2xl">
+            <div className="mt-10 rounded-2xl border border-m-accent bg-m-accent-faint p-6 text-center sm:p-8">
+              <h3 className="text-xl font-semibold text-m-text sm:text-2xl">
                 Your site scored {result.overallScore}/100.
               </h3>
-              <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-[color:var(--m-text-2)]">
+              <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">
                 Strelva builds and manages local business websites that
                 score higher — with AI-powered updates, health monitoring, and
                 weekly reports.

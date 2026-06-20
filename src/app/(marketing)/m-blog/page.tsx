@@ -21,12 +21,12 @@ export default function BlogPage() {
       <section className="px-5 pt-[7rem] pb-12 md:px-8 md:pt-32 md:pb-16">
         <div className="mx-auto max-w-[1200px]">
           <h1
-            className="font-semibold leading-[1.05] tracking-tight text-[color:var(--m-text)]"
+            className="font-semibold leading-[1.05] tracking-tight text-m-text"
             style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)" }}
           >
             Blog
           </h1>
-          <p className="mt-4 max-w-[480px] text-[16px] leading-relaxed text-[color:var(--m-text-2)]">
+          <p className="mt-4 max-w-[480px] text-[16px] leading-relaxed text-m-text-2">
             Practical guides for local businesses on website management, local
             SEO, and getting found online.
           </p>
@@ -39,27 +39,27 @@ export default function BlogPage() {
             {BLOG_POSTS.map((post) => (
               <article
                 key={post.slug}
-                className="flex flex-col rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)]"
+                className="flex flex-col rounded-2xl border border-m-rule-soft bg-m-panel"
               >
                 <div className="flex-1 p-6">
                   <div className="mb-3 flex items-center gap-3">
-                    <span className="rounded-full border border-[var(--m-rule-soft)] bg-[var(--m-panel-strong)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--m-text-3)]">
+                    <span className="rounded-full border border-m-rule-soft bg-m-panel-strong px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-m-text-3">
                       {post.category}
                     </span>
-                    <span className="flex items-center gap-1 text-[12px] text-[color:var(--m-text-3)]">
+                    <span className="flex items-center gap-1 text-[12px] text-m-text-3">
                       <Clock className="size-3" />
                       {post.readTime}
                     </span>
                   </div>
-                  <h2 className="mb-2 text-[17px] font-semibold leading-snug text-[color:var(--m-text)]">
+                  <h2 className="mb-2 text-[17px] font-semibold leading-snug text-m-text">
                     {post.title}
                   </h2>
-                  <p className="text-[14px] leading-relaxed text-[color:var(--m-text-3)]">
+                  <p className="text-[14px] leading-relaxed text-m-text-3">
                     {post.excerpt}
                   </p>
                 </div>
-                <div className="border-t border-[var(--m-rule-soft)] px-6 py-3">
-                  <span className="text-[13px] font-medium text-[color:var(--m-accent)]">
+                <div className="border-t border-m-rule-soft px-6 py-3">
+                  <span className="text-[13px] font-medium text-m-accent">
                     Coming soon
                   </span>
                 </div>
@@ -68,14 +68,14 @@ export default function BlogPage() {
           </div>
 
           {/* Newsletter */}
-          <div className="mt-16 rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-8 text-center md:p-12">
+          <div className="mt-16 rounded-2xl border border-m-rule-soft bg-m-panel p-8 text-center md:p-12">
             <h2
-              className="font-semibold leading-[1.1] text-[color:var(--m-text)]"
+              className="font-semibold leading-[1.1] text-m-text"
               style={{ fontSize: "clamp(1.5rem, 3vw, 2.25rem)" }}
             >
               Get articles delivered
             </h2>
-            <p className="mx-auto mt-3 max-w-[420px] text-[15px] leading-relaxed text-[color:var(--m-text-2)]">
+            <p className="mx-auto mt-3 max-w-[420px] text-[15px] leading-relaxed text-m-text-2">
               One email per week with practical tips for your business website.
               No spam.
             </p>
@@ -85,7 +85,7 @@ export default function BlogPage() {
                 placeholder="you@business.com"
                 disabled
                 aria-label="Email address for blog subscription"
-                className="h-11 flex-1 rounded-xl border border-[var(--m-rule-soft)] bg-[var(--m-panel-strong)] px-4 text-[14px] text-[color:var(--m-text-3)] opacity-50"
+                className="h-11 flex-1 rounded-xl border border-m-rule-soft bg-m-panel-strong px-4 text-[14px] text-m-text-3 opacity-50"
               />
               <button
                 disabled
@@ -99,15 +99,15 @@ export default function BlogPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-[var(--m-rule-soft)] px-5 py-24 md:px-8 md:py-32">
+      <section className="border-t border-m-rule-soft px-5 py-24 md:px-8 md:py-32">
         <div className="mx-auto max-w-[680px] text-center">
           <h2
-            className="font-semibold leading-[1.05] tracking-tight text-[color:var(--m-text)]"
+            className="font-semibold leading-[1.05] tracking-tight text-m-text"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
           >
             Ready to stop managing your website?
           </h2>
-          <p className="mx-auto mt-4 max-w-[440px] text-[16px] leading-relaxed text-[color:var(--m-text-2)]">
+          <p className="mx-auto mt-4 max-w-[440px] text-[16px] leading-relaxed text-m-text-2">
             Let AI handle the updates while you run your business.
           </p>
           <Link href="/pricing" className="marketing-button-primary mt-6 inline-flex">

@@ -130,6 +130,24 @@
   --color-surface-base: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-surface-inset: var(--surface-inset);
+
+  /* Marketing palette (scoped to .marketing-root; resolves at render time) */
+  --color-m-text: var(--m-text);
+  --color-m-text-2: var(--m-text-2);
+  --color-m-text-3: var(--m-text-3);
+  --color-m-panel: var(--m-panel);
+  --color-m-panel-strong: var(--m-panel-strong);
+  --color-m-paper: var(--m-paper);
+  --color-m-surface: var(--m-surface);
+  --color-m-rule: var(--m-rule);
+  --color-m-rule-soft: var(--m-rule-soft);
+  --color-m-accent: var(--m-accent);
+  --color-m-accent-soft: var(--m-accent-soft);
+  --color-m-accent-faint: var(--m-accent-faint);
+  --color-m-button: var(--m-button);
+  --color-m-button-text: var(--m-button-text);
+  --color-m-success: var(--m-success);
+  --color-m-danger: var(--m-danger);
 }
 
 /* Base */

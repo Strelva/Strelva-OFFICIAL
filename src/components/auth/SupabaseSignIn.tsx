@@ -61,8 +61,8 @@ export function SupabaseSignIn({
 
   if (status === "sent") {
     return (
-      <div className="text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
-        <p className="font-medium text-[color:var(--m-text)]">Check your email.</p>
+      <div className="text-[15px] leading-[1.7] text-m-text-2">
+        <p className="font-medium text-m-text">Check your email.</p>
         <p className="mt-2">
           We sent a sign-in link to <strong>{email}</strong>. Open it on this device to continue.
         </p>
@@ -81,10 +81,10 @@ export function SupabaseSignIn({
         {status === "google" ? "Redirecting…" : "Continue with Google"}
       </button>
 
-      <div className="flex items-center gap-3 text-[12px] text-[color:var(--m-text-3)]">
-        <span className="h-px flex-1 bg-[var(--m-rule)]" />
+      <div className="flex items-center gap-3 text-[12px] text-m-text-3">
+        <span className="h-px flex-1 bg-m-rule" />
         or
-        <span className="h-px flex-1 bg-[var(--m-rule)]" />
+        <span className="h-px flex-1 bg-m-rule" />
       </div>
 
       <form onSubmit={sendMagicLink} className="flex flex-col gap-3">
@@ -94,7 +94,7 @@ export function SupabaseSignIn({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@business.com"
-          className="h-11 rounded-[12px] border border-[var(--m-rule)] bg-[var(--m-paper)] px-4 text-[14px] text-[color:var(--m-text)] outline-none focus:border-[color:var(--m-accent)]"
+          className="h-11 rounded-[12px] border border-m-rule bg-m-paper px-4 text-[14px] text-m-text outline-none focus:border-m-accent"
         />
         <button
           type="submit"

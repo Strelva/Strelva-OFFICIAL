@@ -101,7 +101,7 @@ export function AiVisibilityPage() {
         <div className="motion-rise mb-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+            className="inline-flex items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
           >
             <ArrowLeft className="size-4" />
             Strelva
@@ -111,13 +111,13 @@ export function AiVisibilityPage() {
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
-            <p className="text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="text-[14px] font-medium text-m-text-3">
               Free AI visibility audit
             </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-5xl md:text-6xl">
+            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-5xl md:text-6xl">
               Does AI recommend your business?
             </h1>
-            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
+            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
               When customers ask ChatGPT or Gemini for the best option near them,
               do you show up? Get an instant A&ndash;F grade for how visible your
               business is to AI search.
@@ -130,7 +130,7 @@ export function AiVisibilityPage() {
                 onChange={(e) => setBusiness(e.target.value)}
                 placeholder="Business name"
                 autoComplete="organization"
-                className="h-14 w-full rounded-2xl border border-[var(--m-rule)] bg-[var(--m-surface)] px-4 text-[16px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)]"
+                className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
               />
               <input
                 type="text"
@@ -139,14 +139,14 @@ export function AiVisibilityPage() {
                 placeholder="example.com"
                 autoComplete="url"
                 inputMode="url"
-                className="h-14 w-full rounded-2xl border border-[var(--m-rule)] bg-[var(--m-surface)] px-4 text-[16px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)]"
+                className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
               />
               <input
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 placeholder="Category (e.g. HVAC, dentist)"
-                className="h-14 w-full rounded-2xl border border-[var(--m-rule)] bg-[var(--m-surface)] px-4 text-[16px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)]"
+                className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
               />
               <input
                 type="text"
@@ -154,7 +154,7 @@ export function AiVisibilityPage() {
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="City (e.g. Buffalo, NY)"
                 autoComplete="address-level2"
-                className="h-14 w-full rounded-2xl border border-[var(--m-rule)] bg-[var(--m-surface)] px-4 text-[16px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)]"
+                className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
               />
               <button
                 type="submit"
@@ -181,7 +181,7 @@ export function AiVisibilityPage() {
               </p>
             )}
 
-            <p className="mt-4 text-[13px] text-[color:var(--m-text-3)]">
+            <p className="mt-4 text-[13px] text-m-text-3">
               Free. No signup required. Add your website for AI-readiness signals.
             </p>
           </div>
@@ -190,15 +190,15 @@ export function AiVisibilityPage() {
         {/* Scanning state */}
         {state === "scanning" && (
           <div className="motion-rise">
-            <p className="text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="text-[14px] font-medium text-m-text-3">
               Auditing
             </p>
-            <h2 className="mt-4 text-3xl font-semibold text-[color:var(--m-text)] sm:text-4xl">
+            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
               Checking AI visibility for {business}...
             </h2>
-            <div className="mt-10 flex items-center gap-3 rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-6">
-              <Loader2 className="size-5 shrink-0 animate-spin text-[color:var(--m-accent)]" />
-              <span className="text-[14px] text-[color:var(--m-text-2)]">
+            <div className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
+              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+              <span className="text-[14px] text-m-text-2">
                 Reading your site, checking AI-crawler access, and probing live AI
                 answers...
               </span>
@@ -234,15 +234,15 @@ export function AiVisibilityPage() {
                 </div>
               </div>
 
-              <h2 className="mt-6 text-2xl font-semibold text-[color:var(--m-text)] sm:text-3xl">
+              <h2 className="mt-6 text-2xl font-semibold text-m-text sm:text-3xl">
                 {result.business}
               </h2>
               {result.url && (
-                <p className="mt-2 text-[14px] text-[color:var(--m-text-3)]">
+                <p className="mt-2 text-[14px] text-m-text-3">
                   {result.url}
                 </p>
               )}
-              <p className="mx-auto mt-4 max-w-[560px] text-[16px] font-medium leading-[1.6] text-[color:var(--m-text)]">
+              <p className="mx-auto mt-4 max-w-[560px] text-[16px] font-medium leading-[1.6] text-m-text">
                 {result.verdict}
               </p>
             </div>
@@ -250,28 +250,28 @@ export function AiVisibilityPage() {
             {/* Signals */}
             {result.signals.length > 0 && (
               <div className="mt-10">
-                <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[color:var(--m-text-3)]">
+                <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">
                   AI readiness signals
                 </h3>
                 <ul className="mt-4 grid gap-3">
                   {result.signals.map((s) => (
                     <li
                       key={s.id}
-                      className="flex gap-3 rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-4"
+                      className="flex gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-4"
                     >
                       {s.pass ? (
-                        <CheckCircle2 className="size-5 shrink-0 text-[color:var(--m-success)]" />
+                        <CheckCircle2 className="size-5 shrink-0 text-m-success" />
                       ) : (
-                        <XCircle className="size-5 shrink-0 text-[color:var(--m-danger)]" />
+                        <XCircle className="size-5 shrink-0 text-m-danger" />
                       )}
                       <div className="min-w-0">
-                        <p className="text-[14px] font-medium text-[color:var(--m-text)]">
+                        <p className="text-[14px] font-medium text-m-text">
                           {s.label}
-                          <span className="ml-2 text-[12px] font-normal text-[color:var(--m-text-3)]">
+                          <span className="ml-2 text-[12px] font-normal text-m-text-3">
                             {s.weight} pts
                           </span>
                         </p>
-                        <p className="text-[13px] text-[color:var(--m-text-2)]">
+                        <p className="text-[13px] text-m-text-2">
                           {s.detail}
                         </p>
                       </div>
@@ -282,34 +282,34 @@ export function AiVisibilityPage() {
             )}
 
             {/* Live citation probe */}
-            <div className="mt-6 rounded-2xl border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-5">
-              <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[color:var(--m-text-3)]">
+            <div className="mt-6 rounded-2xl border border-m-rule-soft bg-m-panel p-5">
+              <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">
                 Live AI citation probe
               </h3>
-              <p className="mt-2 text-[14px] leading-[1.6] text-[color:var(--m-text-2)]">
+              <p className="mt-2 text-[14px] leading-[1.6] text-m-text-2">
                 {result.citation.note}
               </p>
             </div>
 
             {/* Top fix */}
             <div
-              className="mt-6 rounded-2xl border-l-4 bg-[var(--m-panel)] p-5"
+              className="mt-6 rounded-2xl border-l-4 bg-m-panel p-5"
               style={{ borderLeftColor: gradeColor(result.grade) }}
             >
-              <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[color:var(--m-text-3)]">
+              <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">
                 Do this first
               </h3>
-              <p className="mt-2 text-[15px] font-medium leading-[1.6] text-[color:var(--m-text)]">
+              <p className="mt-2 text-[15px] font-medium leading-[1.6] text-m-text">
                 {result.topFix}
               </p>
             </div>
 
             {/* CTA */}
-            <div className="mt-10 rounded-2xl border border-[var(--m-accent)] bg-[var(--m-accent-faint)] p-6 text-center sm:p-8">
-              <h3 className="text-xl font-semibold text-[color:var(--m-text)] sm:text-2xl">
+            <div className="mt-10 rounded-2xl border border-m-accent bg-m-accent-faint p-6 text-center sm:p-8">
+              <h3 className="text-xl font-semibold text-m-text sm:text-2xl">
                 Want to be the answer AI gives?
               </h3>
-              <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-[color:var(--m-text-2)]">
+              <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">
                 Strelva builds and manages local business websites that AI can
                 read, trust, and recommend &mdash; with structured data,
                 AI-crawler access, and weekly monitoring.

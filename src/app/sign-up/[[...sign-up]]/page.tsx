@@ -89,25 +89,25 @@ export default async function SignUpPage({
           <section>
             <Link
               href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
             >
               <ArrowLeft className="size-4" />
               Strelva
             </Link>
-            <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Dashboard invite confirmed
             </p>
-            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-[color:var(--m-text)] sm:text-6xl">
+            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
               Create access for {invite.siteName}.
             </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
+            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
               Use <strong>{invite.email}</strong> to connect this account to
               the dashboard Jacob prepared. After signup, Strelva will
               open the site dashboard automatically.
             </p>
           </section>
 
-          <section className="rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
+          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
             {useSupabase ? (
               <SupabaseSignIn next="/account" prefillEmail={invite.email} />
             ) : (
@@ -139,24 +139,24 @@ export default async function SignUpPage({
           <section>
             <Link
               href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
             >
               <ArrowLeft className="size-4" />
               Strelva
             </Link>
-            <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
+            <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Client dashboard
             </p>
-            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-[color:var(--m-text)] sm:text-6xl">
+            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
               Create access for {tenantAuth.siteName}.
             </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
+            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
               Use the email Jacob connected to this site. After signup,
               Strelva will open the dashboard for {tenantAuth.siteName}.
             </p>
           </section>
 
-          <section className="rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
+          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
             {useSupabase ? (
               <SupabaseSignIn next={dashboardPath} />
             ) : (
@@ -182,21 +182,21 @@ export default async function SignUpPage({
       <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-40px)] max-w-[960px] flex-col justify-center py-16">
         <Link
           href="/"
-          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
         >
           <ArrowLeft className="size-4" />
           Strelva
         </Link>
 
-        <section className="mt-12 overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
-          <MailCheck className="size-9 text-[color:var(--m-accent)]" />
-          <p className="mt-6 text-[14px] font-medium text-[color:var(--m-text-3)]">
+        <section className="mt-12 overflow-hidden rounded-[28px] border border-m-rule bg-m-paper p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
+          <MailCheck className="size-9 text-m-accent" />
+          <p className="mt-6 text-[14px] font-medium text-m-text-3">
             Build requests stay email-first
           </p>
-          <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-[color:var(--m-text)] sm:text-6xl">
+          <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
             {title}
           </h1>
-          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-[color:var(--m-text-2)]">
+          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-m-text-2">
             We only create dashboard access once there is a website to manage.
             Request your build first, and we will email your delivery-status
             link after the request is received.

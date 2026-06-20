@@ -44,13 +44,13 @@ export default function HomePage() {
           <section className="flex min-h-0 flex-1 items-center justify-center pb-5 pt-2 text-center">
             <div className="motion-rise flex max-w-[960px] min-w-0 flex-col items-center">
               <h1
-                className="max-w-[980px] font-semibold leading-[0.92] tracking-normal text-[color:var(--m-text)]"
+                className="max-w-[980px] font-semibold leading-[0.92] tracking-normal text-m-text"
                 style={{ fontSize: "clamp(3.25rem, 7.3vw, 7.45rem)" }}
               >
                 <span>A site that keeps up when you change</span>
                 <HeroWordRotator />
               </h1>
-              <p className="mt-6 max-w-[660px] text-[17px] leading-[1.55] tracking-normal text-[color:var(--m-text-2)] sm:text-[19px]">
+              <p className="mt-6 max-w-[660px] text-[17px] leading-[1.55] tracking-normal text-m-text-2 sm:text-[19px]">
                 Send the change. Strelva keeps the site current, checks it before publish, and shows what worked.
               </p>
               <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">

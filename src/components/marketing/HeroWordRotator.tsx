@@ -27,7 +27,7 @@ export function HeroWordRotator() {
   return (
     <span
       aria-label={outcomes[index]}
-      className="relative mt-1 flex min-h-[1.04em] w-full justify-center overflow-hidden text-[0.68em] text-[color:var(--m-accent)] sm:text-[0.76em] md:text-[0.84em]"
+      className="relative mt-1 flex min-h-[1.04em] w-full justify-center overflow-hidden text-[0.68em] text-m-accent sm:text-[0.76em] md:text-[0.84em]"
     >
       <span key={outcomes[index]} className="hero-word-single block whitespace-nowrap">
         {outcomes[index]}.

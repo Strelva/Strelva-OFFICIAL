@@ -124,19 +124,19 @@ function AccessRequestForm() {
         <section className="motion-rise max-w-[620px]">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-[color:var(--m-text-2)] transition-colors hover:text-[color:var(--m-text)]"
+            className="inline-flex items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
           >
             <ArrowLeft className="size-4" />
             Strelva
           </Link>
 
-          <p className="mt-12 text-[14px] font-medium text-[color:var(--m-text-3)]">
+          <p className="mt-12 text-[14px] font-medium text-m-text-3">
             Done-for-you website build
           </p>
-          <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-[color:var(--m-text)] sm:text-6xl md:text-7xl">
+          <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-6xl md:text-7xl">
             Request your build.
           </h1>
-          <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-[color:var(--m-text-2)]">
+          <p className="mt-6 max-w-[560px] text-[17px] leading-[1.7] text-m-text-2">
             We build your site, manage it for you, and send a weekly plain-English report. You own everything. Tell us
             the business, how to reach you, and what the site should help customers do. We will follow up after review.
           </p>
@@ -149,8 +149,8 @@ function AccessRequestForm() {
                 aria-pressed={request === option}
                 className={`motion-item rounded-lg border px-4 py-3 text-left text-[14px] transition-colors ${
                   request === option
-                    ? "border-[var(--m-accent)] bg-[var(--m-accent-soft)] text-[color:var(--m-text)]"
-                    : "border-[var(--m-rule-soft)] bg-[var(--m-panel)] text-[color:var(--m-text-2)] hover:border-[var(--m-rule)] hover:text-[color:var(--m-text)]"
+                    ? "border-m-accent bg-m-accent-soft text-m-text"
+                    : "border-m-rule-soft bg-m-panel text-m-text-2 hover:border-m-rule hover:text-m-text"
                 }`}
                 style={{ "--i": index } as React.CSSProperties}
                 onClick={() => setRequest(option)}
@@ -160,15 +160,15 @@ function AccessRequestForm() {
             ))}
           </div>
 
-          <div className="mt-10 hidden rounded-[18px] border border-[var(--m-rule-soft)] bg-[var(--m-panel)] p-5 lg:block">
+          <div className="mt-10 hidden rounded-[18px] border border-m-rule-soft bg-m-panel p-5 lg:block">
             <div className="flex items-center gap-3">
-              <ClipboardCheck className="size-5 text-[color:var(--m-accent)]" />
-              <h2 className="text-[15px] font-medium text-[color:var(--m-text)]">After this</h2>
+              <ClipboardCheck className="size-5 text-m-accent" />
+              <h2 className="text-[15px] font-medium text-m-text">After this</h2>
             </div>
             <ul className="mt-4 grid gap-3">
               {nextSteps.map((step) => (
-                <li key={step} className="flex gap-3 text-[13px] leading-[1.55] text-[color:var(--m-text-2)]">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color:var(--m-success)]" />
+                <li key={step} className="flex gap-3 text-[13px] leading-[1.55] text-m-text-2">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-m-success" />
                   {step}
                 </li>
               ))}
@@ -176,17 +176,17 @@ function AccessRequestForm() {
           </div>
         </section>
 
-        <section className="motion-rise overflow-hidden rounded-[28px] border border-[var(--m-rule)] bg-[var(--m-paper)] shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)]" style={{ "--motion-delay": "120ms" } as React.CSSProperties}>
+        <section className="motion-rise overflow-hidden rounded-[28px] border border-m-rule bg-m-paper shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)]" style={{ "--motion-delay": "120ms" } as React.CSSProperties}>
           {state === "success" ? (
             <div className="p-6 sm:p-8 md:p-10">
-              <MailCheck className="size-9 text-[color:var(--m-success)]" />
-              <h2 className="mt-6 text-3xl font-semibold tracking-normal text-[color:var(--m-text)]">
+              <MailCheck className="size-9 text-m-success" />
+              <h2 className="mt-6 text-3xl font-semibold tracking-normal text-m-text">
                 Request received.
               </h2>
-              <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[color:var(--m-text-2)]">
+              <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-m-text-2">
                 {message || "We will email next steps for your build after review."}
               </p>
-              <p className="mt-6 text-[13px] text-[color:var(--m-text-3)]">
+              <p className="mt-6 text-[13px] text-m-text-3">
                 Sent to {email.trim().toLowerCase()}
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -209,9 +209,9 @@ function AccessRequestForm() {
             </div>
           ) : (
             <form className="grid gap-5 p-6 sm:p-8 md:p-10" onSubmit={onSubmit} noValidate aria-describedby="intake-status">
-              <div className="border-b border-[var(--m-rule-soft)] pb-5">
-                <p className="text-[13px] text-[color:var(--m-text-3)]">Takes one minute</p>
-                <h2 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--m-text)]">
+              <div className="border-b border-m-rule-soft pb-5">
+                <p className="text-[13px] text-m-text-3">Takes one minute</p>
+                <h2 className="mt-2 text-2xl font-semibold leading-tight text-m-text">
                   Request your build.
                 </h2>
               </div>
@@ -308,7 +308,7 @@ function AccessRequestForm() {
                 />
               </Field>
 
-              <div className="flex flex-col gap-3 border-t border-[var(--m-rule-soft)] pt-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 border-t border-m-rule-soft pt-5 sm:flex-row sm:items-center">
                 <button
                   type="submit"
                   disabled={state === "submitting"}
@@ -317,7 +317,7 @@ function AccessRequestForm() {
                   {state === "submitting" ? "Sending..." : "Request your build"}
                   <ArrowRight className="size-4" />
                 </button>
-                <p className="text-[13px] leading-[1.5] text-[color:var(--m-text-3)]">
+                <p className="text-[13px] leading-[1.5] text-m-text-3">
                   No long form. We will follow up after review with the fit and next steps.
                 </p>
               </div>
@@ -352,7 +352,7 @@ function AccessRequestForm() {
 }
 
 const fieldClassName =
-  "h-13 w-full rounded-lg border border-[var(--m-rule)] bg-[var(--m-surface)] px-4 text-[15px] text-[color:var(--m-text)] outline-none transition-colors placeholder:text-[color:var(--m-text-3)] hover:border-[var(--m-rule)] focus:border-[var(--m-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--m-accent)] disabled:cursor-not-allowed disabled:opacity-65";
+  "h-13 w-full rounded-lg border border-m-rule bg-m-surface px-4 text-[15px] text-m-text outline-none transition-colors placeholder:text-m-text-3 hover:border-m-rule focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent disabled:cursor-not-allowed disabled:opacity-65";
 
 function Field({
   children,
@@ -365,7 +365,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-medium text-[color:var(--m-text-3)]">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-medium text-m-text-3">
         {label}
       </label>
       {children}
