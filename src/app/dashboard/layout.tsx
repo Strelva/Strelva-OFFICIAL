@@ -77,11 +77,13 @@ export default async function DashboardLayout({
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
-  // Fetch queue count and stats
+  // Fetch queue count and stats. Each read is independently guarded: this runs
+  // in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip) would
+  // 500 every dashboard route at once. Degrade to safe defaults instead.
   const [pendingCount, pageViews, activity] = await Promise.all([
-    getQueueCount(tenant),
-    getClickCounts("page-view", tenant),
-    getActivity(tenant, { actor: "ai" }),
+    getQueueCount(tenant).catch(() => 0),
+    getClickCounts("page-view", tenant).catch(() => ({ total: 0, today: 0, thisWeek: 0, lastWeek: 0 })),
+    getActivity(tenant, { actor: "ai" }).catch(() => []),
   ]);
   const monthAgo = Date.now() - 30 * 86_400_000;
   const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
