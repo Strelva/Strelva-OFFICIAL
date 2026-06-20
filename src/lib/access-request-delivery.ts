@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { getRedis } from "@/lib/redis";
 import { getSanityClient } from "@/lib/sanity";
 import { upsertLead } from "@/lib/db/repositories";
+import { dualWritePgEnabled } from "@/lib/db/dual-write";
 
 export const hasLeadSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
@@ -298,25 +299,26 @@ export async function saveDeliveryLead(lead: DeliveryLead): Promise<boolean> {
     persisted = true;
   }
 
-  // Postgres shadow-write (first dual-write of the Supabase migration). NULL-SAFE:
-  // a no-op when Supabase env is unset, so this is inert until the migration is
-  // switched on. Redis stays the source of truth; this builds the Postgres copy
-  // so we can validate parity before cutting reads over. Best-effort — never
-  // fails the lead save.
-  await upsertLead({
-    email: lead.email,
-    business_name: lead.businessName,
-    description: lead.description ?? null,
-    location: lead.location ?? null,
-    phone: lead.phone ?? null,
-    current_website: lead.currentWebsite ?? null,
-    plan: lead.plan ?? null,
-    referred_by: lead.referredBy ?? null,
-    status_token: lead.statusToken,
-    delivery_status: lead.deliveryStatus,
-    submitted_at: lead.submittedAt,
-    status_updated_at: lead.statusUpdatedAt,
-  });
+  // Postgres shadow-write (Phase-2 dual-write). NULL-SAFE: a no-op when Supabase
+  // env is unset. Redis/Sanity stay the source of truth; this builds the Postgres
+  // copy so we can validate parity before cutting reads over. Best-effort — never
+  // fails the lead save. Gated by DUAL_WRITE_PG (kill-switch without redeploy).
+  if (dualWritePgEnabled()) {
+    await upsertLead({
+      email: lead.email,
+      business_name: lead.businessName,
+      description: lead.description ?? null,
+      location: lead.location ?? null,
+      phone: lead.phone ?? null,
+      current_website: lead.currentWebsite ?? null,
+      plan: lead.plan ?? null,
+      referred_by: lead.referredBy ?? null,
+      status_token: lead.statusToken,
+      delivery_status: lead.deliveryStatus,
+      submitted_at: lead.submittedAt,
+      status_updated_at: lead.statusUpdatedAt,
+    });
+  }
 
   return persisted;
 }

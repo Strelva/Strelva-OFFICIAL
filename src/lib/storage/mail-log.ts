@@ -11,6 +11,8 @@
  */
 
 import { getRedis } from "../redis";
+import { recordMailSendPg } from "../db/repositories";
+import { dualWritePgEnabled, mailToInsert } from "../db/dual-write";
 
 export type MailKind = "weekly_report" | "daily_summary" | "invite" | "other";
 
@@ -37,17 +39,25 @@ export async function recordMailSend(
   kind: MailKind,
   result: { ok: boolean; messageId?: string; error?: string; to?: string }
 ): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
   const record: MailRecord = { tenant, kind, ts: Date.now(), ...result };
-  const key = mailLogKey(tenant);
-  try {
-    await redis.zadd(key, { score: record.ts, member: JSON.stringify(record) });
-    await redis.expire(key, MAILLOG_TTL_SECONDS, "NX");
-    // Trim to the most recent MAILLOG_MAX (sorted-set, oldest = lowest score).
-    await redis.zremrangebyrank(key, 0, -(MAILLOG_MAX + 1));
-  } catch {
-    // a lost mail-log line must not break sending the mail
+  const redis = getRedis();
+  if (redis) {
+    const key = mailLogKey(tenant);
+    try {
+      await redis.zadd(key, { score: record.ts, member: JSON.stringify(record) });
+      await redis.expire(key, MAILLOG_TTL_SECONDS, "NX");
+      // Trim to the most recent MAILLOG_MAX (sorted-set, oldest = lowest score).
+      await redis.zremrangebyrank(key, 0, -(MAILLOG_MAX + 1));
+    } catch {
+      // a lost mail-log line must not break sending the mail
+    }
+  }
+
+  // Postgres shadow-write (Phase-2 dual-write). Independent of Redis so the
+  // durable mail trail survives even when Redis is unavailable. Null-safe +
+  // never throws. Gated by DUAL_WRITE_PG.
+  if (dualWritePgEnabled()) {
+    await recordMailSendPg(mailToInsert(record));
   }
 }
 
