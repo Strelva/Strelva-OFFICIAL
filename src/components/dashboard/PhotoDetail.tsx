@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Copy, Check } from "lucide-react";
+import { X, Copy, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import type { MediaAsset } from "@/lib/media";
 import { formatFileSize } from "@/lib/media";
 import { timeAgo } from "@/lib/utils";
@@ -11,16 +12,21 @@ import { timeAgo } from "@/lib/utils";
 interface PhotoDetailProps {
   asset: MediaAsset | null;
   onClose: () => void;
+  onDelete?: (asset: MediaAsset) => Promise<void> | void;
 }
 
-export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
+export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
   const [copied, setCopied] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [prevAssetId, setPrevAssetId] = useState(asset?.id);
 
-  // Reset copied when the selected asset changes (derived-state pattern).
+  // Reset transient UI state when the selected asset changes (derived-state pattern).
   if (asset?.id !== prevAssetId) {
     setPrevAssetId(asset?.id);
     setCopied(false);
+    setConfirmingDelete(false);
+    setDeleting(false);
   }
 
   // Close on Escape
@@ -38,6 +44,18 @@ export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
     await navigator.clipboard.writeText(asset.url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!asset || !onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete(asset);
+      // Parent closes the panel on success; reset local state defensively.
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (!asset) return null;
@@ -95,6 +113,17 @@ export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
         >
           {copied ? "Copied!" : "Copy URL"}
         </Button>
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />}
+            onClick={() => setConfirmingDelete(true)}
+            className="mt-2 w-full text-red-600 hover:bg-red-50"
+          >
+            Delete photo
+          </Button>
+        )}
         <p className="text-[11px] text-gray-subtle mt-2 text-center">
           Use this photo in any section of your site
         </p>
@@ -104,6 +133,17 @@ export function PhotoDetail({ asset, onClose }: PhotoDetailProps) {
 
   return (
     <>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this photo?"
+        message="This removes the photo from your library. Any site section still using it will lose the image."
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+
       {/* Desktop: right side panel */}
       <div className="hidden md:flex flex-col w-[320px] border-l border-gray-border bg-surface shrink-0 overflow-y-auto">
         {detail}

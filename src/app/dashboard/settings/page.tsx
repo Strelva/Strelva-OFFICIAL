@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
@@ -191,6 +192,7 @@ function ProfileSection({
   setSettings: (s: SettingsData) => void;
 }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const latestRef = useRef(settings);
   const apiPath = useDashboardApiPath();
   useEffect(() => {
@@ -227,9 +229,33 @@ function ProfileSection({
     [setSettings],
   );
 
-  const handleBlurSave = useCallback(() => {
+  // Lightweight per-field validation. Returns an error string, or "" if valid.
+  const validateField = useCallback((key: string, value: string): string => {
+    const trimmed = value.trim();
+    if (key === "siteName" && !trimmed) {
+      return "Site Name is required.";
+    }
+    if (key === "bookingUrl" && trimmed && !/^https?:\/\/\S+/i.test(trimmed)) {
+      return "Enter a full URL starting with http:// or https://";
+    }
+    return "";
+  }, []);
+
+  const handleBlurSave = useCallback((key: string) => {
+    const value = latestRef.current[key] || "";
+    const message = validateField(key, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[key] = message;
+      else delete next[key];
+      return next;
+    });
+    if (message) {
+      // Don't persist an invalid field; surface the problem inline instead.
+      return;
+    }
     saveSettings(latestRef.current);
-  }, [saveSettings]);
+  }, [saveSettings, validateField]);
 
   return (
     <>
@@ -249,7 +275,7 @@ function ProfileSection({
               <textarea
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
-                onBlur={handleBlurSave}
+                onBlur={() => handleBlurSave(field.key)}
                 rows={2}
                 className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors"
               />
@@ -258,16 +284,21 @@ function ProfileSection({
                 type="text"
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
-                onBlur={handleBlurSave}
+                onBlur={() => handleBlurSave(field.key)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLElement).blur();
                 }}
-                className={`w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors ${
+                className={`w-full bg-surface-base border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors ${
+                  fieldErrors[field.key] ? "border-red-400/50" : "border-gray-border"
+                } ${
                   field.mono
                     ? "font-mono text-accent text-[12px]"
                     : "text-warm-white"
                 }`}
               />
+            )}
+            {fieldErrors[field.key] && (
+              <p className="mt-1.5 text-[11px] text-red-400">{fieldErrors[field.key]}</p>
             )}
           </FormRow>
         ))}
@@ -996,6 +1027,7 @@ function CustomComponentsSection() {
   const [components, setComponents] = useState<NonNullable<SiteCapabilitiesData["customComponents"]>>([]);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [confirmRemoveIndex, setConfirmRemoveIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -1024,6 +1056,13 @@ function CustomComponentsSection() {
     }
   }, [apiPath, tenantId]);
 
+  const removeComponent = useCallback((index: number) => {
+    const next = components.filter((_, i) => i !== index);
+    setComponents(next);
+    saveComponents(next);
+    setConfirmRemoveIndex(null);
+  }, [components, saveComponents]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1034,9 +1073,19 @@ function CustomComponentsSection() {
       <div className="space-y-3">
         {components.map((component, index) => (
           <div key={`${component.id}-${index}`} className="rounded-lg border border-gray-border bg-surface-raised p-4">
-            <div className="mb-3 flex items-center gap-2 text-[11px] text-gray-faint">
-              <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Admin component
+            <div className="mb-3 flex items-center justify-between gap-2 text-[11px] text-gray-faint">
+              <span className="flex items-center gap-2">
+                <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                Admin component
+              </span>
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveIndex(index)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-border text-gray-muted hover:text-red-300"
+                aria-label="Remove component"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <input
@@ -1077,6 +1126,19 @@ function CustomComponentsSection() {
         <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
         Add component
       </button>
+
+      <ConfirmDialog
+        open={confirmRemoveIndex !== null}
+        title="Remove this component?"
+        message="This admin component will be removed from the site manifest."
+        confirmLabel="Remove"
+        destructive
+        busy={saveStatus === "saving"}
+        onConfirm={() => {
+          if (confirmRemoveIndex !== null) removeComponent(confirmRemoveIndex);
+        }}
+        onCancel={() => setConfirmRemoveIndex(null)}
+      />
     </div>
   );
 }

@@ -126,3 +126,39 @@ export async function POST(request: Request) {
 
   return NextResponse.json(result, { status: 201 });
 }
+
+// --- DELETE: Remove an image asset owned by this tenant ---
+
+export async function DELETE(request: Request) {
+  const authed = await verifyAuth();
+  if (!authed) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const tenant = await getTenantFromHeaders();
+  const denied = await requireTenantAccess(tenant);
+  if (denied) return denied;
+  const permissionDenied = await requireTenantPermission(tenant, "content:write");
+  if (permissionDenied) return permissionDenied;
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing asset id" }, { status: 400 });
+  }
+
+  // Only allow deleting an asset that belongs to this tenant (label == tenant).
+  // Prevents an authed editor on one tenant from deleting another tenant's media
+  // by guessing an _id.
+  const owned = await getSanityReadClient().fetch<string | null>(
+    `*[_type == "sanity.imageAsset" && _id == $id && label == $tenant][0]._id`,
+    { id, tenant }
+  );
+  if (!owned) {
+    return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+  }
+
+  await getSanityClient().delete(id);
+
+  return NextResponse.json({ success: true });
+}

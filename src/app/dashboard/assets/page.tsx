@@ -30,6 +30,7 @@ export default function PhotosPage() {
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const newestUpload = Math.max(
@@ -59,10 +60,14 @@ export default function PhotosPage() {
 
     setUploading(true);
     setUploadResults([]);
+    setUploadProgress({ current: 0, total: selectedFiles.length });
     const newAssets: MediaAsset[] = [];
     const results: UploadResult[] = [];
 
+    let processed = 0;
     for (const file of selectedFiles) {
+      processed += 1;
+      setUploadProgress({ current: processed, total: selectedFiles.length });
       if (!file.type.startsWith("image/")) {
         results.push({
           name: file.name,
@@ -121,8 +126,25 @@ export default function PhotosPage() {
       // Select the first newly uploaded photo
       setSelected(newAssets[0]);
     }
+    setUploadProgress(null);
     setUploading(false);
   }, [apiHref]);
+
+  // Delete handler — invoked from PhotoDetail after the user confirms.
+  const deleteAsset = useCallback(
+    async (asset: MediaAsset) => {
+      const res = await fetch(
+        apiHref(`/api/media?id=${encodeURIComponent(asset.id)}`),
+        { method: "DELETE", credentials: "same-origin" },
+      );
+      if (!res.ok) {
+        throw new Error("Delete failed");
+      }
+      setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+      setSelected((current) => (current?.id === asset.id ? null : current));
+    },
+    [apiHref],
+  );
 
   const uploadSummary = uploadResults.length
     ? {
@@ -207,7 +229,23 @@ export default function PhotosPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          {uploadSummary && (
+          {uploading && uploadProgress && (
+            <div className="mt-4 rounded-lg border border-glass-border bg-glass px-4 py-3 text-[12px]">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
+                <p className="font-medium text-warm-white">
+                  Uploading {uploadProgress.current} of {uploadProgress.total}…
+                </p>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-bg-hover">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-200"
+                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {!uploading && uploadSummary && (
             <div
               className={cn(
                 "mt-4 rounded-lg border px-4 py-3 text-[12px]",
@@ -332,7 +370,7 @@ export default function PhotosPage() {
       </div>
 
       {/* Detail panel (desktop) / bottom sheet (mobile) */}
-      <PhotoDetail asset={selected} onClose={() => setSelected(null)} />
+      <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={deleteAsset} />
     </div>
   );
 }

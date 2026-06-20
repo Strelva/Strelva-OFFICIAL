@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 
 const DOMAINS_API = "/api/tenant/domains";
 
@@ -354,31 +355,14 @@ export function DomainsClient({ initialDomains }: Props) {
                     )}
                   </div>
                 </div>
-                {confirmingRemove === entry.domain ? (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      onClick={() => handleRemove(entry.domain)}
-                      disabled={removing === entry.domain}
-                      className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-300 hover:bg-red-500/20 disabled:opacity-50"
-                    >
-                      {removing === entry.domain ? "Removing…" : "Confirm"}
-                    </button>
-                    <button
-                      onClick={() => setConfirmingRemove(null)}
-                      className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmingRemove(entry.domain)}
-                    className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150"
-                    aria-label={`Remove ${entry.domain}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  </button>
-                )}
+                <button
+                  onClick={() => setConfirmingRemove(entry.domain)}
+                  disabled={removing === entry.domain}
+                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
+                  aria-label={`Remove ${entry.domain}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                </button>
               </div>
             </div>
           ))
@@ -389,6 +373,23 @@ export function DomainsClient({ initialDomains }: Props) {
         DNS changes can take up to 48 hours to propagate. SSL certificates are
         issued automatically once DNS resolves.
       </p>
+
+      <ConfirmDialog
+        open={confirmingRemove !== null}
+        title="Remove this domain?"
+        message={
+          confirmingRemove
+            ? `${confirmingRemove} will stop pointing to your site. This may affect your live site if visitors use this domain.`
+            : "This may affect your live site if visitors use this domain."
+        }
+        confirmLabel="Remove"
+        destructive
+        busy={removing !== null}
+        onConfirm={() => {
+          if (confirmingRemove) handleRemove(confirmingRemove);
+        }}
+        onCancel={() => setConfirmingRemove(null)}
+      />
     </div>
   );
 }
