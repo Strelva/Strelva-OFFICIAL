@@ -1293,7 +1293,7 @@ function BillingSection() {
               if (!res.ok) {
                 setBillingError(
                   res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "Billing is not connected yet. Ask Strelva to turn on the billing portal."
+                    ? "You're on a managed plan — there's no billing portal to open. Message Strelva anytime about your plan."
                     : body?.error || "Couldn't open the billing portal. Try again.",
                 );
                 return;

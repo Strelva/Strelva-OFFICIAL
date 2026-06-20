@@ -161,7 +161,7 @@ export function OwnershipSection() {
       if (!res.ok || !body?.portalUrl) {
         setBillingError(
           res.status === 404 || !dashboard?.hasStripeCustomer
-            ? "Billing portal is not connected yet. Ask Strelva to handle cancellation timing."
+            ? "Your plan is managed by Strelva — message us anytime to change or end it."
             : body?.error || "Could not open the billing portal.",
         );
         return;

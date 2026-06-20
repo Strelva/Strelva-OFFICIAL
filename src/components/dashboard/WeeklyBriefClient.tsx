@@ -100,7 +100,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
               Your first weekly report is still warming up
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
-              The Today view already shows the short version. This page becomes the report archive once there is enough visitor, click, and site-change activity for a real weekly summary.
+              The Today view already shows the short version. Your first full report lands at the end of your first week, then a fresh one arrives every week. It builds once there is enough visitor, click, and site-change activity for a real summary.
             </p>
           </div>
 

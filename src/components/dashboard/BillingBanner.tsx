@@ -32,7 +32,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
       if (!res.ok) {
         setError(
           res.status === 404
-            ? "Billing is not connected yet. Ask Strelva to turn on the billing portal."
+            ? "You're on a managed plan — there's no billing portal to open. Message Strelva anytime about your plan."
             : body?.error || "Couldn't open billing. Try again.",
         );
         return;
