@@ -368,6 +368,141 @@ export type Database = {
           },
         ]
       }
+      collection_entries: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          slug: string
+          status: string
+          tenant_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          slug: string
+          status?: string
+          tenant_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          slug?: string
+          status?: string
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          author: string
+          created_at: string
+          external_id: string | null
+          id: string
+          rating: number | null
+          reply: string | null
+          replied_at: string | null
+          review_date: string | null
+          source: string
+          tenant_id: string
+          text: string
+        }
+        Insert: {
+          author?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          rating?: number | null
+          reply?: string | null
+          replied_at?: string | null
+          review_date?: string | null
+          source: string
+          tenant_id: string
+          text?: string
+        }
+        Update: {
+          author?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          rating?: number | null
+          reply?: string | null
+          replied_at?: string | null
+          review_date?: string | null
+          source?: string
+          tenant_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suggestions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          id: string
+          section: string | null
+          status: string
+          tenant_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          description?: string
+          id?: string
+          section?: string | null
+          status?: string
+          tenant_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          id?: string
+          section?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggestions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content: {
         Row: {
           data: Json

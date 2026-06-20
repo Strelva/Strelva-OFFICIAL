@@ -1361,6 +1361,68 @@ Only use tools for manifest-supported sections and actions. If the user requests
         },
       }),
     },
+    list_entries: {
+      capability: "list_entries",
+      def: tool({
+        description:
+          "List CMS collection entries (blog posts, videos, or products) for this site. Use this to see what already exists before creating or editing one.",
+        inputSchema: z.object({
+          type: z.enum(["blog", "video", "product"]),
+          status: z.enum(["draft", "published"]).optional(),
+        }),
+        execute: async ({ type, status }) => {
+          try {
+            const { listEntriesForType } = await import("@/lib/cms/collections-service");
+            const entries = await listEntriesForType(tenant, type, status ? { status } : undefined);
+            return {
+              entries: entries.map((e) => ({
+                slug: e.slug,
+                status: e.status,
+                data: e.data,
+                updatedAt: e.updated_at,
+              })),
+            };
+          } catch (err) {
+            return { error: `Failed to list ${type} entries: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
+    },
+    save_entry: {
+      capability: "save_entry",
+      def: tool({
+        description:
+          "Create or update a CMS collection entry (a blog post, video, or product). Provide the type and the entry fields in `data` (e.g. blog: title, excerpt, body, tags). The slug is derived from the title if omitted. AI-authored entries are saved as DRAFTS for the owner to review and publish.",
+        inputSchema: z.object({
+          type: z.enum(["blog", "video", "product"]),
+          data: z.record(z.string(), z.unknown()),
+          slug: z.string().optional(),
+        }),
+        execute: async ({ type, data, slug }) => {
+          try {
+            const { saveEntry } = await import("@/lib/cms/collections-service");
+            // Governance: the agent drafts; a human publishes from the editor.
+            const result = await saveEntry({
+              tenant,
+              type,
+              data: data as Record<string, unknown>,
+              slug,
+              status: "draft",
+              actor: "ai",
+            });
+            if (!result.ok) return { success: false, error: result.error };
+            return {
+              success: true,
+              slug: result.entry.slug,
+              status: result.entry.status,
+              message: `Saved a draft ${type} entry "${result.entry.slug}". It will go live after you publish it.`,
+            };
+          } catch (err) {
+            return { success: false, error: `Failed to save ${type} entry: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
+    },
   };
 
   // Every active-subscription tenant gets every tool. No tier gating.

@@ -129,6 +129,10 @@ export const scaffoldRoutes = {
     `/api/${SCAFFOLD_CONTRACT_VERSION}/site-capabilities/${tenant}`,
   publicTrack: (tenant: string) =>
     `/api/${SCAFFOLD_CONTRACT_VERSION}/track/${tenant}`,
+  publicCollection: (tenant: string, type: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/collections/${tenant}/${type}`,
+  publicCollectionEntry: (tenant: string, type: string, slug: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/collections/${tenant}/${type}/${slug}`,
 } as const;
 
 /** @deprecated Use scaffoldRoutes. */
@@ -158,6 +162,60 @@ export async function fetchScaffoldContent<T>(
 
 /** @deprecated Use fetchScaffoldContent. */
 export const fetchRebContent = fetchScaffoldContent;
+
+/** A published Collections CMS entry (blog post, video, product). */
+export interface ScaffoldEntry<T = Record<string, unknown>> {
+  slug: string;
+  type: string;
+  status: string;
+  data: T;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Fetch the published entries of a collection type (blog, video, product). */
+export async function fetchScaffoldCollection<T = Record<string, unknown>>(
+  type: string,
+  opts: { preview?: boolean } = {}
+): Promise<ScaffoldEntry<T>[]> {
+  const baseUrl = getScaffoldBaseUrl();
+  if (!baseUrl) return [];
+  try {
+    const url = new URL(`${baseUrl}${scaffoldRoutes.publicCollection(getTenantId(), type)}`);
+    if (opts.preview) url.searchParams.set("preview", "true");
+    const res = await fetch(url, {
+      next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["collections", `collection:${type}`] },
+      cache: opts.preview ? "no-store" : undefined,
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as { entries?: ScaffoldEntry<T>[] };
+    return json.entries ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch one published entry of a collection type by slug. */
+export async function fetchScaffoldEntry<T = Record<string, unknown>>(
+  type: string,
+  slug: string,
+  opts: { preview?: boolean } = {}
+): Promise<ScaffoldEntry<T> | null> {
+  const baseUrl = getScaffoldBaseUrl();
+  if (!baseUrl) return null;
+  try {
+    const url = new URL(`${baseUrl}${scaffoldRoutes.publicCollectionEntry(getTenantId(), type, slug)}`);
+    if (opts.preview) url.searchParams.set("preview", "true");
+    const res = await fetch(url, {
+      next: opts.preview ? { revalidate: 0 } : { revalidate: 60, tags: ["collections", `collection:${type}:${slug}`] },
+      cache: opts.preview ? "no-store" : undefined,
+    });
+    if (!res.ok) return null;
+    return await res.json() as ScaffoldEntry<T>;
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchScaffoldPageConfig(
   fallback: SitePageConfig,

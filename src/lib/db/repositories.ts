@@ -382,3 +382,81 @@ export async function upsertContentData(
     );
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// collection_entries (Collections CMS — typed repeating entries)
+// See src/lib/cms/collection-types.ts + docs/strelva-cms-scope.md.
+// ---------------------------------------------------------------------------
+
+export async function listEntries(
+  tenantId: string,
+  type: string,
+  opts?: { status?: string; limit?: number }
+): Promise<Row<"collection_entries">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listEntries ${tenantId}/${type}`, async () => {
+    let q = db
+      .from("collection_entries")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("type", type)
+      .order("updated_at", { ascending: false })
+      .limit(opts?.limit ?? 100);
+    if (opts?.status) q = q.eq("status", opts.status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+export async function getEntryBySlug(
+  tenantId: string,
+  type: string,
+  slug: string
+): Promise<Row<"collection_entries"> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getEntryBySlug ${tenantId}/${type}/${slug}`, async () => {
+    const { data, error } = await db
+      .from("collection_entries")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("type", type)
+      .eq("slug", slug)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }, null);
+}
+
+/** Create or update an entry (keyed on tenant_id+type+slug). Returns the row. */
+export async function upsertEntry(
+  entry: Insert<"collection_entries">
+): Promise<Row<"collection_entries"> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`upsertEntry ${entry.tenant_id}/${entry.type}/${entry.slug}`, async () => {
+    const { data, error } = await db
+      .from("collection_entries")
+      .upsert({ ...entry, updated_at: new Date().toISOString() }, { onConflict: "tenant_id,type,slug" })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  }, null);
+}
+
+export async function deleteEntry(tenantId: string, type: string, slug: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`deleteEntry ${tenantId}/${type}/${slug}`, async () => {
+    const { error } = await db
+      .from("collection_entries")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .eq("type", type)
+      .eq("slug", slug);
+    if (error) throw error;
+  }, undefined);
+}
