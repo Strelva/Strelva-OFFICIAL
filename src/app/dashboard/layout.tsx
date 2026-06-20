@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
+import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
 import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
@@ -123,6 +124,7 @@ export default async function DashboardLayout({
             </a>
           </div>
         )}
+        {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationLayoutClient
           ownerName={ownerName || siteName}

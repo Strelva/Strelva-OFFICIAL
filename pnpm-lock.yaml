@@ -119,7 +119,7 @@ importers:
         specifier: 1.59.1
         version: 1.59.1
       '@tailwindcss/postcss':
-        specifier: ^4
+        specifier: ^4.2.4
         version: 4.2.4
       '@types/node':
         specifier: ^25
@@ -140,8 +140,8 @@ importers:
         specifier: 16.2.6
         version: 16.2.6(@typescript-eslint/parser@8.57.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       tailwindcss:
-        specifier: ^4
-        version: 4.2.1
+        specifier: ^4.2.4
+        version: 4.2.4
       tsx:
         specifier: 4.21.0
         version: 4.21.0
@@ -6693,9 +6693,6 @@ packages:
   tagged-tag@1.0.0:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
-
-  tailwindcss@4.2.1:
-    resolution: {integrity: sha512-/tBrSQ36vCleJkAOsy9kbNTgaxvGbyOamC30PRePTQe/o1MFwEKHQk4Cn7BNGaPtjp+PuUrByJehM1hgxfq4sw==}
 
   tailwindcss@4.2.4:
     resolution: {integrity: sha512-HhKppgO81FQof5m6TEnuBWCZGgfRAWbaeOaGT00KOy/Pf/j6oUihdvBpA7ltCeAvZpFhW3j0PTclkxsd4IXYDA==}
@@ -15003,8 +15000,6 @@ snapshots:
   symbol-tree@3.2.4: {}
 
   tagged-tag@1.0.0: {}
-
-  tailwindcss@4.2.1: {}
 
   tailwindcss@4.2.4: {}
 
