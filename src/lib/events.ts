@@ -6,6 +6,8 @@
 import type { UnifiedEvent } from "./types";
 import { getRedis } from "./redis";
 import { DEFAULT_TENANT } from "./storage/core";
+import { insertEvent, setEventStatus } from "./db/repositories";
+import { dualWritePgEnabled, eventToInsert } from "./db/dual-write";
 
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
@@ -110,6 +112,12 @@ export async function addEvent(
   // always resolve it.
   await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
   await redis.zadd(eventsKey(event.tenantId), { score, member: id });
+
+  // Postgres shadow-write (Phase-2 dual-write). Null-safe + never throws; Redis
+  // above stays the source of truth and reads. Gated by DUAL_WRITE_PG.
+  if (dualWritePgEnabled()) {
+    await insertEvent(eventToInsert(full));
+  }
 
   return full;
 }
@@ -310,6 +318,13 @@ async function resolveEventLocked(
 
   // The zset member is the stable id; only the event:{id} record changes.
   await redis.set(eventKey(id), updated);
+
+  // Postgres shadow-write: mirror the status transition. No-op if the row was
+  // created before dual-write was enabled (update matches nothing). Never throws.
+  if (dualWritePgEnabled()) {
+    await setEventStatus(id, status);
+  }
+
   return { event: updated, changed: true };
 }
 

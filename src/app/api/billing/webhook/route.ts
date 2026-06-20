@@ -6,6 +6,8 @@ import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
 import { logger } from "@/lib/logger";
 import { alert } from "@/lib/monitoring";
+import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositories";
+import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -248,6 +250,23 @@ async function recordBuildPayment(
       });
       console.error(`[billing webhook] Failed to persist build-payment record for ${session.id}: ${err}`);
     }
+  }
+
+  // 1b. Postgres shadow-write of the money trail (Phase-2 dual-write). Null-safe
+  // + never throws; Redis above stays the canonical record. Gated by DUAL_WRITE_PG.
+  if (dualWritePgEnabled()) {
+    await recordBuildPaymentPg(
+      buildPaymentToInsert({
+        sessionId: session.id,
+        paySlug,
+        leadSlug,
+        tenantId,
+        amountCents: amountTotal,
+        currency,
+        customerEmail: session.customer_details?.email ?? undefined,
+        createdAt: new Date(event.created * 1000).toISOString(),
+      })
+    );
   }
 
   // 2. Slack ping so a live charge is never silent — even pre-tenant ones.
