@@ -319,10 +319,11 @@ async function resolveEventLocked(
   // The zset member is the stable id; only the event:{id} record changes.
   await redis.set(eventKey(id), updated);
 
-  // Postgres shadow-write: mirror the status transition. No-op if the row was
-  // created before dual-write was enabled (update matches nothing). Never throws.
+  // Postgres shadow-write: mirror the status transition AND the updated metadata
+  // (resolutionHistory) so the shadow row stays in parity, not status-frozen.
+  // No-op if the row was created before dual-write was enabled. Never throws.
   if (dualWritePgEnabled()) {
-    await setEventStatus(id, status);
+    await setEventStatus(id, status, updated.metadata ?? null);
   }
 
   return { event: updated, changed: true };
