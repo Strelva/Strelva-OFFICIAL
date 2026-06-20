@@ -86,14 +86,25 @@ export async function listEvents(tenantId: string, limit = 50): Promise<Row<"uni
   }, []);
 }
 
-export async function setEventStatus(id: string, status: string): Promise<void> {
+export async function setEventStatus(
+  id: string,
+  status: string,
+  metadata?: Record<string, unknown> | null
+): Promise<void> {
   const db = getSupabase();
   if (!db) return;
   await safe(`setEventStatus ${id}`, async () => {
-    const { error } = await db
-      .from("unified_events")
-      .update({ status, resolved_at: new Date().toISOString() })
-      .eq("id", id);
+    const update: {
+      status: string;
+      resolved_at: string;
+      metadata?: Insert<"unified_events">["metadata"];
+    } = { status, resolved_at: new Date().toISOString() };
+    // Mirror the updated metadata too (e.g. resolutionHistory) so the Postgres
+    // shadow row stays in parity with Redis on resolve, not just status-frozen.
+    if (metadata !== undefined) {
+      update.metadata = (metadata ?? null) as Insert<"unified_events">["metadata"];
+    }
+    const { error } = await db.from("unified_events").update(update).eq("id", id);
     if (error) throw error;
   }, undefined);
 }
