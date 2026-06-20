@@ -52,14 +52,14 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Smoke tests
-        # Smoke the BUILT app (next start against the .next produced by the Build
-        # step above), not a cold `next dev`. Cold Turbopack compile-on-first-
-        # request raced the Playwright webServer 120s timeout on CI runners and
-        # flaked the whole job; the built app boots in ~1s. PLAYWRIGHT_BUILT_APP=1
-        # flips playwright.config.ts to `next start`.
+        # Runs against `next dev` (see playwright.config.ts). Dev mode is
+        # deliberate: it tolerates a missing Clerk key (prod `next start` throws
+        # "Missing publishableKey" with no auth env) and keeps the lenient
+        # content/tenant dev-file fallbacks the public-route tests rely on. The
+        # webServer timeout in playwright.config.ts is sized for cold Turbopack
+        # compile on a CI runner.
         run: pnpm smoke
         env:
           CI: true
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"
-          PLAYWRIGHT_BUILT_APP: "1"
