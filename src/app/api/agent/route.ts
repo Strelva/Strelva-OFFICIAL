@@ -4,8 +4,7 @@ import { z } from "zod";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
-import { auth } from "@clerk/nextjs/server";
-import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getAuthUserId, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
@@ -302,7 +301,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
 
   const tenantConfig = await getTenantConfig(tenant);
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   const clerkUserId = userId || (isDevAccessBypassEnabled() ? "dev-access-bypass" : null);
   const body = await readJsonObject(req);
   if (!body) {

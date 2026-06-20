@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { auth } from "@clerk/nextjs/server";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
@@ -8,7 +7,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
-import { claimPendingInviteForCurrentUser, getActorContext, hasTenantAccess } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
@@ -25,7 +24,7 @@ export default async function DashboardLayout({
   const devAccessBypass = isDevAccessBypassEnabled();
   const requestHeaders = await headers();
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId && !devAccessBypass) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
-import { claimPendingInviteForCurrentUser, isSuperAdmin, parseTenantAccessMetadata } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/lib/auth";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
 import {
   getTenantDashboardFallbackUrl,
@@ -14,7 +13,7 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
 
   if (!userId) {
     const devTenant = getDevAccessTenant();
@@ -37,8 +36,7 @@ export default async function AccountPage() {
     if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
   }
 
-  const user = await currentUser();
-  const tenants = parseTenantAccessMetadata(user?.publicMetadata).map((grant) => grant.tenant);
+  const tenants = await getCurrentUserTenants();
 
   if (tenants.length === 0) {
     return <NoAccessState />;

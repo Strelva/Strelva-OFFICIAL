@@ -7,6 +7,7 @@ import { getRedis } from "./redis";
 import { getSessionUser, isSupabaseAuthConfigured } from "./db/server-client";
 import {
   getMembershipRole,
+  listMembershipsForUser,
   listTenantOwnerIds,
   isSuperAdminUser,
   upsertMembership,
@@ -205,6 +206,33 @@ export async function verifyAuth(): Promise<boolean> {
 
   const { userId } = await auth();
   return !!userId;
+}
+
+/** The current user's id (Supabase auth.uid or Clerk userId), or null. Dual-path.
+ *  Use this in pages/routes instead of calling Clerk's auth() directly — a raw
+ *  auth() returns null on the Supabase path and wrongly bounces the user. */
+export async function getAuthUserId(): Promise<string | null> {
+  if (isDevAccessBypassEnabled()) return "dev-access-bypass";
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    return user?.id ?? null;
+  }
+  const { userId } = await auth();
+  return userId;
+}
+
+/** The tenants the current user has access to. Dual-path: memberships table on the
+ *  Supabase path, Clerk publicMetadata otherwise. (Super-admins are handled by the
+ *  caller via isSuperAdmin(); this returns only explicit memberships.) */
+export async function getCurrentUserTenants(): Promise<string[]> {
+  if (isSupabaseAuthConfigured()) {
+    const user = await getSessionUser();
+    if (!user) return [];
+    const memberships = await listMembershipsForUser(user.id);
+    return memberships.map((m) => m.tenant_id);
+  }
+  const user = await currentUser();
+  return parseTenantAccessMetadata(user?.publicMetadata).map((g) => g.tenant);
 }
 
 /** Get the current user's email */
