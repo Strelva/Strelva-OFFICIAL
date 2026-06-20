@@ -47,6 +47,7 @@ const FIELDS: Record<CollectionType, FieldDef[]> = {
     { name: "description", label: "Description", kind: "textarea" },
     { name: "priceCents", label: "Price (cents)", kind: "number" },
     { name: "currency", label: "Currency", kind: "text" },
+    { name: "images", label: "Image URLs (comma separated)", kind: "tags" },
     { name: "inStock", label: "In stock", kind: "bool" },
     { name: "checkoutUrl", label: "Checkout URL", kind: "url" },
   ],
@@ -85,11 +86,12 @@ export function CollectionsManager({
       const res = await fetch(`/api/collections/${t}`);
       const json = await res.json();
       setEntries(
-        (json.entries ?? []).map((e: { slug: string; status: string; data: Record<string, unknown>; updated_at?: string; updatedAt?: string }) => ({
+        // The authed GET returns raw rows (snake_case updated_at).
+        (json.entries ?? []).map((e: { slug: string; status: string; data: Record<string, unknown>; updated_at?: string }) => ({
           slug: e.slug,
           status: e.status,
           data: e.data,
-          updatedAt: e.updatedAt ?? e.updated_at ?? "",
+          updatedAt: e.updated_at ?? "",
         }))
       );
     } catch {
