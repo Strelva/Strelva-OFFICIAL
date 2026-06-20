@@ -83,7 +83,9 @@ export default async function DashboardLayout({
   const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
   const valueProof = pageViews.thisWeek > 0
     ? `${pageViews.thisWeek} visitors this week`
-    : `${aiUpdatesThisMonth} AI updates this month`;
+    : aiUpdatesThisMonth > 0
+      ? `${aiUpdatesThisMonth} update${aiUpdatesThisMonth === 1 ? "" : "s"} this month`
+      : "Your site is live";
 
   return (
     <DashboardProvider

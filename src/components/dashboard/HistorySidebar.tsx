@@ -51,6 +51,40 @@ const NAV_GROUPS = [
   },
 ];
 
+/** The client's favicon as their logo, derived from their site domain. Falls back
+ *  to the name's initial if there's no domain or the favicon fails to load. */
+function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
+  const [failed, setFailed] = useState(false);
+  let host = "";
+  try {
+    if (siteUrl) host = new URL(siteUrl).hostname.replace(/^www\./, "");
+  } catch {
+    host = "";
+  }
+  const favicon = host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : "";
+
+  if (favicon && !failed) {
+    return (
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised">
+        <img
+          src={favicon}
+          alt=""
+          width={16}
+          height={16}
+          className="h-4 w-4 object-contain"
+          onError={() => setFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised text-[11px] font-semibold text-warm-black">
+      {(name || "S").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
 export function HistorySidebar({
   ownerName,
   isOpen = true,
@@ -61,7 +95,7 @@ export function HistorySidebar({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { dashboardBasePath, dashboardHref } = useDashboard();
+  const { dashboardBasePath, dashboardHref, siteUrl } = useDashboard();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const activeThread = searchParams.get("thread");
@@ -138,12 +172,10 @@ export function HistorySidebar({
 
       <div className="flex items-center justify-between gap-5 px-4 pt-4 lg:pl-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised text-[11px] font-semibold text-warm-black">
-            {(ownerName || "S").slice(0, 1).toUpperCase()}
-          </div>
+          <SidebarLogo name={ownerName} siteUrl={siteUrl} />
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium leading-tight text-warm-black">{ownerName}</p>
-            <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "AI site management"}</p>
+            <p className="text-[13px] font-medium leading-tight text-warm-black">{ownerName}</p>
+            <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "Your dashboard"}</p>
           </div>
         </div>
         <Link

@@ -22,7 +22,7 @@ const cspBaseDirectives = [
   // (Next bootstrap + JSON-LD + Clerk inline); removing it needs a nonce rollout.
   "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://www.google.com https://*.gstatic.com",
   "font-src 'self' data:",
   // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
   // kept in the looser variant below).
@@ -259,7 +259,21 @@ export function buildContentSecurityPolicy(params: {
     ? getPreviewFrameAncestors(host, params.protocol).join(" ")
     : "'none'";
 
-  return [...cspBaseDirectives, `frame-ancestors ${frameAncestors}`].join("; ");
+  // Dev only: Turbopack/HMR + React dev tooling need 'unsafe-eval' and the HMR
+  // websocket. Prod stays strict (no unsafe-eval). This is the dev case the
+  // live-preview variant above didn't cover.
+  const directives =
+    process.env.NODE_ENV === "production"
+      ? cspBaseDirectives
+      : cspBaseDirectives.map((d) =>
+          d.startsWith("script-src")
+            ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*"
+            : d.startsWith("connect-src")
+              ? `${d} ws://localhost:* http://localhost:*`
+              : d
+        );
+
+  return [...directives, `frame-ancestors ${frameAncestors}`].join("; ");
 }
 
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {

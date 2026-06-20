@@ -433,7 +433,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
   const statusLabel: Record<NonNullable<ConnectionData["connections"][number]["status"]>, string> = {
     no_signal: "No signal",
     signal_available: "Signal available",
-    ai_using_it: "AI using it",
+    ai_using_it: "Active",
     needs_attention: "Needs attention",
     can_act_here: "Can act here",
   };
@@ -447,7 +447,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
       >
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">AI intelligence sources</span>
+          <span className="text-[12px] font-medium text-warm-black">Active sources</span>
           <span className="text-[11px] text-gray-muted">{usefulCount} usable now</span>
         </div>
         {expanded ? (

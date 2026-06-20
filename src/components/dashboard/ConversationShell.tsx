@@ -57,7 +57,7 @@ export function ConversationShell({
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
           <div className="min-w-0">
-            <span className="block text-[13px] font-medium text-warm-black leading-tight">Strelva</span>
+            <span className="block text-[13px] font-medium text-warm-black leading-tight">{ownerName || "Dashboard"}</span>
             <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
           </div>
         </header>

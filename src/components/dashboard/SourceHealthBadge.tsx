@@ -80,7 +80,7 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   ai_using_it: {
     icon: CheckCircle2,
-    label: "AI can use",
+    label: "Ready to use",
     bg: "bg-accent-dim",
     text: "text-accent",
     dot: "bg-accent",

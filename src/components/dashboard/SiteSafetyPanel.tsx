@@ -82,7 +82,7 @@ export function SiteSafetyPanel({ latestSnapshot }: SiteSafetyPanelProps) {
             Revert to a last good version
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-            Full-site backups capture every editable section, so AI or setup changes can be undone without hunting section by section.
+            Full-site backups capture every editable section, so updates and site changes can be undone without hunting section by section.
           </p>
         </div>
         <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-success" strokeWidth={1.5} />

@@ -186,7 +186,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              AI managed
+              Managed
             </span>
           </div>
         </div>

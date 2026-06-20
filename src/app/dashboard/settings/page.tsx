@@ -1391,8 +1391,8 @@ function PublishingSection() {
         </div>
         <p className="text-[13px] text-gray-muted leading-relaxed">
           {autoPublish
-            ? "AI changes go live immediately when you confirm them in chat."
-            : "AI changes are saved for Strelva to check before going live."}
+            ? "Changes go live immediately when you confirm them in chat."
+            : "Changes are saved for Strelva to check before going live."}
         </p>
         {error && <p className="mt-3 text-[12px] text-amber-300">{error}</p>}
         {saved && <p className="mt-3 text-[12px] text-emerald-300">Publishing mode saved.</p>}

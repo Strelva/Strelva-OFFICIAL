@@ -287,7 +287,7 @@ async function DashboardHome({
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
                 What changed
               </p>
-              <h2 className="mt-2 text-[18px] font-semibold text-warm-black">Recent AI/site activity</h2>
+              <h2 className="mt-2 text-[18px] font-semibold text-warm-black">Recent changes</h2>
             </div>
             <Link href={dashboardHref("/dashboard/reports")} className="text-[12px] font-medium text-accent hover:text-accent/80">
               Reports
@@ -304,7 +304,7 @@ async function DashboardHome({
             </div>
           ) : (
             <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-              No AI changes yet. Ask for one small update or edit the site directly, then this becomes your proof trail.
+              No updates yet. Ask for one small update or edit the site directly, then this becomes your proof trail.
             </p>
           )}
           </section>

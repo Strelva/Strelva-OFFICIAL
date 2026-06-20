@@ -138,7 +138,7 @@ const CATEGORY_ORDER: IntelligenceCategory[] = [
   "can_take_action",
 ];
 
-type FilterTab = "AI using it" | "Needs attention" | "All";
+type FilterTab = "Active" | "Needs attention" | "All";
 
 export function ConnectionsPage() {
   const router = useRouter();
@@ -146,7 +146,7 @@ export function ConnectionsPage() {
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const apiHref = dashboardHref;
   const setChatPrompt = dashboard?.setChatPrompt;
-  const [activeTab, setActiveTab] = useState<FilterTab>("AI using it");
+  const [activeTab, setActiveTab] = useState<FilterTab>("Active");
   const [query, setQuery] = useState("");
   const [sourceState, setSourceState] = useState<SourceState>({
     providerStatuses: {},
@@ -229,7 +229,7 @@ export function ConnectionsPage() {
 
   const connections = useMemo(() => {
     const searched = allConnections.filter((connection) => searchedConnectionIds.has(connection.id));
-    if (activeTab === "AI using it") {
+    if (activeTab === "Active") {
       return searched.filter((c) => c.intelligenceStatus === "ai_using_it" || c.intelligenceStatus === "can_act_here");
     }
     if (activeTab === "Needs attention") return searched.filter((c) => c.intelligenceStatus === "needs_attention");
@@ -312,7 +312,7 @@ export function ConnectionsPage() {
             <div>
               <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Source priorities</p>
               <p className="mt-1 text-[13px] text-gray-muted">
-                {usableNowCount} usable now. {needsSetupCount} need setup before they should influence AI decisions.
+                {usableNowCount} usable now. {needsSetupCount} need setup before we can use them.
               </p>
             </div>
             <button
@@ -361,7 +361,7 @@ export function ConnectionsPage() {
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-glass-border mb-4 pb-0">
-        {(["AI using it", "Needs attention", "All"] as const).map((tab) => (
+        {(["Active", "Needs attention", "All"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

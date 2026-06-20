@@ -112,8 +112,8 @@ describe("owner journey copy and links", () => {
     expect(tracker).toContain('"report-view"');
     expect(tracker).toContain('import { track } from "@vercel/analytics"');
     expect(tracker).toContain("track(event)");
-    expect(retentionPanel).toContain("AI changes this week");
-    expect(retentionPanel).toContain("Traffic after AI updates");
+    expect(retentionPanel).toContain("Updates this week");
+    expect(retentionPanel).toContain("Traffic after updates");
     expect(retentionPanel).toContain("Engagement signals");
     expect(retentionPanel).not.toContain("Retention engine");
     expect(retention).toContain("queueRetentionReengagement");

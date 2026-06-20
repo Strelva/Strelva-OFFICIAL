@@ -24,7 +24,7 @@ export function SuggestionCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-medium text-accent uppercase tracking-wide">
-            AI suggestion
+            Suggested update
           </p>
           <h3 className="text-[14px] font-medium text-warm-black leading-snug mt-1">
             {event.title}

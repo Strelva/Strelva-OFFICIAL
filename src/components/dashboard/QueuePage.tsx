@@ -121,7 +121,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              AI control center
+              Updates to approve
             </p>
             <h1 className={`${compact ? "text-[22px]" : "text-[24px] sm:text-[30px]"} font-semibold text-warm-black tracking-[-0.02em]`}>
               Needs You
@@ -176,7 +176,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
         <div className={`queue-tab-content ${compact ? "max-w-none" : "max-w-3xl"}`}>
           {tab === "resolved" && aiHandledThisMonth > 0 && (
             <p className="text-[13px] text-gray-muted mb-3">
-              The AI handled {aiHandledThisMonth} item{aiHandledThisMonth === 1 ? "" : "s"} this month.
+              Completed {aiHandledThisMonth} update{aiHandledThisMonth === 1 ? "" : "s"} this month.
             </p>
           )}
           {currentEvents.length === 0 ? (
@@ -192,7 +192,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                         {staleSectionCount} site area{staleSectionCount === 1 ? "" : "s"} could use a refresh
                       </p>
                       <p className="text-[12px] text-gray-fg mt-1">
-                        Nothing needs your okay, but the AI is watching older site content.
+                        Nothing needs your okay, but we&apos;re watching older site content.
                       </p>
                     </div>
                   </div>

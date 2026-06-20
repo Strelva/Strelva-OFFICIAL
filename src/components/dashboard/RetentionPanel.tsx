@@ -55,10 +55,10 @@ export function RetentionPanel({ signals }: { signals: OwnerRetentionSignals }) 
             Weekly proof
           </p>
           <h2 className="mt-2 text-[18px] font-semibold text-warm-black">
-            AI updates and engagement
+            Updates and engagement
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-            See what the AI changed, how many people found you after fresh work, and which proof signals are active.
+            See what changed on your site, how many people found you after fresh work, and which proof signals are active.
           </p>
         </div>
         <StatusBadge aiChangesThisWeek={signals.aiChangesThisWeek} />
@@ -66,15 +66,15 @@ export function RetentionPanel({ signals }: { signals: OwnerRetentionSignals }) 
 
       <div className="grid gap-3 md:grid-cols-3">
         <RetentionMetric
-          label="AI changes this week"
+          label="Updates this week"
           value={signals.aiChangesThisWeek}
-          detail={`${formatDays(signals.noAiUsageDays)} since last AI change`}
+          detail={`${formatDays(signals.noAiUsageDays)} since last update`}
           icon={Bot}
         />
         <RetentionMetric
-          label="Traffic after AI updates"
+          label="Traffic after updates"
           value={signals.trafficAfterAiUpdates}
-          detail="People found you during weeks with AI site work"
+          detail="People found you during weeks with fresh site work"
           icon={Eye}
         />
         <RetentionMetric

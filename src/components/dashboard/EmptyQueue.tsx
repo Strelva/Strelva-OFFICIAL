@@ -12,7 +12,7 @@ export function EmptyQueue() {
         Nothing needs you right now
       </p>
       <p className="text-[13px] text-gray-muted mt-1">
-        Drafts and bigger AI changes appear here before they go live. Small safe edits can still be made from the site editor.
+        Drafts and larger updates appear here before they go live. Small safe edits can still be made from the site editor.
       </p>
       <div className="mt-5 grid w-full max-w-xl gap-2 sm:grid-cols-3">
         {[
