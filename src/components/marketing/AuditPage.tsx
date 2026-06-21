@@ -16,8 +16,10 @@ import {
   Lock,
   Accessibility,
   Loader2,
+  Download,
 } from "lucide-react";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
+import { topFixes } from "@/lib/audit/impact";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -118,6 +120,11 @@ function CategoryCard({ category }: { category: CategoryResult }) {
                   <p className="text-[12px] text-m-text-3">
                     {check.message}
                   </p>
+                  {check.impact && check.status !== "pass" && (
+                    <p className="mt-1 text-[12px] leading-snug text-m-accent">
+                      {check.impact}
+                    </p>
+                  )}
                   {check.details && (
                     <p className="mt-1 truncate text-[11px] font-mono text-m-text-3 opacity-70">
                       {check.details}
@@ -139,15 +146,16 @@ export function AuditPage() {
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState("");
   const [progressStep, setProgressStep] = useState(0);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const progressSteps = [
     "Connecting to site...",
+    "Checking AI readability...",
+    "Analyzing SEO foundations...",
+    "Scanning security...",
     "Checking Core Web Vitals...",
-    "Analyzing SEO...",
-    "Scanning mobile responsiveness...",
-    "Validating structured data...",
-    "Checking SSL certificate...",
-    "Running accessibility checks...",
+    "Reviewing accessibility...",
+    "Reading trust and content signals...",
     "Calculating score...",
   ];
 
@@ -213,6 +221,37 @@ export function AuditPage() {
     setResult(null);
     setError("");
     setUrl("");
+  }
+
+  // POST the current result to the report renderer and open the returned HTML
+  // in a new tab so the user can print/save it as a PDF. Uses a blob URL so the
+  // document is fully self-contained and never blocked by popup heuristics tied
+  // to async document.write.
+  async function handleDownloadReport() {
+    if (!result || reportLoading) return;
+    setReportLoading(true);
+    try {
+      const res = await fetch("/api/audit/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+      if (!res.ok) throw new Error(`Report failed (${res.status})`);
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        // Popup blocked — fall back to a same-tab navigation.
+        window.location.href = blobUrl;
+      }
+      // Revoke after the new tab has had time to load the document.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      setError("Could not generate the report. Please try again.");
+    } finally {
+      setReportLoading(false);
+    }
   }
 
   return (
@@ -366,6 +405,47 @@ export function AuditPage() {
               </p>
             </div>
 
+            {/* Top priorities — the highest-impact fixes first */}
+            {(() => {
+              const fixes = topFixes(result.categories, 4);
+              if (fixes.length === 0) return null;
+              return (
+                <div className="mt-10">
+                  <h3 className="text-[15px] font-semibold text-m-text">
+                    Fix these first
+                  </h3>
+                  <ul className="mt-3 grid gap-2">
+                    {fixes.map((fix) => (
+                      <li
+                        key={`${fix.category}-${fix.name}`}
+                        className="rounded-xl border border-m-rule-soft bg-m-panel px-4 py-3"
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="text-[13px] font-medium text-m-text">
+                            {fix.name}
+                          </p>
+                          {fix.quantified ? (
+                            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-m-text">
+                              {fix.quantified}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[11px] uppercase tracking-wide text-m-text-3">
+                              {fix.category}
+                            </span>
+                          )}
+                        </div>
+                        {fix.impact && (
+                          <p className="mt-1 text-[12px] leading-snug text-m-accent">
+                            {fix.impact}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+
             {/* Category breakdown */}
             <div className="mt-10 grid gap-3">
               {result.categories.map((cat) => (
@@ -391,6 +471,19 @@ export function AuditPage() {
                   Request your build
                   <ArrowRight className="size-4" />
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  disabled={reportLoading}
+                  className="marketing-button-secondary h-12 px-6 disabled:opacity-60"
+                >
+                  {reportLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  {reportLoading ? "Preparing..." : "Save as PDF"}
+                </button>
                 <button
                   type="button"
                   onClick={handleReset}

@@ -16,6 +16,7 @@ import {
   Star,
   Plus,
   FileText,
+  Activity,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
@@ -64,6 +65,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/collections", label: "Content", icon: FileText },
   { href: "/dashboard/reviews", label: "Reviews", icon: Star },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/health", label: "Health", icon: Activity },
 ];
 
 const NAV_GROUPS = [

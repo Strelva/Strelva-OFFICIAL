@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import * as cheerio from "cheerio";
+import { checkTrust } from "../lib/audit/modules/trust";
+import type { AuditContext } from "../lib/audit/context";
+
+// ---------------------------------------------------------------------------
+// Helper — build a minimal AuditContext from raw HTML (mirrors audit-security).
+// ---------------------------------------------------------------------------
+function makeCtx(opts: { url: string; html: string }): AuditContext {
+  return {
+    url: opts.url,
+    html: opts.html,
+    $: cheerio.load(opts.html),
+    headers: new Headers(),
+    robotsTxt: null,
+    sitemapXml: null,
+    llmsTxt: null,
+  };
+}
+
+describe("checkTrust", () => {
+  it("scores a site rich in trust signals high", () => {
+    const html = `
+      <!doctype html>
+      <html lang="en">
+        <head><title>Trustworthy HVAC</title></head>
+        <body>
+          <header>
+            <a href="tel:+17165551234">(716) 555-1234</a>
+            <p>123 Main Street, Buffalo, NY 14201</p>
+            <p>Hours: Monday 9</p>
+          </header>
+          <section class="testimonials">
+            <blockquote>"Best service ever." - A happy customer</blockquote>
+          </section>
+          <p>Licensed &amp; Insured. Family owned since 2005. Satisfaction guarantee.</p>
+          <p>We accept Visa and Mastercard.</p>
+          <footer>
+            <a href="/about-us">Our Team</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+          </footer>
+        </body>
+      </html>
+    `;
+
+    const result = checkTrust(makeCtx({ url: "https://trustworthy-hvac.com", html }));
+
+    expect(result.slug).toBe("trust");
+    expect(result.name).toBe("Trust Signals");
+    expect(result.weight).toBe(0);
+    expect(result.score).toBeGreaterThanOrEqual(80);
+
+    const byName = (n: string) => result.checks.find((c) => c.name === n);
+    expect(byName("Secure connection (HTTPS)")?.status).toBe("pass");
+    expect(byName("Contact info visible")?.status).toBe("pass");
+    expect(byName("Click-to-call")?.status).toBe("pass");
+    expect(byName("Customer testimonials")?.status).toBe("pass");
+    expect(byName("Privacy & terms pages")?.status).toBe("pass");
+
+    // Every check has a plain-English message and a valid status.
+    for (const c of result.checks) {
+      expect(c.message.length).toBeGreaterThan(0);
+      expect(["pass", "warn", "fail"]).toContain(c.status);
+      expect(c.score).toBeGreaterThanOrEqual(0);
+      expect(c.score).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("scores an empty, insecure page low", () => {
+    const html = `
+      <!doctype html>
+      <html lang="en">
+        <head><title>Bare</title></head>
+        <body><h1>Welcome</h1></body>
+      </html>
+    `;
+
+    const result = checkTrust(makeCtx({ url: "http://bare-site.com", html }));
+
+    expect(result.slug).toBe("trust");
+    expect(result.score).toBeLessThan(50);
+
+    const byName = (n: string) => result.checks.find((c) => c.name === n);
+    expect(byName("Secure connection (HTTPS)")?.status).toBe("fail");
+    expect(byName("Contact info visible")?.status).toBe("fail");
+    expect(byName("Click-to-call")?.status).toBe("fail");
+    expect(byName("Customer testimonials")?.status).toBe("fail");
+    expect(byName("Privacy & terms pages")?.status).toBe("fail");
+  });
+});
