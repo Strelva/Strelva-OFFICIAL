@@ -162,11 +162,13 @@ const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
   ],
   // Crawl-blocked / not indexed: 92% of search traffic goes to page 1. If
   // crawlers are blocked you forfeit organic discovery; apply at half weight.
+  // Rendered as customers (not dollars) — the OWSH source deliberately avoided
+  // quoting a dollar figure for ranking loss, so we keep that restraint.
   [
     /robots|crawler|blocked|index/i,
     () => {
       const lost = GENERIC_METRICS.monthlyVisitors * 0.92 * 0.5 * GENERIC_METRICS.conversionRate;
-      return `${usd(lost * GENERIC_METRICS.orderValue)} estimated`;
+      return `${customers(lost)} from organic search (estimated)`;
     },
   ],
   // Trust / reviews / testimonials / conversion CTA: visible proof and a clear

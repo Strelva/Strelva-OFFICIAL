@@ -66,12 +66,24 @@ function calculateReadingGrade(text: string): number {
 function analyze(ctx: AuditContext): ContentAnalysis {
   const $ = ctx.$;
 
-  // Visible text only: drop script/style before reading text content. Clone the
-  // root (always present, single type) and prefer <body> when it exists.
+  // Visible MAIN-content text only. Mirror the OWSH content audit: drop scripts,
+  // styles, and the page chrome (nav/header/footer/sidebars) so boilerplate does
+  // not inflate the word count, then read the primary content region when one
+  // exists (otherwise the body). A thin page with a big footer should read thin.
   const $clone = $.root().clone();
-  $clone.find("script, style").remove();
+  $clone
+    .find(
+      "script, style, nav, header, footer, .nav, .navigation, .menu, .sidebar, .footer, .header"
+    )
+    .remove();
+  const $main = $clone
+    .find("main, article, .content, .main-content, #content, #main")
+    .first();
+  // cheerio.load always wraps parsed HTML in a body, so $bodyEl is the reliable
+  // fallback (typed Cheerio<Element>, unlike the document-level clone root).
   const $bodyEl = $clone.find("body");
-  const rawText = $bodyEl.length ? $bodyEl.text() : $clone.text();
+  const $textRoot = $main.length ? $main : $bodyEl;
+  const rawText = $textRoot.text();
   const bodyText = rawText.replace(/\s+/g, " ").trim();
   const wordCount = bodyText.split(/\s+/).filter((w) => w.length > 0).length;
 

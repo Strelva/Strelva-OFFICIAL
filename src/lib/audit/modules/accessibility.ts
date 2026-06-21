@@ -34,7 +34,9 @@ interface Finding {
 export function checkAccessibility(ctx: AuditContext): CategoryResult {
   const $ = ctx.$;
   const checks: CheckResult[] = [];
-  // Every WCAG finding (pass or issue) feeds the category-level score.
+  // Each APPLICABLE check feeds the score: a pass or an issue. Checks for an
+  // element type that is absent (no images/forms/iframes/tables) record nothing,
+  // so a missing element neither helps nor hurts the score.
   const findings: Finding[] = [];
 
   const record = (severity: Severity): void => {
@@ -142,7 +144,10 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       details: `Generic alt text provides no meaning. Replace values like: ${genericAltExamples.join(", ")}.`,
     });
   } else {
-    record("pass");
+    // Only credit a pass when there were images to evaluate. A page with no
+    // images has nothing to pass here, so (like forms/iframes/tables) it records
+    // no scoring finding and just shows an informational check.
+    if (totalImages > 0) record("pass");
     checks.push({
       name: "Image Alt Text",
       status: "pass",

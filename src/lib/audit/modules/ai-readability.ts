@@ -634,12 +634,14 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
     } else {
       checks.push({
         name: "llms.txt for AI agents",
+        // Gentle warn (70): llms.txt is an emerging, optional 2026 signal almost
+        // no site publishes yet, so its absence should nudge, not tank the score.
         status: "warn",
-        score: 40,
+        score: 70,
         message:
-          "No llms.txt file found. llms.txt is a plain-text guide at your site root that tells AI assistants (ChatGPT, Claude, Perplexity) what your site is and where the important pages are.",
+          "No llms.txt file found. llms.txt is an emerging, optional plain-text guide at your site root that tells AI assistants (ChatGPT, Claude, Perplexity) what your site is and where the important pages are.",
         details:
-          "Add /llms.txt summarizing your business and linking your key pages so AI agents read the right content.",
+          "Optional but forward-looking: add /llms.txt summarizing your business and linking your key pages so AI agents read the right content.",
       });
     }
   }
