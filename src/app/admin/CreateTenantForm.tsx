@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const TEMPLATES = ["wellness", "food-brand", "restaurant", "trades", "professional"] as const;
-const INDUSTRIES = ["wellness", "food-brand", "restaurant", "trades", "professional", "retail", "services"] as const;
+// Canonical verticals = the templates the engine actually ships
+// (src/components/templates/registry.ts). Kept in sync with /admin/onboard's
+// INDUSTRIES so both new-client entry points offer the same set. retail/services
+// were dropped — no template or page-config default exists for them.
+const TEMPLATES = ["wellness", "food-brand", "restaurant", "trades", "professional", "fashion-stylist"] as const;
+const INDUSTRIES = TEMPLATES;
 
 const inputCls =
   "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 transition-colors";

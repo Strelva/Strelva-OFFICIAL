@@ -187,9 +187,11 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
 function ProfileSection({
   settings,
   setSettings,
+  readOnly = false,
 }: {
   settings: SettingsData;
   setSettings: (s: SettingsData) => void;
+  readOnly?: boolean;
 }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -259,7 +261,10 @@ function ProfileSection({
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-end gap-3">
+        {readOnly && (
+          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+        )}
         <SaveStatusPill status={saveStatus} />
       </div>
 
@@ -276,8 +281,9 @@ function ProfileSection({
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 onBlur={() => handleBlurSave(field.key)}
+                disabled={readOnly}
                 rows={2}
-                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors"
+                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors disabled:opacity-60"
               />
             ) : (
               <input
@@ -288,7 +294,8 @@ function ProfileSection({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLElement).blur();
                 }}
-                className={`w-full bg-surface-base border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors ${
+                disabled={readOnly}
+                className={`w-full bg-surface-base border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors disabled:opacity-60 ${
                   fieldErrors[field.key] ? "border-red-400/50" : "border-gray-border"
                 } ${
                   field.mono
@@ -935,6 +942,7 @@ function NavigationFooterSection() {
 
 function CapabilitiesSection() {
   const apiPath = useDashboardApiPath();
+  const readOnly = useDashboardOptional()?.readOnly ?? false;
   const [capabilities, setCapabilities] = useState<SiteCapabilitiesData | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
@@ -981,7 +989,12 @@ function CapabilitiesSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end"><SaveStatusPill status={saveStatus} /></div>
+      <div className="flex items-center justify-end gap-3">
+        {readOnly && (
+          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+        )}
+        <SaveStatusPill status={saveStatus} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {toggles.map(([key, label]) => (
           <label key={key} className="flex items-center justify-between rounded-lg border border-gray-border bg-surface-raised px-4 py-3">
@@ -989,12 +1002,13 @@ function CapabilitiesSection() {
             <input
               type="checkbox"
               checked={Boolean(capabilities[key])}
+              disabled={readOnly}
               onChange={(event) => {
                 const next = { ...capabilities, [key]: event.target.checked };
                 setCapabilities(next);
                 saveCapabilities(next);
               }}
-              className="h-4 w-4 accent-accent"
+              className="h-4 w-4 accent-accent disabled:opacity-60"
             />
           </label>
         ))}
@@ -1003,6 +1017,7 @@ function CapabilitiesSection() {
         <label className="text-[11px] uppercase tracking-wider text-gray-faint">Custom-only features</label>
         <input
           value={(capabilities.customOnlyFeatures || []).join(", ")}
+          disabled={readOnly}
           onChange={(event) => {
             const next = {
               ...capabilities,
@@ -1013,7 +1028,7 @@ function CapabilitiesSection() {
           }}
           onBlur={() => saveCapabilities(capabilities)}
           placeholder="cart, rewards, booking-flow"
-          className="mt-2 w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+          className="mt-2 w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
         />
       </div>
     </div>
@@ -1523,6 +1538,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const apiPath = useDashboardApiPath();
+  const readOnly = useDashboardOptional()?.readOnly ?? false;
 
   const setSection = useCallback((section: string) => {
     setActiveSection(section);
@@ -1641,7 +1657,7 @@ export default function SettingsPage() {
 
           {/* Section content */}
           {activeSection === "profile" && settings && (
-            <ProfileSection settings={settings} setSettings={setSettings} />
+            <ProfileSection settings={settings} setSettings={setSettings} readOnly={readOnly} />
           )}
           {activeSection === "profile" && !settings && (
             <div className="space-y-4 animate-pulse">

@@ -11,7 +11,7 @@ test("owner dashboard surfaces are reachable and product-complete enough to orie
 
   await expect(page.getByRole("heading", { name: /good (morning|afternoon|evening), great lakes dried fruit/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /what should i improve next/i })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: /tell me what you need/i })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /message the ai about your site/i })).toBeVisible();
   await expect(dashboardNav.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("href", "/dashboard");
   await expect(dashboardNav.getByRole("link", { name: "Ask AI", exact: true })).toHaveAttribute("href", "/dashboard/chat");
   await expect(dashboardNav.getByRole("link", { name: "Site", exact: true })).toHaveAttribute("href", "/dashboard/site");

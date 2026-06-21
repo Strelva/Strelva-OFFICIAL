@@ -88,8 +88,14 @@ export default async function AdminPage() {
   );
 
   const activeTenants = TENANTS.filter((t) => t.active).length;
-  const activeSubscriptions = TENANTS.filter(
-    (t) => t.subscriptionStatus === "active"
+  // MRR must tell the same story as the per-tenant rows: count a tenant only
+  // if it is *effectively* active (founder-comp aware) AND actually billed.
+  // Comped tenants (planOverride === "founder_comp") read as "active" but are
+  // not revenue, so they are excluded.
+  const activeSubscriptions = tenantData.filter(
+    (d) =>
+      d.effectiveSubscriptionStatus === "active" &&
+      d.tenant.planOverride !== "founder_comp"
   ).length;
   const mrr = activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);

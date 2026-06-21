@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import type { ComponentType } from "react";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Link2, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasTenantAccess } from "@/lib/auth";
+import { hasDashboardViewAccess } from "@/lib/auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
 import { getQueueCount } from "@/lib/events";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
@@ -59,7 +59,7 @@ async function DashboardHome({
   const params = searchParams ? await searchParams : {};
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasTenantAccess(tenant);
+  const hasAccess = await hasDashboardViewAccess(tenant);
 
   if (!hasAccess) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));

@@ -18,6 +18,28 @@ import {
   FileText,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+import { createBrowserSupabase } from "@/lib/db/browser-client";
+
+/** Ends the active session (Supabase first, Clerk fallback) then returns to sign-in. */
+async function signOutEverywhere() {
+  try {
+    const supabase = createBrowserSupabase();
+    if (supabase) await supabase.auth.signOut();
+  } catch {
+    // ignore — fall through to redirect so the user always leaves
+  }
+  const clerk = (window as typeof window & {
+    Clerk?: { signOut?: (options?: { redirectUrl?: string }) => Promise<void> };
+  }).Clerk;
+  if (clerk?.signOut) {
+    try {
+      await clerk.signOut();
+    } catch {
+      // ignore
+    }
+  }
+  window.location.href = "/sign-in";
+}
 
 export interface Thread {
   id: string;
@@ -337,16 +359,7 @@ export function HistorySidebar({
           <button
             type="button"
             onClick={() => {
-              const clerk = (window as typeof window & {
-                Clerk?: { signOut?: (options?: { redirectUrl?: string }) => Promise<void> };
-              }).Clerk;
-              if (clerk?.signOut) {
-                clerk.signOut({ redirectUrl: "/sign-in" }).catch(() => {
-                  window.location.href = "/sign-in";
-                });
-              } else {
-                window.location.href = "/sign-in";
-              }
+              void signOutEverywhere();
             }}
             className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
             title="Sign out"

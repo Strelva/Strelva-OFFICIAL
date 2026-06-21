@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasTenantAccess } from "@/lib/auth";
+import { hasDashboardViewAccess } from "@/lib/auth";
 import { getContent } from "@/lib/storage";
 import { getEvents, getQueueCount } from "@/lib/events";
 import { getSectionTimestamps } from "@/lib/storage";
@@ -20,7 +20,7 @@ export default async function ChatPage({
   const params = await searchParams;
   const tenant = await getTenantFromHeaders();
 
-  const allowed = await hasTenantAccess(tenant);
+  const allowed = await hasDashboardViewAccess(tenant);
   if (!allowed) {
     const clientFallbackRoot = getClientFallbackRoot(await headers());
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));

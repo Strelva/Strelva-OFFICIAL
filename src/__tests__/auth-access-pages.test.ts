@@ -72,7 +72,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ email: "owner@example.com" }),
     }));
 
-    expect(html).toContain("Dashboard signup is paused.");
+    expect(html).toContain("Dashboard access is invite-only.");
     expect(html).toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });

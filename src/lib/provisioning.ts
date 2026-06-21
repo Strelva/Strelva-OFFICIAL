@@ -182,23 +182,32 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     "hero", "services", "story", "testimonials", "events",
     "providers", "contact", "settings", "faq",
   ];
+  // setContent is an idempotent upsert, so re-running provision to recover a
+  // partial seed is safe (it overwrites, never duplicates). We capture the
+  // reason for each failed section so the operator sees WHY, not just a count.
   let seeded = 0;
+  const seedFailures: string[] = [];
   for (const section of SEED_SECTIONS) {
     try {
       await setContent(section, defaults[section], tenantId);
       seeded++;
-    } catch {
-      // best-effort; a failed section just falls back to read-time defaults
+    } catch (err) {
+      seedFailures.push(`${section} (${err instanceof Error ? err.message : String(err)})`);
     }
   }
+  const allSeeded = seeded === SEED_SECTIONS.length;
   steps.push({
     key: "seed",
     label: "Seed starter content",
-    status: seeded > 0 ? "ok" : "failed",
-    detail: `${seeded}/${SEED_SECTIONS.length} sections`,
+    // Flag any shortfall as failed so it isn't silently "3/9 looks fine" — the
+    // unseeded sections fall back to read-time defaults and have no edit base.
+    status: allSeeded ? "ok" : "failed",
+    detail: allSeeded
+      ? `${seeded}/${SEED_SECTIONS.length} sections`
+      : `${seeded}/${SEED_SECTIONS.length} sections — failed: ${seedFailures.join(", ")}. Re-run provision to retry (safe; overwrites).`,
   });
 
-  // 3. Owner invite (createTenant already assigns if they exist in Clerk).
+  // 3. Owner invite (createTenant already assigns if they already have an account).
   if (input.ownerEmail) {
     try {
       await createInvite(input.ownerEmail, tenantId, "operator-onboard", "owner");

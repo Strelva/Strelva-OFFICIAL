@@ -25,12 +25,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Parse the body ONCE here — the request stream can only be read a single
+  // time, so the catch below must reuse this object, never re-read `req`.
+  const body = await readJsonObject(req).catch(() => null);
+  const fallbackAuthor =
+    body && typeof body.author === "string" && body.author.trim()
+      ? body.author.trim()
+      : "there";
+  const fallbackRating =
+    body && Number.isFinite(Number(body.rating))
+      ? Math.min(5, Math.max(1, Math.round(Number(body.rating))))
+      : 5;
+
   try {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    const body = await readJsonObject(req);
     if (!body) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -57,16 +68,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply });
   } catch {
     // Last-resort deterministic fallback so the UI always gets something usable.
-    try {
-      const body = await req.clone().json().catch(() => null);
-      const author = body && typeof body.author === "string" ? body.author : "there";
-      const rating = body && Number.isFinite(Number(body.rating)) ? Number(body.rating) : 5;
-      return NextResponse.json({
-        reply: buildDeterministicReply(author, Math.min(5, Math.max(1, Math.round(rating)))),
-        fallback: true,
-      });
-    } catch {
-      return NextResponse.json({ error: "Failed to draft reply" }, { status: 500 });
-    }
+    // Uses the already-parsed body (the stream is gone by now).
+    return NextResponse.json({
+      reply: buildDeterministicReply(fallbackAuthor, fallbackRating),
+      fallback: true,
+    });
   }
 }

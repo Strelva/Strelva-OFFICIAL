@@ -54,7 +54,7 @@ describe("owner journey copy and links", () => {
     // The sign-up page no longer carries the dead self-serve signup branch.
     expect(signUpPage).not.toContain("isSelfServeSignup");
     expect(signUpPage).not.toContain('redirectUrl?.startsWith("/onboard")');
-    expect(signUpPage).toContain('const title = "Dashboard signup is paused.";');
+    expect(signUpPage).toContain('const title = "Dashboard access is invite-only.";');
     expect(signUpPage).toContain("Request your build");
   });
 
