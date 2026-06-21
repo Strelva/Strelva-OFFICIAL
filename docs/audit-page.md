@@ -1,379 +1,168 @@
-# Audit Page Architecture
+# Audit / Site-Health System
 
-Free site health scoring tool at `/audit`. Top-of-funnel lead gen: visitor enters a URL, gets a 0-100 score with letter grade, sees where their site is weak, then hits the CTA to request a free Strelva site.
+Strelva's audit/health system is one engine and one history store, shared across three surfaces: a free public lead-gen tool, the signed-in client's site-health card, and the super-admin portfolio overview. It scores any public URL 0-100 with a letter grade, breaks the score into eight weighted categories, attaches a plain-English "what this costs you" narrative to every issue, and persists a compact per-tenant summary + trend history.
 
-No signup required. 3 scans per day per IP.
-
-## Changed Files
-
-```
-package.json                                  # added cheerio dependency
-src/lib/audit/types.ts                        # type definitions
-src/lib/audit/scoring.ts                      # score computation + grade mapping
-src/lib/audit/checks.ts                       # scoring engine (all 6 categories)
-src/app/api/audit/scan/route.ts               # POST /api/audit/scan
-src/app/(marketing)/audit/page.tsx            # server component (metadata only)
-src/components/marketing/AuditPage.tsx        # client component (form + results UI)
-```
-
-## Route Structure
-
-The page lives at `src/app/(marketing)/audit/page.tsx` inside the `(marketing)` route group. This group is for public-facing pages that do not use the tenant dashboard layout. The server component exports metadata and renders `<AuditPage />`.
-
-The `marketing-site` branch may have its own `/audit` placeholder. When merging, this branch's implementation should win since it contains the full working feature.
+This doc is the source of truth for that system. The older 6-category PageSpeed-centric design (web-vitals / seo / mobile / schema / ssl / a11y) it replaced is gone.
 
 ---
 
-## Scoring System
+## Overview
 
-### Category Weights
+- One scoring engine: `runAudit(url)` in `src/lib/audit/checks.ts`.
+- One history store: `scan-store` (Redis) in `src/lib/scan-store.ts`, written only through `src/lib/scan.ts`.
+- Eight categories. Six are pure single-fetch modules ported from the archived OWSH Systems product (`src/lib/audit/modules/*.ts`); two (Core Web Vitals, Mobile) come from a single optional Google PageSpeed call.
+- Every failing/warning check carries an impact line + a conservative dollar/customer loss estimate (`src/lib/audit/impact.ts`).
+- A `/guides` SEO blog (`src/lib/guides.ts`) repurposes the OWSH fix guides into articles that cross-link back to the audit categories they help fix.
 
-| # | Category | Slug | Weight | Source |
-|---|----------|------|--------|--------|
-| 1 | Core Web Vitals | `web-vitals` | 0.30 | Google PageSpeed API |
-| 2 | Basic SEO | `seo` | 0.25 | HTML parsing (cheerio) |
-| 3 | Mobile Responsiveness | `mobile` | 0.20 | Google PageSpeed API |
-| 4 | Schema / Structured Data | `schema` | 0.10 | HTML parsing (cheerio) |
-| 5 | SSL Certificate | `ssl` | 0.10 | Protocol check + HTTPS fetch |
-| 6 | Accessibility | `a11y` | 0.05 | HTML parsing (cheerio) |
+The product framing: free scan = top of funnel (zero marginal cost, never a "free build"); the build is what gets sold. See `AGENTS.md` ("Do NOT Build" / the free-scan note).
 
-Weights sum to 1.0.
+---
 
-### Overall Score Calculation
+## Architecture
+
+### One engine
+
+`runAudit(inputUrl)` (`src/lib/audit/checks.ts`) is the only audit engine. It:
+
+1. Normalizes the URL (prepends `https://` when no scheme is given).
+2. Runs SSRF protection (`validateUrlSafety`): rejects non-HTTP schemes, DNS-resolves the host forcing IPv4 (`family: 4`, closing the IPv6 SSRF bypass), and rejects private/reserved IP ranges via `isPrivateIP`.
+3. Builds one shared `AuditContext` via `buildAuditContext`: a single homepage fetch (15s timeout, falls back HTTPS to HTTP) plus three well-known files fetched in parallel (`/robots.txt`, `/sitemap.xml`, `/llms.txt`). Any that miss come through as `null` so a module degrades a finding instead of throwing. After redirects it re-validates the final host against private IPs (DNS-rebinding guard).
+4. Makes one optional Google PageSpeed Insights call (`fetchPageSpeedData`, 30s, mobile strategy, PERFORMANCE category only). The single response feeds both `checkWebVitals` and `checkMobile`.
+5. Runs the six ported modules synchronously off the shared context, then assigns each category its weight from the central `WEIGHTS` map.
+6. Calls `attachImpact` on every category to attach the impact narrative + fix priority.
+7. Returns `CategoryResult[]`.
+
+`runAudit` does not compute the overall score or persist anything; callers do. Types live in `src/lib/audit/types.ts` (`CheckResult`, `CategoryResult`, `AuditResult`, `LetterGrade`, `PageSpeedResult`).
+
+### The AuditContext (`src/lib/audit/context.ts`)
+
+The runner gathers everything once so each module stays pure (no module makes its own network call):
+
+- `url` final URL after redirects (https-normalized)
+- `html` raw homepage HTML
+- `$` a cheerio handle parsed once and shared across modules
+- `headers` homepage response headers (for the security-header checks)
+- `robotsTxt`, `sitemapXml`, `llmsTxt` well-known file bodies, or `null`
+
+### One store
+
+`scan-store` (`src/lib/scan-store.ts`) is the single source of truth for per-tenant health history. It is Redis-backed (key prefix `reb:scan:`, 30-day TTL) and stores a compact record, not full per-check detail:
+
+- `saveScanSummary` / `getScanSummary` / `getScanSummaries` the latest `ScanSummary` (overall grade/score + per-category scores) per tenant.
+- `pushScanHistory` / `getScanHistory` a small ring buffer (max 12 points) of `{ scannedAt, overallScore, grade }` for trend lines / sparklines.
+
+Nothing writes the store directly. Everything goes through `src/lib/scan.ts`:
+
+- `scanTenant(tenantId)` resolves the tenant's live public URL, runs `runAudit`, computes the overall score + grade, persists the summary and a history point, and returns the full per-category detail (`ScanResult`) for the live UI.
+- `scanAllTenants(concurrency = 6)` the portfolio version: scans every active tenant with a bounded worker pool (each scan is a ~35s external fetch + PageSpeed call, so a sequential loop would exhaust the cron budget), isolating per-tenant failures.
+
+### The surfaces (one engine + store behind all of them)
+
+| Surface | Entry point | Path through the system |
+|---------|-------------|-------------------------|
+| Free public audit | `POST /api/audit/scan` | `runAudit` directly (no tenant, no store); result cached 1h in Redis, rate-limited 3/day/IP |
+| "Save as PDF" one-pager | `POST /api/audit/report` | pure transform of a caller-supplied `AuditResult` via `renderAuditReport` |
+| Client site-health card | `GET /api/dashboard/site-audit` (+ `/history`) | `scanTenant` (writes scan-store), 24h cache; history reads `getScanHistory` |
+| Admin per-tenant manual scan | `POST /api/admin/scan` | `scanTenant` (writes scan-store) |
+| Admin portfolio overview | `src/app/admin/page.tsx` | reads `getScanSummary` + `getScanHistory` |
+| Daily portfolio cron | `GET /api/cron/portfolio-scan` | `scanAllTenants` (writes scan-store for all tenants) |
+
+The client `/dashboard/health` and the admin overview read the SAME scan-store data. See the consolidation invariant below.
+
+---
+
+## The modules
+
+Eight categories. Weights are the central `WEIGHTS` map in `checks.ts` and sum to 1.0. The slug is what the module emits and what the weight map / impact map key on.
+
+| Category | Slug | Weight | Source | What it checks |
+|----------|------|--------|--------|----------------|
+| AI Readability | `ai-readability` | 0.20 | `modules/ai-readability.ts` | The marquee "are you visible to AI search?" module. Structured-data present; business schema valid (per-type Google rich-result field validation); AI-answer content (FAQPage / HowTo / Article); entity authority (`sameAs` to Wikipedia/Wikidata/LinkedIn/etc.); plain-text readable by AI (SPA-shell / JS-render risk); single clear business name (cross-source ambiguity, placeholder "coming soon"); `llms.txt` present (the 2026 AI-agent signal, gentle warn when absent). |
+| SEO Foundations | `seo` | 0.18 | `modules/seo-foundations.ts` | Crawl + index foundations: robots.txt present; crawlers allowed (no blanket `Disallow: /` for `*`/googlebot/bingbot/gptbot); XML sitemap present + valid; canonical tag; title tag (length-graded); meta description; H1 present + exactly one; server-rendered content (SPA shell with little server HTML warns). Schema is deliberately left to the AI-readability module. |
+| Core Web Vitals | `web-vitals` | 0.15 | `checks.ts` (PageSpeed) | LCP, CLS, TBT, and the Lighthouse performance score, tiered good/needs-improvement/poor. |
+| Security | `security` | 0.12 | `modules/security.ts` | HTTPS; weighted security response headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-XSS-Protection); no mixed content (active HTTP resources fail, passive warn); form security (HTTPS action + CSRF token presence); cookie-consent / GDPR notice. |
+| Accessibility | `a11y` | 0.10 | `modules/accessibility.ts` | 13 WCAG 2.1 AA cheerio checks: document language, page title, image alt text, link text, form labels, heading structure, landmarks, skip-to-content link, button/control names, iframe titles, valid ARIA roles, data-table headers. |
+| Mobile Responsiveness | `mobile` | 0.10 | `checks.ts` (PageSpeed) | Viewport meta, legible font sizes, tap-target sizing (from the same PageSpeed Lighthouse audits, no second API call). |
+| Trust Signals | `trust` | 0.08 | `modules/trust.ts` | Secure connection; contact info visible (phone/address/hours); click-to-call; trust badges & credentials (BBB, licensed, insured, guarantees, awards, etc.); customer testimonials; privacy & terms pages; team/about transparency. |
+| Content Quality | `content` | 0.07 | `modules/content.ts` | Main-content word count; heading structure; key pages linked (About/Services/Contact/Blog); readability (Flesch-Kincaid grade); internal links; image-alt coverage; organization with lists; clear calls to action. |
+
+Notes:
+
+- The six modules are pure: each takes the `AuditContext` and returns a `CategoryResult` with `weight: 0`; the runner overrides the weight from `WEIGHTS[slug]`. They make no network calls and were source-audited against the OWSH originals during a fidelity review.
+- Several modules compute their category score with the OWSH module's own internal weighting (e.g. SEO's per-check raw weights, accessibility's severity model with a critical-issue cap at 60, trust's and content's /100 point models, AI-readability blending the OWSH AI-discovery score 50/50 with the flattened check average), falling back to a simple check average defensively. Individual `CheckResult` scores are always 0-100.
+- PageSpeed is optional. When `GOOGLE_PAGESPEED_API_KEY` is unset (or the call fails), `checkWebVitals` and `checkMobile` return `weight: 0`, which excludes them from the overall grade (see scoring) rather than injecting a 50-point participation score. The other six categories run from the homepage fetch alone, so a URL-only run still grades honestly.
+
+---
+
+## Scoring + impact
+
+### Overall score (`src/lib/audit/scoring.ts`)
+
+`computeOverallScore` is a weighted average that redistributes proportionally when a category is excluded:
 
 ```
-overallScore = round( sum(category.score * category.weight) / sum(category.weight) )
+overallScore = round( sum(score * weight) / sum(weight) )
 ```
 
-Implemented in `scoring.ts:computeOverallScore()`. Each category score is 0-100. The overall score is 0-100.
+Because it divides by the sum of the weights actually present, a category emitted with `weight: 0` (an uninstrumented PageSpeed category) drops out cleanly and the remaining categories renormalize. `scoreToGrade`: 90+ A, 80+ B, 70+ C, 60+ D, else F. `averageCheckScores` is the shared helper modules use for check-average fallback.
 
-### Category Score Calculation
+### Impact narrative + quantified loss (`src/lib/audit/impact.ts`)
 
-Each category contains multiple checks. Each check produces a score from 0 to 100. The category score is the simple average of its check scores:
+`attachImpact(category)` walks every non-passing check (informational "not measured / coming soon" placeholders are skipped) and attaches:
 
-```
-categoryScore = round( sum(check.score) / checkCount )
-```
+- `impact` a plain-English "what this costs you" line, matched by a keyword regex against the check name (`CHECK_IMPACT`), falling back to a per-category line (`CATEGORY_IMPACT`).
+- `quantified` a conservative dollar/customer estimate (e.g. "~12 customers/mo" / "~$45/mo in conversions"), only for issue types where a figure is genuinely credible (`CHECK_QUANTIFIED`); otherwise omitted. Estimates use one generic, deliberately conservative single-profile metric set (`GENERIC_METRICS` = 500 monthly visitors, 3% conversion, $75 order value) ported from OWSH and collapsed to a single profile because Strelva's free audit has no vertical and no client analytics. Every line is prefixed "~".
+- `priority` (`high` / `medium` / `low`) derived from status + how heavily the category counts.
 
-Implemented in `scoring.ts:averageCheckScores()`.
-
-### Letter Grade Mapping
-
-| Score Range | Grade |
-|-------------|-------|
-| 90-100 | A |
-| 80-89 | B |
-| 70-79 | C |
-| 60-69 | D |
-| 0-59 | F |
-
-Implemented in `scoring.ts:scoreToGrade()`.
+`topFixes(categories, limit)` flattens all non-passing checks into a prioritized list (high to low, worst score first). It powers the "Fix these first" block on the public results page, the client health card, and the PDF one-pager.
 
 ---
 
-## Individual Checks by Category
+## The surfaces
 
-### 1. Core Web Vitals (`checkWebVitals`)
+### Free public audit tool (`/audit`)
 
-Uses PageSpeed Insights API data. If no API key or fetch fails, returns a single "warn" check scored at 50.
+- Route: `src/app/(marketing)/audit/page.tsx` (server component, metadata only) renders `src/components/marketing/AuditPage.tsx` (the client form + results UI). It lives in the `(marketing)` route group (public, no tenant dashboard layout).
+- API: `POST /api/audit/scan` extracts the client IP, enforces a Redis per-IP rate limit (`MAX_SCANS_PER_DAY = 3`, 24h window via `isRateLimitedWindowedAsync`), normalizes + validates the URL, checks a 1h Redis result cache (`reb:audit:{url}`), calls `runAudit`, computes score + grade, caches, and returns an `AuditResult`. Failures are reported to Sentry (`feature: audit-scan`) and return a generic 500.
+- UI: animated progress stepper while scanning; on completion a score ring + grade, a "Fix these first" priority list (via `topFixes`), collapsible per-category cards with per-check pass/warn/fail and the impact line, and a CTA to `/access-request?ref=audit`. No signup.
+- "Save as PDF" one-pager: `handleDownloadReport` POSTs the current `AuditResult` to `POST /api/audit/report`, which validates the shape and returns a self-contained, print-friendly HTML document from `renderAuditReport` (`src/lib/audit/html.ts`). The report route does no data access (pure transform, nothing tenant-scoped to leak). The front-end opens it as a blob URL for the user to print/save.
 
-| Check | Good (100) | Needs Improvement (60) | Poor (20) |
-|-------|-----------|----------------------|-----------|
-| Largest Contentful Paint (LCP) | <= 2.5s | <= 4.0s | > 4.0s |
-| Cumulative Layout Shift (CLS) | <= 0.1 | <= 0.25 | > 0.25 |
-| Total Blocking Time (TBT) | <= 200ms | <= 600ms | > 600ms |
-| Performance Score | >= 90 (pass) | >= 50 (warn) | < 50 (fail) |
+### Client site-health (signed-in dashboard)
 
-Performance Score is the raw Lighthouse performance score scaled to 0-100.
+- Page: `src/app/dashboard/health/page.tsx` ("Site Health", access-gated) renders `src/components/dashboard/SiteHealthCard.tsx`.
+- API: `GET /api/dashboard/site-audit` (auth-gated: `verifyAuth` + `requireTenantAccess`) resolves the tenant's best public URL and routes through `scanTenant`, so the client view writes to the SAME scan-store the admin overview reads. Result cached 24h per tenant (`reb:site-audit:{tenant}`); `?refresh=1` forces a re-scan. Returns the full per-category detail plus `topFixes`.
+- History: `GET /api/dashboard/site-audit/history` reads `getScanHistory` (the same store the admin sparkline uses, populated by the daily cron) for the card's trend band.
+- Card: score + grade ring, a re-scan button, a trend band (when >= 2 history points), the "Fix these first" list, and per-category bars (filtered to `weight > 0`).
 
-### 2. Basic SEO (`checkSEO`)
+### Admin (super-admin portfolio + per-tenant)
 
-Parses HTML with cheerio. All checks are synchronous.
-
-| Check | Pass (100) | Warn | Fail (0) |
-|-------|-----------|------|----------|
-| Title Tag | 30-60 chars | < 30 chars (60) or > 60 chars (70) | Missing |
-| Meta Description | 70-160 chars | < 70 chars (60) or > 160 chars (70) | Missing |
-| H1 Tag | Exactly 1 | Multiple (60) | Missing |
-| Canonical URL | Present (100) | Missing (40) | - |
-| Robots Meta | Indexable (100) | noindex/none (30) | - |
-
-### 3. Mobile Responsiveness (`checkMobile`)
-
-Uses the same PageSpeed API response as Web Vitals (no second API call). Falls back to 50 if no API key.
-
-| Check | Pass (100) | Warn/Fail |
-|-------|-----------|-----------|
-| Viewport Meta Tag | Lighthouse score = 1 | Missing/misconfigured (0) |
-| Legible Font Sizes | Lighthouse score = 1 | Too small (40) |
-| Tap Target Sizing | Lighthouse score = 1 | Too small/close (50) |
-
-### 4. Schema / Structured Data (`checkSchema`)
-
-Parses `<script type="application/ld+json">` blocks. Extracts `@type` from top-level objects and `@graph` arrays.
-
-| Check | Pass (100) | Warn (50) | Fail (0) |
-|-------|-----------|-----------|----------|
-| Structured Data | Any JSON-LD types found | - | No JSON-LD found |
-| Business Schema | LocalBusiness, Organization, or related subtype found | Schema exists but no business type | - |
-
-Business Schema check only runs if at least one schema type was found. Recognized business types: LocalBusiness, Organization, Restaurant, Store, MedicalBusiness, LegalService, FinancialService, AutoRepair, HealthAndBeautyBusiness, HomeAndConstructionBusiness, ProfessionalService.
-
-### 5. SSL Certificate (`checkSSL`)
-
-| Check | Pass (100) | Warn (60) | Fail (0) |
-|-------|-----------|-----------|----------|
-| HTTPS | URL uses `https:` protocol | - | URL uses `http:` |
-| HTTPS Available | - | HTTPS reachable but not default | HTTPS not reachable |
-
-The "HTTPS Available" check only runs when the input URL is `http:`. It tries upgrading to `https:` with an 8-second timeout.
-
-### 6. Accessibility (`checkAccessibility`)
-
-| Check | Pass (100) | Warn/Fail |
-|-------|-----------|-----------|
-| Language Attribute | `<html lang="...">` present | Missing (0) |
-| Image Alt Text | All images have `alt` attributes | Proportional score: `round((total - missing) / total * 100)`. >= 80% coverage = warn, < 80% = fail |
+- Portfolio overview: `src/app/admin/page.tsx` loads each tenant's latest scan via `getScanSummary` + `getScanHistory` (no live scan on page load) and renders a per-tenant SEO/health grade pill plus a `Sparkline` of recent scores and a since-last-check delta. A `ScanAllButton` triggers the portfolio scan.
+- Per-tenant detail: `src/app/admin/tenants/[id]/SiteScan.tsx` shows the stored `ScanSummary` and can run a fresh in-session scan via `POST /api/admin/scan` (which also routes through `scanTenant`, writing the store), exposing the full per-check breakdown for that run.
+- Daily cron: `GET /api/cron/portfolio-scan` (scheduled `0 5 * * *` in `vercel.json`, `maxDuration: 300`, CRON_SECRET-gated at the proxy) runs `scanAllTenants`, records a heartbeat, and Slack-pings on failures. This is what keeps the overview grades and every tenant's trend history current without anyone clicking.
 
 ---
 
-## Security
+## The guides blog (`/guides`)
 
-### SSRF Protection
+A marketing/SEO article library that funnels readers into the audit:
 
-`validateUrlSafety()` prevents the server from being used as a proxy to scan internal infrastructure.
-
-1. Parse the user-supplied URL with `new URL()`
-2. Reject if protocol is not `http:` or `https:`
-3. DNS-resolve the hostname via `dns.promises.lookup()`
-4. Check the resolved IP against private ranges via `isPrivateIP()`
-5. Throw if private
-
-**Blocked IP ranges:**
-
-| Range | Reason |
-|-------|--------|
-| `10.0.0.0/8` | RFC 1918 private |
-| `172.16.0.0/12` | RFC 1918 private |
-| `192.168.0.0/16` | RFC 1918 private |
-| `127.0.0.0/8` | Loopback |
-| `169.254.0.0/16` | Link-local (AWS metadata at 169.254.169.254) |
-| `0.0.0.0` | Non-routable |
-
-Note: IPv6 addresses are not currently handled by `isPrivateIP()`. The function only splits on `.` and checks numeric octets. If `dns.promises.lookup()` returns an IPv6 address, it will pass the check. This is a known gap.
-
-### Rate Limiting
-
-Redis-backed, per-IP, 3 scans per 24-hour window.
-
-Implementation in `route.ts:checkRateLimit()`:
-
-1. Key format: `reb:audit-ratelimit:{ip}`
-2. `INCR` the key on every request
-3. If the count is 1 (first request), set `EXPIRE` to 86400 seconds (24 hours)
-4. If count > 3, return 429 with `X-RateLimit-Remaining: 0`
-
-IP is extracted from `x-forwarded-for` (first value) or `x-real-ip`, falling back to `"unknown"`.
-
-### Client-Side URL Validation
-
-In `AuditPage.tsx:handleScan()`:
-
-1. If URL doesn't start with `http://` or `https://`, prepend `https://`
-2. Validate with `new URL()` constructor
-3. If invalid, show error and don't send request
+- Data: `src/lib/guides.ts` is the single read surface (`listGuides`, `getGuide`, `guidesByCategory`). Articles live in `src/content/guides/batch-1.ts` + `batch-2.ts` (two files so they can be authored in parallel) and are merged + sorted newest-reviewed-first.
+- Each `GuideArticle` has a slug, title, excerpt, category, difficulty, reading time, pre-sanitized `bodyHtml`, optional `faq` (rendered as a FAQ section + FAQPage structured data), and an optional `fixesSlug` the audit category slug this guide helps fix.
+- Routes: `src/app/(marketing)/guides/page.tsx` (index, grouped by category) and `src/app/(marketing)/guides/[slug]/page.tsx` (article, with an inline "Run a free audit" CTA).
+- Purpose: these are repurposed from the OWSH Systems fix guides. Strelva manages and fixes client sites itself, so they are NOT a client self-serve deliverable. They exist to rank for the problems the free audit surfaces and route readers into `/audit`. `fixesSlug` is the cross-link back to the audit category.
 
 ---
 
-## API Route
+## Consolidation invariant (read before changing anything here)
 
-### `POST /api/audit/scan`
+There is ONE audit engine and ONE health-history store. Do not build a parallel one.
 
-**Request:**
+- The only engine is `runAudit` (`src/lib/audit/checks.ts`). The free tool, the client card, the admin manual scan, and the cron all run it (directly, or via `scanTenant` / `scanAllTenants`).
+- The only health-history store is `scan-store` (`src/lib/scan-store.ts`), and the only writer is `src/lib/scan.ts` (`scanTenant` / `scanAllTenants`). The client `/dashboard/health` and the admin overview read the SAME scan-store records.
+- A previous duplicate an `audit-history` events store plus a separate weekly cron was removed. Do not reintroduce a second store or a second scheduled scan.
 
-```json
-{
-  "url": "example.com",
-  "businessName": "optional, unused currently",
-  "location": "optional, unused currently"
-}
-```
+Future work must go through `scan.ts` / `scan-store`, not a new store:
 
-Only `url` is required. `businessName` and `location` are accepted but not used by any checks yet (likely reserved for Phase 2 local SEO checks).
-
-**Success Response (200):**
-
-```json
-{
-  "url": "https://example.com",
-  "scannedAt": "2025-05-20T12:00:00.000Z",
-  "overallScore": 73,
-  "grade": "C",
-  "categories": [
-    {
-      "name": "Core Web Vitals",
-      "slug": "web-vitals",
-      "weight": 0.3,
-      "score": 85,
-      "checks": [
-        {
-          "name": "Largest Contentful Paint (LCP)",
-          "status": "pass",
-          "score": 100,
-          "message": "LCP is 1.8s (good)"
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Error Responses:**
-
-| Status | Body | Condition |
-|--------|------|-----------|
-| 400 | `{ "error": "Invalid request body." }` | JSON parse failure |
-| 400 | `{ "error": "URL is required." }` | Missing or empty `url` |
-| 400 | `{ "error": "Invalid URL format." }` | `new URL()` throws |
-| 429 | `{ "error": "Rate limited. You can scan up to 3 sites per day." }` | > 3 scans from same IP in 24h |
-| 500 | `{ "error": "Scan failed: {message}" }` | Any unhandled error (also reported to Sentry with tag `feature: audit-scan`) |
-
----
-
-## PageSpeed Integration
-
-### How It Works
-
-`fetchPageSpeedData()` makes a single call to the Google PageSpeed Insights API v5:
-
-```
-GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
-  ?url={encodedUrl}
-  &key={GOOGLE_PAGESPEED_API_KEY}
-  &strategy=mobile
-  &category=PERFORMANCE
-```
-
-- Timeout: 30 seconds
-- Strategy is always `mobile`
-- Only requests the `PERFORMANCE` category
-- Returns `null` if no API key or if the request fails
-
-### Data Sharing
-
-The PageSpeed response is fetched once in `runAudit()` and passed to both `checkWebVitals()` and `checkMobile()` as the `psData` parameter. This avoids a duplicate API call. Both functions degrade gracefully to score 50 with a "warn" status when `psData` is null.
-
-### Environment Variable
-
-`GOOGLE_PAGESPEED_API_KEY` - Required for Web Vitals and Mobile categories to produce real scores. Without it, both categories return 50 with a warning. The audit still runs; other categories (SEO, Schema, SSL, Accessibility) work from the raw HTML fetch alone.
-
----
-
-## Execution Flow
-
-1. Client submits URL to `POST /api/audit/scan`
-2. Route checks rate limit (Redis INCR)
-3. Route normalizes URL (prepend `https://` if needed), validates format
-4. `runAudit()` is called:
-   a. Normalize URL again (belt-and-suspenders)
-   b. `validateUrlSafety()` - DNS resolve + private IP check
-   c. Fetch page HTML (15s timeout, falls back to HTTP if HTTPS fails)
-   d. `fetchPageSpeedData()` - single API call (30s timeout)
-   e. Run in parallel: `checkWebVitals`, `checkMobile`, `checkSSL`
-   f. Run synchronously: `checkSEO`, `checkSchema`, `checkAccessibility`
-   g. Return array of 6 `CategoryResult` objects
-5. Route computes `overallScore` and `grade`
-6. Route returns `AuditResult` JSON
-
----
-
-## Phase 2 Stubs
-
-Four placeholder functions are exported from `checks.ts` but not called by `runAudit()`. They all return `weight: 0` and `score: 0` with a "Coming soon" message.
-
-| Stub | Slug | Blocker |
-|------|------|---------|
-| `stubGBPCompleteness()` | `gbp` | Requires Google Business Profile API integration |
-| `stubNAPConsistency()` | `nap` | Requires cross-directory scraping |
-| `stubReviewPresence()` | `reviews` | Requires Google/Yelp API |
-| `stubLocalSEOGrid()` | `local-grid` | Requires DataForSEO integration |
-
-These stubs are exported so they can be tested or wired in later without changing the engine. When activated, they need:
-1. A non-zero weight added to the `WEIGHTS` constant (existing weights must be adjusted to still sum to 1.0)
-2. Their function call added to `runAudit()`
-3. Their result pushed into the returned array
-
----
-
-## Adding New Checks
-
-### Adding a check to an existing category
-
-1. Open `checks.ts`, find the category function (e.g., `checkSEO`)
-2. Push a new `CheckResult` onto the `checks` array:
-   ```ts
-   checks.push({
-     name: "Open Graph Tags",
-     status: hasOG ? "pass" : "warn",
-     score: hasOG ? 100 : 40,
-     message: hasOG ? "Open Graph tags found" : "Missing Open Graph tags",
-   });
-   ```
-3. The category score auto-updates because it uses `averageCheckScores(checks.map(c => c.score))`
-4. No weight changes needed. The new check is averaged equally with existing checks in that category.
-
-### Adding a new category
-
-1. **Define the weight.** Add an entry to the `WEIGHTS` constant in `checks.ts`. Adjust existing weights so they still sum to 1.0.
-
-2. **Write the check function.** Follow the pattern of existing functions:
-   ```ts
-   function checkNewCategory(html: string): CategoryResult {
-     const checks: CheckResult[] = [];
-     // ... push CheckResult items ...
-     return {
-       name: "Category Name",
-       slug: "category-slug",
-       weight: WEIGHTS.newCategory,
-       score: averageCheckScores(checks.map(c => c.score)),
-       checks,
-     };
-   }
-   ```
-   - Use `async` if the check needs network access
-   - Accept `html` for DOM-based checks, or `url`/`psData` for API-based checks
-
-3. **Wire it into `runAudit()`.** Add the function call (parallel via `Promise.all` if async, or sequential if sync) and push the result into the returned array.
-
-4. **Add an icon.** In `AuditPage.tsx`, add an entry to `categoryIcons` mapping the slug to a Lucide icon.
-
-5. **Types are automatic.** `CategoryResult` and `CheckResult` are generic enough that no type changes are needed.
-
-### Check scoring conventions
-
-- **Binary pass/fail**: 100 or 0
-- **Tiered**: Pick 2-3 thresholds, score 100 / 60 / 20 (or similar)
-- **Proportional**: `round(ratio * 100)`, clamped 0-100
-- **Status mapping**: score >= 80 = `pass`, >= 50 = `warn`, < 50 = `fail` (convention, not enforced)
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `cheerio` (^1.2.0) | HTML parsing for SEO, Schema, and Accessibility checks |
-| `@upstash/redis` | Rate limiting (already in the project) |
-| `@sentry/nextjs` | Error reporting on scan failures (already in the project) |
-
----
-
-## Client Component Behavior
-
-`AuditPage.tsx` manages four states: `idle`, `scanning`, `done`, `error`.
-
-- **idle/error**: Shows the URL input form. Error state shows the error message above the form.
-- **scanning**: Shows an animated progress stepper (8 steps, 2.8s interval). This is cosmetic; the actual scan runs as a single API call.
-- **done**: Shows the score circle (with letter grade), expandable category cards, and a CTA linking to `/access-request?ref=audit`.
-
-Each category card is collapsible. Clicking expands to show individual checks with pass/warn/fail icons.
+- New persisted health data: extend `ScanSummary` / `ScanHistoryPoint` and write it inside `scanTenant`.
+- New audit signals: add a check to an existing module or a new module that reads only the `AuditContext`; add its slug to `WEIGHTS` (keep the map summing to 1.0) and wire it into `runAudit`.
+- New surface: read `getScanSummary` / `getScanHistory`, or call `scanTenant`. Never write Redis scan keys directly and never stand up a second scan scheduler.
