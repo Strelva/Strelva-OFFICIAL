@@ -1,10 +1,94 @@
 /**
  * Analytics storage - click tracking, page views, section timestamps.
+ *
+ * Migration: when DATA_SOURCE=postgres, click-tracking reads/writes the Postgres
+ * `site_metrics` table (per-day, per-metric counter: PK (tenant_id, metric, day)).
+ * Sanity fallback on read; writes go to Postgres AND Sanity while both are
+ * configured so the transition is reversible. Default off (Sanity path).
+ *
+ * NOTE: `site_metrics` is a numeric per-day counter, so it models the click data
+ * cleanly (metric = event name, day = date, count = count; totals/weeks are
+ * derived by summing rows — no synthetic `_total` row). Section-update timestamps
+ * (recordSectionUpdate / getSectionTimestamps) are ISO-string values, not counts,
+ * and have NO column in site_metrics — that path stays on Sanity (_updatedAt) /
+ * dev-file unchanged. See columnMismatch note in the migration handoff.
  */
 
 import { getSanityClient, getSanityReadClient } from "../sanity";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { SECTION_TO_TYPE } from "./content-store";
+import { dataSourceIsPostgres } from "../db/source-flags";
+import { getSupabase } from "../db/client";
+
+// --- Postgres (site_metrics) helpers — self-contained, never throw ---
+
+/** Local YYYY-MM-DD for a day-offset from now, matching the Sanity/dev key scheme. */
+function isoDay(offsetDays = 0): string {
+  const d = new Date();
+  if (offsetDays) d.setDate(d.getDate() - offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Increment the (tenant, metric, today) counter by 1. Best-effort; never throws. */
+async function pgIncrementMetric(tenant: string, metric: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  const day = isoDay();
+  try {
+    const { data } = await db
+      .from("site_metrics")
+      .select("count")
+      .eq("tenant_id", tenant)
+      .eq("metric", metric)
+      .eq("day", day)
+      .maybeSingle();
+    const next = ((data?.count as number | undefined) ?? 0) + 1;
+    await db
+      .from("site_metrics")
+      .upsert(
+        { tenant_id: tenant, metric, day, count: next },
+        { onConflict: "tenant_id,metric,day" }
+      );
+  } catch {
+    // tracking is fire-and-forget; swallow
+  }
+}
+
+/** All (day,count) rows for a metric in a tenant. Returns [] on any failure. */
+async function pgMetricRows(
+  tenant: string,
+  metric: string
+): Promise<Array<{ day: string; count: number }>> {
+  const db = getSupabase();
+  if (!db) return [];
+  try {
+    const { data } = await db
+      .from("site_metrics")
+      .select("day, count")
+      .eq("tenant_id", tenant)
+      .eq("metric", metric);
+    return (data ?? []) as Array<{ day: string; count: number }>;
+  } catch {
+    return [];
+  }
+}
+
+/** All (metric,day,count) rows for a tenant. Returns [] on any failure. */
+async function pgAllRows(
+  tenant: string
+): Promise<Array<{ metric: string; day: string; count: number }>> {
+  const db = getSupabase();
+  if (!db) return [];
+  try {
+    const { data } = await db
+      .from("site_metrics")
+      .select("metric, day, count")
+      .eq("tenant_id", tenant);
+    return (data ?? []) as Array<{ metric: string; day: string; count: number }>;
+  } catch {
+    return [];
+  }
+}
 
 // --- Click tracking ---
 
@@ -17,6 +101,10 @@ export async function trackClick(
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
+
+  if (dataSourceIsPostgres()) {
+    await pgIncrementMetric(tenant, event);
+  }
 
   if (hasSanity) {
     // Use a single tracking document per tenant, increment counters
@@ -43,12 +131,14 @@ export async function trackClick(
     return;
   }
 
-  const store = await readDevContent(tenant);
-  const clicks = (store.__clicks as Record<string, number>) ?? {};
-  clicks[`${event}:${today}`] = (clicks[`${event}:${today}`] || 0) + 1;
-  clicks[`${event}:total`] = (clicks[`${event}:total`] || 0) + 1;
-  store.__clicks = clicks;
-  await writeDevContent(store, tenant);
+  if (!dataSourceIsPostgres()) {
+    const store = await readDevContent(tenant);
+    const clicks = (store.__clicks as Record<string, number>) ?? {};
+    clicks[`${event}:${today}`] = (clicks[`${event}:${today}`] || 0) + 1;
+    clicks[`${event}:total`] = (clicks[`${event}:total`] || 0) + 1;
+    store.__clicks = clicks;
+    await writeDevContent(store, tenant);
+  }
 }
 
 export async function getClickCounts(
@@ -56,6 +146,25 @@ export async function getClickCounts(
   tenant: string = DEFAULT_TENANT
 ): Promise<{ total: number; today: number; thisWeek: number; lastWeek: number }> {
   const today = new Date().toISOString().slice(0, 10);
+
+  if (dataSourceIsPostgres()) {
+    const rows = await pgMetricRows(tenant, event);
+    if (rows.length > 0 || !hasSanity) {
+      const byDay = new Map<string, number>();
+      let total = 0;
+      for (const r of rows) {
+        byDay.set(r.day, (byDay.get(r.day) || 0) + r.count);
+        total += r.count;
+      }
+      const todayCount = byDay.get(today) || 0;
+      let weekCount = 0;
+      let lastWeekCount = 0;
+      for (let i = 0; i < 7; i++) weekCount += byDay.get(isoDay(i)) || 0;
+      for (let i = 7; i < 14; i++) lastWeekCount += byDay.get(isoDay(i)) || 0;
+      return { total, today: todayCount, thisWeek: weekCount, lastWeek: lastWeekCount };
+    }
+    // fall through to Sanity only if Postgres empty and Sanity still configured
+  }
 
   if (hasSanity) {
     const docId = `clicks-${tenant}`;
@@ -118,6 +227,19 @@ export async function getLastClickDate(
   event: string,
   tenant: string = DEFAULT_TENANT
 ): Promise<string | null> {
+  if (dataSourceIsPostgres()) {
+    const rows = await pgMetricRows(tenant, event);
+    if (rows.length > 0 || !hasSanity) {
+      let newest: string | null = null;
+      for (const r of rows) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(r.day)) continue;
+        if (!newest || r.day > newest) newest = r.day;
+      }
+      return newest;
+    }
+    // fall through to Sanity only if Postgres empty and Sanity still configured
+  }
+
   if (hasSanity) {
     const docId = `clicks-${tenant}`;
     const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
@@ -141,6 +263,27 @@ export async function getDailyMetrics(
   days: number = 30
 ): Promise<DailyMetric[]> {
   const result: DailyMetric[] = [];
+
+  if (dataSourceIsPostgres()) {
+    const pageRows = await pgMetricRows(tenant, "page-view");
+    const bookingRows = await pgMetricRows(tenant, "booking-click");
+    if (pageRows.length > 0 || bookingRows.length > 0 || !hasSanity) {
+      const pageByDay = new Map<string, number>();
+      const bookByDay = new Map<string, number>();
+      for (const r of pageRows) pageByDay.set(r.day, (pageByDay.get(r.day) || 0) + r.count);
+      for (const r of bookingRows) bookByDay.set(r.day, (bookByDay.get(r.day) || 0) + r.count);
+      for (let i = days - 1; i >= 0; i--) {
+        const key = isoDay(i);
+        result.push({
+          date: key,
+          pageViews: pageByDay.get(key) || 0,
+          bookingClicks: bookByDay.get(key) || 0,
+        });
+      }
+      return result;
+    }
+    // fall through to Sanity only if Postgres empty and Sanity still configured
+  }
 
   if (hasSanity) {
     const docId = `clicks-${tenant}`;
@@ -182,6 +325,22 @@ export async function getClickCountsByPrefix(
 ): Promise<Record<string, { total: number; thisWeek: number }>> {
   const result: Record<string, { total: number; thisWeek: number }> = {};
 
+  if (dataSourceIsPostgres()) {
+    const rows = await pgAllRows(tenant);
+    if (rows.length > 0 || !hasSanity) {
+      const week = new Set<string>();
+      for (let i = 0; i < 7; i++) week.add(isoDay(i));
+      for (const r of rows) {
+        if (!r.metric.startsWith(prefix)) continue;
+        const bucket = (result[r.metric] ??= { total: 0, thisWeek: 0 });
+        bucket.total += r.count;
+        if (week.has(r.day)) bucket.thisWeek += r.count;
+      }
+      return result;
+    }
+    // fall through to Sanity only if Postgres empty and Sanity still configured
+  }
+
   if (hasSanity) {
     const docId = `clicks-${tenant}`;
     const doc = await getSanityClient().fetch(`*[_id == $docId][0].clicks`, { docId });
@@ -222,6 +381,11 @@ export async function getClickCountsByPrefix(
 }
 
 // --- Content freshness ---
+//
+// Section-update timestamps are ISO-string values per section, which have no
+// column in the numeric `site_metrics` table (metric/day/count). This path
+// therefore stays on Sanity's automatic `_updatedAt` (prod) and the dev-file
+// fallback — it is NOT migrated to Postgres. See columnMismatch in the handoff.
 
 export async function recordSectionUpdate(
   section: string,

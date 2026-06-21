@@ -1,10 +1,124 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { TenantConfig } from "./types";
+import type { TenantConfig, TemplateId, TenantFeature, IntegrationProvider, TenantDeliveryModel } from "./types";
 import { getRedis } from "./redis";
 import { assignUserToTenant, findUserIdByEmail } from "./auth";
 import { isProductionEnv } from "./production-guard";
 import { getTenantPrimaryDomain, normalizeTenantDomain } from "./tenant-urls";
+import { tenantsSourceIsPostgres } from "./db/source-flags";
+import { listAllTenants, getTenant as getTenantRow, upsertTenant } from "./db/repositories";
+import type { Row, Insert } from "./db/client";
+
+/**
+ * Postgres `tenants` row -> TenantConfig (the spine mapper). The Postgres table
+ * is 45 individual snake_case columns. subdomain has no column (== id), and
+ * domainClaims live in the separate `domain_claims` table (currently empty;
+ * routing uses production_domain/custom_domains, so [] is correct).
+ */
+export function rowToTenant(r: Row<"tenants">): TenantConfig {
+  return {
+    id: r.id,
+    subdomain: r.id,
+    siteName: r.site_name,
+    ownerName: r.owner_name ?? "",
+    ownerEmail: r.owner_email ?? undefined,
+    industry: r.industry ?? "",
+    active: r.active,
+    createdAt: r.created_at,
+    template: (r.template ?? "wellness") as TemplateId,
+    deliveryModel: (r.delivery_model as TenantDeliveryModel) ?? undefined,
+    customRepo: (r.custom_repo as TenantConfig["customRepo"]) ?? undefined,
+    siteCapabilities: (r.site_capabilities as TenantConfig["siteCapabilities"]) ?? undefined,
+    features: (r.features as TenantFeature[]) ?? undefined,
+    integrations: (r.integrations as IntegrationProvider[]) ?? undefined,
+    customDomains: r.custom_domains ?? undefined,
+    domainClaims: [],
+    productionDomain: r.production_domain ?? undefined,
+    adminDomain: r.admin_domain ?? undefined,
+    stripeCustomerId: r.stripe_customer_id ?? undefined,
+    subscriptionStatus: (r.subscription_status as TenantConfig["subscriptionStatus"]) ?? undefined,
+    stripeSubscriptionId: r.stripe_subscription_id ?? undefined,
+    subscriptionStartedAt: r.subscription_started_at ?? undefined,
+    commitmentEndsAt: r.commitment_ends_at ?? undefined,
+    planOverride: (r.plan_override as TenantConfig["planOverride"]) ?? undefined,
+    subscriptionPastDueSince: r.subscription_past_due_since ?? undefined,
+    bookingProvider: r.booking_provider ?? undefined,
+    bookingUrl: r.booking_url ?? undefined,
+    resendDomain: r.resend_domain ?? undefined,
+    siteUrl: r.site_url ?? undefined,
+    ownerPhone: r.owner_phone ?? undefined,
+    referredBy: r.referred_by ?? undefined,
+    autoPublish: r.auto_publish ?? undefined,
+    autoApproveThreshold: r.auto_approve_threshold ?? null,
+    beholdFeedId: r.behold_feed_id ?? undefined,
+    socialConfig: (r.social_config as TenantConfig["socialConfig"]) ?? undefined,
+    reviewsConfig: (r.reviews_config as TenantConfig["reviewsConfig"]) ?? undefined,
+    businessRules: r.business_rules ?? undefined,
+    personality: r.personality ?? undefined,
+    businessHours: (r.business_hours as unknown as TenantConfig["businessHours"]) ?? undefined,
+    slackWebhookUrl: r.slack_webhook_url ?? undefined,
+    googleSearchConsoleKey: r.google_search_console_key ?? undefined,
+    instagramAccessToken: r.instagram_access_token ?? undefined,
+    revalidateUrl: r.revalidate_url ?? undefined,
+    revalidationSecret: r.revalidation_secret ?? undefined,
+    branding: (r.branding as TenantConfig["branding"]) ?? undefined,
+    visibility: (r.visibility as unknown as TenantConfig["visibility"]) ?? undefined,
+  };
+}
+
+/** TenantConfig -> Postgres insert/upsert row. Inverse of rowToTenant; only
+ *  defined fields are set so a partial update doesn't clobber columns. */
+export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"tenants"> {
+  const j = (v: unknown) => (v ?? null) as Insert<"tenants">["custom_repo"];
+  const row: Insert<"tenants"> = {
+    id: t.id,
+    site_name: t.siteName ?? "",
+    created_at: t.createdAt ?? new Date().toISOString().slice(0, 10),
+  };
+  if (t.siteName !== undefined) row.site_name = t.siteName;
+  if (t.ownerName !== undefined) row.owner_name = t.ownerName;
+  if (t.ownerEmail !== undefined) row.owner_email = t.ownerEmail;
+  if (t.industry !== undefined) row.industry = t.industry;
+  if (t.active !== undefined) row.active = t.active;
+  if (t.template !== undefined) row.template = t.template;
+  if (t.deliveryModel !== undefined) row.delivery_model = t.deliveryModel;
+  if (t.customRepo !== undefined) row.custom_repo = j(t.customRepo);
+  if (t.siteCapabilities !== undefined) row.site_capabilities = j(t.siteCapabilities);
+  if (t.features !== undefined) row.features = t.features;
+  if (t.integrations !== undefined) row.integrations = t.integrations;
+  if (t.customDomains !== undefined) row.custom_domains = t.customDomains;
+  if (t.productionDomain !== undefined) row.production_domain = t.productionDomain;
+  if (t.adminDomain !== undefined) row.admin_domain = t.adminDomain;
+  if (t.stripeCustomerId !== undefined) row.stripe_customer_id = t.stripeCustomerId;
+  if (t.subscriptionStatus !== undefined) row.subscription_status = t.subscriptionStatus;
+  if (t.stripeSubscriptionId !== undefined) row.stripe_subscription_id = t.stripeSubscriptionId;
+  if (t.subscriptionStartedAt !== undefined) row.subscription_started_at = t.subscriptionStartedAt;
+  if (t.commitmentEndsAt !== undefined) row.commitment_ends_at = t.commitmentEndsAt;
+  if (t.planOverride !== undefined) row.plan_override = t.planOverride;
+  if (t.subscriptionPastDueSince !== undefined) row.subscription_past_due_since = t.subscriptionPastDueSince;
+  if (t.bookingProvider !== undefined) row.booking_provider = t.bookingProvider;
+  if (t.bookingUrl !== undefined) row.booking_url = t.bookingUrl;
+  if (t.resendDomain !== undefined) row.resend_domain = t.resendDomain;
+  if (t.siteUrl !== undefined) row.site_url = t.siteUrl;
+  if (t.ownerPhone !== undefined) row.owner_phone = t.ownerPhone;
+  if (t.referredBy !== undefined) row.referred_by = t.referredBy;
+  if (t.autoPublish !== undefined) row.auto_publish = t.autoPublish;
+  if (t.autoApproveThreshold !== undefined) row.auto_approve_threshold = t.autoApproveThreshold;
+  if (t.beholdFeedId !== undefined) row.behold_feed_id = t.beholdFeedId;
+  if (t.socialConfig !== undefined) row.social_config = j(t.socialConfig);
+  if (t.reviewsConfig !== undefined) row.reviews_config = j(t.reviewsConfig);
+  if (t.businessRules !== undefined) row.business_rules = t.businessRules;
+  if (t.personality !== undefined) row.personality = t.personality;
+  if (t.businessHours !== undefined) row.business_hours = j(t.businessHours);
+  if (t.slackWebhookUrl !== undefined) row.slack_webhook_url = t.slackWebhookUrl;
+  if (t.googleSearchConsoleKey !== undefined) row.google_search_console_key = t.googleSearchConsoleKey;
+  if (t.instagramAccessToken !== undefined) row.instagram_access_token = t.instagramAccessToken;
+  if (t.revalidateUrl !== undefined) row.revalidate_url = t.revalidateUrl;
+  if (t.revalidationSecret !== undefined) row.revalidation_secret = t.revalidationSecret;
+  if (t.branding !== undefined) row.branding = j(t.branding);
+  if (t.visibility !== undefined) row.visibility = j(t.visibility);
+  return row;
+}
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
@@ -33,34 +147,45 @@ async function loadTenants(): Promise<TenantConfig[]> {
   const now = Date.now();
   if (_memCache && now - _memCacheTime < CACHE_TTL_SECONDS * 1000) return _memCache;
 
-  let tenants: TenantConfig[];
+  let tenants: TenantConfig[] | undefined;
 
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    const docs = await getSanityClient().fetch(
-      `*[_type == "tenant"] | order(createdAt desc)`
-    );
-    const fromSanity = (docs || []).map(sanityToTenant);
-    if (fromSanity.length > 0) {
-      tenants = fromSanity;
-      if (!isProductionEnv()) {
-        const devTenants = await loadFromDevFile();
-        const existingIds = new Set(tenants.map((tenant) => tenant.id));
-        tenants = [
-          ...tenants,
-          ...devTenants.filter((tenant) => !existingIds.has(tenant.id)),
-        ];
+  // Postgres is the source of truth when TENANTS_SOURCE=postgres. Fall through to
+  // Sanity only if Postgres has no rows (so a misconfig can't blank the platform).
+  if (tenantsSourceIsPostgres()) {
+    const rows = await listAllTenants();
+    if (rows.length > 0) tenants = rows.map(rowToTenant);
+  }
+
+  if (!tenants) {
+    if (hasSanity) {
+      const { getSanityClient } = await import("./sanity");
+      const docs = await getSanityClient().fetch(
+        `*[_type == "tenant"] | order(createdAt desc)`
+      );
+      const fromSanity = (docs || []).map(sanityToTenant);
+      if (fromSanity.length > 0) {
+        tenants = fromSanity;
+        if (!isProductionEnv()) {
+          const devTenants = await loadFromDevFile();
+          const existingIds = new Set(fromSanity.map((tenant: TenantConfig) => tenant.id));
+          tenants = [
+            ...fromSanity,
+            ...devTenants.filter((tenant) => !existingIds.has(tenant.id)),
+          ];
+        }
+      } else if (isProductionEnv() && !tenantsSourceIsPostgres()) {
+        throw new Error("[PRODUCTION] Sanity returned no tenants — cannot fall back to dev file");
+      } else {
+        tenants = await loadFromDevFile();
       }
-    } else if (isProductionEnv()) {
-      throw new Error("[PRODUCTION] Sanity returned no tenants — cannot fall back to dev file");
+    } else if (isProductionEnv() && !tenantsSourceIsPostgres()) {
+      throw new Error("[PRODUCTION] Sanity not configured — cannot fall back to dev file");
     } else {
       tenants = await loadFromDevFile();
     }
-  } else if (isProductionEnv()) {
-    throw new Error("[PRODUCTION] Sanity not configured — cannot fall back to dev file");
-  } else {
-    tenants = await loadFromDevFile();
   }
+
+  tenants ??= [];
 
   // Write to Redis cache (fire-and-forget)
   if (redis) {
@@ -300,17 +425,24 @@ export async function createTenant(
     subscriptionStatus: "none",
   };
 
+  if (tenantsSourceIsPostgres()) {
+    const existing = await getTenantRow(tenant.id);
+    if (existing) throw new Error(`Tenant "${tenant.id}" already exists`);
+    await upsertTenant(tenantToRow(tenant));
+    invalidateCache();
+  }
+
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
     const existing = await getSanityClient().fetch(
       `*[_type == "tenant" && id == $id][0]._id`,
       { id: tenant.id }
     );
-    if (existing) throw new Error(`Tenant "${tenant.id}" already exists`);
+    if (existing && !tenantsSourceIsPostgres()) throw new Error(`Tenant "${tenant.id}" already exists`);
 
     await getSanityClient().create({ _type: "tenant", ...tenant });
     invalidateCache();
-  } else {
+  } else if (!tenantsSourceIsPostgres()) {
     const tenants = await loadTenants();
     if (tenants.find((t) => t.id === tenant.id)) {
       throw new Error(`Tenant "${tenant.id}" already exists`);
@@ -340,6 +472,25 @@ export async function updateTenant(
   id: string,
   updates: Partial<TenantConfig>
 ): Promise<TenantConfig | null> {
+  if (tenantsSourceIsPostgres()) {
+    const existing = await getTenantRow(id);
+    if (!existing) return null;
+    await upsertTenant(tenantToRow({ ...updates, id }));
+    invalidateCache();
+    // Dual-write to Sanity during the transition so a rollback stays current.
+    if (hasSanity) {
+      try {
+        const { getSanityClient } = await import("./sanity");
+        const docId = await getSanityClient().fetch(`*[_type == "tenant" && id == $id][0]._id`, { id });
+        if (docId) await getSanityClient().patch(docId).set(updates).commit();
+      } catch {
+        // Sanity mirror is best-effort during the transition.
+      }
+    }
+    const merged = await getTenantRow(id);
+    return merged ? rowToTenant(merged) : null;
+  }
+
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
     const docId = await getSanityClient().fetch(

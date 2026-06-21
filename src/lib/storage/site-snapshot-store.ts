@@ -1,5 +1,11 @@
 /**
  * Full-site snapshots - capture all owner-editable content sections for backup and restore.
+ *
+ * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `site_snapshots`
+ * table (Sanity fallback on read when Postgres is empty). Writes go to Postgres AND
+ * Sanity while both are configured so the transition is reversible; once Sanity is
+ * removed, `hasSanity` is false and only Postgres is written. Default off (Sanity
+ * path). The Postgres repo helpers are self-contained in this file and never throw.
  */
 
 import type { ActorContext } from "../auth";
@@ -7,6 +13,10 @@ import type { ContentMap, ContentSection } from "../types";
 import { getSanityClient, getSanityReadClient } from "../sanity";
 import { DEFAULT_TENANT, hasSanity, readDevContent, writeDevContent } from "./core";
 import { getContent, setContent } from "./content-store";
+import { dataSourceIsPostgres } from "../db/source-flags";
+import { getSupabase, type Row, type Insert } from "../db/client";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const SITE_SNAPSHOT_SECTIONS: ContentSection[] = [
   "hero",
@@ -83,6 +93,140 @@ function snapshotSummary(snapshot: SiteSnapshot): SiteSnapshotSummary {
   return summary;
 }
 
+// --- Postgres repo helpers (self-contained; never throw) -------------------
+
+/** Run a Supabase query and return a safe fallback if it throws or errors. */
+async function safe<T>(fn: (db: NonNullable<ReturnType<typeof getSupabase>>) => Promise<T>, fallback: T): Promise<T> {
+  const db = getSupabase();
+  if (!db) return fallback;
+  try {
+    return await fn(db);
+  } catch {
+    return fallback;
+  }
+}
+
+/** Map a SiteSnapshot to the `site_snapshots` Insert shape (camelCase -> snake_case). */
+function snapshotToInsert(snapshot: SiteSnapshot): Insert<"site_snapshots"> {
+  const actor = snapshot.actor;
+  return {
+    id: snapshot.id,
+    tenant_id: snapshot.tenantId,
+    label: snapshot.label,
+    reason: snapshot.reason,
+    author: snapshot.author,
+    created_at: snapshot.createdAt,
+    sections: snapshot.sections as unknown as string[],
+    data: snapshot.data as unknown as Insert<"site_snapshots">["data"],
+    status: snapshot.status,
+    restored_at: snapshot.restoredAt ?? null,
+    // actor_user_id FKs users(id) (uuid); the Clerk-era id is not a uuid, so null it.
+    actor_user_id: actor?.userId && UUID_RE.test(actor.userId) ? actor.userId : null,
+    actor_email: actor?.email ?? null,
+    actor_type: actor?.type ?? null,
+    actor_is_super_admin: actor?.isSuperAdmin ?? null,
+  };
+}
+
+/** Map a `site_snapshots` Row to a full SiteSnapshot (data included). */
+function mapPgSnapshotRow(row: Row<"site_snapshots">): SiteSnapshot {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    label: row.label,
+    reason: row.reason as SiteSnapshotReason,
+    author: row.author as SiteSnapshotAuthor,
+    createdAt: row.created_at,
+    sections: (row.sections as unknown as ContentSection[]) ?? SITE_SNAPSHOT_SECTIONS,
+    data: (row.data as unknown as Partial<ContentMap>) ?? {},
+    status: (row.status as SiteSnapshot["status"]) || "available",
+    restoredAt: row.restored_at ?? undefined,
+    actor: row.actor_user_id || row.actor_email || row.actor_type || row.actor_is_super_admin
+      ? {
+          userId: row.actor_user_id,
+          email: row.actor_email,
+          type: (row.actor_type as ActorContext["type"]) || "system",
+          isSuperAdmin: Boolean(row.actor_is_super_admin),
+        }
+      : undefined,
+  };
+}
+
+/** Map a `site_snapshots` Row to a summary (no data/actor). */
+function mapPgSnapshotSummaryRow(
+  row: Pick<
+    Row<"site_snapshots">,
+    "id" | "tenant_id" | "label" | "reason" | "author" | "created_at" | "sections" | "status" | "restored_at"
+  >,
+): SiteSnapshotSummary {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    label: row.label,
+    reason: row.reason as SiteSnapshotReason,
+    author: row.author as SiteSnapshotAuthor,
+    createdAt: row.created_at,
+    sections: (row.sections as unknown as ContentSection[]) ?? SITE_SNAPSHOT_SECTIONS,
+    status: (row.status as SiteSnapshot["status"]) || "available",
+    restoredAt: row.restored_at ?? undefined,
+  };
+}
+
+async function pgInsertSnapshot(snapshot: SiteSnapshot): Promise<void> {
+  await safe(async (db) => {
+    await db.from("site_snapshots").insert(snapshotToInsert(snapshot));
+    return null;
+  }, null);
+}
+
+async function pgListSnapshotSummaries(
+  tenantId: string,
+  limit: number,
+): Promise<SiteSnapshotSummary[]> {
+  return safe<SiteSnapshotSummary[]>(async (db) => {
+    const { data, error } = await db
+      .from("site_snapshots")
+      .select("id, tenant_id, label, reason, author, created_at, sections, status, restored_at")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error || !data) return [];
+    return data.map(mapPgSnapshotSummaryRow);
+  }, []);
+}
+
+async function pgGetSnapshot(
+  tenantId: string,
+  snapshotId: string,
+): Promise<SiteSnapshot | null> {
+  return safe<SiteSnapshot | null>(async (db) => {
+    const { data, error } = await db
+      .from("site_snapshots")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("id", snapshotId)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapPgSnapshotRow(data);
+  }, null);
+}
+
+async function pgUpdateSnapshotStatus(
+  tenantId: string,
+  snapshotId: string,
+  updates: Pick<SiteSnapshot, "status" | "restoredAt">,
+): Promise<void> {
+  await safe(async (db) => {
+    await db
+      .from("site_snapshots")
+      .update({ status: updates.status, restored_at: updates.restoredAt ?? null })
+      .eq("tenant_id", tenantId)
+      .eq("id", snapshotId);
+    return null;
+  }, null);
+}
+
 async function readCurrentSiteData(tenantId: string): Promise<Partial<ContentMap>> {
   const entries = await Promise.all(
     SITE_SNAPSHOT_SECTIONS.map(async (section) => {
@@ -138,6 +282,10 @@ export async function createSiteSnapshot(
     actor: options.actor,
   };
 
+  if (dataSourceIsPostgres()) {
+    await pgInsertSnapshot(snapshot);
+  }
+
   if (hasSanity) {
     await getSanityClient().create({
       _type: "siteSnapshot",
@@ -158,7 +306,9 @@ export async function createSiteSnapshot(
     return snapshot;
   }
 
-  await writeDevSnapshot(snapshot);
+  if (!dataSourceIsPostgres()) {
+    await writeDevSnapshot(snapshot);
+  }
   return snapshot;
 }
 
@@ -167,6 +317,13 @@ export async function getSiteSnapshots(
   limit = 12,
 ): Promise<SiteSnapshotSummary[]> {
   const safeLimit = Math.max(1, Math.min(limit, 60));
+
+  if (dataSourceIsPostgres()) {
+    const rows = await pgListSnapshotSummaries(tenantId, safeLimit);
+    if (rows.length > 0 || !hasSanity) return rows;
+    // fall through to Sanity only if Postgres is empty and Sanity still configured
+  }
+
   if (hasSanity) {
     const raw = await getSanityReadClient().fetch<
       Array<{
@@ -211,6 +368,12 @@ async function getSnapshotForRestore(
   tenantId: string,
   snapshotId: string,
 ): Promise<SiteSnapshot | null> {
+  if (dataSourceIsPostgres()) {
+    const pg = await pgGetSnapshot(tenantId, snapshotId);
+    if (pg) return pg;
+    // fall through to Sanity for a snapshot not yet in Postgres
+  }
+
   if (hasSanity) {
     const raw = await getSanityReadClient().fetch<{
       snapshotId: string;
@@ -332,6 +495,10 @@ export async function restoreSiteSnapshot(
   }
 
   const restoredAt = new Date().toISOString();
+  if (dataSourceIsPostgres()) {
+    await pgUpdateSnapshotStatus(tenantId, snapshotId, { status: "restored", restoredAt });
+  }
+
   if (hasSanity) {
     const docId = await getSanityReadClient().fetch<string | null>(
       `*[_type == "siteSnapshot" && tenant == $tenant && snapshotId == $snapshotId][0]._id`,
@@ -340,7 +507,7 @@ export async function restoreSiteSnapshot(
     if (docId) {
       await getSanityClient().patch(docId).set({ status: "restored", restoredAt }).commit();
     }
-  } else {
+  } else if (!dataSourceIsPostgres()) {
     await updateDevSnapshotStatus(tenantId, snapshotId, { status: "restored", restoredAt });
   }
 

@@ -6,6 +6,40 @@ import { getSanityClient } from "../sanity";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { addInboxItem } from "./inbox-store";
 import { emitEventFromActivity } from "../events";
+import { dataSourceIsPostgres } from "../db/source-flags";
+import { insertActivity, listActivity } from "../db/repositories";
+import type { Row, Insert } from "../db/client";
+
+function activityToInsert(entry: ActivityEntry, tenant: string): Insert<"activity_log"> {
+  return {
+    tenant_id: tenant,
+    text: entry.text,
+    time: entry.time,
+    type: entry.type,
+    section: entry.section ?? null,
+    actor: entry.actor ?? null,
+    changes: (entry.changes ?? null) as Insert<"activity_log">["changes"],
+    event_status: entry.eventStatus ?? null,
+    governance_reason: entry.governanceReason ?? null,
+    risk_level: entry.riskLevel ?? null,
+    snapshot: (entry.snapshot ?? null) as Insert<"activity_log">["snapshot"],
+  };
+}
+
+function mapPgActivityRow(row: Row<"activity_log">): ActivityEntry {
+  return {
+    text: row.text ?? "",
+    time: row.time,
+    type: row.type ?? "",
+    section: row.section ?? undefined,
+    actor: (row.actor as ActivityEntry["actor"]) ?? undefined,
+    changes: (row.changes as ActivityEntry["changes"]) ?? undefined,
+    eventStatus: (row.event_status as ActivityEntry["eventStatus"]) ?? undefined,
+    governanceReason: row.governance_reason ?? undefined,
+    riskLevel: row.risk_level ?? undefined,
+    snapshot: row.snapshot ?? undefined,
+  };
+}
 
 export interface ActivityEntry {
   text: string;
@@ -30,6 +64,9 @@ export async function logActivity(
   entry: ActivityEntry,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
+  if (dataSourceIsPostgres()) {
+    await insertActivity(activityToInsert(entry, tenant));
+  }
   if (hasSanity) {
     await getSanityClient().create({
       _type: "activityLog",
@@ -43,7 +80,7 @@ export async function logActivity(
       snapshot:
         entry.snapshot === undefined ? undefined : JSON.stringify(entry.snapshot),
     });
-  } else {
+  } else if (!dataSourceIsPostgres()) {
     const store = await readDevContent(tenant);
     const activity = (store.__activity as unknown[]) ?? [];
     activity.unshift(entry);
@@ -83,6 +120,12 @@ export async function getActivity(
   tenant: string = DEFAULT_TENANT,
   filters?: { section?: string; actor?: string }
 ): Promise<ActivityEntry[]> {
+  if (dataSourceIsPostgres()) {
+    const rows = await listActivity(tenant, { section: filters?.section, actor: filters?.actor, limit: 50 });
+    if (rows.length > 0 || !hasSanity) return rows.map(mapPgActivityRow);
+    // fall through to Sanity only if Postgres is empty and Sanity still configured
+  }
+
   if (hasSanity) {
     let query = `*[_type == "activityLog" && tenant == $tenant`;
     const params: Record<string, string> = { tenant };

@@ -471,3 +471,162 @@ export async function deleteEntry(tenantId: string, type: string, slug: string):
     if (error) throw error;
   }, undefined);
 }
+
+// ---------------------------------------------------------------------------
+// draft_content (unpublished section drafts — the admin override queue source)
+// ---------------------------------------------------------------------------
+
+export async function getDraftContentData(
+  tenant: string,
+  section: string
+): Promise<Record<string, unknown> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return safe(`getDraftContentData ${tenant}/${section}`, async () => {
+    const { data, error } = await db
+      .from("draft_content")
+      .select("data")
+      .eq("tenant_id", tenant)
+      .eq("section", section)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.data as Record<string, unknown>) ?? null;
+  }, null);
+}
+
+export async function upsertDraftContentData(
+  tenant: string,
+  section: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`upsertDraftContentData ${tenant}/${section}`, async () => {
+    const { error } = await db
+      .from("draft_content")
+      .upsert(
+        { tenant_id: tenant, section, data: data as Insert<"draft_content">["data"], updated_at: new Date().toISOString() },
+        { onConflict: "tenant_id,section" }
+      );
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function deleteDraftContentData(tenant: string, section: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`deleteDraftContentData ${tenant}/${section}`, async () => {
+    const { error } = await db
+      .from("draft_content")
+      .delete()
+      .eq("tenant_id", tenant)
+      .eq("section", section);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listDraftSections(tenant: string): Promise<string[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listDraftSections ${tenant}`, async () => {
+    const { data, error } = await db
+      .from("draft_content")
+      .select("section")
+      .eq("tenant_id", tenant);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.section);
+  }, []);
+}
+
+// ---------------------------------------------------------------------------
+// audit_logs (super-admin action trail)
+// ---------------------------------------------------------------------------
+
+export async function insertAuditLog(entry: Insert<"audit_logs">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`insertAuditLog ${entry.id}`, async () => {
+    const { error } = await db.from("audit_logs").insert(entry);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listAuditLogs(tenant: string, limit = 100): Promise<Row<"audit_logs">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listAuditLogs ${tenant}`, async () => {
+    const { data, error } = await db
+      .from("audit_logs")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("time", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+export async function listAllAuditLogs(limit = 100): Promise<Row<"audit_logs">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe("listAllAuditLogs", async () => {
+    const { data, error } = await db
+      .from("audit_logs")
+      .select("*")
+      .order("time", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+// ---------------------------------------------------------------------------
+// activity_log (content-change trail; dashboard activity feed)
+// ---------------------------------------------------------------------------
+
+export async function insertActivity(entry: Insert<"activity_log">): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  await safe(`insertActivity ${entry.tenant_id}`, async () => {
+    const { error } = await db.from("activity_log").insert(entry);
+    if (error) throw error;
+  }, undefined);
+}
+
+export async function listActivity(
+  tenant: string,
+  opts?: { section?: string; actor?: string; limit?: number }
+): Promise<Row<"activity_log">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe(`listActivity ${tenant}`, async () => {
+    let q = db
+      .from("activity_log")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("time", { ascending: false })
+      .limit(opts?.limit ?? 50);
+    if (opts?.section) q = q.eq("section", opts.section);
+    if (opts?.actor) q = q.eq("actor", opts.actor);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}
+
+// ---------------------------------------------------------------------------
+// tenants — list ALL (loadTenants returns every tenant; callers filter active)
+// ---------------------------------------------------------------------------
+
+export async function listAllTenants(): Promise<Row<"tenants">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe("listAllTenants", async () => {
+    const { data, error } = await db
+      .from("tenants")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}

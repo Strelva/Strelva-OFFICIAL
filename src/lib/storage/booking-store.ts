@@ -1,5 +1,16 @@
 /**
  * Booking storage - appointments, availability, and config.
+ *
+ * Migration: when DATA_SOURCE=postgres, the individual-booking functions
+ * (getBookings, createBooking, updateBooking) read/write the Postgres `bookings`
+ * table (Sanity fallback on read). Writes go to Postgres AND Sanity while both
+ * are configured so the transition is reversible. Default off (Sanity path).
+ *
+ * NOTE: only the `bookings` table exists in Postgres. There is no table for
+ * BookingConfig or DateOverride, so getBookingConfig/setBookingConfig/
+ * getDateOverrides stay on Sanity/dev unchanged (see columnMismatch note in the
+ * migration tracker). The Redis slot-lock layer is orthogonal to the data source
+ * and is preserved as-is.
  */
 
 import type { BookingConfig, DateOverride, Booking } from "../types";
@@ -8,6 +19,113 @@ import { getSanityClient } from "../sanity";
 import { getRedis } from "../redis";
 import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent } from "./content-store";
+import { dataSourceIsPostgres } from "../db/source-flags";
+import { getSupabase, type Row, type Insert, type Update } from "../db/client";
+
+// --- Postgres `bookings` repo helpers (self-contained; never throw) -----------
+
+/** Map a Postgres bookings row to the store's camelCase Booking shape. */
+function mapPgBookingRow(row: Row<"bookings">): Booking {
+  return {
+    id: row.id,
+    serviceId: row.service_id,
+    serviceName: row.service_name,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    clientName: row.client_name,
+    clientEmail: row.client_email,
+    clientPhone: row.client_phone,
+    notes: row.notes ?? undefined,
+    status: row.status as Booking["status"],
+    createdAt: row.created_at,
+    cancelledAt: row.cancelled_at ?? undefined,
+  };
+}
+
+/** Build a bookings Insert row from a fully-formed Booking + tenant. */
+function bookingToInsert(booking: Booking, tenant: string): Insert<"bookings"> {
+  return {
+    id: booking.id,
+    tenant_id: tenant,
+    service_id: booking.serviceId,
+    service_name: booking.serviceName,
+    date: booking.date,
+    start_time: booking.startTime,
+    end_time: booking.endTime,
+    client_name: booking.clientName,
+    client_email: booking.clientEmail,
+    client_phone: booking.clientPhone,
+    notes: booking.notes ?? null,
+    status: booking.status,
+    created_at: booking.createdAt,
+    cancelled_at: booking.cancelledAt ?? null,
+  };
+}
+
+async function pgListBookings(
+  tenant: string,
+  dateRange?: { from: string; to: string }
+): Promise<Booking[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  try {
+    let q = db.from("bookings").select("*").eq("tenant_id", tenant);
+    if (dateRange) {
+      q = q.gte("date", dateRange.from).lte("date", dateRange.to);
+    }
+    const { data, error } = await q.order("date", { ascending: true });
+    if (error || !data) return [];
+    return (data as Row<"bookings">[]).map(mapPgBookingRow);
+  } catch {
+    return [];
+  }
+}
+
+async function pgInsertBooking(booking: Booking, tenant: string): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  try {
+    await db.from("bookings").insert(bookingToInsert(booking, tenant));
+  } catch {
+    // best-effort; Sanity/dev path remains the durable store while dual-writing
+  }
+}
+
+async function pgGetBooking(id: string, tenant: string): Promise<Booking | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  try {
+    const { data, error } = await db
+      .from("bookings")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapPgBookingRow(data as Row<"bookings">);
+  } catch {
+    return null;
+  }
+}
+
+async function pgUpdateBooking(
+  id: string,
+  tenant: string,
+  updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>
+): Promise<void> {
+  const db = getSupabase();
+  if (!db) return;
+  try {
+    const patch: Update<"bookings"> = {};
+    if (updates.status !== undefined) patch.status = updates.status;
+    if (updates.notes !== undefined) patch.notes = updates.notes ?? null;
+    if (updates.cancelledAt !== undefined) patch.cancelled_at = updates.cancelledAt ?? null;
+    await db.from("bookings").update(patch).eq("tenant_id", tenant).eq("id", id);
+  } catch {
+    // best-effort
+  }
+}
 
 export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
@@ -77,6 +195,12 @@ export async function getBookings(
   tenant: string = DEFAULT_TENANT,
   dateRange?: { from: string; to: string }
 ): Promise<Booking[]> {
+  if (dataSourceIsPostgres()) {
+    const pg = await pgListBookings(tenant, dateRange);
+    if (pg.length > 0 || !hasSanity) return pg;
+    // fall through to Sanity only if Postgres is empty and Sanity still configured
+  }
+
   if (hasSanity) {
     let query = `*[_type == "booking" && tenant == $tenant`;
     const params: Record<string, string> = { tenant };
@@ -255,6 +379,19 @@ export async function createBooking(
       status: "confirmed",
     });
 
+    const created: Booking = {
+      ...booking,
+      id: bookingId,
+      status: "confirmed",
+      createdAt: doc._createdAt!,
+    };
+
+    // Dual-write to Postgres while migrating (using Sanity's createdAt so the two
+    // stores agree). Best-effort; Sanity remains the durable store of record.
+    if (dataSourceIsPostgres()) {
+      await pgInsertBooking(created, tenant);
+    }
+
     // Mark the full booked span as confirmed in Redis after successful DB write
     await confirmBookingSlot(
       tenant,
@@ -264,12 +401,7 @@ export async function createBooking(
       bufferTime
     );
 
-    return {
-      ...booking,
-      id: bookingId,
-      status: "confirmed",
-      createdAt: doc._createdAt!,
-    };
+    return created;
   }
 
   const newBooking: Booking = {
@@ -279,11 +411,15 @@ export async function createBooking(
     createdAt: new Date().toISOString(),
   };
 
-  const store = await readDevContent(tenant);
-  const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
-  bookings.push(newBooking);
-  store[`__bookings_${tenant}`] = bookings;
-  await writeDevContent(store, tenant);
+  if (dataSourceIsPostgres()) {
+    await pgInsertBooking(newBooking, tenant);
+  } else {
+    const store = await readDevContent(tenant);
+    const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
+    bookings.push(newBooking);
+    store[`__bookings_${tenant}`] = bookings;
+    await writeDevContent(store, tenant);
+  }
 
   // Mark the full booked span as confirmed in Redis after successful write
   await confirmBookingSlot(
@@ -344,13 +480,31 @@ export async function updateBooking(
   updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>,
   tenant: string = DEFAULT_TENANT
 ): Promise<Booking | null> {
+  if (dataSourceIsPostgres()) {
+    const existing = await pgGetBooking(id, tenant);
+    if (existing) {
+      await pgUpdateBooking(id, tenant, updates);
+      // Keep Sanity in sync while dual-writing for reversibility.
+      if (hasSanity) {
+        const doc = await getSanityClient().fetch(
+          `*[_type == "booking" && tenant == $tenant && bookingId == $id][0]._id`,
+          { tenant, id }
+        );
+        if (doc) await getSanityClient().patch(doc).set(updates).commit();
+      }
+      return { ...existing, ...updates };
+    }
+    // Postgres miss: fall through to Sanity only if it's still configured.
+    if (!hasSanity) return null;
+  }
+
   if (hasSanity) {
     const query = `*[_type == "booking" && tenant == $tenant && bookingId == $id][0]`;
     const doc = await getSanityClient().fetch(query, { tenant, id });
     if (!doc) return null;
 
     await getSanityClient().patch(doc._id).set(updates).commit();
-    return {
+    const updated: Booking = {
       id,
       serviceId: doc.serviceId,
       serviceName: doc.serviceName,
@@ -366,6 +520,11 @@ export async function updateBooking(
       cancelledAt: doc.cancelledAt,
       ...updates,
     };
+    // Dual-write the patch to Postgres if it has the row.
+    if (dataSourceIsPostgres()) {
+      await pgUpdateBooking(id, tenant, updates);
+    }
+    return updated;
   }
 
   const store = await readDevContent(tenant);
