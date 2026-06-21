@@ -134,7 +134,7 @@ describe("version-store Postgres dual-path", () => {
       error: null,
     };
 
-    const [v] = await getVersions("about", "rohlax");
+    const [v] = await getVersions("hero", "rohlax");
 
     expect(v.changes).toBeUndefined();
     expect(v.status).toBe("rolled-back");

@@ -613,3 +613,20 @@ export async function listActivity(
     return data ?? [];
   }, []);
 }
+
+// ---------------------------------------------------------------------------
+// tenants — list ALL (loadTenants returns every tenant; callers filter active)
+// ---------------------------------------------------------------------------
+
+export async function listAllTenants(): Promise<Row<"tenants">[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return safe("listAllTenants", async () => {
+    const { data, error } = await db
+      .from("tenants")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }, []);
+}

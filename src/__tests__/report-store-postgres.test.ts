@@ -164,7 +164,7 @@ describe("report-store Postgres dual-path", () => {
       topServices: [{ serviceId: "consult", total: 12, thisWeek: 4 }],
       staleSections: [{ section: "hero", daysSinceUpdate: 10 }],
       summary: "Growth.",
-    });
+    } as unknown as Parameters<typeof saveWeeklyReport>[1]);
 
     expect(supa.lastTable).toBe("weekly_briefs");
 
@@ -205,7 +205,7 @@ describe("report-store Postgres dual-path", () => {
       topServices: [],
       staleSections: [],
       summary: "Patched.",
-    });
+    } as unknown as Parameters<typeof saveWeeklyReport>[1]);
 
     expect(supa.lastTable).toBe("weekly_briefs");
     // Update branch fired; insert did not.
