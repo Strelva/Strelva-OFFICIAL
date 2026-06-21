@@ -8,6 +8,8 @@ import { addEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getAllTenants } from "./tenants";
 import type { ContentSection } from "./types";
+import { dataSourceIsPostgres } from "./db/source-flags";
+import { getSupabase, type Row, type Insert } from "./db/client";
 
 const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
@@ -21,6 +23,114 @@ export interface Suggestion {
   section?: string;
   createdAt: string;
   status: "pending" | "accepted" | "dismissed";
+}
+
+// --- Postgres dual-path helpers (self-contained; do not move to repositories.ts) ---
+//
+// The `suggestions` table maps 1:1 to the Suggestion interface (camelCase ->
+// snake_case). `tenant_id` FKs tenants(id) (uuid) and is passed straight through
+// — tenant ids in this codebase are real uuids, unlike the Clerk-era user ids.
+// Every query is wrapped so it never throws; a failure degrades to the Sanity /
+// dev path the caller already falls through to.
+
+function suggestionToInsert(s: Suggestion): Insert<"suggestions"> {
+  return {
+    id: s.id,
+    tenant_id: s.tenantId,
+    type: s.type,
+    title: s.title,
+    description: s.description,
+    action: s.action,
+    section: s.section ?? null,
+    status: s.status,
+    created_at: s.createdAt,
+  };
+}
+
+function mapPgSuggestionRow(row: Row<"suggestions">): Suggestion {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    type: row.type as Suggestion["type"],
+    title: row.title,
+    description: row.description,
+    action: row.action,
+    section: row.section ?? undefined,
+    createdAt: row.created_at,
+    status: row.status as Suggestion["status"],
+  };
+}
+
+async function pgListPendingSuggestions(tenantId: string): Promise<Suggestion[]> {
+  try {
+    const db = getSupabase();
+    if (!db) return [];
+    const { data, error } = await db
+      .from("suggestions")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map(mapPgSuggestionRow);
+  } catch {
+    return [];
+  }
+}
+
+async function pgFindPendingDuplicate(
+  tenantId: string,
+  type: string,
+  section: string | null,
+): Promise<Suggestion | null> {
+  try {
+    const db = getSupabase();
+    if (!db) return null;
+    let query = db
+      .from("suggestions")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending")
+      .eq("type", type);
+    query = section === null ? query.is("section", null) : query.eq("section", section);
+    const { data, error } = await query.limit(1);
+    if (error || !data || data.length === 0) return null;
+    return mapPgSuggestionRow(data[0]);
+  } catch {
+    return null;
+  }
+}
+
+async function pgInsertSuggestion(suggestion: Suggestion): Promise<void> {
+  try {
+    const db = getSupabase();
+    if (!db) return;
+    await db.from("suggestions").insert(suggestionToInsert(suggestion));
+  } catch {
+    // swallow — Sanity/dev write still happens for reversibility
+  }
+}
+
+async function pgUpdateSuggestionStatus(
+  tenantId: string,
+  suggestionId: string,
+  status: "accepted" | "dismissed",
+): Promise<Suggestion | null> {
+  try {
+    const db = getSupabase();
+    if (!db) return null;
+    const { data, error } = await db
+      .from("suggestions")
+      .update({ status })
+      .eq("tenant_id", tenantId)
+      .eq("id", suggestionId)
+      .select("*")
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return mapPgSuggestionRow(data[0]);
+  } catch {
+    return null;
+  }
 }
 
 // --- Dev file fallback ---
@@ -43,6 +153,12 @@ async function writeSuggestions(data: Record<string, Suggestion[]>): Promise<voi
 // --- CRUD ---
 
 export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
+  if (dataSourceIsPostgres()) {
+    const rows = await pgListPendingSuggestions(tenantId);
+    if (rows.length > 0 || !hasSanity) return rows;
+    // fall through to Sanity only if Postgres is empty and Sanity still configured
+  }
+
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
     const docs = await getSanityClient().fetch(
@@ -63,6 +179,31 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
     createdAt: new Date().toISOString(),
     status: "pending",
   };
+
+  if (dataSourceIsPostgres()) {
+    // Dedupe against Postgres pending suggestions of the same type/section.
+    const existing = await pgFindPendingDuplicate(
+      suggestion.tenantId,
+      suggestion.type,
+      suggestion.section ?? null,
+    );
+    if (existing) return existing;
+
+    await pgInsertSuggestion(entry);
+
+    // Keep the Sanity write alive while configured (dual-write for reversibility).
+    if (hasSanity) {
+      const { getSanityClient } = await import("./sanity");
+      await getSanityClient().create({
+        _type: "suggestion",
+        ...entry,
+        suggestionType: entry.type,
+      });
+    }
+
+    await addSuggestionEvent(entry);
+    return entry;
+  }
 
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
@@ -122,6 +263,22 @@ export async function updateSuggestion(
   suggestionId: string,
   status: "accepted" | "dismissed",
 ): Promise<Suggestion | null> {
+  if (dataSourceIsPostgres()) {
+    const pgUpdated = await pgUpdateSuggestionStatus(tenantId, suggestionId, status);
+
+    // Mirror the status change to Sanity while it's still configured (dual-write).
+    if (hasSanity) {
+      const { getSanityClient } = await import("./sanity");
+      const doc = await getSanityClient().fetch(
+        `*[_type == "suggestion" && tenantId == $tenantId && id == $id][0]._id`,
+        { tenantId, id: suggestionId },
+      );
+      if (doc) await getSanityClient().patch(doc).set({ status }).commit();
+    }
+
+    return pgUpdated;
+  }
+
   if (hasSanity) {
     const { getSanityClient } = await import("./sanity");
     const doc = await getSanityClient().fetch(
