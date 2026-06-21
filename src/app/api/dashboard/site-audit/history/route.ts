@@ -1,9 +1,10 @@
 /**
  * GET /api/dashboard/site-audit/history
  *
- * Returns the signed-in tenant's recent audit snapshots (newest first) so the
- * dashboard health card can render a score trend over time. Snapshots are
- * written weekly by the `/api/cron/site-audit` cron.
+ * Returns the signed-in tenant's recent site-health scores (newest first) so the
+ * dashboard health card can render a score trend over time. This reads the SAME
+ * scan-store the admin overview sparkline uses, written by the daily
+ * `portfolio-scan` cron (and refreshed when the client opens their health page).
  *
  * Auth-gated like the other dashboard routes (verifyAuth + getTenantFromHeaders
  * + requireTenantAccess).
@@ -13,7 +14,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getAuditHistory } from "@/lib/audit/history";
+import { getScanHistory } from "@/lib/scan-store";
 
 const DEFAULT_HISTORY_LIMIT = 12;
 
@@ -28,7 +29,9 @@ export async function GET() {
   if (denied) return denied;
 
   try {
-    const history = await getAuditHistory(tenant, DEFAULT_HISTORY_LIMIT);
+    // scan-store keeps points oldest-to-newest; the card wants newest-first.
+    const points = await getScanHistory(tenant);
+    const history = points.slice(-DEFAULT_HISTORY_LIMIT).reverse();
     return NextResponse.json({ history });
   } catch (err) {
     Sentry.captureException(err, {
