@@ -60,6 +60,7 @@ import {
   getLastClickDate,
   getDailyMetrics,
   getClickCountsByPrefix,
+  getSectionTimestamps,
 } from "@/lib/storage/analytics-store";
 
 const TENANT = "gldf";
@@ -187,6 +188,22 @@ describe("analytics-store Postgres dual-path", () => {
       metric: "page-view",
       day: today,
       count: 1,
+    });
+  });
+
+  it("getSectionTimestamps reads content.updated_at per section (Postgres equivalent of Sanity _updatedAt)", async () => {
+    supa.result = {
+      data: [
+        { section: "hero", updated_at: "2026-06-20T10:00:00.000Z" },
+        { section: "services", updated_at: "2026-06-19T08:00:00.000Z" },
+      ],
+      error: null,
+    };
+    const ts = await getSectionTimestamps("gldf");
+    expect(supa.lastTable).toBe("content");
+    expect(ts).toEqual({
+      hero: "2026-06-20T10:00:00.000Z",
+      services: "2026-06-19T08:00:00.000Z",
     });
   });
 });

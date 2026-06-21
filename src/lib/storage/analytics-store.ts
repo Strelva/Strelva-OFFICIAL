@@ -405,6 +405,29 @@ export async function recordSectionUpdate(
 export async function getSectionTimestamps(
   tenant: string = DEFAULT_TENANT
 ): Promise<Record<string, string>> {
+  // Postgres equivalent of Sanity's per-doc _updatedAt: the content table carries
+  // updated_at per (tenant_id, section), and `section` is already the section name.
+  if (dataSourceIsPostgres()) {
+    const db = getSupabase();
+    if (db) {
+      try {
+        const { data, error } = await db
+          .from("content")
+          .select("section, updated_at")
+          .eq("tenant_id", tenant);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const timestamps: Record<string, string> = {};
+          for (const row of data) timestamps[row.section] = row.updated_at;
+          return timestamps;
+        }
+      } catch (err) {
+        console.error(`[db] getSectionTimestamps ${tenant} failed:`, err instanceof Error ? err.message : err);
+      }
+    }
+    // fall through to Sanity/dev if Postgres is empty or errored
+  }
+
   if (hasSanity) {
     const types = Object.values(SECTION_TO_TYPE);
     const rows = await getSanityReadClient().fetch<Array<{ _type: string; _updatedAt: string }>>(
