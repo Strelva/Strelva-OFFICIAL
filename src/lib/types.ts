@@ -664,7 +664,7 @@ export interface UnifiedEvent {
   id: string;
   tenantId: string;
   source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai' | 'stripe';
-  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request' | 'build_payment' | 'change_verified' | 'change_verify_failed' | 'visibility_snapshot' | 'audit_snapshot';
+  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request' | 'build_payment' | 'change_verified' | 'change_verify_failed' | 'visibility_snapshot';
   title: string;
   body: string;
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';

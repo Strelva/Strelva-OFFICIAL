@@ -56,10 +56,6 @@
     {
       "path": "/api/cron/heartbeat",
       "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/site-audit",
-      "schedule": "0 12 * * 0"
     }
   ]
 }

@@ -16,10 +16,8 @@ import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
-import { runAudit } from "@/lib/audit/checks";
-import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
+import { scanTenant } from "@/lib/scan";
 import { topFixes } from "@/lib/audit/impact";
-import type { AuditResult } from "@/lib/audit/types";
 import type { TenantConfig } from "@/lib/types";
 import { getRedis } from "@/lib/redis";
 
@@ -69,16 +67,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const categories = await runAudit(target);
-    const overallScore = computeOverallScore(categories);
-    const grade = scoreToGrade(overallScore);
-    const result: AuditResult & { topFixes: ReturnType<typeof topFixes> } = {
-      url: target,
-      scannedAt: new Date().toISOString(),
-      overallScore,
-      grade,
-      categories,
-      topFixes: topFixes(categories, 5),
+    // Route through scanTenant so the client view writes to the SAME scan-store
+    // the admin overview + sparkline read (one source of truth), and returns the
+    // full per-category detail for the card.
+    const scan = await scanTenant(tenant);
+    const result = {
+      url: scan.url,
+      scannedAt: scan.scannedAt,
+      overallScore: scan.overallScore,
+      grade: scan.grade,
+      categories: scan.detail,
+      topFixes: topFixes(scan.detail, 5),
     };
 
     if (redis) {
