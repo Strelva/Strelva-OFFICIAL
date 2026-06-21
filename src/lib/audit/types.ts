@@ -6,6 +6,11 @@ export interface CheckResult {
   score: number; // 0-100
   message: string;
   details?: string;
+  /** Plain-English "what this costs you" line (from the impact narrative).
+   *  Populated for failing/warning checks; omitted when passing or n/a. */
+  impact?: string;
+  /** Fix priority for the action list. Derived from status + weight. */
+  priority?: "high" | "medium" | "low";
 }
 
 export interface CategoryResult {

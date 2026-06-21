@@ -264,7 +264,7 @@ describe("Scoring Math", () => {
 });
 
 // ===========================================================================
-// Individual Checks (via runAudit integration)
+// runAudit orchestration (per-module checks live in their own test files)
 // ===========================================================================
 describe("runAudit", () => {
   it("rejects private IP targets via SSRF protection", async () => {
@@ -274,199 +274,82 @@ describe("runAudit", () => {
     );
   });
 
-  it("prepends https:// to bare domain", async () => {
+  it("prepends https:// to a bare domain", async () => {
     await runAudit("example.com");
-    // DNS lookup should have been called with "example.com" and IPv4 forced
     expect(mockLookup).toHaveBeenCalledWith("example.com", { family: 4 });
   });
 
-  it("returns all 6 category results", async () => {
+  it("returns the full set of audit categories", async () => {
     const results = await runAudit("https://example.com");
-    expect(results).toHaveLength(6);
     const slugs = results.map((r) => r.slug);
-    expect(slugs).toContain("web-vitals");
-    expect(slugs).toContain("seo");
-    expect(slugs).toContain("mobile");
-    expect(slugs).toContain("schema");
-    expect(slugs).toContain("ssl");
-    expect(slugs).toContain("a11y");
+    for (const slug of [
+      "ai-readability",
+      "seo",
+      "security",
+      "a11y",
+      "web-vitals",
+      "mobile",
+      "trust",
+      "content",
+    ]) {
+      expect(slugs).toContain(slug);
+    }
   });
 
-  describe("SSL check", () => {
-    it("scores 100 for HTTPS URL", async () => {
-      const results = await runAudit("https://example.com");
-      const ssl = results.find((r) => r.slug === "ssl")!;
-      expect(ssl.score).toBe(100);
-      expect(ssl.checks[0].status).toBe("pass");
-    });
-
-    it("scores 0 for HTTP URL when HTTPS upgrade fails", async () => {
-      // First call: HTML fetch for the http:// URL (succeeds)
-      // Second call: HTTPS probe from checkSSL (fails)
-      mockFetch
-        .mockResolvedValueOnce(
-          mockResponse(
-            "<html><head><title>T</title></head><body></body></html>",
-            "http://example.com"
-          )
-        )
-        .mockRejectedValueOnce(new Error("connection refused"));
-
-      const results = await runAudit("http://example.com");
-      const ssl = results.find((r) => r.slug === "ssl")!;
-      // First check: HTTPS => fail (score 0). Second check: HTTPS Available => fail (score 0).
-      expect(ssl.checks[0].score).toBe(0);
-      expect(ssl.checks[0].status).toBe("fail");
-    });
+  it("assigns the central weights to the ported modules", async () => {
+    const results = await runAudit("https://example.com");
+    const weightBySlug = Object.fromEntries(results.map((r) => [r.slug, r.weight]));
+    expect(weightBySlug["ai-readability"]).toBeCloseTo(0.2);
+    expect(weightBySlug["security"]).toBeCloseTo(0.12);
+    expect(weightBySlug["content"]).toBeCloseTo(0.07);
   });
 
-  describe("SEO checks", () => {
-    it("scores 100 for title tag with correct length", async () => {
-      const html =
-        '<html><head><title>A Perfectly Good Title for SEO Purposes</title></head><body><h1>Hello</h1></body></html>';
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const seo = results.find((r) => r.slug === "seo")!;
-      const titleCheck = seo.checks.find((c) => c.name === "Title Tag")!;
-      expect(titleCheck.score).toBe(100);
-      expect(titleCheck.status).toBe("pass");
-    });
-
-    it("scores 0 for missing title tag", async () => {
-      const html = "<html><head></head><body></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const seo = results.find((r) => r.slug === "seo")!;
-      const titleCheck = seo.checks.find((c) => c.name === "Title Tag")!;
-      expect(titleCheck.score).toBe(0);
-      expect(titleCheck.status).toBe("fail");
-    });
-
-    it("warns for short title tag", async () => {
-      const html =
-        "<html><head><title>Short</title></head><body></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const seo = results.find((r) => r.slug === "seo")!;
-      const titleCheck = seo.checks.find((c) => c.name === "Title Tag")!;
-      expect(titleCheck.score).toBe(60);
-      expect(titleCheck.status).toBe("warn");
-    });
-
-    it("detects missing H1 tag", async () => {
-      const html =
-        "<html><head><title>A Perfectly Good Title for SEO Purposes</title></head><body><p>No heading</p></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const seo = results.find((r) => r.slug === "seo")!;
-      const h1Check = seo.checks.find((c) => c.name === "H1 Tag")!;
-      expect(h1Check.score).toBe(0);
-      expect(h1Check.status).toBe("fail");
-    });
-
-    it("warns for multiple H1 tags", async () => {
-      const html =
-        "<html><head><title>A Perfectly Good Title for SEO Purposes</title></head><body><h1>One</h1><h1>Two</h1></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const seo = results.find((r) => r.slug === "seo")!;
-      const h1Check = seo.checks.find((c) => c.name === "H1 Tag")!;
-      expect(h1Check.score).toBe(60);
-      expect(h1Check.status).toBe("warn");
-    });
+  it("excludes the PageSpeed categories from the grade when no API key is set", async () => {
+    delete process.env.GOOGLE_PAGESPEED_API_KEY;
+    const results = await runAudit("https://example.com");
+    const webVitals = results.find((r) => r.slug === "web-vitals")!;
+    const mobile = results.find((r) => r.slug === "mobile")!;
+    expect(webVitals.weight).toBe(0);
+    expect(webVitals.score).toBe(50);
+    expect(webVitals.checks[0].status).toBe("warn");
+    expect(webVitals.checks[0].message.toLowerCase()).toContain("not measured");
+    expect(mobile.weight).toBe(0);
+    expect(mobile.score).toBe(50);
   });
 
-  describe("PageSpeed-dependent checks", () => {
-    it("handles null psData gracefully (scores 50 for webVitals)", async () => {
-      // No API key => psData is null => fallback to 50
-      delete process.env.GOOGLE_PAGESPEED_API_KEY;
-
-      const results = await runAudit("https://example.com");
-      const webVitals = results.find((r) => r.slug === "web-vitals")!;
-      expect(webVitals.score).toBe(50);
-      expect(webVitals.checks[0].status).toBe("warn");
-      expect(webVitals.checks[0].message).toContain("not configured");
-    });
-
-    it("handles null psData gracefully (scores 50 for mobile)", async () => {
-      delete process.env.GOOGLE_PAGESPEED_API_KEY;
-
-      const results = await runAudit("https://example.com");
-      const mobile = results.find((r) => r.slug === "mobile")!;
-      expect(mobile.score).toBe(50);
-      expect(mobile.checks[0].status).toBe("warn");
-    });
+  it("attaches a 'what this costs you' impact line to failing checks", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse("<html><head></head><body></body></html>")
+    );
+    const results = await runAudit("https://example.com");
+    const failingWithImpact = results
+      .flatMap((c) => c.checks)
+      .find((c) => c.status === "fail" && c.impact);
+    expect(failingWithImpact?.impact).toBeTruthy();
   });
 
-  describe("Schema checks", () => {
-    it("scores 0 when no structured data exists", async () => {
-      const html =
-        "<html><head><title>A Perfectly Good Title for SEO Purposes</title></head><body></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
+  it("scores a rich, well-built page higher than an empty one", async () => {
+    const richHtml = `<!doctype html><html lang="en"><head>
+      <title>Acme Plumbing — Trusted Local Plumbers in Buffalo NY</title>
+      <meta name="description" content="Acme Plumbing offers fast, licensed, insured plumbing across Buffalo with upfront pricing and 24/7 emergency response for homes and businesses.">
+      <link rel="canonical" href="https://example.com/">
+      <script type="application/ld+json">{"@type":"LocalBusiness","name":"Acme Plumbing","address":{"@type":"PostalAddress","streetAddress":"1 Main St","addressLocality":"Buffalo"},"telephone":"716-555-1212","sameAs":["https://en.wikipedia.org/wiki/Acme","https://www.linkedin.com/company/acme"]}</script>
+      </head><body><main>
+      <h1>Acme Plumbing</h1><h2>Our Services</h2>
+      <p>${"Reliable, licensed plumbing for homes and local businesses. ".repeat(40)}</p>
+      <a href="/about">About</a><a href="/services">Services</a><a href="/contact">Contact</a>
+      <a href="tel:716-555-1212">Call us now</a>
+      <img src="team.png" alt="The Acme Plumbing team on a job site">
+      <a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a>
+      </main></body></html>`;
+    mockFetch.mockResolvedValueOnce(mockResponse(richHtml));
+    const richScore = computeOverallScore(await runAudit("https://example.com"));
 
-      const results = await runAudit("https://example.com");
-      const schema = results.find((r) => r.slug === "schema")!;
-      expect(schema.checks[0].score).toBe(0);
-      expect(schema.checks[0].status).toBe("fail");
-    });
+    mockFetch.mockResolvedValueOnce(
+      mockResponse("<html><head></head><body></body></html>")
+    );
+    const emptyScore = computeOverallScore(await runAudit("https://example.com"));
 
-    it("scores 100 when JSON-LD with LocalBusiness is present", async () => {
-      const html = `<html><head>
-        <title>A Perfectly Good Title for SEO Purposes</title>
-        <script type="application/ld+json">{"@type":"LocalBusiness","name":"Test"}</script>
-      </head><body></body></html>`;
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const schema = results.find((r) => r.slug === "schema")!;
-      const structuredCheck = schema.checks.find(
-        (c) => c.name === "Structured Data"
-      )!;
-      expect(structuredCheck.score).toBe(100);
-      expect(structuredCheck.status).toBe("pass");
-    });
-  });
-
-  describe("Accessibility checks", () => {
-    it("passes when html has lang attribute and images have alt", async () => {
-      const html =
-        '<html lang="en"><head><title>Test Page With Good SEO Title</title></head><body><img src="a.png" alt="photo"></body></html>';
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const a11y = results.find((r) => r.slug === "a11y")!;
-      expect(a11y.score).toBe(100);
-    });
-
-    it("fails when html has no lang attribute", async () => {
-      const html =
-        "<html><head><title>Test Page With Good SEO Title Len</title></head><body></body></html>";
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const a11y = results.find((r) => r.slug === "a11y")!;
-      const langCheck = a11y.checks.find(
-        (c) => c.name === "Language Attribute"
-      )!;
-      expect(langCheck.score).toBe(0);
-      expect(langCheck.status).toBe("fail");
-    });
-
-    it("detects images missing alt attributes", async () => {
-      const html =
-        '<html lang="en"><head><title>Test Page With Good SEO Title</title></head><body><img src="a.png"><img src="b.png"></body></html>';
-      mockFetch.mockResolvedValueOnce(mockResponse(html));
-
-      const results = await runAudit("https://example.com");
-      const a11y = results.find((r) => r.slug === "a11y")!;
-      const altCheck = a11y.checks.find((c) => c.name === "Image Alt Text")!;
-      expect(altCheck.score).toBe(0);
-      expect(altCheck.status).toBe("fail");
-    });
+    expect(richScore).toBeGreaterThan(emptyScore);
   });
 });

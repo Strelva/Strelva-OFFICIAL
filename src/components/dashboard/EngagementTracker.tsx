@@ -8,6 +8,7 @@ export type EngagementEvent =
   | "dashboard-open"
   | "ai-chat-open"
   | "report-view"
+  | "health-view"
   | "referral-click";
 
 export function EngagementTracker({ event }: { event: EngagementEvent }) {
