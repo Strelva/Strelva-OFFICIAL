@@ -181,7 +181,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           {assigning ? "Assigning…" : "Assign user"}
         </button>
         <p className="text-xs text-gray-faint">
-          The user must already have a Clerk account (signed up with this exact email).
+          The user must already have an account (signed up with this exact email) — use Resend owner invite below if they don&apos;t.
         </p>
 
         <div className="pt-3 mt-1 border-t border-glass-border">

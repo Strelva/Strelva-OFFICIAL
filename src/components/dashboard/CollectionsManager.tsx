@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useDashboardOptional } from "./DashboardContext";
 
 type CollectionType = "blog" | "video" | "product";
 
@@ -23,12 +24,17 @@ interface FieldDef {
   name: string;
   label: string;
   kind: "text" | "textarea" | "number" | "tags" | "url" | "bool";
+  /** Required on save (mirrors the non-optional fields in the Zod registry). */
+  required?: boolean;
 }
 
 // Client-side mirror of the field shapes in src/lib/cms/collection-types.ts.
+// `required` mirrors the Zod registry: blog/video title and product name are
+// z.string().min(1); video.videoUrl is a required URL. URL-typed fields are
+// validated for URL shape (when present) regardless of required.
 const FIELDS: Record<CollectionType, FieldDef[]> = {
   blog: [
-    { name: "title", label: "Title", kind: "text" },
+    { name: "title", label: "Title", kind: "text", required: true },
     { name: "excerpt", label: "Excerpt", kind: "text" },
     { name: "body", label: "Body", kind: "textarea" },
     { name: "author", label: "Author", kind: "text" },
@@ -36,22 +42,71 @@ const FIELDS: Record<CollectionType, FieldDef[]> = {
     { name: "coverImage", label: "Cover image URL", kind: "url" },
   ],
   video: [
-    { name: "title", label: "Title", kind: "text" },
+    { name: "title", label: "Title", kind: "text", required: true },
     { name: "description", label: "Description", kind: "textarea" },
-    { name: "videoUrl", label: "Video URL", kind: "url" },
+    { name: "videoUrl", label: "Video URL", kind: "url", required: true },
     { name: "thumbnail", label: "Thumbnail URL", kind: "url" },
     { name: "tags", label: "Tags (comma separated)", kind: "tags" },
   ],
   product: [
-    { name: "name", label: "Name", kind: "text" },
+    { name: "name", label: "Name", kind: "text", required: true },
     { name: "description", label: "Description", kind: "textarea" },
-    { name: "priceCents", label: "Price (cents)", kind: "number" },
+    { name: "priceCents", label: "Price in cents (2000 = $20.00)", kind: "number" },
     { name: "currency", label: "Currency", kind: "text" },
     { name: "images", label: "Image URLs (comma separated)", kind: "tags" },
     { name: "inStock", label: "In stock", kind: "bool" },
     { name: "checkoutUrl", label: "Checkout URL", kind: "url" },
   ],
 };
+
+/** True if the string parses as an absolute http(s) URL. */
+function isValidUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate the editing data against the field defs. Returns a map of
+ * fieldName -> error message for any offending field (empty map = valid).
+ * - required text/url fields must be non-empty
+ * - url-typed fields must be valid URLs when present
+ * - tags fields holding image URLs (product `images`) must be valid URLs
+ */
+function validateEntry(type: CollectionType, data: Record<string, unknown>): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const f of FIELDS[type]) {
+    if (f.kind === "url") {
+      const raw = typeof data[f.name] === "string" ? (data[f.name] as string).trim() : "";
+      if (!raw) {
+        if (f.required) errors[f.name] = `${f.label} is required.`;
+        continue;
+      }
+      if (!isValidUrl(raw)) {
+        errors[f.name] = "Enter a full URL starting with http:// or https://";
+      }
+      continue;
+    }
+    if (f.kind === "tags") {
+      // Image-URL tag fields (product `images`) must hold valid URLs.
+      const isUrlList = f.name === "images";
+      if (isUrlList) {
+        const arr = Array.isArray(data[f.name]) ? (data[f.name] as string[]) : [];
+        const bad = arr.find((v) => !isValidUrl(v.trim()));
+        if (bad) errors[f.name] = "Each image must be a full URL starting with http:// or https://";
+      }
+      continue;
+    }
+    if (f.required) {
+      const raw = typeof data[f.name] === "string" ? (data[f.name] as string).trim() : "";
+      if (!raw) errors[f.name] = `${f.label} is required.`;
+    }
+  }
+  return errors;
+}
 
 const TYPE_LABEL: Record<CollectionType, string> = { blog: "Blog", video: "Video", product: "Products" };
 
@@ -72,12 +127,16 @@ export function CollectionsManager({
   initialType: CollectionType;
   initialEntries: EntryView[];
 }) {
+  const readOnly = useDashboardOptional()?.readOnly ?? false;
   const [type, setType] = useState<CollectionType>(initialType);
   const [entries, setEntries] = useState<EntryView[]>(initialEntries);
   const [editing, setEditing] = useState<{ slug?: string; data: Record<string, unknown> } | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Transient confirmation after a successful save, distinguishing the action.
+  const [savedAction, setSavedAction] = useState<"published" | "draft" | null>(null);
 
   const load = useCallback(async (t: CollectionType) => {
     setLoading(true);
@@ -107,6 +166,14 @@ export function CollectionsManager({
 
   async function save(status: "draft" | "published") {
     if (!editing) return;
+    // Client-side validation: block the request and surface inline errors.
+    const errors = validateEntry(type, editing.data);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("Fix the highlighted fields before saving.");
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
     try {
@@ -121,6 +188,8 @@ export function CollectionsManager({
         return;
       }
       setEditing(null);
+      setSavedAction(status === "published" ? "published" : "draft");
+      window.setTimeout(() => setSavedAction(null), 2500);
       await load(type);
     } finally {
       setSaving(false);
@@ -129,7 +198,13 @@ export function CollectionsManager({
 
   async function remove(slug: string) {
     if (!confirm(`Delete "${slug}"? This cannot be undone.`)) return;
-    await fetch(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`, { method: "DELETE" });
+    setError(null);
+    const res = await fetch(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`, { method: "DELETE" });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setError(json.error ?? "Delete failed.");
+      return;
+    }
     await load(type);
   }
 
@@ -137,12 +212,28 @@ export function CollectionsManager({
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-warm-black">Content</h1>
-        <button
-          onClick={() => setEditing({ data: emptyData(type) })}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white"
-        >
-          <Plus className="h-4 w-4" /> New {TYPE_LABEL[type].replace(/s$/, "")}
-        </button>
+        <div className="flex items-center gap-3">
+          {savedAction && (
+            <span
+              role="status"
+              className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300"
+            >
+              {savedAction === "published" ? "Published" : "Saved"}
+            </span>
+          )}
+          {!readOnly && (
+            <button
+              onClick={() => {
+                setFieldErrors({});
+                setError(null);
+                setEditing({ data: emptyData(type) });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white"
+            >
+              <Plus className="h-4 w-4" /> New {TYPE_LABEL[type].replace(/s$/, "")}
+            </button>
+          )}
+        </div>
       </div>
 
       {types.length > 1 && (
@@ -150,7 +241,7 @@ export function CollectionsManager({
           {types.map((t) => (
             <button
               key={t}
-              onClick={() => { setType(t); setEditing(null); }}
+              onClick={() => { setType(t); setEditing(null); setFieldErrors({}); setError(null); }}
               className={`rounded-md px-3 py-1.5 text-sm ${t === type ? "bg-warm-black text-warm-white" : "border border-gray-border text-warm-black"}`}
             >
               {TYPE_LABEL[t]}
@@ -159,51 +250,73 @@ export function CollectionsManager({
         </div>
       )}
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
 
       {editing ? (
         <div className="rounded-lg border border-gray-border p-4">
           {FIELDS[type].map((f) => (
             <label key={f.name} className="mb-3 block text-sm">
-              <span className="mb-1 block font-medium text-warm-black">{f.label}</span>
+              <span className="mb-1 block font-medium text-warm-black">
+                {f.label}
+                {f.required && <span className="ml-1 text-red-400">*</span>}
+              </span>
               <FieldInput
                 field={f}
                 value={editing.data[f.name]}
-                onChange={(v) => setEditing({ ...editing, data: { ...editing.data, [f.name]: v } })}
+                invalid={Boolean(fieldErrors[f.name])}
+                onChange={(v) => {
+                  setEditing({ ...editing, data: { ...editing.data, [f.name]: v } });
+                  if (fieldErrors[f.name]) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next[f.name];
+                      return next;
+                    });
+                  }
+                }}
               />
+              {fieldErrors[f.name] && (
+                <span className="mt-1 block text-[12px] text-red-400">{fieldErrors[f.name]}</span>
+              )}
             </label>
           ))}
           <div className="mt-4 flex gap-2">
-            <button disabled={saving} onClick={() => save("published")} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white disabled:opacity-60">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}
-            </button>
-            <button disabled={saving} onClick={() => save("draft")} className="rounded-md border border-gray-border px-3 py-1.5 text-sm">
-              Save draft
-            </button>
-            <button onClick={() => setEditing(null)} className="rounded-md px-3 py-1.5 text-sm text-warm-black/60">
+            {!readOnly && (
+              <>
+                <button disabled={saving} onClick={() => save("published")} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white disabled:opacity-60">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}
+                </button>
+                <button disabled={saving} onClick={() => save("draft")} className="rounded-md border border-gray-border px-3 py-1.5 text-sm text-warm-black disabled:opacity-60">
+                  Save draft
+                </button>
+              </>
+            )}
+            <button onClick={() => { setEditing(null); setFieldErrors({}); setError(null); }} className="rounded-md px-3 py-1.5 text-sm text-gray-muted">
               Cancel
             </button>
           </div>
         </div>
       ) : loading ? (
-        <div className="flex items-center gap-2 py-10 text-sm text-warm-black/60">
+        <div className="flex items-center gap-2 py-10 text-sm text-gray-muted">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
         </div>
       ) : entries.length === 0 ? (
-        <p className="py-10 text-sm text-warm-black/60">No {TYPE_LABEL[type].toLowerCase()} entries yet.</p>
+        <p className="py-10 text-sm text-gray-muted">No {TYPE_LABEL[type].toLowerCase()} entries yet.</p>
       ) : (
         <ul className="divide-y divide-gray-border rounded-lg border border-gray-border">
           {entries.map((e) => (
             <li key={e.slug} className="flex items-center justify-between gap-3 p-3">
-              <button className="min-w-0 flex-1 text-left" onClick={() => setEditing({ slug: e.slug, data: e.data })}>
+              <button className="min-w-0 flex-1 text-left" onClick={() => { setFieldErrors({}); setError(null); setEditing({ slug: e.slug, data: e.data }); }}>
                 <span className="block truncate text-sm font-medium text-warm-black">
                   {String(e.data.title ?? e.data.name ?? e.slug)}
                 </span>
-                <span className="text-xs text-warm-black/50">{e.status}</span>
+                <span className="text-xs text-gray-muted">{e.status}</span>
               </button>
-              <button onClick={() => remove(e.slug)} aria-label="Delete" className="text-warm-black/40 hover:text-red-600">
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {!readOnly && (
+                <button onClick={() => remove(e.slug)} aria-label="Delete" className="text-gray-muted hover:text-red-400">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -212,8 +325,18 @@ export function CollectionsManager({
   );
 }
 
-function FieldInput({ field, value, onChange }: { field: FieldDef; value: unknown; onChange: (v: unknown) => void }) {
-  const base = "w-full rounded-md border border-gray-border px-3 py-1.5 text-sm";
+function FieldInput({
+  field,
+  value,
+  invalid = false,
+  onChange,
+}: {
+  field: FieldDef;
+  value: unknown;
+  invalid?: boolean;
+  onChange: (v: unknown) => void;
+}) {
+  const base = `w-full rounded-md border px-3 py-1.5 text-sm ${invalid ? "border-red-400/50" : "border-gray-border"}`;
   if (field.kind === "textarea") {
     return <textarea rows={6} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
   }
@@ -221,7 +344,18 @@ function FieldInput({ field, value, onChange }: { field: FieldDef; value: unknow
     return <input type="number" className={base} value={Number(value ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />;
   }
   if (field.kind === "bool") {
-    return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+    // Aligned label + checkbox row, consistent with the rest of the form.
+    return (
+      <span className="inline-flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-border accent-accent"
+        />
+        <span className="text-sm text-gray-muted">{Boolean(value) ? "In stock" : "Out of stock"}</span>
+      </span>
+    );
   }
   if (field.kind === "tags") {
     const arr = Array.isArray(value) ? (value as string[]) : [];

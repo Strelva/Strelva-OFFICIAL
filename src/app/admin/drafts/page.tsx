@@ -98,14 +98,38 @@ export default async function AdminDraftsPage() {
                             <span className="ml-1 text-gray-faint normal-case tracking-normal">({d.type})</span>
                           </span>
                           {d.type !== "added" && d.before && (
-                            <span className="text-xs text-red-300/80 line-through break-words">
-                              {d.before.length > 200 ? `${d.before.slice(0, 200)}...` : d.before}
-                            </span>
+                            d.before.length > 200 ? (
+                              <details className="group">
+                                <summary className="cursor-pointer list-none text-xs text-red-300/80 line-through break-words marker:content-none">
+                                  {d.before.slice(0, 200)}
+                                  <span className="ml-1 no-underline text-gray-faint group-open:hidden">[show full]</span>
+                                </summary>
+                                <span className="text-xs text-red-300/80 line-through break-words">
+                                  {d.before}
+                                </span>
+                              </details>
+                            ) : (
+                              <span className="text-xs text-red-300/80 line-through break-words">
+                                {d.before}
+                              </span>
+                            )
                           )}
                           {d.type !== "removed" && d.after && (
-                            <span className="text-xs text-emerald-200 break-words">
-                              {d.after.length > 200 ? `${d.after.slice(0, 200)}...` : d.after}
-                            </span>
+                            d.after.length > 200 ? (
+                              <details className="group">
+                                <summary className="cursor-pointer list-none text-xs text-emerald-200 break-words marker:content-none">
+                                  {d.after.slice(0, 200)}
+                                  <span className="ml-1 text-gray-faint group-open:hidden">[show full]</span>
+                                </summary>
+                                <span className="text-xs text-emerald-200 break-words">
+                                  {d.after}
+                                </span>
+                              </details>
+                            ) : (
+                              <span className="text-xs text-emerald-200 break-words">
+                                {d.after}
+                              </span>
+                            )
                           )}
                         </div>
                       ))

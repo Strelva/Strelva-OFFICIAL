@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
-import { hasTenantAccess } from "@/lib/auth";
+import { hasDashboardViewAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
@@ -13,7 +13,7 @@ import type { ContentSection } from "@/lib/types";
 
 export default async function SitePage() {
   const tenant = await getTenantFromHeaders();
-  const allowed = await hasTenantAccess(tenant);
+  const allowed = await hasDashboardViewAccess(tenant);
   if (!allowed) {
     const clientFallbackRoot = getClientFallbackRoot(await headers());
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));

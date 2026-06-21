@@ -3,15 +3,15 @@ import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Blog - Scaffold Web",
+  title: "Blog - Strelva",
   description:
     "Tips, guides, and insights on AI website management, local SEO, and growing your business online.",
   openGraph: {
-    title: "Blog - Scaffold Web",
+    title: "Blog - Strelva",
     description:
       "Tips, guides, and insights on AI website management, local SEO, and growing your business online.",
     type: "website",
-    siteName: "Scaffold Web",
+    siteName: "Strelva",
   },
 };
 
@@ -66,35 +66,6 @@ export default function BlogPage() {
               </article>
             ))}
           </div>
-
-          {/* Newsletter */}
-          <div className="mt-16 rounded-2xl border border-m-rule-soft bg-m-panel p-8 text-center md:p-12">
-            <h2
-              className="font-semibold leading-[1.1] text-m-text"
-              style={{ fontSize: "clamp(1.5rem, 3vw, 2.25rem)" }}
-            >
-              Get articles delivered
-            </h2>
-            <p className="mx-auto mt-3 max-w-[420px] text-[15px] leading-relaxed text-m-text-2">
-              One email per week with practical tips for your business website.
-              No spam.
-            </p>
-            <div className="mx-auto mt-6 flex max-w-[420px] gap-2">
-              <input
-                type="email"
-                placeholder="you@business.com"
-                disabled
-                aria-label="Email address for blog subscription"
-                className="h-11 flex-1 rounded-xl border border-m-rule-soft bg-m-panel-strong px-4 text-[14px] text-m-text-3 opacity-50"
-              />
-              <button
-                disabled
-                className="marketing-button-primary h-11 opacity-50"
-              >
-                Subscribe
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -110,8 +81,8 @@ export default function BlogPage() {
           <p className="mx-auto mt-4 max-w-[440px] text-[16px] leading-relaxed text-m-text-2">
             Let AI handle the updates while you run your business.
           </p>
-          <Link href="/pricing" className="marketing-button-primary mt-6 inline-flex">
-            View plans
+          <Link href="/access-request" className="marketing-button-primary mt-6 inline-flex">
+            Request your build
             <ArrowRight className="size-4" />
           </Link>
         </div>

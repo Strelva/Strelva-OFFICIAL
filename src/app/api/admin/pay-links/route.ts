@@ -19,7 +19,7 @@ import {
  *   curl -X POST .../api/admin/pay-links -H 'Content-Type: application/json' \
  *     -d '{"slug":"acme-coffee","clientName":"Acme Coffee","door":"build",
  *          "leadSlug":"acme-coffee","amountCents":200000}'
- * Then send the client https://strelva.com/pay/acme-coffee
+ * Then send the client https://scaffoldweb.com/pay/acme-coffee
  *
  * Pass {"overwrite": true} to replace an existing slug; without it, POST refuses
  * to clobber an existing link (409).

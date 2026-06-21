@@ -4,7 +4,7 @@ import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { ArrowLeft, ArrowRight, MailCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -172,49 +172,43 @@ export default async function SignInPage({
     );
   }
 
-  const title = "Dashboard sign-in is paused.";
-
   return (
     <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <AuthDocumentTitle title={title} />
-      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-40px)] max-w-[960px] flex-col justify-center py-16">
-        <Link
-          href="/"
-          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-        >
-          <ArrowLeft className="size-4" />
-          Strelva
-        </Link>
-
-        <section className="mt-12 overflow-hidden rounded-[28px] border border-m-rule bg-m-paper p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
-          <MailCheck className="size-9 text-m-accent" />
-          <p className="mt-6 text-[14px] font-medium text-m-text-3">
-            Temporary access handoff
-          </p>
+      <AuthDocumentTitle title="Sign in to your dashboard" />
+      <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
+        <section>
+          <Link
+            href="/"
+            className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
+          >
+            <ArrowLeft className="size-4" />
+            Strelva
+          </Link>
+          <p className="mt-12 text-[14px] font-medium text-m-text-3">Dashboard access</p>
           <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
-            {title}
+            Sign in to your dashboard.
           </h1>
-          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-m-text-2">
-            Dashboard accounts open after your website exists. If your site is
-            already live or in delivery, email Jacob and he will send the
-            current access link or next step directly.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="mailto:jacob@strelva.com?subject=Strelva%20dashboard%20access"
-              className="marketing-button-primary h-11 px-5 text-[14px]"
-            >
-              Email Jacob
-              <ArrowRight className="size-4" />
-            </a>
-            <Link
-              href="/access-request"
-              className="marketing-button-secondary h-11 px-5 text-[14px]"
-            >
+          <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
+            Use the email connected to your site to open your Strelva dashboard
+            and see what is working. No site yet?{" "}
+            <Link href="/access-request" className="text-m-text underline underline-offset-2 hover:text-m-text-2">
               Request your build
             </Link>
-          </div>
+            .
+          </p>
+        </section>
+
+        <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
+          {useSupabase ? (
+            <SupabaseSignIn next="/account" />
+          ) : (
+            <SignIn
+              routing="path"
+              path="/sign-in"
+              forceRedirectUrl="/account"
+              fallbackRedirectUrl="/account"
+            />
+          )}
         </section>
       </div>
     </main>

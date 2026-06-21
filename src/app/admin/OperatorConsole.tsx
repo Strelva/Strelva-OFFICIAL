@@ -65,7 +65,6 @@ export function OperatorConsole() {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
-    setProposals([]);
     const history = [...messages, { role: "user" as const, content: text }];
     setMessages(history);
     setBusy(true);

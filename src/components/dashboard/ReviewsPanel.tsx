@@ -37,13 +37,19 @@ function sourceLabel(source: ReviewItem["source"]): string {
 }
 
 function ReviewCard({ review }: { review: ReviewItem }) {
-  const { dashboardHref } = useDashboard();
+  const { dashboardHref, readOnly } = useDashboard();
   const [draft, setDraft] = useState<string | null>(review.reply ?? null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Locally track the saved reply so the card can flip to the locked "Your
+  // reply" state right after a save without waiting for a full page refresh.
+  const [savedReply, setSavedReply] = useState<{ reply: string; repliedAt?: string } | null>(
+    review.reply ? { reply: review.reply, repliedAt: review.repliedAt } : null,
+  );
 
-  const hasExistingReply = Boolean(review.reply);
+  const hasExistingReply = Boolean(savedReply);
 
   async function generateDraft() {
     setLoading(true);
@@ -77,6 +83,31 @@ function ReviewCard({ review }: { review: ReviewItem }) {
     }
   }
 
+  async function saveReply() {
+    if (!draft || readOnly) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(dashboardHref("/api/reviews/reply"), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId: review.id, reply: draft }),
+      });
+      if (!res.ok) throw new Error("Could not save the reply");
+      const data = (await res.json()) as { review?: ReviewItem };
+      const saved = data.review;
+      setSavedReply({
+        reply: saved?.reply ?? draft,
+        repliedAt: saved?.repliedAt,
+      });
+    } catch {
+      setError("Could not save the reply. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="rounded-xl dashboard-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -102,9 +133,9 @@ function ReviewCard({ review }: { review: ReviewItem }) {
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
             Your reply
           </p>
-          <p className="text-[13px] leading-relaxed text-warm-black">{review.reply}</p>
-          {review.repliedAt && (
-            <p className="mt-2 text-[11px] text-gray-muted">Replied {formatDate(review.repliedAt)}</p>
+          <p className="text-[13px] leading-relaxed text-warm-black">{savedReply?.reply}</p>
+          {savedReply?.repliedAt && (
+            <p className="mt-2 text-[11px] text-gray-muted">Replied {formatDate(savedReply.repliedAt)}</p>
           )}
         </div>
       ) : draft ? (
@@ -138,10 +169,30 @@ function ReviewCard({ review }: { review: ReviewItem }) {
                 </>
               )}
             </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={saveReply}
+                disabled={saving}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-glass-border bg-glass px-3 text-[12px] font-medium text-warm-black transition-colors hover:bg-gray-bg disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    Save reply
+                  </>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={generateDraft}
-              disabled={loading}
+              disabled={loading || readOnly}
               className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-glass-border bg-glass px-3 text-[12px] font-medium text-warm-black transition-colors hover:bg-gray-bg disabled:opacity-50"
             >
               <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -154,7 +205,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
           <button
             type="button"
             onClick={generateDraft}
-            disabled={loading}
+            disabled={loading || readOnly}
             className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-glass-border bg-glass px-3 text-[12px] font-medium text-warm-black transition-colors hover:bg-gray-bg disabled:opacity-50"
           >
             {loading ? (

@@ -69,7 +69,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
       <div className="bg-surface-raised border border-glass-border rounded-xl p-6 w-full max-w-sm">
         <h3 id="invite-title" className="text-lg font-medium text-warm-white mb-1">Invite to {siteName}</h3>
         <p className="text-sm text-gray-muted mb-4">
-          They&apos;ll get a tenant/admin sign-up link. Access is assigned to this exact email on signup, and the no-access page can recover it if Clerk is slow.
+          They&apos;ll get a tenant/admin sign-up link. Access is assigned to this exact email on signup, and the no-access page can recover it if access hasn&apos;t propagated yet.
         </p>
 
         {result && (

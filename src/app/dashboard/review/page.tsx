@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasTenantAccess } from "@/lib/auth";
+import { hasDashboardViewAccess } from "@/lib/auth";
 import { getEvents, getQueueCount } from "@/lib/events";
 import { getSectionTimestamps } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
@@ -14,7 +14,7 @@ import type { ContentSection } from "@/lib/types";
 
 async function QueueContent() {
   const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasTenantAccess(tenant);
+  const hasAccess = await hasDashboardViewAccess(tenant);
   if (!hasAccess) {
     const clientFallbackRoot = getClientFallbackRoot(await headers());
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));

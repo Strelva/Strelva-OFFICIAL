@@ -58,6 +58,7 @@ export function ContentWorkspace({
     triggerRefresh,
     editReceipts,
     markDraftReceipts,
+    readOnly,
   } = useDashboard();
   void timestamps;
   const [viewportMode, setViewportMode] = useState<WorkspaceViewport | null>(null);
@@ -176,6 +177,42 @@ export function ContentWorkspace({
       </div>
     </>
   );
+
+  if (readOnly) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-surface-base px-6">
+        <div className="max-w-md text-center">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
+            Read-only demo
+          </p>
+          <h2 className="mt-3 text-[20px] font-semibold tracking-[-0.02em] text-warm-white">
+            The site editor is view-only here
+          </h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
+            This is a live look at the dashboard. Editing the site, layout, and content is turned off in the demo.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/access-request"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+            >
+              Get your own site
+            </Link>
+            {siteUrl && (
+              <a
+                href={siteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-gray-border px-4 text-[13px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+              >
+                View live site
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-surface-base">
