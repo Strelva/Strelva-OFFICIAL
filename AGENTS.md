@@ -26,15 +26,15 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 
 - Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript
 - Routing/middleware lives in **`src/proxy.ts`** (Next 16 renamed `middleware.ts` to `proxy.ts`)
-- Clerk for auth (multi-host: tenant subdomains, custom client domains, admin-host fallback path)
-- Sanity CMS is the **source of truth for tenant and content data in production**; the dev-file path (`dev-tenants.json`, `dev-content-{tenant}.json`) is the local-dev fallback
-- **Upstash Redis sits in front of Sanity as a write-through cache** for `getContent` / `getPageConfig` and the tenant-config list. Operational data (events, bookings, chat, rate limits, rewards, jobs) lives directly in Redis.
+- **Supabase Auth** for auth (`auth.uid()`, Google OAuth + magic-link; see `src/lib/auth.ts`). Clerk is dead-pathed behind `isSupabaseAuthConfigured()` and pending teardown (proxy unwrap last).
+- **Supabase Postgres is the source of truth for tenant + content + operational data in production** (flipped 2026-06-20). Reads/writes go through `src/lib/db/repositories.ts` + the per-store dual-path, gated by `CONTENT_SOURCE`, `TENANTS_SOURCE`, `DATA_SOURCE` (= `postgres` in prod). Sanity is still written during the transition (reversible) but no migrated store *reads* it when the flags are on. RLS enforces tenant isolation (`supabase/migrations/*_rls.sql`); the dev-file path remains the local-dev fallback.
+- **Upstash Redis** is still the write-through cache for `getContent`/`getPageConfig`/the tenant-config list, plus ephemeral state (rate limits, locks). Operational data also dual-writes to Postgres.
 - Vercel Blob for image uploads
 - Vercel AI SDK v6 + Google Gemini for the agent
 - Stripe for billing (currently off — see "The Model" below for the two-door offer and the billing-on cliff)
 - Resend for email (weekly reports, invites)
 
-> **Migration in progress (2026-06-18):** a move of the data + auth backbone to **Supabase Postgres** has begun — see `docs/supabase-migration-plan.md`. The schema is applied (`supabase/migrations/*`) but **the live app still runs on Clerk + Sanity + Redis as described above** (nothing is wired to Supabase yet). Don't assume Postgres in code until a subsystem is explicitly migrated. RLS + the auth decision (Supabase Auth vs keep Clerk) are still open.
+> **Migration FLIPPED + live (2026-06-20):** the data + auth backbone is on Supabase Postgres in prod — auth (Supabase), content (`CONTENT_SOURCE=postgres`), tenants (`TENANTS_SOURCE=postgres`), and the operational stores (`DATA_SOURCE=postgres`) all read/write Postgres, verified live. See `docs/supabase-migration-plan.md` + `docs/post-cutover-runbook.md`. **Remaining:** `blog.ts` (superseded by the CMS collections) + `core.ts` still touch Sanity; the full Sanity + Clerk *teardown* (remove reads, lock the Sanity dataset, unwrap `clerkMiddleware` in `proxy.ts`) is the deliberate destructive end-step, not yet done. Rollback is a flag-flip + redeploy (Sanity stays current via dual-write).
 
 ## Multi-tenant architecture
 
@@ -79,10 +79,10 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 
 ## Key lib files
 
-- `src/lib/tenants.ts` — tenant config lookup (Sanity prod, dev-file local, Redis 60s cache)
+- `src/lib/tenants.ts` — tenant config lookup (Postgres `tenants` via `TENANTS_SOURCE`, Sanity fallback, Redis 60s cache); the `rowToTenant`/`tenantToRow` mapper is the 45-column spine
 - `src/lib/storage/content-cache.ts` — Redis read-through/write-through cache for the public content path
-- `src/lib/storage/content-store.ts` — Sanity/dev-file source-of-truth implementation
-- `src/lib/auth.ts` — Clerk + per-tenant roles + super-admin email allowlist
+- `src/lib/storage/content-store.ts` — Postgres `content` (via `CONTENT_SOURCE`) with Sanity/dev-file fallback; `src/lib/db/repositories.ts` + `src/lib/db/source-flags.ts` back the whole dual-path
+- `src/lib/auth.ts` — Supabase Auth (`auth.uid()`) + per-tenant roles via the `memberships` table + super-admin via `super_admins`; Clerk path dead-pathed behind the flag
 - `src/lib/site-capabilities.ts` — capability manifest builder (merged with optional remote manifest from the custom repo)
 - `src/lib/scaffold-contracts.ts` — versioned route helpers + HMAC revalidation signing/verification (legacy `REB_*` symbol aliases are still exported for back-compat)
 
