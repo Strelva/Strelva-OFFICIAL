@@ -10,6 +10,7 @@ type Fix = {
   name: string;
   message: string;
   impact?: string;
+  quantified?: string;
   priority?: "high" | "medium" | "low";
   score: number;
 };
@@ -41,6 +42,49 @@ const statusIcon: Record<CheckStatus, React.ReactNode> = {
   warn: <AlertTriangle className="h-4 w-4 text-amber-500" strokeWidth={2} />,
   fail: <XCircle className="h-4 w-4 text-red-500" strokeWidth={2} />,
 };
+
+type TrendPoint = { overallScore: number; scannedAt: string };
+
+/** Compact score-over-time band. History arrives newest-first. */
+function TrendBand({ history }: { history: TrendPoint[] }) {
+  const ordered = [...history].reverse(); // oldest -> newest for the sparkline
+  const scores = ordered.map((p) => p.overallScore);
+  const latest = scores[scores.length - 1];
+  const prev = scores[scores.length - 2];
+  const delta = latest - prev;
+  const max = Math.max(100, ...scores);
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-gray-border px-5 py-3">
+      <div className="flex items-end gap-[3px]" aria-hidden>
+        {scores.slice(-10).map((s, i) => (
+          <div
+            key={i}
+            className="w-1.5 rounded-sm"
+            style={{
+              height: `${Math.max(4, (s / max) * 28)}px`,
+              backgroundColor: barColor(s),
+              opacity: 0.45 + (0.55 * (i + 1)) / Math.min(10, scores.length),
+            }}
+          />
+        ))}
+      </div>
+      <p className="text-[12px] text-gray-muted">
+        {delta === 0 ? (
+          "No change since last check"
+        ) : (
+          <>
+            <span className={delta > 0 ? "font-medium text-green-600" : "font-medium text-red-500"}>
+              {delta > 0 ? "+" : ""}
+              {delta}
+            </span>{" "}
+            since last check
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
 
 export function SiteHealthCard() {
   const { dashboardHref } = useDashboard();
@@ -81,6 +125,21 @@ export function SiteHealthCard() {
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  // Weekly history for the trend line (filled by the Sunday cron over time).
+  const [history, setHistory] = useState<TrendPoint[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch(dashboardHref("/api/dashboard/site-audit/history"), { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (active && Array.isArray(d?.history)) setHistory(d.history);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [dashboardHref]);
 
   if (state === "loading") {
     return (
@@ -161,6 +220,9 @@ export function SiteHealthCard() {
         </button>
       </div>
 
+      {/* Weekly trend */}
+      {history.length >= 2 && <TrendBand history={history} />}
+
       {/* Top fixes */}
       {audit.topFixes.length > 0 && (
         <div className="border-b border-gray-border px-5 py-4">
@@ -170,9 +232,15 @@ export function SiteHealthCard() {
               <li key={`${fix.category}-${fix.name}`} className="rounded-lg bg-gray-bg/50 px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[13px] font-medium text-warm-black">{fix.name}</span>
-                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-gray-muted">
-                    {fix.category}
-                  </span>
+                  {fix.quantified ? (
+                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-warm-black">
+                      {fix.quantified}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-gray-muted">
+                      {fix.category}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-[12px] leading-snug text-gray-muted">
                   {fix.impact || fix.message}

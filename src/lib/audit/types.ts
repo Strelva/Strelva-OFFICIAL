@@ -9,6 +9,9 @@ export interface CheckResult {
   /** Plain-English "what this costs you" line (from the impact narrative).
    *  Populated for failing/warning checks; omitted when passing or n/a. */
   impact?: string;
+  /** Quantified loss estimate, e.g. "~$300/mo" or "~12 customers/mo". Derived
+   *  from default per-business metrics (no client analytics needed). */
+  quantified?: string;
   /** Fix priority for the action list. Derived from status + weight. */
   priority?: "high" | "medium" | "low";
 }

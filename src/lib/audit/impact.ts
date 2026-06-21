@@ -74,6 +74,125 @@ function impactLineFor(categorySlug: string, checkName: string): string | undefi
   return CATEGORY_IMPACT[categorySlug];
 }
 
+// ---------------------------------------------------------------------------
+// Quantified loss estimate ("~$Y/mo" / "~X customers/mo")
+//
+// Ported from OWSH Systems' `getQuantifiedImpact` + `DEFAULT_METRICS`.
+// OWSH had four per-business-type metric sets (physical/digital/sab/hybrid).
+// Strelva's free audit has NO vertical and NO client analytics, so we collapse
+// those into ONE generic, deliberately conservative local-business profile:
+//
+//   GENERIC_METRICS = {
+//     monthlyVisitors: 500   // small-local-site baseline (OWSH physical=500,
+//                            //   sab=300, hybrid=1000; 500 is the mid-low pick,
+//                            //   chosen low so we never overstate)
+//     conversionRate:  0.03  // 3% visitor->customer (OWSH physical default)
+//     orderValue:      75    // avg order/job value in USD (between OWSH
+//                            //   physical $50 and sab $200; a safe mid-low)
+//   }
+//
+// Baseline monthly value at stake = 500 * 0.03 * $75 = ~$1,125/mo of revenue
+// that the site is responsible for. Each estimate below takes a research-backed
+// fraction of that (or of raw traffic) as the loss a specific issue causes.
+//
+// These numbers are SHOWN TO BUSINESS OWNERS. Every line is prefixed "~",
+// every multiplier is conservative, and we only emit a figure where a dollar/
+// customer estimate is genuinely credible. Anything speculative returns
+// undefined (no quantified line) so we never invent precision we don't have.
+// ---------------------------------------------------------------------------
+const GENERIC_METRICS = {
+  monthlyVisitors: 500,
+  conversionRate: 0.03,
+  orderValue: 75,
+} as const;
+
+const usd = (n: number) => `~$${Math.round(n).toLocaleString()}/mo`;
+const customers = (n: number) =>
+  `~${Math.max(1, Math.round(n))} ${Math.round(n) === 1 ? "customer" : "customers"}/mo`;
+
+// Keyword (matched against the check name) -> a function producing the
+// quantified string. First match wins, so order most-specific first. Only
+// issue types where a dollar/customer figure is credible appear here.
+const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
+  // Performance / load: ~35% of visitors abandon a slow page (conservative,
+  // vs the often-cited 53% at 3s+). Lost = visitors * 0.35 * conversion.
+  [
+    /lcp|contentful paint|performance|load|speed|slow/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.35 * GENERIC_METRICS.conversionRate;
+      return `${customers(lost)} lost to slow load (estimated)`;
+    },
+  ],
+  // Layout instability: ~40% leave after a jarring experience; only a slice of
+  // those would have converted, so apply at half the abandonment weight.
+  [
+    /cls|layout shift/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.4 * 0.5 * GENERIC_METRICS.conversionRate;
+      return `${usd(lost * GENERIC_METRICS.orderValue)} estimated`;
+    },
+  ],
+  // Mobile: ~60% of local searches are mobile; a poor mobile UX loses a
+  // fraction (0.3) of those would-be customers.
+  [
+    /mobile|viewport|tap target|font size/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.6 * 0.3 * GENERIC_METRICS.conversionRate;
+      return `${customers(lost)} on mobile (estimated)`;
+    },
+  ],
+  // HTTPS / Not Secure: 85% won't submit info on a flagged page; apply to the
+  // ~20% of visitors who would have taken a form/contact action.
+  [
+    /https|ssl|not secure|mixed content/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.85 * 0.2 * GENERIC_METRICS.conversionRate;
+      return `${customers(lost)} who won't submit info (estimated)`;
+    },
+  ],
+  // Schema / AI-readiness / structured data: ~30% of searches now involve AI
+  // assistants; without machine-readable signals AI can't recommend you. Apply
+  // at half weight (this is the emerging, not yet dominant, channel).
+  [
+    /structured data|business schema|schema|llms\.txt|ai readiness|ai[- ]?ready|ai[- ]?answer|discoverab/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.3 * 0.5 * GENERIC_METRICS.conversionRate;
+      return `${customers(lost)} via AI search (estimated)`;
+    },
+  ],
+  // Crawl-blocked / not indexed: 92% of search traffic goes to page 1. If
+  // crawlers are blocked you forfeit organic discovery; apply at half weight.
+  [
+    /robots|crawler|blocked|index/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.92 * 0.5 * GENERIC_METRICS.conversionRate;
+      return `${usd(lost * GENERIC_METRICS.orderValue)} estimated`;
+    },
+  ],
+  // Trust / reviews / testimonials / conversion CTA: visible proof and a clear
+  // next step are what convert. Missing them costs a conservative ~20% of the
+  // converting visitors.
+  [
+    /testimonial|review|trust|badge|credential|cta|call to action|contact|phone|click[- ]?to[- ]?call/i,
+    () => {
+      const lost = GENERIC_METRICS.monthlyVisitors * 0.2 * GENERIC_METRICS.conversionRate;
+      return `${usd(lost * GENERIC_METRICS.orderValue)} in conversions (estimated)`;
+    },
+  ],
+];
+
+/**
+ * A conservative dollar/customer loss estimate for a check, or undefined when
+ * no credible figure exists. Uses GENERIC_METRICS only (no client analytics).
+ * Only failing/warning checks should be passed in; the caller guards status.
+ */
+function quantifiedFor(checkName: string): string | undefined {
+  for (const [re, fn] of CHECK_QUANTIFIED) {
+    if (re.test(checkName)) return fn();
+  }
+  return undefined;
+}
+
 /** Fix priority from a check's status + how heavily its category counts. */
 function priorityFor(status: CheckResult["status"], categoryWeight: number): CheckResult["priority"] {
   if (status === "pass") return undefined;
@@ -93,6 +212,7 @@ export function attachImpact(category: CategoryResult): CategoryResult {
     // real findings, so they get no "what this costs you" line or priority.
     if (/not measured|not configured|coming soon/i.test(check.message)) continue;
     if (!check.impact) check.impact = impactLineFor(category.slug, check.name);
+    if (!check.quantified) check.quantified = quantifiedFor(check.name);
     check.priority = priorityFor(check.status, category.weight);
   }
   return category;
@@ -106,7 +226,7 @@ export function attachImpact(category: CategoryResult): CategoryResult {
 export function topFixes(
   categories: CategoryResult[],
   limit = 5
-): Array<{ category: string; name: string; message: string; impact?: string; priority: CheckResult["priority"]; score: number }> {
+): Array<{ category: string; name: string; message: string; impact?: string; quantified?: string; priority: CheckResult["priority"]; score: number }> {
   const rank = { high: 0, medium: 1, low: 2, undefined: 3 } as const;
   const fixes = categories.flatMap((cat) =>
     cat.checks
@@ -116,6 +236,7 @@ export function topFixes(
         name: c.name,
         message: c.message,
         impact: c.impact,
+        quantified: c.quantified,
         priority: c.priority,
         score: c.score,
       }))

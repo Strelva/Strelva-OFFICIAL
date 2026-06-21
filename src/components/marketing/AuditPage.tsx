@@ -16,6 +16,7 @@ import {
   Lock,
   Accessibility,
   Loader2,
+  Download,
 } from "lucide-react";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
 import { topFixes } from "@/lib/audit/impact";
@@ -145,6 +146,7 @@ export function AuditPage() {
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState("");
   const [progressStep, setProgressStep] = useState(0);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const progressSteps = [
     "Connecting to site...",
@@ -219,6 +221,37 @@ export function AuditPage() {
     setResult(null);
     setError("");
     setUrl("");
+  }
+
+  // POST the current result to the report renderer and open the returned HTML
+  // in a new tab so the user can print/save it as a PDF. Uses a blob URL so the
+  // document is fully self-contained and never blocked by popup heuristics tied
+  // to async document.write.
+  async function handleDownloadReport() {
+    if (!result || reportLoading) return;
+    setReportLoading(true);
+    try {
+      const res = await fetch("/api/audit/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+      if (!res.ok) throw new Error(`Report failed (${res.status})`);
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        // Popup blocked — fall back to a same-tab navigation.
+        window.location.href = blobUrl;
+      }
+      // Revoke after the new tab has had time to load the document.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      setError("Could not generate the report. Please try again.");
+    } finally {
+      setReportLoading(false);
+    }
   }
 
   return (
@@ -391,9 +424,15 @@ export function AuditPage() {
                           <p className="text-[13px] font-medium text-m-text">
                             {fix.name}
                           </p>
-                          <span className="shrink-0 text-[11px] uppercase tracking-wide text-m-text-3">
-                            {fix.category}
-                          </span>
+                          {fix.quantified ? (
+                            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-m-text">
+                              {fix.quantified}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[11px] uppercase tracking-wide text-m-text-3">
+                              {fix.category}
+                            </span>
+                          )}
                         </div>
                         {fix.impact && (
                           <p className="mt-1 text-[12px] leading-snug text-m-accent">
@@ -432,6 +471,19 @@ export function AuditPage() {
                   Request your build
                   <ArrowRight className="size-4" />
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  disabled={reportLoading}
+                  className="marketing-button-secondary h-12 px-6 disabled:opacity-60"
+                >
+                  {reportLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  {reportLoading ? "Preparing..." : "Save as PDF"}
+                </button>
                 <button
                   type="button"
                   onClick={handleReset}

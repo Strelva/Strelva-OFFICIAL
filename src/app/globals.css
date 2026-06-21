@@ -1969,3 +1969,46 @@ a[href*="booking"]:active, a[href*="services#booking"]:active,
 .cta-primary:active {
   transform: scale(0.98);
 }
+
+/* ===== BLOG / GUIDE ARTICLE BODY (rendered from trusted bodyHtml) ===== */
+.guide-body h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--m-text);
+  margin: 2rem 0 0.75rem;
+}
+.guide-body h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--m-text);
+  margin: 1.5rem 0 0.5rem;
+}
+.guide-body p {
+  margin: 0 0 1rem;
+}
+.guide-body ul,
+.guide-body ol {
+  margin: 0 0 1rem 1.25rem;
+  padding: 0;
+}
+.guide-body ul { list-style: disc; }
+.guide-body ol { list-style: decimal; }
+.guide-body li {
+  margin: 0 0 0.4rem;
+  padding-left: 0.25rem;
+}
+.guide-body strong { color: var(--m-text); font-weight: 600; }
+.guide-body a {
+  color: var(--m-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.guide-body a:hover { color: var(--m-text); }
+.guide-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background: var(--m-panel-strong);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
