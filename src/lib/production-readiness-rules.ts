@@ -134,6 +134,11 @@ const productionEnvValidators: Record<string, (value: string) => string | null> 
   NEXT_PUBLIC_CLERK_SIGN_IN_URL: mustEqual("/sign-in"),
   NEXT_PUBLIC_CLERK_SIGN_UP_URL: mustEqual("/sign-up"),
   SUPER_ADMIN_EMAILS: mustBeEmailList,
+  // Supabase is the live auth + data backbone (post-cutover). Validate it.
+  NEXT_PUBLIC_SUPABASE_URL: mustBeHttps,
+  SUPABASE_SERVICE_ROLE_KEY: mustBeAtLeastLength(20),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: mustBeAtLeastLength(20),
+  CONTENT_SOURCE: mustEqual("postgres"),
   GOOGLE_GENERATIVE_AI_API_KEY: mustStartWith("AIza"),
   NEXT_PUBLIC_SANITY_PROJECT_ID: mustMatch(/^[a-z0-9]+$/, "Must be a Sanity project id for production launch"),
   SANITY_API_TOKEN: mustBeAtLeastLength(20),

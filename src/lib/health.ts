@@ -6,6 +6,7 @@
 
 import { getRedis } from "./redis";
 import { getSanityClient } from "./sanity";
+import { getSupabase } from "./db/client";
 
 const APP_VERSION = process.env.APP_VERSION || "0.1.0";
 const TIMEOUT_MS = 3_000;
@@ -23,6 +24,7 @@ export interface HealthReport {
   timestamp: string;
   checks: {
     redis: ServiceCheck;
+    supabase: ServiceCheck;
     sanity: ServiceCheck;
     clerk: ServiceCheck;
     stripe: ServiceCheck;
@@ -57,6 +59,25 @@ async function checkSanity(): Promise<ServiceCheck> {
     return { status: "ok", responseMs: ms };
   } catch (err) {
     console.error("[health] Sanity check failed:", err instanceof Error ? err.message : err);
+    return { status: "error", responseMs: TIMEOUT_MS };
+  }
+}
+
+async function checkSupabase(): Promise<ServiceCheck> {
+  const db = getSupabase();
+  if (!db) return { status: "not configured", responseMs: 0 };
+  try {
+    const { ms } = await timed(async () => {
+      const { error } = await withTimeout(
+        Promise.resolve(db.from("tenants").select("id").limit(1)),
+        TIMEOUT_MS,
+        "Supabase"
+      );
+      if (error) throw error;
+    });
+    return { status: "ok", responseMs: ms };
+  } catch (err) {
+    console.error("[health] Supabase check failed:", err instanceof Error ? err.message : err);
     return { status: "error", responseMs: TIMEOUT_MS };
   }
 }
@@ -137,18 +158,21 @@ async function checkGemini(): Promise<ServiceCheck> {
 
 /** Run all dependency checks and roll up an overall status. */
 export async function getServiceHealth(): Promise<HealthReport> {
-  const [sanity, redis, clerk, stripe, gemini] = await Promise.all([
+  const [sanity, supabase, redis, clerk, stripe, gemini] = await Promise.all([
     checkSanity(),
+    checkSupabase(),
     checkRedis(),
     checkClerk(),
     checkStripe(),
     checkGemini(),
   ]);
 
-  const checks = { redis, sanity, clerk, stripe, gemini };
-  // "down" if a core service (redis or sanity) is failing; "degraded" if any
-  // other check errors; else "healthy" (not-configured counts as healthy).
-  const coreDown = redis.status === "error" || sanity.status === "error";
+  const checks = { redis, supabase, sanity, clerk, stripe, gemini };
+  // Core = the live backbone (Redis + Supabase/Postgres). Sanity and Clerk are
+  // being decommissioned, so their errors are "degraded", not "down" — otherwise
+  // pulling those keys would falsely page the platform as down. not-configured
+  // counts as healthy.
+  const coreDown = redis.status === "error" || supabase.status === "error";
   const anyError = Object.values(checks).some((c) => c.status === "error");
   const status: HealthReport["status"] = coreDown ? "down" : anyError ? "degraded" : "healthy";
 
