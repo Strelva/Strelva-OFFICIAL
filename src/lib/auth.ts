@@ -569,6 +569,20 @@ export async function hasTenantAccess(tenant: string): Promise<boolean> {
   return getRoleForTenantFromMetadata(user.publicMetadata, tenant) !== null;
 }
 
+/** The public, read-only showcase tenant. It renders without a session so
+ *  prospects can tour the product. It must NEVER gain write access — keep this
+ *  out of `hasTenantAccess` (which guards write APIs via requireTenantAccess). */
+export function isPublicDemoTenant(tenant: string): boolean {
+  return tenant === "demo";
+}
+
+/** View gate for dashboard PAGES (read-only render): real tenant access OR the
+ *  public demo. Write APIs must keep using `hasTenantAccess`, never this. */
+export async function hasDashboardViewAccess(tenant: string): Promise<boolean> {
+  if (isPublicDemoTenant(tenant)) return true;
+  return hasTenantAccess(tenant);
+}
+
 export async function getTenantRole(tenant: string): Promise<ClientRole | "super_admin" | null> {
   if (isDevAccessBypassEnabled()) return "super_admin";
   if (await isSuperAdmin()) return "super_admin";

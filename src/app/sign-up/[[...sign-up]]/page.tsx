@@ -4,7 +4,7 @@ import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { ArrowLeft, ArrowRight, MailCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -101,9 +101,9 @@ export default async function SignUpPage({
               Create access for {invite.siteName}.
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Use <strong>{invite.email}</strong> to connect this account to
-              the dashboard Jacob prepared. After signup, Strelva will
-              open the site dashboard automatically.
+              Sign in with <strong>{invite.email}</strong> — the email your
+              invite was sent to. Strelva opens your site dashboard
+              automatically.
             </p>
           </section>
 
@@ -151,8 +151,8 @@ export default async function SignUpPage({
               Create access for {tenantAuth.siteName}.
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Use the email Jacob connected to this site. After signup,
-              Strelva will open the dashboard for {tenantAuth.siteName}.
+              Sign in with the email your invite was sent to. Strelva opens
+              the dashboard for {tenantAuth.siteName}.
             </p>
           </section>
 
@@ -174,7 +174,7 @@ export default async function SignUpPage({
     );
   }
 
-  const title = "Dashboard signup is paused.";
+  const title = "Dashboard access is invite-only.";
 
   return (
     <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
@@ -189,17 +189,16 @@ export default async function SignUpPage({
         </Link>
 
         <section className="mt-12 overflow-hidden rounded-[28px] border border-m-rule bg-m-paper p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
-          <MailCheck className="size-9 text-m-accent" />
-          <p className="mt-6 text-[14px] font-medium text-m-text-3">
-            Build requests stay email-first
+          <p className="text-[14px] font-medium text-m-text-3">
+            Dashboards are created from your build
           </p>
           <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
             {title}
           </h1>
           <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-m-text-2">
-            We only create dashboard access once there is a website to manage.
-            Request your build first, and we will email your delivery-status
-            link after the request is received.
+            Your dashboard opens when your site does. Already have access? Sign
+            in with the email connected to your site. No site yet? Request your
+            build and we will get you set up.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -210,12 +209,12 @@ export default async function SignUpPage({
               Request your build
               <ArrowRight className="size-4" />
             </Link>
-            <a
-              href="mailto:jacob@strelva.com?subject=Strelva%20signup"
+            <Link
+              href="/sign-in"
               className="marketing-button-secondary h-11 px-5 text-[14px]"
             >
-              Email Jacob
-            </a>
+              Sign in
+            </Link>
           </div>
         </section>
       </div>

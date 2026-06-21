@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, LayoutPanelLeft, MessageCircle, Link2, BarChart3, Star, CheckCircle2, FileText } from "lucide-react";
+import { House, LayoutPanelLeft, MessageCircle, Link2, BarChart3, Star, FileText } from "lucide-react";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useDashboard } from "./DashboardContext";
 
@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { href: "/dashboard/collections", label: "Content", icon: FileText },
   { href: "/dashboard/reviews", label: "Reviews", icon: Star },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/review", label: "Review", icon: CheckCircle2 },
 ];
 
 export function MobileNav() {

@@ -107,6 +107,11 @@ interface DashboardContextValue {
 
   // Super-admin visibility
   impersonation: ImpersonationContext;
+
+  // Read-only mode: the public demo (and any other non-editable context like a
+  // suspended tenant). Write controls disable themselves; the API layer is the
+  // real backstop (a no-session demo viewer 401s on every mutation regardless).
+  readOnly: boolean;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -144,6 +149,7 @@ export function DashboardProvider({
   hasStripeCustomer = false,
   planOverride = null,
   impersonation,
+  readOnly = false,
 }: {
   children: ReactNode;
   tenantId?: string;
@@ -157,6 +163,7 @@ export function DashboardProvider({
   hasStripeCustomer?: boolean;
   planOverride?: PlanOverride;
   impersonation?: ImpersonationContext;
+  readOnly?: boolean;
 }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
@@ -339,6 +346,7 @@ export function DashboardProvider({
         hasStripeCustomer,
         planOverride,
         impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
+        readOnly,
       }}
     >
       {children}

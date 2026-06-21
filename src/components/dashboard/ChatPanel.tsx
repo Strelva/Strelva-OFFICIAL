@@ -184,6 +184,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const shouldStickToBottomRef = useRef(true);
 
   const dashCtx = useDashboardOptional();
+  const readOnly = dashCtx?.readOnly ?? false;
   const contextDashboardHref = dashCtx?.dashboardHref;
   const dashboardHref = useCallback(
     (path: string) => contextDashboardHref?.(path) ?? path,
@@ -852,6 +853,20 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       {/* Chat input - always at bottom, with safe area for notched devices */}
       <div className={`${variant === "compact" ? "px-3 pb-3 pt-2" : "px-4 sm:px-6 pb-4 sm:pb-6 pt-3"} shrink-0 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe`}>
         <div className="max-w-3xl mx-auto">
+          {readOnly ? (
+            <div className="rounded-2xl border border-glass-border bg-glass px-4 py-3 text-center">
+              <p className="text-[12px] leading-relaxed text-gray-muted">
+                This is a read-only demo.{" "}
+                <Link
+                  href="/access-request"
+                  className="font-medium text-accent hover:underline"
+                >
+                  Get your own site to chat with your AI
+                </Link>
+              </p>
+            </div>
+          ) : (
+          <>
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((file) => (
@@ -880,6 +895,8 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           <p className={`${variant === "compact" ? "hidden" : ""} text-[11px] text-gray-subtle text-center mt-2`}>
             Update your site, write content, check analytics
           </p>
+          </>
+          )}
         </div>
       </div>
       {needsYou && variant !== "compact" && needsDrawerOpen && (

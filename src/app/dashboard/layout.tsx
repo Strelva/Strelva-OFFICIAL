@@ -46,6 +46,19 @@ export default async function DashboardLayout({
   }
   const actor = await getActorContext(tenant);
   const tenantConfig = await getTenantConfig(tenant);
+
+  // Suspended site: an inactive (non-demo) tenant shows a hold state to its
+  // members instead of a half-working dashboard. Super-admins and the dev
+  // bypass still get in to fix it; the demo tenant is intentionally inactive
+  // and already renders read-only via isDemo above.
+  if (
+    tenantConfig?.active === false &&
+    !isDemo &&
+    !devAccessBypass &&
+    !actor.isSuperAdmin
+  ) {
+    return <TenantSuspended siteName={tenantConfig.siteName || tenant} />;
+  }
   const domainMapSiteUrl = getTenantPublicUrlFromDomainMap(tenant);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
@@ -110,6 +123,7 @@ export default async function DashboardLayout({
         actorEmail: actor.email,
         tenantId: tenant,
       }}
+      readOnly={isDemo}
     >
       <CapabilityProvider>
         <a
@@ -120,7 +134,7 @@ export default async function DashboardLayout({
         </a>
         {isDemo && (
           <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
-            <span className="font-medium">You&apos;re viewing a live demo.</span>
+            <span className="font-medium">You&apos;re viewing a read-only live demo &mdash; editing is off.</span>
             <a href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
               Get your own site &rarr;
             </a>
@@ -137,5 +151,27 @@ export default async function DashboardLayout({
         </ConversationLayoutClient>
       </CapabilityProvider>
     </DashboardProvider>
+  );
+}
+
+function TenantSuspended({ siteName }: { siteName: string }) {
+  return (
+    <main className="marketing-root flex min-h-dvh items-center justify-center px-6">
+      <div className="max-w-md text-center">
+        <h1 className="text-[24px] font-medium tracking-[-0.02em] text-m-text">
+          {siteName} is paused
+        </h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-m-text-2">
+          This dashboard is on hold. Your site and data are safe. Reach out and
+          we will get it switched back on.
+        </p>
+        <a
+          href="mailto:hello@strelva.com?subject=Dashboard%20access"
+          className="marketing-button-primary mt-6 inline-flex h-11 px-5 text-[14px]"
+        >
+          Contact Strelva
+        </a>
+      </div>
+    </main>
   );
 }

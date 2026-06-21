@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Check, LayoutTemplate, Palette, Send, Wrench } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -17,7 +18,7 @@ const REQUEST_KIND_OPTIONS: Array<{
 ];
 
 export function CustomChangeRequestPanel() {
-  const { selectedNode, activeSection, activePage, dashboardHref } = useDashboard();
+  const { selectedNode, activeSection, activePage, dashboardHref, readOnly } = useDashboard();
   const [prompt, setPrompt] = useState("");
   const [requestKind, setRequestKind] = useState<RequestKind>("custom_design");
   const [submitting, setSubmitting] = useState(false);
@@ -159,15 +160,24 @@ export function CustomChangeRequestPanel() {
       </div>
 
       <div className="border-t border-gray-border p-4">
-        <button
-          type="button"
-          onClick={submitRequest}
-          disabled={submitting || !prompt.trim()}
-          className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
-          {submitting ? "Sending..." : "Send request"}
-        </button>
+        {readOnly ? (
+          <p className="text-center text-[12px] leading-relaxed text-gray-muted">
+            This is a read-only demo.{" "}
+            <Link href="/access-request" className="font-medium text-accent hover:underline">
+              Get your own site to send requests
+            </Link>
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={submitRequest}
+            disabled={submitting || !prompt.trim()}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
+            {submitting ? "Sending..." : "Send request"}
+          </button>
+        )}
       </div>
     </div>
   );

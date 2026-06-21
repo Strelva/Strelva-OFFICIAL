@@ -13,8 +13,8 @@ test("admin operator surfaces show client readiness and draft review paths", asy
   await expect(page.getByRole("heading", { name: "Client Overview" })).toBeVisible();
   await expect(page.getByText(/active clients across your portfolio/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Controlled platform launch proof loop" })).toBeVisible();
-  await expect(page.getByText(/Owner AI: (used|missing)/)).toHaveCount(2);
-  await expect(page.getByText(/Weekly proof: (ready|pending)/)).toHaveCount(2);
+  await expect(page.getByText("Launch command center")).toBeVisible();
+  await expect(page.getByText(/custom-repo delivery, trustworthy AI action receipts/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /New Client/i })).toBeVisible();
   await expect(page.getByRole("button", { name: "Invite" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Dashboard" }).first()).toBeVisible();
