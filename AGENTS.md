@@ -76,6 +76,7 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 - Pay links: `src/lib/pay-links.ts` + `/pay/[slug]` + super-admin `POST/GET /api/admin/pay-links` — per-client payment-before-work links (Redis `reb:paylink:*`). Submitted amounts are **whole dollars** (number or string) on the public API. `/pay/rohlax` is a grandfathered one-off (her deal is one-time, "no monthly fees ever" — never use it as the template).
 - Build payments: the Stripe webhook records every completed `mode:"payment"` session as a durable no-TTL `reb:build-payment:{sessionId}` record + Slack ping (tenant events alone prune at 90 days).
 - One-active-request gate: `getOpenChangeRequest` in `src/lib/events.ts` — one open custom change request per tenant, enforced on both the dashboard route (409) and the agent's `request_custom_change` tool; offboarding handoff requests are excluded by `metadata.kind`.
+- Site health / audit: `src/lib/scan.ts` (`scanTenant`/`scanAllTenants`) wraps the audit engine (`src/lib/audit/checks.ts` `runAudit`) and is the ONLY writer to `scan-store` (`src/lib/scan-store.ts`, Redis) — the single source of truth for per-tenant health + history. The daily `portfolio-scan` cron (`0 5 * * *`) populates every tenant; the client `/dashboard/health` and the admin overview grade/score/sparkline read the SAME store. **Do NOT add a parallel audit-history store or cron** — a duplicate was built and removed; all health work goes through `scan.ts`/`scan-store`. Public free tool at `/audit` (rate-limited); sendable one-pager via `src/lib/audit/html.ts` + `/api/audit/report`. Full: `docs/audit-page.md`.
 
 ## Key lib files
 
@@ -85,6 +86,8 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 - `src/lib/auth.ts` — Supabase Auth (`auth.uid()`) + per-tenant roles via the `memberships` table + super-admin via `super_admins`; Clerk path dead-pathed behind the flag
 - `src/lib/site-capabilities.ts` — capability manifest builder (merged with optional remote manifest from the custom repo)
 - `src/lib/scaffold-contracts.ts` — versioned route helpers + HMAC revalidation signing/verification (legacy `REB_*` symbol aliases are still exported for back-compat)
+- `src/lib/audit/*` — the site-health audit engine: `checks.ts` (`runAudit`), `context.ts` (one-fetch `AuditContext`), `modules/*` (6 checks ported + fidelity-reviewed from the archived OWSH Systems product: ai-readability/seo-foundations/security/accessibility/trust/content), `impact.ts` ("what this costs you" + dollar-quantified narrative + `topFixes`), `scoring.ts`. Always consumed via `src/lib/scan.ts` -> `src/lib/scan-store.ts` (see Operational systems).
+- `src/lib/guides.ts` + `src/content/guides/batch-*.ts` — the `/guides` SEO blog (articles repurposed from the OWSH fix guides; each `fixesSlug` links an article to the audit category it addresses)
 
 ---
 
