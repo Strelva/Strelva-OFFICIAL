@@ -1,8 +1,8 @@
 # Post-cutover cleanup runbook
 
-**Status:** prod cut over to Supabase Auth + Postgres content (2026-06-20). This is the operational runbook for the remaining cleanup. Strategy/history lives in [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback steps: [rollback.md](./rollback.md).
+**Status (updated 2026-06-20):** migration **FLIPPED + LIVE**. Auth=Supabase, and `CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod — every store + the tenant spine read/write Postgres, verified live (health ok, real content/tenant resolution, full prod e2e green). What's left is the **destructive teardown** (see bottom): residual Sanity reads in `blog.ts`/`core.ts`, locking the Sanity dataset, and unwrapping `clerkMiddleware` in `proxy.ts`. Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback: [rollback.md](./rollback.md).
 
-The governing rule: every load-bearing change is flag-gated so rollback is a flag flip in Vercel env, never a redeploy-revert. Do the additive work now, gate the destructive work on a 2-3 day soak.
+The governing rule: every load-bearing change is flag-gated so rollback is a flag flip in Vercel env (+ redeploy), never a code revert. The migration phases below are now DONE through the flip; the teardown is the remaining careful step.
 
 ## Flag reference (and exact rollback)
 
