@@ -22,6 +22,11 @@ export interface CategoryResult {
   weight: number;
   score: number; // 0-100
   checks: CheckResult[];
+  /** Cross-links to `/guides` articles that fix this category, set by the
+   *  server-only runner when the category needs improvement. Plain inline type
+   *  on purpose: NEVER import from guides.ts here (that would bundle all guide
+   *  HTML into any client component that imports this types module). */
+  guides?: { slug: string; title: string }[];
 }
 
 export type LetterGrade = "A" | "B" | "C" | "D" | "F";
