@@ -43,6 +43,7 @@ const isPublicRoute = createRouteMatcher([
   "/onboard(.*)",
   "/api/access-request/(.*)",
   "/api/ai-visibility",
+  "/api/audit/(.*)",
   "/api/onboard/(.*)",
   "/api/pay/(.*)",
   "/api/health",
