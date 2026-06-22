@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getBlogPosts } from "@/lib/blog";
+import { getBlogPostsForSite } from "@/lib/cms/blog-public";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
@@ -28,7 +28,7 @@ export default async function BlogPage() {
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
   // In preview mode, show all posts including drafts; in production, only published
-  const posts = await getBlogPosts(tenant, preview ? {} : { status: "published" });
+  const posts = await getBlogPostsForSite(tenant, preview ? {} : { status: "published" });
   const settings = await getContent("settings", tenant, preview ? { preview: true } : undefined);
 
   if (posts.length === 0) {

@@ -56,6 +56,23 @@ export function getGuide(slug: string): GuideArticle | null {
   return guides.find((g) => g.slug === slug) ?? null;
 }
 
+/**
+ * Guide cross-links for an audit category, for the audit -> guide funnel.
+ * Returns guides whose `fixesSlug` matches the audit category slug, mapped to
+ * a light `{ slug, title }` shape (NO `bodyHtml`) so callers can pass these
+ * across the server/client boundary without bundling guide content.
+ * SERVER-ONLY callers only (this module imports the full guide HTML).
+ */
+export function guideRefsForCategory(
+  auditSlug: string,
+  limit = 2
+): { slug: string; title: string }[] {
+  return guides
+    .filter((g) => g.fixesSlug === auditSlug)
+    .slice(0, limit)
+    .map((g) => ({ slug: g.slug, title: g.title }));
+}
+
 /** Categories present, each with its guides, for the index page grouping. */
 export function guidesByCategory(): Array<{ category: string; items: GuideArticle[] }> {
   const map = new Map<string, GuideArticle[]>();

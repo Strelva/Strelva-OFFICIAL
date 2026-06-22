@@ -150,6 +150,7 @@ A marketing/SEO article library that funnels readers into the audit:
 - Each `GuideArticle` has a slug, title, excerpt, category, difficulty, reading time, pre-sanitized `bodyHtml`, optional `faq` (rendered as a FAQ section + FAQPage structured data), and an optional `fixesSlug` the audit category slug this guide helps fix.
 - Routes: `src/app/(marketing)/guides/page.tsx` (index, grouped by category) and `src/app/(marketing)/guides/[slug]/page.tsx` (article, with an inline "Run a free audit" CTA).
 - Purpose: these are repurposed from the OWSH Systems fix guides. Strelva manages and fixes client sites itself, so they are NOT a client self-serve deliverable. They exist to rank for the problems the free audit surfaces and route readers into `/audit`. `fixesSlug` is the cross-link back to the audit category.
+- `fixesSlug` is WIRED (not just declared): the server-only `runAudit` (`src/lib/audit/checks.ts`) calls `guideRefsForCategory(cat.slug)` from `src/lib/guides.ts` for every category scoring under 80 and stores the matching `{ slug, title }` refs on `CategoryResult.guides`. `topFixes` (`src/lib/audit/impact.ts`) carries that field onto each fix, and the client UIs (`AuditPage`, `SiteHealthCard`) render "Fix it: <title>" links to `/guides/[slug]`. Bundle rule: only server-only modules import `guides.ts`; the `{ slug, title }` shape is intentionally light so no guide `bodyHtml` crosses to the browser — never import `@/lib/guides` from a client component or from `impact.ts`.
 
 ---
 

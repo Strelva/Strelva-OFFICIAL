@@ -1,7 +1,7 @@
 import { addSuggestion } from "./suggestions";
 import { getReviews } from "./reviews";
 import { getOwnerRetentionSignals } from "./retention";
-import { getBlogPosts } from "./blog";
+import { getBlogPostsForSite } from "./cms/blog-public";
 
 const STALE_SITE_DAYS = 21;
 
@@ -55,7 +55,7 @@ async function suggestStaleSite(tenant: string): Promise<void> {
 }
 
 async function suggestFirstPost(tenant: string): Promise<void> {
-  const posts = await getBlogPosts(tenant, { limit: 1 });
+  const posts = await getBlogPostsForSite(tenant, { limit: 1 });
   if (posts.length > 0) return;
 
   await addSuggestion({

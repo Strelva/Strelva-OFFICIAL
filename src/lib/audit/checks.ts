@@ -4,6 +4,7 @@ import type { AuditContext } from "./context";
 import type { CategoryResult, CheckResult, PageSpeedResult } from "./types";
 import { averageCheckScores } from "./scoring";
 import { attachImpact } from "./impact";
+import { guideRefsForCategory } from "@/lib/guides";
 import { checkAiReadability } from "./modules/ai-readability";
 import { checkSeoFoundations } from "./modules/seo-foundations";
 import { checkSecurity } from "./modules/security";
@@ -383,6 +384,15 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
 
   // Attach the "what this costs you" narrative + fix priority to every finding.
   for (const cat of categories) attachImpact(cat);
+
+  // Cross-link weak categories (needs improvement) to the `/guides` articles
+  // that fix them. Server-only: guideRefsForCategory returns a light
+  // {slug,title} shape, so no guide HTML crosses to the client.
+  for (const cat of categories) {
+    if (cat.score >= 80) continue;
+    const refs = guideRefsForCategory(cat.slug);
+    if (refs.length > 0) cat.guides = refs;
+  }
 
   return categories;
 }

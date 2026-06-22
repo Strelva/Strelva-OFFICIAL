@@ -439,6 +439,19 @@ export function AuditPage() {
                             {fix.impact}
                           </p>
                         )}
+                        {fix.guides && fix.guides.length > 0 && (
+                          <div className="mt-2 flex flex-col gap-1">
+                            {fix.guides.map((g) => (
+                              <Link
+                                key={g.slug}
+                                href={`/guides/${g.slug}`}
+                                className="text-[12px] font-medium text-m-accent transition-colors hover:text-m-text"
+                              >
+                                Fix it: {g.title} -&gt;
+                              </Link>
+                            ))}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

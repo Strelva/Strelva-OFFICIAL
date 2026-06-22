@@ -228,7 +228,7 @@ export function attachImpact(category: CategoryResult): CategoryResult {
 export function topFixes(
   categories: CategoryResult[],
   limit = 5
-): Array<{ category: string; name: string; message: string; impact?: string; quantified?: string; priority: CheckResult["priority"]; score: number }> {
+): Array<{ category: string; name: string; message: string; impact?: string; quantified?: string; priority: CheckResult["priority"]; score: number; guides?: { slug: string; title: string }[] }> {
   const rank = { high: 0, medium: 1, low: 2, undefined: 3 } as const;
   const fixes = categories.flatMap((cat) =>
     cat.checks
@@ -241,6 +241,9 @@ export function topFixes(
         quantified: c.quantified,
         priority: c.priority,
         score: c.score,
+        // Guide cross-links live on the category (set by the server-only
+        // runner); read the field here, never import guides.ts.
+        guides: cat.guides,
       }))
   );
   fixes.sort((a, b) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
@@ -13,6 +14,7 @@ type Fix = {
   quantified?: string;
   priority?: "high" | "medium" | "low";
   score: number;
+  guides?: { slug: string; title: string }[];
 };
 type SiteAudit = AuditResult & { topFixes: Fix[] };
 
@@ -245,6 +247,19 @@ export function SiteHealthCard() {
                 <p className="mt-0.5 text-[12px] leading-snug text-gray-muted">
                   {fix.impact || fix.message}
                 </p>
+                {fix.guides && fix.guides.length > 0 && (
+                  <div className="mt-1.5 flex flex-col gap-1">
+                    {fix.guides.map((g) => (
+                      <Link
+                        key={g.slug}
+                        href={`/guides/${g.slug}`}
+                        className="text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
+                      >
+                        Fix it: {g.title} -&gt;
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
