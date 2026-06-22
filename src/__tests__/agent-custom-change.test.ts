@@ -68,6 +68,7 @@ vi.mock("@/lib/auth", () => ({
   requireTenantAccess: () => Promise.resolve(null),
   requireTenantPermission: () => Promise.resolve(null),
   getAuthUserId: () => Promise.resolve("user_test"),
+  isSuperAdmin: () => Promise.resolve(false),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({

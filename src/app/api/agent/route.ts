@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
-import { getAuthUserId, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { isSuperAdmin, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
@@ -38,7 +38,6 @@ import { applySectionUpdate } from "@/lib/apply-section-update";
 import { postCustomChangeRequest } from "@/lib/custom-request-client";
 import { type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
-import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import {
   agentResultFromToolOutput,
   buildAgentResultContract,
@@ -301,8 +300,6 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
 
   const tenantConfig = await getTenantConfig(tenant);
-  const userId = await getAuthUserId();
-  const clerkUserId = userId || (isDevAccessBypassEnabled() ? "dev-access-bypass" : null);
   const body = await readJsonObject(req);
   if (!body) {
     return new Response(
@@ -340,7 +337,7 @@ export async function POST(req: Request) {
     }
     return undefined;
   })();
-  const signalSource = classifySource(clerkUserId);
+  const signalSource = classifySource(await isSuperAdmin());
   const signalSiteName = tenantConfig?.siteName || tenant;
   const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
