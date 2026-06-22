@@ -81,3 +81,6 @@ supabase/.temp
 supabase/.env
 supabase/.env.*
 coverage
+
+# Local sales artifacts (AI-visibility scorecards / outreach kit) — scratch, not platform code
+outbound/

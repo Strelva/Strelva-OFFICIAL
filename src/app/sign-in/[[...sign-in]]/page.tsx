@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { SignIn } from "@clerk/nextjs";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
@@ -72,15 +70,8 @@ export default async function SignInPage({
   searchParams: Promise<AuthSearchParams>;
 }) {
   const params = await searchParams;
-  const useSupabase = isSupabaseAuthConfigured();
   const invite = await getInviteContext(params);
   if (invite) {
-    const requestHeaders = await headers();
-    const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-    const signInPath = withClientFallbackRoot(clientFallbackRoot, "/sign-in");
-    const signUpPath = withClientFallbackRoot(clientFallbackRoot, "/sign-up");
-    const signUpUrl = `${signUpPath}?email=${encodeURIComponent(invite.email)}`;
-
     return (
       <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
         <AuthDocumentTitle title="Sign in to your dashboard" />
@@ -106,18 +97,7 @@ export default async function SignInPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            {useSupabase ? (
-              <SupabaseSignIn next="/account" prefillEmail={invite.email} />
-            ) : (
-              <SignIn
-                routing="path"
-                path={signInPath}
-                signUpUrl={signUpUrl}
-                forceRedirectUrl="/account"
-                fallbackRedirectUrl="/account"
-                initialValues={{ emailAddress: invite.email }}
-              />
-            )}
+            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
           </section>
         </div>
       </main>
@@ -126,8 +106,6 @@ export default async function SignInPage({
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
-    const signInPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/sign-in");
-    const signUpPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/sign-up");
     const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
 
     return (
@@ -155,17 +133,7 @@ export default async function SignInPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            {useSupabase ? (
-              <SupabaseSignIn next={dashboardPath} />
-            ) : (
-              <SignIn
-                routing="path"
-                path={signInPath}
-                signUpUrl={signUpPath}
-                forceRedirectUrl={dashboardPath}
-                fallbackRedirectUrl={dashboardPath}
-              />
-            )}
+            <SupabaseSignIn next={dashboardPath} />
           </section>
         </div>
       </main>
@@ -199,16 +167,7 @@ export default async function SignInPage({
         </section>
 
         <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-          {useSupabase ? (
-            <SupabaseSignIn next="/account" />
-          ) : (
-            <SignIn
-              routing="path"
-              path="/sign-in"
-              forceRedirectUrl="/account"
-              fallbackRedirectUrl="/account"
-            />
-          )}
+          <SupabaseSignIn next="/account" />
         </section>
       </div>
     </main>

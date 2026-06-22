@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { SignUp } from "@clerk/nextjs";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -72,16 +70,9 @@ export default async function SignUpPage({
   searchParams: Promise<AuthSearchParams>;
 }) {
   const params = await searchParams;
-  const useSupabase = isSupabaseAuthConfigured();
   const invite = await getInviteContext(params);
 
   if (invite) {
-    const requestHeaders = await headers();
-    const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-    const signUpPath = withClientFallbackRoot(clientFallbackRoot, "/sign-up");
-    const signInPath = withClientFallbackRoot(clientFallbackRoot, "/sign-in");
-    const signInUrl = `${signInPath}?email=${encodeURIComponent(invite.email)}`;
-
     return (
       <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
         <AuthDocumentTitle title="Create your dashboard account" />
@@ -108,18 +99,7 @@ export default async function SignUpPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            {useSupabase ? (
-              <SupabaseSignIn next="/account" prefillEmail={invite.email} />
-            ) : (
-              <SignUp
-                routing="path"
-                path={signUpPath}
-                signInUrl={signInUrl}
-                forceRedirectUrl="/account"
-                fallbackRedirectUrl="/account"
-                initialValues={{ emailAddress: invite.email }}
-              />
-            )}
+            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
           </section>
         </div>
       </main>
@@ -128,8 +108,6 @@ export default async function SignUpPage({
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
-    const signUpPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/sign-up");
-    const signInPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/sign-in");
     const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
 
     return (
@@ -157,17 +135,7 @@ export default async function SignUpPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            {useSupabase ? (
-              <SupabaseSignIn next={dashboardPath} />
-            ) : (
-              <SignUp
-                routing="path"
-                path={signUpPath}
-                signInUrl={signInPath}
-                forceRedirectUrl={dashboardPath}
-                fallbackRedirectUrl={dashboardPath}
-              />
-            )}
+            <SupabaseSignIn next={dashboardPath} />
           </section>
         </div>
       </main>

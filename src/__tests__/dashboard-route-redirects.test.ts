@@ -120,11 +120,11 @@ describe("dashboard route redirects", () => {
     );
 
     expect(source).toContain("UseInvitedEmailButton");
-    expect(recoveryButton).toContain("SignOutButton");
+    expect(recoveryButton).toContain("supabase.auth.signOut");
     expect(recoveryButton).toContain('redirectUrl = "/sign-in"');
-    expect(recoveryButton).toContain("redirectUrl={redirectUrl}");
+    expect(recoveryButton).toContain("window.location.href = redirectUrl");
     expect(recoveryButton).toContain('type="button"');
-    expect(recoveryButton).toContain("{button}</SignOutButton>");
+    expect(recoveryButton).toContain("onClick={signOut}");
     expect(recoveryButton).toContain("Use invited email");
     expect(source).toContain('withClientFallbackRoot(clientFallbackRoot, "/sign-in")');
     expect(source).toContain("Use the exact email address that received your invite");
