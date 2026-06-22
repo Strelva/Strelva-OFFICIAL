@@ -4,6 +4,17 @@
 migration plan (`docs/supabase-migration-plan.md`, Phase 4) executes against. Goal: get the
 foundation right once so nothing here forces a rewrite as we grow from 3 → 50+ clients.
 
+> **2026-06-22 — much of this is now SHIPPED.** The Clerk → Supabase Auth +
+> Postgres swap **cut over in production on 2026-06-20**: Supabase Auth is live
+> (`auth.uid()`, Google OAuth + magic link), `memberships`/`super_admins` back
+> authorization, **RLS is enabled and enforcing tenant isolation**, and the
+> `handle_new_user` trigger provisions users on first sign-in (replacing the
+> Clerk webhook). What remains from "Phase 4 scope" below is the **destructive
+> teardown** — the `src/proxy.ts` net-removal (`clerkMiddleware` unwrap,
+> dropping `admin.*`/custom-domain auth fallback) and locking the Sanity dataset
+> — held deliberately as the end-step. The three-plane model and the
+> service-role discipline below remain the live operating rules.
+
 Grounded in current Supabase guidance (RLS performance lint `0003_auth_rls_initplan`,
 Custom Access Token Hook, `@supabase/ssr`, multi-SSO) — verified against live docs, not memory.
 
@@ -100,9 +111,10 @@ on a discipline, written here so it survives team growth:
   separate cliff: `STRIPE_BILLING_GRANDFATHER_TENANTS`.)
 - **Token encryption.** `integrations` holds OAuth access/refresh tokens — encrypt at rest
   (pgcrypto or app-level), never plaintext. (= migration-plan Decision 3.)
-- **Cutover is a forcing function.** The Clerk→Supabase swap costs one scheduled logout at 3
-  clients; every client added before cutover is one more forced re-login. Argument for doing it
-  now, in this window.
+- **Cutover is a forcing function.** *(Resolved — the Clerk→Supabase swap shipped
+  2026-06-20, at the low client count this argued for.)* The swap cost one
+  scheduled logout; doing it early avoided forcing a re-login on every client
+  added later.
 
 ## Future roadmap: block editor + Strelva CMS (reinforces the kill-Sanity call)
 
@@ -148,15 +160,18 @@ repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* 
 
 ---
 
-## What this changes in code (Phase 4 scope)
+## What this changes in code (Phase 4 scope) — status as of 2026-06-22
 
-- `src/proxy.ts` — **net removal**: drop `admin.*` subdomain detection and the custom-domain
-  auth fallback (`shouldUseFallbackAuthForAdminHost`, `buildTenantFallbackUrl`). The auth gate
-  runs only on `app.strelva.com`; public hosts (`{tenant}.strelva.com`, custom client domains)
-  are unauthenticated read paths.
-- `src/lib/auth.ts` — rewrite against the Supabase server client + `memberships`/`super_admins`,
-  signatures preserved. (`getTenantOwnerUserIds` collapses from paginating Clerk's user list to a
-  single indexed query.)
-- Dashboard routing moves to `app.strelva.com/{tenant}`; any existing `admin.{client-domain}`
-  dashboard URL becomes a 301 to it.
+- `src/proxy.ts` — **net removal (STILL PENDING — the teardown end-step):** drop
+  `admin.*` subdomain detection and the custom-domain auth fallback
+  (`shouldUseFallbackAuthForAdminHost`, `buildTenantFallbackUrl`), and unwrap
+  `clerkMiddleware`. The auth gate runs only on `app.strelva.com`; public hosts
+  (`{tenant}.strelva.com`, custom client domains) are unauthenticated read paths.
+- `src/lib/auth.ts` — **DONE (live 2026-06-20):** rewritten against the Supabase
+  server client + `memberships`/`super_admins`, signatures preserved. (Clerk path
+  dead-pathed behind `isSupabaseAuthConfigured()`; `getTenantOwnerUserIds`
+  collapses to a single indexed query.)
+- Dashboard routing moves to `app.strelva.com/{tenant}` (pending the rebrand /
+  single-host work); any existing `admin.{client-domain}` dashboard URL becomes a
+  301 to it.
 - Full file inventory + API mapping: `docs/supabase-migration-plan.md` → "Auth swap" section.

@@ -8,7 +8,8 @@
  * This module owns:
  *  - recordAgentToolCall: fire Slack + bump Redis counter (fire-and-forget)
  *  - readAndResetDailyCounts: cron rollup reader
- *  - classifySource: "jacob" | "owner" based on Clerk userId
+ *  - classifySource: "jacob" | "owner" — Jacob is the founder/super-admin,
+ *    everyone else is a client owner (the calls we actually want to count)
  *
  * Coverage note: E1 (this file + agent route wiring) and E2
  * (/api/cron/daily-summary) together cover the p4-slack-notifications
@@ -17,17 +18,17 @@
 
 import { getRedis } from "./redis";
 
-// TODO: move FOUNDER_CLERK_USER_ID into src/lib/env.ts alongside other
-// optional env vars once founder-os config stabilizes.
-const FOUNDER_CLERK_USER_ID = process.env.FOUNDER_CLERK_USER_ID;
-
 export type AgentCallSource = "jacob" | "owner";
 
 let _slackMissingLogged = false;
 
-export function classifySource(clerkUserId: string | null | undefined): AgentCallSource {
-  if (!FOUNDER_CLERK_USER_ID) return "owner";
-  return clerkUserId && clerkUserId === FOUNDER_CLERK_USER_ID ? "jacob" : "owner";
+/**
+ * Jacob (the founder) is the only super-admin; every other caller is a client
+ * owner — those are the unprompted agent calls the proof-signal exists to count.
+ * Pass the result of `isSuperAdmin()` (Supabase super_admins allowlist) here.
+ */
+export function classifySource(isSuperAdmin: boolean): AgentCallSource {
+  return isSuperAdmin ? "jacob" : "owner";
 }
 
 function todayKey(): string {
