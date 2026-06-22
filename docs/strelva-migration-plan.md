@@ -1,8 +1,19 @@
 # Strelva Migration Plan
 
-**Status:** Draft for approval — no code moved yet
+**Status:** Draft for approval — no code moved yet (this is the **domain/brand
+rebrand**, still parked)
 **Author:** generated from a full read of `main` (post release-branch merge, commit `5967494`)
 **Date:** 2026-06-01
+
+> **2026-06-22 — scope clarification.** This plan covers ONLY the
+> `scaffoldweb.com` → `strelva.com` **domain rebrand + repo split**. It is
+> *separate from* the **auth + data backbone cutover** (Clerk+Sanity → Supabase
+> Auth + Postgres), which is **DONE in production (2026-06-20)** — see
+> `docs/supabase-migration-plan.md` / `docs/post-cutover-runbook.md`. Concretely
+> that changes two assumptions in §5 below: the **Clerk** cutover step is moot
+> (auth is Supabase now, dead-pathed Clerk), and the **Supabase** "if used" note
+> is now "in use, primary." Everything else here (the 518-literal rebrand, the
+> repo split, Resend/Stripe/OAuth re-pointing) is still pending and accurate.
 
 ## Locked decisions
 
@@ -103,12 +114,13 @@ Do **not** hand-edit ~518 literals. First centralize, then codemod:
 
 Each references the domain and/or brand and must be re-pointed:
 
-- **Clerk** — add `strelva.com` + `app.strelva.com`, set `clerk.strelva.com` CNAME, update allowed origins + OAuth redirect URLs. ⚠️ Session-domain change logs everyone out.
+- **Supabase Auth** (replaced Clerk; live since 2026-06-20) — add `strelva.com` + `app.strelva.com` to the redirect-URL allowlist + Site URL, update Google OAuth redirect URLs. No custom auth CNAME and no forced logout (the Clerk session-domain logout risk no longer applies).
+- ~~**Clerk**~~ — *obsolete: auth is Supabase now; Clerk is dead-pathed pending teardown. Skip.*
 - **Resend** — verify `strelva.com` / `send.strelva.com` (SPF + DKIM), update `RESEND_DOMAIN`, warm up the new sending domain.
 - **Stripe** — update account branding, webhook endpoint → `app.strelva.com/api/...`, rename `STRIPE_SCAFFOLD_PRICE_ID`.
 - **OAuth providers** (Google, Yelp, Calendly, Instagram, Vegaro) — update redirect/callback URLs to `app.strelva.com`.
-- **Supabase** — update auth redirect/allowed URLs if used.
-- **Sanity** — webhook URL → app subdomain; dataset unchanged.
+- **Supabase** — in use as the primary auth + data backbone; update auth redirect/allowed URLs to the new host (this is the auth gate for the rebrand).
+- **Sanity** — *being decommissioned post-cutover (dual-write rollback mirror only).* If still present at rebrand time, point the webhook URL → app subdomain; dataset unchanged.
 - **Sentry** — update allowed domains / DSN project settings.
 - **Google Search Console** — verify `strelva.com`, submit new sitemap (marketing repo owns SEO).
 - **Vercel** — two projects, domains assigned per §2, env vars set per project.
@@ -137,7 +149,7 @@ Each references the domain and/or brand and must be re-pointed:
 
 - [ ] Marketing site loads at `strelva.com`; `www` + apex both resolve
 - [ ] `scaffoldweb.com/*` 301s to `strelva.com/*`
-- [ ] Sign-in / sign-up works on `app.strelva.com` (Clerk)
+- [ ] Sign-in / sign-up works on `app.strelva.com` (Supabase Auth)
 - [ ] OAuth provider logins succeed (new callback URLs)
 - [ ] A tenant site renders at `<tenant>.strelva.com`; old `<tenant>.scaffoldweb.com` redirects
 - [ ] Customer custom domains still resolve (`CUSTOM_DOMAIN_MAP`)

@@ -1,5 +1,10 @@
 # Domain Setup Checklist
 
+> **2026-06-22:** tenant records (incl. `productionDomain`/`adminDomain`) now
+> live in **Postgres** (`tenants` table) as the source of truth since the
+> 2026-06-20 cutover — not Sanity. The DNS/Vercel/Cloudflare steps below are
+> unaffected.
+
 ## Step 0 — The domain belongs to the client, from day one
 
 This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the domain is in YOUR name from day one, and you leave with everything." Do not register a client's domain inside Strelva's registrar or Cloudflare account.
@@ -30,7 +35,7 @@ This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the
    CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid"}
    ```
    `www.` and `admin.` are resolved from the bare-domain entry by the proxy.
-5. Update the tenant's `productionDomain` in Sanity to `yourbusiness.com`; set `adminDomain` only if it is not `admin.yourbusiness.com`.
+5. Update the tenant's `productionDomain` to `yourbusiness.com` (in the Postgres `tenants` table — the source of truth since the 2026-06-20 cutover; edit via the admin tenant-edit UI / `PATCH /api/admin/tenants`, not Sanity); set `adminDomain` only if it is not `admin.yourbusiness.com`.
 6. Verify a Resend domain for `updates.yourbusiness.com` if using newsletter.
 7. Pull production env and verify:
    ```

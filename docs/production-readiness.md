@@ -1,5 +1,7 @@
 # Strelva Production Readiness
 
+> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (auth, content, tenants, and operational data all on Postgres; `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live). This doc is retained for historical/runbook reference. The only remaining work is the deliberate destructive Sanity/Clerk teardown (remove Sanity reads, lock the dataset, unwrap `clerkMiddleware` in `src/proxy.ts`).
+
 ## Branch And Release Model
 
 - Primary branch: `main`.

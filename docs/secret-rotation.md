@@ -1,10 +1,15 @@
 # Secret Rotation Runbook
 
+> **2026-06-22:** reflects the Supabase Auth + Postgres production stack (cut
+> over 2026-06-20). The Supabase secrets below are the live auth/data path;
+> Clerk + Sanity secrets are retained only until those services are torn down
+> post-cutover, so rotate them only if a leak forces it. This is a reference
+> procedure for *when* a secret needs rotating — not a standing to-do list.
+
 How to rotate each production secret without taking the platform (or a live
 client site) down. Setup of first-time secrets is a different doc
 (`first-time-production-secrets.md`); this is for rotating one that already
-exists — on a schedule, after a suspected leak, or when an integration is
-re-provisioned.
+exists — after a suspected leak, or when an integration is re-provisioned.
 
 ## General procedure (zero-downtime where possible)
 
@@ -30,12 +35,21 @@ before a production deploy — run it after rotating.
   Cache + operational data (events, locks, rate limits) is lost on a new
   instance; the platform degrades gracefully (Sanity is the source of truth)
   and rewarms. Prefer rotating the token in-place over recreating the instance.
-- **SANITY_API_TOKEN** — source-of-truth write token. Mint a new token in
-  Sanity, deploy, revoke the old. Reads/writes fail between revoke and deploy,
-  so deploy the new token FIRST.
-- **CLERK_SECRET_KEY / CLERK_WEBHOOK_SECRET** — dual-key capable. Add the new
-  secret key, deploy, then revoke the old in Clerk. For the webhook secret,
-  update it in both Clerk and Vercel and replay a test event.
+- **SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL** — the service-role key is the
+  high-blast-radius secret (bypasses RLS). It's set per-environment in Vercel;
+  rotate it in the Supabase dashboard (Project Settings → API → roll), update
+  Vercel (Production + Preview), redeploy, confirm `/api/health` Postgres probe
+  + a dashboard sign-in. The publishable/anon key
+  (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) is client-safe; rotating it just needs
+  a redeploy. Database password rotation is separate (Supabase → Database).
+- **SANITY_API_TOKEN** — *legacy.* No longer the source of truth (Postgres is);
+  Sanity is dual-written as the rollback mirror until teardown, so a stale token
+  breaks the rollback write path, not live reads. To rotate: mint a new token,
+  deploy, revoke the old.
+- **CLERK_SECRET_KEY / CLERK_WEBHOOK_SECRET** — *legacy, dead-pathed.* Clerk is
+  no longer the live auth path (Supabase Auth is, gated by
+  `isSupabaseAuthConfigured()`); these secrets are inert until Clerk teardown.
+  Only rotate if a leak forces it: add the new key, deploy, revoke the old.
 - **STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET** — roll the API key in the
   Stripe dashboard (supports a rolled-key grace window); update the webhook
   signing secret and re-send a test webhook. Billing is OFF today, so blast

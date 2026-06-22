@@ -1,5 +1,7 @@
 # First-Time Production Secrets Setup
 
+> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (`CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live, Google OAuth consent screen published, billing intentionally off). This doc is retained for historical/runbook reference. The only remaining work is the deliberate destructive Sanity/Clerk teardown (remove Sanity reads, lock the dataset, unwrap `clerkMiddleware` in `src/proxy.ts`).
+
 This is the plain-English checklist for getting Strelva production-ready.
 Do not paste real secrets into ChatGPT, Slack, GitHub, or docs. Put them directly into Vercel Production environment variables.
 

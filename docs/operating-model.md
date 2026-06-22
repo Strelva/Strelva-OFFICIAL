@@ -1,5 +1,20 @@
 # Strelva Operating Model + Solidification Roadmap
 
+> **2026-06-22 update — the stack moved underneath this doc.** On **2026-06-20**
+> the auth + data backbone CUT OVER to **Supabase Auth + Postgres in
+> production** (`scaffoldweb.com` live + healthy). Where this doc (written
+> 2026-06-13) says **Sanity is the source of truth** / **Clerk** is the auth
+> layer / a **durable operational store is "soon, not yet built"** — that is now
+> DONE: **Postgres is the source of truth** for tenant + content + operational
+> data (prod flags `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE` = `postgres`),
+> **RLS** enforces tenant isolation, and the `handle_new_user` trigger provisions
+> users. Sanity is dual-written as a reversible rollback mirror (no migrated
+> store reads it); Clerk is dead-pathed behind `isSupabaseAuthConfigured()`,
+> pending teardown. The remaining destructive teardown (remove Sanity reads, lock
+> the dataset, unwrap `clerkMiddleware` in `proxy.ts`) is the deliberate
+> end-step, not done yet (`core.ts` still uses Sanity as the content-store
+> fallback). Read the per-section corrections inline below.
+
 Authoritative source for **how Strelva operates as a whole** and the punch list to
 lock it. Written 2026-06-13 from a full code-level audit of the admin portal, the
 client portal, and the platform architecture. Supersedes scattered notes; update
@@ -13,9 +28,13 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done · `(N)` = Noah · 
 
 Strelva is a **control plane**, not a website host.
 
-- **Sanity** is the source of truth for content + tenant config.
-- **Redis (Upstash)** is a write-through cache **and** the operational store
-  (events, bookings, clicks, reviews, pay-links, rewards, rate limits).
+- **Supabase Postgres** is the source of truth for content + tenant config +
+  operational data (cut over 2026-06-20; prod flags `CONTENT_SOURCE`/
+  `TENANTS_SOURCE`/`DATA_SOURCE` = `postgres`). RLS enforces tenant isolation.
+  Sanity is dual-written as a reversible rollback mirror only.
+- **Redis (Upstash)** is a write-through cache **and** still an operational
+  store (events, bookings, clicks, reviews, pay-links, rewards, rate limits) —
+  operational data now also dual-writes to Postgres.
 - The **owner dashboard + AI agent** are the only write surfaces.
 - Every paid client gets **one hand-built custom repo** on their own domain that
   **pulls** content from `/api/v1/*` (ISR, 60s) and **receives** HMAC-signed
@@ -33,10 +52,12 @@ Strelva is a **control plane**, not a website host.
    (`src/components/templates/`) is **legacy**. Archive it to a clearly-labeled
    folder (do not delete — may be revived), **after** verifying no live tenant
    still renders through it (see 4.C — `jada` likely uses `fashion-stylist`).
-2. **Operational-data durability = Redis + backup now, durable store soon.**
-   Accept Redis-only at current scale; make the maintenance cron's snapshot a real
-   restorable backup. Stand up a durable operational store (Postgres/Supabase)
-   before ~15 tenants — tracked, not yet built.
+2. **Operational-data durability = Postgres (DONE 2026-06-20).** The durable
+   operational store this decision called for "before ~15 tenants" shipped early:
+   Supabase Postgres is now the source of truth and operational data dual-writes
+   to it (`DATA_SOURCE=postgres`). Redis remains the write-through cache +
+   ephemeral state. The maintenance-cron snapshot remains as a content backup
+   path; Supabase's own backups now cover the durable store.
 3. **One agent core.** Collapse the two divergent agent implementations into a
    single shared core (one tool registry, one prompt builder, one governance+risk
    pipeline). Entry points differ only in `generateText` vs `streamText`.
@@ -50,14 +71,16 @@ strelva.com (marketing, separate repo)
    │ lead → /access-request
    ▼
 CONTROL PLANE (this repo, → app.strelva.com)
-   proxy.ts (host→tenant routing, Clerk auth, CSP)
-   /dashboard (owner) · /admin (Jacob+Noah) · /studio (Sanity)
+   proxy.ts (host→tenant routing, Supabase Auth, CSP; Clerk dead-pathed)
+   /dashboard (owner) · /admin (Jacob+Noah) · /studio (Sanity — pending teardown)
    AI agent + ai-governance.ts
    /api/v1/* (content · page-config · site-capabilities · track) — frozen v1 contract
    │ pull (ISR 60s) ▲        ▼ push (HMAC revalidate)
    ▼                         │
- Sanity (truth) + Redis (cache+ops)   CUSTOM CLIENT REPOS (1 per client, own domain)
-External: Clerk · Stripe(off) · Resend · Gemini · Vercel Blob · Slack · Yelp/Google/IG/GSC
+ Postgres (truth, RLS) + Redis (cache+ops)   CUSTOM CLIENT REPOS (1 per client, own domain)
+   (Sanity dual-written as rollback mirror)
+External: Supabase(auth+db) · Stripe(off) · Resend · Gemini · Vercel Blob · Slack · Yelp/Google/IG/GSC
+          (Clerk + Sanity retained until post-cutover teardown)
 ```
 
 Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-client.ts`,
@@ -184,12 +207,18 @@ durability backup + cron de-stampede (G), and the cutover (H, Jacob's).
   every load (O(N)); precompute a per-tenant summary or batch.
 - [ ] **Second alerting channel** (N/J) — Slack is the only error channel and most
   crons fire-and-forget it.
-- [ ] **Durable operational store** (N/J) — the "soon" from decision 2; revisit at ~15 tenants.
+- [x] **Durable operational store** (N) — the "soon" from decision 2; SHIPPED
+  2026-06-20 (Supabase Postgres, `DATA_SOURCE=postgres`, RLS). _(was: revisit at ~15 tenants)_
 
 ### H. Cutover (Jacob's lane — external dashboards)
-- [ ] **T004 infra** (J) — Cloudflare DNS → Vercel domains → **Clerk session-domain
-  (before the next client; it logs everyone out)** → Resend/Stripe/OAuth → 301
-  scaffoldweb→strelva. Runbook: `docs/goals/strelva-cutover/runbook.md`.
+> The **auth/data cutover** (Clerk+Sanity → Supabase+Postgres) is DONE
+> (2026-06-20). What remains here is the **domain/brand rebrand**
+> (`scaffoldweb.com` → `strelva.com`), which is independent. Auth is no longer
+> on Clerk, so the "Clerk session-domain logs everyone out" risk is gone — the
+> equivalent step is now Supabase Auth's redirect-URL allowlist.
+- [ ] **T004 infra** (J) — Cloudflare DNS → Vercel domains → **Supabase Auth
+  redirect-URL allowlist** → Resend/Stripe/OAuth → 301 scaffoldweb→strelva.
+  Runbook: `docs/goals/strelva-cutover/runbook.md` + `docs/url-cutover-runbook.md`.
 - [ ] **T005 tenant flip** (J) — point each tenant's `REB_API_URL` value at
   `app.strelva.com`. Auto-unblocks after T004.
 - [ ] **Single-source the v1 version constant** (N) — `SCAFFOLD_CONTRACT_VERSION` is
