@@ -2,91 +2,132 @@
 
 End-to-end guide for spinning up a new Strelva tenant and its custom repo.
 
+The **primary path is the super-admin onboard UI** at `/admin/onboard`, which
+runs the same orchestrator (`provisionTenant()`) used everywhere. A local
+scriptable path (`pnpm provision-tenant`) still exists for dev work — see the
+bottom of this doc.
+
 ## Overview
 
 Every paid client gets:
-1. A **tenant record** in Strelva (Sanity in prod, `dev-tenants.json` locally)
-2. A **custom repo** (separate Next.js project) that serves the public website
-3. **Signed revalidation** so content edits in the dashboard push to the live site
-4. **Clerk auth** so the client can log into their admin dashboard
-5. **Seed content** matching their industry template
+1. A **tenant record** in Postgres (the source of truth since the 2026-06-20
+   cutover; dual-written to Sanity during the transition).
+2. A **custom repo** (separate Next.js project) that serves the public website —
+   hand-built by Jacob, connected to a per-client Vercel project.
+3. **Signed revalidation** so content edits in the dashboard push to the live site.
+4. **Supabase Auth** so the client can log into their admin dashboard (Clerk is
+   removed from the auth UI; see AGENTS.md).
+5. **Seeded starter content** (9 sections) so the dashboard starts from real,
+   editable documents.
+
+> **What provisioning does NOT do:** it does not generate or deploy the website.
+> That stays Jacob's hand-built repo, connected to the Vercel project that
+> provisioning creates.
 
 ## Prerequisites
 
-- Access to the Strelva repo (`~/Projects/REB`)
-- Node.js 20+ and pnpm installed
-- For production: Vercel account, Clerk dashboard access, domain registrar access
+- Super-admin access to the Strelva dashboard (the onboard route is gated by
+  `isSuperAdmin()` — non-super-admins get a 403).
+- For the 3 Vercel automation steps to run, **`VERCEL_API_TOKEN`** (or the
+  fallback `VERCEL_TOKEN`) **+ `VERCEL_TEAM_ID`** must be set. Without a token,
+  the Vercel project/env/domain steps are silently **skipped** (the tenant,
+  content seed, and invite still complete; the steps[] result says `skipped:
+  VERCEL_API_TOKEN not set`).
+- For production Postgres writes, `TENANTS_SOURCE=postgres` (on in prod). With it
+  unset locally, the tenant is written to the dev file path instead.
 
-## Step 1: Provision the Tenant
+## Primary path: the `/admin/onboard` UI
 
-### Dry run first
+1. As a super-admin, open **`/admin/onboard`** (`src/app/admin/onboard/page.tsx`).
+2. Fill the form:
+   - **Subdomain** *(required)* — 2-63 lowercase letters/numbers/hyphens, no
+     leading/trailing hyphen (e.g. `acme-hvac`). This becomes the tenant id.
+   - **Site name** *(required)* — e.g. `Acme HVAC`.
+   - **Owner name** *(required)* — e.g. `Jane Doe`.
+   - **Owner email** *(optional)* — enables the owner invite step.
+   - **Industry** — select; defaults to `trades`. (See the known gap below: the
+     seed step ignores this value today.)
+   - **Production domain** *(optional)* — e.g. `acmehvac.com`. Supplying it
+     triggers the Vercel domain-attach step and derives `siteUrl` /
+     `admin.acmehvac.com`. Omit it and the tenant uses the
+     `{subdomain}.strelva.com` fallback.
+3. Submit. The UI POSTs to **`/api/admin/provision`** and renders the live
+   checklist returned in `steps[]`.
 
-```bash
-pnpm provision-tenant --dry-run \
-  --id "buffalo-barber" \
-  --subdomain "buffalo-barber" \
-  --siteName "Buffalo Barber Co" \
-  --ownerName "Mike" \
-  --industry "trades" \
-  --ownerEmail "mike@buffalobarber.com" \
-  --features "booking,newsletter" \
-  --bookingProvider "Square" \
-  --bookingUrl "https://squareup.com/appointments/book/buffalo-barber" \
-  --productionDomain "buffalobarber.com"
-```
+### What `/api/admin/provision` does
 
-Review the summary output. When satisfied, run again without `--dry-run`.
+(`src/app/api/admin/provision/route.ts`)
 
-### What the script does
+1. Rejects non-super-admins (403).
+2. Validates `subdomain`/`siteName`/`ownerName`/`industry` and the subdomain
+   format; rejects a subdomain already in use (409).
+3. Calls `provisionTenant()`.
+4. Writes a `tenant.provision` **audit row** (`logAuditEvent`) recording each
+   step's key + status.
+5. Returns the full `ProvisionResult` JSON: `steps[]`, `manualNext[]`, `siteUrl`,
+   `tenantId`, and `clientEnv` (the env vars the hand-built client repo needs,
+   including the generated `REVALIDATION_SECRET`).
 
-1. Validates all inputs (ID format, email, industry)
-2. Generates a 256-bit `revalidationSecret` for HMAC webhook signing
-3. Derives `siteUrl` and `revalidateUrl` from the production domain (or subdomain fallback)
-4. Writes the tenant to `dev-tenants.json`
-5. Optionally creates a Vercel project if `VERCEL_TOKEN` is set
-6. Prints env vars, Vercel CLI commands, and a next-steps checklist
+### The 6 steps `provisionTenant()` runs
 
-### Interactive mode
+(`src/lib/provisioning.ts` — every step is **best-effort** and reported in
+`steps[]` as `ok` / `failed` / `skipped`. The whole thing is **idempotent /
+resume-safe**: re-running treats an existing tenant/env/domain as success, so you
+recover from a partial failure by fixing the cause and re-running — there is no
+auto-rollback.)
 
-Run without arguments for guided prompts:
+1. **Create tenant record** — the hard prerequisite (the only step that bails the
+   whole run on failure). Generates a 256-bit `revalidationSecret`, derives
+   `siteUrl`/`revalidateUrl`, and writes the row to Postgres
+   (`TENANTS_SOURCE=postgres`) **and** dual-writes it to Sanity for rollback
+   safety. If the tenant already exists, the run resumes the remaining steps.
+2. **Seed starter content** — upserts **9 sections** (`hero`, `services`,
+   `story`, `testimonials`, `events`, `providers`, `contact`, `settings`,
+   `faq`) via `setContent`. Idempotent (overwrites, never duplicates). A
+   shortfall (<9) is reported as `failed` with the per-section reason.
+3. **Create owner invite** — `createInvite()` writes the invite to **Redis**
+   (`reb:invites:*`) **and** the Postgres **`invites`** table (load-bearing for
+   Supabase-auth first sign-in). Skipped if no owner email was supplied.
+4. **Create Vercel project** — `POST /v9/projects` (named `{tenantId}-site`).
+   Skipped if Vercel isn't configured.
+5. **Set Vercel env vars** — `POST /v10/projects/{id}/env` with `clientEnv`.
+   Skipped if step 4 produced no project.
+6. **Attach production domain** — `POST /v10/projects/{id}/domains`. Only runs
+   when a project exists **and** a production domain was supplied.
 
-```bash
-pnpm provision-tenant
-```
+The returned `manualNext[]` lists the human follow-ups (point DNS at Vercel,
+connect the hand-built repo to the `{tenantId}-site` project and deploy,
+customize the seeded content, send the owner invite).
 
-### Valid industries
+### Known gaps (read before relying on this)
 
-`wellness`, `food-brand`, `restaurant`, `trades`, `professional`, `fashion-stylist`
+- **No deprovision / teardown script exists.** Because provisioning is
+  forward-recovery (not transactional), an aborted or partial onboard leaves
+  orphaned rows across **Postgres + Sanity + Redis** (and possibly a created
+  Vercel project). To clean up a failed test tenant you must do it by hand:
+  deactivate the tenant (`active:false`), remove the Postgres/Sanity rows and any
+  Redis invite, and delete the Vercel project via the dashboard/CLI. The returned
+  `steps[]` tells you exactly what was created.
+- **Seed content ignores `industry`.** Step 2 always writes the generic
+  `defaults` for each section — the `industry` field is stored on the tenant but
+  does not currently pick an industry-specific content template.
 
-### Valid features
-
-`booking`, `newsletter`, `blog`, `events`, `shop`, `products`, `rewards`, `providers`, `instagram`, `reviews`
-
-## Step 2: Create the Client Repo
+## Create the client repo
 
 Copy the starter scaffold into a new repo:
 
 ```bash
-mkdir ~/Projects/buffalo-barber-site
-cp -r custom-repo-starter/* ~/Projects/buffalo-barber-site/
-cd ~/Projects/buffalo-barber-site
+mkdir ~/Projects/acme-hvac-site
+cp -r custom-repo-starter/* ~/Projects/acme-hvac-site/
+cd ~/Projects/acme-hvac-site
 ```
 
 The starter includes:
-- **`scaffold-client.ts`** -- typed fetch client for all Strelva API endpoints
-- **`revalidate-route.ts`** -- Next.js route handler with HMAC signature verification
-- **`content-defaults.ts`** -- fallback content for all 15 section types
-- **`README.md`** -- setup and ship checklist
-
-### Set up the Next.js project
-
-```bash
-npx create-next-app@latest . --typescript --tailwind --app --no-src-dir
-cp scaffold-client.ts lib/
-cp content-defaults.ts lib/
-mkdir -p app/api/v1/revalidate
-cp revalidate-route.ts app/api/v1/revalidate/route.ts
-```
+- **`scaffold-client.ts`** — typed fetch client for the Strelva `/api/v1/*` endpoints
+- **`revalidate-route.ts`** — Next.js route handler with HMAC signature verification
+- **`content-defaults.ts`** — fallback content for all section types
+- **`ScaffoldTracker.tsx`** — fail-silent page-view/booking-click beacons
+- **`README.md`** — setup and ship checklist
 
 ### Wire up content fetching
 
@@ -102,74 +143,59 @@ export default async function Home() {
 }
 ```
 
-### Environment variables
+### Environment variables for the client repo
+
+Use the `clientEnv` block the onboard result hands you (it already contains the
+correct values, including the revalidation secret):
 
 ```bash
 # .env.local (development)
-TENANT_ID=buffalo-barber
+TENANT_ID=acme-hvac
 SCAFFOLD_API_URL=http://localhost:3000
-REVALIDATION_SECRET=<from provisioning output>
+REVALIDATION_SECRET=<from the onboard result>
 
-# Production (set via Vercel CLI or dashboard)
-TENANT_ID=buffalo-barber
-SCAFFOLD_API_URL=https://strelva.com
-REVALIDATION_SECRET=<from provisioning output>
+# Production
+TENANT_ID=acme-hvac
+SCAFFOLD_API_URL=https://scaffoldweb.com   # control plane; NOT strelva.com (marketing)
+REVALIDATION_SECRET=<from the onboard result>
 ```
 
-> **Note:** The revalidation route handler accepts both `REVALIDATION_SECRET` and the legacy `REVALIDATE_SECRET` name. Existing deployed repos may use the older name.
+> **Control-plane host:** the client repo fetches `/api/v1/*` from
+> **`scaffoldweb.com`** (the code default in `src/lib/provisioning.ts`, overridable
+> via `CONTROL_PLANE_API_URL`). `strelva.com` is the marketing site and does **not**
+> serve the v1 contract.
 
-## Step 3: Seed Content
+> **Note:** the revalidation route handler accepts both `REVALIDATION_SECRET` and
+> the legacy `REVALIDATE_SECRET` name. Existing deployed repos may use the older
+> name.
 
-Back in the Strelva repo:
+## Configure auth (Supabase)
 
-```bash
-pnpm seed-tenant buffalo-barber
-```
+Provisioning's owner-invite step seeds the invite in Redis + the Postgres
+`invites` table. The owner signs into the admin dashboard via **Supabase Auth**
+(Google OAuth / magic-link); their tenant membership is provisioned on first
+sign-in. There is no Clerk `publicMetadata` step anymore — the Clerk auth UI was
+removed (#83, 2026-06-22).
 
-This writes all 15 content sections to the storage backend (Sanity in prod, dev files locally).
+## Deploy
 
-## Step 4: Configure Clerk Auth
-
-1. Go to Clerk dashboard
-2. Find or create the client's user account
-3. Set `publicMetadata`:
-   ```json
-   { "tenants": ["buffalo-barber"], "role": "owner" }
-   ```
-4. The admin dashboard at `admin.buffalobarber.com` will now authenticate this user
-
-## Step 5: Deploy
-
-### Client repo
-
-```bash
-cd ~/Projects/buffalo-barber-site
-vercel link
-vercel env add TENANT_ID production <<< "buffalo-barber"
-vercel env add SCAFFOLD_API_URL production <<< "https://strelva.com"
-vercel env add REVALIDATION_SECRET production <<< "<secret>"
-vercel domains add buffalobarber.com
-vercel domains add www.buffalobarber.com
-vercel domains add admin.buffalobarber.com
-vercel deploy --prod
-```
+Connect the hand-built `{tenant}` repo to the `{tenant}-site` Vercel project
+(git integration) and deploy. If provisioning created the project and set its env
+vars, those are already in place; otherwise add them via `vercel env`.
 
 ### DNS configuration
 
-- `buffalobarber.com` -- A record to `76.76.21.21` (or CNAME to `cname.vercel-dns.com`)
-- `www.buffalobarber.com` -- CNAME to `cname.vercel-dns.com`
-- `admin.buffalobarber.com` -- CNAME to `cname.vercel-dns.com`
+- `acmehvac.com` — A record to `76.76.21.21` (or CNAME to `cname.vercel-dns.com`)
+- `www.acmehvac.com` — CNAME to `cname.vercel-dns.com`
+- `admin.acmehvac.com` — CNAME to `cname.vercel-dns.com`
 
-## Step 6: Verify
+## Verify
 
-### Verification checklist
-
-- [ ] Site renders at production URL with seeded content
-- [ ] Admin dashboard loads at admin subdomain
-- [ ] Client can log in via Clerk
-- [ ] Content edit in dashboard appears on live site within seconds
-- [ ] Revalidation webhook returns 200 with valid signature
-- [ ] Revalidation webhook returns 401 with invalid signature
+- [ ] Site renders at production URL with the seeded content
+- [ ] Admin dashboard loads at the admin subdomain
+- [ ] Owner can sign in via Supabase Auth
+- [ ] Content edit in the dashboard appears on the live site within seconds
+- [ ] Revalidation webhook returns 200 with a valid signature, 401 with an invalid one
 - [ ] Site renders fallback content when `SCAFFOLD_API_URL` is unreachable
 
 ## Wire Format Reference
@@ -180,13 +206,13 @@ Strelva POSTs to the client repo's `/api/v1/revalidate` endpoint.
 
 **Headers:**
 - `Content-Type: application/json`
-- `x-reb-timestamp` -- Unix timestamp in milliseconds (string)
-- `x-reb-signature` -- HMAC-SHA256 hex digest of `{timestamp}.{body}`
+- `x-reb-timestamp` — Unix timestamp in milliseconds (string)
+- `x-reb-signature` — HMAC-SHA256 hex digest of `{timestamp}.{body}`
 
 **Body (JSON):**
 ```json
 {
-  "tenant": "buffalo-barber",
+  "tenant": "acme-hvac",
   "paths": ["/"],
   "tags": ["content"],
   "all": true
@@ -199,13 +225,14 @@ expected = HMAC-SHA256(secret, "{timestamp}.{body}")
 valid = timingSafeEqual(provided, expected) && abs(now - timestamp) < 300000ms
 ```
 
-The header names `x-reb-timestamp` and `x-reb-signature` are part of the v1 wire format.
+The header names `x-reb-timestamp` / `x-reb-signature` are part of the v1 wire
+format and are intentionally not renamed.
 
 ### Content API
 
-- `GET /api/v1/content/{tenant}/{section}` -- fetch a content section
-- `GET /api/v1/page-config/{tenant}` -- fetch page structure
-- `GET /api/v1/site-capabilities/{tenant}` -- fetch capability manifest
+- `GET /api/v1/content/{tenant}/{section}` — fetch a content section
+- `GET /api/v1/page-config/{tenant}` — fetch page structure
+- `GET /api/v1/site-capabilities/{tenant}` — fetch capability manifest
 
 ## Architecture
 
@@ -217,18 +244,62 @@ The header names `x-reb-timestamp` and `x-reb-signature` are part of the v1 wire
        |                       |
        | fetchScaffoldContent  | POST /api/v1/revalidate
        v                       ^
-[Strelva (Vercel)]  ------|
+[Strelva control plane: scaffoldweb.com (Vercel)]
        |
        v
-[Sanity CMS] <-> [Redis Cache]
+[Supabase Postgres]  (+ Redis cache; Sanity dual-write during transition)
 ```
+
+## Secondary path: the `pnpm provision-tenant` CLI
+
+`scripts/provision-tenant.ts` is the older scriptable/local path. It is **not**
+the production flow — it writes to the local **`dev-tenants.json`** file (not the
+prod Postgres/Sanity store) and still prints the legacy `strelva.com` URLs.
+Useful for local-dev tenant setup; for real clients use `/admin/onboard`.
+
+```bash
+# Dry run first — shows what would be created, writes nothing
+pnpm provision-tenant --dry-run \
+  --id "acme-hvac" \
+  --subdomain "acme-hvac" \
+  --siteName "Acme HVAC" \
+  --ownerName "Jane" \
+  --industry "trades" \
+  --ownerEmail "jane@acmehvac.com" \
+  --productionDomain "acmehvac.com"
+
+# Run interactively with no args for guided prompts
+pnpm provision-tenant
+```
+
+Env it reads: `VERCEL_TOKEN` (creates a Vercel project if set), `VERCEL_TEAM_ID`.
+
+To seed content for a CLI-created tenant:
+
+```bash
+pnpm seed-tenant acme-hvac
+```
+
+### Valid industries
+
+`wellness`, `food-brand`, `restaurant`, `trades`, `professional`, `fashion-stylist`
 
 ## Troubleshooting
 
-**Revalidation returns 401:** Check `REVALIDATION_SECRET` matches between Strelva tenant config and the client repo. Ensure system clocks are within 5 minutes.
+**Vercel steps show `skipped`:** `VERCEL_API_TOKEN` (or `VERCEL_TOKEN`) isn't set
+in the Strelva environment. Set it (+ `VERCEL_TEAM_ID`) and re-run provision —
+it's idempotent.
 
-**Content shows fallback instead of real data:** Verify `SCAFFOLD_API_URL` is set and reachable. Check `TENANT_ID` matches exactly. Verify content was seeded.
+**Seed shows fewer than 9/9 sections:** the `steps[]` detail names the failed
+sections and the reason. Re-run provision to retry (safe; the seed overwrites).
 
-**Client can't log into admin dashboard:** Verify Clerk `publicMetadata.tenants` includes the tenant ID. Check that `admin.domain.com` resolves to the Strelva Vercel project.
+**Revalidation returns 401:** `REVALIDATION_SECRET` doesn't match between the
+tenant config and the client repo, or clocks are >5 minutes apart.
 
-**Revalidation failures in Slack:** Check `reb:revalidation:failures` in Redis. The reconciliation cron auto-retries stale revalidations.
+**Content shows fallback instead of real data:** verify `SCAFFOLD_API_URL` points
+at `scaffoldweb.com` (not `strelva.com`), `TENANT_ID` matches exactly, and content
+was seeded.
+
+**Owner can't sign in:** confirm the owner invite landed (Redis `reb:invites:*` +
+Postgres `invites`) and that the owner is using the email the invite was issued to.
+```

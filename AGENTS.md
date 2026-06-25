@@ -26,7 +26,7 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 
 - Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript
 - Routing/middleware lives in **`src/proxy.ts`** (Next 16 renamed `middleware.ts` to `proxy.ts`)
-- **Supabase Auth** for auth (`auth.uid()`, Google OAuth + magic-link; see `src/lib/auth.ts`). Clerk is dead-pathed behind `isSupabaseAuthConfigured()` and pending teardown (proxy unwrap last).
+- **Supabase Auth** for auth (`auth.uid()`, Google OAuth + magic-link; see `src/lib/auth.ts`). The Clerk leaf code (webhook route + auth-UI branches + `ClerkProvider`) was **removed 2026-06-22 (#83)**; only `src/proxy.ts` + `src/lib/auth.ts` still import `@clerk`. Remaining teardown = collapse the `auth.ts` Clerk branches, unwrap `clerkMiddleware` in `proxy.ts` (last), and lock the Sanity dataset.
 - **Supabase Postgres is the source of truth for tenant + content + operational data in production** (flipped 2026-06-20). Reads/writes go through `src/lib/db/repositories.ts` + the per-store dual-path, gated by `CONTENT_SOURCE`, `TENANTS_SOURCE`, `DATA_SOURCE` (= `postgres` in prod). Sanity is still written during the transition (reversible) but no migrated store *reads* it when the flags are on. RLS enforces tenant isolation (`supabase/migrations/*_rls.sql`); the dev-file path remains the local-dev fallback.
 - **Upstash Redis** is still the write-through cache for `getContent`/`getPageConfig`/the tenant-config list, plus ephemeral state (rate limits, locks). Operational data also dual-writes to Postgres.
 - Vercel Blob for image uploads

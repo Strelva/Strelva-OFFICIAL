@@ -1,6 +1,6 @@
 # Post-cutover cleanup runbook
 
-**Status (updated 2026-06-20):** migration **FLIPPED + LIVE**. Auth=Supabase, and `CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod — every store + the tenant spine read/write Postgres, verified live (health ok, real content/tenant resolution, full prod e2e green). What's left is the **destructive teardown** (see bottom): residual Sanity reads in `blog.ts`/`core.ts`, locking the Sanity dataset, and unwrapping `clerkMiddleware` in `proxy.ts`. Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback: [rollback.md](./rollback.md).
+**Status (updated 2026-06-25):** migration **FLIPPED + LIVE** (cutover 2026-06-20). Auth=Supabase, and `CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod — every store + the tenant spine read/write Postgres, verified live (health ok, real content/tenant resolution, full prod e2e green). Since cutover: **#82** (fixed the dead `classifySource` proof-signal + refreshed ~18 docs) and **#83** (Clerk LEAF teardown — webhook route deleted, sign-in/sign-up + `UseInvitedEmailButton` + `layout.tsx` Clerk branches stripped, `ClerkProvider` gone) merged to main. What's left is the **destructive teardown** (see bottom): residual Sanity reads in `core.ts`, locking the Sanity dataset, the `auth.ts` Clerk-branch collapse, and unwrapping `clerkMiddleware` in `proxy.ts` (`src/proxy.ts` + `src/lib/auth.ts` are the only two files still importing `@clerk`). Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback: [rollback.md](./rollback.md).
 
 The governing rule: every load-bearing change is flag-gated so rollback is a flag flip in Vercel env (+ redeploy), never a code revert. The migration phases below are now DONE through the flip; the teardown is the remaining careful step.
 
@@ -10,7 +10,7 @@ The governing rule: every load-bearing change is flag-gated so rollback is a fla
 |---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` + anon/publishable key | Activates the Supabase auth path (`isSupabaseAuthConfigured()`). | SET in prod | Unset both -> reverts to Clerk path (Clerk code still present until 2.B). |
 | `CONTENT_SOURCE=postgres` | `getContent`/`setContent` read/write the Postgres `content` table, Sanity fallback on miss. | SET in prod | Unset -> reverts to Sanity/dev-file source. |
-| `DUAL_WRITE_PG` (new, Phase 1.2) | Write operational rows to Postgres alongside Redis. Reads stay Redis. Null-safe, catch-and-log. | not yet | Unset -> Redis-only, today's behavior. |
+| `DUAL_WRITE_PG` (Phase 1.2) | Write operational rows to Postgres alongside Redis. Reads stay Redis. Null-safe, catch-and-log. | **IMPLEMENTED** (`src/lib/db/dual-write.ts`; default-on per `dualWritePgEnabled()`, but inert until Supabase env is set). events/leads/mail/build-payments shadow-write PG behind this flag. | Set `DUAL_WRITE_PG=0` (or `false`) -> Redis-only, no redeploy. |
 | `TENANTS_SOURCE=postgres` (new, Phase 2.A.4) | `getTenantConfig` reads the Postgres `tenants` table, Sanity fallback. | not yet | Unset -> Sanity source. Keep Sanity fallback live through the flip. |
 
 ## Phase 1 (now / additive, during soak)
@@ -38,11 +38,11 @@ Lockdown order: (1) confirm zero reads, (2) add read-client token + `useCdn:fals
 
 ## Phase 2.B: Clerk removal order (proxy.ts LAST)
 
-Leaf usages first, request entry point last. Supabase path is already live; Clerk code is dead weight, safe through the soak.
+Leaf usages first, request entry point last. Supabase path is already live; Clerk code is dead weight, safe through the soak. **Steps 1-3 DONE (merged #83, 2026-06-22) — the Clerk leaf is gone. Only `src/proxy.ts` + `src/lib/auth.ts` still import `@clerk`; steps 4-8 remain.**
 
-1. Delete `src/app/api/clerk/webhook/route.ts` (replaced by `handle_new_user` trigger).
-2. UI ternaries: sign-in / sign-up pages + `UseInvitedEmailButton` -> Supabase branch only.
-3. `src/app/layout.tsx` -> drop conditional `ClerkProvider`.
+1. ~~Delete `src/app/api/clerk/webhook/route.ts` (replaced by `handle_new_user` trigger).~~ **DONE (#83).**
+2. ~~UI ternaries: sign-in / sign-up pages + `UseInvitedEmailButton` -> Supabase branch only.~~ **DONE (#83).**
+3. ~~`src/app/layout.tsx` -> drop conditional `ClerkProvider`.~~ **DONE (#83) — `ClerkProvider` gone.**
 4. `src/lib/auth.ts` -> collapse 9 Clerk branches to Supabase-only. Verify owner/member/super-admin.
 5. CSP + `CLERK_*` env in `production-readiness-rules.ts`, `health.ts`, `proof-signals.ts`. `pnpm check:prod` must pass.
 6. Update the 9 `@clerk`-mocking test files. `pnpm test` green.
