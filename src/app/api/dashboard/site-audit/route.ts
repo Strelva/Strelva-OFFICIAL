@@ -71,13 +71,28 @@ export async function GET(request: NextRequest) {
     // the admin overview + sparkline read (one source of truth), and returns the
     // full per-category detail for the card.
     const scan = await scanTenant(tenant);
+    // The per-check "~$X/mo lost" / "~N customers/mo" figures come from a GENERIC
+    // traffic baseline (500 visitors · 3% · $75), not this client's real numbers.
+    // That's a fair cold-open hook on the public /audit tool, but invented
+    // precision about a PAYING client's own site reads as fabricated — and we
+    // already track their real traffic. Drop the quantified figures here; the
+    // qualitative "what this costs you" impact lines (true regardless of traffic)
+    // stay. Revisit by feeding real tracked traffic in, not a generic baseline.
+    const detail = scan.detail.map((cat) => ({
+      ...cat,
+      checks: cat.checks.map((c) => {
+        const clone = { ...c };
+        delete clone.quantified;
+        return clone;
+      }),
+    }));
     const result = {
       url: scan.url,
       scannedAt: scan.scannedAt,
       overallScore: scan.overallScore,
       grade: scan.grade,
-      categories: scan.detail,
-      topFixes: topFixes(scan.detail, 5),
+      categories: detail,
+      topFixes: topFixes(detail, 5),
     };
 
     if (redis) {
