@@ -29,7 +29,7 @@ cp revalidate-route.ts my-client-site/app/api/v1/revalidate/route.ts
 cd my-client-site
 cat > .env.local << EOF
 TENANT_ID=client-slug
-SCAFFOLD_API_URL=https://scaffoldweb.com
+SCAFFOLD_API_URL=https://app.strelva.com
 REVALIDATION_SECRET=<from-provision-tenant-output>
 EOF
 ```
@@ -38,12 +38,12 @@ EOF
 
 ```bash
 TENANT_ID=client-slug                              # Required (server-side content fetch)
-SCAFFOLD_API_URL=https://scaffoldweb.com            # Required (or legacy REB_API_URL)
+SCAFFOLD_API_URL=https://app.strelva.com            # Required (or legacy REB_API_URL)
 REVALIDATION_SECRET=shared-secret-from-scaffold     # Required
 
 # Tracking beacon (browser) — required only if you mount <ScaffoldTracker />:
 NEXT_PUBLIC_TENANT_ID=client-slug                   # Same slug as TENANT_ID
-NEXT_PUBLIC_SCAFFOLD_API_URL=https://scaffoldweb.com # Same URL as SCAFFOLD_API_URL
+NEXT_PUBLIC_SCAFFOLD_API_URL=https://app.strelva.com # Same URL as SCAFFOLD_API_URL
 ```
 
 `scaffold-client.ts` also accepts the legacy `REB_API_URL` env var. New repos

@@ -7,7 +7,7 @@
  *
  * Env vars:
  *   - TENANT_ID            (required)            the tenant slug
- *   - SCAFFOLD_API_URL     (preferred)           https://scaffoldweb.com
+ *   - SCAFFOLD_API_URL     (preferred)           https://app.strelva.com
  *   - REB_API_URL          (legacy alias)        falls back when SCAFFOLD_API_URL is unset
  *
  * Legacy `REB_*` names are kept readable so existing custom repos do not

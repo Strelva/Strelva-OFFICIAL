@@ -25,7 +25,7 @@
  *
  * Env (set in the client repo, browser-inlined by Next.js):
  *   - NEXT_PUBLIC_TENANT_ID        the tenant slug (e.g. "gldf", "rohlax")
- *   - NEXT_PUBLIC_SCAFFOLD_API_URL https://scaffoldweb.com  (control plane)
+ *   - NEXT_PUBLIC_SCAFFOLD_API_URL https://app.strelva.com  (control plane)
  */
 
 import { useEffect } from "react";

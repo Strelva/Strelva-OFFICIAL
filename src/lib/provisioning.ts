@@ -63,14 +63,15 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-// The control-plane host the client repo pulls /api/v1/* from. Verified live:
-// the control plane serves on scaffoldweb.com (strelva.com is now the marketing
-// site and does NOT serve the v1 contract). Flips to app.strelva.com at the
-// cutover (T004) — env-driven so that flip needs no code change. Wire-level
-// REB_*/SCAFFOLD env *names* stay frozen; only this value moves.
-// NOTE: scripts/provision-tenant.ts still prints the stale strelva.com value.
-// IMPORTANT: scaffoldweb.com is hardcoded because it is the operational wire-level
-// endpoint that existing deployed client repos expect. Do NOT change this default.
+// The control-plane host the client repo pulls /api/v1/* from.
+// Cutover DONE (2026-06-26): prod sets CONTROL_PLANE_API_URL=https://app.strelva.com,
+// so new clients now bake app.strelva.com (the canonical control plane). app.strelva.com
+// + scaffoldweb.com are the same Vercel project during the soak; strelva.com is the
+// marketing site and does NOT serve the v1 contract.
+// The literal default stays scaffoldweb.com on purpose: it is the operational wire-level
+// endpoint that already-deployed legacy client repos expect, and it keeps working until
+// scaffoldweb is decommissioned (post-soak). Wire-level REB_*/SCAFFOLD env *names* stay
+// frozen; only the value moves, via the env var above. Do NOT change this default literal.
 const CONTROL_PLANE_API =
   process.env.CONTROL_PLANE_API_URL || "https://scaffoldweb.com";
 
