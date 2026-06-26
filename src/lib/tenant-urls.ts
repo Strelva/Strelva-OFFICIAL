@@ -153,7 +153,10 @@ export function getTenantDashboardFallbackUrl(
   const tenantId = tenant.subdomain || tenant.id;
 
   if (environment === "production") {
-    return `https://strelva.com/client/${tenantId}${normalizedPath}`;
+    // app.strelva.com is the control plane and serves /client/* paths.
+    // strelva.com is the marketing site and 404s on /client/* — using it here
+    // broke the admin tenant-dashboard links and the post-login account redirect.
+    return `https://app.strelva.com/client/${tenantId}${normalizedPath}`;
   }
 
   return `http://localhost:3000/client/${tenantId}${normalizedPath}`;

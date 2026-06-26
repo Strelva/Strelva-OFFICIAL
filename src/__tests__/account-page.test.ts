@@ -45,7 +45,7 @@ vi.mock("@/lib/dev-access", () => ({
 
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardFallbackUrl: (tenant: { id: string }) =>
-    `https://strelva.com/client/${tenant.id}/dashboard`,
+    `https://app.strelva.com/client/${tenant.id}/dashboard`,
   getTenantDashboardHost: (tenant: { id: string }) => `admin.${tenant.id}.example.com`,
 }));
 

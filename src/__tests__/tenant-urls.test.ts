@@ -31,12 +31,14 @@ describe("tenant URL helpers", () => {
     );
   });
 
-  it("builds stable strelva.com fallback dashboard URLs", () => {
+  it("builds stable control-plane fallback dashboard URLs", () => {
     expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard/site", "development")).toBe(
       "http://localhost:3000/client/gldf/dashboard/site"
     );
+    // Production fallback must hit the control plane (app.strelva.com), not the
+    // marketing host (strelva.com), which 404s on /client/*.
     expect(getTenantDashboardFallbackUrl(tenant(), "/dashboard", "production")).toBe(
-      "https://strelva.com/client/gldf/dashboard"
+      "https://app.strelva.com/client/gldf/dashboard"
     );
   });
 
