@@ -145,7 +145,33 @@ describe("scanAllTenants", () => {
 
     const outcome = await scanAllTenants();
 
-    expect(outcome).toEqual({ scanned: [], failed: [] });
+    expect(outcome).toEqual({ scanned: [], failed: [], deferred: 0, windowIndex: undefined, windowCount: undefined });
     expect(mockRunAudit).not.toHaveBeenCalled();
+  });
+
+  it("caps the run and rotates the covered window when a per-run window is given", async () => {
+    mockGetAllTenants.mockResolvedValue([
+      tenant("a", true),
+      tenant("b", true),
+      tenant("c", true),
+      tenant("d", true),
+    ]);
+    mockGetTenantConfig.mockImplementation(async (id: string) => tenant(id));
+    mockGetTenantPublicUrl.mockImplementation((c: TenantConfig) => `https://${c.id}.example.com`);
+    mockRunAudit.mockResolvedValue(detail);
+
+    // 4 active tenants, cap 2 → 2 windows. rotateIndex 0 = first half, 1 = second half.
+    const run0 = await scanAllTenants(6, { maxPerRun: 2, rotateIndex: 0 });
+    expect(run0.scanned.map((s) => s.tenant)).toEqual(["a", "b"]);
+    expect(run0.deferred).toBe(2);
+    expect(run0.windowCount).toBe(2);
+
+    const run1 = await scanAllTenants(6, { maxPerRun: 2, rotateIndex: 1 });
+    expect(run1.scanned.map((s) => s.tenant)).toEqual(["c", "d"]);
+    expect(run1.deferred).toBe(2);
+
+    // rotateIndex wraps modulo windowCount, so day 2 covers the first half again.
+    const run2 = await scanAllTenants(6, { maxPerRun: 2, rotateIndex: 2 });
+    expect(run2.scanned.map((s) => s.tenant)).toEqual(["a", "b"]);
   });
 });

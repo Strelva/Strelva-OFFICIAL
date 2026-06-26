@@ -11,6 +11,11 @@ import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { isAuthorizedPreview } from "@/lib/preview-auth";
 
+// Per-tenant content is tenant-private: a shared/CDN cache must never store one
+// tenant's response and serve it to another. No CDN sits in front today, but
+// this closes the latent cross-tenant bleed before one ever does.
+const TENANT_PRIVATE_CACHE = "private, max-age=0, must-revalidate";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ tenant: string; section: string }> }
@@ -45,7 +50,9 @@ export async function GET(
       tenant,
       preview ? { preview: true } : undefined,
     );
-    return NextResponse.json(data as ContentMap[ContentSection]);
+    return NextResponse.json(data as ContentMap[ContentSection], {
+      headers: { "Cache-Control": TENANT_PRIVATE_CACHE },
+    });
   } catch (err) {
     console.error("[v1 content GET]", tenant, section, err);
     return NextResponse.json({ error: "Failed to load content" }, { status: 500 });
