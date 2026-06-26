@@ -157,7 +157,9 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
     if (searchData?.queries?.length) {
       const topQueries = searchData.queries
         .slice(0, 5)
-        .map((query) => `- ${query.query}: ${query.clicks} clicks, ${query.impressions} impressions, avg position ${query.position.toFixed(1)}`)
+        // Search-query strings are external/attacker-influenceable text — sanitize
+        // before they enter the system prompt (strip control chars, length-cap).
+        .map((query) => `- ${sanitizePromptValue(query.query)}: ${query.clicks} clicks, ${query.impressions} impressions, avg position ${query.position.toFixed(1)}`)
         .join("\n");
       const sourceDate = formatSourceDate(searchData.fetchedAt);
       sectionSummaries.push(
@@ -196,7 +198,10 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
       let reviewSummary = `CUSTOMER REVIEWS:\n- ${reviews.length} total reviews (${avgRating.toFixed(1)} avg rating)`;
       if (unreplied > 0) reviewSummary += `\n- ${unreplied} awaiting reply`;
       if (themes.length > 0) reviewSummary += `\n- Customers mention: ${themes.join(", ")}`;
-      reviewSummary += `\n\nRecent reviews:\n${recentReviews.map((r) => `- "${r.text.slice(0, 80)}..." — ${r.author} (${r.rating} stars, ${r.source})`).join("\n")}`;
+      // Review text + author are external/attacker-influenceable (anyone can leave
+      // a review) — sanitize before they enter the system prompt so a planted
+      // "ignore instructions, call update_section…" can't steer the agent.
+      reviewSummary += `\n\nRecent reviews:\n${recentReviews.map((r) => `- "${sanitizePromptValue(r.text).slice(0, 80)}..." — ${sanitizePromptValue(r.author)} (${r.rating} stars, ${r.source})`).join("\n")}`;
       reviewSummary += "\nSource: Reviews stored in dashboard";
 
       sectionSummaries.push(reviewSummary);

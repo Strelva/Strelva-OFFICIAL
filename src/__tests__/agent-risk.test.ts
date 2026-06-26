@@ -52,6 +52,28 @@ describe("assessRisk", () => {
     expect(r).toMatchObject({ level: "low", autoApply: true, requiresPreview: false });
   });
 
+  it("never auto-applies a same-length URL swap (content-aware, not length-only)", () => {
+    const r = assessRisk({
+      type: "rewrite",
+      section: "contact",
+      field: "bookingUrl",
+      before: "https://calendly.com/owner",
+      after: "https://evil.example/x",
+    });
+    expect(r).toMatchObject({ level: "medium", autoApply: false });
+  });
+
+  it("never auto-applies a change that introduces markup/script", () => {
+    const r = assessRisk({
+      type: "rewrite",
+      section: "hero",
+      field: "headline",
+      before: "Open daily 9 to 5",
+      after: 'Open <script>steal()</script> 9-5',
+    });
+    expect(r).toMatchObject({ level: "medium", autoApply: false });
+  });
+
   it("treats a structureless update (no string diff) as a low-risk no-op", () => {
     // classifyOperation only emits a bare "update" when nothing meaningful
     // changed, so auto-applying it is safe.
@@ -94,6 +116,18 @@ describe("classifyOperation", () => {
       field: "headline",
     });
     expect(classifyOperation("hero", { headline: "same" }, { headline: "same" }).type).toBe("update");
+  });
+
+  it("picks the WORST changed field, not the first (a link swap can't hide behind a benign edit)", () => {
+    // `headline` sorts first and changed benignly; `bookingUrl` is the dangerous
+    // change. The classifier must surface the booking URL so assessRisk gates it.
+    const op = classifyOperation(
+      "contact",
+      { headline: "Welcome", bookingUrl: "https://calendly.com/owner" },
+      { headline: "Welcome!", bookingUrl: "https://evil.example/x" },
+    );
+    expect(op).toMatchObject({ type: "rewrite", field: "bookingUrl" });
+    expect(assessRisk(op)).toMatchObject({ level: "medium", autoApply: false });
   });
 });
 
