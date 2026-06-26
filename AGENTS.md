@@ -116,7 +116,8 @@ Pivoted 2026-06-26 from the two-door build-fee offer (`docs/strategy/website-off
 - **Ownership is the positioning spine**: domain in the client's name from day one, content export anytime (see `docs/repo-transfer-runbook.md`, `docs/domain-setup.md`).
 - **Billing is LIVE (2026-06-26)** on the new standalone Strelva Stripe account (`acct_1Tmc5dA4gUnh4arE`). `isBillingEnabled()` (`src/lib/subscription.ts`) is true (`STRIPE_SCAFFOLD_PRICE_ID` = the Growth price). `STRIPE_BILLING_GRANDFATHER_TENANTS=gldf,rohlax` keeps existing clients active; `check:prod` enforces the grandfather-list-or-402 rule.
 - ⚠️ **To change any Stripe/billing env var you MUST do a fresh `vercel deploy --prod --yes --scope scaffold-web`. `vercel redeploy` REUSES the target deployment's env snapshot and will NOT apply env changes.**
-- **gldf + rohlax are grandfathered** (no subscription; protected via the list). New clients subscribe at a tier price. Operational guardrail (no upfront fee): collect month-1 payment before building.
+- **gldf + rohlax are grandfathered** (no subscription; protected via the list). New clients subscribe at a tier price.
+- **Offer hook = "free to build" (founder decision, 2026-06-26):** no build fee, no upfront/setup cost. We **build first**, the client approves, and the **monthly subscription starts at go-live** ("pay when you're happy"). This is a deliberate low-friction growth hook — we accept the risk of an occasional unpaid build as the cost of frictionless sign-on. Marketing says "free to build / pay when happy" on purpose; do NOT "correct" it to a pay-first framing.
 - Canonical pricing/Stripe-setup detail (account, live price IDs, branding): vault `1-projects/scaffold-web/pricing-and-billing.md`.
 - Agency channel (wholesale resell) was researched and parked (2026-06-09); not built.
 
@@ -161,7 +162,7 @@ Local-business owners will pay for a dashboard that proves their website is work
 - Tiered pricing UI.
 - A `/api/public/*` re-export shell of the v1 contract (v1 owns the contract directly now).
 - Self-serve onboarding/provisioning (backend deleted 2026-06-10; don't resurrect without a founder decision).
-- "Free site" offers or copy anywhere (the free thing is the scan/scorecard — zero marginal cost — never the build).
+- Copy implying the ONGOING service is free. "Free to build" (no build fee) and the free audit tool are the only "free" — the monthly subscription ($99/$199/$499) is always paid. Don't say "free site/free hosting/free forever."
 
 ## Execution Rules
 - NEVER add "Co-Authored-By" lines to commits.
