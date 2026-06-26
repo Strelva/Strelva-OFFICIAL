@@ -106,13 +106,18 @@ A control plane for local-business websites. Owners see a dashboard with what's 
 ## One-Liner
 "See what's working. Tell the AI what to change."
 
-## The Model (founder decision, 2026-06-09 — cash-first)
-- **Free sites are killed. Paid builds only**, sold as a two-door offer — full spec, scope walls, verified competitive claims, and objection table in `docs/strategy/website-offer-two-door.md` (final prices pending founder confirmation):
-  - **Door 1 "Built for you"**: $1,500–2,500 one-time, includes first 3 months of management, then $99/mo. Lead with this.
-  - **Door 2 "Managed"** (rescue close only): $499 start + $199/mo, 12-month minimum, client owns repo+files after month 12. Client agreement draft: `docs/strategy/client-agreement-draft.md` (lawyer pass before first Door 2 signature).
-- **Ownership is the positioning spine**: domain in the client's name from day one, content export anytime, "you leave with everything" (see `docs/repo-transfer-runbook.md`, `docs/domain-setup.md`).
-- **Billing is still OFF.** `isBillingEnabled()` in `src/lib/subscription.ts` returns false while `STRIPE_SCAFFOLD_PRICE_ID` is unset and treats every tenant as active. **Flipping it on is a cliff**: set `STRIPE_BILLING_GRANDFATHER_TENANTS` (e.g. `gldf,rohlax`) in the SAME deploy or existing tenants get 402'd — `check:prod` enforces this.
-- **Rohlax is grandfathered**: one-time payment, ongoing management free, never pitch her recurring. The recurring-price test goes to the next client.
+## The Model (founder decision, 2026-06-26 — 3-tier subscription, billing LIVE)
+Pivoted 2026-06-26 from the two-door build-fee offer (`docs/strategy/website-offer-two-door.md`, now **superseded**) to a **pure monthly subscription, no upfront fee** — building is fast now, so the goal is low-friction sign-on. Three tiers, differentiated by **capability** (not page count):
+- **Presence — $99/mo:** one-page lander (get found, click-to-call/booking, local-SEO foundations).
+- **Growth — $199/mo:** full multi-page site + **transact** (online booking or basic ecom). The anchor/"most popular" tier; `STRIPE_SCAFFOLD_PRICE_ID` defaults to it.
+- **Scale — $499/mo:** everything in Growth + the **content engine** (blog/SEO content the AI writes and we review), multi-location, integrations, priority done-with-you management.
+- **Shared across all:** custom site (never a template), update-by-chat AI, weekly report, hosting; **you own your domain + content, leave anytime** (the wedge + the no-contract trust signal).
+- **Tiers are packaging + build-scope, NOT code-enforced feature flags** — the platform serves whatever's built into the client's repo; the Stripe price just sets the charge. No engineering needed to "support tiers."
+- **Ownership is the positioning spine**: domain in the client's name from day one, content export anytime (see `docs/repo-transfer-runbook.md`, `docs/domain-setup.md`).
+- **Billing is LIVE (2026-06-26)** on the new standalone Strelva Stripe account (`acct_1Tmc5dA4gUnh4arE`). `isBillingEnabled()` (`src/lib/subscription.ts`) is true (`STRIPE_SCAFFOLD_PRICE_ID` = the Growth price). `STRIPE_BILLING_GRANDFATHER_TENANTS=gldf,rohlax` keeps existing clients active; `check:prod` enforces the grandfather-list-or-402 rule.
+- ⚠️ **To change any Stripe/billing env var you MUST do a fresh `vercel deploy --prod --yes --scope scaffold-web`. `vercel redeploy` REUSES the target deployment's env snapshot and will NOT apply env changes.**
+- **gldf + rohlax are grandfathered** (no subscription; protected via the list). New clients subscribe at a tier price. Operational guardrail (no upfront fee): collect month-1 payment before building.
+- Canonical pricing/Stripe-setup detail (account, live price IDs, branding): vault `1-projects/scaffold-web/pricing-and-billing.md`.
 - Agency channel (wholesale resell) was researched and parked (2026-06-09); not built.
 
 ## Value Hypothesis
