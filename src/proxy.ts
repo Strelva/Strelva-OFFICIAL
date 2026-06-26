@@ -12,6 +12,12 @@ const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   "gldf.strelva.com": "https://greatlakesdriedfruit.com",
 };
 
+// Reserved control-plane subdomains under strelva.com that are NOT tenants.
+// `app`/`api` matter for the scaffoldweb.com -> app.strelva.com cutover: without
+// this, app.strelva.com would resolve to a phantom tenant "app". `www`/`admin`
+// were already excluded inline; they live here now so there is one list.
+const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
+
 const cspBaseDirectives = [
   "default-src 'self'",
   // Clerk's live frontend API is still served from clerk.scaffoldweb.com (CLERK_DOMAIN=scaffoldweb.com);
@@ -87,7 +93,7 @@ export function extractTenantFromHost(host: string): { tenant: string | null; is
         ? { tenant, isAdminSubdomain: true }
         : { tenant: null, isAdminSubdomain: false };
     }
-    if (subdomain && subdomain !== "www" && subdomain !== "admin") {
+    if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain)) {
       return { tenant: subdomain, isAdminSubdomain: false };
     }
     return { tenant: null, isAdminSubdomain: false };

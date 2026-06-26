@@ -41,6 +41,22 @@ describe("proxy host routing helpers", () => {
     });
   });
 
+  it("keeps reserved control-plane subdomains out of tenant routing", () => {
+    // app.strelva.com is the post-cutover control-plane host, NOT a tenant.
+    expect(extractTenantFromHost("app.strelva.com")).toEqual({
+      tenant: null,
+      isAdminSubdomain: false,
+    });
+    expect(extractTenantFromHost("api.strelva.com")).toEqual({
+      tenant: null,
+      isAdminSubdomain: false,
+    });
+    expect(extractTenantFromHost("www.strelva.com")).toEqual({
+      tenant: null,
+      isAdminSubdomain: false,
+    });
+  });
+
   it("routes admin tenant hosts to the tenant dashboard surface", () => {
     expect(extractTenantFromHost("admin.gldf.localhost:3000")).toEqual({
       tenant: "gldf",
