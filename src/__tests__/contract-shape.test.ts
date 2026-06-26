@@ -9,6 +9,7 @@
  * blank every client site.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defaults } from "@/lib/defaults";
 
 const getTenantConfig = vi.fn();
 const getContent = vi.fn();
@@ -111,4 +112,33 @@ describe("v1 page-config + site-capabilities contract shape", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(manifest);
   });
+});
+
+// The tests above mock getContent, so they lock the ENVELOPE (unwrapped, status
+// codes) but NOT the per-section FIELDS that actually flow to the wire. This
+// block locks those: the v1 content route returns getContent(section), which
+// falls back to defaults[section], so the default's field set IS the contract a
+// deployed client repo (GLDF/Rohlax) renders. A rename/add/remove in types.ts +
+// defaults would otherwise silently change the response and blank a live site.
+// Changing a list here must be a CONSCIOUS, versioned decision — not a "make CI
+// green" reflex. Add a v2 sibling for a breaking change.
+const V1_SECTION_FIELDS: Record<string, string[]> = {
+  hero: ["backgroundImageUrl", "ctaLink", "ctaText", "headline", "subheadline", "tagline"],
+  services: ["description", "headline", "sectionLabel", "services"],
+  story: ["accentText", "headline", "imageUrl", "paragraphs", "quote", "quoteAttribution", "sectionLabel", "statement", "stats"],
+  testimonials: ["headline", "sectionLabel", "testimonials"],
+  events: ["events", "headline", "sectionLabel"],
+  providers: ["description", "headline", "providers", "sectionLabel"],
+  contact: ["address", "email", "facebookUrl", "googleMapsUrl", "hours", "instagramUrl", "locationDescription", "locationTitle", "phone"],
+  settings: ["bookingUrl", "copyrightText", "footerTagline", "instagramHandle", "ownerName", "ownerTitle", "siteDescription", "siteKeywords", "siteName", "siteTagline", "vagaro_embed_id"],
+  faq: ["description", "faqs", "headline", "sectionLabel"],
+};
+
+describe("v1 content per-section field shape (the wire contract)", () => {
+  it.each(Object.entries(V1_SECTION_FIELDS))(
+    "%s exposes exactly its locked field set",
+    (section, fields) => {
+      expect(Object.keys(defaults[section as keyof typeof defaults]).sort()).toEqual(fields);
+    },
+  );
 });

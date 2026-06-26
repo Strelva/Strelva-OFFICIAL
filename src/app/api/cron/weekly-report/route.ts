@@ -7,14 +7,20 @@ import { generateAllReports } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { sanitizeEmailSubjectText, escapeHtml } from "@/lib/invite-email";
 
 function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
+  // The summary can echo tenant-authored content (service names, search queries)
+  // via the deterministic fallback or the Gemini output, and siteName is
+  // tenant-set — escape both before interpolating into HTML so a renamed service
+  // like `<a href="evil">…</a>` can't become a live link in the owner's email
+  // sent from Strelva's verified domain. Escape THEN convert newlines to <br>.
   const paragraphs = summary
     .split("\n\n")
     .filter(Boolean)
-    .map((p) => `<p style="margin: 0 0 16px; line-height: 1.6; color: #1a1a1a;">${p.replace(/\n/g, "<br>")}</p>`)
+    .map((p) => `<p style="margin: 0 0 16px; line-height: 1.6; color: #1a1a1a;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
     .join("");
+  const safeSiteName = escapeHtml(siteName);
 
   return `<!DOCTYPE html>
 <html>
@@ -31,7 +37,7 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string): 
       </p>
       <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
       <p style="font-size: 13px; color: #77716a; margin: 0;">
-        Sent by Strelva for ${siteName}
+        Sent by Strelva for ${safeSiteName}
       </p>
     </div>
   </div>

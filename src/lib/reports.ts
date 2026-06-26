@@ -8,6 +8,7 @@ import type { TenantConfig, ContentSection, SearchQuery, UnifiedEvent } from "./
 import type { ActivityEntry } from "./storage";
 import { getLatestSnapshots, diffSnapshots } from "./visibility/snapshots";
 import type { VisibilityDiff } from "./visibility/snapshots";
+import { sanitizeEmailSubjectText } from "./invite-email";
 
 export interface ServiceClickData {
   serviceId: string;
@@ -292,8 +293,11 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
     .map((s) => `- ${s.section} (${s.daysSinceUpdate} days)`)
     .join("\n");
 
+  // Service names are tenant-authored and search queries are external — strip
+  // markup/newlines before they enter the Gemini prompt so a planted value can't
+  // inject instructions into the report (parity with the agent-prompt hardening).
   const serviceSummary = data.topServices
-    .map((s) => `- ${data.serviceNames[s.serviceId] || s.serviceId}: ${s.thisWeek} clicks this week (${s.total} total)`)
+    .map((s) => `- ${sanitizeEmailSubjectText(data.serviceNames[s.serviceId] || s.serviceId)}: ${s.thisWeek} clicks this week (${s.total} total)`)
     .join("\n");
 
   const verificationBlock = data.verifiedChanges.length > 0 || data.failedVerifications > 0
@@ -316,7 +320,7 @@ Stats this week:
 
 ${serviceSummary ? `Top services by booking clicks:\n${serviceSummary}` : ""}
 
-${data.topSearchQueries.length > 0 ? `Top searches that found the site:\n${data.topSearchQueries.map((q) => `- "${q.query}" (${q.clicks} clicks, ${q.impressions} impressions)`).join("\n")}` : ""}
+${data.topSearchQueries.length > 0 ? `Top searches that found the site:\n${data.topSearchQueries.map((q) => `- "${sanitizeEmailSubjectText(q.query)}" (${q.clicks} clicks, ${q.impressions} impressions)`).join("\n")}` : ""}
 
 ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : "All sections are up to date."}
 
