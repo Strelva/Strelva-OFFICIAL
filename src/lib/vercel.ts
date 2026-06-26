@@ -90,6 +90,26 @@ export async function setVercelEnv(
   return { ok: true, data: { set } };
 }
 
+/** Delete a project by name or id. Used by the deprovision script to tear down
+ *  the `{tenantId}-site` project an onboard created (env vars + domains go with
+ *  it). Idempotent: a missing project (404) is treated as success. */
+export async function deleteVercelProject(
+  nameOrId: string
+): Promise<VercelResult<{ deleted: string }>> {
+  const token = vercelToken();
+  if (!token) return { ok: false, error: "VERCEL_API_TOKEN not set" };
+  try {
+    const res = await fetch(
+      `${VERCEL_API}/v9/projects/${encodeURIComponent(nameOrId)}${teamQuery()}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (res.ok || res.status === 404) return { ok: true, data: { deleted: nameOrId } };
+    return { ok: false, error: await errorMessage(res) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
+
 export async function addVercelDomain(
   projectId: string,
   domain: string

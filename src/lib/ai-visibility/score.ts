@@ -94,44 +94,37 @@ async function fetchText(url: string, ms = 9000): Promise<string | null> {
   }
 }
 
-/** True if robots.txt disallows the whole site for AI crawlers (or for *). */
+/** True if robots.txt disallows the whole site (`Disallow: /`) for any AI
+ *  crawler or for `*`. Follows robots grouping properly: consecutive
+ *  User-agent lines share one rule block, and any directive ends the block so a
+ *  following User-agent starts a new one — blank-line separators are NOT
+ *  required (the old version assumed they were). Inline `#` comments stripped. */
 function aiCrawlersBlocked(robots: string): { blocked: boolean; who: string[] } {
-  const lines = robots.split(/\r?\n/).map((l) => l.trim());
-  const blocked: string[] = [];
-  let current: string[] = [];
-  let disallowAll = false;
-  const flush = () => {
-    if (disallowAll) {
-      for (const ua of current) {
-        if (ua === "*" || AI_BOTS.some((b) => b.toLowerCase() === ua.toLowerCase())) {
-          blocked.push(ua);
-        }
+  const isAiOrWildcard = (ua: string) =>
+    ua === "*" || AI_BOTS.some((b) => b.toLowerCase() === ua.toLowerCase());
+  const blocked = new Set<string>();
+  let group: string[] = []; // user-agents (original case) in the current block
+  let sawRule = false; // seen a directive since the last User-agent line?
+
+  for (const raw of robots.split(/\r?\n/)) {
+    const line = raw.split("#")[0].trim();
+    const idx = line.indexOf(":");
+    if (idx === -1) continue;
+    const key = line.slice(0, idx).trim().toLowerCase();
+    const value = line.slice(idx + 1).trim();
+
+    if (key === "user-agent") {
+      if (sawRule) { group = []; sawRule = false; } // a UA after rules = new block
+      group.push(value);
+    } else {
+      sawRule = true; // disallow/allow/crawl-delay/sitemap all close the UA list
+      if (key === "disallow" && value === "/") {
+        for (const ua of group) if (isAiOrWildcard(ua)) blocked.add(ua);
       }
-    }
-  };
-  for (const line of lines) {
-    if (/^user-agent:/i.test(line)) {
-      if (current.length && /* new group after rules */ disallowAll !== undefined) {
-        // groups are separated by blank lines; handled below
-      }
-      const ua = line.split(":")[1]?.trim() ?? "";
-      // start of a new group when previous group had directives
-      if (current.length === 0 || disallowAll !== false) {
-        // accumulate consecutive UA lines into one group
-      }
-      current.push(ua);
-    } else if (/^disallow:/i.test(line)) {
-      const path = line.split(":")[1]?.trim() ?? "";
-      if (path === "/") disallowAll = true;
-    } else if (line === "") {
-      flush();
-      current = [];
-      disallowAll = false;
     }
   }
-  flush();
-  const uniq = Array.from(new Set(blocked));
-  return { blocked: uniq.length > 0, who: uniq };
+  const who = [...blocked];
+  return { blocked: who.length > 0, who };
 }
 
 function readinessSignals(html: string, robots: string | null, _input: ScoreInput): Signal[] {

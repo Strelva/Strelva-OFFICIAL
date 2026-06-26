@@ -8,10 +8,12 @@
  * live "does AI actually recommend you?" citation probe.
  *
  * Pass --html to ALSO write a clean, self-contained one-page HTML artifact
- * (./ai-visibility-{slug}.html) that Jacob can send to a prospect. ANSI terminal
- * output is unchanged.
+ * (ai-visibility-{slug}.html) that Jacob can send to a prospect. ANSI terminal
+ * output is unchanged. By default the file lands in the current directory; pass
+ * --out=<dir> to write it somewhere specific (the dir is created if missing) —
+ * e.g. --out=outbound to collect a batch of prospect one-pagers in one folder.
  */
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { scoreAiVisibility, type Grade } from "../src/lib/ai-visibility/score";
 import { renderAiVisibilityHtml, slugify } from "../src/lib/ai-visibility/html";
@@ -68,7 +70,9 @@ async function main() {
 
   if (flag("html")) {
     const html = renderAiVisibilityHtml(result);
-    const outPath = resolve(process.cwd(), `ai-visibility-${slugify(result.business)}.html`);
+    const outDir = arg("out");
+    if (outDir) mkdirSync(outDir, { recursive: true });
+    const outPath = resolve(outDir ?? process.cwd(), `ai-visibility-${slugify(result.business)}.html`);
     writeFileSync(outPath, html, "utf8");
     console.log(`  ${BOLD}HTML artifact:${R} ${outPath}`);
     console.log("");

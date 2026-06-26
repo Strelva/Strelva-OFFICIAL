@@ -16,8 +16,8 @@ pnpm typecheck                    # tsc --noEmit
 pnpm provision-tenant             # Create new tenant
 pnpm check:prod                   # Production readiness checklist
 pnpm check:custom-repos           # Verify sibling custom-repo workspaces
-npx tsx scripts/ai-visibility.ts "<Business>" --site=x.com --category="HVAC" --city="Buffalo, NY" [--html]
-                                  # AI-visibility scorecard (door-opener artifact; --html writes a sendable one-pager)
+npx tsx scripts/ai-visibility.ts "<Business>" --site=x.com --category="HVAC" --city="Buffalo, NY" [--html] [--out=<dir>]
+                                  # AI-visibility scorecard (door-opener artifact; --html writes a sendable one-pager, --out=<dir> sets where)
 ```
 
 For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom domain routing is exercised via `CUSTOM_DOMAIN_MAP` in `.env`.
