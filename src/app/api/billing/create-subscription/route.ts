@@ -7,13 +7,6 @@ import {
   createTenantSubscriptionCheckout,
 } from "@/lib/billing";
 
-function getRequestOrigin(req: Request): string {
-  const url = new URL(req.url);
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
-  return `${proto}://${host}`;
-}
-
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
@@ -55,15 +48,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unknown tenant: ${normalizedTenantId}` }, { status: 400 });
   }
 
-  const origin = getRequestOrigin(req);
-
   try {
+    // No successUrl/cancelUrl override: the CLIENT pays this checkout, so they
+    // must land back on THEIR OWN dashboard. createTenantSubscriptionCheckout
+    // defaults to getTenantDashboardUrl(tenant, "/dashboard?checkout=success").
+    // The previous `${origin}/admin?...` sent the paying client to the operator
+    // admin host, where they have no access — a Forbidden on the "you're
+    // subscribed" moment.
     const result = await createTenantSubscriptionCheckout({
       tenant: tenantConfig,
       customerEmail,
       customerName: normalizedCustomerName || undefined,
-      successUrl: `${origin}/admin?subscription=success&tenant=${normalizedTenantId}`,
-      cancelUrl: `${origin}/admin?subscription=cancelled&tenant=${normalizedTenantId}`,
     });
 
     return NextResponse.json({

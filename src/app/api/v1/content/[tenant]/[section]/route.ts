@@ -3,7 +3,8 @@
  *
  * Stable contract consumed by custom-repo client sites. The response shape
  * here is the canonical v1 contract — change it only by versioning (add a
- * v2 sibling). Tests in `contracts.test.ts` lock the shape.
+ * v2 sibling). `contract-shape.test.ts` locks both the envelope (the section
+ * object is returned UNWRAPPED) and the per-section field set.
  */
 import { NextResponse } from "next/server";
 import type { ContentMap, ContentSection } from "@/lib/types";

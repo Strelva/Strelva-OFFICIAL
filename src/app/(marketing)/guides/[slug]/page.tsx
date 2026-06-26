@@ -4,6 +4,18 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Clock } from "lucide-react";
 import { getGuide, listGuides } from "@/lib/guides";
 
+// Serialize JSON-LD safely: JSON.stringify escapes quotes but NOT `<`, so a
+// `</script>` in the data would close the tag. Mirrors the escaper in
+// (public)/layout.tsx. Guide data is team-authored today, so this is
+// defense-in-depth — applied for parity in case a field ever becomes dynamic.
+function jsonLd(obj: unknown): string {
+  return JSON.stringify(obj)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/;/g, "\\u003b");
+}
+
 export function generateStaticParams() {
   return listGuides().map((g) => ({ slug: g.slug }));
 }
@@ -63,12 +75,12 @@ export default async function GuidePage({
     <article className="marketing-root min-h-dvh px-5 py-5 md:px-8">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(articleLd) }}
       />
       {faqLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(faqLd) }}
         />
       )}
 

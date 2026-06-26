@@ -415,12 +415,23 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     );
     const portal = readFileSync(path.join(process.cwd(), "src/app/api/billing/portal/route.ts"), "utf8");
 
+    // Neither route may build a Stripe return URL from the browser-controlled
+    // Origin header (open-redirect / phishing-return risk).
     for (const source of [subscription, portal]) {
-      expect(source).toContain("getRequestOrigin");
-      expect(source).toContain('"x-forwarded-host"');
-      expect(source).toContain('"x-forwarded-proto"');
       expect(source).not.toContain('headers.get("origin")');
     }
+
+    // Portal derives its return URL from the server-set forwarded host.
+    expect(portal).toContain("getRequestOrigin");
+    expect(portal).toContain('"x-forwarded-host"');
+    expect(portal).toContain('"x-forwarded-proto"');
+
+    // Subscription does NOT construct return URLs from the request at all — it
+    // lets createTenantSubscriptionCheckout default to the tenant's OWN dashboard
+    // (getTenantDashboardUrl, from trusted tenant config), so the paying client
+    // lands on their site rather than the operator admin host.
+    expect(subscription).not.toContain("getRequestOrigin");
+    expect(subscription).not.toContain("successUrl:");
 
     expect(subscription).toContain("normalizeEmail");
     expect(subscription).toContain("customerEmail = normalizeEmail");

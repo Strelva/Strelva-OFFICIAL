@@ -15,7 +15,7 @@ import { createInvite } from "./invites";
 import { setContent } from "./storage";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
-import type { ContentSection } from "./types";
+import type { ContentSection, ContentMap } from "./types";
 import {
   createVercelProject,
   setVercelEnv,
@@ -182,6 +182,16 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     "hero", "services", "story", "testimonials", "events",
     "providers", "contact", "settings", "faq",
   ];
+  // Seed baseline = the shared defaults, but with the few wellness-flavored
+  // placeholder strings neutralized so a non-wellness client (HVAC, legal,
+  // restaurant) doesn't open their dashboard to yoga copy. The rest of the
+  // defaults are already industry-agnostic ("What We Offer", "Your story goes
+  // here"). Real per-vertical seed content is a separate content effort.
+  const seedDefaults: ContentMap = {
+    ...defaults,
+    hero: { ...defaults.hero, headline: "Your headline\ngoes here.", ctaText: "Get in touch" },
+    providers: { ...defaults.providers, description: "People and partners you trust and recommend." },
+  };
   // setContent is an idempotent upsert, so re-running provision to recover a
   // partial seed is safe (it overwrites, never duplicates). We capture the
   // reason for each failed section so the operator sees WHY, not just a count.
@@ -189,7 +199,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   const seedFailures: string[] = [];
   for (const section of SEED_SECTIONS) {
     try {
-      await setContent(section, defaults[section], tenantId);
+      await setContent(section, seedDefaults[section], tenantId);
       seeded++;
     } catch (err) {
       seedFailures.push(`${section} (${err instanceof Error ? err.message : String(err)})`);
@@ -282,6 +292,12 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       ? `Point ${productionDomain} DNS at Vercel (A 76.76.21.21, or CNAME cname.vercel-dns.com) and verify`
       : `${subdomain}.strelva.com routes automatically once the control plane is live`,
     `Connect the hand-built ${tenantId} repo to the "${tenantId}-site" Vercel project (git integration) and deploy`,
+    // The whole "proof it's working" value prop (dashboard stats + the weekly
+    // report's lead number) is downstream of this ONE signal. If the repo ships
+    // without ScaffoldTracker, the dashboard reads 0 forever and the weekly
+    // email says "no visits" every week — the client pays and the product looks
+    // dead, with no alert. Verify it BEFORE handing over the dashboard.
+    `CRITICAL: confirm the tracking beacon fires — load the live ${tenantId} site, then check /admin/tenants/${tenantId} shows a page-view (the repo must include ScaffoldTracker with NEXT_PUBLIC_SCAFFOLD_API_URL + NEXT_PUBLIC_TENANT_ID set)`,
     `Customize the seeded starter content in the dashboard or via the AI agent`,
     input.ownerEmail
       ? `Send the owner invite email from /admin/tenants/${tenantId}`
