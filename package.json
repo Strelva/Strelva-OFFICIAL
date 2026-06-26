@@ -17,6 +17,7 @@
     "smoke:dashboard": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/dashboard-owner.spec.ts",
     "bench:agent": "npx tsx scripts/run-benchmark.ts",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
+    "deprovision-tenant": "npx tsx --env-file=.env.local scripts/deprovision-tenant.ts",
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:custom-repos": "tsx scripts/custom-repo-workspace-check.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
