@@ -171,6 +171,39 @@ async function deleteRedisClaim(domain: string): Promise<void> {
   }
 }
 
+/**
+ * Remove every Redis domain-claim owned by a tenant. The claims live in ONE map
+ * keyed by domain, so we delete just this tenant's domains rather than dropping
+ * the whole map. Returns the domains that had a claim. With `apply=false` it
+ * reports what it would clear without writing (for the deprovision dry run). The
+ * Postgres `domain_claims` rows are removed separately by the caller.
+ */
+export async function clearTenantDomainClaims(
+  tenant: TenantConfig,
+  apply = true
+): Promise<string[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const claims = await getRedisClaims();
+    const cleared: string[] = [];
+    for (const { domain } of domainsFromTenant(tenant)) {
+      const key = claimKey(domain);
+      if (key in claims) {
+        cleared.push(domain);
+        if (apply) delete claims[key];
+      }
+    }
+    if (apply && cleared.length) {
+      await redis.set(CLAIMS_REDIS_KEY, claims);
+      invalidateDomainMapCache();
+    }
+    return cleared;
+  } catch {
+    return [];
+  }
+}
+
 async function addDomainToVercel(domain: string): Promise<Partial<DomainClaim>> {
   const projectId = getVercelProjectId();
   if (!hasVercelDomainApi() || !projectId) {

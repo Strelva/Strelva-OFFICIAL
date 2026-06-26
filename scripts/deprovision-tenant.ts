@@ -9,42 +9,46 @@
  *
  * Postgres is the source of truth, so it is the primary target: every
  * tenant-scoped table is purged by tenant_id, then the `tenants` row itself.
- * Redis cache keys and the per-tenant Vercel project are torn down too, and the
- * Sanity `tenant` doc is best-effort deleted to remove the active:true mirror
- * that getTenantConfig() can otherwise fall back to (resurrecting the tenant).
+ * Redis cache keys and the per-tenant Vercel project are torn down too, the
+ * tenant's domain-claims are cleared from the shared claim map, and the Sanity
+ * `tenant` doc is best-effort deleted (resolved by its `id` field) to remove the
+ * active:true mirror that getTenantConfig() can otherwise fall back to.
  *
- * SAFETY:
+ * SAFETY (this deletes PRODUCTION data — .env.local points at prod):
  *   - DRY RUN BY DEFAULT. Nothing is deleted without --confirm.
- *   - A protected denylist (real paying tenants) is refused unless --force.
- *   - It prints the tenant's identity (name / owner / active / created) before
- *     acting so a human can verify it is the throwaway, not a live client.
+ *   - Refuses anything that looks like a real client: a hardcoded denylist AND
+ *     a live "has paid" signal (active subscription or any build payment).
+ *   - On a real run it prints the target DB host + tenant identity and requires
+ *     the operator to re-type the tenant id before deleting.
  *
  * Usage:
  *   npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId>            # dry run (discovery)
- *   npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> --confirm  # execute
+ *   npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> --confirm  # execute (prompts)
  *
  * Flags:
  *   --confirm       Actually delete (default is a no-write dry run).
- *   --force         Override the protected-tenant denylist (use with care).
+ *   --force         Override the real-client guards (denylist + has-paid).
  *   --keep-vercel   Leave the {tenantId}-site Vercel project in place.
- *   --sanity        Also delete the Sanity tenant doc (default: on; --no-sanity to skip).
+ *   --no-sanity     Skip the Sanity tenant-doc delete.
  *   --json          Emit a machine-readable summary instead of the human report.
- *
- * Run it against the SAME env the control plane uses (.env.local pulled from the
- * strelva Vercel project) — that points at production data. Hence the guards.
  */
 
+import * as readline from "node:readline";
 import { getSupabase } from "../src/lib/db/client";
 import { getRedis } from "../src/lib/redis";
 import { getTenantConfig } from "../src/lib/tenants";
+import { clearTenantDomainClaims } from "../src/lib/domains";
 import { deleteVercelProject, isVercelConfigured } from "../src/lib/vercel";
 
-// Real tenants that must never be torn down by accident. Mirrors the
-// grandfather list spirit in AGENTS.md ("The Model"). --force overrides.
+// Real tenants that must never be torn down by accident. A backstop only — the
+// live "has paid" guard below is the primary defense (this set drifts stale).
 const PROTECTED = new Set(["gldf", "rohlax"]);
 
-// Every public table carrying a tenant_id, purged child-first. Derived from
-// src/lib/db/database.types.ts (all Tables whose Row has a tenant_id column).
+// Subscription states that mean a real billing relationship exists.
+const PAYING_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+// Every public table carrying a tenant_id, purged child-first. Kept in sync with
+// src/lib/db/database.types.ts (asserted by deprovision-tenant.coverage.test.ts).
 // `tenants` (keyed by id) is deleted last, after its children are gone.
 const TENANT_SCOPED_TABLES = [
   "activity_log", "audit_logs", "auto_approval_streaks", "bookings",
@@ -57,9 +61,8 @@ const TENANT_SCOPED_TABLES = [
   "site_snapshots", "social_posts", "unified_events", "weekly_briefs",
 ] as const;
 
-// Global Redis caches that include this tenant and must be busted so a deleted
-// tenant stops appearing in the all-tenants list / domain map.
-const GLOBAL_CACHE_KEYS = ["reb:tenants:all", "reb:domain-map"];
+// Global Redis caches that include this tenant; safe to bust (they rebuild).
+const GLOBAL_CACHE_KEYS = ["reb:tenants:all", "reb:domain-map", "reb:portfolio:summary"];
 
 interface Flags {
   confirm: boolean;
@@ -84,10 +87,15 @@ function parseFlags(): { tenantId: string | undefined; flags: Flags } {
   };
 }
 
+function prompt(question: string): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => rl.question(`${question}: `, (a) => { rl.close(); resolve(a); }));
+}
+
 type StoreAction = { target: string; found: number | string; deleted: boolean; detail?: string };
 
-// The Supabase client is strongly typed to literal table names; a generic
-// sweep over 35 tables needs dynamic access, so we narrow to a minimal
+// The Supabase client is strongly typed to literal table names; a generic sweep
+// over the tenant-scoped tables needs dynamic access, so we narrow to a minimal
 // structural view of just the builder methods this script uses.
 type PgError = { message: string } | null;
 type DynTable = {
@@ -116,20 +124,42 @@ async function deleteRows(table: string, tenantId: string): Promise<void> {
   if (error) throw new Error(`${table}: ${error.message}`);
 }
 
-/** Scan for every reb:* key where tenantId appears as a full ':'-delimited
- *  segment (avoids substring collisions like tenant "spa" matching "spasm"). */
-async function findTenantRedisKeys(tenantId: string): Promise<string[]> {
+/** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
+ *  position. A bare "id appears anywhere" match would delete OTHER tenants' keys
+ *  for an unlucky id — e.g. a tenant literally named "hist" matching
+ *  reb:scan:hist:<everyTenant>, or "member" matching reb:rewards:<x>:member:<e>.
+ *  Wildcards are SCANned; exact keys checked with EXISTS. */
+function tenantRedisPatterns(tenantId: string, ownerEmail?: string): string[] {
+  const p = [
+    `reb:content:${tenantId}:*`,
+    `reb:chat:${tenantId}:*`,
+    `reb:rewards:${tenantId}:*`,
+    `reb:page-config:${tenantId}`,
+    `reb:maillog:${tenantId}`,
+    `reb:scan:${tenantId}`,
+    `reb:scan:hist:${tenantId}`,
+    `reb:site-audit:${tenantId}`,
+  ];
+  if (ownerEmail) p.push(`reb:invites:${ownerEmail.toLowerCase()}`);
+  return p;
+}
+
+async function findTenantRedisKeys(patterns: string[]): Promise<string[]> {
   const redis = getRedis();
   if (!redis) return [];
   const found = new Set<string>();
-  let cursor = "0";
-  do {
-    const [next, keys] = await redis.scan(cursor, { match: "reb:*", count: 500 });
-    cursor = next;
-    for (const k of keys) {
-      if (k.split(":").includes(tenantId)) found.add(k);
+  for (const pattern of patterns) {
+    if (!pattern.includes("*")) {
+      if (await redis.exists(pattern)) found.add(pattern);
+      continue;
     }
-  } while (cursor !== "0");
+    let cursor = "0";
+    do {
+      const [next, keys] = await redis.scan(cursor, { match: pattern, count: 500 });
+      cursor = String(next); // @upstash types this as string; coerce defensively
+      for (const k of keys) found.add(k);
+    } while (cursor !== "0");
+  }
   return [...found];
 }
 
@@ -139,37 +169,54 @@ async function main() {
     console.error("Usage: npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> [--confirm] [--force] [--keep-vercel] [--no-sanity]");
     process.exit(1);
   }
-
   if (!getSupabase()) {
     console.error("No Supabase client — set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (run with --env-file=.env.local).");
     process.exit(1);
   }
 
   const tenant = await getTenantConfig(tenantId).catch(() => null);
-  const protectedHit = PROTECTED.has(tenantId);
+  const dbHost = (() => {
+    try { return new URL(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").host; }
+    catch { return "(unknown)"; }
+  })();
 
-  // Identity check — show who this is before touching anything.
+  // Identity + target banner — printed before anything is touched.
   const banner = "=".repeat(64);
   console.log(`\n${banner}`);
   console.log(`${flags.confirm ? "DEPROVISION" : "DEPROVISION (DRY RUN)"} — ${tenantId}`);
   console.log(banner);
+  console.log(`  Target DB:   ${dbHost}`);
   if (tenant) {
     console.log(`  Site name:   ${tenant.siteName}`);
     console.log(`  Owner:       ${tenant.ownerEmail ?? "(none)"}`);
     console.log(`  Active:      ${tenant.active}`);
+    console.log(`  Subscription:${" "}${tenant.subscriptionStatus ?? "(none)"}`);
     console.log(`  Created:     ${tenant.createdAt ?? "(unknown)"}`);
-    console.log(`  Delivery:    ${tenant.deliveryModel ?? "(unknown)"}`);
   } else {
     console.log("  No tenant record found — will still sweep for orphan rows/keys.");
   }
   console.log("");
 
-  if (protectedHit && !flags.force) {
+  // Guard 1: hardcoded denylist (backstop).
+  if (PROTECTED.has(tenantId) && !flags.force) {
     console.error(`REFUSED: "${tenantId}" is a protected tenant. Re-run with --force only if you are certain.\n`);
     process.exit(2);
   }
-  if (protectedHit && flags.force) {
-    console.log(`!! "${tenantId}" is PROTECTED and --force was given. Proceeding under protest.\n`);
+  // Guard 2: live "has paid" signal — the denylist drifts stale as clients onboard.
+  const buildPayments = await countRows("build_payments", tenantId);
+  const paying = (tenant?.subscriptionStatus && PAYING_STATUSES.has(tenant.subscriptionStatus)) || buildPayments > 0;
+  if (paying && !flags.force) {
+    console.error(`REFUSED: "${tenantId}" looks like a real client (subscription=${tenant?.subscriptionStatus ?? "?"}, build_payments=${buildPayments}). Re-run with --force only if you are certain.\n`);
+    process.exit(2);
+  }
+
+  // Guard 3 (real runs only): require the operator to re-type the id.
+  if (flags.confirm) {
+    const typed = await prompt(`Type the tenant id "${tenantId}" to permanently delete it from ${dbHost}`);
+    if (typed.trim() !== tenantId) {
+      console.error("Confirmation did not match — aborting. Nothing deleted.\n");
+      process.exit(2);
+    }
   }
 
   const summary: Record<string, StoreAction[]> = { postgres: [], redis: [], vercel: [], sanity: [] };
@@ -179,18 +226,21 @@ async function main() {
   for (const table of [...TENANT_SCOPED_TABLES, "tenants"]) {
     const n = await countRows(table, tenantId);
     pgTotal += n;
-    if (n === 0) continue; // skip empties to keep the report readable
+    if (n === 0) continue;
     if (flags.confirm) await deleteRows(table, tenantId);
     summary.postgres.push({ target: table, found: n, deleted: flags.confirm });
   }
 
-  // --- Redis: per-tenant keys (scan) + explicit global cache busts ---
+  // --- Redis: per-tenant keys (pinned patterns) + global cache busts ---
   const redis = getRedis();
-  const tenantKeys = await findTenantRedisKeys(tenantId);
-  if (tenant?.ownerEmail) tenantKeys.push(`reb:invites:${tenant.ownerEmail.toLowerCase()}`);
+  const tenantKeys = await findTenantRedisKeys(tenantRedisPatterns(tenantId, tenant?.ownerEmail));
   if (flags.confirm && redis && tenantKeys.length) await redis.del(...tenantKeys);
   for (const k of tenantKeys) summary.redis.push({ target: k, found: 1, deleted: flags.confirm });
-  // Global caches always busted on a real run so the tenant leaves the lists.
+  // Domain claims live in one shared map — clear just this tenant's entries.
+  if (tenant) {
+    const claimed = await clearTenantDomainClaims(tenant, flags.confirm);
+    for (const d of claimed) summary.redis.push({ target: `domain-claim ${d}`, found: 1, deleted: flags.confirm });
+  }
   if (flags.confirm && redis) await redis.del(...GLOBAL_CACHE_KEYS);
   for (const k of GLOBAL_CACHE_KEYS) summary.redis.push({ target: k, found: "cache", deleted: flags.confirm, detail: "global cache invalidated" });
 
@@ -206,28 +256,32 @@ async function main() {
     summary.vercel.push({ target: `${tenantId}-site`, found: "?", deleted: false, detail: "would delete (dry run)" });
   }
 
-  // --- Sanity: best-effort delete the tenant doc (kills the active:true mirror) ---
+  // --- Sanity: delete the tenant doc, resolved by its `id` FIELD (not _id, which
+  //     is auto-generated). Kills the active:true mirror that can resurrect the
+  //     tenant via getTenantConfig's zero-row Sanity fallback. ---
   if (flags.sanity) {
     try {
       const { getSanityClient } = await import("../src/lib/sanity");
-      if (flags.confirm) {
-        await getSanityClient().delete(tenantId);
-        summary.sanity.push({ target: `tenant doc ${tenantId}`, found: 1, deleted: true });
+      const client = getSanityClient();
+      const docId = await client.fetch<string | null>('*[_type=="tenant" && id==$id][0]._id', { id: tenantId });
+      if (!docId) {
+        summary.sanity.push({ target: `tenant doc (id==${tenantId})`, found: 0, deleted: false, detail: "no Sanity tenant doc (dual-write off, or already gone)" });
+      } else if (flags.confirm) {
+        await client.delete(docId);
+        summary.sanity.push({ target: `tenant doc ${docId}`, found: 1, deleted: true });
       } else {
-        summary.sanity.push({ target: `tenant doc ${tenantId}`, found: "?", deleted: false, detail: "would delete (dry run, best-effort)" });
+        summary.sanity.push({ target: `tenant doc ${docId}`, found: 1, deleted: false, detail: "would delete (dry run)" });
       }
     } catch (err) {
-      summary.sanity.push({ target: `tenant doc ${tenantId}`, found: "?", deleted: false, detail: `skipped: ${err instanceof Error ? err.message : String(err)}` });
+      summary.sanity.push({ target: `tenant doc (id==${tenantId})`, found: "?", deleted: false, detail: `skipped: ${err instanceof Error ? err.message : String(err)}` });
     }
-    summary.sanity.push({ target: "content/audit docs", found: "n/a", deleted: false, detail: "left in Sanity (read-fallback only, slated for lockdown/decommission)" });
   }
 
   if (flags.json) {
-    console.log(JSON.stringify({ tenantId, executed: flags.confirm, pgRowTotal: pgTotal, summary }, null, 2));
+    console.log(JSON.stringify({ tenantId, dbHost, executed: flags.confirm, pgRowTotal: pgTotal, summary }, null, 2));
     return;
   }
 
-  // --- Human report ---
   const verb = flags.confirm ? "Deleted" : "Would delete";
   for (const [store, actions] of Object.entries(summary)) {
     if (!actions.length) continue;
@@ -243,7 +297,7 @@ async function main() {
   if (!flags.confirm) {
     console.log("DRY RUN — nothing was deleted. Re-run with --confirm to execute.\n");
   } else {
-    console.log("Done. Verify the tenant is gone from the admin Tenants list.\n");
+    console.log("Done. If a table delete threw mid-run, re-running is safe (idempotent). Verify the tenant is gone from the admin Tenants list.\n");
   }
 }
 
