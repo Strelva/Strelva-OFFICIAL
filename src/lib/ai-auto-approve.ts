@@ -41,6 +41,13 @@ export async function maybeAutoApprove(
   // Only upgrade "review" decisions; "block" stays blocked, "publish" is already good
   if (governance.action !== "review") return governance;
 
+  // NEVER auto-publish a change that was sent to review BECAUSE it touches
+  // high-risk facts — booking/payment links, prices, hours, address, phone,
+  // email. A trusted streak buys faster COPY edits, never money/contact details:
+  // an AI hallucination or a prompt-injected review could otherwise redirect a
+  // client's booking link or payment URL live with no human in the loop.
+  if (governance.reasonCode === "high_risk_facts") return governance;
+
   const threshold = tenantConfig?.autoApproveThreshold;
   if (!threshold || threshold <= 0) return governance;
 
@@ -60,6 +67,7 @@ export async function maybeAutoApprove(
   return {
     action: "publish",
     reason: `Auto-approved: tenant has ${streak} consecutive approvals (threshold: ${threshold}). Original: ${governance.reason}`,
+    reasonCode: "auto_approved",
   };
 }
 

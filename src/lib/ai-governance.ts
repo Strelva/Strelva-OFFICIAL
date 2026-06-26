@@ -1,17 +1,35 @@
 import type { ContentSection } from "./types";
 
+/**
+ * Machine-readable reason for a governance decision. The prose `reason` is for
+ * humans; `reasonCode` lets downstream gates (e.g. auto-approval) branch on WHY
+ * a change was sent to review without string-matching the message. Critically,
+ * `high_risk_facts` must never be auto-published, even for a trusted tenant.
+ */
+export type AiGovernanceReasonCode =
+  | "structural"
+  | "tenant_review_required"
+  | "high_risk_facts"
+  | "marketing_copy"
+  | "factual_auto"
+  | "unclassified"
+  | "auto_approved";
+
 export type AiGovernanceDecision =
   | {
       action: "publish";
       reason: string;
+      reasonCode: AiGovernanceReasonCode;
     }
   | {
       action: "review";
       reason: string;
+      reasonCode: AiGovernanceReasonCode;
     }
   | {
       action: "block";
       reason: string;
+      reasonCode: AiGovernanceReasonCode;
     };
 
 const STRUCTURAL_SECTIONS = new Set<ContentSection>([
@@ -125,6 +143,7 @@ export function decideAiContentGovernance(
     return {
       action: "block",
       reason: "Structural design and navigation changes require manual admin work.",
+      reasonCode: "structural",
     };
   }
 
@@ -132,6 +151,7 @@ export function decideAiContentGovernance(
     return {
       action: "review",
       reason: "This tenant requires admin review before AI changes publish.",
+      reasonCode: "tenant_review_required",
     };
   }
 
@@ -147,6 +167,7 @@ export function decideAiContentGovernance(
     return {
       action: "review",
       reason: "High-risk business details such as prices, booking links, hours, addresses, contact info, or dates require review.",
+      reasonCode: "high_risk_facts",
     };
   }
 
@@ -154,6 +175,7 @@ export function decideAiContentGovernance(
     return {
       action: "review",
       reason: "New or revised marketing copy needs human review before publishing.",
+      reasonCode: "marketing_copy",
     };
   }
 
@@ -161,11 +183,13 @@ export function decideAiContentGovernance(
     return {
       action: "publish",
       reason: "Factual business details can publish automatically.",
+      reasonCode: "factual_auto",
     };
   }
 
   return {
     action: "review",
     reason: "Unclassified AI content changes require review.",
+    reasonCode: "unclassified",
   };
 }

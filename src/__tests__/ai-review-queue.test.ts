@@ -50,6 +50,7 @@ describe("AI review queue persistence", () => {
       governance: {
         action: "review",
         reason: "High-risk business details require review.",
+        reasonCode: "high_risk_facts",
       },
     });
 

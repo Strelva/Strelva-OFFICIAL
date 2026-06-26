@@ -7,6 +7,36 @@ import type { ContentSection } from "./types";
 
 export type RiskLevel = "low" | "medium" | "high";
 
+// A field name that carries a link, payment, or contact detail — changes to
+// these are never "minor", regardless of how few characters move.
+const SENSITIVE_FIELD = /url|link|href|booking|stripe|payment|email|phone|address|map/i;
+// Markup/script tokens that must never auto-publish if newly introduced.
+const MARKUP_TOKEN = /<\s*(script|iframe|a|img|svg|object|embed|style)\b|javascript:|on\w+\s*=/i;
+
+function looksLikeUrl(v: unknown): boolean {
+  return typeof v === "string" && /^\s*(https?:\/\/|\/\/|www\.|mailto:|tel:)/i.test(v);
+}
+
+/** A change that introduces markup/script not present before. */
+function introducesMarkup(before: unknown, after: unknown): boolean {
+  const a = typeof after === "string" ? after : "";
+  const b = typeof before === "string" ? before : "";
+  return MARKUP_TOKEN.test(a) && !MARKUP_TOKEN.test(b);
+}
+
+/** How risky a single field's before→after change is — higher = more dangerous.
+ *  Used to pick the WORST changed field so a malicious link/markup swap can't
+ *  hide behind a benign first field. */
+function changeRisk(field: string, before: unknown, after: unknown): number {
+  if (JSON.stringify(before) === JSON.stringify(after)) return 0;
+  if (introducesMarkup(before, after)) return 100;
+  if (SENSITIVE_FIELD.test(field) || looksLikeUrl(before) || looksLikeUrl(after)) return 90;
+  if (typeof before === "string" && typeof after === "string") {
+    return 1 + Math.abs(after.length - before.length) / Math.max(before.length, 1);
+  }
+  return 1;
+}
+
 export interface RiskAssessment {
   level: RiskLevel;
   reason: string;
@@ -104,6 +134,30 @@ export function assessRisk(operation: AgentOperation): RiskAssessment {
 
   // Low risk: minor text edits, rewrites
   if (operation.type === "rewrite" || operation.type === "update") {
+    // Content-aware checks come BEFORE the length heuristic: a same-length swap
+    // ("calendly.com/me" -> "evil.com/x", or "Open 9-5" -> "<script>…") moves
+    // few characters but is high-consequence. Length alone would wave it through.
+    if (introducesMarkup(operation.before, operation.after)) {
+      return {
+        level: "medium",
+        reason: "Change introduces markup or script — needs review.",
+        requiresPreview: true,
+        autoApply: false,
+      };
+    }
+    if (
+      SENSITIVE_FIELD.test(operation.field ?? "") ||
+      looksLikeUrl(operation.before) ||
+      looksLikeUrl(operation.after)
+    ) {
+      return {
+        level: "medium",
+        reason: "Change to a link, payment, or contact field — needs review.",
+        requiresPreview: true,
+        autoApply: false,
+      };
+    }
+
     // Check if it's a significant rewrite
     if (typeof operation.before === "string" && typeof operation.after === "string") {
       const beforeLen = operation.before.length;
@@ -201,18 +255,22 @@ export function classifyOperation(
     }
   }
 
-  // Default: update/rewrite
-  // Find the first changed field
+  // Default: update/rewrite. Pick the WORST changed field, not the first — a
+  // malicious link/markup swap could otherwise hide behind a benign field that
+  // sorts earlier, getting the whole op classified on the benign change.
+  let worst: { key: string; risk: number } | null = null;
   for (const key of beforeKeys) {
-    if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
-      return {
-        type: "rewrite",
-        section,
-        field: key,
-        before: before[key],
-        after: after[key],
-      };
-    }
+    const risk = changeRisk(key, before[key], after[key]);
+    if (risk > 0 && (!worst || risk > worst.risk)) worst = { key, risk };
+  }
+  if (worst) {
+    return {
+      type: "rewrite",
+      section,
+      field: worst.key,
+      before: before[worst.key],
+      after: after[worst.key],
+    };
   }
 
   return { type: "update", section, before, after };
