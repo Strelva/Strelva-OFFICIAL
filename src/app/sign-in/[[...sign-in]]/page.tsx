@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import { SignInPeek } from "@/components/auth/SignInPeek";
+import { LogoFull } from "@/components/Logo";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { ArrowLeft } from "lucide-react";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -80,10 +79,9 @@ export default async function SignInPage({
           <section>
             <Link
               href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
+              className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
             >
-              <ArrowLeft className="size-4" />
-              Strelva
+              <LogoFull />
             </Link>
             <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Invited dashboard access
@@ -95,7 +93,6 @@ export default async function SignInPage({
               Use <strong>{invite.email}</strong> so Strelva can connect
               the pending invite, open the dashboard, and show what is working.
             </p>
-            <SignInPeek />
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
@@ -117,10 +114,9 @@ export default async function SignInPage({
           <section>
             <Link
               href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
+              className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
             >
-              <ArrowLeft className="size-4" />
-              Strelva
+              <LogoFull />
             </Link>
             <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Client dashboard
@@ -132,7 +128,6 @@ export default async function SignInPage({
               Use the email address connected to this site. After sign-in,
               Strelva will open the dashboard for {tenantAuth.siteName}.
             </p>
-            <SignInPeek />
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
@@ -150,10 +145,9 @@ export default async function SignInPage({
         <section>
           <Link
             href="/"
-            className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
+            className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
           >
-            <ArrowLeft className="size-4" />
-            Strelva
+            <LogoFull />
           </Link>
           <p className="mt-12 text-[14px] font-medium text-m-text-3">Dashboard access</p>
           <h1 className="mt-4 max-w-[720px] font-[family-name:var(--font-display)] text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
@@ -167,7 +161,6 @@ export default async function SignInPage({
             </Link>
             .
           </p>
-          <SignInPeek />
         </section>
 
         <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
