@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
+import { SignInPeek } from "@/components/auth/SignInPeek";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
@@ -94,6 +95,7 @@ export default async function SignInPage({
               Use <strong>{invite.email}</strong> so Strelva can connect
               the pending invite, open the dashboard, and show what is working.
             </p>
+            <SignInPeek />
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
@@ -130,6 +132,7 @@ export default async function SignInPage({
               Use the email address connected to this site. After sign-in,
               Strelva will open the dashboard for {tenantAuth.siteName}.
             </p>
+            <SignInPeek />
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
@@ -164,6 +167,7 @@ export default async function SignInPage({
             </Link>
             .
           </p>
+          <SignInPeek />
         </section>
 
         <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
