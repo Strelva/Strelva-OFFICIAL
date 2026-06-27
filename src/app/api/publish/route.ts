@@ -114,7 +114,7 @@ export async function POST() {
       await recordSectionUpdate(draft.section, tenant);
       await logActivity({
         text: actor.isImpersonating
-          ? `Scaffold admin published ${draft.section}`
+          ? `Strelva admin published ${draft.section}`
           : `Published ${draft.section} from site editor`,
         time: new Date().toISOString(),
         type: "admin",

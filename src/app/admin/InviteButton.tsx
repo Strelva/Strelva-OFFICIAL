@@ -89,7 +89,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-emerald-200">
                   Share this link only with {email.trim().toLowerCase()}.{" "}
-                  Access is tied to that exact email, and it opens the stable Scaffold fallback route for this site.
+                  Access is tied to that exact email, and it opens the stable fallback route for this site.
                 </p>
                 <a
                   href={result.signUpUrl}

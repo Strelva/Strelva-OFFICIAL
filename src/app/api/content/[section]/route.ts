@@ -120,7 +120,7 @@ export async function PUT(
     await appendVersion(s, parsed.data, actor.isImpersonating ? "admin" : "user", tenant, changes);
     await recordSectionUpdate(s, tenant);
     await logActivity({
-      text: actor.isImpersonating ? `Scaffold admin updated ${s}` : `Updated ${s} via admin`,
+      text: actor.isImpersonating ? `Strelva admin updated ${s}` : `Updated ${s} via admin`,
       time: new Date().toISOString(),
       type: "admin",
       section: s,

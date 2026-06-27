@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     await appendVersion(typedSection, parsed.data, "admin", tenant, changes);
     await recordSectionUpdate(typedSection, tenant);
     await logActivity({
-      text: `Scaffold admin approved AI draft for ${typedSection}`,
+      text: `Strelva admin approved AI draft for ${typedSection}`,
       time: new Date().toISOString(),
       type: "admin",
       section: typedSection,

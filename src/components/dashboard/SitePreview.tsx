@@ -227,9 +227,9 @@ export function SitePreview() {
   const previewBadgeDetail = (() => {
     try {
       const url = new URL(isLivePreview ? liveTargetUrl : iframeSrc, "http://localhost");
-      return isLivePreview ? url.hostname : "unpublished Scaffold copy";
+      return isLivePreview ? url.hostname : "unpublished draft";
     } catch {
-      return isLivePreview ? "live site" : "unpublished Scaffold copy";
+      return isLivePreview ? "live site" : "unpublished draft";
     }
   })();
   const activeSectionLabel = activeSection
@@ -633,8 +633,8 @@ export function SitePreview() {
                 if (!hasAnyDraft && siteUrl) setPreviewSource("live");
               }}
               className="flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-medium text-black transition-colors hover:bg-white/90"
-              title="Exit Scaffold mode"
-              aria-label="Exit Scaffold mode"
+              title="Exit preview mode"
+              aria-label="Exit preview mode"
             >
               <Minimize2 className="h-[13px] w-[13px]" strokeWidth={1.5} />
               Exit

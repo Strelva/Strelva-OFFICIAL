@@ -73,7 +73,7 @@ export async function POST(
     }
     await logActivity({
       text: actor.isImpersonating
-        ? `Scaffold admin restored ${section} from version history`
+        ? `Strelva admin restored ${section} from version history`
         : `Restored ${section} from version history`,
       time: new Date().toISOString(),
       type: "admin",

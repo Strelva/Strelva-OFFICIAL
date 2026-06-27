@@ -584,7 +584,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
             <p className="text-[10px] text-gray-faint">
               {liveSyncEnabled
                 ? "Review the preview, then publish live from the bottom bar."
-                : "Review the preview, then publish Scaffold copy from the bottom bar."}
+                : "Review the preview, then publish your changes from the bottom bar."}
             </p>
           </div>
         </div>

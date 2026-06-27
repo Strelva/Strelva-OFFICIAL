@@ -984,10 +984,10 @@ body {
   --m-text-3: oklch(55% 0.011 235);
   --m-ink: oklch(94.5% 0.008 235);
   --m-ink-2: oklch(79% 0.01 235);
-  --m-accent: oklch(73% 0.105 178);
-  --m-accent-strong: oklch(79% 0.13 176);
-  --m-accent-soft: oklch(73% 0.105 178 / 0.14);
-  --m-accent-faint: oklch(73% 0.105 178 / 0.065);
+  --m-accent: oklch(73% 0.07 145);
+  --m-accent-strong: oklch(79% 0.08 145);
+  --m-accent-soft: oklch(73% 0.07 145 / 0.14);
+  --m-accent-faint: oklch(73% 0.07 145 / 0.065);
   --m-data: oklch(70% 0.08 202);
   --m-success: oklch(72% 0.12 154);
   --m-danger: oklch(66% 0.16 25);
@@ -1000,7 +1000,7 @@ body {
   --m-duration-state: 260ms;
   --m-duration-enter: 720ms;
   background:
-    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 182 / 0.36), transparent 35rem),
+    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 145 / 0.36), transparent 35rem),
     linear-gradient(180deg, oklch(16% 0.018 245 / 0.74), transparent 30rem),
     var(--m-bg);
   color: var(--m-text);
@@ -1015,7 +1015,7 @@ body {
 .marketing-root {
   background-color: var(--m-bg);
   background-image:
-    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 182 / 0.36), transparent 35rem),
+    radial-gradient(circle at 50% -18rem, oklch(33% 0.04 145 / 0.36), transparent 35rem),
     linear-gradient(180deg, oklch(16% 0.018 245 / 0.74), transparent 30rem);
 }
 
@@ -1136,7 +1136,7 @@ body {
   z-index: 1;
   width: 38%;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, oklch(82% 0.105 178 / 0.18), transparent);
+  background: linear-gradient(90deg, transparent, oklch(82% 0.07 145 / 0.18), transparent);
   mix-blend-mode: screen;
   transform: skewX(-12deg) translate3d(-20%, 0, 0);
   animation: receipt-scan 4200ms var(--m-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) 900ms infinite;
@@ -1220,10 +1220,10 @@ body {
     box-shadow: 0 0 0 0 var(--m-accent-soft);
   }
   70% {
-    box-shadow: 0 0 0 7px oklch(73% 0.105 178 / 0);
+    box-shadow: 0 0 0 7px oklch(73% 0.07 145 / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 oklch(73% 0.105 178 / 0);
+    box-shadow: 0 0 0 0 oklch(73% 0.07 145 / 0);
   }
 }
 
@@ -1255,7 +1255,7 @@ body {
   }
 }
 [data-dashboard] :focus-visible {
-  outline: 2px solid rgba(138, 182, 255, 0.45);
+  outline: 2px solid oklch(76% 0.07 145 / 0.45);
   outline-offset: 1px;
   border-radius: 6px;
 }

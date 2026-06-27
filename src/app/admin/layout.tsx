@@ -34,7 +34,7 @@ export default async function AdminLayout({
             <Link href="/admin" className="flex items-center gap-2.5 group">
               <span
                 className="h-2 w-2 rounded-full shrink-0"
-                style={{ background: "oklch(73% 0.105 178)" }}
+                style={{ background: "oklch(73% 0.07 145)" }}
                 aria-hidden
               />
               <span className="font-display text-xl tracking-tight text-warm-white leading-none">

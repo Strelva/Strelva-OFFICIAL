@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
     await logActivity({
       text: actor.isImpersonating
-        ? "Scaffold admin saved a full-site backup"
+        ? "Strelva admin saved a full-site backup"
         : "Saved a full-site backup",
       time: snapshot.createdAt,
       type: "admin",
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 
       await logActivity({
         text: actor.isImpersonating
-          ? `Scaffold admin restored full site from ${result.restored.label}`
+          ? `Strelva admin restored full site from ${result.restored.label}`
           : `Restored full site from ${result.restored.label}`,
         time: new Date().toISOString(),
         type: "admin",

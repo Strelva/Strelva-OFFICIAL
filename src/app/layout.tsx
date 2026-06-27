@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Serif, Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
 import "./globals.css";
 
-const instrumentSerif = Instrument_Serif({
+const fraunces = Fraunces({
   variable: "--font-display",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400"],
+  axes: ["SOFT", "WONK", "opsz"],
 });
 
 const inter = Inter({
@@ -52,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${instrumentSerif.variable} ${inter.variable} antialiased`}
+        className={`${fraunces.variable} ${inter.variable} antialiased`}
       >
         {children}
         <Analytics />
