@@ -87,7 +87,7 @@ export default async function SignInPage({
             <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Invited dashboard access
             </p>
-            <h1 className="mt-4 max-w-[720px] text-3xl font-semibold leading-[1.05] tracking-[-0.01em] text-m-text sm:text-4xl">
+            <h1 className="mt-4 max-w-[720px] font-[family-name:var(--font-display)] text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
               Sign in to manage {invite.siteName}.
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
@@ -123,7 +123,7 @@ export default async function SignInPage({
             <p className="mt-12 text-[14px] font-medium text-m-text-3">
               Client dashboard
             </p>
-            <h1 className="mt-4 max-w-[720px] text-3xl font-semibold leading-[1.05] tracking-[-0.01em] text-m-text sm:text-4xl">
+            <h1 className="mt-4 max-w-[720px] font-[family-name:var(--font-display)] text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
               Sign in to manage {tenantAuth.siteName}.
             </h1>
             <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
@@ -153,7 +153,7 @@ export default async function SignInPage({
             Strelva
           </Link>
           <p className="mt-12 text-[14px] font-medium text-m-text-3">Dashboard access</p>
-          <h1 className="mt-4 max-w-[720px] text-3xl font-semibold leading-[1.05] tracking-[-0.01em] text-m-text sm:text-4xl">
+          <h1 className="mt-4 max-w-[720px] font-[family-name:var(--font-display)] text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
             Sign in to your dashboard.
           </h1>
           <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
