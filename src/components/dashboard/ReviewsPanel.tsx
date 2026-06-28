@@ -7,6 +7,48 @@ import { useDashboard } from "./DashboardContext";
 
 interface ReviewsPanelProps {
   reviews: ReviewItem[];
+  googlePlaceId?: string;
+}
+
+/** A shareable Google "write a review" link — owners need more reviews, not more reply tools. */
+function ReviewRequestCard({ placeId }: { placeId: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — the link is still visible to copy manually
+    }
+  };
+  return (
+    <div className="mb-6 rounded-xl border border-accent/20 bg-accent-dim/40 p-4 sm:p-5">
+      <h2 className="text-[14px] font-medium text-warm-black">Get more reviews</h2>
+      <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
+        Share this link with happy customers — it opens straight to your Google review form.
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="min-w-0 flex-1 truncate rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-gray-muted hover:text-warm-black"
+        >
+          {url}
+        </a>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-surface-base transition-opacity hover:opacity-90"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" strokeWidth={2} /> : <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />}
+          {copied ? "Copied" : "Copy link"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Stars({ rating }: { rating: number }) {
@@ -228,7 +270,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
   );
 }
 
-export function ReviewsPanel({ reviews }: ReviewsPanelProps) {
+export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
   if (reviews.length === 0) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -241,6 +283,7 @@ export function ReviewsPanel({ reviews }: ReviewsPanelProps) {
               No reviews yet
             </h1>
           </div>
+          {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
           <div className="rounded-xl dashboard-panel p-6 text-center">
             <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
               <MessageSquare className="h-5 w-5" strokeWidth={1.5} />
@@ -288,6 +331,8 @@ export function ReviewsPanel({ reviews }: ReviewsPanelProps) {
             Draft a warm, on-brand reply for any of them, then copy it into Google.
           </p>
         </div>
+
+        {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
 
         <div className="space-y-3">
           {reviews.map((review) => (
