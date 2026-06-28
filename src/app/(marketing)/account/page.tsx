@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
 import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/lib/auth";
-import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
+import { getTenantConfig, isActiveTenant } from "@/lib/tenants";
 import {
   getTenantDashboardFallbackUrl,
   getTenantDashboardHost,
@@ -25,9 +25,10 @@ export default async function AccountPage() {
     redirect("/sign-in");
   }
 
+  // Super admins go straight to the operator console — it already has
+  // client-switching, so there's no reason to stop on a chooser first.
   if (await isSuperAdmin()) {
-    const tenants = (await getAllTenants()).filter(isActiveTenant);
-    return <TenantPicker tenants={tenants.map((config) => ({ id: config.id, config }))} isSuperAdmin />;
+    redirect("/admin");
   }
 
   const claimedInvite = await claimPendingInviteForCurrentUser();
@@ -72,7 +73,7 @@ function NoAccessState() {
     >
       <div className="text-center max-w-md">
         <h1
-          className="text-[24px] font-medium tracking-[-0.02em] mb-3"
+          className="font-[family-name:var(--font-display)] text-[26px] font-normal mb-3"
           style={{ color: "var(--m-text)" }}
         >
           No invited sites on this account
@@ -133,7 +134,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
     >
       <div className="w-full max-w-md">
         <h1
-          className="text-[24px] font-medium tracking-[-0.02em] mb-2 text-center"
+          className="font-[family-name:var(--font-display)] text-[26px] font-normal mb-2 text-center"
           style={{ color: "var(--m-text)" }}
         >
           Choose a site
