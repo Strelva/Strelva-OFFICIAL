@@ -18,7 +18,7 @@ const mockRedis = {
   zrange: vi.fn(async () => zmembers),
   mget: vi.fn(async (...keys: string[]) => keys.map((k) => kv.get(k) ?? null)),
   get: vi.fn(async (key: string) => kv.get(key) ?? null),
-  zremrangebyscore: vi.fn(async () => 0),
+  zremrangebyscore: vi.fn(async (_key: string, _min: number, _max: number) => 0),
 };
 
 vi.mock("../lib/redis", () => ({ getRedis: () => mockRedis }));
