@@ -112,6 +112,12 @@ export async function addEvent(
   // always resolve it.
   await redis.set(eventKey(id), full, { ex: EVENT_TTL_SECONDS });
   await redis.zadd(eventsKey(event.tenantId), { score, member: id });
+  // Prune index entries older than the record TTL. The event:{id} bodies expire
+  // at EVENT_TTL_SECONDS but their zset members don't, so without this the index
+  // grows unbounded and fills the recency window that getEvents /
+  // getOpenChangeRequest scan with ids that no longer resolve. Bounding by score
+  // keeps the index aligned with what's actually still readable.
+  await redis.zremrangebyscore(eventsKey(event.tenantId), 0, score - EVENT_TTL_SECONDS * 1000);
 
   // Postgres shadow-write (Phase-2 dual-write). Null-safe + never throws; Redis
   // above stays the source of truth and reads. Gated by DUAL_WRITE_PG.
