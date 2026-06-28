@@ -402,6 +402,35 @@ async function gateRequest(
   return null;
 }
 
+/**
+ * Is the request's session a verified super-admin? Gates the ?tenant=
+ * impersonation fallback at the proxy. Uses the RLS-scoped middleware client:
+ * the `super_admins` policy is `app_is_super_admin()`, so the row is readable
+ * ONLY by a super-admin — a hit means yes, a miss (or any error) means no.
+ * Fail-closed is safe here: ?tenant= is impersonation-only, so denying it never
+ * blocks a user from their OWN tenant (normal subdomain / /client path routing
+ * is unaffected). Only runs when ?tenant= is present, so it's off the hot path.
+ */
+export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
+  if (!isSupabaseAuthConfigured()) return false;
+  try {
+    const supabase = createMiddlewareSupabase(req);
+    if (!supabase) return false;
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user?.id || !user.email_confirmed_at) return false;
+    const { data } = await supabase
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .is("revoked_at", null)
+      .maybeSingle();
+    return data !== null;
+  } catch {
+    return false;
+  }
+}
+
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
@@ -487,14 +516,25 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     isAdminSubdomain = customDomainResult.isAdminSubdomain;
   }
 
-  // Fallback: extract tenant from ?tenant= query param (for super admin access only).
-  // PRIVILEGE ISOLATION: ?tenant= is super-admin impersonation only and requires valid auth.
-  // This is not for multi-tenant routing — use subdomain or /client/{tenant} path instead.
-  // This requires authentication to prevent tenant spoofing
+  // Fallback: extract tenant from the ?tenant= query param (super-admin
+  // impersonation). NOT for multi-tenant routing — use a subdomain or
+  // /client/{tenant} path instead.
+  //
+  // SECURITY: honored ONLY for a verified super-admin (or dev-access bypass).
+  // This is the proxy-level half of the privilege boundary; per-route
+  // requireTenantAccess() is the other half. Gating here means a non-super-admin
+  // can't set the proxy tenant via ?tenant=, so even a future route that reads
+  // x-tenant without its own access check can't be tricked into cross-tenant
+  // access through this param. The super_admins lookup only runs when ?tenant=
+  // is present, so normal traffic pays nothing.
   let tenantFromQueryParam = false;
   if (!tenantId) {
     const tenantParam = req.nextUrl.searchParams.get("tenant");
-    if (tenantParam && /^[a-z0-9-]+$/.test(tenantParam)) {
+    if (
+      tenantParam &&
+      /^[a-z0-9-]+$/.test(tenantParam) &&
+      (devAccessBypass || (await requestIsSuperAdmin(req)))
+    ) {
       tenantId = tenantParam;
       tenantFromQueryParam = true;
     }
