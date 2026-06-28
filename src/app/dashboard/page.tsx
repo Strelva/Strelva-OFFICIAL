@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentType } from "react";
-import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Link2, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Inbox, Link2, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
 import { getQueueCount } from "@/lib/events";
@@ -10,6 +10,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { getLatestSiteSnapshot } from "@/lib/storage";
 import { getOwnerRetentionSignals } from "@/lib/retention";
+import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
@@ -65,6 +66,7 @@ async function DashboardHome({
     latestSnapshot,
     template,
     retentionSignals,
+    leadSummary,
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -89,6 +91,7 @@ async function DashboardHome({
       nextAction: "Check back shortly.",
       ownerNextAction: "Check back shortly.",
     })),
+    getLeadSummary(tenant, 30).catch(() => ({ count: 0, recent: [] })),
   ]);
   const recentAiChanges = activity.slice(0, 3);
   const siteUrl = tenantConfig
@@ -305,6 +308,37 @@ async function DashboardHome({
               <span className="text-gray-muted">customer actions</span>
             </span>
           </section>
+          ) : null}
+
+          {leadSummary.recent.length > 0 ? (
+            <section className="rounded-2xl border border-glass-border bg-glass p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+                    Who reached out
+                  </p>
+                  <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">
+                    {leadSummary.count} {leadSummary.count === 1 ? "person" : "people"} this month
+                  </h2>
+                </div>
+                <Inbox className="h-5 w-5 shrink-0 text-accent" strokeWidth={1.5} />
+              </div>
+              <ul className="divide-y divide-gray-border/60">
+                {leadSummary.recent.map((lead) => (
+                  <li key={lead.id} className="py-2.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13px] font-medium text-warm-black">{lead.name}</span>
+                      <span className="shrink-0 text-[11px] text-gray-faint">{new Date(lead.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    {lead.message ? (
+                      <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-gray-muted">{lead.message}</p>
+                    ) : lead.email ? (
+                      <p className="mt-0.5 text-[12px] text-gray-muted">{lead.email}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
 
           <RetentionPanel signals={retentionSignals} />
