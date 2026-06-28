@@ -1507,6 +1507,12 @@ Only use tools for manifest-supported sections and actions. If the user requests
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "tool-result") {
             const output = ("result" in part ? part.result : "output" in part ? part.output : undefined) as unknown;
+            // Inline display tools (show_report/show_content/show_photos/...) return
+            // { __inlineTool, ...cardData }. Stream it as a __CARD__ line so the chat
+            // renders the rich card — the data was built here but never sent (H5).
+            if (output && typeof output === "object" && "__inlineTool" in output) {
+              controller.enqueue(encoder.encode(`__CARD__${JSON.stringify(output)}\n`));
+            }
             const actionResult = agentResultFromToolOutput(output);
             if (actionResult) recordActionResult(actionResult);
           } else if (part.type === "text-delta") {
