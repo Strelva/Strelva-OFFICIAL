@@ -1,13 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 
 /**
  * Minimal cart: line items keyed by product slug, persisted to localStorage and
- * synced across tabs. Prices live in the catalog (server-side at checkout) — the
- * cart only tracks slug + quantity + a display price/name for the UI. The server
- * re-prices everything at checkout, so a tampered localStorage can't change what
- * the customer is charged.
+ * synced across tabs AND restored on same-tab reload. Backed by
+ * useSyncExternalStore so localStorage is the single source of truth — no
+ * useState/useEffect hydration dance, no lost cart on refresh.
+ *
+ * Prices here are for display only; checkout re-prices everything server-side
+ * from the catalog, so a tampered localStorage can't change what's charged.
  */
 export interface CartLine {
   slug: string;
@@ -28,70 +30,73 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "cart:v1";
+const CHANGE_EVENT = "cart:changed";
+const EMPTY: CartLine[] = [];
 
-function load(): CartLine[] {
-  if (typeof window === "undefined") return [];
+// Module-level cache so getSnapshot returns a STABLE reference while the stored
+// string is unchanged — re-parsing on every call would return a new array each
+// time and spin useSyncExternalStore into an infinite render loop.
+let cachedRaw: string | null = null;
+let cachedLines: CartLine[] = EMPTY;
+
+function readSnapshot(): CartLine[] {
+  if (typeof window === "undefined") return EMPTY;
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (raw === cachedRaw) return cachedLines;
+  cachedRaw = raw;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as CartLine[]) : [];
-    return Array.isArray(parsed) ? parsed.filter((l) => l && typeof l.slug === "string") : [];
+    cachedLines = Array.isArray(parsed) ? parsed.filter((l) => l && typeof l.slug === "string") : EMPTY;
   } catch {
-    return [];
+    cachedLines = EMPTY;
   }
+  return cachedLines;
+}
+
+function serverSnapshot(): CartLine[] {
+  return EMPTY;
+}
+
+function subscribe(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", onChange); // other tabs
+  window.addEventListener(CHANGE_EVENT, onChange); // this tab's mutations
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+function write(next: CartLine[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // storage full / disabled — nothing persisted, but the event still fires so
+    // the in-memory snapshot updates for this tab.
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  // Lazy init reads localStorage once (returns [] during SSR — `load` guards on
-  // `window`). Mount cart-count UI inside a client boundary if you want to avoid
-  // a first-paint flash of the empty cart.
-  const [lines, setLines] = useState<CartLine[]>(load);
+  const lines = useSyncExternalStore(subscribe, readSnapshot, serverSnapshot);
 
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) setLines(load());
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+  const add = useCallback<CartContextValue["add"]>((line, quantity = 1) => {
+    const cur = readSnapshot();
+    const existing = cur.find((l) => l.slug === line.slug);
+    write(
+      existing
+        ? cur.map((l) => (l.slug === line.slug ? { ...l, quantity: l.quantity + quantity } : l))
+        : [...cur, { ...line, quantity }],
+    );
   }, []);
 
-  const persist = useCallback((next: CartLine[]) => {
-    setLines(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // storage full / disabled — cart stays in memory for this tab
-    }
+  const setQuantity = useCallback<CartContextValue["setQuantity"]>((slug, quantity) => {
+    const cur = readSnapshot();
+    write(quantity <= 0 ? cur.filter((l) => l.slug !== slug) : cur.map((l) => (l.slug === slug ? { ...l, quantity } : l)));
   }, []);
 
-  const add = useCallback<CartContextValue["add"]>(
-    (line, quantity = 1) => {
-      setLines((prev) => {
-        const existing = prev.find((l) => l.slug === line.slug);
-        const next = existing
-          ? prev.map((l) => (l.slug === line.slug ? { ...l, quantity: l.quantity + quantity } : l))
-          : [...prev, { ...line, quantity }];
-        try {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    },
-    [],
-  );
-
-  const setQuantity = useCallback<CartContextValue["setQuantity"]>(
-    (slug, quantity) => {
-      persist(
-        quantity <= 0
-          ? lines.filter((l) => l.slug !== slug)
-          : lines.map((l) => (l.slug === slug ? { ...l, quantity } : l)),
-      );
-    },
-    [lines, persist],
-  );
-
-  const remove = useCallback((slug: string) => persist(lines.filter((l) => l.slug !== slug)), [lines, persist]);
-  const clear = useCallback(() => persist([]), [persist]);
+  const remove = useCallback((slug: string) => write(readSnapshot().filter((l) => l.slug !== slug)), []);
+  const clear = useCallback(() => write([]), []);
 
   const value = useMemo<CartContextValue>(
     () => ({
