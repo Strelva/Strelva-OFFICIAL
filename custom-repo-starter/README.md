@@ -199,10 +199,11 @@ dashboard Store shows revenue/orders in real time.
 
 Setup: set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`, point a Stripe webhook
 at `/api/webhooks/stripe` for `checkout.session.completed`, and render Stripe's
-embedded checkout with the returned `clientSecret`. Two TODOs are marked in the
-webhook (order-confirmation email via Resend; itemizing the beacon for
-best-sellers) — wire them per client. Address-based shipping rates (Shippo/USPS)
-replace `shipping.ts` when a client needs them.
+embedded checkout with the returned `clientSecret`. The webhook itemizes the
+order beacon (best-sellers populate) and sends an order-confirmation email when
+`RESEND_API_KEY` + `ORDER_EMAIL_FROM` (a verified Resend sender) are set — both
+best-effort, neither can fail the webhook. Address-based shipping rates
+(Shippo/USPS) replace `shipping.ts` when a client needs them.
 
 ## Full Documentation
 
