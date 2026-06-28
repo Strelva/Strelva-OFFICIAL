@@ -337,6 +337,20 @@ describe("createGbpPost", () => {
     expect(result.success).toBe(false);
     expect(result.evidence).toContain("api_error");
   });
+
+  it("blocks an unsafe ctaUrl (SSRF) before any write to Google", async () => {
+    const { createGbpPost } = await import("@/lib/gbp-management");
+    // A non-HTTP scheme is rejected by validateUrlSafety at the egress boundary,
+    // so the post never reaches Google's API (which would fetch the URL).
+    const result = await createGbpPost(TENANT, {
+      summary: "Check this out",
+      ctaUrl: "file:///etc/passwd",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.evidence).toContain("blocked_url");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Agent governance: GBP post always queued as pending ─────────────────────
