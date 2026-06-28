@@ -71,6 +71,13 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
   which leaves the event pending if the write fails. Review replies follow the same governed
   path (`review_reply_draft` → `publishReviewReply`). This is the safety invariant — do not
   add a tool that publishes to an external surface without queuing for approval first.
+  - **Resolve on `success`, NOT on `verified`.** These external writes are NON-idempotent
+    (a re-posted GBP update / review reply duplicates), so approval resolution gates on the
+    write being *accepted* (`success`/`published`), not on the read-back confirmation
+    (`verified`). When a write is accepted but the read-back can't confirm it, the write
+    function emits a separate `change_verify_failed` event to surface the gap — keeping the
+    approval pending instead would let a re-approval create a duplicate. Don't "fix" this to
+    gate on `verified`.
 - Governance: `src/lib/ai-governance.ts` decides publish vs review-queue vs block.
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
