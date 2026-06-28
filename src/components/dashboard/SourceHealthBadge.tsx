@@ -182,22 +182,3 @@ export function SourceHealthBadge({
     </div>
   );
 }
-
-/**
- * Utility to determine connection status based on last sync time
- */
-export function getConnectionStatus(
-  connected: boolean,
-  lastSync?: string | Date | null,
-  staleThresholdHours = 24
-): ConnectionStatus {
-  if (!connected) return "not_configured";
-  if (!lastSync) return "connected"; // No sync tracking, assume OK
-
-  const syncTime = new Date(lastSync);
-  const hoursSinceSync = (Date.now() - syncTime.getTime()) / (1000 * 60 * 60);
-
-  if (hoursSinceSync > staleThresholdHours * 2) return "sync_failed";
-  if (hoursSinceSync > staleThresholdHours) return "stale";
-  return "connected";
-}

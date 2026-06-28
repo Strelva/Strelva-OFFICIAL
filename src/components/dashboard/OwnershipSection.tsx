@@ -166,7 +166,7 @@ export function OwnershipSection() {
         );
         return;
       }
-      window.open(body.portalUrl, "_blank");
+      window.open(body.portalUrl, "_blank", "noopener,noreferrer");
     } catch {
       setBillingError("Could not open the billing portal. Check your connection and try again.");
     } finally {

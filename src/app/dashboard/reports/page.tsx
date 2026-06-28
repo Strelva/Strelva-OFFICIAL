@@ -1,20 +1,10 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasDashboardViewAccess } from "@/lib/auth";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getWeeklyBrief, getWeeklyBriefs } from "@/lib/weekly-brief";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 
 export default async function ReportsPage() {
-  const clientFallbackRoot = getClientFallbackRoot(await headers());
-  const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasDashboardViewAccess(tenant);
-
-  if (!hasAccess) {
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  const { tenant } = await requireDashboardView();
 
   // Degrade to the empty state on a transient backend error rather than
   // escalating a recoverable null into the full error boundary.

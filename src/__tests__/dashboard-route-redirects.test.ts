@@ -16,6 +16,13 @@ describe("dashboard route redirects", () => {
   });
 
   it("sends dashboard child access denials to the no-access page", () => {
+    // The access check + no-access redirect was extracted into one shared guard
+    // (so it can't drift per-page, as it once did to the wrong auth helper).
+    const guard = readFileSync(path.join(process.cwd(), "src/lib/dashboard-auth.ts"), "utf8");
+    expect(guard).toContain('withClientFallbackRoot(clientFallbackRoot, "/no-access")');
+    expect(guard).toContain("hasDashboardViewAccess");
+
+    // Every dashboard child page must route its access check through that guard.
     const routeFiles = [
       "src/app/dashboard/page.tsx",
       "src/app/dashboard/chat/page.tsx",
@@ -27,7 +34,7 @@ describe("dashboard route redirects", () => {
       const source = readFileSync(path.join(process.cwd(), routeFile), "utf8");
 
       expect(source, routeFile).not.toMatch(/redirect\(\s*["']\/["']\s*\)/);
-      expect(source, routeFile).toContain('withClientFallbackRoot(clientFallbackRoot, "/no-access")');
+      expect(source, routeFile).toContain("requireDashboardView()");
     }
   });
 

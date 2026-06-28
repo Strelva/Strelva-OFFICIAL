@@ -72,7 +72,9 @@ export async function GET(req: Request) {
   const error = url.searchParams.get("error");
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const connectionsUrl = `${appUrl}/dashboard/sources/google-business`;
+  // Land on the Google Business tab after connecting — it shows the now-live
+  // listing state (hours, posts) rather than the raw connection-detail page.
+  const connectionsUrl = `${appUrl}/dashboard/google`;
 
   // Handle OAuth errors from Google
   if (error) {

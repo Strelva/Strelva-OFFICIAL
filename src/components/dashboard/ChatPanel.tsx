@@ -21,6 +21,7 @@ import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
+import { SectionErrorBoundary } from "@/components/public/SectionErrorBoundary";
 import { QueuePage } from "./QueuePage";
 import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from "@/lib/agent-results";
 import type { UnifiedEvent } from "@/lib/types";
@@ -836,12 +837,15 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               <div className="flex justify-start">
                 <div className="max-w-[80%] space-y-2">
                   {activeTools.map((tool) => (
-                    <ToolOutput
-                      key={tool.id}
-                      toolName={tool.name}
-                      result={tool.result}
-                      status={tool.status === "running" ? "pending" : tool.status}
-                    />
+                    // Contain a malformed tool payload to its own card — a crash
+                    // here used to take down the whole conversation.
+                    <SectionErrorBoundary key={tool.id}>
+                      <ToolOutput
+                        toolName={tool.name}
+                        result={tool.result}
+                        status={tool.status === "running" ? "pending" : tool.status}
+                      />
+                    </SectionErrorBoundary>
                   ))}
                 </div>
               </div>

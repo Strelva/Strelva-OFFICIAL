@@ -447,7 +447,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
       >
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Active sources</span>
+          <span className="text-[12px] font-medium text-warm-black">Active integrations</span>
           <span className="text-[11px] text-gray-muted">{usefulCount} usable now</span>
         </div>
         {expanded ? (
@@ -597,8 +597,11 @@ function parseResult(toolName: string, result: unknown): ToolResult {
           type: "report",
           data: {
             siteName: (data.siteName as string) || "Your site",
-            pageViews: data.pageViews as ReportData["pageViews"],
-            bookingClicks: data.bookingClicks as ReportData["bookingClicks"],
+            // Default the nested metrics — a malformed streamed payload with a
+            // missing pageViews/bookingClicks used to crash ReportOutput (and,
+            // with no error boundary, blank the whole chat).
+            pageViews: (data.pageViews as ReportData["pageViews"]) ?? { total: 0, thisWeek: 0, today: 0 },
+            bookingClicks: (data.bookingClicks as ReportData["bookingClicks"]) ?? { total: 0, thisWeek: 0, today: 0 },
             siteScore: (data.siteScore as number) || 0,
             trend: data.trend as ReportData["trend"],
             weekLabel: data.weekLabel as string | undefined,

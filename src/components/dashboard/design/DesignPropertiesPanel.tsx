@@ -582,30 +582,40 @@ function AITab({
       if (!reader) throw new Error("No response body");
 
       const decoder = new TextDecoder();
+      let buffer = "";
       let fullText = "";
       let currentStepId: string | null = null;
+
+      const handleLine = (line: string) => {
+        if (line.startsWith("__TOOL__")) {
+          if (currentStepId) {
+            updateTraceStep(currentStepId, "success");
+          }
+          const label = line.replace("__TOOL__", "");
+          currentStepId = addTraceStep(label);
+        } else if (line.startsWith("__RESULT__")) {
+          return;
+        } else {
+          // Preserve newlines — the old `+= line` ran every paragraph together.
+          fullText += line + "\n";
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("__TOOL__")) {
-            if (currentStepId) {
-              updateTraceStep(currentStepId, "success");
-            }
-            const label = line.replace("__TOOL__", "");
-            currentStepId = addTraceStep(label);
-          } else if (line.startsWith("__RESULT__")) {
-            continue;
-          } else {
-            fullText += line;
-          }
-        }
+        // Buffer across chunks: a marker or line split on a network boundary
+        // used to be silently dropped. Only process complete lines; keep the
+        // trailing partial for the next read.
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) handleLine(line);
       }
+
+      // Flush a final line that arrived without a trailing newline.
+      if (buffer) handleLine(buffer);
 
       if (currentStepId) {
         updateTraceStep(currentStepId, "success");

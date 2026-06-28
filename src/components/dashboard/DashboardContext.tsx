@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode, type Dispatch, type SetStateAction } from "react";
 import type { EditableNode } from "@/lib/editor-types";
 
 type Panel = "content" | "preview" | "chat";
@@ -299,56 +299,72 @@ export function DashboardProvider({
   const safeLeftCollapsed = hasMounted ? leftCollapsed : false;
   const safeRightCollapsed = hasMounted ? rightCollapsed : false;
 
+  // Memoize the context value: ~15 consumers read this, so a fresh object every
+  // render re-rendered the whole dashboard tree on any state change (a chat
+  // keystroke, a refresh bump) and made consumers that dep on the value loop.
+  // All the callbacks below are already useCallback-stable, so this is the fix.
+  const value = useMemo(
+    () => ({
+      activePanel,
+      setActivePanel,
+      chatPrompt,
+      setChatPrompt,
+      activeSection,
+      setActiveSection,
+      selectedNode,
+      setSelectedNode,
+      activePage,
+      setActivePage,
+      rightTab,
+      setRightTab,
+      leftCollapsed: safeLeftCollapsed,
+      rightCollapsed: safeRightCollapsed,
+      toggleLeft,
+      toggleRight,
+      refreshKey,
+      triggerRefresh,
+      scrollToSection,
+      setScrollToSection,
+      chatDrawerOpen,
+      setChatDrawerOpen,
+      editMode,
+      setEditMode,
+      hasDraft,
+      setHasDraft,
+      hasPageConfigDraft,
+      setHasPageConfigDraft,
+      reloadDraftState,
+      editReceipts,
+      addEditReceipts,
+      markDraftReceipts,
+      tenantId,
+      siteUrl,
+      previewUrl,
+      liveSyncEnabled,
+      dashboardBasePath,
+      dashboardHref,
+      siteModel,
+      autoPublish,
+      subscriptionStatus,
+      hasStripeCustomer,
+      planOverride,
+      impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
+      readOnly,
+    }),
+    [
+      activePanel, setActivePanel, chatPrompt, setChatPrompt, activeSection, setActiveSection,
+      selectedNode, setSelectedNode, activePage, setActivePage, rightTab, setRightTab,
+      safeLeftCollapsed, safeRightCollapsed, toggleLeft, toggleRight, refreshKey, triggerRefresh,
+      scrollToSection, setScrollToSection, chatDrawerOpen, setChatDrawerOpen, editMode, setEditMode,
+      hasDraft, setHasDraft, hasPageConfigDraft, setHasPageConfigDraft, reloadDraftState,
+      editReceipts, addEditReceipts, markDraftReceipts, tenantId, siteUrl, previewUrl,
+      liveSyncEnabled, dashboardBasePath, dashboardHref, siteModel, autoPublish, subscriptionStatus,
+      hasStripeCustomer, planOverride, impersonation, readOnly,
+    ],
+  );
+
   return (
-    <DashboardContext.Provider
-      value={{
-        activePanel,
-        setActivePanel,
-        chatPrompt,
-        setChatPrompt,
-        activeSection,
-        setActiveSection,
-        selectedNode,
-        setSelectedNode,
-        activePage,
-        setActivePage,
-        rightTab,
-        setRightTab,
-        leftCollapsed: safeLeftCollapsed,
-        rightCollapsed: safeRightCollapsed,
-        toggleLeft,
-        toggleRight,
-        refreshKey,
-        triggerRefresh,
-        scrollToSection,
-        setScrollToSection,
-        chatDrawerOpen,
-        setChatDrawerOpen,
-        editMode,
-        setEditMode,
-        hasDraft,
-        setHasDraft,
-        hasPageConfigDraft,
-        setHasPageConfigDraft,
-        reloadDraftState,
-        editReceipts,
-        addEditReceipts,
-        markDraftReceipts,
-        tenantId,
-        siteUrl,
-        previewUrl,
-        liveSyncEnabled,
-        dashboardBasePath,
-        dashboardHref,
-        siteModel,
-        autoPublish,
-        subscriptionStatus,
-        hasStripeCustomer,
-        planOverride,
-        impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
-        readOnly,
-      }}
-    >
+    <DashboardContext.Provider value={value}>
       {children}
     </DashboardContext.Provider>
   );

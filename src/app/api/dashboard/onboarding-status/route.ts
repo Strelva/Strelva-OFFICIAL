@@ -24,9 +24,9 @@ export async function GET() {
   const steps = [
     {
       key: "connect",
-      label: "Connect a source so the AI knows your business",
+      label: "Connect an account so Strelva can manage more for you",
       done: connections.length > 0,
-      href: "/dashboard/sources",
+      href: "/dashboard/integrations",
     },
     {
       key: "ai_edit",

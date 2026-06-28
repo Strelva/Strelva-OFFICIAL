@@ -8,27 +8,22 @@ function readRepoFile(filePath: string): string {
 
 describe("owner journey copy and links", () => {
   it("keeps the dashboard navigation in owner language with Ask AI visible", () => {
-    const desktopNav = readRepoFile("src/components/dashboard/HistorySidebar.tsx");
-    const mobileNav = readRepoFile("src/components/dashboard/MobileNav.tsx");
+    // Nav labels live in the conditional surface resolver now (not inline in the
+    // sidebar). The pillars are owner-language; old-IA labels are gone.
+    const surfaces = readRepoFile("src/lib/dashboard-surfaces.ts");
 
-    expect(desktopNav).toContain("Today");
-    expect(desktopNav).toContain("Ask AI");
-    expect(desktopNav).toContain("Site");
-    expect(desktopNav).toContain("Sources");
-    expect(desktopNav).not.toContain('label: "Needs You"');
-    expect(desktopNav).not.toContain("Approvals");
-    expect(desktopNav).not.toContain("Connections");
-    expect(desktopNav).not.toContain("Ownership");
-    expect(desktopNav).not.toContain("Overview");
+    expect(surfaces).toContain('label: "Today"');
+    expect(surfaces).toContain('label: "Ask AI"');
+    expect(surfaces).toContain('label: "Website"');
+    expect(surfaces).toContain('label: "Google Business"');
+    expect(surfaces).toContain('label: "Analytics"');
+    expect(surfaces).toContain('label: "Reviews"');
+    expect(surfaces).toContain('label: "Health"');
 
-    expect(mobileNav).toContain("Today");
-    expect(mobileNav).toContain("Ask AI");
-    expect(mobileNav).toContain("Sources");
-    expect(mobileNav).not.toContain('label: "Needs You"');
-    expect(mobileNav).not.toContain("Approvals");
-    expect(mobileNav).not.toContain("Connections");
-    expect(mobileNav).not.toContain("Ownership");
-    expect(mobileNav).not.toContain("Overview");
+    // Old IA names should not resurface as nav labels.
+    expect(surfaces).not.toContain('label: "Site"');
+    expect(surfaces).not.toContain('label: "Sources"');
+    expect(surfaces).not.toContain('label: "Reports"');
   });
 
   it("keeps the dashboard root focused on proof and next action", () => {
@@ -168,13 +163,13 @@ describe("owner journey copy and links", () => {
     expect(publishBar).toContain("Published to Strelva - live refresh failed");
   });
 
-  it("keeps Sources honest about setup and availability", () => {
+  it("keeps Integrations honest about setup and availability", () => {
     const sources = readRepoFile("src/components/dashboard/ConnectionsPage.tsx");
     const detail = readRepoFile("src/components/dashboard/ConnectionDetailPage.tsx");
     const badges = readRepoFile("src/components/dashboard/SourceHealthBadge.tsx");
 
-    expect(sources).toContain("What the AI should trust");
-    expect(sources).toContain("A short source map");
+    expect(sources).toContain("Connect your accounts");
+    expect(sources).toContain("expands what we can see and update");
     expect(sources).toContain("OAuth ready");
     expect(sources).toContain("Manual Search Console setup");
     expect(sources).not.toContain("Sources the AI can actually use");

@@ -55,7 +55,10 @@ vi.mock("@/lib/db/client", async (orig) => ({
 
 // Suggestion creation fires an event into the Redis-backed event queue; stub it
 // so only the Postgres suggestion write is observed.
-vi.mock("@/lib/events", () => ({ addEvent: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/events", () => ({
+  addEvent: vi.fn().mockResolvedValue(undefined),
+  getEvents: vi.fn().mockResolvedValue([]),
+}));
 
 import { getSuggestions, addSuggestion, updateSuggestion } from "@/lib/suggestions";
 

@@ -3,9 +3,11 @@ import { headers } from "next/headers";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
-import { CapabilityProvider } from "@/components/dashboard/CapabilityGate";
+import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfacesContext";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
+import { getConnections } from "@/lib/connections";
+import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
@@ -15,7 +17,7 @@ import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custom-repos";
 import { getLocalClientPreviewUrl } from "@/lib/preview-target";
-import { ConversationLayoutClient } from "./ConversationLayoutClient";
+import { ConversationShell } from "@/components/dashboard/ConversationShell";
 
 export default async function DashboardLayout({
   children,
@@ -93,11 +95,19 @@ export default async function DashboardLayout({
   // Fetch queue count and stats. Each read is independently guarded: this runs
   // in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip) would
   // 500 every dashboard route at once. Degrade to safe defaults instead.
-  const [pendingCount, pageViews, activity] = await Promise.all([
+  const [pendingCount, pageViews, activity, connections] = await Promise.all([
     getQueueCount(tenant).catch(() => 0),
     getClickCounts("page-view", tenant).catch(() => ({ total: 0, today: 0, thisWeek: 0, lastWeek: 0 })),
     getActivity(tenant, { actor: "ai" }).catch(() => []),
+    getConnections(tenant).catch(() => []),
   ]);
+
+  // The conditional tab set — big-4 presence pillars shown by business type +
+  // what's connected. Falls back to a local-business default if config is missing.
+  const surfaces = getVisibleSurfaces({
+    tenantConfig: tenantConfig ?? { template: "wellness" },
+    connections,
+  });
   const monthAgo = Date.now() - 30 * 86_400_000;
   const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
   const valueProof = pageViews.thisWeek > 0
@@ -125,7 +135,7 @@ export default async function DashboardLayout({
       }}
       readOnly={isDemo}
     >
-      <CapabilityProvider>
+      <DashboardSurfacesProvider surfaces={surfaces}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200] focus:rounded-md focus:bg-warm-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-surface-base"
@@ -142,14 +152,14 @@ export default async function DashboardLayout({
         )}
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
-        <ConversationLayoutClient
+        <ConversationShell
           ownerName={ownerName || siteName}
           pendingCount={pendingCount}
           valueProof={valueProof}
         >
           {children}
-        </ConversationLayoutClient>
-      </CapabilityProvider>
+        </ConversationShell>
+      </DashboardSurfacesProvider>
     </DashboardProvider>
   );
 }

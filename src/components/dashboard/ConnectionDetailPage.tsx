@@ -207,13 +207,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const setupPath = status === "connected"
     ? "Connected and available according to the current sync status."
     : status === "coming_soon"
-      ? "This source is planned. It is not available for setup yet."
+      ? "This integration is planned. It is not available for setup yet."
       : detail.connectionProvider === "google"
         ? "Connect Google once, then the AI can use this as trusted business context."
         : detail.id === "google-search-console"
-          ? "This source uses manual Search Console credential setup today, not OAuth."
+          ? "This integration uses manual Search Console credential setup today, not OAuth."
           : detail.connectionProvider
-            ? "Connect the provider before this source influences AI decisions."
+            ? "Connect the provider before this integration influences AI decisions."
             : detail.builtIn
               ? "This is a built-in Strelva signal."
               : "Set this up before it influences AI decisions.";
@@ -222,11 +222,11 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
       {/* Back link */}
       <button
-        onClick={() => router.push(dashboardHref("/dashboard/sources"))}
+        onClick={() => router.push(dashboardHref("/dashboard/integrations"))}
         className="flex items-center gap-1.5 text-gray-faint hover:text-gray-muted transition-colors mb-8"
       >
         <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span className="text-[13px]">Sources</span>
+        <span className="text-[13px]">Integrations</span>
       </button>
 
       {/* Header */}
@@ -285,13 +285,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <p className="mt-2 text-[15px] font-medium text-warm-black">{detail.addsIntelligence}</p>
           {canUseNow ? (
             <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
-              This source is active. The AI uses it in chat, suggestions, and the weekly report when relevant data lands.
+              This integration is active. The AI uses it in chat, suggestions, and the weekly report when relevant data lands.
             </p>
           ) : (
             <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
               {status === "coming_soon"
                 ? "Not available for setup yet — listed here so you know it's planned."
-                : "Connect this source before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers."}
+                : "Connect this integration before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers."}
             </p>
           )}
         </div>
@@ -425,7 +425,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         <div className="mb-8 max-w-[600px] rounded-2xl border border-glass-border bg-surface-raised px-5 py-4">
           <h3 className="text-[13px] font-medium text-warm-black mb-1">Connection coming soon</h3>
           <p className="text-[12px] text-gray-muted leading-relaxed">
-            This source is visible so you can see what it will support, but setup is not available yet.
+            This integration is visible so you can see what it will support, but setup is not available yet.
           </p>
         </div>
       )}

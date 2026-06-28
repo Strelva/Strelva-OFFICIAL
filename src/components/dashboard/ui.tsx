@@ -90,23 +90,3 @@ export function FormRow({
     </div>
   );
 }
-
-export function SavedToast({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast">
-      <div className="bg-surface-raised border border-gray-border rounded-lg px-4 py-2 flex items-center gap-1.5 text-xs font-mono text-emerald-400 shadow-lg">
-        <svg
-          className="w-3 h-3"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        Saved
-      </div>
-    </div>
-  );
-}

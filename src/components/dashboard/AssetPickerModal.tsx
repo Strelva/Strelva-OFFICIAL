@@ -23,6 +23,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -107,6 +108,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
     if (!file.type.startsWith("image/")) return;
 
     setUploading(true);
+    setUploadError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -120,7 +122,13 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
         setAssets((prev) => (prev ? [asset, ...prev] : [asset]));
         // Auto-select the newly uploaded photo
         handlePick(asset);
+      } else {
+        // Don't swallow the failure — the spinner used to just stop and users
+        // retried endlessly with no idea why.
+        setUploadError("Upload failed. Try a smaller image, or check your connection.");
       }
+    } catch {
+      setUploadError("Upload failed. Check your connection and try again.");
     } finally {
       setUploading(false);
     }
@@ -239,6 +247,10 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
             onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
           />
         </div>
+
+        {uploadError && (
+          <div className="px-5 pt-2 text-[12px] text-red-400" role="alert">{uploadError}</div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Circle, X } from "lucide-react";
+import { useDashboardOptional } from "./DashboardContext";
 
 interface Step {
   key: string;
@@ -34,6 +35,9 @@ export function OnboardingChecklist({
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [hidden, setHidden] = useState(!defaultOpen);
   const [loaded, setLoaded] = useState(false);
+  // Prefix the dashboard base path so this works under /client/{tenant} path-
+  // fallback hosting, not just subdomains.
+  const dashboardHref = useDashboardOptional()?.dashboardHref ?? ((p: string) => p);
 
   const storageKey = `strelva_onboarding_dismissed_${tenant}`;
 
@@ -43,7 +47,7 @@ export function OnboardingChecklist({
       return;
     }
     let active = true;
-    fetch("/api/dashboard/onboarding-status")
+    fetch(dashboardHref("/api/dashboard/onboarding-status"))
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { steps?: Step[]; complete?: boolean } | null) => {
         if (!active) return;

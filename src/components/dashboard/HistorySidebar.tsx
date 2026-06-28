@@ -4,22 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  House,
-  Link2,
-  MessageCircle,
   Settings,
   Search,
   X,
   LogOut,
-  LayoutPanelLeft,
-  BarChart3,
-  Star,
   Plus,
-  FileText,
-  Activity,
+  Inbox,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { PropertySwitcher } from "./PropertySwitcher";
+import { useDashboardSurfaces } from "./DashboardSurfacesContext";
+import { SURFACE_ICONS, GROUP_LABELS, SURFACE_MATCH } from "./surface-nav";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
 
 /** Ends the active session (Supabase first, Clerk fallback) then returns to sign-in. */
@@ -57,28 +52,6 @@ interface HistorySidebarProps {
   pendingCount?: number;
   valueProof?: string;
 }
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Today", icon: House },
-  { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
-  { href: "/dashboard/collections", label: "Content", icon: FileText },
-  { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/health", label: "Health", icon: Activity },
-];
-
-const NAV_GROUPS = [
-  {
-    label: "Manage",
-    items: NAV_ITEMS.slice(0, 2),
-  },
-  {
-    label: "Site",
-    items: NAV_ITEMS.slice(2, 6),
-  },
-];
 
 /** The client's favicon as their logo, derived from their site domain. Falls back
  *  to the name's initial if there's no domain or the favicon fails to load. */
@@ -118,13 +91,17 @@ export function HistorySidebar({
   ownerName,
   isOpen = true,
   onClose,
-  pendingCount: _pendingCount = 0,
+  pendingCount = 0,
   valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { dashboardBasePath, dashboardHref, siteUrl } = useDashboard();
+  const surfaces = useDashboardSurfaces();
+  const navGroups = (["manage", "presence"] as const)
+    .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
+    .filter((g) => g.items.length > 0);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const activeThread = searchParams.get("thread");
@@ -222,20 +199,36 @@ export function HistorySidebar({
       {/* Main navigation */}
       <nav className="mt-6" aria-label="Dashboard">
         <ul>
-          {NAV_GROUPS.map((group) => (
-            <li key={group.label}>
+          {navGroups.map((group) => (
+            <li key={group.id}>
               <div className="px-5 pb-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-muted">{group.label}</p>
               </div>
               <ul className="px-3 pb-5">
+                {group.id === "manage" && pendingCount > 0 && (
+                  <li className="py-0.5">
+                    <Link
+                      href={dashboardHref("/dashboard/review")}
+                      prefetch={false}
+                      onClick={onClose}
+                      className="group flex min-h-[42px] w-full items-center gap-3 rounded-lg bg-accent-dim px-3 py-2.5 text-[13px] font-medium text-accent transition-colors hover:bg-accent-dim/80"
+                    >
+                      <Inbox className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                      <span className="flex-1 truncate">Needs you</span>
+                      <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-surface-base">
+                        {pendingCount}
+                      </span>
+                    </Link>
+                  </li>
+                )}
                 {group.items.map((item) => {
-                  const matchHref = item.href;
-                  const isActive = matchHref === "/dashboard"
+                  const isActive = item.id === "today"
                     ? effectivePathname === "/dashboard"
-                    : effectivePathname?.startsWith(matchHref);
-                  const Icon = item.icon;
+                    : SURFACE_MATCH[item.id].some((m) => effectivePathname?.startsWith(m));
+                  const Icon = SURFACE_ICONS[item.id];
+                  const isConnect = item.state === "connect";
                   return (
-                    <li key={item.href} className="py-0.5">
+                    <li key={item.id} className="py-0.5">
                       <Link
                         href={dashboardHref(item.href)}
                         prefetch={false}
@@ -243,17 +236,24 @@ export function HistorySidebar({
                         className={`group flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
                           isActive
                             ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
-                            : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
+                            : isConnect
+                              ? "text-gray-faint hover:bg-gray-bg hover:text-warm-black"
+                              : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
                         }`}
                         aria-current={isActive ? "page" : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
+                        {isConnect && (
+                          <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
+                            Connect
+                          </span>
+                        )}
                       </Link>
                     </li>
                   );
                 })}
-                {group.label === "Manage" && isChatRoute && (
+                {group.id === "manage" && isChatRoute && (
                   <li className="mt-2 rounded-lg border border-gray-border bg-surface-raised/45 p-2">
                     <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
                       <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-faint">

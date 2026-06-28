@@ -2,23 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, LayoutPanelLeft, MessageCircle, Link2, BarChart3, Star, FileText } from "lucide-react";
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useDashboard } from "./DashboardContext";
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Today", icon: House },
-  { href: "/dashboard/chat", label: "Ask AI", icon: MessageCircle },
-  { href: "/dashboard/site", label: "Site", icon: LayoutPanelLeft },
-  { href: "/dashboard/sources", label: "Sources", icon: Link2 },
-  { href: "/dashboard/collections", label: "Content", icon: FileText },
-  { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-];
+import { useDashboardSurfaces } from "./DashboardSurfacesContext";
+import { SURFACE_ICONS, SURFACE_MATCH } from "./surface-nav";
 
 export function MobileNav() {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
+  const surfaces = useDashboardSurfaces();
+  // The bottom bar shows only fully-active tabs, capped at 5 so a fully-connected
+  // business doesn't overflow a phone bar — the rest stay in the hamburger nav.
+  // "Connect to unlock" nudges live in Today/desktop. Memoized so it's a stable
+  // reference — otherwise the active-pill effect loops forever.
+  const navItems = useMemo(() => surfaces.filter((s) => s.state === "shown").slice(0, 5), [surfaces]);
   const effectivePathname =
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"
@@ -27,13 +24,12 @@ export function MobileNav() {
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const getActiveIndex = useCallback(() => {
-    return NAV_ITEMS.findIndex((item) => {
-      const matchHref = item.href;
-      return matchHref === "/dashboard"
+    return navItems.findIndex((item) =>
+      item.id === "today"
         ? effectivePathname === "/dashboard"
-        : effectivePathname?.startsWith(matchHref);
-    });
-  }, [effectivePathname]);
+        : SURFACE_MATCH[item.id].some((m) => effectivePathname?.startsWith(m)),
+    );
+  }, [effectivePathname, navItems]);
 
   useEffect(() => {
     const activeIndex = getActiveIndex();
@@ -67,15 +63,14 @@ export function MobileNav() {
             opacity: pillStyle.width > 0 ? 1 : 0,
           }}
         />
-        {NAV_ITEMS.map((item) => {
-          const matchHref = item.href;
-          const isActive = matchHref === "/dashboard"
+        {navItems.map((item) => {
+          const isActive = item.id === "today"
             ? effectivePathname === "/dashboard"
-            : effectivePathname?.startsWith(matchHref);
-          const Icon = item.icon;
+            : SURFACE_MATCH[item.id].some((m) => effectivePathname?.startsWith(m));
+          const Icon = SURFACE_ICONS[item.id];
           return (
             <Link
-              key={item.href}
+              key={item.id}
               href={dashboardHref(item.href)}
               prefetch={false}
               className={`relative flex flex-col items-center justify-center gap-1 w-[60px] h-14 rounded-xl transition-colors ${
