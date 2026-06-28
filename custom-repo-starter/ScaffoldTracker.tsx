@@ -10,6 +10,8 @@
  *
  * For booking CTAs, import `trackBookingClick` and call it from the button's
  * onClick (optionally with the service id) to record `booking-click` events.
+ * For a storefront, import `trackOrder` and call it on checkout success to
+ * record an `order` (revenue shows on the owner's dashboard Store).
  *
  * Self-contained on purpose: this file imports only React + standard browser
  * APIs (no `@/lib/...`), so it is a true single-file drop-in and typechecks
@@ -32,7 +34,16 @@ import { useEffect } from "react";
 
 const CONTRACT_VERSION = "v1";
 
-type TrackEvent = "page-view" | "booking-click";
+type TrackEvent = "page-view" | "booking-click" | "order";
+
+/** Payload for an `order` beacon — mirrors the v1 track contract's order shape. */
+export interface TrackOrder {
+  amountCents: number;
+  currency?: string;
+  items?: Array<{ name: string; quantity: number }>;
+  /** Provider order id — makes the beacon idempotent (a retried fire won't double-count). */
+  externalId?: string;
+}
 
 /** Browser-safe control-plane base URL. Mirrors getPublicScaffoldBaseUrl in
  *  scaffold-client.ts; inlined here so this component has no cross-file dep.
@@ -67,10 +78,9 @@ function prefersReducedData(): boolean {
 
 /**
  * Fire a single tracking event at the control plane. Always fail silent.
- * `serviceId` is only meaningful for "booking-click" and records which service
- * the visitor clicked through to book.
+ * `serviceId` is only meaningful for "booking-click"; `order` for "order".
  */
-function sendEvent(event: TrackEvent, serviceId?: string): void {
+function sendEvent(event: TrackEvent, opts?: { serviceId?: string; order?: TrackOrder }): void {
   try {
     if (typeof window === "undefined") return;
     if (process.env.NODE_ENV === "development") {
@@ -91,8 +101,14 @@ function sendEvent(event: TrackEvent, serviceId?: string): void {
     if (!baseUrl || !tenant) return;
 
     const url = `${baseUrl}/api/${CONTRACT_VERSION}/track/${tenant}`;
-    const payload: Record<string, string> = { event };
-    if (event === "booking-click" && serviceId) payload.serviceId = serviceId;
+    const payload: Record<string, unknown> = { event };
+    if (event === "booking-click" && opts?.serviceId) payload.serviceId = opts.serviceId;
+    if (event === "order" && opts?.order) {
+      payload.amountCents = opts.order.amountCents;
+      if (opts.order.currency) payload.currency = opts.order.currency;
+      if (opts.order.items) payload.items = opts.order.items;
+      if (opts.order.externalId) payload.orderId = opts.order.externalId;
+    }
     const body = JSON.stringify(payload);
 
     // sendBeacon is the most reliable on unload/navigation and is non-blocking.
@@ -125,7 +141,24 @@ function sendEvent(event: TrackEvent, serviceId?: string): void {
  * report's "top services" breakdown populates; omit it for a generic CTA.
  */
 export function trackBookingClick(serviceId?: string): void {
-  sendEvent("booking-click", serviceId);
+  sendEvent("booking-click", { serviceId });
+}
+
+/**
+ * Record a completed order so the owner's dashboard Store shows revenue/orders.
+ * Call it after a successful checkout:
+ *
+ *   trackOrder({ amountCents: 2499, currency: "USD",
+ *                items: [{ name: "Dried Mango", quantity: 1 }],
+ *                externalId: stripeSessionId });
+ *
+ * NOTE: a SERVER-side fire from your Stripe webhook (see
+ * commerce/stripe-webhook-route.ts) is more reliable than this client call — the
+ * browser can close before checkout returns. Use this only when you don't run
+ * the webhook. Pass `externalId` so a retry can't double-count.
+ */
+export function trackOrder(order: TrackOrder): void {
+  sendEvent("order", { order });
 }
 
 /**

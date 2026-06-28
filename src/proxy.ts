@@ -487,10 +487,18 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     isAdminSubdomain = customDomainResult.isAdminSubdomain;
   }
 
-  // Fallback: extract tenant from ?tenant= query param (for super admin access only).
-  // PRIVILEGE ISOLATION: ?tenant= is super-admin impersonation only and requires valid auth.
-  // This is not for multi-tenant routing — use subdomain or /client/{tenant} path instead.
-  // This requires authentication to prevent tenant spoofing
+  // Fallback: extract tenant from the ?tenant= query param (super-admin
+  // impersonation). NOT for multi-tenant routing — use a subdomain or
+  // /client/{tenant} path instead.
+  //
+  // SECURITY (honest accounting): the proxy only AUTH-gates this (see `needsAuth`
+  // below) — it does NOT verify super-admin here. The actual privilege boundary is
+  // DOWNSTREAM: every handler derives the tenant from the x-tenant header this sets
+  // and calls requireTenantAccess(), which rejects a non-member. So a non-super-admin
+  // who appends ?tenant=X is auth-gated and then access-denied per route. The
+  // residual risk is a future route that reads x-tenant WITHOUT requireTenantAccess
+  // — defense-in-depth TODO: gate ?tenant= on super-admin at the proxy (needs a
+  // middleware super_admins lookup; reviewed change to the auth path).
   let tenantFromQueryParam = false;
   if (!tenantId) {
     const tenantParam = req.nextUrl.searchParams.get("tenant");
