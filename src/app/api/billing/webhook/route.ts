@@ -349,7 +349,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, duplicate: true });
   }
   if (claimResult === "retry") {
-    return NextResponse.json({ received: true, retry: true });
+    // Another worker holds the claim (still processing, or it crashed mid-write).
+    // Returning 200 would tell Stripe "done" and it would never redeliver — so a
+    // crashed first attempt silently drops the event. Return 503 so Stripe
+    // retries; the idempotency claim resolves to "duplicate" once the in-flight
+    // attempt actually finishes, or re-claims it if that attempt died.
+    return NextResponse.json({ error: "Processing in progress, retry" }, { status: 503 });
   }
 
   const tenantId = extractTenantId(event.data.object);
