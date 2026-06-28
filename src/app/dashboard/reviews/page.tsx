@@ -1,5 +1,6 @@
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getReviews } from "@/lib/reviews";
+import { getTenantConfig } from "@/lib/tenants";
 import { ReviewsPanel } from "@/components/dashboard/ReviewsPanel";
 
 export default async function ReviewsPage() {
@@ -7,7 +8,10 @@ export default async function ReviewsPage() {
 
   // Degrade to the empty state on a transient backend error rather than
   // escalating a recoverable failure into the full error boundary.
-  const reviews = await getReviews(tenant).catch(() => []);
+  const [reviews, config] = await Promise.all([
+    getReviews(tenant).catch(() => []),
+    getTenantConfig(tenant).catch(() => null),
+  ]);
 
-  return <ReviewsPanel reviews={reviews} />;
+  return <ReviewsPanel reviews={reviews} googlePlaceId={config?.reviewsConfig?.googlePlaceId} />;
 }
