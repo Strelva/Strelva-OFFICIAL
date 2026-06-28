@@ -83,58 +83,120 @@ export async function resolveEventAction(
     return { changed: false, reason: "invalid_action" };
   }
 
-  const resolved = await resolveEvent(eventId, action, { actor: "user" });
-  if (!resolved.changed) {
-    return { changed: false, reason: "already_resolved" };
-  }
+  // For approvals that actually do something external (post to Google, send an
+  // email, publish content), validate + perform the effect BEFORE flipping the
+  // event to resolved. A failed or stale action must leave the item pending —
+  // never resolve it and have the UI falsely say "Made live".
 
   if (event.type === "content_update") {
+    const kind = event.metadata?.kind;
+
+    // GBP post draft (B1): on approve, actually post to the Google listing.
+    if (kind === "gbp_post_draft") {
+      if (action === "approved") {
+        const summary = typeof event.metadata?.summary === "string" ? event.metadata.summary : "";
+        if (!summary) return { changed: false, reason: "gbp_post_invalid" };
+        const { createGbpPost } = await import("./gbp-management");
+        const result = await createGbpPost(tenantId, {
+          summary,
+          ctaUrl: typeof event.metadata?.ctaUrl === "string" ? event.metadata.ctaUrl : undefined,
+          photoUrl: typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : undefined,
+        });
+        if (!result.success) return { changed: false, reason: "gbp_post_failed" };
+      }
+      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+
+    // Structural change (H6): never auto-applied — it's queued manual work for
+    // the builder. Resolve it, but signal the handoff so the UI doesn't claim
+    // "Made live" for a change that hasn't shipped.
+    if (kind === "manual_structural_change") {
+      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      return resolved.changed
+        ? { changed: true, reason: "structural_handoff" }
+        : { changed: false, reason: "already_resolved" };
+    }
+
+    // Section content (H4): confirm a draft exists and isn't stale BEFORE
+    // resolving, then resolve (claim) and only apply if we won the claim.
     const section = typeof event.metadata?.section === "string"
       ? event.metadata.section as ContentSection
       : null;
 
-    if (section && event.metadata?.kind !== "manual_structural_change") {
-      if (action === "approved") {
-        const metadataDraft =
-          event.metadata?.kind === "agent_preview" &&
-          event.metadata.proposedData &&
-          typeof event.metadata.proposedData === "object" &&
-          !Array.isArray(event.metadata.proposedData)
-            ? event.metadata.proposedData
-            : null;
-        const draft = await getDraftContent(section, tenantId) || metadataDraft;
-        if (!draft) return { changed: true, reason: "draft_not_found" };
+    if (section && action === "approved") {
+      const metadataDraft =
+        kind === "agent_preview" &&
+        event.metadata?.proposedData &&
+        typeof event.metadata.proposedData === "object" &&
+        !Array.isArray(event.metadata.proposedData)
+          ? event.metadata.proposedData
+          : null;
+      const draft = (await getDraftContent(section, tenantId)) || metadataDraft;
+      if (!draft) return { changed: false, reason: "draft_not_found" };
 
-        const current = await getContent(section, tenantId) as unknown as Record<string, unknown>;
-        await setContent(section, draft as ContentMap[typeof section], tenantId);
-        await appendVersion(
-          section,
-          draft,
-          "user",
-          tenantId,
-          diffFields(current, draft as unknown as Record<string, unknown>)
-        );
-        await recordSectionUpdate(section, tenantId);
-        const { revalidatePath } = await import("next/cache");
-        revalidatePath("/");
-        const { revalidateClientSite } = await import("./revalidate-client");
-        revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
+      // Stale-overwrite guard: if the section was edited after this change was
+      // proposed, the queued AI change is stale — refuse rather than silently
+      // revert the owner's newer edit.
+      const { getSectionTimestamps } = await import("./storage");
+      const timestamps = await getSectionTimestamps(tenantId).catch(
+        () => ({}) as Record<string, string>,
+      );
+      const sectionUpdatedAt = timestamps[section] ? new Date(timestamps[section]).getTime() : 0;
+      const proposedAt = event.createdAt ? new Date(event.createdAt).getTime() : 0;
+      if (sectionUpdatedAt && proposedAt && sectionUpdatedAt > proposedAt) {
+        return { changed: false, reason: "stale_superseded" };
       }
 
+      const current = (await getContent(section, tenantId)) as unknown as Record<string, unknown>;
+      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      if (!resolved.changed) return { changed: false, reason: "already_resolved" };
+
+      await setContent(section, draft as ContentMap[typeof section], tenantId);
+      await appendVersion(
+        section,
+        draft,
+        "user",
+        tenantId,
+        diffFields(current, draft as unknown as Record<string, unknown>),
+      );
+      await recordSectionUpdate(section, tenantId);
+      const { revalidatePath } = await import("next/cache");
+      revalidatePath("/");
+      const { revalidateClientSite } = await import("./revalidate-client");
+      revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
       await clearDraft(section, tenantId);
+      if (event.source === "ai") recordApproval(tenantId).catch(() => {});
+      return { changed: true };
     }
 
-    // Track approval/rejection streak for auto-approve threshold
+    // Dismissed, or a content_update with no section: resolve + clean up.
+    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    if (!resolved.changed) return { changed: false, reason: "already_resolved" };
+    if (section) await clearDraft(section, tenantId);
     if (event.source === "ai") {
-      if (action === "approved") {
-        recordApproval(tenantId).catch(() => {});
-      } else {
-        recordRejection(tenantId).catch(() => {});
-      }
+      (action === "approved" ? recordApproval : recordRejection)(tenantId).catch(() => {});
     }
-
     return { changed: true };
   }
+
+  // Newsletter draft (B2): on approve, actually send to subscribers.
+  if (event.type === "newsletter_draft") {
+    if (action === "approved") {
+      const subject = typeof event.metadata?.subject === "string" ? event.metadata.subject : "";
+      const body = typeof event.metadata?.body === "string" ? event.metadata.body : "";
+      if (!subject || !body) return { changed: false, reason: "newsletter_invalid" };
+      const { sendNewsletter } = await import("./newsletter");
+      const result = await sendNewsletter(tenantId, { subject, body });
+      if (!result.success) return { changed: false, reason: result.reason || "newsletter_failed" };
+    }
+    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+  }
+
+  // Remaining simple cases (suggestion, etc.) — resolve then handle.
+  const resolved = await resolveEvent(eventId, action, { actor: "user" });
+  if (!resolved.changed) return { changed: false, reason: "already_resolved" };
 
   if (event.type !== "suggestion") return { changed: true };
 

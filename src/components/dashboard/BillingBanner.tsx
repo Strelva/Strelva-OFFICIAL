@@ -12,12 +12,70 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [dismissed, setDismissed] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
   if (dismissed) return null;
-  if (subscriptionStatus !== "cancelled" && subscriptionStatus !== "past_due") return null;
+  if (
+    subscriptionStatus !== "cancelled" &&
+    subscriptionStatus !== "past_due" &&
+    subscriptionStatus !== "none"
+  )
+    return null;
 
+  const isNone = subscriptionStatus === "none";
   const isCancelled = subscriptionStatus === "cancelled";
+
+  async function startSubscription() {
+    setError("");
+    setStarting(true);
+    try {
+      const res = await fetch(dashboardHref("/api/billing/start-subscription"), {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body?.error || "Couldn't start your subscription. Try again, or message Strelva.");
+        return;
+      }
+      if (body?.checkoutUrl) window.location.href = body.checkoutUrl;
+      else setError("Couldn't start your subscription. Try again.");
+    } catch {
+      setError("Couldn't start your subscription. Check your connection and try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  if (isNone) {
+    return (
+      <div className="flex items-center justify-between gap-4 border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <div>
+          <p>
+            Your site is built and ready. Start your subscription to publish
+            changes and go live.{" "}
+            <button
+              type="button"
+              onClick={startSubscription}
+              disabled={starting}
+              className="font-medium underline text-emerald-950 disabled:opacity-60"
+            >
+              {starting ? "Opening…" : "Start your subscription"}
+            </button>
+          </p>
+          {error && <p className="mt-1 text-xs opacity-80">{error}</p>}
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="ml-4 shrink-0 text-lg leading-none opacity-60 hover:opacity-100"
+          aria-label="Dismiss"
+        >
+          x
+        </button>
+      </div>
+    );
+  }
 
   async function openBillingPortal() {
     setError("");

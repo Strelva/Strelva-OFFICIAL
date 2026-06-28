@@ -65,11 +65,6 @@ async function DashboardHome({
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
 
-  // Proactive nudges: turn already-cheap signals (unreplied reviews, stale site,
-  // no posts) into pending suggestions so the product feels managed. Idempotent
-  // (addSuggestion dedupes) and isolated — must never block render or throw.
-  await generateProactiveSuggestions(tenant).catch(() => {});
-
   const [
     pageViews,
     customerActions,
@@ -128,6 +123,14 @@ async function DashboardHome({
     pendingCount === 0 &&
     activity.length === 0 &&
     !briefHeadline;
+
+  // Proactive nudges (unreplied reviews, stale site, no posts) make the product
+  // feel managed — but NEVER for a brand-new tenant: a phantom "needs you: 1" on
+  // the day-one screen reads as broken. Generated after isFresh is computed off a
+  // clean queue count, so a fresh tenant stays fresh. Idempotent + must not throw.
+  if (!isFresh) {
+    await generateProactiveSuggestions(tenant).catch(() => {});
+  }
 
   // What the site already ships, derived from its template (zero extra reads
   // beyond the tenant config we already loaded). These are honest "it's live"

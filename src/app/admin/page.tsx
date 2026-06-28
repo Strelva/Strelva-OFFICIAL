@@ -18,7 +18,7 @@ import {
   tenantHasOwnerMessage,
 } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
-import { getPortfolioSummary } from "@/lib/portfolio";
+import { getPortfolioSummary, computeMrrDollars } from "@/lib/portfolio";
 import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { Sparkline } from "./Sparkline";
 import { ScanAllButton } from "./ScanAllButton";
@@ -90,14 +90,14 @@ export default async function AdminPage() {
   const activeTenants = TENANTS.filter((t) => t.active).length;
   // MRR must tell the same story as the per-tenant rows: count a tenant only
   // if it is *effectively* active (founder-comp aware) AND actually billed.
-  // Comped tenants (planOverride === "founder_comp") read as "active" but are
-  // not revenue, so they are excluded.
-  const activeSubscriptions = tenantData.filter(
-    (d) =>
-      d.effectiveSubscriptionStatus === "active" &&
-      d.tenant.planOverride !== "founder_comp"
-  ).length;
-  const mrr = activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
+  // MRR is computed in ONE place (computeMrrDollars) so this card and the
+  // Mission Control agent never disagree. It counts only real paid subscriptions
+  // — grandfathered ($0) and founder-comp ($0) tenants are excluded. The
+  // displayed subscription count is derived from the same number.
+  const mrr = computeMrrDollars(TENANTS);
+  const activeSubscriptions = SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS
+    ? Math.round(mrr / SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS)
+    : 0;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
   const customRepoCount = TENANTS.filter((t) => getTenantDeliveryModel(t) === "custom_repo").length;
   const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;

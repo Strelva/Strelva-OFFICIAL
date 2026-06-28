@@ -399,12 +399,14 @@ export async function generateWeeklyReport(
 
   const topSearchQueries = (searchData?.queries || []).slice(0, 5);
 
-  // Extract verification data for the current week (Mon–Sun).
+  // Verification data for the COMPLETED prior week (Mon–Sun). The report runs
+  // Monday, so the just-started week would be near-empty — suppressing the
+  // "verified changes this week" proof lines. Use the previous full week.
   const now = new Date();
   const dayOfWeek = now.getDay();
   const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() + diffToMonday);
+  weekStart.setDate(now.getDate() + diffToMonday - 7);
   weekStart.setHours(0, 0, 0, 0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);

@@ -14,7 +14,7 @@ import { mapPool } from "./concurrency";
 import { getActivity, listDrafts } from "./storage";
 import { listThreads } from "./threads";
 import { getWeeklyBrief } from "./weekly-brief";
-import { getEffectiveSubscriptionStatus } from "./subscription";
+import { getEffectiveSubscriptionStatus, isGrandfathered } from "./subscription";
 import { getTenantLaunchReadinessResults } from "./production-readiness-rules";
 import {
   buildTenantLaunchReadiness,
@@ -23,6 +23,24 @@ import {
 } from "./launch-readiness";
 import { getTenantDeliveryModel } from "./custom-repos";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "./pricing";
+
+/**
+ * Monthly recurring revenue in dollars. Counts only tenants on a real paid
+ * subscription — excludes grandfathered ($0) and founder-comp ($0) — so the
+ * overview card and the operator agent (both call this) always agree. One live
+ * Stripe price today, so it's billable-count × the plan price.
+ */
+export function computeMrrDollars(
+  tenants: Array<{ id: string; subscriptionStatus?: string; planOverride?: string | null }>,
+): number {
+  const billable = tenants.filter(
+    (t) =>
+      (t.subscriptionStatus === "active" || t.subscriptionStatus === "trialing") &&
+      t.planOverride !== "founder_comp" &&
+      !isGrandfathered(t.id),
+  ).length;
+  return billable * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
+}
 import { buildOpsReport, type OpsReport } from "./ops";
 import { getRedis } from "./redis";
 import { getLatestSnapshots } from "./visibility/snapshots";
@@ -124,16 +142,12 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
     }
   );
 
-  const activeSubscriptions = TENANTS.filter(
-    (t) => t.subscriptionStatus === "active"
-  ).length;
-
   return {
     snapshotAt: new Date().toISOString(),
     tenantCount: TENANTS.length,
     activeTenantCount: TENANTS.filter((t) => t.active).length,
     archivedTenantCount,
-    mrr: activeSubscriptions * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS,
+    mrr: computeMrrDollars(TENANTS),
     launchReadyCount: tenants.filter((t) => t.launchStatus === "ready").length,
     launchWatchCount: tenants.filter((t) => t.launchStatus === "watch").length,
     launchBlockedCount: tenants.filter((t) => t.launchStatus === "blocked").length,

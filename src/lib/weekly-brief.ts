@@ -16,9 +16,15 @@ function getWeekBounds(date: Date = new Date()): { weekStart: string; weekEnd: s
   const d = new Date(date);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d);
-  monday.setDate(diff);
-  monday.setHours(0, 0, 0, 0);
+  const thisMonday = new Date(d);
+  thisMonday.setDate(diff);
+  thisMonday.setHours(0, 0, 0, 0);
+
+  // The Monday report covers the week that JUST ENDED — previous Mon→Sun. The
+  // just-started week (Monday 00:00 → upcoming Sun) would be near-empty and read
+  // ~0 for every event metric (reviews, content updates, verified changes).
+  const monday = new Date(thisMonday);
+  monday.setDate(thisMonday.getDate() - 7);
 
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);

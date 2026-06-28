@@ -39,6 +39,11 @@ function getGrandfatheredTenants(): Set<string> {
   return set;
 }
 
+/** A grandfathered tenant has full access but pays $0 — never counts as revenue. */
+export function isGrandfathered(tenant: string): boolean {
+  return getGrandfatheredTenants().has(tenant);
+}
+
 let warnedEmptyGrandfather = false;
 
 export async function getEffectiveSubscriptionStatus(tenant: string): Promise<SubscriptionStatus> {

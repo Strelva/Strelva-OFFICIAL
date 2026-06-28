@@ -28,10 +28,17 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   instagram: <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />,
 };
 
-function formatEventStatus(status: UnifiedEvent["status"]): string {
-  if (status === "approved") return "Made live";
-  if (status === "auto_approved") return "Handled";
-  if (status === "dismissed") return "Skipped";
+function formatEventStatus(event: UnifiedEvent): string {
+  if (event.status === "approved") {
+    // Structural changes are handed to the builder, not auto-published — don't
+    // claim "Made live" for a change that hasn't shipped to the live site.
+    return event.type === "content_update" &&
+      event.metadata?.kind === "manual_structural_change"
+      ? "Sent to your builder"
+      : "Made live";
+  }
+  if (event.status === "auto_approved") return "Handled";
+  if (event.status === "dismissed") return "Skipped";
   return "Needs you";
 }
 
@@ -217,7 +224,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
                     : "bg-gray-bg text-gray-muted"
                 }`}
               >
-                {formatEventStatus(event.status)}
+                {formatEventStatus(event)}
               </span>
             )}
           </div>
