@@ -18,6 +18,7 @@ const mockRedis = {
   zrange: vi.fn(async () => zmembers),
   mget: vi.fn(async (...keys: string[]) => keys.map((k) => kv.get(k) ?? null)),
   get: vi.fn(async (key: string) => kv.get(key) ?? null),
+  zremrangebyscore: vi.fn(async () => 0),
 };
 
 vi.mock("../lib/redis", () => ({ getRedis: () => mockRedis }));
@@ -49,9 +50,17 @@ describe("events id-based zset members", () => {
     zmembers = [];
     const created = await addEvent({ tenantId: "t1", source: "ai", type: "review", title: "hi", body: "", status: "pending" });
     expect(mockRedis.zadd).toHaveBeenCalledOnce();
-    const entry = mockRedis.zadd.mock.calls[0][1] as { member: string };
+    const entry = mockRedis.zadd.mock.calls[0][1] as { member: string; score: number };
     expect(entry.member).toBe(created.id);
     expect(entry.member.startsWith("evt_")).toBe(true);
+
+    // The index is pruned by score on every add so it can't outgrow the record
+    // TTL (90 days). Cutoff = this add's score minus the 90-day window in ms.
+    const TTL_MS = 90 * 24 * 60 * 60 * 1000;
+    expect(mockRedis.zremrangebyscore).toHaveBeenCalledOnce();
+    const [, min, max] = mockRedis.zremrangebyscore.mock.calls[0];
+    expect(min).toBe(0);
+    expect(max).toBe(entry.score - TTL_MS);
   });
 
   it("reads bare-id members by resolving event:{id}", async () => {
