@@ -183,7 +183,7 @@ async function DashboardHome({
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
                   Your site is live
                 </p>
-                <h2 className="mt-2 text-[22px] font-semibold leading-snug text-warm-black">
+                <h2 className="mt-2 font-[family-name:var(--font-display)] text-[22px] font-normal leading-snug text-warm-black">
                   {siteName ? `${siteName} is up and running.` : "Your site is up and running."}
                 </h2>
                 {siteDomain ? (
@@ -323,7 +323,7 @@ async function DashboardHome({
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
                   First run
                 </p>
-                <h2 className="mt-2 text-[20px] font-semibold text-warm-black">
+                <h2 className="mt-2 font-[family-name:var(--font-display)] text-[20px] font-normal text-warm-black">
                   Your starter site is ready. Make the first useful wins.
                 </h2>
                 <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
@@ -362,7 +362,7 @@ async function DashboardHome({
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
                   Next useful move
                 </p>
-                <h2 className="mt-2 text-[20px] font-semibold text-warm-black">{nextAction}</h2>
+                <h2 className="mt-2 font-[family-name:var(--font-display)] text-[20px] font-normal text-warm-black">{nextAction}</h2>
                 <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">{nextActionDetail}</p>
               </div>
               <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-success" strokeWidth={1.5} />
@@ -398,7 +398,7 @@ async function DashboardHome({
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
                 What changed
               </p>
-              <h2 className="mt-2 text-[18px] font-semibold text-warm-black">Recent changes</h2>
+              <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">Recent changes</h2>
             </div>
             <Link href={dashboardHref("/dashboard/reports")} className="text-[12px] font-medium text-accent hover:text-accent/80">
               Reports
