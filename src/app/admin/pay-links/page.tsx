@@ -108,7 +108,7 @@ export default function PayLinksPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-warm-white">Pay Links</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Pay Links</h1>
         <p className="text-sm text-gray-muted mt-1">
           Mint a per-client payment link to send before work starts.
         </p>

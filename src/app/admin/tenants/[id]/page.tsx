@@ -17,7 +17,7 @@ function Pulse({ label, value, sub }: { label: string; value: string | number; s
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-4">
       <p className="text-xs text-gray-muted">{label}</p>
-      <p className="text-2xl font-semibold text-warm-white mt-1">{value}</p>
+      <p className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white mt-1">{value}</p>
       {sub && <p className="text-xs text-gray-faint mt-0.5">{sub}</p>}
     </div>
   );
@@ -62,7 +62,7 @@ export default async function TenantDetailPage({
         <Link href="/admin" className="text-sm text-gray-muted hover:text-warm-white">
           ← Overview
         </Link>
-        <h1 className="text-2xl font-semibold text-warm-white mt-2">{tenant.siteName}</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white mt-2">{tenant.siteName}</h1>
         <p className="text-sm text-gray-muted mt-1">
           {tenant.id} · {tenant.deliveryModel ?? "custom_repo"} ·{" "}
           {tenant.active ? "active" : "archived"}

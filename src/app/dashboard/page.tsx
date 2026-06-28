@@ -149,7 +149,7 @@ async function DashboardHome({
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Today
             </p>
-            <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-warm-black sm:text-[36px]">
+            <h1 className="font-[family-name:var(--font-display)] text-[28px] font-normal text-warm-black sm:text-[36px]">
               See what is working. Change what is next.
             </h1>
             <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-gray-muted">

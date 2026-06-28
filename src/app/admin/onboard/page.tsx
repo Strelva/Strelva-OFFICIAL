@@ -87,7 +87,7 @@ export default function OnboardPage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-semibold text-warm-white">Onboard a client</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Onboard a client</h1>
         <p className="text-sm text-gray-muted mt-1">
           Automates the tenant record, revalidation secret, owner invite, and the Vercel
           project/env/domain. The site itself stays a hand-built repo you connect after.

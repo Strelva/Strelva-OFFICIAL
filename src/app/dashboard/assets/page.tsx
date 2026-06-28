@@ -204,7 +204,7 @@ export default function PhotosPage() {
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
               Visual proof
             </p>
-            <h1 className="text-[24px] sm:text-[30px] font-semibold tracking-[-0.02em] text-warm-black">
+            <h1 className="font-[family-name:var(--font-display)] text-[24px] sm:text-[30px] font-normal text-warm-black">
               Photo library
             </h1>
             <p className="text-[13px] text-gray-muted mt-2 max-w-xl">

@@ -18,7 +18,7 @@ export default async function AdminTenantsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-warm-white">Tenants</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Tenants</h1>
         <p className="text-sm text-gray-muted mt-1">
           {tenants.length} tenant{tenants.length !== 1 ? "s" : ""} across the
           platform

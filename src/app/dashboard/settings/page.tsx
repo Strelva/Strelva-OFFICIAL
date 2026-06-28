@@ -1639,7 +1639,7 @@ export default function SettingsPage() {
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Operations
             </p>
-            <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-warm-white">
+            <h1 className="mt-2 font-[family-name:var(--font-display)] text-[24px] font-normal text-warm-white">
               Settings with real ownership impact
             </h1>
             <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">

@@ -53,7 +53,7 @@ export default async function AdminDraftsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-warm-white">Pending Drafts</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Pending Drafts</h1>
         <p className="text-sm text-gray-muted mt-1">
           Review AI-generated content changes before they go live
         </p>
