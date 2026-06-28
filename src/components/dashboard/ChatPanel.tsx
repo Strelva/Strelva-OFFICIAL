@@ -91,14 +91,6 @@ interface AgentNodeContextPayload {
   currentValue?: string;
 }
 
-function inferCustomRequestKind(text: string): "custom_design" | "template" | "infrastructure" {
-  if (/\b(template|component|section type|layout system)\b/i.test(text)) return "template";
-  if (/\b(infra|infrastructure|domain|routing|integration|schema|database|analytics|tracking|navigation)\b/i.test(text)) {
-    return "infrastructure";
-  }
-  return "custom_design";
-}
-
 interface ChatPanelProps {
   threadId?: string;
   ownerName: string;
@@ -361,23 +353,11 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
         }
       }
 
-      if (/custom (site|design|code)|scaffold web request|beyond normal content/i.test(text)) {
-        fetch(dashboardHref("/api/change-requests"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({
-            prompt: text,
-            requestKind: inferCustomRequestKind(text),
-            page: dashCtx?.activePage,
-            section: dashCtx?.selectedNode?.section || dashCtx?.activeSection,
-            field: dashCtx?.selectedNode?.field,
-            label: dashCtx?.selectedNode?.label || dashCtx?.activeSection || "AI chat request",
-            nodeType: dashCtx?.selectedNode?.nodeType,
-            rect: dashCtx?.selectedNode?.rect,
-          }),
-        }).catch(() => {});
-      }
+      // Custom-change-request classification is the AGENT's job, server-side: its
+      // `request_custom_change` tool decides (with full context + the one-active-
+      // request gate). The old client-side regex here fired on innocent words like
+      // "design"/"customize", auto-creating a request that tripped the one-open
+      // wall and blocked legitimate ones. Removed — don't classify on the client.
 
       try {
         const nodeContext = await buildSelectedNodeContext(
