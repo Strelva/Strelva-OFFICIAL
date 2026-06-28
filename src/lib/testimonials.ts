@@ -70,6 +70,8 @@ export async function appendTestimonial(
       content,
       actor,
       tenant,
+      // Double cast via unknown is required — TestimonialsContent isn't
+      // structurally assignable to Record<string, unknown> (typed array field).
       diffFields(base as unknown as Record<string, unknown>, content as unknown as Record<string, unknown>),
     );
     await recordSectionUpdate("testimonials", tenant);
