@@ -42,6 +42,11 @@ vi.mock("@/lib/production-guard", () => ({
   isProductionEnv: vi.fn(() => false),
 }));
 
+const mockAlert = vi.fn();
+vi.mock("@/lib/monitoring", () => ({
+  alert: (...args: unknown[]) => mockAlert(...args),
+}));
+
 vi.mock("stripe", () => {
   class FakeStripe {
     webhooks = { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) };
@@ -201,6 +206,31 @@ describe("billing webhook checkout.session.completed mode guard", () => {
     expect(res.status).toBe(200);
     expect(mockUpdateTenant).not.toHaveBeenCalled();
     expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("subscription event missing tenantId acks 200 + alerts (no 3-day retry storm)", async () => {
+    // A signed subscription event with no tenantId metadata is non-retryable —
+    // returning 500 would trigger a 3-day Stripe retry storm that fails the same
+    // way every time. It must ack 200 and alert instead.
+    const res = await postEvent({
+      id: "evt_sub_no_tenant",
+      type: "invoice.paid",
+      created: 1_700_000_000,
+      data: {
+        object: {
+          id: "in_no_tenant",
+          metadata: {},
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_webhook_missing_tenant",
+      "high",
+      expect.objectContaining({ eventType: "invoice.paid" }),
+    );
   });
 
   it("setup mode moves no money: no tenant update, no event, no durable record", async () => {
