@@ -92,6 +92,32 @@ describe("getDashboardSurfaces — Reviews", () => {
   });
 });
 
+describe("getDashboardSurfaces — Store", () => {
+  it("is hidden for a non-commerce site", () => {
+    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
+    expect(at(s, "store").state).toBe("hidden");
+  });
+
+  for (const feature of ["commerce", "products", "shop"]) {
+    it(`is shown when the tenant has the "${feature}" feature`, () => {
+      const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand", features: [feature] }, connections: [] });
+      const store = at(s, "store");
+      expect(store.state).toBe("shown");
+      expect(store.href).toBe("/dashboard/store");
+    });
+  }
+
+  it("appears in the visible nav for a commerce tenant", () => {
+    const ids = getVisibleSurfaces({ tenantConfig: { template: "food-brand", features: ["products"] }, connections: [] }).map((x) => x.id);
+    expect(ids).toContain("store");
+  });
+
+  it("is dropped from the visible nav for a non-commerce tenant", () => {
+    const ids = getVisibleSurfaces({ tenantConfig: { template: "wellness" }, connections: [] }).map((x) => x.id);
+    expect(ids).not.toContain("store");
+  });
+});
+
 describe("getDashboardSurfaces — always-on pillars", () => {
   it("today / ask-ai / website / analytics / health are always shown", () => {
     const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [] });

@@ -16,7 +16,11 @@ import type { Connection, TenantConfig } from "./types";
 /** The slice of tenant config the surface resolver actually reads. */
 export type SurfaceTenantConfig = Pick<TenantConfig, "template" | "reviewsConfig"> & {
   businessModel?: PresenceProfile;
+  features?: string[];
 };
+
+/** Feature flags that mean this tenant runs a storefront. */
+const COMMERCE_FEATURES = new Set(["commerce", "products", "shop"]);
 
 /** How the business shows up to customers — drives which presence tabs apply. */
 export type PresenceProfile = "local" | "online" | "hybrid";
@@ -33,6 +37,7 @@ export type SurfaceId =
   | "today"
   | "ask-ai"
   | "website"
+  | "store"
   | "google-business"
   | "analytics"
   | "reviews"
@@ -97,11 +102,15 @@ export function getDashboardSurfaces({
   const local = presence === "local" || presence === "hybrid";
   const gbpConnected = isConnected(connections, "google");
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
+  const hasCommerce = (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
     { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
+    // Store — the primary surface for a commerce tenant (orders, revenue,
+    // products). Hidden entirely for non-commerce sites.
+    { id: "store", label: "Store", href: "/dashboard/store", state: hasCommerce ? "shown" : "hidden", group: "presence" },
     {
       id: "google-business",
       label: "Google Business",
