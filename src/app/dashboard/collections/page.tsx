@@ -1,20 +1,11 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasDashboardViewAccess } from "@/lib/auth";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getTenantConfig } from "@/lib/tenants";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { COLLECTION_TYPES, type CollectionType } from "@/lib/cms/collection-types";
 import { listEntriesForType } from "@/lib/cms/collections-service";
 import { CollectionsManager } from "@/components/dashboard/CollectionsManager";
 
 export default async function CollectionsPage() {
-  const clientFallbackRoot = getClientFallbackRoot(await headers());
-  const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasDashboardViewAccess(tenant);
-  if (!hasAccess) {
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  const { tenant } = await requireDashboardView();
 
   const config = await getTenantConfig(tenant);
   const features = new Set(config?.features ?? []);

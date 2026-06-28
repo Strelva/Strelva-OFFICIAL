@@ -16,6 +16,7 @@ import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
 import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
+import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getTenantConfig } from "@/lib/tenants";
@@ -191,6 +192,18 @@ async function pollTenant(tenantId: string): Promise<number> {
         createdAt: review.createTime,
       },
     });
+
+    // Mirror into the reviews table the dashboard Reviews tab reads. The events
+    // queue alone left that tab empty (audit: reviews disconnect). Best-effort +
+    // gated on new-only above, so a write blip never blocks the poll.
+    await addReview(tenantId, {
+      source: "google",
+      author: review.reviewer.displayName,
+      rating,
+      text: review.comment || "",
+      date: review.createTime,
+      externalId: review.reviewId,
+    }).catch(() => {});
 
     // Draft a filter-safe reply and queue it for human approval.
     // This is fire-and-recover: a draft failure must not block the review event.

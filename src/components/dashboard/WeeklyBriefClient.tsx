@@ -94,7 +94,7 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
         <div className="mx-auto w-full max-w-4xl">
           <div className="mb-5 max-w-2xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Reports
+              Analytics
             </p>
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
               Your first weekly report is still warming up

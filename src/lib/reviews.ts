@@ -75,8 +75,17 @@ async function pgInsertReview(tenant: string, review: Omit<ReviewItem, "id">): P
       review_date: review.date,
       reply: review.reply ?? null,
       replied_at: review.repliedAt ?? null,
+      external_id: review.externalId ?? null,
     };
-    const { data, error } = await db.from("reviews").insert(insert).select("*").single();
+    // Upsert on the provider id so a re-poll (e.g. after the 30-day Redis dedup
+    // cache expires) can't insert duplicate rows. ignoreDuplicates keeps the
+    // existing row, preserving any reply. Manual reviews have a null external_id
+    // (NULLs are distinct under the unique key), so they always insert, as before.
+    const { data, error } = await db
+      .from("reviews")
+      .upsert(insert, { onConflict: "tenant_id,source,external_id", ignoreDuplicates: true })
+      .select("*")
+      .maybeSingle();
     if (error) throw error;
     return data ? rowToReview(data) : null;
   } catch (err) {

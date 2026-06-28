@@ -13,13 +13,13 @@ type Property = { id: string; name: string; href: string };
  * single-site client never sees a switcher.
  */
 export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
-  const { tenantId } = useDashboard();
+  const { tenantId, dashboardHref } = useDashboard();
   const [properties, setProperties] = useState<Property[] | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/my-properties")
+    fetch(dashboardHref("/api/my-properties"))
       .then((r) => r.json())
       .then((d) => {
         if (active) setProperties(Array.isArray(d.properties) ? d.properties : []);
@@ -30,7 +30,7 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [dashboardHref]);
 
   // The current property's richest name is the layout's fallbackName (from
   // content settings); other properties use the name from the API.

@@ -1,23 +1,14 @@
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { getContent, getSectionTimestamps } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getTemplateForTenant } from "@/components/templates/registry";
-import { hasDashboardViewAccess } from "@/lib/auth";
 import { defaults } from "@/lib/defaults";
 import { safeFetch } from "@/lib/utils";
 import { buildSectionData } from "@/lib/buildSectionData";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
 import type { ContentSection } from "@/lib/types";
 
 export default async function SitePage() {
-  const tenant = await getTenantFromHeaders();
-  const allowed = await hasDashboardViewAccess(tenant);
-  if (!allowed) {
-    const clientFallbackRoot = getClientFallbackRoot(await headers());
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  const { tenant } = await requireDashboardView();
 
   const siteModel = await getTemplateForTenant(tenant);
 

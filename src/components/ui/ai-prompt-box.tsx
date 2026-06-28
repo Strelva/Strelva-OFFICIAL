@@ -508,7 +508,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                           ))}
                           <div className="my-1 h-px bg-white/10" />
                           <a
-                            href={actionHref("/dashboard/sources")}
+                            href={actionHref("/dashboard/integrations")}
                             role="menuitem"
                             onClick={() => {
                               setActionsOpen(false);

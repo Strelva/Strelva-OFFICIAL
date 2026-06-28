@@ -18,7 +18,10 @@ vi.mock("@/lib/tenants", () => ({
 vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity, listDrafts: mockListDrafts }));
 vi.mock("@/lib/threads", () => ({ listThreads: mockListThreads }));
 vi.mock("@/lib/weekly-brief", () => ({ getWeeklyBrief: mockGetWeeklyBrief }));
-vi.mock("@/lib/subscription", () => ({ getEffectiveSubscriptionStatus: mockGetEffectiveSubscriptionStatus }));
+vi.mock("@/lib/subscription", () => ({
+  getEffectiveSubscriptionStatus: mockGetEffectiveSubscriptionStatus,
+  isGrandfathered: () => false,
+}));
 vi.mock("@/lib/production-readiness-rules", () => ({ getTenantLaunchReadinessResults: mockGetTenantLaunchReadinessResults }));
 vi.mock("@/lib/launch-readiness", () => ({
   buildTenantLaunchReadiness: mockBuildTenantLaunchReadiness,

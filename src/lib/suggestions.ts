@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
 import { sanitizePromptValue } from "./capabilities";
-import { addEvent } from "./events";
+import { addEvent, getEvents, resolveEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getAllTenants } from "./tenants";
 import type { ContentSection } from "./types";
@@ -240,6 +240,12 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
 }
 
 async function addSuggestionEvent(suggestion: Suggestion): Promise<void> {
+  // Backstop dedup: never stack a second pending card for the same suggestion.
+  // The suggestion-row dedup above can miss across stores/retries; this guards the
+  // queue itself so a re-run can't flood "Needs you" with identical cards.
+  const pending = await getEvents(suggestion.tenantId, { status: "pending", limit: 100 }).catch(() => []);
+  if (pending.some((e) => e.type === "suggestion" && e.title === suggestion.title)) return;
+
   await addEvent({
     tenantId: suggestion.tenantId,
     source: "ai",
@@ -256,6 +262,37 @@ async function addSuggestionEvent(suggestion: Suggestion): Promise<void> {
       section: suggestion.section,
     },
   });
+}
+
+/**
+ * Maintenance cleanup for the "Needs you" queue: collapse duplicate pending
+ * suggestion cards (keep the newest per title) and dismiss any whose title is no
+ * longer valid for this tenant (e.g. blog nudges on a site with no content
+ * engine). Only touches `suggestion`-type pending events — never real changes,
+ * reviews, or structural requests. Returns the number of cards dismissed.
+ */
+export async function dedupePendingSuggestionEvents(
+  tenant: string,
+  opts?: { invalidTitles?: string[] },
+): Promise<number> {
+  const invalid = new Set(opts?.invalidTitles ?? []);
+  const pending = await getEvents(tenant, { status: "pending", limit: 200 }).catch(() => []);
+  const suggestions = pending
+    .filter((e) => e.type === "suggestion")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const keptTitles = new Set<string>();
+  let dismissed = 0;
+  for (const event of suggestions) {
+    const drop = invalid.has(event.title) || keptTitles.has(event.title);
+    if (drop) {
+      const { changed } = await resolveEvent(event.id, "dismissed", { actor: "system-cleanup" });
+      if (changed) dismissed++;
+    } else {
+      keptTitles.add(event.title);
+    }
+  }
+  return dismissed;
 }
 
 export async function updateSuggestion(

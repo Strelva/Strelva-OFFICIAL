@@ -1,14 +1,6 @@
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasDashboardViewAccess } from "@/lib/auth";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getContent } from "@/lib/storage";
-import { getEvents, getQueueCount } from "@/lib/events";
-import { getSectionTimestamps } from "@/lib/storage";
-import { getTemplateForTenant } from "@/components/templates/registry";
-import { detectStaleSections } from "@/lib/reports";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
-import type { ContentSection } from "@/lib/types";
+import { getNeedsYouData } from "@/lib/needs-you";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ChatPageClient } from "./ChatPageClient";
 
@@ -18,36 +10,16 @@ export default async function ChatPage({
   searchParams: Promise<{ thread?: string; needs?: string }>;
 }) {
   const params = await searchParams;
-  const tenant = await getTenantFromHeaders();
-
-  const allowed = await hasDashboardViewAccess(tenant);
-  if (!allowed) {
-    const clientFallbackRoot = getClientFallbackRoot(await headers());
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  const { tenant } = await requireDashboardView();
 
   let ownerName = "there";
   try {
     const settings = await getContent("settings", tenant);
     ownerName = settings.ownerName || ownerName;
   } catch {}
-  const siteModel = await getTemplateForTenant(tenant);
-  // The AI chat is the product's core surface — never let a transient backend
-  // blip on the activity sidebars replace the whole chat with an error page.
-  const [pending, resolved, pendingCount, timestamps] = await Promise.all([
-    getEvents(tenant, { status: "pending", limit: 50 }).catch(() => []),
-    getEvents(tenant, { limit: 30 })
-      .then((events) =>
-        events.filter((e) => e.status === "approved" || e.status === "dismissed" || e.status === "auto_approved")
-      )
-      .catch(() => []),
-    getQueueCount(tenant).catch(() => 0),
-    getSectionTimestamps(tenant).catch(() => ({})),
-  ]);
-  const staleSectionCount = detectStaleSections(
-    timestamps,
-    siteModel.contentSections as ContentSection[]
-  ).length;
+  // The AI chat is the product's core surface — getNeedsYouData degrades every
+  // read so a transient backend blip can't replace the whole chat with an error.
+  const { pending, resolved, pendingCount, staleSectionCount } = await getNeedsYouData(tenant);
 
   return (
     <>

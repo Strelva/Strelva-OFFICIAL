@@ -32,6 +32,9 @@ vi.mock("../lib/storage", () => ({
   appendVersion: (...args: unknown[]) => mockAppendVersion(...args),
   clearDraft: (...args: unknown[]) => mockClearDraft(...args),
   recordSectionUpdate: (...args: unknown[]) => mockRecordSectionUpdate(...args),
+  // Staleness guard added by the H4 audit fix; empty = no manual edit after the
+  // queued change, so apply proceeds.
+  getSectionTimestamps: () => Promise.resolve({}),
 }));
 
 vi.mock("../lib/revalidate-client", () => ({

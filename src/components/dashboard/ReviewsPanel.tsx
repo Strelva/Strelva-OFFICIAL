@@ -265,12 +265,27 @@ export function ReviewsPanel({ reviews }: ReviewsPanelProps) {
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
             Reviews
           </p>
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-warm-black sm:text-[30px]">
+          <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
             What people are saying
           </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">
-            {reviews.length} {reviews.length === 1 ? "review" : "reviews"}. Draft a warm, on-brand
-            reply for any of them, then copy it into Google.
+          <div className="mt-3 flex items-center gap-3">
+            {(() => {
+              const rated = reviews.filter((r) => r.rating > 0);
+              if (!rated.length) return null;
+              const avg = rated.reduce((sum, r) => sum + r.rating, 0) / rated.length;
+              return (
+                <span className="flex items-center gap-1.5">
+                  <Stars rating={avg} />
+                  <span className="text-[14px] font-medium text-warm-black">{avg.toFixed(1)}</span>
+                </span>
+              );
+            })()}
+            <span className="text-[14px] text-gray-muted">
+              {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+            </span>
+          </div>
+          <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
+            Draft a warm, on-brand reply for any of them, then copy it into Google.
           </p>
         </div>
 

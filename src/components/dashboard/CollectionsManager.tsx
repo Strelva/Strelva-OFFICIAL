@@ -7,7 +7,7 @@
  * is the direct-edit surface). Talks to /api/collections/[type].
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useDashboardOptional } from "./DashboardContext";
 
@@ -127,7 +127,11 @@ export function CollectionsManager({
   initialType: CollectionType;
   initialEntries: EntryView[];
 }) {
-  const readOnly = useDashboardOptional()?.readOnly ?? false;
+  const dashboard = useDashboardOptional();
+  const readOnly = dashboard?.readOnly ?? false;
+  // Prefix the dashboard base path so collection CRUD works under /client/{tenant}
+  // path-fallback hosting, not just subdomains.
+  const apiPath = useMemo(() => dashboard?.dashboardHref ?? ((p: string) => p), [dashboard]);
   const [type, setType] = useState<CollectionType>(initialType);
   const [entries, setEntries] = useState<EntryView[]>(initialEntries);
   const [editing, setEditing] = useState<{ slug?: string; data: Record<string, unknown> } | null>(null);
@@ -142,8 +146,14 @@ export function CollectionsManager({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/collections/${t}`);
-      const json = await res.json();
+      const res = await fetch(apiPath(`/api/collections/${t}`));
+      // Guard status before treating the body as data — otherwise a non-JSON 5xx
+      // resolves to {} and renders as an indistinguishable "empty collection".
+      if (!res.ok) {
+        setError("Could not load entries.");
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
       setEntries(
         // The authed GET returns raw rows (snake_case updated_at).
         (json.entries ?? []).map((e: { slug: string; status: string; data: Record<string, unknown>; updated_at?: string }) => ({
@@ -158,7 +168,7 @@ export function CollectionsManager({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiPath]);
 
   useEffect(() => {
     if (type !== initialType) void load(type);
@@ -177,12 +187,12 @@ export function CollectionsManager({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/collections/${type}`, {
+      const res = await fetch(apiPath(`/api/collections/${type}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: editing.slug, data: editing.data, status }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(json.error ?? "Save failed.");
         return;
@@ -199,7 +209,7 @@ export function CollectionsManager({
   async function remove(slug: string) {
     if (!confirm(`Delete "${slug}"? This cannot be undone.`)) return;
     setError(null);
-    const res = await fetch(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`, { method: "DELETE" });
+    const res = await fetch(apiPath(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`), { method: "DELETE" });
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
       setError(json.error ?? "Delete failed.");

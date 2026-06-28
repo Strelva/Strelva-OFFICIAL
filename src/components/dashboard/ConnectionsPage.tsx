@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronRight } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
-  DISCOVERABLE_INTEGRATIONS,
-  INTELLIGENCE_CATEGORY_LABELS,
+  CONNECTABLE_INTEGRATIONS,
   deriveIntelligenceStatus,
   filterIntegrations,
   getIntegrationCategories,
@@ -61,7 +60,7 @@ function ConnectionRow({
   const setupCopy = connection.status === "connected"
     ? "Connected account"
     : connection.status === "coming_soon"
-      ? "Planned source"
+      ? "Coming soon"
       : connection.providerId === "google-business"
         ? "OAuth ready"
         : connection.providerId === "google-search-console"
@@ -70,8 +69,8 @@ function ConnectionRow({
             ? "Available"
             : needsSetup
               ? "Setup required"
-              : "Built-in signal";
-  const actionCopy = canUseNow ? "Ask AI with source" : "Connect first";
+              : "Available";
+  const actionCopy = canUseNow ? "Ask AI" : "Connect first";
 
   return (
     <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-gray-border bg-surface-raised p-3.5 transition-colors hover:border-accent/25">
@@ -112,7 +111,7 @@ function ConnectionRow({
           onClick={onClick}
           className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent/85"
         >
-          {needsSetup ? "Set up source" : "Manage source"}
+          {needsSetup ? "Set up" : "Manage"}
         </button>
         <button
           type="button"
@@ -131,13 +130,6 @@ function ConnectionRow({
   );
 }
 
-const CATEGORY_ORDER: IntelligenceCategory[] = [
-  "understands_customers",
-  "understands_demand",
-  "understands_content",
-  "can_take_action",
-];
-
 type FilterTab = "Active" | "Needs attention" | "All";
 
 export function ConnectionsPage() {
@@ -146,7 +138,7 @@ export function ConnectionsPage() {
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const apiHref = dashboardHref;
   const setChatPrompt = dashboard?.setChatPrompt;
-  const [activeTab, setActiveTab] = useState<FilterTab>("Active");
+  const [activeTab, setActiveTab] = useState<FilterTab>("All");
   const [query, setQuery] = useState("");
   const [sourceState, setSourceState] = useState<SourceState>({
     providerStatuses: {},
@@ -189,7 +181,7 @@ export function ConnectionsPage() {
 
   const allConnections: Connection[] = useMemo(
     () =>
-      DISCOVERABLE_INTEGRATIONS.map((integration) => {
+      CONNECTABLE_INTEGRATIONS.map((integration) => {
         const rawConnection = integration.connectionProvider
           ? sourceState.providerStatuses[integration.connectionProvider]
           : null;
@@ -223,7 +215,7 @@ export function ConnectionsPage() {
   );
 
   const searchedConnectionIds = useMemo(
-    () => new Set(filterIntegrations(DISCOVERABLE_INTEGRATIONS, query).map((integration) => integration.id)),
+    () => new Set(filterIntegrations(CONNECTABLE_INTEGRATIONS, query).map((integration) => integration.id)),
     [query]
   );
 
@@ -236,14 +228,14 @@ export function ConnectionsPage() {
     return searched;
   }, [allConnections, searchedConnectionIds, activeTab]);
 
-  const groupedConnections = useMemo(
-    () =>
-      CATEGORY_ORDER.map((category) => ({
-        category,
-        connections: connections.filter((connection) => connection.intelligenceCategories.includes(category)),
-      })).filter((group) => group.connections.length > 0),
-    [connections]
-  );
+  const groupedConnections = useMemo(() => {
+    const connected = connections.filter((c) => c.connected);
+    const available = connections.filter((c) => !c.connected);
+    return [
+      { key: "connected", label: "Connected", connections: connected },
+      { key: "available", label: "Available", connections: available },
+    ].filter((group) => group.connections.length > 0);
+  }, [connections]);
 
   const usableNowCount = allConnections.filter((c) =>
     c.intelligenceStatus === "ai_using_it" ||
@@ -281,14 +273,14 @@ export function ConnectionsPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-            Business sources
+            Integrations
           </p>
           <div className="flex items-baseline gap-3">
-            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-              What the AI should trust
+            <h1 className="font-[family-name:var(--font-display)] text-[24px] sm:text-[30px] font-normal text-warm-black tracking-[-0.01em]">
+              Connect your accounts
             </h1>
             <span className="text-[13px] text-gray-muted">
-              {usableNowCount} usable now
+              {usableNowCount} active
             </span>
           </div>
         </div>
@@ -297,22 +289,22 @@ export function ConnectionsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search sources..."
+            placeholder="Search integrations..."
             className="bg-transparent text-[13px] text-warm-black placeholder-gray-subtle outline-none w-full sm:w-[180px]"
           />
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        A short source map for what can guide site changes today. Keep connected signals at the top; park anything that still needs setup.
+        Connect the accounts Strelva manages for you — Google Business, reviews, booking, and more. Each one expands what we can see and update on your behalf.
       </p>
 
       {!query.trim() && (
         <div className="mb-6 rounded-2xl border border-glass-border bg-glass p-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Source priorities</p>
+              <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Connected accounts</p>
               <p className="mt-1 text-[13px] text-gray-muted">
-                {usableNowCount} usable now. {needsSetupCount} need setup before we can use them.
+                {usableNowCount} active. {needsSetupCount} need setup before we can use them.
               </p>
             </div>
             <button
@@ -352,7 +344,7 @@ export function ConnectionsPage() {
             onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
             className="mt-3 w-full rounded-xl border border-accent/25 bg-accent-dim px-3 py-2.5 text-left transition-colors hover:border-accent/45"
           >
-            <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Best next source</p>
+            <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Recommended</p>
             <p className="mt-2 text-[15px] font-medium text-warm-white">{featured.name}</p>
             <p className="mt-1 text-[12px] text-gray-muted">{featured.description}</p>
           </button>
@@ -379,15 +371,17 @@ export function ConnectionsPage() {
       {groupedConnections.length > 0 ? (
         <div className="space-y-8">
           {groupedConnections.map((group) => (
-            <section key={group.category}>
+            <section key={group.key}>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[14px] font-medium text-warm-black">{INTELLIGENCE_CATEGORY_LABELS[group.category]}</h2>
-                <span className="text-[11px] text-gray-faint">{group.connections.length} sources</span>
+                <h2 className="text-[14px] font-medium text-warm-black">{group.label}</h2>
+                <span className="text-[11px] text-gray-faint">
+                  {group.connections.length} {group.connections.length === 1 ? "account" : "accounts"}
+                </span>
               </div>
               <div className="grid gap-3 xl:grid-cols-2">
                 {group.connections.map((connection) => (
                   <ConnectionRow
-                    key={`${group.category}-${connection.id}`}
+                    key={`${group.key}-${connection.id}`}
                     connection={connection}
                     onClick={() => router.push(dashboardHref(`/dashboard/sources/${connection.id}`))}
                     onRunAction={() => runConnectionPrompt(connection)}

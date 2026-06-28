@@ -1,14 +1,11 @@
-import { headers } from "next/headers";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import type { ComponentType } from "react";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Link2, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasDashboardViewAccess } from "@/lib/auth";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
 import { getQueueCount } from "@/lib/events";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { getLatestSiteSnapshot } from "@/lib/storage";
@@ -55,15 +52,8 @@ async function DashboardHome({
 }: {
   searchParams?: Promise<DashboardSearchParams>;
 }) {
-  const requestHeaders = await headers();
   const params = searchParams ? await searchParams : {};
-  const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
-  const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasDashboardViewAccess(tenant);
-
-  if (!hasAccess) {
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  const { tenant, clientFallbackRoot } = await requireDashboardView();
 
   const [
     pageViews,
@@ -229,7 +219,7 @@ async function DashboardHome({
                 description="Tell it what changed this week and it turns it into fresh site content."
               />
               <QuickWinLink
-                href={dashboardHref("/dashboard/sources/google")}
+                href={dashboardHref("/dashboard/google")}
                 icon={Link2}
                 title="Connect Google Business"
                 description="Bring trusted profile and review signals into your dashboard."
@@ -343,7 +333,7 @@ async function DashboardHome({
                 description="Confirm phone, booking link, and the hours customers rely on."
               />
               <QuickWinLink
-                href={dashboardHref("/dashboard/sources/google")}
+                href={dashboardHref("/dashboard/google")}
                 icon={Link2}
                 title="Connect Google Business"
                 description="Bring trusted profile and review signals into the dashboard."
@@ -404,7 +394,7 @@ async function DashboardHome({
               <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">Recent changes</h2>
             </div>
             <Link href={dashboardHref("/dashboard/reports")} className="text-[12px] font-medium text-accent hover:text-accent/80">
-              Reports
+              Analytics
             </Link>
           </div>
           {recentAiChanges.length > 0 ? (

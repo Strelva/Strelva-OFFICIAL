@@ -17,6 +17,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Run the open-source gitleaks CLI directly (MIT, free). The
+      # gitleaks/gitleaks-action wrapper now requires a paid license for org
+      # accounts; the underlying tool does not. Scans full history against the
+      # repo's .gitleaks.toml allowlist; non-zero exit on a finding fails the job.
+      - name: Scan for secrets (gitleaks OSS)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo --redact --no-banner

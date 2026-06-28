@@ -100,18 +100,14 @@ describe("account page access handoff", () => {
     expect(text).toContain("jacob@strelva.com");
   });
 
-  it("hides archived tenants from the super-admin account picker", async () => {
+  it("sends super-admins straight to the operator console", async () => {
+    // The old per-tenant account picker was removed — a super admin landing on
+    // /account is bounced to /admin (verified in account/page.tsx).
     mockIsSuperAdmin.mockResolvedValue(true);
-    mockGetAllTenants.mockResolvedValue([
-      { id: "gldf", siteName: "Great Lakes Dried Fruit", active: true },
-      { id: "rohlax-wellness", siteName: "Old Rohlax Duplicate", active: false },
-    ]);
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    const page = await AccountPage();
-    const text = textFrom(page);
+    await AccountPage();
 
-    expect(text).toContain("Great Lakes Dried Fruit");
-    expect(text).not.toContain("Old Rohlax Duplicate");
+    expect(mockRedirect).toHaveBeenCalledWith("/admin");
   });
 });

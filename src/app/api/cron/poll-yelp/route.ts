@@ -4,6 +4,7 @@ import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
+import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 
 const YELP_API_BASE = "https://api.yelp.com/v3";
@@ -80,6 +81,18 @@ await mapPool(active, 8, async (tenant) => {
             date: review.time_created,
           },
         });
+
+        // Mirror into the reviews table the dashboard Reviews tab reads. The
+        // events queue alone left that tab empty (audit: reviews disconnect).
+        // Best-effort + gated on new-only above, so it doesn't break the poll.
+        await addReview(tenant.id, {
+          source: "yelp",
+          author: review.user.name,
+          rating: review.rating,
+          text: review.text,
+          date: review.time_created,
+          externalId: review.id,
+        }).catch(() => {});
       }
 
       if (newReviews.length > 0 && redis) {

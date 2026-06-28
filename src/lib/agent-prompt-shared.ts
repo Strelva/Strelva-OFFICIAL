@@ -80,12 +80,13 @@ export async function loadAgentPromptContent(tenant: string): Promise<AgentPromp
  */
 export function aboutBlock(ctx: AgentPromptContent): string {
   const { settings, contact, ownerName, ownerTitle } = ctx;
+  const brandVoice = sanitizePromptValue(settings.brandVoice);
   return `ABOUT THE BUSINESS:
 - Owner: ${ownerName}${ownerTitle ? `, ${ownerTitle}` : ""}
 - Phone: ${sanitizePromptValue(contact.phone) || "(not set)"}
 - Email: ${sanitizePromptValue(contact.email) || "(not set)"}
 - Address: ${sanitizePromptValue(contact.address) || "(not set)"}
-- Hours: ${sanitizePromptValue(contact.hours) || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${sanitizePromptValue(settings.bookingUrl)}` : ""}`;
+- Hours: ${sanitizePromptValue(contact.hours) || "(not set)"}${settings.bookingUrl ? `\n- Booking: ${sanitizePromptValue(settings.bookingUrl)}` : ""}${brandVoice ? `\n- Voice & tone (write in this voice): ${brandVoice}` : ""}`;
 }
 
 export function heroBlock(ctx: AgentPromptContent): string | null {

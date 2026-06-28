@@ -109,17 +109,21 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     }
   }, [activeSection]);
 
-  const saveConfig = useCallback(async (config: SitePageConfig) => {
+  const saveConfig = useCallback(async (config: SitePageConfig, previous: SitePageConfig) => {
     setSaving(true);
     try {
-      await fetch(dashboardHref("/api/page-config"), {
+      const res = await fetch(dashboardHref("/api/page-config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify(config),
       });
+      // A 4xx/5xx (validation, RLS reject) used to be treated as success — the
+      // optimistic edit appeared to stick, then vanished on reload. Roll it back.
+      if (!res.ok) throw new Error(`page-config save failed: ${res.status}`);
       triggerRefresh();
     } catch {
+      setPageConfig(previous);
       setSaveError(true);
       setTimeout(() => setSaveError(false), 3000);
     }
@@ -136,28 +140,28 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
 
   function handleAddSection(type: string) {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = [...sortedSections];
     const newSection: PageSectionConfig = { type, visible: true, order: sections.length };
     sections.push(newSection);
     const updated = { ...pageConfig, [activePage]: { sections } };
     setPageConfig(updated);
-    saveConfig(updated);
+    saveConfig(updated, pageConfig);
     setShowAddMenu(false);
   }
 
   function handleToggleVisibility(type: string) {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = sortedSections.map((s) =>
       s.type === type ? { ...s, visible: !s.visible } : s
     );
     const updated = { ...pageConfig, [activePage]: { sections } };
     setPageConfig(updated);
-    saveConfig(updated);
+    saveConfig(updated, pageConfig);
   }
 
   function handleMoveSection(type: string, direction: "up" | "down") {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = [...sortedSections];
     const idx = sections.findIndex((s) => s.type === type);
     if (idx === -1) return;
@@ -168,7 +172,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     const reordered = sections.map((s, i) => ({ ...s, order: i }));
     const updated = { ...pageConfig, [activePage]: { sections: reordered } };
     setPageConfig(updated);
-    saveConfig(updated);
+    saveConfig(updated, pageConfig);
   }
 
 

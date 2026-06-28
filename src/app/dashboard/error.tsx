@@ -15,7 +15,10 @@ export default function DashboardError({
   const dashboard = useDashboardOptional();
 
   useEffect(() => {
-    void error;
+    // Surface the failure — this boundary catches every thrown error across all
+    // dashboard routes; swallowing it left a paying client with a blank screen
+    // and us with zero signal. digest correlates to the server-side log.
+    console.error("[dashboard] route error", { message: error.message, digest: error.digest });
   }, [error]);
 
   return (
@@ -28,7 +31,7 @@ export default function DashboardError({
           Something went wrong
         </h2>
         <p className="text-sm text-gray-muted mb-6">
-          {error.message || "An unexpected error occurred. Try refreshing the page."}
+          An unexpected error occurred. Try refreshing the page, or head back to your overview.
         </p>
         <div className="flex items-center justify-center gap-3">
           <button

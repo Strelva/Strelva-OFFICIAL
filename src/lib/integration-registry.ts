@@ -22,9 +22,9 @@ export type IntelligenceStatus =
   | "can_act_here";
 
 export const INTELLIGENCE_CATEGORY_LABELS: Record<IntelligenceCategory, string> = {
-  understands_customers: "Understands Customers",
-  understands_demand: "Understands Demand",
-  understands_content: "Understands Content",
+  understands_customers: "Customer signals",
+  understands_demand: "Demand signals",
+  understands_content: "Content signals",
   can_take_action: "Can Take Action",
 };
 
@@ -644,6 +644,16 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
 ];
 
 export const DISCOVERABLE_INTEGRATIONS = INTEGRATION_REGISTRY;
+
+/**
+ * Just the connectable accounts — the ones an owner actually links to expand what
+ * Strelva can see and manage (Google Business, Search Console, Instagram, Calendly,
+ * Yelp). Excludes the built-in/derived signals (website activity, uploads, history),
+ * which are the owner's *context* and live in Brand Kit, not Integrations.
+ */
+export const CONNECTABLE_INTEGRATIONS = INTEGRATION_REGISTRY.filter(
+  (i) => Boolean(i.connectionProvider) || Boolean(i.configField),
+);
 
 export function getIntegrationDefinition(id: string): IntegrationDefinition | undefined {
   return INTEGRATION_REGISTRY.find((integration) => integration.id === id);

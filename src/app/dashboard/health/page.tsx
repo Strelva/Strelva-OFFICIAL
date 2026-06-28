@@ -1,19 +1,9 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { getTenantFromHeaders } from "@/lib/tenant";
-import { hasTenantAccess } from "@/lib/auth";
-import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { requireDashboardView } from "@/lib/dashboard-auth";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { SiteHealthCard } from "@/components/dashboard/SiteHealthCard";
 
 export default async function HealthPage() {
-  const clientFallbackRoot = getClientFallbackRoot(await headers());
-  const tenant = await getTenantFromHeaders();
-  const hasAccess = await hasTenantAccess(tenant);
-
-  if (!hasAccess) {
-    redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
-  }
+  await requireDashboardView();
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">

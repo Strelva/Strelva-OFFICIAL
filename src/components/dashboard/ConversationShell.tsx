@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ShieldAlert, Menu } from "lucide-react";
 import { HistorySidebar } from "./HistorySidebar";
 import { MobileNav } from "./MobileNav";
+import { SectionSubNav } from "./SectionSubNav";
 import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
@@ -61,6 +62,9 @@ export function ConversationShell({
             <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
           </div>
         </header>
+
+        {/* Secondary nav for consolidated tabs (Website / Analytics); null elsewhere */}
+        <SectionSubNav />
 
         {/* Content — add bottom padding on mobile for tab bar */}
         <div className="flex-1 min-h-0 pb-16 lg:pb-0">{children}</div>

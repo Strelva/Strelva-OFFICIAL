@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
@@ -155,8 +155,8 @@ function setNestedValue(
 const SETTINGS_SECTIONS = [
   { id: "profile", label: "Business" },
   { id: "site-config", label: "Site config" },
-  { id: "dependencies", label: "Dependencies" },
-  { id: "utilities", label: "Utilities" },
+  { id: "dependencies", label: "Services" },
+  { id: "utilities", label: "Shortcuts" },
   { id: "ownership", label: "Ownership" },
   { id: "domains", label: "Domains" },
   { id: "billing", label: "Billing" },
@@ -707,6 +707,18 @@ function UtilitiesSection() {
 
   const utilities = [
     {
+      title: "Brand Kit",
+      description: "Tell the AI about your business — what you do, your voice, and your media.",
+      href: "/dashboard/brand-kit",
+      icon: Sparkles,
+    },
+    {
+      title: "Integrations",
+      description: "Connect the accounts Strelva manages — Google Business, reviews, booking.",
+      href: "/dashboard/integrations",
+      icon: Link2,
+    },
+    {
       title: "Photo library",
       description: "Upload and reuse real photos, logos, and files the AI can reference in chat.",
       href: "/dashboard/assets",
@@ -717,12 +729,6 @@ function UtilitiesSection() {
       description: "Download content and asset manifests or start a provider handoff.",
       href: "/dashboard/settings#ownership",
       icon: Download,
-    },
-    {
-      title: "Connection setup",
-      description: "Repair source health, OAuth, API keys, and manual setup paths.",
-      href: "/dashboard/sources",
-      icon: Link2,
     },
   ];
 

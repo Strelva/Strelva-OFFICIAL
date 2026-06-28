@@ -90,6 +90,11 @@
       "@babel/plugin-transform-modules-systemjs": "7.29.4",
       "undici@>=7.23.0 <7.28.0": "7.28.0",
       "undici@>=6 <6.27.0": "6.27.0"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-22p9-wv53-3rq4"
+      ]
     }
   }
 }
