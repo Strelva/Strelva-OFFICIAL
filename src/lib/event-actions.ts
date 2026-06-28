@@ -40,6 +40,17 @@ function workflowStatusFromAction(action: EventWorkflowAction): CustomChangeRequ
   return action;
 }
 
+/** Parse "HH:MM" into the GBP TimeOfDay shape, or null if malformed. */
+function parseHHMM(v: unknown): { hours: number; minutes: number } | null {
+  if (typeof v !== "string") return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
 export async function resolveEventAction(
   tenantId: string,
   eventId: string,
@@ -103,6 +114,31 @@ export async function resolveEventAction(
           photoUrl: typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : undefined,
         });
         if (!result.success) return { changed: false, reason: "gbp_post_failed" };
+      }
+      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+
+    // GBP hours draft: on approve, push hours to the Google listing. Governed —
+    // routed through this approval queue, NEVER auto-published (the audit core-M3
+    // fix: the website-hours edit is reviewed the same way).
+    if (kind === "gbp_hours_draft") {
+      if (action === "approved") {
+        const raw = Array.isArray(event.metadata?.hours) ? event.metadata.hours : [];
+        const periods = raw.flatMap((p: unknown) => {
+          const row = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
+          const day = typeof row.day === "string" ? row.day.toUpperCase() : null;
+          const open = parseHHMM(row.open);
+          const close = parseHHMM(row.close);
+          if (!day || !open || !close) return [];
+          return [{ openDay: day, openTime: open, closeDay: day, closeTime: close }];
+        });
+        if (!periods.length) return { changed: false, reason: "gbp_hours_invalid" };
+        const { updateBusinessHours } = await import("./gbp-management");
+        const result = await updateBusinessHours(tenantId, {
+          regularHours: { periods } as Parameters<typeof updateBusinessHours>[1]["regularHours"],
+        });
+        if (!result.success) return { changed: false, reason: "gbp_hours_failed" };
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
