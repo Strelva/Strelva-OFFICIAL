@@ -1,5 +1,6 @@
-import { ShoppingBag, TrendingUp, Package, Receipt } from "lucide-react";
+import { ShoppingBag, TrendingUp, Package, Receipt, Tag } from "lucide-react";
 import type { OrderRecord, OrderSummary } from "@/lib/orders";
+import type { Product } from "@/lib/products";
 
 function money(cents: number, currency: string): string {
   try {
@@ -9,7 +10,15 @@ function money(cents: number, currency: string): string {
   }
 }
 
-export function StorePanel({ summary, orders }: { summary: OrderSummary | null; orders: OrderRecord[] }) {
+export function StorePanel({
+  summary,
+  orders,
+  products = [],
+}: {
+  summary: OrderSummary | null;
+  orders: OrderRecord[];
+  products?: Product[];
+}) {
   const hasOrders = (summary?.orderCount ?? 0) > 0;
 
   return (
@@ -59,6 +68,36 @@ export function StorePanel({ summary, orders }: { summary: OrderSummary | null; 
               <li key={p.name} className="flex items-center justify-between text-[13px]">
                 <span className="truncate text-warm-black">{p.name}</span>
                 <span className="shrink-0 text-gray-muted">{p.quantity} sold</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Products */}
+      {products.length > 0 && (
+        <section className="mt-4 rounded-xl border border-glass-border bg-surface-raised p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-gray-muted" strokeWidth={1.6} />
+              <h2 className="text-[14px] font-medium text-warm-black">Products</h2>
+            </div>
+            <span className="text-[12px] text-gray-muted">{products.length}</span>
+          </div>
+          <ul className="mt-3 divide-y divide-gray-border/60">
+            {products.map((p, i) => (
+              <li key={`${p.name}-${i}`} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-warm-black">{p.name}</span>
+                  {!p.inStock && (
+                    <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
+                      Sold out
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 text-gray-muted">
+                  {p.priceCents != null ? money(p.priceCents, p.currency) : "—"}
+                </span>
               </li>
             ))}
           </ul>
