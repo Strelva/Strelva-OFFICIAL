@@ -4,11 +4,55 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { TrendingUp, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 import type { WeeklyBrief } from "@/lib/types";
+import type { DailyMetric } from "@/lib/storage";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface WeeklyBriefClientProps {
   brief: WeeklyBrief | null;
   history?: WeeklyBrief[];
+  dailyMetrics?: DailyMetric[];
+}
+
+/** Plain-English verdict on whether the site is working, from the week's numbers. */
+export function buildVerdict(stats: WeeklyBrief["stats"]): string {
+  const views = stats.pageViews;
+  const delta = stats.pageViewsDelta ?? 0;
+  if (views === 0) return "A quiet week — no visitors yet. Let's change that.";
+  const people = `${views.toLocaleString()} ${views === 1 ? "person" : "people"} found you`;
+  if (delta > 0) return `It's working — ${people}, up from last week.`;
+  if (delta < 0) return `${people} this week — down from last week.`;
+  return `${people} this week.`;
+}
+
+/** A lightweight 30-day traffic sparkline (no chart dependency). */
+function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
+  if (metrics.length < 2) return null;
+  const values = metrics.map((m) => m.pageViews);
+  const total = values.reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...values);
+  const w = 300;
+  const h = 56;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - (v / max) * (h - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = `M ${pts.join(" L ")}`;
+  const area = `M 0,${h} L ${pts.join(" L ")} L ${w},${h} Z`;
+  return (
+    <div className="rounded-xl border border-glass-border bg-glass p-4">
+      <div className="mb-3 flex items-baseline justify-between">
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
+        <p className="text-[12px] text-gray-muted">
+          <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> visitors
+        </p>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-14 w-full" aria-hidden="true">
+        <path d={area} fill="var(--accent-dim)" opacity={0.5} />
+        <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  );
 }
 
 function CountUp({ end, duration = 800 }: { end: number; duration?: number }) {
@@ -85,7 +129,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
 
   if (!brief) {
@@ -177,12 +221,9 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
-                Your weekly report
+              <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[24px] font-normal leading-snug text-warm-black tracking-[-0.01em] sm:text-[30px]">
+                {buildVerdict(brief.stats)}
               </h1>
-              <p className="text-[13px] text-gray-muted mt-2 max-w-xl">
-                Plain-English performance, site changes, and the next useful action.
-              </p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
@@ -200,6 +241,12 @@ export function WeeklyBriefClient({ brief, history = [] }: WeeklyBriefClientProp
           >
             {brief.summary}
           </div>
+
+          {dailyMetrics.length >= 2 && (
+            <div className="animate-fade-in-up" style={{ animationDelay: "75ms" }}>
+              <TrendChart metrics={dailyMetrics} />
+            </div>
+          )}
 
           <div
             className="grid grid-cols-2 xl:grid-cols-4 gap-3 animate-fade-in-up"
