@@ -6,6 +6,7 @@ import {
   BarChart3,
   Star,
   Activity,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import type { SurfaceId } from "@/lib/dashboard-surfaces";
@@ -15,6 +16,7 @@ export const SURFACE_ICONS: Record<SurfaceId, LucideIcon> = {
   "today": House,
   "ask-ai": MessageCircle,
   "website": Globe,
+  "store": ShoppingBag,
   "google-business": MapPin,
   "analytics": BarChart3,
   "reviews": Star,
@@ -35,6 +37,7 @@ export const SURFACE_MATCH: Record<SurfaceId, string[]> = {
   "today": [],
   "ask-ai": ["/dashboard/chat"],
   "website": ["/dashboard/site", "/dashboard/collections", "/dashboard/content", "/dashboard/assets"],
+  "store": ["/dashboard/store"],
   "google-business": ["/dashboard/google"],
   "analytics": ["/dashboard/reports"],
   "reviews": ["/dashboard/reviews"],

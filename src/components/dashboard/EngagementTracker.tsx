@@ -11,6 +11,7 @@ export type EngagementEvent =
   | "health-view"
   | "gbp-view"
   | "brand-kit-view"
+  | "store-view"
   | "referral-click";
 
 export function EngagementTracker({ event }: { event: EngagementEvent }) {
