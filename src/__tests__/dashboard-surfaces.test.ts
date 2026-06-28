@@ -116,6 +116,18 @@ describe("getDashboardSurfaces — Store", () => {
     const ids = getVisibleSurfaces({ tenantConfig: { template: "wellness" }, connections: [] }).map((x) => x.id);
     expect(ids).not.toContain("store");
   });
+
+  it("is shown when the caller passes hasCommerce (e.g. tenant has products) even without a features flag", () => {
+    const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [], hasCommerce: true });
+    expect(at(s, "store").state).toBe("shown");
+  });
+
+  it("hasCommerce=false falls back to the features flag", () => {
+    const withFlag = getDashboardSurfaces({ tenantConfig: { template: "food-brand", features: ["shop"] }, connections: [], hasCommerce: false });
+    expect(at(withFlag, "store").state).toBe("shown");
+    const without = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [], hasCommerce: false });
+    expect(at(without, "store").state).toBe("hidden");
+  });
 });
 
 describe("getDashboardSurfaces — always-on pillars", () => {

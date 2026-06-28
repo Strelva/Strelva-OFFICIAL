@@ -94,15 +94,22 @@ function hasReviewsSource(tenantConfig: SurfaceTenantConfig, connections: Connec
 export function getDashboardSurfaces({
   tenantConfig,
   connections,
+  hasCommerce: hasCommerceSignal,
 }: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  /** Truth signal from the caller (e.g. the tenant has published products).
+   *  ORed with the config features flag so Store shows for a real ecom tenant
+   *  even when the features array isn't set on the record. */
+  hasCommerce?: boolean;
 }): DashboardSurface[] {
   const presence = getPresenceProfile(tenantConfig);
   const local = presence === "local" || presence === "hybrid";
   const gbpConnected = isConnected(connections, "google");
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
-  const hasCommerce = (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
+  const hasCommerce =
+    hasCommerceSignal === true ||
+    (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
     { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
@@ -139,6 +146,7 @@ export function getDashboardSurfaces({
 export function getVisibleSurfaces(args: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  hasCommerce?: boolean;
 }): DashboardSurface[] {
   return getDashboardSurfaces(args).filter((s) => s.state !== "hidden");
 }
