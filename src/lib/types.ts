@@ -349,6 +349,8 @@ export interface ReviewItem {
   date: string;
   reply?: string;
   repliedAt?: string;
+  /** Provider review id — dedupes polled reviews via the (tenant, source, external_id) unique key. Null for manual. */
+  externalId?: string;
 }
 
 // --- Booking Types ---

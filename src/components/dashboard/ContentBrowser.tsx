@@ -140,7 +140,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
 
 
   function handleAddSection(type: string) {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = [...sortedSections];
     const newSection: PageSectionConfig = { type, visible: true, order: sections.length };
     sections.push(newSection);
@@ -151,7 +151,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   }
 
   function handleToggleVisibility(type: string) {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = sortedSections.map((s) =>
       s.type === type ? { ...s, visible: !s.visible } : s
     );
@@ -161,7 +161,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
   }
 
   function handleMoveSection(type: string, direction: "up" | "down") {
-    if (!pageConfig) return;
+    if (!pageConfig || saving) return;
     const sections = [...sortedSections];
     const idx = sections.findIndex((s) => s.type === type);
     if (idx === -1) return;

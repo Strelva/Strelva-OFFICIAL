@@ -202,6 +202,7 @@ async function pollTenant(tenantId: string): Promise<number> {
       rating,
       text: review.comment || "",
       date: review.createTime,
+      externalId: review.reviewId,
     }).catch(() => {});
 
     // Draft a filter-safe reply and queue it for human approval.

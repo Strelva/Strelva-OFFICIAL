@@ -91,6 +91,7 @@ await mapPool(active, 8, async (tenant) => {
           rating: review.rating,
           text: review.text,
           date: review.time_created,
+          externalId: review.id,
         }).catch(() => {});
       }
 

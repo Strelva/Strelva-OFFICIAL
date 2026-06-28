@@ -19,6 +19,7 @@ function builder() {
           return () => Promise.resolve({ data: supa.single, error: null });
         }
         if (prop === "insert") return (v: unknown) => { supa.lastInsert = v; return builder(); };
+        if (prop === "upsert") return (v: unknown) => { supa.lastInsert = v; return builder(); };
         if (prop === "update") return (v: unknown) => { supa.lastUpdate = v; return builder(); };
         return () => builder();
       },

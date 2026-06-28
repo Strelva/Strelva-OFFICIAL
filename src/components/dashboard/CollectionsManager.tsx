@@ -147,6 +147,12 @@ export function CollectionsManager({
     setError(null);
     try {
       const res = await fetch(apiPath(`/api/collections/${t}`));
+      // Guard status before treating the body as data — otherwise a non-JSON 5xx
+      // resolves to {} and renders as an indistinguishable "empty collection".
+      if (!res.ok) {
+        setError("Could not load entries.");
+        return;
+      }
       const json = await res.json().catch(() => ({}));
       setEntries(
         // The authed GET returns raw rows (snake_case updated_at).

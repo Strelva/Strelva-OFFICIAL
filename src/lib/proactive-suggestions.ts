@@ -1,4 +1,4 @@
-import { addSuggestion } from "./suggestions";
+import { addSuggestion, dedupePendingSuggestionEvents } from "./suggestions";
 import { getReviews } from "./reviews";
 import { getOwnerRetentionSignals } from "./retention";
 import { getBlogPostsForSite } from "./cms/blog-public";
@@ -36,7 +36,11 @@ export async function generateProactiveSuggestions(tenant: string): Promise<void
   const hasContent = await tenantHasContentEngine(tenant);
   await Promise.allSettled([
     suggestUnrepliedReview(tenant),
-    ...(hasContent ? [suggestStaleSite(tenant), suggestFirstPost(tenant)] : []),
+    // Sites without a content engine: don't add blog nudges, AND dismiss any that
+    // were queued before this gating existed (or while the site still had a blog).
+    ...(hasContent
+      ? [suggestStaleSite(tenant), suggestFirstPost(tenant)]
+      : [dedupePendingSuggestionEvents(tenant, { invalidTitles: CONTENT_SUGGESTION_TITLES })]),
   ]);
 }
 

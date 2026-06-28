@@ -190,8 +190,14 @@ function SavePill({ status }: { status: SaveStatus }) {
     error: { label: "Could not save", cls: "border-red-400/30 bg-red-400/10 text-red-300" },
   };
   const item = copy[status];
+  // Announce autosave outcome — there's no save button, so a non-sighted user
+  // gets no other feedback that a blur-save succeeded or (critically) failed.
   return (
-    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.cls}`}>
+    <span
+      role={status === "error" ? "alert" : "status"}
+      aria-live={status === "error" ? "assertive" : "polite"}
+      className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.cls}`}
+    >
       {item.label}
     </span>
   );
