@@ -13,6 +13,7 @@ const mockRecordSectionUpdate = vi.fn();
 const mockRevalidateClientSite = vi.fn();
 const mockUpdateBusinessHours = vi.fn();
 const mockCreateGbpPost = vi.fn();
+const mockPublishReviewReply = vi.fn();
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -55,6 +56,10 @@ vi.mock("next/cache", () => ({
 vi.mock("../lib/gbp-management", () => ({
   updateBusinessHours: (...args: unknown[]) => mockUpdateBusinessHours(...args),
   createGbpPost: (...args: unknown[]) => mockCreateGbpPost(...args),
+}));
+
+vi.mock("../lib/gbp-replies", () => ({
+  publishReviewReply: (...args: unknown[]) => mockPublishReviewReply(...args),
 }));
 
 import { resolveEventAction } from "../lib/event-actions";
@@ -239,5 +244,49 @@ describe("resolveEventAction", () => {
     expect(result).toEqual({ changed: true });
     expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "dismissed", { actor: "user" });
+  });
+
+  // Review reply: owner approval through the queue publishes to Google, and a
+  // failed publish must leave the draft pending (never falsely "handled").
+  const reviewDraft = () => ({
+    id: "evt_rr",
+    tenantId: "tenant-a",
+    type: "review",
+    status: "pending",
+    body: "Thank you!",
+    metadata: { kind: "review_reply_draft", reviewId: "rev_9", draftedReply: "Thank you!" },
+  });
+
+  it("publishes a review reply to Google then resolves on approval", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockPublishReviewReply.mockResolvedValue({ published: true, verified: true });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!");
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: "user" });
+  });
+
+  it("leaves a review reply pending when the Google publish fails", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockPublishReviewReply.mockResolvedValue({ published: false });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "review_reply_failed" });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("dismisses a review reply draft without publishing to Google", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "dismissed");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockPublishReviewReply).not.toHaveBeenCalled();
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "dismissed", { actor: "user" });
   });
 });
