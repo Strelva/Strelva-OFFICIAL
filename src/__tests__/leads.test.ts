@@ -1,37 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { makeRedisMock } from "./support/redis-mock";
 
-const store = new Map<string, unknown>();
-const zsets = new Map<string, Map<string, number>>();
+const mockRedis = makeRedisMock();
 let clock = Date.UTC(2026, 5, 1);
-
-const mockRedis = {
-  set: async (k: string, v: unknown, opts?: { nx?: boolean }) => {
-    if (opts?.nx && store.has(k)) return null;
-    store.set(k, v);
-    return "OK";
-  },
-  get: async (k: string) => store.get(k) ?? null,
-  mget: async (...keys: string[]) => keys.map((k) => store.get(k) ?? null),
-  zadd: async (k: string, { score, member }: { score: number; member: string }) => {
-    const z = zsets.get(k) ?? new Map<string, number>();
-    z.set(member, score);
-    zsets.set(k, z);
-    return 1;
-  },
-  zrange: async (k: string, start: number, stop: number, opts?: { rev?: boolean }) => {
-    const z = zsets.get(k) ?? new Map<string, number>();
-    let arr = [...z.entries()].sort((a, b) => a[1] - b[1]).map(([m]) => m);
-    if (opts?.rev) arr = arr.reverse();
-    return arr.slice(start, stop + 1);
-  },
-  zremrangebyrank: async () => 0,
-};
 
 vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
 
 beforeEach(() => {
-  store.clear();
-  zsets.clear();
+  mockRedis.store.clear();
+  mockRedis.zsets.clear();
   clock = Date.UTC(2026, 5, 1);
   vi.spyOn(Date, "now").mockImplementation(() => clock);
   vi.useFakeTimers();
@@ -70,5 +47,20 @@ describe("leads store", () => {
     const s = await getLeadSummary("t1", 30);
     expect(s.count).toBe(2);
     expect(s.recent[0].name).toBe("B"); // newest first
+  });
+
+  it("releases the dedup lock when indexing fails, so a retry isn't swallowed", async () => {
+    const orig = mockRedis.zadd;
+    mockRedis.zadd = async () => {
+      throw new Error("redis down mid-write");
+    };
+    await expect(
+      recordLead("t1", { name: "Sarah", email: "s@x.com", message: "hi" }),
+    ).rejects.toThrow();
+
+    mockRedis.zadd = orig;
+    const retry = await recordLead("t1", { name: "Sarah", email: "s@x.com", message: "hi" });
+    expect(retry).not.toBeNull(); // dedup lock was released, retry captured it
+    expect(await getLeads("t1")).toHaveLength(1);
   });
 });

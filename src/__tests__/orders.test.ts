@@ -1,40 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { makeRedisMock } from "./support/redis-mock";
 
-// In-memory Redis covering exactly what orders.ts uses.
-const store = new Map<string, unknown>();
-const zsets = new Map<string, Map<string, number>>();
+const mockRedis = makeRedisMock();
 let clock = 1_000;
-
-const mockRedis = {
-  set: async (k: string, v: unknown, opts?: { nx?: boolean }) => {
-    if (opts?.nx && store.has(k)) return null;
-    store.set(k, v);
-    return "OK";
-  },
-  get: async (k: string) => store.get(k) ?? null,
-  mget: async (...keys: string[]) => keys.map((k) => store.get(k) ?? null),
-  zadd: async (k: string, { score, member }: { score: number; member: string }) => {
-    const z = zsets.get(k) ?? new Map<string, number>();
-    z.set(member, score);
-    zsets.set(k, z);
-    return 1;
-  },
-  zrange: async (k: string, start: number, stop: number, opts?: { rev?: boolean }) => {
-    const z = zsets.get(k) ?? new Map<string, number>();
-    let arr = [...z.entries()].sort((a, b) => a[1] - b[1]).map(([m]) => m);
-    if (opts?.rev) arr = arr.reverse();
-    return arr.slice(start, stop + 1);
-  },
-  zremrangebyrank: async () => 0,
-};
 
 vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
 
 // orders.ts stamps createdAt from Date.now via new Date(); advance a fake clock
 // so ordering + the 30-day window are deterministic.
 beforeEach(() => {
-  store.clear();
-  zsets.clear();
+  mockRedis.store.clear();
+  mockRedis.zsets.clear();
   clock = Date.UTC(2026, 5, 1);
   vi.spyOn(Date, "now").mockImplementation(() => clock);
   vi.useFakeTimers();
@@ -86,5 +62,20 @@ describe("orders store", () => {
     const s = await getOrderSummary("t1", 30);
     expect(s.orderCount).toBe(1);
     expect(s.revenueCents).toBe(1000);
+  });
+
+  it("releases the externalId lock when indexing fails, so a retried beacon isn't dropped", async () => {
+    const orig = mockRedis.zadd;
+    mockRedis.zadd = async () => {
+      throw new Error("redis down mid-write");
+    };
+    await expect(
+      recordOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" }),
+    ).rejects.toThrow();
+
+    mockRedis.zadd = orig;
+    const retry = await recordOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" });
+    expect(retry).not.toBeNull(); // dedup lock released → the retry captures it
+    expect(await getOrders("t1")).toHaveLength(1);
   });
 });

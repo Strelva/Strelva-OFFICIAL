@@ -60,7 +60,8 @@ export async function recordLead(
 
   // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
   const hash = dedupHash(input.name, input.email ?? "", input.message ?? "");
-  const fresh = await redis.set(`lead-dedup:${tenant}:${hash}`, "1", { nx: true, ex: 300 });
+  const dedupKey = `lead-dedup:${tenant}:${hash}`;
+  const fresh = await redis.set(dedupKey, "1", { nx: true, ex: 300 });
   if (!fresh) return null;
 
   const lead: LeadRecord = {
@@ -72,9 +73,18 @@ export async function recordLead(
     createdAt: new Date().toISOString(),
   };
 
-  await redis.set(leadKey(tenant, lead.id), lead, { ex: LEAD_TTL_SECONDS });
-  await redis.zadd(leadsKey(tenant), { score: Date.now(), member: lead.id });
-  await redis.zremrangebyrank(leadsKey(tenant), 0, -(LEAD_KEEP + 1));
+  // The dedup lock is held before the writes; if a write fails we must release
+  // it, or a retry of the same submission is swallowed by the 5-minute guard
+  // while the record sits orphaned (set but never indexed → invisible to
+  // getLeads). Releasing lets the beacon's retry capture the lead cleanly.
+  try {
+    await redis.set(leadKey(tenant, lead.id), lead, { ex: LEAD_TTL_SECONDS });
+    await redis.zadd(leadsKey(tenant), { score: Date.now(), member: lead.id });
+    await redis.zremrangebyrank(leadsKey(tenant), 0, -(LEAD_KEEP + 1));
+  } catch (err) {
+    await redis.del(dedupKey).catch(() => {});
+    throw err;
+  }
   return lead;
 }
 
