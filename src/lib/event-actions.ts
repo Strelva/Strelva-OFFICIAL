@@ -230,6 +230,29 @@ export async function resolveEventAction(
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 
+  // Review reply draft: on approve, publish the reply to the Google listing.
+  // Governed like the other external writes — the reply only reaches Google
+  // through this approval (owner-facing, via the queue route's auth), and a
+  // failed publish leaves the draft pending so the queue can't falsely show it
+  // as handled.
+  if (event.type === "review" && event.metadata?.kind === "review_reply_draft") {
+    if (action === "approved") {
+      const reviewId = typeof event.metadata?.reviewId === "string" ? event.metadata.reviewId : "";
+      const replyText =
+        typeof event.metadata?.draftedReply === "string"
+          ? event.metadata.draftedReply
+          : typeof event.body === "string"
+            ? event.body
+            : "";
+      if (!reviewId || !replyText) return { changed: false, reason: "review_reply_invalid" };
+      const { publishReviewReply } = await import("./gbp-replies");
+      const result = await publishReviewReply(tenantId, reviewId, replyText);
+      if (!result.published) return { changed: false, reason: "review_reply_failed" };
+    }
+    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+  }
+
   // Remaining simple cases (suggestion, etc.) — resolve then handle.
   const resolved = await resolveEvent(eventId, action, { actor: "user" });
   if (!resolved.changed) return { changed: false, reason: "already_resolved" };
