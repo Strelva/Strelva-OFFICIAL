@@ -36,20 +36,25 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
 
-    // Surface the sale on the owner's Strelva dashboard (best-effort).
+    // Surface the sale on the owner's Strelva dashboard (best-effort). Guard the
+    // amount: Stripe types amount_total as nullable, and a $0 beacon would
+    // silently pollute revenue + mask a broken session — skip it instead.
+    const amountCents = session.amount_total;
     const base = getScaffoldBaseUrl();
     const tenant = getTenantId();
-    if (base) {
+    if (base && typeof amountCents === "number" && amountCents > 0) {
       await fetch(`${base}/api/v1/track/${tenant}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event: "order",
           orderId: session.id,
-          amountCents: session.amount_total ?? 0,
+          amountCents,
           currency: (session.currency ?? "usd").toUpperCase(),
         }),
       }).catch(() => {});
+    } else if (!amountCents) {
+      console.warn(`[stripe webhook] session ${session.id} completed with no amount_total — order beacon skipped`);
     }
 
     // TODO: send the order confirmation email (Resend) — RESEND_API_KEY.

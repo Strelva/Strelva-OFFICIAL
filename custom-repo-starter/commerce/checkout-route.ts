@@ -52,6 +52,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const lineItems: StripeNS.Checkout.SessionCreateParams.LineItem[] = [];
   let subtotalCents = 0;
+  // Stripe requires every line item AND the shipping rate to share one currency.
+  // Capture the cart's currency from the first item and reject a mixed-currency
+  // cart up front (rather than letting Stripe fail with a cryptic error).
+  let cartCurrency = "";
 
   for (const item of items) {
     if (!item || typeof item.slug !== "string") {
@@ -71,10 +75,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (product.priceCents <= 0) {
       return NextResponse.json({ error: `${product.name} isn't available for purchase.` }, { status: 400 });
     }
+    const currency = (product.currency || "USD").toLowerCase();
+    if (!cartCurrency) cartCurrency = currency;
+    else if (currency !== cartCurrency) {
+      return NextResponse.json({ error: "All items must be in the same currency." }, { status: 400 });
+    }
     subtotalCents += product.priceCents * quantity;
     lineItems.push({
       price_data: {
-        currency: (product.currency || "USD").toLowerCase(),
+        currency,
         product_data: {
           name: product.name,
           description: product.description.slice(0, 500) || undefined,
@@ -105,7 +114,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       {
         shipping_rate_data: {
           type: "fixed_amount",
-          fixed_amount: { amount: shippingCents, currency: "usd" },
+          fixed_amount: { amount: shippingCents, currency: cartCurrency || "usd" },
           display_name: freeShipping ? "Free shipping" : "Standard shipping",
           delivery_estimate: {
             minimum: { unit: "business_day", value: SHIPPING_MIN_DAYS },
