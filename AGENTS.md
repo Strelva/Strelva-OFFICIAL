@@ -47,6 +47,7 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 - Custom-repo wiring: `src/lib/custom-repos.ts`, `src/lib/revalidate-client.ts` (signed HMAC revalidation), `custom-repo-starter/` (drop-in scaffold), `scripts/custom-repo-workspace-check.ts`, `release-manifest.json`.
 - `DEFAULT_DELIVERY_MODEL` is `"custom_repo"`. Every paid client is a separate hand-built repo. The `platform_template` value still exists in the type for legacy tenant records but should not be used for new tenants. The self-serve backend was **deleted** (2026-06-10; `/onboard` redirects to `/access-request` preserving `?ref=`) — the only lead path is `/access-request`, Jacob builds the repo.
 - **Client-site traffic tracking**: custom repos send page-view/booking-click beacons to `POST /api/v1/track/[tenant]` (additive v1 route; rate-limited, fail-silent tracker in `custom-repo-starter/ScaffoldTracker.tsx`, needs `NEXT_PUBLIC_SCAFFOLD_API_URL` + `NEXT_PUBLIC_TENANT_ID`). This feeds the weekly report's numbers — rollout steps for live repos in `docs/tracking-rollout.md`.
+- **Conversion capture (additive v1)**: the same beacon carries an `order` event (validated, idempotent on `externalId`) into `src/lib/orders.ts` — powers the Store pillar's revenue/orders/best-sellers. Native form submissions POST to `/api/v1/leads/[tenant]` (validated, deduped, rate-limited) into `src/lib/leads.ts` — surfaced as "Who reached out" on Today. Both stores set a dedup lock that is **released on a write failure** so a retried beacon is never silently swallowed. v1 stays additive-only; change by versioning.
 
 ## Content system
 
@@ -57,8 +58,19 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 
 ## AI agent
 
-- `src/lib/agent-executor.ts` uses Vercel AI SDK + `gemini-2.5-flash`.
-- Tools: `read_section`, `update_section`, `get_suggestions`, `create_suggestion`, `create_blog_post`, `list_blog_posts`.
+- `src/lib/agent-executor.ts` uses Vercel AI SDK + `gemini-2.5-flash`. The streaming
+  chat endpoint is `src/app/api/agent/route.ts`; it emits `__TOOL__<label>` status,
+  text deltas, `__RESULT__<json>`, and `__CARD__<json>` (rich inline tool cards) —
+  ChatPanel + DesignPropertiesPanel both consume the same protocol.
+- Content tools: `read_section`, `update_section`, `get_suggestions`, `create_suggestion`,
+  `create_blog_post`, `list_blog_posts`, `draft_newsletter`. Inline-display tools return
+  `{ __inlineTool, ... }` → streamed as `__CARD__` (e.g. `show_report`, `show_content`).
+- Google Business tools (`create_gbp_post`, `update_business_hours`) NEVER write to Google
+  directly — they queue a `status:"pending"` event (`metadata.kind` of `gbp_post_draft` /
+  `gbp_hours_draft`); the real write happens on owner approval in `src/lib/event-actions.ts`,
+  which leaves the event pending if the write fails. Review replies follow the same governed
+  path (`review_reply_draft` → `publishReviewReply`). This is the safety invariant — do not
+  add a tool that publishes to an external surface without queuing for approval first.
 - Governance: `src/lib/ai-governance.ts` decides publish vs review-queue vs block.
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
@@ -69,7 +81,7 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 
 ## Operational systems
 
-- Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log.
+- Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log. `event:{id}` bodies carry a 90-day TTL; `addEvent` prunes the per-tenant index zset by score on every write so the index can't outgrow the record TTL (dangling members would otherwise dilute the recency window `getEvents`/`getOpenChangeRequest` scan).
 - Crons in `src/app/api/cron/` (see `vercel.json`): maintenance, weekly-report, staleness, search-console, daily-summary, poll-yelp, poll-google-reviews, poll-instagram.
 - Integrations registry: `src/lib/integration-registry.ts` (UI metadata) + `src/lib/connections.ts` (live API access).
 - Weekly brief: `src/lib/weekly-brief.ts` + `src/lib/reports.ts` (per-tenant error isolation; deterministic claims-safe fallback when Gemini fails; Resend errors are counted, not swallowed).
@@ -158,7 +170,12 @@ Local-business owners will pay for a dashboard that proves their website is work
 ## Do NOT Build
 - Drag-and-drop visual editor (AI handles content; Jacob handles quality).
 - Client-facing code editor (never).
-- E-commerce / checkout (booking platforms handle this).
+- A checkout / payment engine in the control plane. The client repo (or its commerce
+  provider) owns the cart and the charge. The control plane **surfaces** commerce:
+  the Store pillar reads products, and orders arrive over the `/api/v1/track` beacon
+  (`order` event) into `src/lib/orders.ts` for the revenue/orders/best-seller view.
+  This is the "basic ecom" of the Growth tier (founder decision 2026-06-26) — capture
+  and visibility, not a storefront we build.
 - Tiered pricing UI.
 - A `/api/public/*` re-export shell of the v1 contract (v1 owns the contract directly now).
 - Self-serve onboarding/provisioning (backend deleted 2026-06-10; don't resurrect without a founder decision).

@@ -8,6 +8,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
+import { getProducts } from "@/lib/products";
 import { getActivity, getClickCounts, getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
@@ -95,18 +96,22 @@ export default async function DashboardLayout({
   // Fetch queue count and stats. Each read is independently guarded: this runs
   // in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip) would
   // 500 every dashboard route at once. Degrade to safe defaults instead.
-  const [pendingCount, pageViews, activity, connections] = await Promise.all([
+  const [pendingCount, pageViews, activity, connections, products] = await Promise.all([
     getQueueCount(tenant).catch(() => 0),
     getClickCounts("page-view", tenant).catch(() => ({ total: 0, today: 0, thisWeek: 0, lastWeek: 0 })),
     getActivity(tenant, { actor: "ai" }).catch(() => []),
     getConnections(tenant).catch(() => []),
+    getProducts(tenant).catch(() => []),
   ]);
 
   // The conditional tab set — big-4 presence pillars shown by business type +
   // what's connected. Falls back to a local-business default if config is missing.
+  // Store shows when the tenant actually has products (the truth signal), not
+  // just when a features flag is set — so a real ecom client always gets it.
   const surfaces = getVisibleSurfaces({
     tenantConfig: tenantConfig ?? { template: "wellness" },
     connections,
+    hasCommerce: products.length > 0,
   });
   const monthAgo = Date.now() - 30 * 86_400_000;
   const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;

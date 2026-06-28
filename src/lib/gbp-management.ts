@@ -359,6 +359,24 @@ export async function createGbpPost(
   const ctx = await resolveWriteContext(tenantId, "create_post");
   if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
 
+  // SSRF guard at the egress boundary: ctaUrl/photoUrl come from an AI draft
+  // (owner-approved, but the agent prompt is attacker-influencable) and Google's
+  // API fetches them. Reject non-HTTP schemes and anything resolving to a
+  // private IP — same defense the audit fetch path uses. Covers every caller.
+  const { validateUrlSafety } = await import("./audit/checks");
+  for (const url of [post.ctaUrl, post.photoUrl]) {
+    if (!url) continue;
+    try {
+      await validateUrlSafety(url);
+    } catch (err) {
+      return {
+        success: false,
+        verified: false,
+        evidence: `tenant=${tenantId} operation=create_post blocked_url=${err instanceof Error ? err.message : "unsafe url"}`,
+      };
+    }
+  }
+
   const { accessToken, accountId, locationId } = ctx;
 
   const locationName = locationId.startsWith("locations/")

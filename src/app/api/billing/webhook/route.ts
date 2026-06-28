@@ -143,16 +143,12 @@ async function applyTenantSubscriptionStatus(
   event: Stripe.Event
 ) {
   if (!tenantId) {
-    const msg = `[billing webhook] ${event.type} missing tenantId metadata — cannot apply subscription status`;
-    console.error(msg);
-    if (process.env.SLACK_WEBHOOK_URL) {
-      fetch(process.env.SLACK_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: `⚠️ ${msg}` }),
-      }).catch(() => {});
-    }
-    throw new Error(msg);
+    // A signed subscription event with no tenantId metadata is NOT retryable —
+    // the event is immutable, so throwing here would 500 and trigger a 3-day
+    // Stripe retry storm that fails identically every time. Alert loudly (Slack
+    // + Sentry) and let the caller ack 200, same as the unknown-tenant path.
+    alert("billing_webhook_missing_tenant", "high", { eventType: event.type });
+    return;
   }
 
   const redis = getRedis();

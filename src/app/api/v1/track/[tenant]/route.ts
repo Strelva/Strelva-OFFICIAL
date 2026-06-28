@@ -36,7 +36,37 @@ import { getRedis } from "@/lib/redis";
 // The minimal public event vocabulary. Kept intentionally small: this is a
 // non-sensitive beacon, not the full internal event set. Maps 1:1 onto the
 // base event names `trackClick` already stores and `reports.ts` already reads.
-const ALLOWED_EVENTS = new Set(["page-view", "booking-click"]);
+const ALLOWED_EVENTS = new Set(["page-view", "booking-click", "order"]);
+
+const MAX_ORDER_CENTS = 100_000_000; // $1M — reject absurd/garbage amounts
+const MAX_ITEMS = 100;
+
+/** Parse + strictly validate the order payload from a public beacon. */
+function parseOrder(body: Record<string, unknown>):
+  | { amountCents: number; currency: string; items: { name: string; quantity: number }[]; externalId?: string }
+  | { error: string } {
+  const amountCents = body.amountCents;
+  if (typeof amountCents !== "number" || !Number.isFinite(amountCents) || amountCents < 0 || amountCents > MAX_ORDER_CENTS) {
+    return { error: "Invalid amountCents" };
+  }
+  const currencyRaw = typeof body.currency === "string" ? body.currency.toUpperCase() : "USD";
+  const currency = /^[A-Z]{3}$/.test(currencyRaw) ? currencyRaw : "USD";
+  const orderId = body.orderId;
+  if (orderId !== undefined && (typeof orderId !== "string" || orderId.length > 200)) {
+    return { error: "Invalid orderId" };
+  }
+  const items: { name: string; quantity: number }[] = [];
+  if (Array.isArray(body.items)) {
+    for (const raw of body.items.slice(0, MAX_ITEMS)) {
+      if (!raw || typeof raw !== "object") continue;
+      const it = raw as Record<string, unknown>;
+      const name = typeof it.name === "string" ? it.name.slice(0, 200) : null;
+      const quantity = typeof it.quantity === "number" && Number.isFinite(it.quantity) ? Math.max(1, Math.min(10_000, Math.round(it.quantity))) : 1;
+      if (name) items.push({ name, quantity });
+    }
+  }
+  return { amountCents: Math.round(amountCents), currency, items, externalId: typeof orderId === "string" ? orderId : undefined };
+}
 
 // A service id is only meaningful for booking-click. Constrain it the same way
 // the internal route constrains its `booking-click:<id>` suffix so a hostile
@@ -115,6 +145,19 @@ export async function POST(
     const config = await getTenantConfig(tenant);
     if (!config || config.active === false) {
       return corsJson({ error: "Tenant not found" }, 404);
+    }
+
+    // Order beacon: a completed storefront purchase. Recorded idempotently by
+    // orderId (its own dedup) and counted in the click metrics, then we return
+    // — it doesn't go through the click dedup/trackClick path below.
+    if (event === "order") {
+      const parsed = parseOrder(body);
+      if ("error" in parsed) {
+        return corsJson({ error: parsed.error }, 400);
+      }
+      const { recordOrder } = await import("@/lib/orders");
+      await recordOrder(tenant, parsed);
+      return corsJson({ ok: true }, 200);
     }
 
     // Best-effort dedup: collapse identical rapid-fire events (double-fires,

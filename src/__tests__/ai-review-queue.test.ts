@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockRedis = {
   zadd: vi.fn(),
   set: vi.fn(),
+  zremrangebyscore: vi.fn(),
 };
 let redisClient: typeof mockRedis | null = mockRedis;
 

@@ -593,7 +593,8 @@ function AITab({
           }
           const label = line.replace("__TOOL__", "");
           currentStepId = addTraceStep(label);
-        } else if (line.startsWith("__RESULT__")) {
+        } else if (line.startsWith("__RESULT__") || line.startsWith("__CARD__")) {
+          // Inline cards are a chat-only concern; don't dump them into design text.
           return;
         } else {
           // Preserve newlines — the old `+= line` ran every paragraph together.

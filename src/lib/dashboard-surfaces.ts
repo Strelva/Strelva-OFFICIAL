@@ -16,7 +16,11 @@ import type { Connection, TenantConfig } from "./types";
 /** The slice of tenant config the surface resolver actually reads. */
 export type SurfaceTenantConfig = Pick<TenantConfig, "template" | "reviewsConfig"> & {
   businessModel?: PresenceProfile;
+  features?: string[];
 };
+
+/** Feature flags that mean this tenant runs a storefront. */
+const COMMERCE_FEATURES = new Set(["commerce", "products", "shop"]);
 
 /** How the business shows up to customers — drives which presence tabs apply. */
 export type PresenceProfile = "local" | "online" | "hybrid";
@@ -33,6 +37,7 @@ export type SurfaceId =
   | "today"
   | "ask-ai"
   | "website"
+  | "store"
   | "google-business"
   | "analytics"
   | "reviews"
@@ -89,19 +94,30 @@ function hasReviewsSource(tenantConfig: SurfaceTenantConfig, connections: Connec
 export function getDashboardSurfaces({
   tenantConfig,
   connections,
+  hasCommerce: hasCommerceSignal,
 }: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  /** Truth signal from the caller (e.g. the tenant has published products).
+   *  ORed with the config features flag so Store shows for a real ecom tenant
+   *  even when the features array isn't set on the record. */
+  hasCommerce?: boolean;
 }): DashboardSurface[] {
   const presence = getPresenceProfile(tenantConfig);
   const local = presence === "local" || presence === "hybrid";
   const gbpConnected = isConnected(connections, "google");
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
+  const hasCommerce =
+    hasCommerceSignal === true ||
+    (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
     { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
+    // Store — the primary surface for a commerce tenant (orders, revenue,
+    // products). Hidden entirely for non-commerce sites.
+    { id: "store", label: "Store", href: "/dashboard/store", state: hasCommerce ? "shown" : "hidden", group: "presence" },
     {
       id: "google-business",
       label: "Google Business",
@@ -130,6 +146,7 @@ export function getDashboardSurfaces({
 export function getVisibleSurfaces(args: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  hasCommerce?: boolean;
 }): DashboardSurface[] {
   return getDashboardSurfaces(args).filter((s) => s.state !== "hidden");
 }

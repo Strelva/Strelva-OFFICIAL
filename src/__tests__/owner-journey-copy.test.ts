@@ -131,9 +131,11 @@ describe("owner journey copy and links", () => {
 
     expect(reportsPage).toContain("getWeeklyBrief(tenant)");
     expect(reportsPage).toContain("getWeeklyBriefs(tenant)");
-    expect(reportsPage).toContain("<WeeklyBriefClient brief={brief} history={history} />");
+    expect(reportsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
     expect(reportsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
-    expect(weeklyBrief).toContain("Your weekly report");
+    // Verdict-first: lead with a plain-English verdict + the 30-day trend.
+    expect(weeklyBrief).toContain("buildVerdict");
+    expect(weeklyBrief).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
     expect(weeklyBrief).toContain("Open Today");
   });

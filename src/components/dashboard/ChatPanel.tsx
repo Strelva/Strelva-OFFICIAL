@@ -173,7 +173,8 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const [isLoading, setIsLoading] = useState(false);
   const [updateToast, setUpdateToast] = useState<UpdateToast | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
-  const [activeTools, setActiveTools] = useState<ToolCall[]>([]);
+  // Rich inline tool cards (report/content/photos/connections) streamed via __CARD__.
+  const [toolCards, setToolCards] = useState<{ id: string; tool: string; data: unknown }[]>([]);
   const [needsDrawerOpen, setNeedsDrawerOpen] = useState(Boolean(needsYou?.openInitially));
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -326,7 +327,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       setAttachments([]);
       setIsLoading(true);
       setToolStatus("Contacting AI...");
-      setActiveTools([]);
+      setToolCards([]);
 
       const slowStatusTimer = window.setTimeout(() => {
         if (!abortController.signal.aborted) setToolStatus("Checking the site context...");
@@ -477,14 +478,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
 
           for (const line of lines) {
             if (line.startsWith("__TOOL__")) {
-              const toolInfo = line.slice(8);
-              setToolStatus(toolInfo);
-              // Track tool calls
-              const toolId = makeClientId(`tool_${toolIdCounterRef.current++}`);
-              setActiveTools((prev) => [
-                ...prev,
-                { id: toolId, name: toolInfo, status: "running" as const },
-              ]);
+              setToolStatus(line.slice(8));
               continue;
             }
             if (line.startsWith("__RESULT__")) {
@@ -496,14 +490,21 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               continue;
             }
             if (line.startsWith("__TOOL_DONE__")) {
-              const toolName = line.slice(13);
-              setActiveTools((prev) =>
-                prev.map((t) =>
-                  t.name === toolName && t.status === "running"
-                    ? { ...t, status: "complete" as const }
-                    : t
-                )
-              );
+              // Consume the marker (cards are tracked via __CARD__ now).
+              continue;
+            }
+            if (line.startsWith("__CARD__")) {
+              try {
+                const card = JSON.parse(line.slice(8)) as { __inlineTool?: string };
+                if (card.__inlineTool) {
+                  setToolCards((prev) => [
+                    ...prev,
+                    { id: makeClientId(`card_${toolIdCounterRef.current++}`), tool: card.__inlineTool!, data: card },
+                  ]);
+                }
+              } catch {
+                // Ignore a malformed card line rather than dumping JSON into the text.
+              }
               continue;
             }
             fullText += line + "\n";
@@ -513,7 +514,8 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             buffer &&
             !buffer.startsWith("__TOOL__") &&
             !buffer.startsWith("__TOOL_DONE__") &&
-            !buffer.startsWith("__RESULT__")
+            !buffer.startsWith("__RESULT__") &&
+            !buffer.startsWith("__CARD__")
           ) {
             fullText += buffer;
             buffer = "";
@@ -532,14 +534,13 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             } catch {
               agentResult = null;
             }
-          } else if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__")) {
+          } else if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__") && !buffer.startsWith("__CARD__")) {
             fullText += buffer;
           }
         }
         streamFinished = true;
         await revealComplete;
         setToolStatus(null);
-        setActiveTools((prev) => prev.map((t) => ({ ...t, status: "complete" as const })));
 
         // Save messages to thread
         if (activeThreadId) {
@@ -594,7 +595,6 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           abortRef.current = null;
           setIsLoading(false);
           setToolStatus(null);
-          setActiveTools([]);
         }
       }
     },
@@ -606,7 +606,6 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     abortRef.current = null;
     setIsLoading(false);
     setToolStatus(null);
-    setActiveTools([]);
   }, []);
 
   const isEmpty = messages.length === 0 && !isLoading;
@@ -832,19 +831,15 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               </div>
             )}
 
-            {/* Active tool calls */}
-            {activeTools.some((tool) => tool.result) && (
+            {/* Rich inline tool cards (report / content / photos / connections) */}
+            {toolCards.length > 0 && (
               <div className="flex justify-start">
                 <div className="max-w-[80%] space-y-2">
-                  {activeTools.map((tool) => (
-                    // Contain a malformed tool payload to its own card — a crash
+                  {toolCards.map((card) => (
+                    // Contain a malformed card payload to its own bubble — a crash
                     // here used to take down the whole conversation.
-                    <SectionErrorBoundary key={tool.id}>
-                      <ToolOutput
-                        toolName={tool.name}
-                        result={tool.result}
-                        status={tool.status === "running" ? "pending" : tool.status}
-                      />
+                    <SectionErrorBoundary key={card.id}>
+                      <ToolOutput toolName={card.tool} result={card.data} status="complete" />
                     </SectionErrorBoundary>
                   ))}
                 </div>

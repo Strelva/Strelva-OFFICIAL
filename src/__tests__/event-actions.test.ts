@@ -11,6 +11,9 @@ const mockAppendVersion = vi.fn();
 const mockClearDraft = vi.fn();
 const mockRecordSectionUpdate = vi.fn();
 const mockRevalidateClientSite = vi.fn();
+const mockUpdateBusinessHours = vi.fn();
+const mockCreateGbpPost = vi.fn();
+const mockPublishReviewReply = vi.fn();
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -48,6 +51,15 @@ vi.mock("../lib/ai-auto-approve", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
+}));
+
+vi.mock("../lib/gbp-management", () => ({
+  updateBusinessHours: (...args: unknown[]) => mockUpdateBusinessHours(...args),
+  createGbpPost: (...args: unknown[]) => mockCreateGbpPost(...args),
+}));
+
+vi.mock("../lib/gbp-replies", () => ({
+  publishReviewReply: (...args: unknown[]) => mockPublishReviewReply(...args),
 }));
 
 import { resolveEventAction } from "../lib/event-actions";
@@ -149,5 +161,132 @@ describe("resolveEventAction", () => {
       "tenant-a"
     );
     expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
+  });
+
+  // GBP hours: governed — the real Google write happens on approval, never
+  // auto-published, and a failed/invalid write must leave the item pending.
+  it("pushes hours to Google then resolves on an approved gbp_hours_draft", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_h",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: {
+        kind: "gbp_hours_draft",
+        hours: [{ day: "monday", open: "09:00", close: "17:00" }],
+      },
+    });
+    mockUpdateBusinessHours.mockResolvedValue({ success: true });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_h", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockUpdateBusinessHours).toHaveBeenCalledWith("tenant-a", {
+      regularHours: {
+        periods: [
+          {
+            openDay: "MONDAY",
+            openTime: { hours: 9, minutes: 0 },
+            closeDay: "MONDAY",
+            closeTime: { hours: 17, minutes: 0 },
+          },
+        ],
+      },
+    });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "approved", { actor: "user" });
+  });
+
+  it("leaves a gbp_hours_draft pending and skips the Google write when hours are malformed", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_h",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: { kind: "gbp_hours_draft", hours: [{ day: "monday", open: "nope", close: "17:00" }] },
+    });
+
+    const result = await resolveEventAction("tenant-a", "evt_h", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "gbp_hours_invalid" });
+    expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not resolve a gbp_hours_draft when the Google write fails", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_h",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: { kind: "gbp_hours_draft", hours: [{ day: "friday", open: "08:00", close: "12:00" }] },
+    });
+    mockUpdateBusinessHours.mockResolvedValue({ success: false });
+
+    const result = await resolveEventAction("tenant-a", "evt_h", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "gbp_hours_failed" });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not touch Google when a gbp_hours_draft is dismissed, just resolves it", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_h",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: { kind: "gbp_hours_draft", hours: [{ day: "monday", open: "09:00", close: "17:00" }] },
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_h", "dismissed");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "dismissed", { actor: "user" });
+  });
+
+  // Review reply: owner approval through the queue publishes to Google, and a
+  // failed publish must leave the draft pending (never falsely "handled").
+  const reviewDraft = () => ({
+    id: "evt_rr",
+    tenantId: "tenant-a",
+    type: "review",
+    status: "pending",
+    body: "Thank you!",
+    metadata: { kind: "review_reply_draft", reviewId: "rev_9", draftedReply: "Thank you!" },
+  });
+
+  it("publishes a review reply to Google then resolves on approval", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockPublishReviewReply.mockResolvedValue({ published: true, verified: true });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!");
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: "user" });
+  });
+
+  it("leaves a review reply pending when the Google publish fails", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockPublishReviewReply.mockResolvedValue({ published: false });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "review_reply_failed" });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("dismisses a review reply draft without publishing to Google", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "dismissed");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockPublishReviewReply).not.toHaveBeenCalled();
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "dismissed", { actor: "user" });
   });
 });

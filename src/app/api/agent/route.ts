@@ -821,6 +821,83 @@ Only use tools for manifest-supported sections and actions. If the user requests
         },
       }),
     },
+    create_gbp_post: {
+      capability: "create_gbp_post",
+      def: tool({
+        description:
+          "Draft a Google Business post (a 'What's new' update on the Google listing) for an offer, update, or announcement. Creates a draft the owner must APPROVE before it publishes to Google — never posts directly.",
+        inputSchema: z.object({
+          summary: z.string().describe("The post text"),
+          ctaUrl: z.string().optional().describe("Optional call-to-action link"),
+        }),
+        execute: async ({ summary, ctaUrl }) => {
+          try {
+            const { addEvent } = await import("@/lib/events");
+            const event = await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "content_update",
+              title: "Google post draft",
+              body: summary.slice(0, 500),
+              status: "pending",
+              metadata: { kind: "gbp_post_draft", summary, ctaUrl },
+            });
+            recordActionResult({
+              status: "queued",
+              eventIds: [event.id],
+              message: "Google post drafted — approve it to publish to your listing.",
+            });
+            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
+          } catch (err) {
+            const error = err instanceof Error ? err.message : "Failed to draft";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
+          }
+        },
+      }),
+    },
+    update_business_hours: {
+      capability: "update_business_hours",
+      def: tool({
+        description:
+          "Draft an update to the business hours on the Google listing. Creates a draft the owner must APPROVE before it publishes to Google — never updates directly. Give each open day's open/close in 24-hour HH:MM.",
+        inputSchema: z.object({
+          hours: z
+            .array(
+              z.object({
+                day: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
+                open: z.string().describe("Opening time, 24h HH:MM, e.g. 09:00"),
+                close: z.string().describe("Closing time, 24h HH:MM, e.g. 17:00"),
+              }),
+            )
+            .describe("One entry per open day"),
+        }),
+        execute: async ({ hours }) => {
+          try {
+            const { addEvent } = await import("@/lib/events");
+            const event = await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "content_update",
+              title: "Google hours update",
+              body: hours.map((h) => `${h.day}: ${h.open}-${h.close}`).join("\n").slice(0, 500),
+              status: "pending",
+              metadata: { kind: "gbp_hours_draft", hours },
+            });
+            recordActionResult({
+              status: "queued",
+              eventIds: [event.id],
+              message: "Hours update drafted — approve it to publish to Google.",
+            });
+            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
+          } catch (err) {
+            const error = err instanceof Error ? err.message : "Failed to draft";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
+          }
+        },
+      }),
+    },
     list_subscribers: {
       capability: "list_subscribers",
       def: tool({
@@ -1507,6 +1584,12 @@ Only use tools for manifest-supported sections and actions. If the user requests
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
           } else if (part.type === "tool-result") {
             const output = ("result" in part ? part.result : "output" in part ? part.output : undefined) as unknown;
+            // Inline display tools (show_report/show_content/show_photos/...) return
+            // { __inlineTool, ...cardData }. Stream it as a __CARD__ line so the chat
+            // renders the rich card — the data was built here but never sent (H5).
+            if (output && typeof output === "object" && "__inlineTool" in output) {
+              controller.enqueue(encoder.encode(`__CARD__${JSON.stringify(output)}\n`));
+            }
             const actionResult = agentResultFromToolOutput(output);
             if (actionResult) recordActionResult(actionResult);
           } else if (part.type === "text-delta") {
