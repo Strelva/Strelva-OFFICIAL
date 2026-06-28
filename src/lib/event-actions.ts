@@ -103,6 +103,15 @@ export async function resolveEventAction(
     const kind = event.metadata?.kind;
 
     // GBP post draft (B1): on approve, actually post to the Google listing.
+    //
+    // We gate resolution on `success` (Google accepted the write), NOT on
+    // `verified` (the read-back confirmation). A GBP post is NON-IDEMPOTENT —
+    // once `success` is true the post already exists on Google, so keeping the
+    // event pending would let a re-approval create a DUPLICATE post. When the
+    // read-back can't confirm (success=true, verified=false), createGbpPost
+    // already emits a separate `change_verify_failed` event to surface the gap;
+    // that's the right signal, not a stuck approval. Same rule for the hours +
+    // review-reply branches below.
     if (kind === "gbp_post_draft") {
       if (action === "approved") {
         const summary = typeof event.metadata?.summary === "string" ? event.metadata.summary : "";

@@ -42,6 +42,18 @@ export function makeRedisMock(): RedisMock {
       if (opts?.rev) arr = arr.reverse();
       return arr.slice(start, stop + 1);
     },
-    zremrangebyrank: async () => 0,
+    zremrangebyrank: async (k, start, stop) => {
+      const z = zsets.get(k);
+      if (!z) return 0;
+      const asc = [...z.entries()].sort((a, b) => a[1] - b[1]).map(([m]) => m);
+      const n = asc.length;
+      const s = start < 0 ? Math.max(0, n + start) : start;
+      const e = stop < 0 ? n + stop : Math.min(stop, n - 1);
+      let removed = 0;
+      for (let i = s; i <= e && i < n; i++) {
+        if (z.delete(asc[i])) removed++;
+      }
+      return removed;
+    },
   };
 }
