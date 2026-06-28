@@ -179,6 +179,31 @@ picks it up.
 - [ ] DNS configured: production domain, www subdomain, admin subdomain
 - [ ] Vercel env vars set: `TENANT_ID`, `SCAFFOLD_API_URL`, `REVALIDATION_SECRET`, `NEXT_PUBLIC_TENANT_ID`, `NEXT_PUBLIC_SCAFFOLD_API_URL`
 
+## Commerce (optional — for storefront clients)
+
+Drop-in module under `commerce/` for a client that sells online. Proven on RHM +
+GLDF, promoted here per the build-at-2-repos rule. Reads the canonical Model B
+product catalog from Strelva; checkout is **rock solid by construction** — prices
+come from the catalog server-side (never the browser), sold-out items are
+rejected, and a completed order fires the Strelva `order` beacon so the owner's
+dashboard Store shows revenue/orders in real time.
+
+| File | Drop into | What it does |
+|------|-----------|--------------|
+| `commerce/catalog.ts` | `src/lib/catalog.ts` | Fetches the canonical product catalog (`/api/v1/collections/{tenant}/product`) |
+| `commerce/cart-context.tsx` | `src/contexts/cart-context.tsx` | localStorage cart, cross-tab synced; UI prices only |
+| `commerce/shipping.ts` | `src/lib/shipping.ts` | One source of truth for flat-rate shipping |
+| `commerce/rate-limit.ts` | `src/lib/rate-limit.ts` | Per-IP limiter for the checkout route |
+| `commerce/checkout-route.ts` | `src/app/api/checkout/route.ts` | Validates stock + re-prices server-side, returns a Stripe embedded client secret |
+| `commerce/stripe-webhook-route.ts` | `src/app/api/webhooks/stripe/route.ts` | Verifies the signature, fires the Strelva order beacon |
+
+Setup: set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`, point a Stripe webhook
+at `/api/webhooks/stripe` for `checkout.session.completed`, and render Stripe's
+embedded checkout with the returned `clientSecret`. Two TODOs are marked in the
+webhook (order-confirmation email via Resend; itemizing the beacon for
+best-sellers) — wire them per client. Address-based shipping rates (Shippo/USPS)
+replace `shipping.ts` when a client needs them.
+
 ## Full Documentation
 
 See `PROVISIONING.md` in the Scaffold Web repo root for the complete provisioning guide.

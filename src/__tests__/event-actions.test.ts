@@ -197,6 +197,27 @@ describe("resolveEventAction", () => {
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "approved", { actor: "user" });
   });
 
+  it("resolves an approved gbp_post_draft even when read-back verification fails (write succeeded — re-approval would duplicate)", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_p",
+      tenantId: "tenant-a",
+      type: "content_update",
+      status: "pending",
+      metadata: { kind: "gbp_post_draft", summary: "We're open Saturdays now" },
+    });
+    // Google accepted the post (success) but the read-back couldn't confirm it.
+    // createGbpPost has already emitted its own change_verify_failed event; the
+    // approval must still resolve so a re-approval can't create a second post.
+    mockCreateGbpPost.mockResolvedValue({ success: true, verified: false });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_p", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockCreateGbpPost).toHaveBeenCalledOnce();
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_p", "approved", { actor: "user" });
+  });
+
   it("leaves a gbp_hours_draft pending and skips the Google write when hours are malformed", async () => {
     mockGetEvent.mockResolvedValue({
       id: "evt_h",

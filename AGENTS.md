@@ -27,14 +27,14 @@ For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom dom
 - Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript
 - Routing/middleware lives in **`src/proxy.ts`** (Next 16 renamed `middleware.ts` to `proxy.ts`)
 - **Supabase Auth** for auth (`auth.uid()`, Google OAuth + magic-link; see `src/lib/auth.ts`). The Clerk leaf code (webhook route + auth-UI branches + `ClerkProvider`) was **removed 2026-06-22 (#83)**; only `src/proxy.ts` + `src/lib/auth.ts` still import `@clerk`. Remaining teardown = collapse the `auth.ts` Clerk branches, unwrap `clerkMiddleware` in `proxy.ts` (last), and lock the Sanity dataset.
-- **Supabase Postgres is the source of truth for tenant + content + operational data in production** (flipped 2026-06-20). Reads/writes go through `src/lib/db/repositories.ts` + the per-store dual-path, gated by `CONTENT_SOURCE`, `TENANTS_SOURCE`, `DATA_SOURCE` (= `postgres` in prod). Sanity is still written during the transition (reversible) but no migrated store *reads* it when the flags are on. RLS enforces tenant isolation (`supabase/migrations/*_rls.sql`); the dev-file path remains the local-dev fallback.
+- **Supabase Postgres is the source of truth for tenant + content + operational data in production** (flipped 2026-06-20). Reads/writes go through `src/lib/db/repositories.ts` + the per-store dual-path, gated by `CONTENT_SOURCE`, `TENANTS_SOURCE`, `DATA_SOURCE` (= `postgres` in prod). No migrated store *reads* Sanity when the flags are on. **Content writes are Postgres-only — `setContent` does NOT dual-write Sanity** (only the operational stores still shadow-write), so a `CONTENT_SOURCE` flag-flip back to Sanity would serve content frozen at the 2026-06-20 cutover, losing every edit since. Content rollback is forward-only (restore from a Postgres backup), not a flag-flip; this is acceptable because Sanity is being decommissioned. RLS enforces tenant isolation (`supabase/migrations/*_rls.sql`); the dev-file path remains the local-dev fallback.
 - **Upstash Redis** is still the write-through cache for `getContent`/`getPageConfig`/the tenant-config list, plus ephemeral state (rate limits, locks). Operational data also dual-writes to Postgres.
 - Vercel Blob for image uploads
 - Vercel AI SDK v6 + Google Gemini for the agent
 - Stripe for billing (currently off — see "The Model" below for the two-door offer and the billing-on cliff)
 - Resend for email (weekly reports, invites)
 
-> **Migration FLIPPED + live (2026-06-20):** the data + auth backbone is on Supabase Postgres in prod — auth (Supabase), content (`CONTENT_SOURCE=postgres`), tenants (`TENANTS_SOURCE=postgres`), and the operational stores (`DATA_SOURCE=postgres`) all read/write Postgres, verified live. See `docs/supabase-migration-plan.md` + `docs/post-cutover-runbook.md`. **Remaining:** `core.ts` still touches Sanity (the content-store fallback); the full Sanity + Clerk *teardown* (remove reads, lock the Sanity dataset, unwrap `clerkMiddleware` in `proxy.ts`) is the deliberate destructive end-step, not yet done. (`blog.ts` is GONE as of 2026-06-22 — the blog read AND write now go through the Collections CMS / Postgres via `src/lib/cms/blog-public.ts` + the agent's collections-backed blog tools.) Rollback is a flag-flip + redeploy (Sanity stays current via dual-write).
+> **Migration FLIPPED + live (2026-06-20):** the data + auth backbone is on Supabase Postgres in prod — auth (Supabase), content (`CONTENT_SOURCE=postgres`), tenants (`TENANTS_SOURCE=postgres`), and the operational stores (`DATA_SOURCE=postgres`) all read/write Postgres, verified live. See `docs/supabase-migration-plan.md` + `docs/post-cutover-runbook.md`. **Remaining:** `core.ts` still touches Sanity (the content-store fallback); the full Sanity + Clerk *teardown* (remove reads, lock the Sanity dataset, unwrap `clerkMiddleware` in `proxy.ts`) is the deliberate destructive end-step, not yet done. (`blog.ts` is GONE as of 2026-06-22 — the blog read AND write now go through the Collections CMS / Postgres via `src/lib/cms/blog-public.ts` + the agent's collections-backed blog tools.) Rollback of the *operational + tenant* stores is a flag-flip + redeploy (those still shadow-write Sanity). **Content is the exception — Postgres-only, so its rollback is restore-from-backup, not a flag-flip** (see the content-store note above).
 
 ## Multi-tenant architecture
 
@@ -71,6 +71,13 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
   which leaves the event pending if the write fails. Review replies follow the same governed
   path (`review_reply_draft` → `publishReviewReply`). This is the safety invariant — do not
   add a tool that publishes to an external surface without queuing for approval first.
+  - **Resolve on `success`, NOT on `verified`.** These external writes are NON-idempotent
+    (a re-posted GBP update / review reply duplicates), so approval resolution gates on the
+    write being *accepted* (`success`/`published`), not on the read-back confirmation
+    (`verified`). When a write is accepted but the read-back can't confirm it, the write
+    function emits a separate `change_verify_failed` event to surface the gap — keeping the
+    approval pending instead would let a re-approval create a duplicate. Don't "fix" this to
+    gate on `verified`.
 - Governance: `src/lib/ai-governance.ts` decides publish vs review-queue vs block.
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.

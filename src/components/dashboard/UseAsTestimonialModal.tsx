@@ -57,32 +57,18 @@ export function UseAsTestimonialModal({
     setError(null);
 
     try {
-      // Fetch current testimonials
-      const res = await fetch(dashboardHref("/api/content/testimonials"), {
-        credentials: "same-origin",
-      });
-      if (!res.ok) throw new Error("Failed to fetch testimonials");
-      const current = await res.json();
-
-      // Add new testimonial
-      const newTestimonial = {
-        id: `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        quote: quote.trim(),
-        author: author.trim(),
-        location: location.trim() || `via ${review?.source || "review"}`,
-      };
-
-      const updated = {
-        ...current,
-        testimonials: [...(current.testimonials || []), newTestimonial],
-      };
-
-      // Save
-      const saveRes = await fetch(dashboardHref("/api/content/testimonials"), {
-        method: "PUT",
+      // Append atomically server-side (the server reads + merges + writes under
+      // a lock). Sending only the new item avoids the GET-then-PUT lost-update
+      // that dropped a testimonial when two saves landed close together.
+      const saveRes = await fetch(dashboardHref("/api/content/testimonials/append"), {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify(updated),
+        body: JSON.stringify({
+          quote: quote.trim(),
+          author: author.trim(),
+          location: location.trim() || `via ${review?.source || "review"}`,
+        }),
       });
 
       if (!saveRes.ok) throw new Error("Failed to save testimonial");
