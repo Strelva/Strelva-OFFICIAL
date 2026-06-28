@@ -19,6 +19,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
+import { PropertySwitcher } from "./PropertySwitcher";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
 
 /** Ends the active session (Supabase first, Clerk fallback) then returns to sign-in. */
@@ -202,7 +203,7 @@ export function HistorySidebar({
         <div className="flex min-w-0 items-center gap-2.5">
           <SidebarLogo name={ownerName} siteUrl={siteUrl} />
           <div className="min-w-0">
-            <p className="text-[13px] font-medium leading-tight text-warm-black">{ownerName}</p>
+            <PropertySwitcher fallbackName={ownerName} />
             <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "Your dashboard"}</p>
           </div>
         </div>
