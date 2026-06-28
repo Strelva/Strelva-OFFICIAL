@@ -56,11 +56,10 @@ export async function recordOrder(
   const redis = getRedis();
   if (!redis) return null;
 
+  let dedupKey: string | null = null;
   if (input.externalId) {
-    const fresh = await redis.set(`order-ext:${tenant}:${input.externalId}`, "1", {
-      nx: true,
-      ex: ORDER_TTL_SECONDS,
-    });
+    dedupKey = `order-ext:${tenant}:${input.externalId}`;
+    const fresh = await redis.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
     if (!fresh) return null; // already captured this provider order
   }
 
@@ -74,10 +73,18 @@ export async function recordOrder(
     createdAt: new Date().toISOString(),
   };
 
-  await redis.set(orderKey(tenant, order.id), order, { ex: ORDER_TTL_SECONDS });
-  await redis.zadd(ordersKey(tenant), { score: Date.now(), member: order.id });
-  // Cap the index so it can't grow unbounded (the per-order keys TTL out anyway).
-  await redis.zremrangebyrank(ordersKey(tenant), 0, -(ORDER_KEEP + 1));
+  // If a write fails after the externalId dedup lock is set, release it — else a
+  // retry of the same provider order is silently dropped while the record sits
+  // orphaned (set but never indexed → invisible to getOrders).
+  try {
+    await redis.set(orderKey(tenant, order.id), order, { ex: ORDER_TTL_SECONDS });
+    await redis.zadd(ordersKey(tenant), { score: Date.now(), member: order.id });
+    // Cap the index so it can't grow unbounded (the per-order keys TTL out anyway).
+    await redis.zremrangebyrank(ordersKey(tenant), 0, -(ORDER_KEEP + 1));
+  } catch (err) {
+    if (dedupKey) await redis.del(dedupKey).catch(() => {});
+    throw err;
+  }
   return order;
 }
 
