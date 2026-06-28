@@ -19,6 +19,16 @@ export type CollectionType = "blog" | "video" | "product";
 const tags = z.array(z.string().min(1)).default([]);
 const optionalUrl = z.string().url().optional();
 
+// A storefront image reference: an absolute URL OR a root-relative path. Client
+// repos serve product images from their own /public (e.g. "/images/bag.png"), so
+// requiring a fully-qualified URL would make real catalogs unrepresentable.
+const imageRef = z
+  .string()
+  .min(1)
+  .refine((s) => /^https?:\/\//i.test(s) || s.startsWith("/"), {
+    message: "image must be an absolute URL or a root-relative path (/...)",
+  });
+
 const blogSchema = z.object({
   title: z.string().min(1),
   excerpt: z.string().default(""),
@@ -43,7 +53,7 @@ const productSchema = z.object({
   description: z.string().default(""),
   priceCents: z.number().int().nonnegative(),
   currency: z.string().default("USD"),
-  images: z.array(z.string().url()).default([]),
+  images: z.array(imageRef).default([]),
   inStock: z.boolean().default(true),
   checkoutUrl: optionalUrl,
 });

@@ -35,6 +35,14 @@ describe("validateEntryData", () => {
     expect(validateEntryData("product", { name: "p", priceCents: -1 }).success).toBe(false);
     expect(validateEntryData("product", { name: "p", priceCents: 100 }).success).toBe(true);
   });
+
+  it("accepts product images as root-relative paths or absolute URLs, rejects garbage", () => {
+    // Client repos serve product images from their own /public — so a relative
+    // path must validate (the migration would otherwise drop real catalog images).
+    expect(validateEntryData("product", { name: "p", priceCents: 1, images: ["/images/bag.png"] }).success).toBe(true);
+    expect(validateEntryData("product", { name: "p", priceCents: 1, images: ["https://cdn.x/y.png"] }).success).toBe(true);
+    expect(validateEntryData("product", { name: "p", priceCents: 1, images: ["not a path"] }).success).toBe(false);
+  });
 });
 
 describe("entryTitle", () => {
