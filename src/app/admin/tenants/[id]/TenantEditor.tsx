@@ -44,7 +44,10 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           productionDomain: form.productionDomain || undefined,
           adminDomain: form.adminDomain || undefined,
           subscriptionStatus: form.subscriptionStatus,
-          planOverride: form.planOverride || undefined,
+          // Send the raw value (incl. "") so un-checking founder-comp actually
+          // clears it. `|| undefined` stripped the empty string from the body,
+          // so the row never got written back to "" and the comp never lifted.
+          planOverride: form.planOverride,
           active: form.active,
         }),
       });
