@@ -5,7 +5,7 @@ import {
   scaffoldRoutes,
   signRevalidationBody,
   verifyRevalidationSignature,
-} from "./scaffold-contracts";
+} from "../lib/scaffold-contracts";
 
 describe("Strelva/GLDF contract", () => {
   it("signs and verifies revalidation payloads", () => {
