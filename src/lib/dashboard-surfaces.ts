@@ -127,10 +127,10 @@ export function getDashboardSurfaces({
       state: !local ? "hidden" : gbpConnected ? "shown" : "connect",
       group: "presence",
     },
-    { id: "analytics", label: "Analytics", href: "/dashboard/reports", state: "shown", group: "presence" },
     {
       id: "reviews",
       label: "Reviews",
+      // Sits right under Google Business (reviews come from the GBP listing).
       // Always the Reviews surface — its empty state pitches connecting Google,
       // so a "connect" tab lands on reviews (not the generic integrations list).
       href: "/dashboard/reviews",
@@ -138,6 +138,7 @@ export function getDashboardSurfaces({
       state: reviewsReady ? "shown" : local ? "connect" : "hidden",
       group: "presence",
     },
+    { id: "analytics", label: "Analytics", href: "/dashboard/reports", state: "shown", group: "presence" },
     // Site health — the daily scan engine (speed, security, SEO, accessibility),
     // the same checks behind the public audit. Always relevant: every site is scanned.
     { id: "health", label: "Health", href: "/dashboard/health", state: "shown", group: "presence" },

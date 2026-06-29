@@ -50,13 +50,15 @@ interface HistorySidebarProps {
   /** The signed-in person — shown bottom-left as "Hello, {first name}". */
   accountName: string;
   accountEmail?: string | null;
+  isSuperAdmin?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
 }
 
 /** The client's favicon as their logo, derived from their site domain. Falls back
- *  to the name's initial if there's no domain or the favicon fails to load. */
+ *  to the name's initial if there's no domain or the favicon fails to load.
+ *  Sits on a light chip so a dark logo (e.g. Rohlax) stays visible on the dark UI. */
 function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
   const [failed, setFailed] = useState(false);
   let host = "";
@@ -69,7 +71,7 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
 
   if (favicon && !failed) {
     return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-warm-white">
         <img
           src={favicon}
           alt=""
@@ -83,7 +85,7 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
   }
 
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised text-[11px] font-semibold text-warm-black">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-warm-white text-[11px] font-semibold text-surface-base">
       {(name || "S").slice(0, 1).toUpperCase()}
     </div>
   );
@@ -93,6 +95,7 @@ export function HistorySidebar({
   businessName,
   accountName,
   accountEmail,
+  isSuperAdmin = false,
   isOpen = true,
   onClose,
   pendingCount = 0,
@@ -345,9 +348,16 @@ export function HistorySidebar({
             <p className="truncate text-[12px] font-medium text-warm-black leading-tight">
               Hello, {firstName}
             </p>
-            {accountEmail && (
-              <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
-            )}
+            <div className="flex items-center gap-1.5">
+              {accountEmail && (
+                <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
+              )}
+              {isSuperAdmin && (
+                <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+                  Admin
+                </span>
+              )}
+            </div>
           </div>
           <Link
             href={dashboardHref("/dashboard/settings")}

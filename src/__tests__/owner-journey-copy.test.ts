@@ -221,8 +221,9 @@ describe("owner journey copy and links", () => {
     const ownershipPage = readRepoFile("src/components/dashboard/OwnershipSection.tsx");
     const settingsPage = readRepoFile("src/app/dashboard/settings/page.tsx");
 
-    expect(settingsPage).toContain('{ id: "ownership", label: "Ownership" }');
-    expect(settingsPage).toContain("/dashboard/settings#ownership");
+    // Ownership is intentionally dropped from the settings nav (kept as a
+    // component for later) — extensive and not needed in the day-to-day surface.
+    expect(settingsPage).not.toContain('{ id: "ownership", label: "Ownership" }');
     expect(ownershipPage).toContain("Your business owns");
     expect(ownershipPage).toContain("Strelva manages");
     expect(ownershipPage).toContain("Export content");

@@ -84,11 +84,9 @@ export default async function DashboardLayout({
     ? localClientPreviewUrl || ""
     : tenantEditablePreviewUrl;
   let siteName = "Your Business";
-  let ownerName = "";
   try {
     const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
-    ownerName = settings.ownerName || ownerName;
   } catch {}
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
@@ -111,12 +109,19 @@ export default async function DashboardLayout({
     connections,
     hasCommerce: products.length > 0,
   });
-  // The signed-in person, for the sidebar's "Hello, {name}" account footer —
-  // distinct from the business shown up top. Prefer the configured owner name,
-  // fall back to the email's local-part, then a neutral greeting.
+  // The signed-in PERSON, for the sidebar's "Hello, {name}" account footer —
+  // this is the login identity, NOT the tenant's owner-name setting, so a
+  // super-admin sees their own name across every client they open. Falls back
+  // to the email local-part, then "Noah" under the local dev bypass.
   const accountEmail = actor.email && actor.email.includes("@") ? actor.email : null;
-  const rawAccount = ownerName.trim() || (accountEmail ? accountEmail.split("@")[0] : "");
-  const accountName = rawAccount ? rawAccount.charAt(0).toUpperCase() + rawAccount.slice(1) : "there";
+  const isAdmin = actor.isSuperAdmin || devAccessBypass;
+  const rawAccount =
+    actor.name?.trim() ||
+    (accountEmail ? accountEmail.split("@")[0] : "") ||
+    (devAccessBypass ? "Noah" : "");
+  const accountName = rawAccount
+    ? rawAccount.charAt(0).toUpperCase() + rawAccount.slice(1)
+    : isAdmin ? "Admin" : "there";
 
   return (
     <DashboardProvider
@@ -132,7 +137,9 @@ export default async function DashboardLayout({
       planOverride={tenantConfig?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax" ? "founder_comp" : null}
       impersonation={{
         isActive: actor.isImpersonating,
-        actorEmail: actor.email,
+        actorEmail: accountEmail,
+        actorName: accountName,
+        isSuperAdmin: isAdmin,
         tenantId: tenant,
       }}
       // The public demo is read-only for prospects, but the internal dev-access
@@ -161,6 +168,7 @@ export default async function DashboardLayout({
           businessName={siteName}
           accountName={accountName}
           accountEmail={accountEmail}
+          isSuperAdmin={isAdmin}
           pendingCount={pendingCount}
         >
           {children}

@@ -72,14 +72,11 @@ type IdentityField = {
   mono?: boolean;
 };
 
-/** Personal — the signed-in person, kept separate from the business below. */
-const PERSONAL_FIELDS: readonly IdentityField[] = [
-  { key: "ownerName", label: "Your name", description: "How Strelva greets you here — “Hello, {name}”" },
-];
-
-/** Business — the public-facing identity of the business this account manages. */
+/** Business — the public-facing identity of the business this account manages.
+ *  (The personal greeting comes from the login, shown read-only in Account.) */
 const BUSINESS_FIELDS: readonly IdentityField[] = [
   { key: "siteName", label: "Business name", description: "Your business name" },
+  { key: "ownerName", label: "Owner name", description: "Primary contact for the business" },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
   { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
@@ -166,7 +163,8 @@ const SETTINGS_SECTIONS = [
   { id: "site-config", label: "Site config" },
   { id: "dependencies", label: "Services" },
   { id: "utilities", label: "Shortcuts" },
-  { id: "ownership", label: "Ownership" },
+  // Ownership intentionally dropped from the nav (kept as a component for later);
+  // it was extensive and not needed in the day-to-day surface right now.
   { id: "domains", label: "Domains" },
   { id: "billing", label: "Billing" },
 ] as const;
@@ -322,6 +320,43 @@ function ProfileSection({
         ))}
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account section — read-only login identity (who you are, not the business)
+// ---------------------------------------------------------------------------
+
+function AccountSection() {
+  const dashboard = useDashboardOptional();
+  const name = dashboard?.impersonation.actorName?.trim() || "You";
+  const email = dashboard?.impersonation.actorEmail || null;
+  const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
+
+  return (
+    <div className="rounded-xl border border-gray-border bg-surface-raised p-5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-semibold text-accent">
+          {(name[0] || "U").toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
+            {isAdmin && (
+              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+                Strelva Admin
+              </span>
+            )}
+          </div>
+          {email && <p className="truncate text-[12px] text-gray-muted">{email}</p>}
+        </div>
+      </div>
+      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
+        This is the account you&apos;re signed in with — it stays the same across every
+        business you can access. Your business&apos;s public details live in{" "}
+        <span className="text-warm-white">Business info</span>.
+      </p>
+    </div>
   );
 }
 
@@ -628,6 +663,7 @@ function NavigationFooterSection() {
   const apiPath = useDashboardApiPath();
   const [navigation, setNavigation] = useState<NavigationData | null>(null);
   const [footer, setFooter] = useState<FooterData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   useEffect(() => {
@@ -637,7 +673,7 @@ function NavigationFooterSection() {
     ]).then(([nav, foot]) => {
       setNavigation(nav);
       setFooter(foot);
-    }).catch(() => setSaveStatus("error"));
+    }).catch(() => setSaveStatus("error")).finally(() => setLoading(false));
   }, [apiPath]);
 
   const saveContent = useCallback(async (section: "navigation" | "footer", data: NavigationData | FooterData) => {
@@ -656,8 +692,20 @@ function NavigationFooterSection() {
     }
   }, [apiPath]);
 
-  if (!navigation || !footer) {
+  if (loading) {
     return <SkeletonLine width="w-full" height="h-20" />;
+  }
+
+  if (!navigation || !footer) {
+    return (
+      <div className="rounded-lg border border-gray-border bg-surface-raised px-5 py-6 text-center">
+        <p className="text-[13px] font-medium text-warm-white">Navigation &amp; footer aren&apos;t editable here</p>
+        <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
+          This site&apos;s menu and footer are managed in its code. Ask the AI in chat to change a
+          link or label and we&apos;ll handle it.
+        </p>
+      </div>
+    );
   }
 
   const updateNavItem = (index: number, key: "label" | "href", value: string) => {
@@ -1393,15 +1441,16 @@ export default function SettingsPage() {
           )}
 
           {/* Section content */}
-          {(activeSection === "account" || activeSection === "profile") && settings && (
+          {activeSection === "account" && <AccountSection />}
+          {activeSection === "profile" && settings && (
             <ProfileSection
               settings={settings}
               setSettings={setSettings}
-              fields={activeSection === "account" ? PERSONAL_FIELDS : BUSINESS_FIELDS}
+              fields={BUSINESS_FIELDS}
               readOnly={readOnly}
             />
           )}
-          {(activeSection === "account" || activeSection === "profile") && !settings && (
+          {activeSection === "profile" && !settings && (
             <div className="space-y-4 animate-pulse">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="h-12 bg-surface-raised rounded-lg" />

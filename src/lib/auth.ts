@@ -27,7 +27,18 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Supabase Auth user shape we rely on (subset of @supabase/supabase-js User). */
-type SupabaseAuthUser = { id: string; email?: string | null; email_confirmed_at?: string | null };
+type SupabaseAuthUser = {
+  id: string;
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  user_metadata?: { full_name?: string | null; name?: string | null } | null;
+};
+
+/** Best display name for a Supabase user (Google OAuth fills user_metadata). */
+function supabaseDisplayName(user: SupabaseAuthUser): string | null {
+  const meta = user.user_metadata;
+  return meta?.full_name?.trim() || meta?.name?.trim() || null;
+}
 
 /** Verified email for a Supabase user, or null. Enforces the verified-email gate:
  *  an unconfirmed email never grants invite-claim or super-admin matching. */
@@ -82,6 +93,8 @@ const PERMISSION_MIN_ROLE: Record<TenantPermission, ClientRole> = {
 export interface ActorContext {
   userId: string | null;
   email: string | null;
+  /** Display name from the auth provider (Google OAuth), or null. */
+  name: string | null;
   type: "anonymous" | "user" | "super_admin" | "system";
   isSuperAdmin: boolean;
   isImpersonating: boolean;
@@ -291,6 +304,7 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
     return {
       userId: "dev-access-bypass",
       email: "dev-access-bypass",
+      name: null,
       type: "system",
       isSuperAdmin: false,
       isImpersonating: false,
@@ -304,6 +318,7 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
     return {
       userId: user?.id ?? null,
       email,
+      name: user ? supabaseDisplayName(user) : null,
       type: admin ? "super_admin" : user ? "user" : "anonymous",
       isSuperAdmin: admin,
       isImpersonating: Boolean(admin && tenant),
@@ -316,10 +331,12 @@ export async function getActorContext(tenant?: string): Promise<ActorContext> {
   // which a user could influence by reordering/adding unverified addresses).
   const email = getUserEmailAddresses(user)[0] || null;
   const admin = email ? await isSuperAdmin() : false;
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() || null;
 
   return {
     userId,
     email,
+    name,
     type: admin ? "super_admin" : userId ? "user" : "anonymous",
     isSuperAdmin: admin,
     isImpersonating: Boolean(admin && tenant),

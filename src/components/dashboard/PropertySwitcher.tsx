@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
@@ -16,6 +16,10 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
   const { tenantId, dashboardHref } = useDashboard();
   const [properties, setProperties] = useState<Property[] | null>(null);
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // The menu is position:fixed so the sidebar's overflow-auto can't clip it;
+  // we anchor it to the trigger's viewport rect on open.
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -45,11 +49,20 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
     );
   }
 
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: r.bottom + 8, left: r.left });
+    }
+    setOpen((o) => !o);
+  };
+
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className="group flex max-w-full items-center gap-1.5 text-left"
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -60,10 +73,13 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
         <ChevronsUpDown className="size-3.5 shrink-0 text-gray-muted transition-colors group-hover:text-warm-black" />
       </button>
 
-      {open && (
+      {open && menuPos && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-glass-border bg-[var(--cream-mid)] shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            className="fixed z-[61] w-64 overflow-hidden rounded-xl border border-glass-border bg-[var(--cream-mid)] shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
+            style={{ top: menuPos.top, left: menuPos.left }}
+          >
             <p className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-muted">
               Switch property
             </p>

@@ -12,6 +12,7 @@ interface ConversationShellProps {
   businessName: string;
   accountName: string;
   accountEmail?: string | null;
+  isSuperAdmin?: boolean;
   pendingCount?: number;
 }
 
@@ -20,6 +21,7 @@ export function ConversationShell({
   businessName,
   accountName,
   accountEmail,
+  isSuperAdmin = false,
   pendingCount = 0,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +34,7 @@ export function ConversationShell({
         businessName={businessName}
         accountName={accountName}
         accountEmail={accountEmail}
+        isSuperAdmin={isSuperAdmin}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}

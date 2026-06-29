@@ -14,6 +14,10 @@ type EditReceiptSource = "field_editor" | "inline_canvas" | "layout_editor" | "a
 export interface ImpersonationContext {
   isActive: boolean;
   actorEmail: string | null;
+  /** The signed-in person's display name (login identity, not the tenant). */
+  actorName: string | null;
+  /** Whether the signed-in person is a Strelva super-admin. */
+  isSuperAdmin: boolean;
   tenantId: string;
 }
 
@@ -348,7 +352,7 @@ export function DashboardProvider({
       subscriptionStatus,
       hasStripeCustomer,
       planOverride,
-      impersonation: impersonation || { isActive: false, actorEmail: null, tenantId },
+      impersonation: impersonation || { isActive: false, actorEmail: null, actorName: null, isSuperAdmin: false, tenantId },
       readOnly,
     }),
     [
