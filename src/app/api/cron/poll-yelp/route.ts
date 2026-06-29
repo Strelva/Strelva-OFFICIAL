@@ -7,6 +7,10 @@ import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 const YELP_API_BASE = "https://api.yelp.com/v3";
 
 interface YelpReview {

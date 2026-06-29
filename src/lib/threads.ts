@@ -10,6 +10,11 @@ import { promises as fs } from "fs";
 import path from "path";
 import { getRedis } from "./redis";
 
+// Chat threads expire after 90 days and the per-tenant index is capped, so they
+// can't grow unbounded and LRU-evict hotter cache (rate limits, locks, content).
+const THREAD_TTL_SECONDS = 90 * 24 * 60 * 60;
+const THREAD_KEEP = 200;
+
 // --- Types ---
 
 export interface ChatMessage {
@@ -155,11 +160,12 @@ export async function createThread(
 
   if (redis) {
     try {
-      await redis.set(threadKey(tenant, thread.id), thread);
+      await redis.set(threadKey(tenant, thread.id), thread, { ex: THREAD_TTL_SECONDS });
       await redis.zadd(indexKey(tenant), {
         score: Date.now(),
         member: thread.id,
       });
+      await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
       return thread;
     } catch {
       // Redis failed, fall through to dev file
@@ -195,11 +201,12 @@ export async function updateThread(
 
   if (redis) {
     try {
-      await redis.set(threadKey(tenant, threadId), updated);
+      await redis.set(threadKey(tenant, threadId), updated, { ex: THREAD_TTL_SECONDS });
       await redis.zadd(indexKey(tenant), {
         score: Date.now(),
         member: threadId,
       });
+      await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
       return updated;
     } catch {
       // Redis failed, fall through to dev file

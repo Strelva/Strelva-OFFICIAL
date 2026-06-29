@@ -13,22 +13,26 @@ function briefsKey(tenantId: string): string {
 }
 
 function getWeekBounds(date: Date = new Date()): { weekStart: string; weekEnd: string } {
+  // All UTC: mixing local getDay/setDate/setHours with toISOString (UTC) shifted
+  // the boundary by a day in any non-UTC environment (a Sunday 23:59 local =
+  // Monday UTC → "double Sunday" / 8-day window). Prod is UTC so it was correct
+  // there, but dev and any non-UTC deploy mis-counted. UTC arithmetic is stable.
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
   const thisMonday = new Date(d);
-  thisMonday.setDate(diff);
-  thisMonday.setHours(0, 0, 0, 0);
+  thisMonday.setUTCDate(diff);
+  thisMonday.setUTCHours(0, 0, 0, 0);
 
   // The Monday report covers the week that JUST ENDED — previous Mon→Sun. The
   // just-started week (Monday 00:00 → upcoming Sun) would be near-empty and read
   // ~0 for every event metric (reviews, content updates, verified changes).
   const monday = new Date(thisMonday);
-  monday.setDate(thisMonday.getDate() - 7);
+  monday.setUTCDate(thisMonday.getUTCDate() - 7);
 
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  sunday.setUTCHours(23, 59, 59, 999);
 
   return {
     weekStart: monday.toISOString().split("T")[0],

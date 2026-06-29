@@ -22,6 +22,10 @@ import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getTenantConfig } from "@/lib/tenants";
 import type { Connection } from "@/lib/types";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 interface GoogleReview {

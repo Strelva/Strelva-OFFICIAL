@@ -16,6 +16,10 @@ import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { postSlack, readAndResetDailyCounts } from "@/lib/proof-signals";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 function yesterdayKey(): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 1);

@@ -117,8 +117,15 @@ export async function PUT(
     const changes = diffFields(current, parsed.data as Record<string, unknown>);
 
     await setContent(s, parsed.data as ContentMap[typeof s], tenant);
-    await appendVersion(s, parsed.data, actor.isImpersonating ? "admin" : "user", tenant, changes);
-    await recordSectionUpdate(s, tenant);
+    // Content is now live. Version history + the section timestamp are
+    // bookkeeping — if one throws here, DON'T 500 (that would tell the owner the
+    // save failed when it actually succeeded, and they'd retry / lose trust).
+    try {
+      await appendVersion(s, parsed.data, actor.isImpersonating ? "admin" : "user", tenant, changes);
+      await recordSectionUpdate(s, tenant);
+    } catch (err) {
+      console.error("[content PUT] post-write bookkeeping failed (content IS saved):", s, err);
+    }
     await logActivity({
       text: actor.isImpersonating ? `Strelva admin updated ${s}` : `Updated ${s} via admin`,
       time: new Date().toISOString(),

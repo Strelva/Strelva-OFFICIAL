@@ -9,6 +9,10 @@ import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText, escapeHtml } from "@/lib/invite-email";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
   // The summary can echo tenant-authored content (service names, search queries)
   // via the deterministic fallback or the Gemini output, and siteName is

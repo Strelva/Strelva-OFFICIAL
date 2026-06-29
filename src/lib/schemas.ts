@@ -97,7 +97,9 @@ export const storySchema = z.object({
 export const testimonialItemSchema = z.object({
   id: z.string().max(10000).min(1),
   quote: z.string().max(10000).min(1),
-  author: z.string().max(10000),
+  // author required (non-empty) — the append path already rejects empty; the PUT
+  // path must match so a blank author can't slip in via a full-section save.
+  author: z.string().max(10000).min(1),
   location: z.string().max(10000),
 });
 

@@ -147,6 +147,8 @@ export async function revalidateClientSite(
         method: "POST",
         headers: signed.headers,
         body: signed.body,
+        // A hung client site must not block the (sequential) reconcile batch.
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!response.ok) {
