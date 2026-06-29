@@ -274,7 +274,11 @@ async function recordBuildPayment(
       body: JSON.stringify({
         text: `💸 Build payment received — ${amountLabel} (${who}). Session ${session.id}.`,
       }),
-    }).catch(() => {});
+    }).catch((err) =>
+      // The comment above promises "never silent" — honor it. The durable trail
+      // is already written; this just makes a missed ping visible in logs.
+      console.error(`[billing webhook] Slack payment ping failed for session ${session.id}:`, err),
+    );
   }
 
   // 3. Tenant event (only when we know the tenant) for the activity log.

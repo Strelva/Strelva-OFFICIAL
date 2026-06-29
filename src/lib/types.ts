@@ -528,6 +528,8 @@ export interface TenantConfig {
   industry: string;
   active: boolean;
   createdAt: string;
+  /** Last write timestamp (the tenants.updated_at column). */
+  updatedAt?: string;
   template: TemplateId;
   /** Custom repos are the default delivery model for paid clients. */
   deliveryModel?: TenantDeliveryModel;

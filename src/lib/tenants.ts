@@ -25,6 +25,7 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     industry: r.industry ?? "",
     active: r.active,
     createdAt: r.created_at,
+    updatedAt: r.updated_at,
     template: (r.template ?? "wellness") as TemplateId,
     deliveryModel: (r.delivery_model as TenantDeliveryModel) ?? undefined,
     customRepo: (r.custom_repo as TenantConfig["customRepo"]) ?? undefined,
@@ -74,6 +75,9 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
     id: t.id,
     site_name: t.siteName ?? "",
     created_at: t.createdAt ?? new Date().toISOString().slice(0, 10),
+    // Stamp the last-write time on every upsert (the column existed but was
+    // never set, so updated_at was frozen at row creation).
+    updated_at: new Date().toISOString(),
   };
   if (t.siteName !== undefined) row.site_name = t.siteName;
   if (t.ownerName !== undefined) row.owner_name = t.ownerName;

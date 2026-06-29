@@ -48,11 +48,17 @@ export async function createTenantSubscriptionCheckout(
   let customerId = tenant.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: input.customerEmail || tenant.ownerEmail,
-      name: input.customerName || tenant.ownerName,
-      metadata: { tenantId: tenant.id },
-    });
+    const customer = await stripe.customers.create(
+      {
+        email: input.customerEmail || tenant.ownerEmail,
+        name: input.customerName || tenant.ownerName,
+        metadata: { tenantId: tenant.id },
+      },
+      // Idempotency key keyed on the tenant — two concurrent checkouts for the
+      // same tenant return the SAME Stripe customer instead of creating a
+      // duplicate (the second updateTenant would orphan the first).
+      { idempotencyKey: `tenant-customer-${tenant.id}` },
+    );
     customerId = customer.id;
     await updateTenant(tenant.id, { stripeCustomerId: customerId });
   }

@@ -80,7 +80,11 @@ export async function POST(request: Request) {
     },
     "platform",
     tenantConfig,
-  ).catch(() => {});
+  ).catch((err) => {
+    // A handoff request that doesn't reach Jacob is a real miss — the queue
+    // event is the durable record, but the Slack ping must not fail silently.
+    console.error(`[offboarding/request] Slack handoff ping failed for ${tenant}:`, err);
+  });
 
   return NextResponse.json({
     ok: true,
