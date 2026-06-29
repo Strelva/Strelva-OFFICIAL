@@ -14,6 +14,7 @@ const SUBNAVS: { href: string; label: string }[][] = [
     { href: "/dashboard/site", label: "Preview" },
     { href: "/dashboard/collections", label: "Content" },
     { href: "/dashboard/assets", label: "Media" },
+    { href: "/dashboard/history", label: "History" },
   ],
 ];
 

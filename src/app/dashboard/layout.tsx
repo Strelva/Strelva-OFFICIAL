@@ -84,9 +84,11 @@ export default async function DashboardLayout({
     ? localClientPreviewUrl || ""
     : tenantEditablePreviewUrl;
   let siteName = "Your Business";
+  let settingsBusinessModel = "";
   try {
     const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
+    settingsBusinessModel = settings.businessModel || "";
   } catch {}
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
@@ -104,8 +106,18 @@ export default async function DashboardLayout({
   // what's connected. Falls back to a local-business default if config is missing.
   // Store shows when the tenant actually has products (the truth signal), not
   // just when a features flag is set — so a real ecom client always gets it.
+  // An explicit "business type" from Business info (Local/Online/Both) wins over
+  // the template guess, so an online-only brand never sees Google Business or
+  // Reviews surfaces it can't use.
+  const businessModel =
+    settingsBusinessModel === "local" || settingsBusinessModel === "online" || settingsBusinessModel === "hybrid"
+      ? settingsBusinessModel
+      : undefined;
   const surfaces = getVisibleSurfaces({
-    tenantConfig: tenantConfig ?? { template: "wellness" },
+    tenantConfig: {
+      ...(tenantConfig ?? { template: "wellness" }),
+      ...(businessModel ? { businessModel } : {}),
+    },
     connections,
     hasCommerce: products.length > 0,
   });

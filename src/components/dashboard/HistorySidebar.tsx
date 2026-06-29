@@ -9,6 +9,8 @@ import {
   LogOut,
   Plus,
   Inbox,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { PropertySwitcher } from "./PropertySwitcher";
@@ -51,6 +53,10 @@ interface HistorySidebarProps {
   accountName: string;
   accountEmail?: string | null;
   isSuperAdmin?: boolean;
+  /** Admin "view as client" preview is on — hide the Admin badge. */
+  viewAsClient?: boolean;
+  /** Provided only for admins; toggles the client-preview mode. */
+  onToggleViewAsClient?: () => void;
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
@@ -96,6 +102,8 @@ export function HistorySidebar({
   accountName,
   accountEmail,
   isSuperAdmin = false,
+  viewAsClient = false,
+  onToggleViewAsClient,
   isOpen = true,
   onClose,
   pendingCount = 0,
@@ -113,7 +121,6 @@ export function HistorySidebar({
     siteHost = "";
   }
   const firstName = accountName.trim().split(/\s+/)[0] || "there";
-  const accountInitial = (accountName.trim()[0] || "U").toUpperCase();
   const surfaces = useDashboardSurfaces();
   const navGroups = (["manage", "presence"] as const)
     .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
@@ -338,12 +345,7 @@ export function HistorySidebar({
 
       {/* Account footer — the signed-in person (separate from the business up top). */}
       <div className="p-3 border-t border-glass-border mt-auto">
-        <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-          <div className="w-8 h-8 rounded-full bg-accent-dim flex items-center justify-center shrink-0">
-            <span className="text-[12px] font-semibold text-accent">
-              {accountInitial}
-            </span>
-          </div>
+        <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-medium text-warm-black leading-tight">
               Hello, {firstName}
@@ -352,18 +354,39 @@ export function HistorySidebar({
               {accountEmail && (
                 <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
               )}
-              {isSuperAdmin && (
+              {isSuperAdmin && !viewAsClient && (
                 <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
                   Admin
                 </span>
               )}
+              {isSuperAdmin && viewAsClient && (
+                <span className="shrink-0 rounded-full bg-gray-bg px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-gray-muted">
+                  Client view
+                </span>
+              )}
             </div>
           </div>
+          {onToggleViewAsClient && (
+            <button
+              type="button"
+              onClick={onToggleViewAsClient}
+              className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
+                viewAsClient
+                  ? "text-accent bg-accent-dim"
+                  : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
+              }`}
+              title={viewAsClient ? "Exit client view" : "View as client"}
+              aria-label={viewAsClient ? "Exit client view" : "View as client"}
+              aria-pressed={viewAsClient}
+            >
+              {viewAsClient ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
+            </button>
+          )}
           <Link
             href={dashboardHref("/dashboard/settings")}
             prefetch={false}
             onClick={onClose}
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
               effectivePathname?.startsWith("/dashboard/settings")
                 ? "text-warm-black bg-gray-bg"
                 : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
@@ -377,7 +400,7 @@ export function HistorySidebar({
             onClick={() => {
               void signOutEverywhere();
             }}
-            className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
             title="Sign out"
             aria-label="Sign out"
           >

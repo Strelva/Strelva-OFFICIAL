@@ -8,14 +8,12 @@ import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
-import { getLatestSiteSnapshot } from "@/lib/storage";
 import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
-import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 
 function StatTile({
@@ -63,7 +61,6 @@ async function DashboardHome({
     activity,
     brief,
     tenantConfig,
-    latestSnapshot,
     template,
     retentionSignals,
     leadSummary,
@@ -74,7 +71,6 @@ async function DashboardHome({
     getActivity(tenant, { actor: "ai" }).catch(() => []),
     getWeeklyBrief(tenant).catch(() => null),
     getTenantConfig(tenant).catch(() => null),
-    getLatestSiteSnapshot(tenant).catch(() => null),
     getTemplateForTenant(tenant).catch(() => null),
     getOwnerRetentionSignals(tenant).catch(() => ({
       aiChangesThisWeek: 0,
@@ -93,7 +89,6 @@ async function DashboardHome({
     })),
     getLeadSummary(tenant, 30).catch(() => ({ count: 0, recent: [] })),
   ]);
-  const recentAiChanges = activity.slice(0, 3);
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : getTenantPublicUrlFromDomainMap(tenant);
@@ -371,7 +366,7 @@ async function DashboardHome({
           </section>
           ) : null}
 
-          <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <section>
           <div className="rounded-2xl border border-glass-border bg-glass p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -404,38 +399,6 @@ async function DashboardHome({
               )}
             </div>
           </div>
-
-          <SiteSafetyPanel latestSnapshot={latestSnapshot} />
-          </section>
-
-          <section className="rounded-2xl border border-glass-border bg-glass p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-                What changed
-              </p>
-              <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">Recent changes</h2>
-            </div>
-            <Link href={dashboardHref("/dashboard/reports")} className="text-[12px] font-medium text-accent hover:text-accent/80">
-              Analytics
-            </Link>
-          </div>
-          {recentAiChanges.length > 0 ? (
-            <div className="grid gap-2 md:grid-cols-3">
-              {recentAiChanges.map((entry) => (
-                <div key={`${entry.time}-${entry.text}`} className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-2">
-                  <p className="line-clamp-2 text-[13px] text-warm-black">{entry.text}</p>
-                  <p className="mt-1 text-[10px] text-gray-faint">{new Date(entry.time).toLocaleDateString()}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-              {isFresh
-                ? "Your site is live and ready. Ask the AI for your first update — every change you make shows up here as your proof trail."
-                : "No updates yet. Ask for one small update or edit the site directly, then this becomes your proof trail."}
-            </p>
-          )}
           </section>
         </div>
       </div>

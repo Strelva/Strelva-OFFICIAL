@@ -25,6 +25,10 @@ export function ConversationShell({
   pendingCount = 0,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Admins can preview the dashboard exactly as the client sees it — hides the
+  // admin chrome (impersonation banner + Admin badge). Cosmetic only; it changes
+  // nothing about permissions or what the API will accept.
+  const [viewAsClient, setViewAsClient] = useState(false);
   const { impersonation } = useDashboard();
 
   return (
@@ -35,6 +39,8 @@ export function ConversationShell({
         accountName={accountName}
         accountEmail={accountEmail}
         isSuperAdmin={isSuperAdmin}
+        viewAsClient={viewAsClient}
+        onToggleViewAsClient={isSuperAdmin ? () => setViewAsClient((v) => !v) : undefined}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}
@@ -42,7 +48,7 @@ export function ConversationShell({
 
       {/* Main content area */}
       <main id="main-content" className="flex-1 flex flex-col min-w-0 dashboard-gradient">
-        {impersonation.isActive && (
+        {impersonation.isActive && !viewAsClient && (
           <div className="shrink-0 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2 text-amber-100">
             <div className="flex items-center gap-2 text-[12px]">
               <ShieldAlert className="h-4 w-4 text-amber-200" strokeWidth={1.7} />

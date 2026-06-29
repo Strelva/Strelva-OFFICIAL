@@ -70,6 +70,8 @@ type IdentityField = {
   description: string;
   multiline?: boolean;
   mono?: boolean;
+  /** When set, the field renders as a dropdown instead of a text input. */
+  options?: { value: string; label: string }[];
 };
 
 /** Business — the public-facing identity of the business this account manages.
@@ -77,6 +79,17 @@ type IdentityField = {
 const BUSINESS_FIELDS: readonly IdentityField[] = [
   { key: "siteName", label: "Business name", description: "Your business name" },
   { key: "ownerName", label: "Owner name", description: "Primary contact for the business" },
+  {
+    key: "businessModel",
+    label: "Business type",
+    description: "Sets whether Google Business & Reviews apply to you",
+    options: [
+      { value: "", label: "Auto (based on your site)" },
+      { value: "local", label: "Local — customers visit or I serve an area" },
+      { value: "online", label: "Online only — no physical/local presence" },
+      { value: "hybrid", label: "Both online and local" },
+    ],
+  },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
   { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
@@ -285,7 +298,17 @@ function ProfileSection({
             description={field.description}
             last={i === fields.length - 1}
           >
-            {field.multiline ? (
+            {field.options ? (
+              <DashSelect
+                value={settings[field.key] || ""}
+                onChange={(e) => {
+                  handleChange(field.key, e.target.value);
+                  saveSettings(latestRef.current);
+                }}
+                disabled={readOnly}
+                options={field.options}
+              />
+            ) : field.multiline ? (
               <textarea
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
@@ -1236,6 +1259,11 @@ function BillingSection() {
           <p className="text-[12px] text-gray-faint">
             {copy.note}
           </p>
+          {!isFounderComp && dashboard?.hasStripeCustomer && (
+            <p className="mt-1 text-[12px] text-gray-faint">
+              Manage billing opens your secure Stripe portal to update payment, change plan, or cancel.
+            </p>
+          )}
           {billingError && (
             <p className="mt-3 text-[12px] text-amber-300">{billingError}</p>
           )}

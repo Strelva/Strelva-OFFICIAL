@@ -63,14 +63,16 @@ describe("owner journey copy and links", () => {
     expect(dashboardPage).toContain("Draft first blog post");
   });
 
-  it("keeps rollback safety visible from the owner dashboard", () => {
-    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+  it("keeps rollback safety reachable under the Website History tab", () => {
+    // Safety net + recent changes moved off the dashboard into Website > History
+    // (site-management tools, not at-a-glance metrics).
+    const historyPage = readRepoFile("src/app/dashboard/history/page.tsx");
     const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
-    expect(dashboardPage).toContain("getLatestSiteSnapshot(tenant)");
-    expect(dashboardPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
+    expect(historyPage).toContain("getLatestSiteSnapshot(tenant)");
+    expect(historyPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
     expect(safetyPanel).toContain("Revert to a last good version");
     expect(safetyPanel).toContain("Save backup");
     expect(safetyPanel).toContain("Restore latest backup");
