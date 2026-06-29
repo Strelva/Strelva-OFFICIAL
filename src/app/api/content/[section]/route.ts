@@ -144,7 +144,11 @@ export async function PUT(
       metadata: { section: s, changeCount: changes.length },
     });
 
-    await clearDraft(s, tenant).catch(() => {});
+    await clearDraft(s, tenant).catch((err) =>
+      // A leftover draft after publish would resurface as a phantom unsaved
+      // change; log it (matches the revalidate-failure logging just below).
+      console.error("[content PUT] failed to clear draft after publish:", s, err),
+    );
 
     revalidatePath("/");
 

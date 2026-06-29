@@ -1167,8 +1167,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
       def: tool({
         description: "Reply to a customer review by ID. Use get_reviews first to find the review ID.",
         inputSchema: z.object({
-          reviewId: z.string().describe("The review ID to reply to"),
-          replyText: z.string().describe("The reply text"),
+          reviewId: z.string().min(1).max(200).describe("The review ID to reply to"),
+          replyText: z.string().min(1).max(4096).describe("The reply text"),
         }),
         execute: async ({ reviewId, replyText }) => {
           try {

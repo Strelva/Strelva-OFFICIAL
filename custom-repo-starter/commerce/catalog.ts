@@ -38,7 +38,7 @@ export async function fetchCatalog(): Promise<CatalogProduct[]> {
         description: typeof d.description === "string" ? d.description : "",
         priceCents: typeof d.priceCents === "number" ? d.priceCents : 0,
         currency: typeof d.currency === "string" ? d.currency : "USD",
-        images: Array.isArray(d.images) ? (d.images as string[]) : [],
+        images: Array.isArray(d.images) ? d.images.filter((i): i is string => typeof i === "string") : [],
         inStock: d.inStock !== false,
         checkoutUrl: typeof d.checkoutUrl === "string" ? d.checkoutUrl : undefined,
       };

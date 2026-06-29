@@ -26,8 +26,10 @@ interface YelpReviewsResponse {
   total: number;
 }
 
-function lastReviewKey(tenantId: string): string {
-  return `yelp:lastReview:${tenantId}`;
+function seenReviewsKey(tenantId: string): string {
+  // New key (string[] set), distinct from the old single-id `yelp:lastReview:*`
+  // which simply expires.
+  return `yelp:seenReviews:${tenantId}`;
 }
 
 async function fetchYelpReviews(apiKey: string, businessId: string): Promise<YelpReview[]> {
@@ -62,15 +64,17 @@ await mapPool(active, 8, async (tenant) => {
       const reviews = await fetchYelpReviews(apiKey, businessId);
       if (reviews.length === 0) return;
 
-      const lastSeenId = redis ? await redis.get<string>(lastReviewKey(tenant.id)) : null;
-      const newReviews: YelpReview[] = [];
-
-      for (const review of reviews) {
-        if (review.id === lastSeenId) break;
-        newReviews.push(review);
+      // Set-based dedup (matches Google) — membership, not order. The old
+      // single-lastSeenId + break double-counted every review if that id was
+      // deleted or the API reordered (the break never fired).
+      let seenIds = new Set<string>();
+      if (redis) {
+        const cached = await redis.get<string[]>(seenReviewsKey(tenant.id));
+        if (cached) seenIds = new Set(cached);
       }
+      const newReviews = reviews.filter((r) => !seenIds.has(r.id));
 
-      for (const review of newReviews.reverse()) {
+      for (const review of newReviews) {
         await addEvent({
           tenantId: tenant.id,
           source: "yelp",
@@ -99,8 +103,14 @@ await mapPool(active, 8, async (tenant) => {
         }).catch(() => {});
       }
 
-      if (newReviews.length > 0 && redis) {
-        await redis.set(lastReviewKey(tenant.id), reviews[0].id);
+      // Cache the CURRENT review-id snapshot (30-day TTL), unconditionally —
+      // refreshing the window even when nothing was new keeps dedup honest.
+      if (redis) {
+        await redis.set(
+          seenReviewsKey(tenant.id),
+          reviews.map((r) => r.id),
+          { ex: 60 * 60 * 24 * 30 },
+        );
       }
 
       await updateLastSynced(tenant.id, "yelp");
