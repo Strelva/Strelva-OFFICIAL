@@ -207,7 +207,9 @@ async function pollTenant(tenantId: string): Promise<number> {
       text: review.comment || "",
       date: review.createTime,
       externalId: review.reviewId,
-    }).catch(() => {});
+    }).catch((err) =>
+      console.error(`[poll-google-reviews] addReview failed for ${tenantId}/${review.reviewId}:`, err),
+    );
 
     // Draft a filter-safe reply and queue it for human approval.
     // This is fire-and-recover: a draft failure must not block the review event.

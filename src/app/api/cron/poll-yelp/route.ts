@@ -100,7 +100,11 @@ await mapPool(active, 8, async (tenant) => {
           text: review.text,
           date: review.time_created,
           externalId: review.id,
-        }).catch(() => {});
+        }).catch((err) =>
+          // The code comment calls this the "reviews disconnect" — don't make it
+          // invisible. The event was already queued; this just mirrors to the table.
+          console.error(`[poll-yelp] addReview failed for ${tenant.id}/${review.id}:`, err),
+        );
       }
 
       // Cache the CURRENT review-id snapshot (30-day TTL), unconditionally —
