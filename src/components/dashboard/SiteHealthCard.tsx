@@ -57,7 +57,7 @@ function TrendBand({ history }: { history: TrendPoint[] }) {
   const max = Math.max(100, ...scores);
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gray-border px-5 py-3">
+    <div className="flex items-center justify-between gap-4 border-b border-glass-border px-5 py-3">
       <div className="flex items-end gap-[3px]" aria-hidden>
         {scores.slice(-10).map((s, i) => (
           <div
@@ -145,7 +145,7 @@ export function SiteHealthCard() {
 
   if (state === "loading") {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-gray-border bg-gray-bg/40 px-5 py-8 text-sm text-gray-muted">
+      <div className="flex items-center gap-2 rounded-xl border border-glass-border bg-glass px-5 py-8 text-sm text-gray-muted">
         <Loader2 className="h-4 w-4 animate-spin" />
         Checking your site health...
       </div>
@@ -154,7 +154,7 @@ export function SiteHealthCard() {
 
   if (state === "empty") {
     return (
-      <div className="rounded-xl border border-gray-border bg-gray-bg/40 px-5 py-8 text-center">
+      <div className="rounded-xl border border-glass-border bg-glass px-5 py-8 text-center">
         <p className="text-sm font-medium text-warm-black">Site health is not available yet</p>
         <p className="mt-1 text-[13px] text-gray-muted">
           Your health score appears here once your site is live.
@@ -165,8 +165,8 @@ export function SiteHealthCard() {
 
   if (state === "error") {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center">
-        <p className="text-sm font-medium text-red-700">{error}</p>
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-6 text-center">
+        <p className="text-sm font-medium text-red-400">{error}</p>
         <button
           type="button"
           onClick={() => void load(false)}
@@ -181,9 +181,9 @@ export function SiteHealthCard() {
   if (!audit) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-border bg-warm-white">
+    <div className="rounded-2xl border border-glass-border bg-surface-raised">
       {/* Header: score + grade + rescan */}
-      <div className="flex items-center justify-between gap-4 border-b border-gray-border px-5 py-4">
+      <div className="flex items-center justify-between gap-4 border-b border-glass-border px-5 py-4">
         <div className="flex items-center gap-4">
           <div
             className="flex size-16 shrink-0 items-center justify-center rounded-full border-4"
@@ -215,7 +215,7 @@ export function SiteHealthCard() {
           type="button"
           onClick={() => void load(true)}
           disabled={rescanning}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-border px-3 py-1.5 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-md border border-glass-border px-3 py-1.5 text-[13px] font-medium text-warm-black transition-colors hover:bg-glass disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${rescanning ? "animate-spin" : ""}`} />
           {rescanning ? "Scanning" : "Re-scan"}
@@ -225,13 +225,27 @@ export function SiteHealthCard() {
       {/* Weekly trend */}
       {history.length >= 2 && <TrendBand history={history} />}
 
-      {/* Top fixes */}
+      {/* Top fixes — MANAGED framing. The owner sees WHAT we're watching, but the
+          action is "ask the AI", not a DIY how-to guide. This is a managed
+          service; DIY "here's how YOU fix it" links contradicted the pitch. */}
       {audit.topFixes.length > 0 && (
-        <div className="border-b border-gray-border px-5 py-4">
-          <p className="text-[13px] font-semibold text-warm-black">Fix these first</p>
-          <ul className="mt-2 grid gap-2">
+        <div className="border-b border-glass-border px-5 py-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[13px] font-semibold text-warm-black">What to fix first</p>
+            <Link
+              href={dashboardHref("/dashboard/chat")}
+              className="shrink-0 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
+            >
+              Ask the AI to fix these -&gt;
+            </Link>
+          </div>
+          <p className="mt-0.5 text-[12px] text-gray-muted">
+            Strelva keeps an eye on these — ask the AI to handle one in chat, or it
+            gets picked up as we manage your site.
+          </p>
+          <ul className="mt-3 grid gap-2">
             {audit.topFixes.map((fix) => (
-              <li key={`${fix.category}-${fix.name}`} className="rounded-lg bg-gray-bg/50 px-3 py-2">
+              <li key={`${fix.category}-${fix.name}`} className="rounded-lg bg-glass px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[13px] font-medium text-warm-black">{fix.name}</span>
                   {fix.quantified ? (
@@ -247,19 +261,6 @@ export function SiteHealthCard() {
                 <p className="mt-0.5 text-[12px] leading-snug text-gray-muted">
                   {fix.impact || fix.message}
                 </p>
-                {fix.guides && fix.guides.length > 0 && (
-                  <div className="mt-1.5 flex flex-col gap-1">
-                    {fix.guides.map((g) => (
-                      <Link
-                        key={g.slug}
-                        href={`/guides/${g.slug}`}
-                        className="text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
-                      >
-                        Fix it: {g.title} -&gt;
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </li>
             ))}
           </ul>
@@ -274,7 +275,7 @@ export function SiteHealthCard() {
             <div key={cat.slug} className="flex items-center gap-3">
               {statusIcon[cat.score >= 80 ? "pass" : cat.score >= 50 ? "warn" : "fail"]}
               <span className="w-40 shrink-0 truncate text-[13px] text-warm-black">{cat.name}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-bg">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-glass">
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${cat.score}%`, backgroundColor: barColor(cat.score) }}
