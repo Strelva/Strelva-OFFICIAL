@@ -225,11 +225,25 @@ export function SiteHealthCard() {
       {/* Weekly trend */}
       {history.length >= 2 && <TrendBand history={history} />}
 
-      {/* Top fixes */}
+      {/* Top fixes — MANAGED framing. The owner sees WHAT we're watching, but the
+          action is "ask the AI", not a DIY how-to guide. This is a managed
+          service; DIY "here's how YOU fix it" links contradicted the pitch. */}
       {audit.topFixes.length > 0 && (
         <div className="border-b border-glass-border px-5 py-4">
-          <p className="text-[13px] font-semibold text-warm-black">Fix these first</p>
-          <ul className="mt-2 grid gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[13px] font-semibold text-warm-black">What to fix first</p>
+            <Link
+              href={dashboardHref("/dashboard/chat")}
+              className="shrink-0 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
+            >
+              Ask the AI to fix these -&gt;
+            </Link>
+          </div>
+          <p className="mt-0.5 text-[12px] text-gray-muted">
+            Strelva keeps an eye on these — ask the AI to handle one in chat, or it
+            gets picked up as we manage your site.
+          </p>
+          <ul className="mt-3 grid gap-2">
             {audit.topFixes.map((fix) => (
               <li key={`${fix.category}-${fix.name}`} className="rounded-lg bg-glass px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
@@ -247,19 +261,6 @@ export function SiteHealthCard() {
                 <p className="mt-0.5 text-[12px] leading-snug text-gray-muted">
                   {fix.impact || fix.message}
                 </p>
-                {fix.guides && fix.guides.length > 0 && (
-                  <div className="mt-1.5 flex flex-col gap-1">
-                    {fix.guides.map((g) => (
-                      <Link
-                        key={g.slug}
-                        href={`/guides/${g.slug}`}
-                        className="text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
-                      >
-                        Fix it: {g.title} -&gt;
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </li>
             ))}
           </ul>
