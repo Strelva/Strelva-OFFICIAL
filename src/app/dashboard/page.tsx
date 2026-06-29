@@ -273,16 +273,20 @@ async function DashboardHome({
 
           {!isFresh ? (
           <section className="grid gap-3 md:grid-cols-3">
+          {/* Lead with the cumulative number (the reassuring one that matches the
+              weekly report + "since launch"), not the just-started week — which
+              reads 0 most of the time and made the headline contradict the copy
+              right next to it. Recent activity goes in the detail line. */}
           <StatTile
             label="People found you"
-            value={pageViews.thisWeek}
-            detail={`${pageViews.total} total visits tracked`}
+            value={pageViews.total}
+            detail={`${pageViews.thisWeek} in the last 7 days`}
             icon={TrendingUp}
           />
           <StatTile
             label="Customer actions"
-            value={customerActions.thisWeek}
-            detail={`${customerActions.total} product/contact clicks tracked`}
+            value={customerActions.total}
+            detail={`${customerActions.thisWeek} in the last 7 days`}
             icon={MousePointerClick}
           />
           <StatTile
@@ -294,21 +298,6 @@ async function DashboardHome({
           </section>
           ) : null}
 
-          {!isFresh ? (
-          <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-glass-border bg-glass px-4 py-3">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">
-              Since launch
-            </span>
-            <span className="text-[13px] text-warm-black">
-              <span className="font-semibold">{pageViews.total.toLocaleString()}</span>{" "}
-              <span className="text-gray-muted">people found you</span>
-            </span>
-            <span className="text-[13px] text-warm-black">
-              <span className="font-semibold">{customerActions.total.toLocaleString()}</span>{" "}
-              <span className="text-gray-muted">customer actions</span>
-            </span>
-          </section>
-          ) : null}
 
           {leadSummary.recent.length > 0 ? (
             <section className="rounded-2xl border border-glass-border bg-glass p-5">
