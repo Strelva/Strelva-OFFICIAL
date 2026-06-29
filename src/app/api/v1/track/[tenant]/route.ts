@@ -43,7 +43,7 @@ const MAX_ITEMS = 100;
 
 /** Parse + strictly validate the order payload from a public beacon. */
 function parseOrder(body: Record<string, unknown>):
-  | { amountCents: number; currency: string; items: { name: string; quantity: number }[]; externalId?: string }
+  | { amountCents: number; currency: string; items: { name: string; quantity: number }[]; externalId: string }
   | { error: string } {
   const amountCents = body.amountCents;
   if (typeof amountCents !== "number" || !Number.isFinite(amountCents) || amountCents < 0 || amountCents > MAX_ORDER_CENTS) {
@@ -51,9 +51,12 @@ function parseOrder(body: Record<string, unknown>):
   }
   const currencyRaw = typeof body.currency === "string" ? body.currency.toUpperCase() : "USD";
   const currency = /^[A-Z]{3}$/.test(currencyRaw) ? currencyRaw : "USD";
+  // orderId is REQUIRED — it's the idempotency key. Without it, a retried beacon
+  // (sendBeacon/keepalive often double-fire) would double-count revenue, since
+  // recordOrder can only dedup on a stable provider id.
   const orderId = body.orderId;
-  if (orderId !== undefined && (typeof orderId !== "string" || orderId.length > 200)) {
-    return { error: "Invalid orderId" };
+  if (typeof orderId !== "string" || orderId.length === 0 || orderId.length > 200) {
+    return { error: "Missing or invalid orderId (required for order events)" };
   }
   const items: { name: string; quantity: number }[] = [];
   if (Array.isArray(body.items)) {
@@ -65,7 +68,7 @@ function parseOrder(body: Record<string, unknown>):
       if (name) items.push({ name, quantity });
     }
   }
-  return { amountCents: Math.round(amountCents), currency, items, externalId: typeof orderId === "string" ? orderId : undefined };
+  return { amountCents: Math.round(amountCents), currency, items, externalId: orderId };
 }
 
 // A service id is only meaningful for booking-click. Constrain it the same way

@@ -34,8 +34,11 @@ export function computeMrrDollars(
   tenants: Array<{ id: string; subscriptionStatus?: string; planOverride?: string | null }>,
 ): number {
   const billable = tenants.filter(
+    // Only "active" counts as revenue. A "trialing" sub has access but hasn't
+    // been charged yet (no MRR until its first invoice.paid flips it to active),
+    // so counting it here inflates the metric the operator agent reasons over.
     (t) =>
-      (t.subscriptionStatus === "active" || t.subscriptionStatus === "trialing") &&
+      t.subscriptionStatus === "active" &&
       t.planOverride !== "founder_comp" &&
       !isGrandfathered(t.id),
   ).length;

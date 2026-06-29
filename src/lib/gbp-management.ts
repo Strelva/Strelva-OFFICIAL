@@ -496,6 +496,19 @@ export async function uploadGbpPhoto(
   const ctx = await resolveWriteContext(tenantId, "upload_photo");
   if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
 
+  // SSRF guard at the egress boundary — Google fetches sourceUrl. Same defense
+  // createGbpPost applies; uploadGbpPhoto was missing it.
+  const { validateUrlSafety } = await import("./audit/checks");
+  try {
+    await validateUrlSafety(photoUrl);
+  } catch (err) {
+    return {
+      success: false,
+      verified: false,
+      evidence: `tenant=${tenantId} operation=upload_photo blocked_url=${err instanceof Error ? err.message : "unsafe url"}`,
+    };
+  }
+
   const { accessToken, accountId, locationId } = ctx;
 
   const locationName = locationId.startsWith("locations/")
