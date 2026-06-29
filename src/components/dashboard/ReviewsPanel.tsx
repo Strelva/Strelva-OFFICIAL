@@ -197,7 +197,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
             <button
               type="button"
               onClick={copyDraft}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-white transition-colors hover:bg-accent/85"
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               {copied ? (
                 <>

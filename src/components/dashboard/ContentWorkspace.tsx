@@ -194,7 +194,7 @@ export function ContentWorkspace({
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <Link
               href="/access-request"
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               Get your own site
             </Link>

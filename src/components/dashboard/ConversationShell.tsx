@@ -9,16 +9,18 @@ import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
   children: ReactNode;
-  ownerName: string;
+  businessName: string;
+  accountName: string;
+  accountEmail?: string | null;
   pendingCount?: number;
-  valueProof?: string;
 }
 
 export function ConversationShell({
   children,
-  ownerName,
+  businessName,
+  accountName,
+  accountEmail,
   pendingCount = 0,
-  valueProof,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { impersonation } = useDashboard();
@@ -27,11 +29,12 @@ export function ConversationShell({
     <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
       {/* Navigation sidebar */}
       <HistorySidebar
-        ownerName={ownerName}
+        businessName={businessName}
+        accountName={accountName}
+        accountEmail={accountEmail}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}
-        valueProof={valueProof}
       />
 
       {/* Main content area */}
@@ -58,8 +61,8 @@ export function ConversationShell({
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
           <div className="min-w-0">
-            <span className="block text-[13px] font-medium text-warm-black leading-tight">{ownerName || "Dashboard"}</span>
-            <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
+            <span className="block text-[13px] font-medium text-warm-black leading-tight truncate">{businessName || "Dashboard"}</span>
+            <span className="block text-[11px] text-gray-muted leading-tight truncate">Hello, {accountName.trim().split(/\s+/)[0] || "there"}</span>
           </div>
         </header>
 

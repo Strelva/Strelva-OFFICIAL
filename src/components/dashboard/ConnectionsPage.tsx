@@ -109,7 +109,7 @@ function ConnectionRow({
         <button
           type="button"
           onClick={onClick}
-          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent/85"
+          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-on-accent transition-colors hover:bg-accent/85"
         >
           {needsSetup ? "Set up" : "Manage"}
         </button>

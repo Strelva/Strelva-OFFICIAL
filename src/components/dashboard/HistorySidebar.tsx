@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Settings,
-  Search,
   X,
   LogOut,
   Plus,
@@ -46,11 +45,14 @@ export interface Thread {
 }
 
 interface HistorySidebarProps {
-  ownerName: string;
+  /** The business the account is managing — shown top-left with its logo. */
+  businessName: string;
+  /** The signed-in person — shown bottom-left as "Hello, {first name}". */
+  accountName: string;
+  accountEmail?: string | null;
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
-  valueProof?: string;
 }
 
 /** The client's favicon as their logo, derived from their site domain. Falls back
@@ -88,16 +90,27 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
 }
 
 export function HistorySidebar({
-  ownerName,
+  businessName,
+  accountName,
+  accountEmail,
   isOpen = true,
   onClose,
   pendingCount = 0,
-  valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { dashboardBasePath, dashboardHref, siteUrl } = useDashboard();
+  // The business's own domain, shown as the quiet sublabel under its name —
+  // useful context, not the "visitors this week" metric (deliberately dropped).
+  let siteHost = "";
+  try {
+    if (siteUrl) siteHost = new URL(siteUrl).hostname.replace(/^www\./, "");
+  } catch {
+    siteHost = "";
+  }
+  const firstName = accountName.trim().split(/\s+/)[0] || "there";
+  const accountInitial = (accountName.trim()[0] || "U").toUpperCase();
   const surfaces = useDashboardSurfaces();
   const navGroups = (["manage", "presence"] as const)
     .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
@@ -176,24 +189,16 @@ export function HistorySidebar({
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-5 px-4 pt-4 lg:pl-5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <SidebarLogo name={ownerName} siteUrl={siteUrl} />
-          <div className="min-w-0">
-            <PropertySwitcher fallbackName={ownerName} />
-            <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "Your dashboard"}</p>
-          </div>
+      {/* Business identity — the business this account manages: logo + name + its
+          own domain. No search, no "visitors this week" (moved to the dashboard). */}
+      <div className="flex min-w-0 items-center gap-2.5 px-4 pt-4 lg:pl-5">
+        <SidebarLogo name={businessName} siteUrl={siteUrl} />
+        <div className="min-w-0">
+          <PropertySwitcher fallbackName={businessName} />
+          {siteHost && (
+            <p className="truncate text-[11px] leading-tight text-gray-muted">{siteHost}</p>
+          )}
         </div>
-        <Link
-          href={dashboardHref("/dashboard/chat")}
-          prefetch={false}
-          onClick={onClose}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
-          title="Search"
-          aria-label="Search"
-        >
-          <Search className="h-4 w-4" strokeWidth={1.5} />
-        </Link>
       </div>
 
       {/* Main navigation */}
@@ -328,24 +333,22 @@ export function HistorySidebar({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User footer with settings */}
+      {/* Account footer — the signed-in person (separate from the business up top). */}
       <div className="p-3 border-t border-glass-border mt-auto">
-        {valueProof && (
-          <div className="lg:hidden mb-2 rounded-lg border border-glass-border bg-surface-raised px-3 py-2">
-            <p className="text-[12px] font-medium text-warm-black mt-0.5">
-              {valueProof}
-            </p>
-          </div>
-        )}
-        <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-          <div className="w-7 h-7 rounded-full bg-accent-dim flex items-center justify-center shrink-0">
-            <span className="text-[11px] font-semibold text-accent">
-              {ownerName[0]?.toUpperCase() || "U"}
+        <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+          <div className="w-8 h-8 rounded-full bg-accent-dim flex items-center justify-center shrink-0">
+            <span className="text-[12px] font-semibold text-accent">
+              {accountInitial}
             </span>
           </div>
-          <span className="text-[12px] text-warm-black flex-1 truncate">
-            {ownerName}
-          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-medium text-warm-black leading-tight">
+              Hello, {firstName}
+            </p>
+            {accountEmail && (
+              <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
+            )}
+          </div>
           <Link
             href={dashboardHref("/dashboard/settings")}
             prefetch={false}

@@ -64,19 +64,26 @@ function useDashboardApiPath() {
 // Identity field definitions
 // ---------------------------------------------------------------------------
 
-const IDENTITY_FIELDS: readonly {
+type IdentityField = {
   key: string;
   label: string;
   description: string;
   multiline?: boolean;
   mono?: boolean;
-}[] = [
-  { key: "siteName", label: "Site Name", description: "Your business name" },
-  { key: "ownerName", label: "Owner Name", description: "Shown in greetings" },
+};
+
+/** Personal — the signed-in person, kept separate from the business below. */
+const PERSONAL_FIELDS: readonly IdentityField[] = [
+  { key: "ownerName", label: "Your name", description: "How Strelva greets you here — “Hello, {name}”" },
+];
+
+/** Business — the public-facing identity of the business this account manages. */
+const BUSINESS_FIELDS: readonly IdentityField[] = [
+  { key: "siteName", label: "Business name", description: "Your business name" },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
   { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
-  { key: "footerTagline", label: "Footer Tagline", description: "Bottom of your site" },
+  { key: "footerTagline", label: "Footer tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
 
@@ -153,7 +160,9 @@ function setNestedValue(
 // ---------------------------------------------------------------------------
 
 const SETTINGS_SECTIONS = [
-  { id: "profile", label: "Business" },
+  { id: "account", label: "Account" },
+  { id: "profile", label: "Business info" },
+  { id: "branding", label: "Branding" },
   { id: "site-config", label: "Site config" },
   { id: "dependencies", label: "Services" },
   { id: "utilities", label: "Shortcuts" },
@@ -187,10 +196,12 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
 function ProfileSection({
   settings,
   setSettings,
+  fields,
   readOnly = false,
 }: {
   settings: SettingsData;
   setSettings: (s: SettingsData) => void;
+  fields: readonly IdentityField[];
   readOnly?: boolean;
 }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -269,12 +280,12 @@ function ProfileSection({
       </div>
 
       <div className="rounded-lg border border-gray-border overflow-hidden">
-        {IDENTITY_FIELDS.map((field, i) => (
+        {fields.map((field, i) => (
           <FormRow
             key={field.key}
             label={field.label}
             description={field.description}
-            last={i === IDENTITY_FIELDS.length - 1}
+            last={i === fields.length - 1}
           >
             {field.multiline ? (
               <textarea
@@ -392,13 +403,44 @@ function BrandSection() {
     );
   }
 
+  const swatches = THEME_COLOR_FIELDS.map((f) => ({
+    label: f.label,
+    hex: (getNestedValue(theme, f.key) as string) || "#000000",
+  }));
+  const displayFont = ((getNestedValue(theme, "fontDisplay") as string) || "").replace(/_/g, " ");
+
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-[12px] text-gray-muted">Changes apply to your live site after publish.</p>
         <SaveStatusPill status={saveStatus} />
       </div>
 
-      {/* Fonts */}
+      {/* Brand at a glance — the display face over the color set, so the brand
+          reads as a whole before you edit any single token. */}
+      <div className="mb-6 rounded-xl border border-glass-border bg-glass p-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Brand at a glance</p>
+        <p
+          className="mt-2 text-[24px] leading-tight text-warm-white"
+          style={displayFont ? { fontFamily: `"${displayFont}", serif` } : undefined}
+        >
+          {displayFont || "Your display font"}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {swatches.map((s) => (
+            <div
+              key={s.label}
+              className="flex items-center gap-2 rounded-lg border border-gray-border bg-surface-base px-2.5 py-1.5"
+            >
+              <span className="h-4 w-4 rounded-full border border-gray-border" style={{ backgroundColor: s.hex }} />
+              <span className="text-[11px] text-gray-muted">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Typography */}
+      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Typography</h2>
       <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
         {THEME_FONT_FIELDS.map((field, i) => {
           const current = (getNestedValue(theme, field.key) as string) || "";
@@ -430,7 +472,8 @@ function BrandSection() {
         })}
       </div>
 
-      {/* Colors */}
+      {/* Brand colors */}
+      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Brand colors</h2>
       <div className="rounded-lg border border-gray-border overflow-hidden">
         {THEME_COLOR_FIELDS.map((field, i) => {
           const hex = (getNestedValue(theme, field.key) as string) || "#000000";
@@ -551,10 +594,10 @@ function UtilitiesSection() {
 // Site config section
 // ---------------------------------------------------------------------------
 
-const SITE_CONFIG_TABS = ["design", "navigation", "capabilities", "components"] as const;
+const SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
 
 function SiteConfigSection() {
-  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("design");
+  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("navigation");
 
   return (
     <div className="space-y-5">
@@ -574,7 +617,6 @@ function SiteConfigSection() {
           </button>
         ))}
       </div>
-      {tab === "design" && <BrandSection />}
       {tab === "navigation" && <NavigationFooterSection />}
       {tab === "capabilities" && <CapabilitiesSection />}
       {tab === "components" && <CustomComponentsSection />}
@@ -1192,9 +1234,17 @@ function BillingSection() {
 // ---------------------------------------------------------------------------
 
 const SECTION_META: Record<string, { title: string; description: string }> = {
+  account: {
+    title: "Account",
+    description: "Your personal details on this dashboard — separate from the business you manage.",
+  },
   profile: {
-    title: "Business profile",
-    description: "Core identity and the primary action visitors should take. Brand, hours, and AI rules now live in Ask AI.",
+    title: "Business info",
+    description: "Your business name, tagline, and the primary action visitors should take.",
+  },
+  branding: {
+    title: "Branding",
+    description: "The fonts and colors that define how your site looks.",
   },
   "site-config": {
     title: "Site configurability",
@@ -1327,38 +1377,38 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="min-w-0 flex-1 overflow-y-auto p-4 pb-28 md:p-8 lg:p-10">
-        <div className={activeSection === "ownership" ? "max-w-5xl" : "max-w-2xl"}>
-          <div className="mb-8 rounded-2xl border border-glass-border bg-glass p-5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-              Operations
-            </p>
-            <h1 className="mt-2 font-[family-name:var(--font-display)] text-[24px] font-normal text-warm-white">
-              Settings with real ownership impact
-            </h1>
-            <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-              Use this area for domains, billing, exports, and handoff. Day-to-day business instructions now happen in Ask AI.
-            </p>
-          </div>
-
-          {/* Section header */}
+        <div className={
+          activeSection === "ownership"
+            ? "max-w-5xl"
+            : activeSection === "profile" || activeSection === "branding"
+              ? "max-w-3xl"
+              : "max-w-2xl"
+        }>
+          {/* Section header — each tab owns its own framing now (no generic banner). */}
           {meta && (
             <div className="mb-8">
-              <h1 className="text-[20px] font-medium text-warm-white">{meta.title}</h1>
-              <p className="text-[13px] text-gray-muted mt-1">{meta.description}</p>
+              <h1 className="font-[family-name:var(--font-display)] text-[26px] font-normal text-warm-white">{meta.title}</h1>
+              <p className="text-[13px] leading-relaxed text-gray-muted mt-1.5">{meta.description}</p>
             </div>
           )}
 
           {/* Section content */}
-          {activeSection === "profile" && settings && (
-            <ProfileSection settings={settings} setSettings={setSettings} readOnly={readOnly} />
+          {(activeSection === "account" || activeSection === "profile") && settings && (
+            <ProfileSection
+              settings={settings}
+              setSettings={setSettings}
+              fields={activeSection === "account" ? PERSONAL_FIELDS : BUSINESS_FIELDS}
+              readOnly={readOnly}
+            />
           )}
-          {activeSection === "profile" && !settings && (
+          {(activeSection === "account" || activeSection === "profile") && !settings && (
             <div className="space-y-4 animate-pulse">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="h-12 bg-surface-raised rounded-lg" />
               ))}
             </div>
           )}
+          {activeSection === "branding" && <BrandSection />}
           {activeSection === "site-config" && <SiteConfigSection />}
           {activeSection === "dependencies" && <DependencyHealthSection />}
           {activeSection === "utilities" && <UtilitiesSection />}

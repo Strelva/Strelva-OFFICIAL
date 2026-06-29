@@ -9,7 +9,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
-import { getActivity, getClickCounts, getContent } from "@/lib/storage";
+import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
@@ -93,13 +93,11 @@ export default async function DashboardLayout({
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
-  // Fetch queue count and stats. Each read is independently guarded: this runs
-  // in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip) would
-  // 500 every dashboard route at once. Degrade to safe defaults instead.
-  const [pendingCount, pageViews, activity, connections, products] = await Promise.all([
+  // Fetch queue count and connections. Each read is independently guarded: this
+  // runs in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip)
+  // would 500 every dashboard route at once. Degrade to safe defaults instead.
+  const [pendingCount, connections, products] = await Promise.all([
     getQueueCount(tenant).catch(() => 0),
-    getClickCounts("page-view", tenant).catch(() => ({ total: 0, today: 0, thisWeek: 0, lastWeek: 0 })),
-    getActivity(tenant, { actor: "ai" }).catch(() => []),
     getConnections(tenant).catch(() => []),
     getProducts(tenant).catch(() => []),
   ]);
@@ -113,13 +111,12 @@ export default async function DashboardLayout({
     connections,
     hasCommerce: products.length > 0,
   });
-  const monthAgo = Date.now() - 30 * 86_400_000;
-  const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
-  const valueProof = pageViews.thisWeek > 0
-    ? `${pageViews.thisWeek} visitors this week`
-    : aiUpdatesThisMonth > 0
-      ? `${aiUpdatesThisMonth} update${aiUpdatesThisMonth === 1 ? "" : "s"} this month`
-      : "Your site is live";
+  // The signed-in person, for the sidebar's "Hello, {name}" account footer —
+  // distinct from the business shown up top. Prefer the configured owner name,
+  // fall back to the email's local-part, then a neutral greeting.
+  const accountEmail = actor.email && actor.email.includes("@") ? actor.email : null;
+  const rawAccount = ownerName.trim() || (accountEmail ? accountEmail.split("@")[0] : "");
+  const accountName = rawAccount ? rawAccount.charAt(0).toUpperCase() + rawAccount.slice(1) : "there";
 
   return (
     <DashboardProvider
@@ -138,7 +135,10 @@ export default async function DashboardLayout({
         actorEmail: actor.email,
         tenantId: tenant,
       }}
-      readOnly={isDemo}
+      // The public demo is read-only for prospects, but the internal dev-access
+      // bypass (local only — never set in prod) gets full control so the team can
+      // actually drive the demo (test chat + edits).
+      readOnly={isDemo && !devAccessBypass}
     >
       <DashboardSurfacesProvider surfaces={surfaces}>
         <a
@@ -147,7 +147,7 @@ export default async function DashboardLayout({
         >
           Skip to content
         </a>
-        {isDemo && (
+        {isDemo && !devAccessBypass && (
           <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
             <span className="font-medium">You&apos;re viewing a read-only live demo &mdash; editing is off.</span>
             <a href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
@@ -158,9 +158,10 @@ export default async function DashboardLayout({
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationShell
-          ownerName={ownerName || siteName}
+          businessName={siteName}
+          accountName={accountName}
+          accountEmail={accountEmail}
           pendingCount={pendingCount}
-          valueProof={valueProof}
         >
           {children}
         </ConversationShell>

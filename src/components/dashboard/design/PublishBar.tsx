@@ -152,7 +152,7 @@ export function PublishBar({
           title={publishTitle}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
             hasDrafts && !publishing
-              ? "bg-accent text-white hover:bg-accent/90"
+              ? "bg-accent text-on-accent hover:bg-accent/90"
               : "bg-gray-bg text-gray-faint cursor-not-allowed"
           }`}
         >

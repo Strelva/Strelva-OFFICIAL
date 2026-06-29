@@ -155,7 +155,7 @@ async function DashboardHome({
           <div className="flex flex-wrap gap-2">
             <Link
               href={dashboardHref("/dashboard/chat")}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
               Ask AI

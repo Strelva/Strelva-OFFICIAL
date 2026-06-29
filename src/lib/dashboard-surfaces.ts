@@ -112,7 +112,7 @@ export function getDashboardSurfaces({
     (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
-    { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+    { id: "today", label: "Dashboard", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
     // Store — the primary surface for a commerce tenant (orders, revenue,
@@ -131,7 +131,9 @@ export function getDashboardSurfaces({
     {
       id: "reviews",
       label: "Reviews",
-      href: reviewsReady ? "/dashboard/reviews" : "/dashboard/integrations",
+      // Always the Reviews surface — its empty state pitches connecting Google,
+      // so a "connect" tab lands on reviews (not the generic integrations list).
+      href: "/dashboard/reviews",
       // A review source → shown; local without one → connect; online without one → hidden.
       state: reviewsReady ? "shown" : local ? "connect" : "hidden",
       group: "presence",

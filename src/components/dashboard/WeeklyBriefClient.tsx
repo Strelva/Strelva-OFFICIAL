@@ -181,10 +181,10 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: We
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link
               href={dashboard?.dashboardHref("/dashboard") || "/dashboard"}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent/85"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
-              Open Today
+              Open dashboard
             </Link>
             <Link
               href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}

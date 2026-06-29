@@ -365,7 +365,7 @@ function ContentTab({
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="h-[28px] px-3 rounded-lg bg-accent text-white text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  className="h-[28px] px-3 rounded-lg bg-accent text-on-accent text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSaving ? (
                     <>
@@ -757,7 +757,7 @@ function AITab({
           <button
             onClick={handleApply}
             disabled={isApplying || !prompt.trim()}
-            className="h-[28px] px-3 rounded-lg bg-accent text-white text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            className="h-[28px] px-3 rounded-lg bg-accent text-on-accent text-[11px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {isApplying ? (
               <>

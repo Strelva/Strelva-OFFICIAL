@@ -12,7 +12,7 @@ describe("owner journey copy and links", () => {
     // sidebar). The pillars are owner-language; old-IA labels are gone.
     const surfaces = readRepoFile("src/lib/dashboard-surfaces.ts");
 
-    expect(surfaces).toContain('label: "Today"');
+    expect(surfaces).toContain('label: "Dashboard"');
     expect(surfaces).toContain('label: "Ask AI"');
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
@@ -137,7 +137,7 @@ describe("owner journey copy and links", () => {
     expect(weeklyBrief).toContain("buildVerdict");
     expect(weeklyBrief).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
-    expect(weeklyBrief).toContain("Open Today");
+    expect(weeklyBrief).toContain("Open dashboard");
   });
 
   it("keeps the site editor focused on direct editing instead of embedded chat", () => {
