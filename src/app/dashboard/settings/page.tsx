@@ -1121,9 +1121,9 @@ function DependencyHealthSection() {
   if (data.deliveryModel !== "custom_repo") {
     return (
       <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
-        <p className="text-[13px] text-warm-white">Platform template site</p>
+        <p className="text-[13px] text-warm-white">No connected services to monitor</p>
         <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-          No custom repo dependency checks are needed for this tenant.
+          This site doesn&apos;t rely on any outside services we need to keep an eye on.
         </p>
       </div>
     );
@@ -1327,8 +1327,8 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
     description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
   },
   dependencies: {
-    title: "Custom repo dependencies",
-    description: "External services the custom site relies on, with paused or failing services called out before they break the storefront.",
+    title: "Connected services",
+    description: "Outside services your site relies on — like payments or email — with anything paused or failing flagged before it can affect your site.",
   },
   utilities: {
     title: "Operations utilities",

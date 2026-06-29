@@ -153,14 +153,24 @@ Local-business owners will pay for a dashboard that proves their website is work
 
 ## What The Client Sees
 1. **Custom website** built by Jacob, hosted in a separate per-client repo, served on the client's own domain.
-2. **Business OS Dashboard** at `admin.{client-domain}` (dark monochrome).
-   - Overview: "People who found you" / "Booking clicks" / "Site health"
-   - AI Chat: "Update my hours" / "Write a blog post" / "How's my site doing?"
-   - My Site: live preview iframe
-   - Content: visual map of what's on the site
-   - Reports: weekly plain-English performance summary
+2. **Business OS Dashboard** at `admin.{client-domain}` (dark monochrome). The nav is a
+   conditional surface set (`src/lib/dashboard-surfaces.ts`), grouped:
+   - **Manage** — Dashboard (at-a-glance metrics + next action), Ask AI (the chat).
+   - **Your presence** — Website (Preview / Content / Media / **History**, where History
+     holds the change log + the revert-to-last-good safety net), Google Business, Reviews,
+     Analytics, Health. Google Business + Reviews are shown by business type: an
+     online-only brand (Business info → Business type = "online", or an online-only
+     template) never sees them. See the presence resolver in `dashboard-surfaces.ts`.
+   - Identity split (founder feedback): top-left = the **business** (logo + name + domain);
+     bottom-left = the **signed-in person** ("Hello, {name}", login identity, with an Admin
+     badge + a "view as client" toggle for super-admins). Settings separates **Account**
+     (read-only login identity) from **Business info** (the editable business fields).
 3. **AI Agent** that manages the site ongoing (updates, blog, social drafts).
 4. **Weekly report** by email.
+
+> Dashboard UI conventions: accent buttons pair `bg-accent` with `text-on-accent` (dark
+> ink — white fails WCAG AA on the light sage accent). `text-warm-black` / `text-gray-muted`
+> are theme-aware and render light on the dark dashboard.
 
 ## What You See (Jacob)
 - Slack notifications for every AI change
