@@ -1566,8 +1566,10 @@ Only use tools for manifest-supported sections and actions. If the user requests
               toolName === "upload_image" ? "Uploading image..." :
               toolName === "get_metrics" ? "Checking your metrics..." :
               toolName === "get_activity" ? "Looking at recent activity..." :
-              toolName === "send_newsletter" ? "Sending newsletter..." :
+              toolName === "draft_newsletter" ? "Drafting newsletter..." :
               toolName === "list_subscribers" ? "Checking subscribers..." :
+              toolName === "create_gbp_post" ? "Drafting a Google post..." :
+              toolName === "update_business_hours" ? "Drafting your hours update..." :
               toolName === "draft_social_post" ? "Drafting social post..." :
               toolName === "list_social_posts" ? "Checking social posts..." :
               toolName === "schedule_social_post" ? "Scheduling social post..." :
