@@ -26,6 +26,10 @@ import type { AiAnswerResult } from "@/lib/visibility/ai-answers";
 import { saveVisibilitySnapshot } from "@/lib/visibility/snapshots";
 import type { VisibilitySnapshot } from "@/lib/visibility/snapshots";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 interface TenantVisibilityResult {
   tenantId: string;
   status: "ok" | "skipped" | "error";

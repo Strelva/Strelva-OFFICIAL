@@ -402,15 +402,17 @@ export async function generateWeeklyReport(
   // Verification data for the COMPLETED prior week (Mon–Sun). The report runs
   // Monday, so the just-started week would be near-empty — suppressing the
   // "verified changes this week" proof lines. Use the previous full week.
+  // UTC arithmetic (matches getWeekBounds in weekly-brief.ts) — local-time
+  // methods mixed with UTC comparisons shifted the window by a day off-UTC.
   const now = new Date();
-  const dayOfWeek = now.getDay();
+  const dayOfWeek = now.getUTCDay();
   const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() + diffToMonday - 7);
-  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setUTCDate(now.getUTCDate() + diffToMonday - 7);
+  weekStart.setUTCHours(0, 0, 0, 0);
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+  weekEnd.setUTCHours(23, 59, 59, 999);
 
   const { verifiedChanges, failedVerifications } = extractVerificationData(
     events,

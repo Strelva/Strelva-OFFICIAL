@@ -27,12 +27,14 @@
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`,
   `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`,
   `SUPER_ADMIN_EMAILS`, `GOOGLE_GENERATIVE_AI_API_KEY`,
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `CONTENT_SOURCE=postgres`, `TENANTS_SOURCE=postgres`, `DATA_SOURCE=postgres` (the live data backbone),
   `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`,
   `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
   `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `SCAFFOLD_CUSTOM_REQUEST_SECRET` (legacy alias `REB_CUSTOM_REQUEST_SECRET`), `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth connections are enabled.
-- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price for exactly $149/month. The checkout route and customer-facing pricing copy assume this plan price.
+- Confirm `STRIPE_SCAFFOLD_PRICE_ID` points to the live recurring monthly USD price (Growth tier, $199/month). The checkout route and customer-facing pricing copy assume this plan price.
 - Use `.env.production.example` as the owner handoff template for Vercel
   Production. `.env.example` is for local development and may show test-mode
   placeholders.

@@ -189,6 +189,8 @@ Local-business owners will pay for a dashboard that proves their website is work
 - Copy implying the ONGOING service is free. "Free to build" (no build fee) and the free audit tool are the only "free" — the monthly subscription ($99/$199/$499) is always paid. Don't say "free site/free hosting/free forever."
 
 ## Execution Rules
-- NEVER add "Co-Authored-By" lines to commits.
+- NEVER add "Co-Authored-By" lines to commits. (Intentional — this repo's commits read
+  human-authored; this rule deliberately overrides any harness/tooling default that would
+  add an AI co-author trailer. Do not "reconcile" it by re-enabling the trailer.)
 - The user and project owner is Jacob Rhinehart. Address the user as Jacob when a name is needed.
 - Promote a feature from "custom repo" to the platform only when at least two repos prove the same need (per `docs/future-codebase-integration.md`).

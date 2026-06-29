@@ -1167,8 +1167,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
       def: tool({
         description: "Reply to a customer review by ID. Use get_reviews first to find the review ID.",
         inputSchema: z.object({
-          reviewId: z.string().describe("The review ID to reply to"),
-          replyText: z.string().describe("The reply text"),
+          reviewId: z.string().min(1).max(200).describe("The review ID to reply to"),
+          replyText: z.string().min(1).max(4096).describe("The reply text"),
         }),
         execute: async ({ reviewId, replyText }) => {
           try {
@@ -1566,8 +1566,10 @@ Only use tools for manifest-supported sections and actions. If the user requests
               toolName === "upload_image" ? "Uploading image..." :
               toolName === "get_metrics" ? "Checking your metrics..." :
               toolName === "get_activity" ? "Looking at recent activity..." :
-              toolName === "send_newsletter" ? "Sending newsletter..." :
+              toolName === "draft_newsletter" ? "Drafting newsletter..." :
               toolName === "list_subscribers" ? "Checking subscribers..." :
+              toolName === "create_gbp_post" ? "Drafting a Google post..." :
+              toolName === "update_business_hours" ? "Drafting your hours update..." :
               toolName === "draft_social_post" ? "Drafting social post..." :
               toolName === "list_social_posts" ? "Checking social posts..." :
               toolName === "schedule_social_post" ? "Scheduling social post..." :

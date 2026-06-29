@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { checkHeartbeats } from "@/lib/heartbeat";
 import { alertOnce } from "@/lib/monitoring";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 /**
  * Cron watchdog. Runs every 30 min (vercel.json), checks that every known cron
  * has a fresh heartbeat, and alerts (deduped) on any stale one — so a silently-

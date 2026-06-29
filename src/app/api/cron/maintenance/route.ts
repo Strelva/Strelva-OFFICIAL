@@ -8,6 +8,10 @@ import { pruneOldEvents } from "@/lib/events";
 import { createDailySiteSnapshot } from "@/lib/storage";
 import { queueRetentionReengagement } from "@/lib/retention";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 export async function GET() {
   // Auth handled by proxy (CRON_SECRET check)
 

@@ -126,7 +126,7 @@ export async function validateTenantDomains(
     if (collision) {
       errors.push({
         ...entry,
-        error: `Domain already claimed by tenant ${collision.tenantId}`,
+        error: "This domain is already connected to another site",
       });
     }
   }
@@ -359,7 +359,7 @@ export async function addCustomDomain(
 
   const collision = await findDomainCollision(normalized, tenantId);
   if (collision) {
-    return { ok: false, status: 409, error: `Domain already claimed by tenant ${collision.tenantId}` };
+    return { ok: false, status: 409, error: "This domain is already connected to another site" };
   }
 
   const createdAt = nowIso();
@@ -404,7 +404,7 @@ export async function refreshDomainClaim(tenantId: string, domain: string): Prom
 
   const collision = await findDomainCollision(normalized, tenantId);
   const inspection = collision
-    ? { status: "conflict" as const, error: `Domain already claimed by tenant ${collision.tenantId}` }
+    ? { status: "conflict" as const, error: "This domain is already connected to another site" }
     : await inspectVercelDomain(normalized);
   const claim: DomainClaim = {
     ...existing,

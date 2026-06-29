@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildAttentionBriefing } from "@/lib/attention";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 /**
  * Daily operator briefing to Slack: the prioritized "what needs attention"
  * digest from the portfolio brain. Auth via the proxy (CRON_SECRET). Stays

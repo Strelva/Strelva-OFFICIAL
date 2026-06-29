@@ -87,7 +87,9 @@ describe("domain lifecycle groundwork", () => {
     expect(duplicate).toEqual({
       ok: false,
       status: 409,
-      error: "Domain already claimed by tenant alpha",
+      // Generic on purpose — the user-facing error must NOT leak the other
+      // tenant's id (the collision is still detected; the id stays server-side).
+      error: "This domain is already connected to another site",
     });
   });
 

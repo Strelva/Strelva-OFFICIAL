@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildPortfolioSnapshot, setPortfolioSummary } from "@/lib/portfolio";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 /**
  * Recompute the portfolio brain and warm the Redis cache so Mission Control and
  * the operator agent read an aggregate instead of fanning out per tenant on

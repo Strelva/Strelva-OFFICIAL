@@ -48,20 +48,18 @@ function newOrderId(): string {
   return `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Record a completed storefront order. Idempotent on externalId; returns null on dedup/no-redis. */
+/** Record a completed storefront order. Idempotent on externalId (required —
+ *  the idempotency key); returns null on dedup/no-redis. */
 export async function recordOrder(
   tenant: string,
-  input: { amountCents: number; currency: string; items: OrderLineItem[]; externalId?: string },
+  input: { amountCents: number; currency: string; items: OrderLineItem[]; externalId: string },
 ): Promise<OrderRecord | null> {
   const redis = getRedis();
   if (!redis) return null;
 
-  let dedupKey: string | null = null;
-  if (input.externalId) {
-    dedupKey = `order-ext:${tenant}:${input.externalId}`;
-    const fresh = await redis.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
-    if (!fresh) return null; // already captured this provider order
-  }
+  const dedupKey = `order-ext:${tenant}:${input.externalId}`;
+  const fresh = await redis.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
+  if (!fresh) return null; // already captured this provider order
 
   const order: OrderRecord = {
     id: newOrderId(),
@@ -82,7 +80,7 @@ export async function recordOrder(
     // Cap the index so it can't grow unbounded (the per-order keys TTL out anyway).
     await redis.zremrangebyrank(ordersKey(tenant), 0, -(ORDER_KEEP + 1));
   } catch (err) {
-    if (dedupKey) await redis.del(dedupKey).catch(() => {});
+    await redis.del(dedupKey).catch(() => {});
     throw err;
   }
   return order;

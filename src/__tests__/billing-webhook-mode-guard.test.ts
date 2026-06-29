@@ -16,8 +16,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  */
 
 const mockUpdateTenant = vi.fn();
+const mockGetTenantConfig = vi.fn();
 const mockAddEvent = vi.fn();
 const mockConstructEvent = vi.fn();
+const mockSubRetrieve = vi.fn();
 const mockRedisSet = vi.fn();
 const mockRedisGet = vi.fn();
 
@@ -28,6 +30,7 @@ let redisHandle: unknown = null;
 
 vi.mock("@/lib/tenants", () => ({
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+  getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args),
 }));
 
 vi.mock("@/lib/events", () => ({
@@ -50,6 +53,7 @@ vi.mock("@/lib/monitoring", () => ({
 vi.mock("stripe", () => {
   class FakeStripe {
     webhooks = { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) };
+    subscriptions = { retrieve: (...args: unknown[]) => mockSubRetrieve(...args) };
   }
   return { default: FakeStripe };
 });
@@ -62,6 +66,8 @@ beforeEach(() => {
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
   mockUpdateTenant.mockResolvedValue({ id: "acme" });
+  mockGetTenantConfig.mockResolvedValue(null);
+  mockSubRetrieve.mockResolvedValue({ status: "active" });
   mockAddEvent.mockResolvedValue({ id: "evt_fake" });
   mockRedisSet.mockResolvedValue("OK");
   // Default: no Redis (matches non-prod idempotency short-circuit).
@@ -339,5 +345,34 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       amountCents: 75000,
       currency: "USD",
     });
+  });
+
+  it("stores a trial subscription as 'trialing' (not active) so it isn't counted as MRR", async () => {
+    mockSubRetrieve.mockResolvedValue({ status: "trialing" });
+    const res = await postEvent({
+      id: "evt_trial",
+      type: "checkout.session.completed",
+      created: 1_700_000_000,
+      data: { object: { id: "cs_trial", mode: "subscription", subscription: "sub_trial", metadata: { tenantId: "acme" } } },
+    });
+    expect(res.status).toBe(200);
+    expect(mockSubRetrieve).toHaveBeenCalledWith("sub_trial");
+    expect(mockUpdateTenant).toHaveBeenCalledWith("acme", expect.objectContaining({ subscriptionStatus: "trialing" }));
+  });
+
+  it("preserves the first failure's past-due timestamp instead of resetting it each failure", async () => {
+    const firstFailure = "2026-06-01T00:00:00.000Z";
+    mockGetTenantConfig.mockResolvedValue({ subscriptionPastDueSince: firstFailure });
+    const res = await postEvent({
+      id: "evt_fail2",
+      type: "invoice.payment_failed",
+      created: 1_700_500_000,
+      data: { object: { id: "in_fail2", metadata: { tenantId: "acme" } } },
+    });
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "past_due", subscriptionPastDueSince: firstFailure }),
+    );
   });
 });

@@ -19,6 +19,10 @@ import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import type { Connection } from "@/lib/types";
 
+// Cap matches the platform function ceiling — this cron iterates tenants and
+// would otherwise die mid-batch at scale on a lower default.
+export const maxDuration = 300;
+
 const INSTAGRAM_REFRESH_URL = "https://graph.instagram.com/refresh_access_token";
 const INSTAGRAM_MEDIA_URL = "https://graph.instagram.com/me/media";
 

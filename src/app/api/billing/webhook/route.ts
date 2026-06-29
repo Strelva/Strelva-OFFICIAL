@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { updateTenant } from "@/lib/tenants";
+import { updateTenant, getTenantConfig } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
@@ -274,7 +274,11 @@ async function recordBuildPayment(
       body: JSON.stringify({
         text: `💸 Build payment received — ${amountLabel} (${who}). Session ${session.id}.`,
       }),
-    }).catch(() => {});
+    }).catch((err) =>
+      // The comment above promises "never silent" — honor it. The durable trail
+      // is already written; this just makes a missed ping visible in logs.
+      console.error(`[billing webhook] Slack payment ping failed for session ${session.id}:`, err),
+    );
   }
 
   // 3. Tenant event (only when we know the tenant) for the activity log.
@@ -344,7 +348,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, ignored: "mode-mismatch" });
   }
 
-  const claimResult = await claimStripeEvent(event.id);
+  // claimStripeEvent throws if Redis is unavailable in production (idempotency
+  // can't be guaranteed). That throw is OUTSIDE the processing try/catch below,
+  // so without this guard it becomes an unhandled 500 + stack leak and Stripe
+  // retries the same failure for 3 days. Catch it: 503 tells Stripe to retry
+  // later (when Redis is back) and alerts operators to the outage.
+  let claimResult: "claimed" | "duplicate" | "retry";
+  try {
+    claimResult = await claimStripeEvent(event.id);
+  } catch (err) {
+    alert("billing_webhook_idempotency_unavailable", "critical", {
+      eventType: event.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json({ error: "Idempotency store unavailable, retry" }, { status: 503 });
+  }
   if (claimResult === "duplicate") {
     return NextResponse.json({ received: true, duplicate: true });
   }
@@ -366,10 +384,24 @@ export async function POST(req: Request) {
         if (session.mode === "subscription") {
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : undefined;
+          // Reflect the subscription's ACTUAL status. A trial checkout yields a
+          // "trialing" sub (no charge yet) — it must not count as active MRR. It
+          // still grants dashboard access (requireActiveSubscription allows
+          // trialing) and flips to "active" when the trial's first invoice.paid
+          // fires. Best-effort: fall back to "active" if the lookup fails.
+          let subscriptionStatus: "active" | "trialing" = "active";
+          if (subscriptionId) {
+            try {
+              const sub = await stripe.subscriptions.retrieve(subscriptionId);
+              if (sub.status === "trialing") subscriptionStatus = "trialing";
+            } catch {
+              // keep "active" — a paid checkout completed
+            }
+          }
           await applyTenantSubscriptionStatus(
             tenantId,
             {
-              subscriptionStatus: "active",
+              subscriptionStatus,
               ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
               subscriptionStartedAt: new Date(event.created * 1000).toISOString(),
             },
@@ -396,10 +428,16 @@ export async function POST(req: Request) {
         break;
       }
 
-      case "invoice.payment_failed":
+      case "invoice.payment_failed": {
+        // Preserve the FIRST failure's timestamp across a continuous past-due
+        // streak — resetting it on every failure would let a customer with
+        // payments spaced just under 3 days apart dodge the grace window forever
+        // and keep free access. invoice.paid clears it, so a recovered-then-failed
+        // sub correctly starts a fresh streak.
+        const existing = tenantId ? await getTenantConfig(tenantId).catch(() => null) : null;
         await applyTenantSubscriptionStatus(tenantId, {
           subscriptionStatus: "past_due",
-          subscriptionPastDueSince: new Date().toISOString(),
+          subscriptionPastDueSince: existing?.subscriptionPastDueSince || new Date().toISOString(),
         }, event);
         // alert() now routes to Slack AND Sentry — a failed customer payment
         // must not be invisible if Sentry is unconfigured (it usually is).
@@ -408,6 +446,7 @@ export async function POST(req: Request) {
           hint: "Check the Stripe dashboard.",
         });
         break;
+      }
 
       case "customer.subscription.deleted":
         await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);

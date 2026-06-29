@@ -78,6 +78,9 @@ const envSourceHints: Record<string, string> = {
   NEXT_PUBLIC_APP_URL: "https://strelva.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
   NEXT_PUBLIC_SITE_URL: "https://strelva.com",
+  NEXT_PUBLIC_SUPABASE_URL: "Supabase project URL (Project Settings → API)",
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: "Supabase anon/publishable key (Project Settings → API)",
+  SUPABASE_SERVICE_ROLE_KEY: "Supabase service-role key (Project Settings → API) — server-only, bypasses RLS",
   SCAFFOLD_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints. Canonical name; the agent route falls back to REB_CUSTOM_REQUEST_SECRET if this is unset.",
   REB_CUSTOM_REQUEST_SECRET: "Legacy alias for SCAFFOLD_CUSTOM_REQUEST_SECRET. Kept readable so deployed custom repos that still set the REB_ name keep working.",
   RESEND_API_KEY: "Resend production API key",
@@ -477,7 +480,11 @@ function checkCiWorkflow(path: string) {
   ];
   const missing = requiredTerms.filter((term) => !content.includes(term));
 
-  if (missing.length || content.includes("--audit-level")) {
+  // NOTE: do NOT fail on `--audit-level` — the CI deliberately runs
+  // `pnpm audit --audit-level high` (gate on HIGH+ only). The old check here
+  // flagged the workflow as broken precisely because it was configured correctly,
+  // which blocked check:prod / check:release.
+  if (missing.length) {
     log({
       name: "CI workflow",
       status: "fail",
@@ -1039,7 +1046,29 @@ checkVercelProjectLink(".vercel/project.json");
 console.log("\n─── AI Agent ────────────────────────────────────────────────────");
 checkEnvVar("GOOGLE_GENERATIVE_AI_API_KEY", true);
 
-console.log("\n─── Content Storage (Sanity) ────────────────────────────────────");
+console.log("\n─── Data backbone (Supabase Postgres + Auth) ────────────────────");
+// Supabase is the live source of truth (auth + tenant + content + ops data).
+// A deploy missing these — or with the source flags not set to "postgres" —
+// silently falls back to reading stale Sanity, which is the worst kind of bug
+// (looks fine, serves old data). So these are hard prod requirements now.
+checkEnvVar("NEXT_PUBLIC_SUPABASE_URL", true, false);
+const hasSupabaseKey = !!(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+log({
+  name: "ENV: Supabase anon/publishable key",
+  status: hasSupabaseKey ? "ok" : "fail",
+  message: hasSupabaseKey ? "set" : "Set NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+});
+checkEnvVar("SUPABASE_SERVICE_ROLE_KEY", true);
+for (const flag of ["CONTENT_SOURCE", "TENANTS_SOURCE", "DATA_SOURCE"]) {
+  const v = process.env[flag];
+  log({
+    name: `ENV: ${flag}`,
+    status: v === "postgres" ? "ok" : "fail",
+    message: v === "postgres" ? "postgres" : `must be "postgres" in prod (is "${v ?? "unset"}" → falls back to stale Sanity)`,
+  });
+}
+
+console.log("\n─── Content Storage (Sanity — legacy, teardown pending) ─────────");
 const hasSanityProject = checkEnvVar("NEXT_PUBLIC_SANITY_PROJECT_ID", true, false);
 checkEnvVar("NEXT_PUBLIC_SANITY_DATASET", false, false);
 const hasSanityToken = checkEnvVar("SANITY_API_TOKEN", true);
