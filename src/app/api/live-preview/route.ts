@@ -38,6 +38,8 @@ export async function GET(request: Request) {
         "User-Agent": "ScaffoldWebLivePreview/1.0",
       },
       cache: "no-store",
+      // A slow/hung customer site must not hang the preview request indefinitely.
+      signal: AbortSignal.timeout(10000),
     });
 
     const contentType = upstream.headers.get("content-type") || "";

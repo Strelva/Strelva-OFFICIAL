@@ -30,9 +30,9 @@ function parseSubscriptionWeeks(interval: string | undefined): number {
 }
 
 function getRequestOrigin(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
-  const proto = req.headers.get("x-forwarded-proto") || req.nextUrl.protocol.replace(":", "") || "https";
-  return `${proto}://${host}`;
+  // Trusted origin only — not client-spoofable x-forwarded-* headers — for the
+  // Stripe success/cancel redirect (which carries the session id).
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || req.nextUrl.origin;
 }
 
 export async function POST(req: NextRequest) {

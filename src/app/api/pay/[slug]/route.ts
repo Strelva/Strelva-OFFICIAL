@@ -19,10 +19,11 @@ function getStripe() {
 }
 
 function getRequestOrigin(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
-  const proto =
-    req.headers.get("x-forwarded-proto") || req.nextUrl.protocol.replace(":", "") || "https";
-  return `${proto}://${host}`;
+  // Trusted origin only — the Stripe success/cancel redirect carries the session
+  // id, so it must not be built from client-spoofable x-forwarded-* headers.
+  // NEXT_PUBLIC_APP_URL is the canonical app host; req.nextUrl.origin is the
+  // platform-derived origin (both server-trusted).
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || req.nextUrl.origin;
 }
 
 function normalizeEmail(value: unknown): string | undefined {
