@@ -440,11 +440,11 @@ export function SitePreview() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Canvas chrome — one bar: status, page, view toggle, device, actions */}
+      {/* Canvas chrome — one bar: status, view toggle, device, actions */}
       <div className="flex items-center gap-2 border-b border-gray-border bg-surface px-3 py-2 shrink-0">
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-            isLivePreview ? "bg-emerald-400" : "bg-amber-300"
+            isLivePreview ? "bg-accent" : "bg-amber-300"
           }`}
         />
         <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
@@ -465,7 +465,7 @@ export function SitePreview() {
                 disabled={disabled}
                 onClick={() => setPreviewSource(source.value as PreviewSource)}
                 aria-pressed={active}
-                className={`h-6 rounded-md px-2.5 text-[11px] font-medium transition-colors ${
+                className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
                   active
                     ? "bg-surface text-warm-white shadow-sm"
                     : disabled
@@ -479,6 +479,8 @@ export function SitePreview() {
           })}
         </div>
 
+        <span className="mx-0.5 h-5 w-px bg-gray-border" />
+
         <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
           {BREAKPOINTS.map((bp) => {
             const active = breakpoint.label === bp.label;
@@ -489,7 +491,7 @@ export function SitePreview() {
                 aria-pressed={active}
                 aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
                 title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
-                className={`flex h-6 w-7 items-center justify-center rounded-md transition-colors ${
+                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${
                   active ? "bg-surface text-warm-white shadow-sm" : "text-gray-muted hover:text-warm-white"
                 }`}
               >
@@ -499,13 +501,13 @@ export function SitePreview() {
           })}
         </div>
 
-        <span className="mx-1 h-5 w-px bg-gray-border" />
+        <span className="mx-0.5 h-5 w-px bg-gray-border" />
 
         <button
           type="button"
           onClick={retryPreview}
           title="Refresh preview"
-          className="flex h-6 w-6 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
         >
           <RefreshCw className="h-[13px] w-[13px]" strokeWidth={1.5} />
         </button>
@@ -515,7 +517,7 @@ export function SitePreview() {
             target="_blank"
             rel="noopener noreferrer"
             title="Open live site"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
           >
             <ExternalLink className="h-[13px] w-[13px]" strokeWidth={1.5} />
           </a>

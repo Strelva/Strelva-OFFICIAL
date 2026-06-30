@@ -496,9 +496,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
             <h3 className="truncate text-[15px] font-semibold text-warm-white">
               {SECTION_LABELS[activeSection] || activeSection}
             </h3>
-            <p className="mt-0.5 truncate text-[10px] text-gray-faint">
-              Click text in the preview to edit it.
-            </p>
           </div>
           <button
             onClick={() => setTab(tab === "versions" ? "edit" : "versions")}
@@ -564,9 +561,9 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
       {/* Saved confirmation */}
       {saved && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
-          <Check className="w-4 h-4 text-emerald-500 animate-check-settle" strokeWidth={2} />
-          <span className="text-[12px] font-medium text-emerald-400">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-accent/[0.07] shrink-0">
+          <Check className="w-4 h-4 text-accent animate-check-settle" strokeWidth={2} />
+          <span className="text-[12px] font-medium text-accent-text">
             {editMode === "draft"
               ? "Draft saved - preview updated"
               : liveSyncEnabled
@@ -655,14 +652,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                         type="color"
                         value={hex}
                         onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        className="h-9 w-12 rounded-xl border-0 bg-surface-inset p-1 cursor-pointer"
+                        className="h-9 w-12 rounded-lg border-0 bg-surface-inset p-1 cursor-pointer"
                       />
                       <input
                         type="text"
                         value={hex}
                         onChange={(e) => handleFieldChange(field.key, e.target.value)}
                         placeholder="#000000"
-                        className="w-28 rounded-xl border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black font-mono"
+                        className="w-28 rounded-lg border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black font-mono"
                       />
                     </div>
                   </div>
@@ -680,7 +677,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                     <select
                       value={current}
                       onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                      className="w-full rounded-xl border-0 bg-surface-inset px-3.5 py-2 text-[13px] text-warm-black"
+                      className="w-full rounded-lg border-0 bg-surface-inset px-3.5 py-2 text-[13px] text-warm-black"
                     >
                       {current && !opts.some((o) => o.value === current) && (
                         <option value={current}>{current}</option>

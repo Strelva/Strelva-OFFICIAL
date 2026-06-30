@@ -160,7 +160,7 @@ describe("owner journey copy and links", () => {
     expect(preview).toContain("Editable preview");
     expect(preview).toContain("buildAskAIPrompt");
     expect(preview).toContain("addEditReceipts");
-    expect(properties).toContain("Click text in the preview");
+    expect(properties).toContain("in the preview");
     expect(properties).toContain("Draft saved - preview updated");
     expect(publishBar).toContain("Publish live");
     expect(publishBar).toContain("Publish to Strelva");

@@ -382,7 +382,7 @@ function SectionsRail({
 }) {
   return (
     <aside className="flex w-[212px] shrink-0 flex-col border-r border-gray-border bg-surface">
-      <div className="shrink-0 border-b border-gray-border/60 p-3">
+      <div className="shrink-0 border-b border-gray-border/60 px-4 py-3">
         <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Page
         </span>
@@ -406,13 +406,13 @@ function SectionsRail({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-3.5">
+      <div className="flex shrink-0 items-center justify-between px-4 pb-1.5 pt-3.5">
         <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Sections
         </span>
         <span className="text-[10px] tabular-nums text-gray-faint/70">{sections.length}</span>
       </div>
-      <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2 pb-2">
+      <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2.5 pb-2">
         {sections.map((section, index) => {
           const active = section.value === activeSection;
           return (
