@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Minimize2, Monitor, Pencil, RefreshCw, Smartphone, Tablet, Wand2 } from "lucide-react";
+import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Tablet } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
@@ -124,8 +124,7 @@ export function SitePreview() {
     BREAKPOINTS[2]
   );
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
-  const [previewSource, setPreviewSource] = useState<PreviewSource>("live");
-  const [scaffoldMode, setScaffoldMode] = useState(false);
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("editable");
   const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(0);
@@ -150,7 +149,6 @@ export function SitePreview() {
     setChatPrompt,
     setRightTab,
     setSelectedNode,
-    selectedNode,
     addEditReceipts,
   } = useDashboard();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -218,30 +216,12 @@ export function SitePreview() {
     ? dashboardHref(`/api/edit-preview?${editPreviewParams.toString()}`)
     : directEditableIframeSrc;
   const requestedPreviewSource = previewSource === "live" && !siteUrl ? "editable" : previewSource;
-  const effectivePreviewSource = hasAnyDraft && !scaffoldMode ? "editable" : requestedPreviewSource;
+  const effectivePreviewSource = hasAnyDraft ? "editable" : requestedPreviewSource;
   const iframeSrc = effectivePreviewSource === "live" && siteUrl ? liveIframeSrc : editableIframeSrc;
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
   const isLivePreview = effectivePreviewSource === "live" && !!siteUrl;
   const previewKind = isLivePreview ? "Active site preview" : "Editable preview";
   const previewBadgeLabel = isLivePreview ? "Active site" : hasAnyDraft ? "Draft preview" : "Editable preview";
-  const previewBadgeDetail = (() => {
-    try {
-      const url = new URL(isLivePreview ? liveTargetUrl : iframeSrc, "http://localhost");
-      return isLivePreview ? url.hostname : "unpublished draft";
-    } catch {
-      return isLivePreview ? "live site" : "unpublished draft";
-    }
-  })();
-  const activeSectionLabel = activeSection
-    ? SECTION_LABELS[activeSection] || activeSection
-    : null;
-  const scaffoldSections = [...(siteModelPages[activePage]?.sections || [])]
-    .sort((a, b) => a.order - b.order)
-    .map((section) => ({
-      value: section.type,
-      label: SECTION_LABELS[section.type] || section.type,
-    }));
-
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource: effectivePreviewSource });
   if (
@@ -270,15 +250,6 @@ export function SitePreview() {
       setActiveSection(null);
     }
   }, [activePage, setActiveSection]);
-
-  useEffect(() => {
-    if (!scaffoldMode) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setScaffoldMode(false);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [scaffoldMode]);
 
   // Handle scroll-to-section requests from ContentBrowser
   useEffect(() => {
@@ -360,7 +331,7 @@ export function SitePreview() {
         const node = toEditableNode(data);
         if (node) {
           setSelectedNode(node);
-          setRightTab(node.nodeType === "section" ? "layout" : "properties");
+          setRightTab("properties");
           setContextMenu(null);
         }
       }
@@ -371,7 +342,7 @@ export function SitePreview() {
             nodeType: "section",
             label: SECTION_LABELS[data.section] || data.section,
           });
-          setRightTab("layout");
+          setRightTab("properties");
         } else {
           setActiveSection(data.section);
         }
@@ -451,204 +422,117 @@ export function SitePreview() {
     triggerRefresh();
   }, [triggerRefresh]);
 
-  const focusSelectedSection = useCallback(() => {
-    if (!activeSection) return;
-    setRightTab("properties");
-    setScrollToSection(activeSection);
-  }, [activeSection, setRightTab, setScrollToSection]);
-
-  const askAIForSelectedSection = useCallback(() => {
-    const label = activeSectionLabel || "selected section";
-    const fieldLabel =
-      selectedNode?.section === activeSection && selectedNode.field
-        ? selectedNode.label || labelFromEditablePath(selectedNode.field)
-        : undefined;
-    setChatPrompt(buildAskAIPrompt(label, fieldLabel));
-    setRightTab("chat");
-  }, [activeSection, activeSectionLabel, selectedNode, setChatPrompt, setRightTab]);
-
   return (
-    <div
-        className={
-          scaffoldMode
-            ? "fixed inset-0 z-[80] flex h-screen flex-col bg-[oklch(4%_0.01_255)] animate-overlay-enter"
-            : "flex h-full flex-col"
-        }
-    >
+    <div className="flex h-full flex-col">
+      {/* Canvas chrome — one bar: status, page, view toggle, device, actions */}
+      <div className="flex items-center gap-2 border-b border-gray-border bg-surface px-3 py-2 shrink-0">
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+            isLivePreview ? "bg-emerald-400" : "bg-amber-300"
+          }`}
+        />
+        <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
+
+        <span className="mx-1 h-5 w-px bg-gray-border" />
+
+        <select
+          value={activePage}
+          onChange={(event) => {
+            setActiveSection(null);
+            setActivePage(event.target.value);
+          }}
+          className="h-7 rounded-md border border-gray-border bg-surface-raised px-2 text-[11px] font-medium text-warm-white outline-none transition-colors focus:border-gray-muted"
+          aria-label="Page"
+        >
+          {pageOptions.map((page) => (
+            <option key={page.value} value={page.value}>
+              {page.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
+          {[
+            { value: "editable", label: "Edit" },
+            { value: "live", label: "Live" },
+          ].map((source) => {
+            const active = effectivePreviewSource === source.value;
+            const disabled = source.value === "live" && !siteUrl;
+            return (
+              <button
+                key={source.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => setPreviewSource(source.value as PreviewSource)}
+                aria-pressed={active}
+                className={`h-6 rounded-md px-2.5 text-[11px] font-medium transition-colors ${
+                  active
+                    ? "bg-surface text-warm-white shadow-sm"
+                    : disabled
+                      ? "cursor-not-allowed text-gray-faint/60"
+                      : "text-gray-muted hover:text-warm-white"
+                }`}
+              >
+                {source.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
+          {BREAKPOINTS.map((bp) => {
+            const active = breakpoint.label === bp.label;
+            return (
+              <button
+                key={bp.label}
+                onClick={() => setBreakpoint(bp)}
+                aria-pressed={active}
+                aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
+                title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
+                className={`flex h-6 w-7 items-center justify-center rounded-md transition-colors ${
+                  active ? "bg-surface text-warm-white shadow-sm" : "text-gray-muted hover:text-warm-white"
+                }`}
+              >
+                <bp.icon className="h-[13px] w-[13px]" strokeWidth={1.5} />
+              </button>
+            );
+          })}
+        </div>
+
+        <span className="mx-1 h-5 w-px bg-gray-border" />
+
+        <button
+          type="button"
+          onClick={retryPreview}
+          title="Refresh preview"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+        >
+          <RefreshCw className="h-[13px] w-[13px]" strokeWidth={1.5} />
+        </button>
+        {siteUrl && (
+          <a
+            href={liveTargetUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open live site"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+          >
+            <ExternalLink className="h-[13px] w-[13px]" strokeWidth={1.5} />
+          </a>
+        )}
+      </div>
+
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className={`relative flex flex-1 justify-center overflow-hidden ${
-          scaffoldMode ? "bg-[oklch(4%_0.01_255)] p-0" : "bg-surface-base p-3 xl:p-4"
-        }`}
+        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-3 xl:p-4"
       >
-        {!scaffoldMode && (
-          <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-9.5rem)] items-center gap-2 rounded-full border border-white/10 bg-[rgba(8,8,10,0.76)] px-3 py-2 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                isLivePreview ? "bg-emerald-300" : "bg-amber-300"
-              }`}
-            />
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em]">
-              {previewBadgeLabel}
-            </span>
-            <span className="min-w-0 truncate text-[11px] text-white/55">
-              {previewBadgeDetail}
-            </span>
-          </div>
-        )}
 
-        {!scaffoldMode && (
-          <button
-            type="button"
-            onClick={() => {
-              setPreviewSource("editable");
-              setScaffoldMode(true);
-            }}
-            className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-[rgba(8,8,10,0.76)] px-3 text-[12px] font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(8,8,10,0.9)]"
-          >
-            <Wand2 className="h-3.5 w-3.5" strokeWidth={1.6} />
-            Edit mode
-          </button>
-        )}
-
-        {scaffoldMode && (
-          <div className="pointer-events-none absolute inset-x-4 bottom-5 z-20 flex items-end justify-center">
-            <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[rgba(8,8,10,0.8)] p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-overlay-enter">
-              <div className="flex items-center gap-1.5 px-2">
-                <Wand2 className="h-3.5 w-3.5 text-white" strokeWidth={1.6} />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">Site editor</span>
-              </div>
-              <span className="mx-1 h-6 w-px bg-white/10" />
-              <select
-                value={activePage}
-                onChange={(event) => {
-                  setActiveSection(null);
-                  setActivePage(event.target.value);
-                }}
-                className="h-8 min-w-[112px] rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-medium text-white outline-none transition-colors focus:border-white/30"
-                aria-label="Page"
-              >
-                {pageOptions.map((page) => (
-                  <option key={page.value} value={page.value}>
-                    {page.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={activeSection || ""}
-                onChange={(event) => setActiveSection(event.target.value || null)}
-                className="h-8 min-w-[172px] rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-medium text-white outline-none transition-colors focus:border-white/30"
-                aria-label="Section"
-              >
-                <option value="">Select section</option>
-                {scaffoldSections.map((section) => (
-                  <option key={section.value} value={section.value}>
-                    {section.label}
-                  </option>
-                ))}
-              </select>
-              <span className="mx-1 h-6 w-px bg-white/10" />
-            {[
-              { value: "editable", label: "Edit" },
-              { value: "live", label: "Live" },
-            ].map((source) => {
-              const active = effectivePreviewSource === source.value;
-              const disabled = source.value === "live" && !siteUrl;
-              return (
-                <button
-                  key={source.value}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setPreviewSource(source.value as PreviewSource)}
-                  aria-pressed={active}
-                  className={`h-7 rounded-full px-3 text-[11px] font-medium transition-colors ${
-                    active
-                      ? "bg-white text-black"
-                      : disabled
-                        ? "cursor-not-allowed text-white/25"
-                        : "text-white/65 hover:text-white"
-                  }`}
-                >
-                  {source.label}
-                </button>
-              );
-            })}
-            <span className="mx-1 h-6 w-px bg-white/10" />
-            {BREAKPOINTS.map((bp) => {
-              const active = breakpoint.label === bp.label;
-              return (
-                <button
-                  key={bp.label}
-                  onClick={() => setBreakpoint(bp)}
-                  aria-pressed={active}
-                  aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
-                  title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
-                  className={`flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors ${
-                    active ? "bg-white/12 text-white" : "text-white/55 hover:text-white"
-                  }`}
-                >
-                  <bp.icon className="h-[13px] w-[13px]" strokeWidth={1.5} />
-                  <span className="hidden xl:inline">{bp.label}</span>
-                </button>
-              );
-            })}
-            <span className="mx-1 h-6 w-px bg-white/10" />
-            <button
-              type="button"
-              onClick={focusSelectedSection}
-              disabled={!activeSection || isLivePreview}
-              className="h-7 rounded-full px-3 text-[11px] font-medium text-white/65 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              Edit fields
-            </button>
-            <button
-              type="button"
-              onClick={askAIForSelectedSection}
-              className="h-7 rounded-full px-3 text-[11px] font-medium text-white/65 transition-colors hover:text-white"
-            >
-              Ask AI
-            </button>
-            <a
-              href={siteUrl || "/"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-              title="Open live site"
-            >
-              <ExternalLink className="h-[14px] w-[14px]" strokeWidth={1.5} />
-            </a>
-            <button
-              type="button"
-              onClick={retryPreview}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-              title="Refresh preview"
-            >
-              <RefreshCw className="h-[14px] w-[14px]" strokeWidth={1.5} />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setScaffoldMode(false);
-                if (!hasAnyDraft && siteUrl) setPreviewSource("live");
-              }}
-              className="flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-medium text-black transition-colors hover:bg-white/90"
-              title="Exit preview mode"
-              aria-label="Exit preview mode"
-            >
-              <Minimize2 className="h-[13px] w-[13px]" strokeWidth={1.5} />
-              Exit
-            </button>
-          </div>
-        </div>
-        )}
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full shrink-0 overflow-hidden bg-surface transition-[max-width] duration-200 ease-out ${
-            scaffoldMode
-              ? "rounded-none"
-              : `rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] xl:rounded-xl ${refreshKey > 0 ? "preview-flash" : ""}`
-          }`}
+          className={`relative h-full w-full shrink-0 overflow-hidden rounded-lg bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] transition-[max-width] duration-200 ease-out xl:rounded-xl ${refreshKey > 0 ? "preview-flash" : ""}`}
           style={{
             width: breakpoint.width ? `${breakpoint.width}px` : "100%",
             maxWidth: breakpoint.width ? undefined : "100%",

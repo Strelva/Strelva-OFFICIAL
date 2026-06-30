@@ -154,10 +154,10 @@ describe("owner journey copy and links", () => {
     expect(workspace).toContain("hasDrafts={hasAnyDraft}");
     expect(workspace).toContain("markDraftReceipts");
     expect(workspace).not.toContain('label: "AI Chat"');
-    expect(preview).toContain('useState<PreviewSource>("live")');
+    expect(preview).toContain('useState<PreviewSource>("editable")');
     expect(preview).toContain("Active site");
     expect(preview).toContain("Draft preview");
-    expect(preview).toContain("Site editor");
+    expect(preview).toContain("Editable preview");
     expect(preview).toContain("buildAskAIPrompt");
     expect(preview).toContain("addEditReceipts");
     expect(properties).toContain("Click text in the preview");
