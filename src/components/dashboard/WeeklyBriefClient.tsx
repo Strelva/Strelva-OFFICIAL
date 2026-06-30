@@ -2,15 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { TrendingUp, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
+import { TrendingUp, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief } from "@/lib/types";
 import type { DailyMetric } from "@/lib/storage";
+import type { ProofCard } from "@/lib/proof";
+import { metricVerdicts } from "@/lib/proof";
+import type { Goal } from "@/lib/goals";
 import { useDashboardOptional } from "./DashboardContext";
+import { GoalCard } from "./GoalCard";
 
 interface WeeklyBriefClientProps {
   brief: WeeklyBrief | null;
   history?: WeeklyBrief[];
   dailyMetrics?: DailyMetric[];
+  proofCards?: ProofCard[];
+  goal?: Goal | null;
 }
 
 /** Plain-English verdict on whether the site is working, from the week's numbers. */
@@ -129,7 +135,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
 
   if (!brief) {
@@ -138,7 +144,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: We
         <div className="mx-auto w-full max-w-4xl">
           <div className="mb-5 max-w-2xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Analytics
+              Reports
             </p>
             <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
               Your first weekly report is still warming up
@@ -211,6 +217,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: We
   const topServices = brief.topServices ?? [];
   const topSearchQueries = brief.topSearchQueries ?? [];
   const staleSections = brief.staleSections ?? [];
+  const verdicts = metricVerdicts(brief.stats);
 
   return (
     <div className="flex flex-col h-full animate-route-enter">
@@ -275,6 +282,55 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [] }: We
               icon={FileText}
             />
           </div>
+
+          {/* What this means — the verdict on each number, in plain English */}
+          <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "108ms" }}>
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+              What this means
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {verdicts.map((v) => (
+                <div key={v.key} className="rounded-xl border border-glass-border bg-glass p-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        v.tone === "good" ? "bg-success" : v.tone === "attention" ? "bg-amber-400" : "bg-gray-faint"
+                      }`}
+                    />
+                    <p className="text-[12px] font-medium text-warm-black">{v.label}</p>
+                  </div>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-gray-fg">{v.verdict}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Weekly goal + progress */}
+          <div className="animate-fade-in-up" style={{ animationDelay: "118ms" }}>
+            <GoalCard goal={goal} stats={brief.stats} />
+          </div>
+
+          {/* Before/after proof — site changes that moved the needle */}
+          {proofCards.length > 0 && (
+            <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "128ms" }}>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+                Proof it&apos;s working
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {proofCards.map((c) => (
+                  <div key={c.changedAt} className="rounded-xl border border-success/25 bg-success-dim/40 p-4">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-success" strokeWidth={2} />
+                      <p className="text-[14px] font-semibold text-warm-black">{c.headline}</p>
+                    </div>
+                    <p className="mt-2 text-[12px] text-gray-muted">
+                      {c.beforeAvg} &rarr; {c.afterAvg} visitors/day on average
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {brief.nextAction && (
             <div

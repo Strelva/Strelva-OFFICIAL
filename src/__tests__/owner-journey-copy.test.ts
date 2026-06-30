@@ -16,14 +16,14 @@ describe("owner journey copy and links", () => {
     expect(surfaces).toContain('label: "Ask AI"');
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
-    expect(surfaces).toContain('label: "Analytics"');
+    expect(surfaces).toContain('label: "Reports"');
     expect(surfaces).toContain('label: "Reviews"');
     expect(surfaces).toContain('label: "Health"');
 
     // Old IA names should not resurface as nav labels.
     expect(surfaces).not.toContain('label: "Site"');
     expect(surfaces).not.toContain('label: "Sources"');
-    expect(surfaces).not.toContain('label: "Reports"');
+    expect(surfaces).not.toContain('label: "Analytics"');
   });
 
   it("keeps the dashboard root focused on proof and next action", () => {
