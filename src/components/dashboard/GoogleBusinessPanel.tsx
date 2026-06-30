@@ -58,7 +58,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
         </div>
 
         <Link
-          href={dashboardHref("/dashboard/integrations")}
+          href={dashboardHref("/dashboard/sources/google-business")}
           prefetch={false}
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[14px] font-medium text-surface-base transition-opacity hover:opacity-90"
         >

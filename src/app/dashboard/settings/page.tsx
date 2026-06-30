@@ -850,6 +850,7 @@ function CapabilitiesSection() {
   const apiPath = useDashboardApiPath();
   const readOnly = useDashboardOptional()?.readOnly ?? false;
   const [capabilities, setCapabilities] = useState<SiteCapabilitiesData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   useEffect(() => {
@@ -864,7 +865,8 @@ function CapabilitiesSection() {
         designTokens: data?.siteCapabilities?.designTokens || data?.customRepo?.supportedDesignTokens || ["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"],
         customOnlyFeatures: data?.siteCapabilities?.customOnlyFeatures || data?.customRepo?.customFeatures || [],
       }))
-      .catch(() => setSaveStatus("error"));
+      .catch(() => setSaveStatus("error"))
+      .finally(() => setLoading(false));
   }, [apiPath]);
 
   const saveCapabilities = useCallback(async (next: SiteCapabilitiesData) => {
@@ -883,7 +885,17 @@ function CapabilitiesSection() {
     }
   }, [apiPath]);
 
-  if (!capabilities) return <SkeletonLine width="w-full" height="h-20" />;
+  if (loading) return <SkeletonLine width="w-full" height="h-20" />;
+  if (!capabilities) {
+    return (
+      <div className="rounded-lg border border-gray-border bg-surface-raised px-5 py-6 text-center">
+        <p className="text-[13px] font-medium text-warm-white">Couldn&apos;t load site capabilities</p>
+        <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
+          Refresh the page to try again.
+        </p>
+      </div>
+    );
+  }
 
   const toggles: Array<[keyof SiteCapabilitiesData, string]> = [
     ["supportsPageConfig", "Page structure"],

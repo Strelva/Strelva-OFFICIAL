@@ -49,6 +49,8 @@ export interface Thread {
 interface HistorySidebarProps {
   /** The business the account is managing — shown top-left with its logo. */
   businessName: string;
+  /** The business's own uploaded logo (settings.logoUrl), if any. */
+  businessLogoUrl?: string;
   /** The signed-in person — shown bottom-left as "Hello, {first name}". */
   accountName: string;
   accountEmail?: string | null;
@@ -62,28 +64,20 @@ interface HistorySidebarProps {
   pendingCount?: number;
 }
 
-/** The client's favicon as their logo, derived from their site domain. Falls back
- *  to the name's initial if there's no domain or the favicon fails to load.
- *  Sits on a light chip so a dark logo (e.g. Rohlax) stays visible on the dark UI. */
-function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
+/** The business's own uploaded logo, falling back to its initial. Uses the
+ *  tenant's `logoUrl` directly — deliberately NOT Google's favicon service,
+ *  which leaked the client domain to Google on every load and 404'd for new/
+ *  local domains. Sits on a light chip so a dark logo stays visible on the dark UI. */
+function SidebarLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
   const [failed, setFailed] = useState(false);
-  let host = "";
-  try {
-    if (siteUrl) host = new URL(siteUrl).hostname.replace(/^www\./, "");
-  } catch {
-    host = "";
-  }
-  const favicon = host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : "";
 
-  if (favicon && !failed) {
+  if (logoUrl && !failed) {
     return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-warm-white">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-border bg-warm-white">
         <img
-          src={favicon}
+          src={logoUrl}
           alt=""
-          width={16}
-          height={16}
-          className="h-4 w-4 object-contain"
+          className="h-full w-full object-contain p-0.5"
           onError={() => setFailed(true)}
         />
       </div>
@@ -99,6 +93,7 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
 
 export function HistorySidebar({
   businessName,
+  businessLogoUrl,
   accountName,
   accountEmail,
   isSuperAdmin = false,
@@ -138,12 +133,19 @@ export function HistorySidebar({
     fetch(dashboardHref("/api/threads"), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        const list = Array.isArray(data) ? data : [];
+        const list = (Array.isArray(data) ? data : []) as Array<
+          Thread & { messages?: Array<{ content?: string }> }
+        >;
         setThreads(
-          list.slice(0, 6).map((thread: Thread & { messages?: Array<{ content?: string }> }) => ({
-            ...thread,
-            preview: thread.preview || thread.messages?.at(-1)?.content || "No messages yet",
-          })),
+          list
+            // Drop empty threads (created but never used) so the history isn't
+            // cluttered with "No messages yet" placeholders.
+            .filter((thread) => Boolean(thread.preview?.trim()) || Boolean(thread.messages?.length))
+            .slice(0, 6)
+            .map((thread) => ({
+              ...thread,
+              preview: thread.preview || thread.messages?.at(-1)?.content || "",
+            })),
         );
       })
       .catch(() => setThreads([]));
@@ -202,7 +204,7 @@ export function HistorySidebar({
       {/* Business identity — the business this account manages: logo + name + its
           own domain. No search, no "visitors this week" (moved to the dashboard). */}
       <div className="flex min-w-0 items-center gap-2.5 px-4 pt-4 lg:pl-5">
-        <SidebarLogo name={businessName} siteUrl={siteUrl} />
+        <SidebarLogo name={businessName} logoUrl={businessLogoUrl} />
         <div className="min-w-0">
           <PropertySwitcher fallbackName={businessName} />
           {siteHost && (

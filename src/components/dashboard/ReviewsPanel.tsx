@@ -298,7 +298,7 @@ export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
               can draft a reply for each one.
             </p>
             <Link
-              href={dashboardHref("/dashboard/integrations")}
+              href={dashboardHref("/dashboard/sources/google-business")}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               Connect Google

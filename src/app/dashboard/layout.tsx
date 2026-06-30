@@ -85,10 +85,12 @@ export default async function DashboardLayout({
     : tenantEditablePreviewUrl;
   let siteName = "Your Business";
   let settingsBusinessModel = "";
+  let businessLogoUrl = "";
   try {
     const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
     settingsBusinessModel = settings.businessModel || "";
+    businessLogoUrl = settings.logoUrl || "";
   } catch {}
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
@@ -178,6 +180,7 @@ export default async function DashboardLayout({
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationShell
           businessName={siteName}
+          businessLogoUrl={businessLogoUrl}
           accountName={accountName}
           accountEmail={accountEmail}
           isSuperAdmin={isAdmin}
