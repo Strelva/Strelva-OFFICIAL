@@ -331,6 +331,7 @@ export function SitePreview() {
         const node = toEditableNode(data);
         if (node) {
           setSelectedNode(node);
+          setActiveSection(node.section);
           setRightTab("properties");
           setContextMenu(null);
         }
@@ -342,9 +343,8 @@ export function SitePreview() {
             nodeType: "section",
             label: SECTION_LABELS[data.section] || data.section,
           });
-          setRightTab("properties");
-        } else {
           setActiveSection(data.section);
+          setRightTab("properties");
         }
         setContextMenu(null);
       }

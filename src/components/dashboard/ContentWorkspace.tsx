@@ -37,6 +37,7 @@ export function ContentWorkspace({
   const {
     activeSection,
     setActiveSection,
+    setScrollToSection,
     rightTab,
     setRightTab,
     rightCollapsed,
@@ -213,6 +214,16 @@ export function ContentWorkspace({
 
       {viewportMode === "desktop" && (
         <div className="flex flex-1 min-h-0">
+          <SectionsRail
+            sections={sectionOptions}
+            activeSection={activeSection}
+            onSelect={(value) => {
+              setActiveSection(value);
+              setScrollToSection(value);
+              setRightTab("properties");
+            }}
+          />
+
           <main className="flex-1 flex flex-col min-w-0">
             <SitePreview />
           </main>
@@ -285,6 +296,51 @@ export function ContentWorkspace({
       </div>
       )}
     </div>
+  );
+}
+
+function SectionsRail({
+  sections,
+  activeSection,
+  onSelect,
+}: {
+  sections: { value: string; label: string }[];
+  activeSection: string | null;
+  onSelect: (value: string) => void;
+}) {
+  if (sections.length === 0) return null;
+  return (
+    <aside className="flex w-[196px] shrink-0 flex-col border-r border-gray-border bg-surface">
+      <div className="shrink-0 px-3 py-2.5">
+        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+          Sections
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-2">
+        {sections.map((section) => {
+          const active = section.value === activeSection;
+          return (
+            <button
+              key={section.value}
+              type="button"
+              onClick={() => onSelect(section.value)}
+              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
+                active
+                  ? "bg-surface-raised text-warm-white"
+                  : "text-gray-muted hover:bg-surface-raised/50 hover:text-warm-white"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+                  active ? "bg-accent" : "bg-gray-border"
+                }`}
+              />
+              <span className="truncate">{section.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
   );
 }
 
