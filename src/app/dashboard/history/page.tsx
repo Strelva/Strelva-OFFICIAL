@@ -48,7 +48,7 @@ export default async function SiteHistoryPage() {
               href={dashboardHref("/dashboard/reports")}
               className="text-[12px] font-medium text-accent hover:text-accent/80"
             >
-              Analytics
+              Reports
             </Link>
           </div>
           {recentChanges.length > 0 ? (

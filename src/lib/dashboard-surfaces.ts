@@ -138,7 +138,9 @@ export function getDashboardSurfaces({
       state: reviewsReady ? "shown" : local ? "connect" : "hidden",
       group: "presence",
     },
-    { id: "analytics", label: "Analytics", href: "/dashboard/reports", state: "shown", group: "presence" },
+    // Labeled "Reports" (not "Analytics") — for a non-technical owner the weekly
+    // report is the retention artifact; "Analytics" buried it behind data jargon.
+    { id: "analytics", label: "Reports", href: "/dashboard/reports", state: "shown", group: "presence" },
     // Site health — the daily scan engine (speed, security, SEO, accessibility),
     // the same checks behind the public audit. Always relevant: every site is scanned.
     { id: "health", label: "Health", href: "/dashboard/health", state: "shown", group: "presence" },
