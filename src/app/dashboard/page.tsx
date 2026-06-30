@@ -15,6 +15,7 @@ import { getTemplateForTenant } from "@/components/templates/registry";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
+import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 
 function StatTile({
   label,
@@ -165,6 +166,7 @@ async function DashboardHome({
           </div>
         </header>
 
+          <OnboardingWizard />
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
 
           {isFresh ? (
