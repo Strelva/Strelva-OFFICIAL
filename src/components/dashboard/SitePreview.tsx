@@ -266,6 +266,29 @@ export function SitePreview() {
     }
   }, [scrollToSection, setScrollToSection, pagePath]);
 
+  // Handshake: tell the editable preview which origin to trust, so the in-page
+  // overlay will post click/select messages back. Without this the overlay
+  // silently drops every canvas interaction.
+  useEffect(() => {
+    if (previewStatus !== "ready" || effectivePreviewSource !== "editable") return;
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    let targetOrigin = window.location.origin;
+    try {
+      targetOrigin = new URL(iframeSrc, window.location.origin).origin;
+    } catch {}
+    // Re-send a few times: the in-page overlay attaches its listener a tick after
+    // the iframe's load event, so a single post can miss the handshake.
+    const send = () => {
+      try {
+        win.postMessage({ type: "reb-edit-mode", enabled: true }, targetOrigin);
+      } catch {}
+    };
+    send();
+    const timers = [200, 500, 1000].map((ms) => window.setTimeout(send, ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [previewStatus, effectivePreviewSource, iframeSrc]);
+
   // Send highlight to iframe when activeSection changes
   useEffect(() => {
     if (iframeRef.current?.contentWindow) {
