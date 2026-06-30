@@ -145,7 +145,6 @@ export function SitePreview() {
     dashboardHref,
     siteModel,
     activePage,
-    setActivePage,
     setChatPrompt,
     setRightTab,
     setSelectedNode,
@@ -179,12 +178,6 @@ export function SitePreview() {
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
   }
-  const pageOptions = Object.keys(siteModelPages)
-    .sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b)))
-    .map((page) => ({
-      value: page,
-      label: page === "home" ? "Home" : page.charAt(0).toUpperCase() + page.slice(1),
-    }));
   const currentPage = activeSection
     ? (sectionToPage[activeSection] || activePage || "home")
     : (activePage || "home");
@@ -455,24 +448,6 @@ export function SitePreview() {
           }`}
         />
         <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
-
-        <span className="mx-1 h-5 w-px bg-gray-border" />
-
-        <select
-          value={activePage}
-          onChange={(event) => {
-            setActiveSection(null);
-            setActivePage(event.target.value);
-          }}
-          className="h-7 rounded-md border border-gray-border bg-surface-raised px-2 text-[11px] font-medium text-warm-white outline-none transition-colors focus:border-gray-muted"
-          aria-label="Page"
-        >
-          {pageOptions.map((page) => (
-            <option key={page.value} value={page.value}>
-              {page.label}
-            </option>
-          ))}
-        </select>
 
         <div className="flex-1" />
 

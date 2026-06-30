@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PanelRightOpen } from "lucide-react";
+import { ChevronDown, PanelRightOpen } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
@@ -11,6 +11,7 @@ import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
 import { PublishBar, type PublishOutcome } from "./design/PublishBar";
 import type { SectionData } from "./ContentBrowser";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
+import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 
 interface ContentWorkspaceProps {
   siteName: string;
@@ -38,6 +39,9 @@ export function ContentWorkspace({
     activeSection,
     setActiveSection,
     setScrollToSection,
+    activePage,
+    setActivePage,
+    siteModel,
     rightTab,
     setRightTab,
     rightCollapsed,
@@ -64,6 +68,30 @@ export function ContentWorkspace({
       })),
     [sectionData],
   );
+
+  // Pages and their sections come from the active site model's page config, so
+  // the rail shows a Page selector on top of that page's sections.
+  const siteModelPages = useMemo(() => getDefaultPageConfig(siteModel), [siteModel]);
+  const pageOptions = useMemo(
+    () =>
+      Object.keys(siteModelPages)
+        .sort((a, b) => (a === "home" ? -1 : b === "home" ? 1 : a.localeCompare(b)))
+        .map((page) => ({
+          value: page,
+          label: page === "home" ? "Home" : page.charAt(0).toUpperCase() + page.slice(1),
+        })),
+    [siteModelPages],
+  );
+  const pageSections = useMemo(() => {
+    const secs = [...(siteModelPages[activePage]?.sections || [])]
+      .sort((a, b) => a.order - b.order)
+      .filter((section) => section.visible !== false)
+      .map((section) => ({
+        value: section.type,
+        label: SECTION_LABELS[section.type] || sectionData[section.type]?.preview || section.type,
+      }));
+    return secs.length > 0 ? secs : sectionOptions;
+  }, [siteModelPages, activePage, sectionData, sectionOptions]);
 
   const hasAnyDraft = Object.values(hasDraft).some(Boolean) || hasPageConfigDraft;
 
@@ -104,9 +132,9 @@ export function ContentWorkspace({
   }, [setRightTab]);
 
   useEffect(() => {
-    if (activeSection || sectionOptions.length === 0) return;
-    setActiveSection(sectionOptions[0].value);
-  }, [activeSection, sectionOptions, setActiveSection]);
+    if (activeSection || pageSections.length === 0) return;
+    setActiveSection(pageSections[0].value);
+  }, [activeSection, pageSections, setActiveSection]);
 
   useEffect(() => {
     const updateViewportMode = () => setViewportMode(getWorkspaceViewport());
@@ -215,7 +243,13 @@ export function ContentWorkspace({
       {viewportMode === "desktop" && (
         <div className="flex flex-1 min-h-0">
           <SectionsRail
-            sections={sectionOptions}
+            pages={pageOptions}
+            activePage={activePage}
+            onPageChange={(value) => {
+              setActivePage(value);
+              setActiveSection(null);
+            }}
+            sections={pageSections}
             activeSection={activeSection}
             onSelect={(value) => {
               setActiveSection(value);
@@ -300,18 +334,47 @@ export function ContentWorkspace({
 }
 
 function SectionsRail({
+  pages,
+  activePage,
+  onPageChange,
   sections,
   activeSection,
   onSelect,
 }: {
+  pages: { value: string; label: string }[];
+  activePage: string;
+  onPageChange: (value: string) => void;
   sections: { value: string; label: string }[];
   activeSection: string | null;
   onSelect: (value: string) => void;
 }) {
-  if (sections.length === 0) return null;
   return (
-    <aside className="flex w-[208px] shrink-0 flex-col border-r border-gray-border bg-surface">
-      <div className="flex shrink-0 items-center justify-between px-3.5 py-3">
+    <aside className="flex w-[212px] shrink-0 flex-col border-r border-gray-border bg-surface">
+      <div className="shrink-0 border-b border-gray-border/60 p-3">
+        <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
+          Page
+        </span>
+        <div className="relative">
+          <select
+            value={activePage}
+            onChange={(event) => onPageChange(event.target.value)}
+            className="w-full appearance-none rounded-lg border border-gray-border bg-surface-raised py-2 pl-3 pr-8 text-[12.5px] font-medium text-warm-white outline-none transition-colors hover:border-gray-muted focus:border-gray-muted"
+            aria-label="Page"
+          >
+            {pages.map((page) => (
+              <option key={page.value} value={page.value}>
+                {page.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-muted"
+            strokeWidth={1.5}
+          />
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-3.5">
         <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Sections
         </span>
