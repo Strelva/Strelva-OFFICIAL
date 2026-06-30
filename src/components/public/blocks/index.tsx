@@ -1,5 +1,5 @@
 import type { PageSectionConfig } from "@/lib/types";
-import { validateBlockProps } from "@/lib/blocks/registry";
+import { validateBlockProps, BLOCK_PREFIX } from "@/lib/blocks/registry";
 
 /**
  * The block renderer — maps a registered block `type` to a component, fed
@@ -165,7 +165,9 @@ const RENDERERS: Record<string, (p: Record<string, unknown>) => React.ReactNode>
 };
 
 export function BlockRenderer({ block }: { block: PageSectionConfig }) {
-  const Render = RENDERERS[block.type];
+  // RENDERERS is keyed by the short name; the stored type is namespaced.
+  const key = block.type.startsWith(BLOCK_PREFIX) ? block.type.slice(BLOCK_PREFIX.length) : block.type;
+  const Render = RENDERERS[key];
   if (!Render) return null;
   return <>{Render(validateBlockProps(block.type, block.props))}</>;
 }

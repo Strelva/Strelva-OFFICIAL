@@ -16,11 +16,19 @@ const alignField: BlockFieldSpec = {
 const alignSchema = z.enum(ALIGN).default("left");
 
 /**
+ * Block type ids are namespaced (`block:heading`) so they never collide with a
+ * template section type (`hero`, `services`, …) — same idea as Gutenberg's
+ * `core/heading`. Authored below with short keys; the namespace is applied once
+ * when the registry is built.
+ */
+export const BLOCK_PREFIX = "block:";
+
+/**
  * The core block set — deliberately simple, flat props (no nested arrays) so the
  * editor stays a clean field form and the AI can edit any block reliably. Each
  * schema uses `.default()` everywhere so validation never throws on partial props.
  */
-export const BLOCK_DEFINITIONS: Record<string, BlockDefinition> = {
+const RAW_DEFINITIONS: Record<string, BlockDefinition> = {
   heading: {
     type: "heading",
     label: "Heading",
@@ -249,6 +257,14 @@ export const BLOCK_DEFINITIONS: Record<string, BlockDefinition> = {
     ],
   },
 };
+
+/** The registry, keyed by namespaced type (`block:heading`). */
+export const BLOCK_DEFINITIONS: Record<string, BlockDefinition> = Object.fromEntries(
+  Object.entries(RAW_DEFINITIONS).map(([key, def]) => {
+    const type = `${BLOCK_PREFIX}${key}`;
+    return [type, { ...def, type }];
+  }),
+);
 
 export const BLOCK_TYPES = Object.keys(BLOCK_DEFINITIONS);
 

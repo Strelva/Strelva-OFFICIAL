@@ -7,22 +7,24 @@ import {
 } from "@/lib/blocks/registry";
 
 describe("block registry", () => {
-  it("distinguishes blocks from legacy template sections", () => {
-    expect(isBlockType("heading")).toBe(true);
-    expect(isBlockType("cta")).toBe(true);
-    expect(isBlockType("services")).toBe(false); // legacy typed section
-    expect(isBlockType("nope")).toBe(false);
+  it("distinguishes namespaced blocks from legacy template sections", () => {
+    expect(isBlockType("block:heading")).toBe(true);
+    expect(isBlockType("block:cta")).toBe(true);
+    // Critical: a block id must never collide with a template section type.
+    expect(isBlockType("hero")).toBe(false); // template section, not the block
+    expect(isBlockType("services")).toBe(false);
+    expect(isBlockType("heading")).toBe(false); // un-namespaced is not a block
   });
 
   it("coerces and fills props from the schema", () => {
-    const p = validateBlockProps("heading", { text: "Hi", level: "3" });
+    const p = validateBlockProps("block:heading", { text: "Hi", level: "3" });
     expect(p.text).toBe("Hi");
     expect(p.level).toBe(3); // string coerced to number
     expect(p.align).toBe("left"); // default filled
   });
 
   it("fills every default for an empty block", () => {
-    const p = validateBlockProps("button", {});
+    const p = validateBlockProps("block:button", {});
     expect(p.label).toBe("Get started");
     expect(p.href).toBe("#");
     expect(p.style).toBe("primary");
