@@ -152,6 +152,117 @@ function SpacerBlock(p: Record<string, unknown>) {
   return <div className={size[s(p.size, "medium")] ?? "h-12"} aria-hidden />;
 }
 
+function embedUrl(url: string): string {
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  return "";
+}
+
+function VideoBlock(p: Record<string, unknown>) {
+  const src = embedUrl(s(p.url));
+  if (!src) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-400">
+        Paste a YouTube or Vimeo link
+      </div>
+    );
+  }
+  return (
+    <figure>
+      <div className="aspect-video w-full overflow-hidden rounded-xl">
+        <iframe src={src} className="h-full w-full" allowFullScreen title={s(p.caption, "Video")} />
+      </div>
+      {s(p.caption) && <figcaption className="mt-2 text-center text-[13px] text-gray-500">{s(p.caption)}</figcaption>}
+    </figure>
+  );
+}
+
+function QuoteBlock(p: Record<string, unknown>) {
+  return (
+    <figure className="mx-auto max-w-2xl text-center">
+      <blockquote className="text-xl font-medium leading-relaxed text-gray-900 sm:text-2xl">&ldquo;{s(p.text)}&rdquo;</blockquote>
+      {(s(p.author) || s(p.role)) && (
+        <figcaption className="mt-4 text-[14px] text-gray-500">
+          <span className="font-medium text-gray-900">{s(p.author)}</span>
+          {s(p.role) && <span> · {s(p.role)}</span>}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+function GalleryBlock(p: Record<string, unknown>) {
+  const imgs = [s(p.img1), s(p.img2), s(p.img3), s(p.img4)].filter(Boolean);
+  if (imgs.length === 0) {
+    return (
+      <div className="flex aspect-[16/7] w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-400">
+        Add images to your gallery
+      </div>
+    );
+  }
+  return (
+    <div className={`grid gap-3 ${imgs.length >= 3 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2"}`}>
+      {imgs.map((src, i) => (
+        <img key={i} src={src} alt="" className="aspect-square w-full rounded-lg object-cover" />
+      ))}
+    </div>
+  );
+}
+
+function StatsBlock(p: Record<string, unknown>) {
+  const stats = [
+    { v: s(p.stat1Value), l: s(p.stat1Label) },
+    { v: s(p.stat2Value), l: s(p.stat2Label) },
+    { v: s(p.stat3Value), l: s(p.stat3Label) },
+  ].filter((x) => x.v || x.l);
+  return (
+    <div className="grid gap-6 sm:grid-cols-3">
+      {stats.map((x, i) => (
+        <div key={i} className="text-center">
+          <p className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">{x.v}</p>
+          <p className="mt-1 text-[13px] text-gray-500">{x.l}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FaqBlock(p: Record<string, unknown>) {
+  const items = [
+    { q: s(p.q1), a: s(p.a1) },
+    { q: s(p.q2), a: s(p.a2) },
+    { q: s(p.q3), a: s(p.a3) },
+  ].filter((x) => x.q);
+  return (
+    <div className="mx-auto max-w-2xl divide-y divide-gray-200">
+      {items.map((x, i) => (
+        <div key={i} className="py-4">
+          <p className="text-[16px] font-medium text-gray-900">{x.q}</p>
+          {x.a && <p className="mt-1.5 text-[14px] leading-relaxed text-gray-600">{x.a}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LogosBlock(p: Record<string, unknown>) {
+  const logos = [s(p.logo1), s(p.logo2), s(p.logo3), s(p.logo4)].filter(Boolean);
+  return (
+    <div className="text-center">
+      {s(p.heading) && <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-gray-400">{s(p.heading)}</p>}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+        {logos.length === 0
+          ? <span className="text-sm text-gray-400">Add logos</span>
+          : logos.map((src, i) => (
+              <img key={i} src={src} alt="" className="h-8 w-auto object-contain opacity-60 grayscale" />
+            ))}
+      </div>
+    </div>
+  );
+}
+
 const RENDERERS: Record<string, (p: Record<string, unknown>) => React.ReactNode> = {
   heading: HeadingBlock,
   text: TextBlock,
@@ -162,6 +273,12 @@ const RENDERERS: Record<string, (p: Record<string, unknown>) => React.ReactNode>
   columns: ColumnsBlock,
   divider: DividerBlock,
   spacer: SpacerBlock,
+  video: VideoBlock,
+  quote: QuoteBlock,
+  gallery: GalleryBlock,
+  stats: StatsBlock,
+  faq: FaqBlock,
+  logos: LogosBlock,
 };
 
 export function BlockRenderer({ block }: { block: PageSectionConfig }) {

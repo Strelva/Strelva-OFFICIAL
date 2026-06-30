@@ -256,6 +256,117 @@ const RAW_DEFINITIONS: Record<string, BlockDefinition> = {
       },
     ],
   },
+
+  video: {
+    type: "video",
+    label: "Video",
+    icon: "Video",
+    category: "media",
+    defaults: { url: "", caption: "" },
+    schema: z.object({ url: z.string().default(""), caption: z.string().default("") }),
+    fields: [
+      { key: "url", label: "Video URL", type: "url", placeholder: "YouTube or Vimeo link", help: "Paste a YouTube or Vimeo link — we embed it." },
+      { key: "caption", label: "Caption", type: "text" },
+    ],
+  },
+
+  quote: {
+    type: "quote",
+    label: "Quote",
+    icon: "Quote",
+    category: "text",
+    defaults: { text: "Working with them was the best decision we made.", author: "Happy customer", role: "" },
+    schema: z.object({ text: z.string().default(""), author: z.string().default(""), role: z.string().default("") }),
+    fields: [
+      { key: "text", label: "Quote", type: "textarea" },
+      { key: "author", label: "Author", type: "text" },
+      { key: "role", label: "Role / company", type: "text" },
+    ],
+  },
+
+  gallery: {
+    type: "gallery",
+    label: "Gallery",
+    icon: "Images",
+    category: "media",
+    defaults: { img1: "", img2: "", img3: "", img4: "" },
+    schema: z.object({
+      img1: z.string().default(""), img2: z.string().default(""),
+      img3: z.string().default(""), img4: z.string().default(""),
+    }),
+    fields: [
+      { key: "img1", label: "Image 1", type: "image" },
+      { key: "img2", label: "Image 2", type: "image" },
+      { key: "img3", label: "Image 3", type: "image" },
+      { key: "img4", label: "Image 4", type: "image" },
+    ],
+  },
+
+  stats: {
+    type: "stats",
+    label: "Stats",
+    icon: "BarChart3",
+    category: "layout",
+    defaults: {
+      stat1Value: "500+", stat1Label: "Happy clients",
+      stat2Value: "4.9", stat2Label: "Average rating",
+      stat3Value: "10 yrs", stat3Label: "In business",
+    },
+    schema: z.object({
+      stat1Value: z.string().default(""), stat1Label: z.string().default(""),
+      stat2Value: z.string().default(""), stat2Label: z.string().default(""),
+      stat3Value: z.string().default(""), stat3Label: z.string().default(""),
+    }),
+    fields: [
+      { key: "stat1Value", label: "Stat 1 value", type: "text" },
+      { key: "stat1Label", label: "Stat 1 label", type: "text" },
+      { key: "stat2Value", label: "Stat 2 value", type: "text" },
+      { key: "stat2Label", label: "Stat 2 label", type: "text" },
+      { key: "stat3Value", label: "Stat 3 value", type: "text" },
+      { key: "stat3Label", label: "Stat 3 label", type: "text" },
+    ],
+  },
+
+  faq: {
+    type: "faq",
+    label: "FAQ",
+    icon: "CircleHelp",
+    category: "text",
+    defaults: { q1: "How does it work?", a1: "Tell us, and we handle it.", q2: "Can I cancel anytime?", a2: "Yes — no contracts.", q3: "", a3: "" },
+    schema: z.object({
+      q1: z.string().default(""), a1: z.string().default(""),
+      q2: z.string().default(""), a2: z.string().default(""),
+      q3: z.string().default(""), a3: z.string().default(""),
+    }),
+    fields: [
+      { key: "q1", label: "Question 1", type: "text" },
+      { key: "a1", label: "Answer 1", type: "textarea" },
+      { key: "q2", label: "Question 2", type: "text" },
+      { key: "a2", label: "Answer 2", type: "textarea" },
+      { key: "q3", label: "Question 3", type: "text" },
+      { key: "a3", label: "Answer 3", type: "textarea" },
+    ],
+  },
+
+  logos: {
+    type: "logos",
+    label: "Logo row",
+    icon: "Building2",
+    category: "media",
+    defaults: { heading: "Trusted by local businesses", logo1: "", logo2: "", logo3: "", logo4: "" },
+    schema: z.object({
+      heading: z.string().default(""),
+      logo1: z.string().default(""), logo2: z.string().default(""),
+      logo3: z.string().default(""), logo4: z.string().default(""),
+    }),
+    fields: [
+      { key: "heading", label: "Heading", type: "text" },
+      { key: "logo1", label: "Logo 1", type: "image" },
+      { key: "logo2", label: "Logo 2", type: "image" },
+      { key: "logo3", label: "Logo 3", type: "image" },
+      { key: "logo4", label: "Logo 4", type: "image" },
+    ],
+  },
 };
 
 /** The registry, keyed by namespaced type (`block:heading`). */
