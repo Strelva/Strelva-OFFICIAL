@@ -161,6 +161,9 @@ Local-business owners will pay for a dashboard that proves their website is work
      Analytics, Health. Google Business + Reviews are shown by business type: an
      online-only brand (Business info → Business type = "online", or an online-only
      template) never sees them. See the presence resolver in `dashboard-surfaces.ts`.
+     The first-run checklist (`/api/dashboard/onboarding-status`) leads with "Tell us
+     how customers find you" so business type is set on day one, before the presence
+     surfaces render — `settings.businessModel` drives it (`"" `= infer from template).
    - Identity split (founder feedback): top-left = the **business** (logo + name + domain);
      bottom-left = the **signed-in person** ("Hello, {name}", login identity, with an Admin
      badge + a "view as client" toggle for super-admins). Settings separates **Account**

@@ -4,12 +4,13 @@ import { NextResponse } from "next/server";
 const mockGetTenantFromHeaders = vi.hoisted(() => vi.fn());
 const mockRequireTenantAccess = vi.hoisted(() => vi.fn());
 const mockGetActivity = vi.hoisted(() => vi.fn());
+const mockGetContent = vi.hoisted(() => vi.fn());
 const mockGetWeeklyBrief = vi.hoisted(() => vi.fn());
 const mockGetConnections = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: mockGetTenantFromHeaders }));
 vi.mock("@/lib/auth", () => ({ requireTenantAccess: mockRequireTenantAccess }));
-vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity }));
+vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity, getContent: mockGetContent }));
 vi.mock("@/lib/weekly-brief", () => ({ getWeeklyBrief: mockGetWeeklyBrief }));
 vi.mock("@/lib/connections", () => ({ getConnections: mockGetConnections }));
 
@@ -18,6 +19,7 @@ beforeEach(() => {
   mockGetTenantFromHeaders.mockResolvedValue("acme");
   mockRequireTenantAccess.mockResolvedValue(null);
   mockGetActivity.mockResolvedValue([]);
+  mockGetContent.mockResolvedValue({});
   mockGetWeeklyBrief.mockResolvedValue(null);
   mockGetConnections.mockResolvedValue([]);
 });
@@ -41,10 +43,11 @@ describe("GET /api/dashboard/onboarding-status", () => {
     mockGetConnections.mockResolvedValue([{ id: "google" }]);
     mockGetActivity.mockResolvedValue([{ text: "AI updated hours" }]);
     mockGetWeeklyBrief.mockResolvedValue({ summary: "..." });
+    mockGetContent.mockResolvedValue({ businessModel: "local" });
     const { GET } = await import("@/app/api/dashboard/onboarding-status/route");
     const body = await (await GET()).json();
     expect(body.complete).toBe(true);
     const byKey = Object.fromEntries(body.steps.map((s: { key: string; done: boolean }) => [s.key, s.done]));
-    expect(byKey).toEqual({ connect: true, ai_edit: true, report: true });
+    expect(byKey).toEqual({ business_type: true, connect: true, ai_edit: true, report: true });
   });
 });
