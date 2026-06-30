@@ -3,6 +3,7 @@ import { getWeeklyBrief, getWeeklyBriefs } from "@/lib/weekly-brief";
 import { getDailyMetrics, getActivity } from "@/lib/storage";
 import { getGoal } from "@/lib/goals";
 import { buildProofCards } from "@/lib/proof";
+import { detectTrafficAnomaly } from "@/lib/anomaly";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 
@@ -21,6 +22,8 @@ export default async function ReportsPage() {
 
   // Correlate AI changes with the traffic that followed → before/after proof.
   const proofCards = buildProofCards(activity, dailyMetrics);
+  // Flag a meaningful break in the traffic trend (down 35%+ / up 100%+).
+  const anomaly = detectTrafficAnomaly(dailyMetrics);
 
   return (
     <>
@@ -31,6 +34,7 @@ export default async function ReportsPage() {
         dailyMetrics={dailyMetrics}
         proofCards={proofCards}
         goal={goal}
+        anomaly={anomaly}
       />
     </>
   );

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { TrendingUp, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief } from "@/lib/types";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
 import type { Goal } from "@/lib/goals";
+import type { TrafficAnomaly } from "@/lib/anomaly";
 import { useDashboardOptional } from "./DashboardContext";
 import { GoalCard } from "./GoalCard";
 
@@ -17,6 +18,7 @@ interface WeeklyBriefClientProps {
   dailyMetrics?: DailyMetric[];
   proofCards?: ProofCard[];
   goal?: Goal | null;
+  anomaly?: TrafficAnomaly | null;
 }
 
 /** Plain-English verdict on whether the site is working, from the week's numbers. */
@@ -135,7 +137,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
 
   if (!brief) {
@@ -242,6 +244,36 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5 sm:py-8">
         <div className="max-w-5xl space-y-6">
+          {/* Anomaly heads-up — a meaningful break in the traffic trend, with a why + a fix */}
+          {anomaly && (
+            <div
+              className={`rounded-xl border p-4 sm:p-5 animate-fade-in-up ${
+                anomaly.type === "drop" ? "border-amber-400/30 bg-amber-400/10" : "border-success/25 bg-success-dim/40"
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                {anomaly.type === "drop" ? (
+                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" strokeWidth={2} />
+                ) : (
+                  <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-success" strokeWidth={2} />
+                )}
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-warm-black">{anomaly.headline}</p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-gray-fg">{anomaly.why}</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-gray-fg">
+                    <span className="font-medium text-warm-black">Do this:</span> {anomaly.suggestion}
+                  </p>
+                  <Link
+                    href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}
+                    className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
+                  >
+                    Ask the AI to handle it &rarr;
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div
             className="max-w-3xl text-[16px] text-gray-fg leading-relaxed animate-fade-in-up"
             style={{ animationDelay: "50ms" }}
