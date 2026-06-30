@@ -149,8 +149,9 @@ describe("owner journey copy and links", () => {
     const publishBar = readRepoFile("src/components/dashboard/design/PublishBar.tsx");
 
     expect(workspace).toContain('label: "Edit"');
-    expect(workspace).toContain('label: "Layout"');
-    expect(workspace).toContain("Ready to publish");
+    expect(workspace).toContain('label: "Ask AI"');
+    expect(workspace).toContain("PropertiesEditor");
+    expect(workspace).toContain("hasDrafts={hasAnyDraft}");
     expect(workspace).toContain("markDraftReceipts");
     expect(workspace).not.toContain('label: "AI Chat"');
     expect(preview).toContain('useState<PreviewSource>("live")');

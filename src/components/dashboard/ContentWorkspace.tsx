@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FileText, GitBranch, LayoutList, MessageCircle, PanelRightOpen, SlidersHorizontal } from "lucide-react";
+import { PanelRightOpen } from "lucide-react";
 import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
-import type { EditReceipt } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
 import { PropertiesEditor } from "./PropertiesEditor";
-import { LayoutPanel } from "./LayoutPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
 import { PublishBar, type PublishOutcome } from "./design/PublishBar";
@@ -28,11 +26,6 @@ function getWorkspaceViewport(): WorkspaceViewport {
   if (window.innerWidth >= 1024) return "desktop";
   if (window.innerWidth >= 768) return "tablet";
   return "mobile";
-}
-
-function shorten(value: string, max = 58): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length > max ? `${compact.slice(0, max - 3)}...` : compact;
 }
 
 export function ContentWorkspace({
@@ -56,7 +49,6 @@ export function ContentWorkspace({
     setHasPageConfigDraft,
     reloadDraftState,
     triggerRefresh,
-    editReceipts,
     markDraftReceipts,
     readOnly,
   } = useDashboard();
@@ -73,14 +65,6 @@ export function ContentWorkspace({
   );
 
   const hasAnyDraft = Object.values(hasDraft).some(Boolean) || hasPageConfigDraft;
-  const draftSections = useMemo(
-    () => Object.entries(hasDraft).filter(([, value]) => value).map(([section]) => section),
-    [hasDraft],
-  );
-  const draftReceipts = useMemo(
-    () => editReceipts.filter((receipt) => receipt.status === "draft"),
-    [editReceipts],
-  );
 
   const handlePublishAll = useCallback(async (): Promise<PublishOutcome> => {
     const res = await fetch(dashboardHref("/api/publish"), {
@@ -130,86 +114,50 @@ export function ContentWorkspace({
     return () => window.removeEventListener("resize", updateViewportMode);
   }, []);
 
-  const showSectionContext = rightTab === "properties" || rightTab === "layout";
+  const inRequest = rightTab === "request";
+  const inChat = rightTab === "chat";
 
   const rightPanelContent = (
     <>
-      <div className="border-b border-gray-border bg-surface px-2.5 pb-2 pt-2.5 shrink-0 space-y-2">
-        {/* What you're editing — explicit section switcher */}
-        {showSectionContext && sectionOptions.length > 0 && (
-          <label className="flex items-center gap-2">
-            <span className="shrink-0 text-[9px] font-medium uppercase tracking-[0.14em] text-gray-faint">
-              Editing
-            </span>
-            <select
-              value={activeSection ?? ""}
-              onChange={(event) => setActiveSection(event.target.value)}
-              className="min-w-0 flex-1 truncate rounded-md border border-gray-border bg-surface-raised px-2 py-1.5 text-[12px] font-medium text-warm-white outline-none transition-colors focus:border-gray-muted"
-            >
-              {sectionOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {/* Primary: the two ways to change content */}
-        <div className="grid grid-cols-2 gap-1">
+      {/* One slim mode switch — Edit the selected element, or ask the AI */}
+      <div className="flex items-center justify-between gap-2 border-b border-gray-border bg-surface px-2 py-2 shrink-0">
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
           {[
-            { value: "properties", label: "Edit", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-            { value: "chat", label: "Ask AI", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-          ].map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setRightTab(item.value as "properties" | "chat" | "layout" | "request")}
-              className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium transition-colors ${
-                rightTab === item.value
-                  ? "bg-surface-raised text-warm-white shadow-sm ring-1 ring-gray-border"
-                  : "text-gray-muted hover:bg-surface-raised/60 hover:text-warm-white"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+            { value: "properties", label: "Edit" },
+            { value: "chat", label: "Ask AI" },
+          ].map((item) => {
+            const active = item.value === "chat" ? inChat : !inChat && !inRequest;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setRightTab(item.value as "properties" | "chat")}
+                className={`flex h-7 items-center rounded-md px-3.5 text-[12px] font-medium transition-colors ${
+                  active
+                    ? "bg-surface text-warm-white shadow-sm"
+                    : "text-gray-muted hover:text-warm-white"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-
-        {/* Secondary: structure + custom work */}
-        <div className="flex items-center gap-1">
-          {[
-            { value: "layout", label: "Layout", icon: <LayoutList className="h-3 w-3" strokeWidth={1.5} /> },
-            { value: "request", label: "Request a change", icon: <GitBranch className="h-3 w-3" strokeWidth={1.5} /> },
-          ].map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setRightTab(item.value as "properties" | "chat" | "layout" | "request")}
-              className={`flex h-7 items-center gap-1.5 rounded-md px-2 text-[10.5px] font-medium transition-colors ${
-                rightTab === item.value
-                  ? "bg-surface-raised/80 text-warm-white"
-                  : "text-gray-faint hover:bg-surface-raised/40 hover:text-gray-muted"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => setRightTab(inRequest ? "properties" : "request")}
+          className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+            inRequest ? "text-warm-white" : "text-gray-faint hover:text-gray-muted"
+          }`}
+        >
+          Request a change
+        </button>
       </div>
 
-      {hasAnyDraft && (
-        <ReadyToPublishPanel receipts={draftReceipts} draftSections={draftSections} hasPageConfigDraft={hasPageConfigDraft} />
-      )}
-
       <div className="flex min-h-0 flex-1 flex-col">
-        {rightTab === "chat" ? (
+        {inChat ? (
           <ChatPanel ownerName={ownerName || siteName} variant="compact" />
-        ) : rightTab === "layout" ? (
-          <LayoutPanel />
-        ) : rightTab === "request" ? (
+        ) : inRequest ? (
           <CustomChangeRequestPanel />
         ) : (
           <PropertiesEditor activeSection={activeSection} />
@@ -269,17 +217,12 @@ export function ContentWorkspace({
             <SitePreview />
           </main>
 
-          {/* Right: Properties + Chat */}
           <aside
             className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
               rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
             }`}
           >
-            {rightCollapsed ? (
-              <CollapsedRight />
-            ) : (
-              rightPanelContent
-            )}
+            {rightCollapsed ? <CollapsedRight /> : rightPanelContent}
           </aside>
         </div>
       )}
@@ -340,71 +283,6 @@ export function ContentWorkspace({
           liveSyncEnabled={liveSyncEnabled}
         />
       </div>
-      )}
-    </div>
-  );
-}
-
-function ReadyToPublishPanel({
-  receipts,
-  draftSections,
-  hasPageConfigDraft,
-}: {
-  receipts: EditReceipt[];
-  draftSections: string[];
-  hasPageConfigDraft: boolean;
-}) {
-  const visibleReceipts = receipts.slice(0, 3);
-  const hiddenCount = Math.max(0, receipts.length - visibleReceipts.length);
-  const sectionLabels = draftSections
-    .map((section) => SECTION_LABELS[section] || section)
-    .slice(0, 3);
-
-  return (
-    <div className="border-b border-gray-border bg-amber-500/[0.035] px-3 py-3">
-      <div className="mb-2 flex items-start gap-2">
-        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/10 text-amber-300">
-          <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.7} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-warm-white">Ready to publish</p>
-          <p className="mt-0.5 text-[10px] leading-4 text-gray-faint">
-            {receipts.length > 0
-              ? `${receipts.length} saved ${receipts.length === 1 ? "edit is" : "edits are"} in the draft preview.`
-              : `${draftSections.length + (hasPageConfigDraft ? 1 : 0)} draft ${draftSections.length + (hasPageConfigDraft ? 1 : 0) === 1 ? "change is" : "changes are"} waiting for review.`}
-          </p>
-        </div>
-      </div>
-
-      {visibleReceipts.length > 0 ? (
-        <div className="space-y-1.5">
-          {visibleReceipts.map((receipt) => (
-            <div key={receipt.id} className="rounded-md border border-gray-border/70 bg-surface/70 px-2.5 py-2">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="truncate text-[10px] font-medium text-gray-muted">
-                  {receipt.sectionLabel} / {receipt.fieldLabel}
-                </span>
-                <span className="shrink-0 text-[9px] uppercase tracking-[0.08em] text-amber-300">
-                  Draft
-                </span>
-              </div>
-              <div className="grid gap-1 text-[10px] leading-4">
-                <p className="truncate text-gray-faint">Before: {shorten(receipt.before)}</p>
-                <p className="truncate text-warm-white">After: {shorten(receipt.after)}</p>
-              </div>
-            </div>
-          ))}
-          {hiddenCount > 0 && (
-            <p className="pl-1 text-[10px] text-gray-faint">+{hiddenCount} more saved {hiddenCount === 1 ? "edit" : "edits"}</p>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-md border border-gray-border/70 bg-surface/70 px-2.5 py-2 text-[10px] text-gray-muted">
-          <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-          <span className="truncate">
-            {sectionLabels.length > 0 ? sectionLabels.join(", ") : "Layout"} draft waiting in preview.
-          </span>
-        </div>
       )}
     </div>
   );

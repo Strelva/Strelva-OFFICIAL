@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Save, Check, RotateCcw, AlertCircle, MessageCircle, Pencil, History } from "lucide-react";
+import { Save, Check, RotateCcw, AlertCircle, MessageCircle, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { StringArrayEditor } from "./StringArrayEditor";
@@ -267,7 +267,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   const {
     triggerRefresh,
     editMode,
-    hasDraft,
     setHasDraft,
     siteModel,
     liveSyncEnabled,
@@ -429,8 +428,8 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
             <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
           </svg>
         }
-        title="Select a section to edit"
-        description="Click any section in the left panel"
+        title="Click anything on your site to edit it"
+        description="Select text, an image, or a button in the preview"
         className="h-full"
       />
     );
@@ -498,33 +497,20 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               {SECTION_LABELS[activeSection] || activeSection}
             </h3>
             <p className="mt-0.5 truncate text-[10px] text-gray-faint">
-              Click text in the preview or update fields here. Save draft, review, then publish live.
+              Click text in the preview to edit it.
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded border border-gray-border bg-gray-bg-alt p-0.5">
-            <button
-              onClick={() => setTab("edit")}
-              className={`flex items-center gap-1 px-2 h-6 rounded text-[11px] transition-colors ${
-                tab === "edit"
-                  ? "bg-surface text-warm-black shadow-sm"
-                  : "text-gray-muted hover:text-warm-black"
-              }`}
-            >
-              <Pencil className="w-3 h-3" strokeWidth={1.5} />
-              Edit
-            </button>
-            <button
-              onClick={() => setTab("versions")}
-              className={`flex items-center gap-1 px-2 h-6 rounded text-[11px] transition-colors ${
-                tab === "versions"
-                  ? "bg-surface text-warm-black shadow-sm"
-                  : "text-gray-muted hover:text-warm-black"
-              }`}
-            >
-              <History className="w-3 h-3" strokeWidth={1.5} />
-              Versions
-            </button>
-          </div>
+          <button
+            onClick={() => setTab(tab === "versions" ? "edit" : "versions")}
+            className={`flex shrink-0 items-center gap-1 rounded-md px-2 h-7 text-[11px] font-medium transition-colors ${
+              tab === "versions"
+                ? "bg-surface-raised text-warm-white"
+                : "text-gray-faint hover:text-warm-white"
+            }`}
+          >
+            <History className="w-3 h-3" strokeWidth={1.5} />
+            History
+          </button>
         </div>
       </div>
 
@@ -576,20 +562,6 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         </div>
       )}
 
-      {/* Publish bar — shown in draft mode when a draft exists */}
-      {editMode === "draft" && activeSection && hasDraft[activeSection] && !hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.04] shrink-0 animate-fade-in-up">
-          <div>
-            <p className="text-[11px] font-medium text-amber-300">Draft saved</p>
-            <p className="text-[10px] text-gray-faint">
-              {liveSyncEnabled
-                ? "Review the preview, then publish live from the bottom bar."
-                : "Review the preview, then publish your changes from the bottom bar."}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Saved confirmation */}
       {saved && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
@@ -599,7 +571,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               ? "Draft saved - preview updated"
               : liveSyncEnabled
                 ? "Saved - live refresh requested"
-                : "Saved to Scaffold"}
+                : "Saved"}
           </span>
         </div>
       )}
@@ -622,9 +594,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
       {/* Fields */}
       <div className="flex-1 overflow-y-auto pb-20">
-        <div className="px-4 pb-1 pt-3">
-          <p className="text-[10px] font-mono uppercase tracking-[0.08em] text-gray-muted">Inputs</p>
-        </div>
+        <div className="pt-3" />
         {selectedNode?.section === activeSection && selectedNode.field && (
           <div className="mx-4 mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2">
             <div className="flex items-start justify-between gap-3">
@@ -677,7 +647,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 const hex = (getNestedValue(data, field.key) as string) || "#000000";
                 return (
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-fg mb-1">
+                    <label className="block text-[11px] text-gray-muted mb-0.5">
                       {field.label}
                     </label>
                     <div className="flex items-center gap-2">
@@ -685,14 +655,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                         type="color"
                         value={hex}
                         onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        className="h-8 w-10 rounded border border-gray-border bg-surface p-0.5 cursor-pointer"
+                        className="h-9 w-12 rounded-xl border-0 bg-surface-inset p-1 cursor-pointer"
                       />
                       <input
                         type="text"
                         value={hex}
                         onChange={(e) => handleFieldChange(field.key, e.target.value)}
                         placeholder="#000000"
-                        className="w-24 h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black font-mono"
+                        className="w-28 rounded-xl border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black font-mono"
                       />
                     </div>
                   </div>
@@ -704,13 +674,13 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 const opts = field.options ?? [];
                 return (
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-fg mb-1">
+                    <label className="block text-[11px] text-gray-muted mb-0.5">
                       {field.label}
                     </label>
                     <select
                       value={current}
                       onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                      className="w-full h-8 px-2 text-[12px] rounded border border-gray-border bg-surface text-warm-black"
+                      className="w-full rounded-xl border-0 bg-surface-inset px-3.5 py-2 text-[13px] text-warm-black"
                     >
                       {current && !opts.some((o) => o.value === current) && (
                         <option value={current}>{current}</option>
