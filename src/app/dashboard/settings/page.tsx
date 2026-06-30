@@ -64,19 +64,36 @@ function useDashboardApiPath() {
 // Identity field definitions
 // ---------------------------------------------------------------------------
 
-const IDENTITY_FIELDS: readonly {
+type IdentityField = {
   key: string;
   label: string;
   description: string;
   multiline?: boolean;
   mono?: boolean;
-}[] = [
-  { key: "siteName", label: "Site Name", description: "Your business name" },
-  { key: "ownerName", label: "Owner Name", description: "Shown in greetings" },
+  /** When set, the field renders as a dropdown instead of a text input. */
+  options?: { value: string; label: string }[];
+};
+
+/** Business — the public-facing identity of the business this account manages.
+ *  (The personal greeting comes from the login, shown read-only in Account.) */
+const BUSINESS_FIELDS: readonly IdentityField[] = [
+  { key: "siteName", label: "Business name", description: "Your business name" },
+  { key: "ownerName", label: "Owner name", description: "Primary contact for the business" },
+  {
+    key: "businessModel",
+    label: "Business type",
+    description: "Sets whether Google Business & Reviews apply to you",
+    options: [
+      { value: "", label: "Auto (based on your site)" },
+      { value: "local", label: "Local — customers visit or I serve an area" },
+      { value: "online", label: "Online only — no physical/local presence" },
+      { value: "hybrid", label: "Both online and local" },
+    ],
+  },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
   { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
-  { key: "footerTagline", label: "Footer Tagline", description: "Bottom of your site" },
+  { key: "footerTagline", label: "Footer tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
 
@@ -153,11 +170,14 @@ function setNestedValue(
 // ---------------------------------------------------------------------------
 
 const SETTINGS_SECTIONS = [
-  { id: "profile", label: "Business" },
+  { id: "account", label: "Account" },
+  { id: "profile", label: "Business info" },
+  { id: "branding", label: "Branding" },
   { id: "site-config", label: "Site config" },
   { id: "dependencies", label: "Services" },
   { id: "utilities", label: "Shortcuts" },
-  { id: "ownership", label: "Ownership" },
+  // Ownership intentionally dropped from the nav (kept as a component for later);
+  // it was extensive and not needed in the day-to-day surface right now.
   { id: "domains", label: "Domains" },
   { id: "billing", label: "Billing" },
 ] as const;
@@ -187,10 +207,12 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
 function ProfileSection({
   settings,
   setSettings,
+  fields,
   readOnly = false,
 }: {
   settings: SettingsData;
   setSettings: (s: SettingsData) => void;
+  fields: readonly IdentityField[];
   readOnly?: boolean;
 }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -269,14 +291,24 @@ function ProfileSection({
       </div>
 
       <div className="rounded-lg border border-gray-border overflow-hidden">
-        {IDENTITY_FIELDS.map((field, i) => (
+        {fields.map((field, i) => (
           <FormRow
             key={field.key}
             label={field.label}
             description={field.description}
-            last={i === IDENTITY_FIELDS.length - 1}
+            last={i === fields.length - 1}
           >
-            {field.multiline ? (
+            {field.options ? (
+              <DashSelect
+                value={settings[field.key] || ""}
+                onChange={(e) => {
+                  handleChange(field.key, e.target.value);
+                  saveSettings(latestRef.current);
+                }}
+                disabled={readOnly}
+                options={field.options}
+              />
+            ) : field.multiline ? (
               <textarea
                 value={settings[field.key] || ""}
                 onChange={(e) => handleChange(field.key, e.target.value)}
@@ -311,6 +343,43 @@ function ProfileSection({
         ))}
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account section — read-only login identity (who you are, not the business)
+// ---------------------------------------------------------------------------
+
+function AccountSection() {
+  const dashboard = useDashboardOptional();
+  const name = dashboard?.impersonation.actorName?.trim() || "You";
+  const email = dashboard?.impersonation.actorEmail || null;
+  const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
+
+  return (
+    <div className="rounded-xl border border-gray-border bg-surface-raised p-5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-semibold text-accent">
+          {(name[0] || "U").toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
+            {isAdmin && (
+              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+                Strelva Admin
+              </span>
+            )}
+          </div>
+          {email && <p className="truncate text-[12px] text-gray-muted">{email}</p>}
+        </div>
+      </div>
+      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
+        This is the account you&apos;re signed in with — it stays the same across every
+        business you can access. Your business&apos;s public details live in{" "}
+        <span className="text-warm-white">Business info</span>.
+      </p>
+    </div>
   );
 }
 
@@ -392,13 +461,44 @@ function BrandSection() {
     );
   }
 
+  const swatches = THEME_COLOR_FIELDS.map((f) => ({
+    label: f.label,
+    hex: (getNestedValue(theme, f.key) as string) || "#000000",
+  }));
+  const displayFont = ((getNestedValue(theme, "fontDisplay") as string) || "").replace(/_/g, " ");
+
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-[12px] text-gray-muted">Changes apply to your live site after publish.</p>
         <SaveStatusPill status={saveStatus} />
       </div>
 
-      {/* Fonts */}
+      {/* Brand at a glance — the display face over the color set, so the brand
+          reads as a whole before you edit any single token. */}
+      <div className="mb-6 rounded-xl border border-glass-border bg-glass p-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Brand at a glance</p>
+        <p
+          className="mt-2 text-[24px] leading-tight text-warm-white"
+          style={displayFont ? { fontFamily: `"${displayFont}", serif` } : undefined}
+        >
+          {displayFont || "Your display font"}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {swatches.map((s) => (
+            <div
+              key={s.label}
+              className="flex items-center gap-2 rounded-lg border border-gray-border bg-surface-base px-2.5 py-1.5"
+            >
+              <span className="h-4 w-4 rounded-full border border-gray-border" style={{ backgroundColor: s.hex }} />
+              <span className="text-[11px] text-gray-muted">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Typography */}
+      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Typography</h2>
       <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
         {THEME_FONT_FIELDS.map((field, i) => {
           const current = (getNestedValue(theme, field.key) as string) || "";
@@ -430,7 +530,8 @@ function BrandSection() {
         })}
       </div>
 
-      {/* Colors */}
+      {/* Brand colors */}
+      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Brand colors</h2>
       <div className="rounded-lg border border-gray-border overflow-hidden">
         {THEME_COLOR_FIELDS.map((field, i) => {
           const hex = (getNestedValue(theme, field.key) as string) || "#000000";
@@ -551,10 +652,10 @@ function UtilitiesSection() {
 // Site config section
 // ---------------------------------------------------------------------------
 
-const SITE_CONFIG_TABS = ["design", "navigation", "capabilities", "components"] as const;
+const SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
 
 function SiteConfigSection() {
-  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("design");
+  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("navigation");
 
   return (
     <div className="space-y-5">
@@ -574,7 +675,6 @@ function SiteConfigSection() {
           </button>
         ))}
       </div>
-      {tab === "design" && <BrandSection />}
       {tab === "navigation" && <NavigationFooterSection />}
       {tab === "capabilities" && <CapabilitiesSection />}
       {tab === "components" && <CustomComponentsSection />}
@@ -586,6 +686,7 @@ function NavigationFooterSection() {
   const apiPath = useDashboardApiPath();
   const [navigation, setNavigation] = useState<NavigationData | null>(null);
   const [footer, setFooter] = useState<FooterData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   useEffect(() => {
@@ -595,7 +696,7 @@ function NavigationFooterSection() {
     ]).then(([nav, foot]) => {
       setNavigation(nav);
       setFooter(foot);
-    }).catch(() => setSaveStatus("error"));
+    }).catch(() => setSaveStatus("error")).finally(() => setLoading(false));
   }, [apiPath]);
 
   const saveContent = useCallback(async (section: "navigation" | "footer", data: NavigationData | FooterData) => {
@@ -614,8 +715,20 @@ function NavigationFooterSection() {
     }
   }, [apiPath]);
 
-  if (!navigation || !footer) {
+  if (loading) {
     return <SkeletonLine width="w-full" height="h-20" />;
+  }
+
+  if (!navigation || !footer) {
+    return (
+      <div className="rounded-lg border border-gray-border bg-surface-raised px-5 py-6 text-center">
+        <p className="text-[13px] font-medium text-warm-white">Navigation &amp; footer aren&apos;t editable here</p>
+        <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
+          This site&apos;s menu and footer are managed in its code. Ask the AI in chat to change a
+          link or label and we&apos;ll handle it.
+        </p>
+      </div>
+    );
   }
 
   const updateNavItem = (index: number, key: "label" | "href", value: string) => {
@@ -1008,9 +1121,9 @@ function DependencyHealthSection() {
   if (data.deliveryModel !== "custom_repo") {
     return (
       <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
-        <p className="text-[13px] text-warm-white">Platform template site</p>
+        <p className="text-[13px] text-warm-white">No connected services to monitor</p>
         <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-          No custom repo dependency checks are needed for this tenant.
+          This site doesn&apos;t rely on any outside services we need to keep an eye on.
         </p>
       </div>
     );
@@ -1146,6 +1259,11 @@ function BillingSection() {
           <p className="text-[12px] text-gray-faint">
             {copy.note}
           </p>
+          {!isFounderComp && dashboard?.hasStripeCustomer && (
+            <p className="mt-1 text-[12px] text-gray-faint">
+              Manage billing opens your secure Stripe portal to update payment, change plan, or cancel.
+            </p>
+          )}
           {billingError && (
             <p className="mt-3 text-[12px] text-amber-300">{billingError}</p>
           )}
@@ -1192,17 +1310,25 @@ function BillingSection() {
 // ---------------------------------------------------------------------------
 
 const SECTION_META: Record<string, { title: string; description: string }> = {
+  account: {
+    title: "Account",
+    description: "Your personal details on this dashboard — separate from the business you manage.",
+  },
   profile: {
-    title: "Business profile",
-    description: "Core identity and the primary action visitors should take. Brand, hours, and AI rules now live in Ask AI.",
+    title: "Business info",
+    description: "Your business name, tagline, and the primary action visitors should take.",
+  },
+  branding: {
+    title: "Branding",
+    description: "The fonts and colors that define how your site looks.",
   },
   "site-config": {
     title: "Site configurability",
     description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
   },
   dependencies: {
-    title: "Custom repo dependencies",
-    description: "External services the custom site relies on, with paused or failing services called out before they break the storefront.",
+    title: "Connected services",
+    description: "Outside services your site relies on — like payments or email — with anything paused or failing flagged before it can affect your site.",
   },
   utilities: {
     title: "Operations utilities",
@@ -1327,30 +1453,30 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="min-w-0 flex-1 overflow-y-auto p-4 pb-28 md:p-8 lg:p-10">
-        <div className={activeSection === "ownership" ? "max-w-5xl" : "max-w-2xl"}>
-          <div className="mb-8 rounded-2xl border border-glass-border bg-glass p-5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-              Operations
-            </p>
-            <h1 className="mt-2 font-[family-name:var(--font-display)] text-[24px] font-normal text-warm-white">
-              Settings with real ownership impact
-            </h1>
-            <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-              Use this area for domains, billing, exports, and handoff. Day-to-day business instructions now happen in Ask AI.
-            </p>
-          </div>
-
-          {/* Section header */}
+        <div className={
+          activeSection === "ownership"
+            ? "max-w-5xl"
+            : activeSection === "profile" || activeSection === "branding"
+              ? "max-w-3xl"
+              : "max-w-2xl"
+        }>
+          {/* Section header — each tab owns its own framing now (no generic banner). */}
           {meta && (
             <div className="mb-8">
-              <h1 className="text-[20px] font-medium text-warm-white">{meta.title}</h1>
-              <p className="text-[13px] text-gray-muted mt-1">{meta.description}</p>
+              <h1 className="font-[family-name:var(--font-display)] text-[26px] font-normal text-warm-white">{meta.title}</h1>
+              <p className="text-[13px] leading-relaxed text-gray-muted mt-1.5">{meta.description}</p>
             </div>
           )}
 
           {/* Section content */}
+          {activeSection === "account" && <AccountSection />}
           {activeSection === "profile" && settings && (
-            <ProfileSection settings={settings} setSettings={setSettings} readOnly={readOnly} />
+            <ProfileSection
+              settings={settings}
+              setSettings={setSettings}
+              fields={BUSINESS_FIELDS}
+              readOnly={readOnly}
+            />
           )}
           {activeSection === "profile" && !settings && (
             <div className="space-y-4 animate-pulse">
@@ -1359,6 +1485,7 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+          {activeSection === "branding" && <BrandSection />}
           {activeSection === "site-config" && <SiteConfigSection />}
           {activeSection === "dependencies" && <DependencyHealthSection />}
           {activeSection === "utilities" && <UtilitiesSection />}

@@ -261,7 +261,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             {workflowStatus === "requested" && (
               <button
                 onClick={() => onWorkflowAction(event.id, "triaged")}
-                className="h-9 rounded-lg bg-amber-500/10 px-2.5 text-[12px] font-medium text-amber-700 hover:bg-amber-500 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                className="h-9 rounded-lg bg-amber-500/10 px-2.5 text-[12px] font-medium text-amber-700 hover:bg-amber-500 hover:text-amber-950 flex items-center justify-center gap-1.5 transition-colors"
                 title="Mark triaged"
               >
                 <ClipboardCheck className="w-4 h-4" strokeWidth={1.5} />
@@ -271,7 +271,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             {(workflowStatus === "triaged" || workflowStatus === "quoted" || workflowStatus === "accepted") && (
               <button
                 onClick={() => onWorkflowAction(event.id, "in_progress")}
-                className="h-9 rounded-lg bg-accent-dim px-2.5 text-[12px] font-medium text-accent hover:bg-accent hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                className="h-9 rounded-lg bg-accent-dim px-2.5 text-[12px] font-medium text-accent hover:bg-accent hover:text-on-accent flex items-center justify-center gap-1.5 transition-colors"
                 title="Mark in progress"
               >
                 <GitBranch className="w-4 h-4" strokeWidth={1.5} />

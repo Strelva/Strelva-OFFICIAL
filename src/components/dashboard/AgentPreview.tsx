@@ -114,7 +114,7 @@ export function AgentPreview({
         <button
           onClick={onApprove}
           disabled={isApplying}
-          className="flex-1 h-[32px] rounded-lg bg-accent text-white text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          className="flex-1 h-[32px] rounded-lg bg-accent text-on-accent text-[12px] font-medium hover:bg-accent/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
           <Check className="w-3.5 h-3.5" />
           {isApplying ? "Dismissing..." : "Dismiss Preview"}

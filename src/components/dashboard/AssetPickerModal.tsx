@@ -312,7 +312,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
                       className="object-cover"
                     />
                     {isRecent && (
-                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-accent/90 text-white text-[9px] font-medium">
+                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-accent/90 text-on-accent text-[9px] font-medium">
                         New
                       </span>
                     )}

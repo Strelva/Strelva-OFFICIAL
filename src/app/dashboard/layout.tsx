@@ -9,7 +9,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
-import { getActivity, getClickCounts, getContent } from "@/lib/storage";
+import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
 import { getQueueCount } from "@/lib/events";
@@ -84,22 +84,20 @@ export default async function DashboardLayout({
     ? localClientPreviewUrl || ""
     : tenantEditablePreviewUrl;
   let siteName = "Your Business";
-  let ownerName = "";
+  let settingsBusinessModel = "";
   try {
     const settings = await getContent("settings", tenant);
     siteName = settings.siteName || siteName;
-    ownerName = settings.ownerName || ownerName;
+    settingsBusinessModel = settings.businessModel || "";
   } catch {}
 
   const subscriptionStatus = await getEffectiveSubscriptionStatus(tenant);
 
-  // Fetch queue count and stats. Each read is independently guarded: this runs
-  // in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip) would
-  // 500 every dashboard route at once. Degrade to safe defaults instead.
-  const [pendingCount, pageViews, activity, connections, products] = await Promise.all([
+  // Fetch queue count and connections. Each read is independently guarded: this
+  // runs in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip)
+  // would 500 every dashboard route at once. Degrade to safe defaults instead.
+  const [pendingCount, connections, products] = await Promise.all([
     getQueueCount(tenant).catch(() => 0),
-    getClickCounts("page-view", tenant).catch(() => ({ total: 0, today: 0, thisWeek: 0, lastWeek: 0 })),
-    getActivity(tenant, { actor: "ai" }).catch(() => []),
     getConnections(tenant).catch(() => []),
     getProducts(tenant).catch(() => []),
   ]);
@@ -108,18 +106,34 @@ export default async function DashboardLayout({
   // what's connected. Falls back to a local-business default if config is missing.
   // Store shows when the tenant actually has products (the truth signal), not
   // just when a features flag is set — so a real ecom client always gets it.
+  // An explicit "business type" from Business info (Local/Online/Both) wins over
+  // the template guess, so an online-only brand never sees Google Business or
+  // Reviews surfaces it can't use.
+  const businessModel =
+    settingsBusinessModel === "local" || settingsBusinessModel === "online" || settingsBusinessModel === "hybrid"
+      ? settingsBusinessModel
+      : undefined;
   const surfaces = getVisibleSurfaces({
-    tenantConfig: tenantConfig ?? { template: "wellness" },
+    tenantConfig: {
+      ...(tenantConfig ?? { template: "wellness" }),
+      ...(businessModel ? { businessModel } : {}),
+    },
     connections,
     hasCommerce: products.length > 0,
   });
-  const monthAgo = Date.now() - 30 * 86_400_000;
-  const aiUpdatesThisMonth = activity.filter((entry) => new Date(entry.time).getTime() >= monthAgo).length;
-  const valueProof = pageViews.thisWeek > 0
-    ? `${pageViews.thisWeek} visitors this week`
-    : aiUpdatesThisMonth > 0
-      ? `${aiUpdatesThisMonth} update${aiUpdatesThisMonth === 1 ? "" : "s"} this month`
-      : "Your site is live";
+  // The signed-in PERSON, for the sidebar's "Hello, {name}" account footer —
+  // this is the login identity, NOT the tenant's owner-name setting, so a
+  // super-admin sees their own name across every client they open. Falls back
+  // to the email local-part, then "Noah" under the local dev bypass.
+  const accountEmail = actor.email && actor.email.includes("@") ? actor.email : null;
+  const isAdmin = actor.isSuperAdmin || devAccessBypass;
+  const rawAccount =
+    actor.name?.trim() ||
+    (accountEmail ? accountEmail.split("@")[0] : "") ||
+    (devAccessBypass ? "Noah" : "");
+  const accountName = rawAccount
+    ? rawAccount.charAt(0).toUpperCase() + rawAccount.slice(1)
+    : isAdmin ? "Admin" : "there";
 
   return (
     <DashboardProvider
@@ -135,10 +149,15 @@ export default async function DashboardLayout({
       planOverride={tenantConfig?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax" ? "founder_comp" : null}
       impersonation={{
         isActive: actor.isImpersonating,
-        actorEmail: actor.email,
+        actorEmail: accountEmail,
+        actorName: accountName,
+        isSuperAdmin: isAdmin,
         tenantId: tenant,
       }}
-      readOnly={isDemo}
+      // The public demo is read-only for prospects, but the internal dev-access
+      // bypass (local only — never set in prod) gets full control so the team can
+      // actually drive the demo (test chat + edits).
+      readOnly={isDemo && !devAccessBypass}
     >
       <DashboardSurfacesProvider surfaces={surfaces}>
         <a
@@ -147,7 +166,7 @@ export default async function DashboardLayout({
         >
           Skip to content
         </a>
-        {isDemo && (
+        {isDemo && !devAccessBypass && (
           <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
             <span className="font-medium">You&apos;re viewing a read-only live demo &mdash; editing is off.</span>
             <a href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
@@ -158,9 +177,11 @@ export default async function DashboardLayout({
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationShell
-          ownerName={ownerName || siteName}
+          businessName={siteName}
+          accountName={accountName}
+          accountEmail={accountEmail}
+          isSuperAdmin={isAdmin}
           pendingCount={pendingCount}
-          valueProof={valueProof}
         >
           {children}
         </ConversationShell>

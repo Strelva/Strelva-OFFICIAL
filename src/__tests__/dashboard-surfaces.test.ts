@@ -79,11 +79,13 @@ describe("getDashboardSurfaces — Reviews", () => {
     expect(at(s, "reviews").state).toBe("shown");
   });
 
-  it("is connect for a local business with no review source", () => {
+  it("is connect for a local business with no review source, still pointing at the Reviews surface", () => {
     const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
     const r = at(s, "reviews");
     expect(r.state).toBe("connect");
-    expect(r.href).toBe("/dashboard/integrations");
+    // Even in the connect state, Reviews lands on its own surface (whose empty
+    // state pitches connecting Google), not the generic integrations list.
+    expect(r.href).toBe("/dashboard/reviews");
   });
 
   it("is hidden for an online brand with no review source", () => {

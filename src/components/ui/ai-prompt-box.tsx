@@ -582,7 +582,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
               isLoading
                 ? "bg-white/[0.07] text-warm-white hover:bg-white/[0.09]"
                 : hasContent
-                  ? "bg-accent text-white hover:bg-accent/85"
+                  ? "bg-accent text-on-accent hover:bg-accent/85"
                   : "bg-white/[0.045] text-gray-subtle hover:bg-white/[0.06]",
             )}
             title={isLoading ? "Stop generation" : "Send message"}

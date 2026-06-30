@@ -227,6 +227,9 @@ export const siteSettingsSchema = z.object({
   // Brand Kit: how the AI should sound when it writes/updates the site. Fed into
   // the agent prompt (aboutBlock) so the owner's voice actually shapes output.
   brandVoice: z.string().max(10000).optional().default(""),
+  // How the business is found ("local" | "online" | "hybrid"); "" = infer from
+  // template. Drives which presence surfaces (Google Business, Reviews) appear.
+  businessModel: z.string().max(20).optional().default(""),
 });
 
 export const themeSchema = z.object({

@@ -172,7 +172,7 @@ export function CustomChangeRequestPanel() {
             type="button"
             onClick={submitRequest}
             disabled={submitting || !prompt.trim()}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
             {submitting ? "Sending..." : "Send request"}

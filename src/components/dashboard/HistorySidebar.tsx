@@ -5,11 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Settings,
-  Search,
   X,
   LogOut,
   Plus,
   Inbox,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { PropertySwitcher } from "./PropertySwitcher";
@@ -46,15 +47,24 @@ export interface Thread {
 }
 
 interface HistorySidebarProps {
-  ownerName: string;
+  /** The business the account is managing — shown top-left with its logo. */
+  businessName: string;
+  /** The signed-in person — shown bottom-left as "Hello, {first name}". */
+  accountName: string;
+  accountEmail?: string | null;
+  isSuperAdmin?: boolean;
+  /** Admin "view as client" preview is on — hide the Admin badge. */
+  viewAsClient?: boolean;
+  /** Provided only for admins; toggles the client-preview mode. */
+  onToggleViewAsClient?: () => void;
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
-  valueProof?: string;
 }
 
 /** The client's favicon as their logo, derived from their site domain. Falls back
- *  to the name's initial if there's no domain or the favicon fails to load. */
+ *  to the name's initial if there's no domain or the favicon fails to load.
+ *  Sits on a light chip so a dark logo (e.g. Rohlax) stays visible on the dark UI. */
 function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
   const [failed, setFailed] = useState(false);
   let host = "";
@@ -67,7 +77,7 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
 
   if (favicon && !failed) {
     return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-warm-white">
         <img
           src={favicon}
           alt=""
@@ -81,23 +91,36 @@ function SidebarLogo({ name, siteUrl }: { name: string; siteUrl?: string }) {
   }
 
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-surface-raised text-[11px] font-semibold text-warm-black">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-border bg-warm-white text-[11px] font-semibold text-surface-base">
       {(name || "S").slice(0, 1).toUpperCase()}
     </div>
   );
 }
 
 export function HistorySidebar({
-  ownerName,
+  businessName,
+  accountName,
+  accountEmail,
+  isSuperAdmin = false,
+  viewAsClient = false,
+  onToggleViewAsClient,
   isOpen = true,
   onClose,
   pendingCount = 0,
-  valueProof,
 }: HistorySidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { dashboardBasePath, dashboardHref, siteUrl } = useDashboard();
+  // The business's own domain, shown as the quiet sublabel under its name —
+  // useful context, not the "visitors this week" metric (deliberately dropped).
+  let siteHost = "";
+  try {
+    if (siteUrl) siteHost = new URL(siteUrl).hostname.replace(/^www\./, "");
+  } catch {
+    siteHost = "";
+  }
+  const firstName = accountName.trim().split(/\s+/)[0] || "there";
   const surfaces = useDashboardSurfaces();
   const navGroups = (["manage", "presence"] as const)
     .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
@@ -176,24 +199,16 @@ export function HistorySidebar({
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-5 px-4 pt-4 lg:pl-5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <SidebarLogo name={ownerName} siteUrl={siteUrl} />
-          <div className="min-w-0">
-            <PropertySwitcher fallbackName={ownerName} />
-            <p className="truncate text-[11px] leading-tight text-gray-muted">{valueProof || "Your dashboard"}</p>
-          </div>
+      {/* Business identity — the business this account manages: logo + name + its
+          own domain. No search, no "visitors this week" (moved to the dashboard). */}
+      <div className="flex min-w-0 items-center gap-2.5 px-4 pt-4 lg:pl-5">
+        <SidebarLogo name={businessName} siteUrl={siteUrl} />
+        <div className="min-w-0">
+          <PropertySwitcher fallbackName={businessName} />
+          {siteHost && (
+            <p className="truncate text-[11px] leading-tight text-gray-muted">{siteHost}</p>
+          )}
         </div>
-        <Link
-          href={dashboardHref("/dashboard/chat")}
-          prefetch={false}
-          onClick={onClose}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
-          title="Search"
-          aria-label="Search"
-        >
-          <Search className="h-4 w-4" strokeWidth={1.5} />
-        </Link>
       </div>
 
       {/* Main navigation */}
@@ -328,29 +343,50 @@ export function HistorySidebar({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User footer with settings */}
+      {/* Account footer — the signed-in person (separate from the business up top). */}
       <div className="p-3 border-t border-glass-border mt-auto">
-        {valueProof && (
-          <div className="lg:hidden mb-2 rounded-lg border border-glass-border bg-surface-raised px-3 py-2">
-            <p className="text-[12px] font-medium text-warm-black mt-0.5">
-              {valueProof}
+        <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-medium text-warm-black leading-tight">
+              Hello, {firstName}
             </p>
+            <div className="flex items-center gap-1.5">
+              {accountEmail && (
+                <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
+              )}
+              {isSuperAdmin && !viewAsClient && (
+                <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+                  Admin
+                </span>
+              )}
+              {isSuperAdmin && viewAsClient && (
+                <span className="shrink-0 rounded-full bg-gray-bg px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-gray-muted">
+                  Client view
+                </span>
+              )}
+            </div>
           </div>
-        )}
-        <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-          <div className="w-7 h-7 rounded-full bg-accent-dim flex items-center justify-center shrink-0">
-            <span className="text-[11px] font-semibold text-accent">
-              {ownerName[0]?.toUpperCase() || "U"}
-            </span>
-          </div>
-          <span className="text-[12px] text-warm-black flex-1 truncate">
-            {ownerName}
-          </span>
+          {onToggleViewAsClient && (
+            <button
+              type="button"
+              onClick={onToggleViewAsClient}
+              className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
+                viewAsClient
+                  ? "text-accent bg-accent-dim"
+                  : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
+              }`}
+              title={viewAsClient ? "Exit client view" : "View as client"}
+              aria-label={viewAsClient ? "Exit client view" : "View as client"}
+              aria-pressed={viewAsClient}
+            >
+              {viewAsClient ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
+            </button>
+          )}
           <Link
             href={dashboardHref("/dashboard/settings")}
             prefetch={false}
             onClick={onClose}
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
               effectivePathname?.startsWith("/dashboard/settings")
                 ? "text-warm-black bg-gray-bg"
                 : "text-gray-muted hover:text-warm-black hover:bg-gray-bg"
@@ -364,7 +400,7 @@ export function HistorySidebar({
             onClick={() => {
               void signOutEverywhere();
             }}
-            className="w-9 h-9 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
             title="Sign out"
             aria-label="Sign out"
           >

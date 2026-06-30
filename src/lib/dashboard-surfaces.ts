@@ -112,7 +112,7 @@ export function getDashboardSurfaces({
     (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
-    { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+    { id: "today", label: "Dashboard", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
     // Store — the primary surface for a commerce tenant (orders, revenue,
@@ -127,15 +127,18 @@ export function getDashboardSurfaces({
       state: !local ? "hidden" : gbpConnected ? "shown" : "connect",
       group: "presence",
     },
-    { id: "analytics", label: "Analytics", href: "/dashboard/reports", state: "shown", group: "presence" },
     {
       id: "reviews",
       label: "Reviews",
-      href: reviewsReady ? "/dashboard/reviews" : "/dashboard/integrations",
+      // Sits right under Google Business (reviews come from the GBP listing).
+      // Always the Reviews surface — its empty state pitches connecting Google,
+      // so a "connect" tab lands on reviews (not the generic integrations list).
+      href: "/dashboard/reviews",
       // A review source → shown; local without one → connect; online without one → hidden.
       state: reviewsReady ? "shown" : local ? "connect" : "hidden",
       group: "presence",
     },
+    { id: "analytics", label: "Analytics", href: "/dashboard/reports", state: "shown", group: "presence" },
     // Site health — the daily scan engine (speed, security, SEO, accessibility),
     // the same checks behind the public audit. Always relevant: every site is scanned.
     { id: "health", label: "Health", href: "/dashboard/health", state: "shown", group: "presence" },

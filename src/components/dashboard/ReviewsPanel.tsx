@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Star, Sparkles, Check, Copy, Loader2, MessageSquare } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
 import { useDashboard } from "./DashboardContext";
@@ -197,7 +198,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
             <button
               type="button"
               onClick={copyDraft}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-white transition-colors hover:bg-accent/85"
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               {copied ? (
                 <>
@@ -271,6 +272,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
 }
 
 export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
+  const { dashboardHref } = useDashboard();
   if (reviews.length === 0) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -295,6 +297,12 @@ export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
               Once your Google Business Profile is connected, your reviews show up here and the AI
               can draft a reply for each one.
             </p>
+            <Link
+              href={dashboardHref("/dashboard/integrations")}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
+            >
+              Connect Google
+            </Link>
           </div>
         </div>
       </div>

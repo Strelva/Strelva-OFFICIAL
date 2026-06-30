@@ -149,6 +149,10 @@ export interface SiteSettings {
   vagaro_embed_id?: string;
   logoUrl?: string;
   marqueeText?: string;
+  /** How the business is found — drives which presence surfaces show (a local
+   *  business gets Google Business + Reviews; an online-only brand doesn't).
+   *  Empty/unset = infer from the site template. */
+  businessModel?: string;
 }
 
 

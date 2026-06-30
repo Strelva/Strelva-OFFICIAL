@@ -238,7 +238,7 @@ export function CollectionsManager({
                 setError(null);
                 setEditing({ data: emptyData(type) });
               }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white"
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent"
             >
               <Plus className="h-4 w-4" /> New {TYPE_LABEL[type].replace(/s$/, "")}
             </button>
@@ -293,7 +293,7 @@ export function CollectionsManager({
           <div className="mt-4 flex gap-2">
             {!readOnly && (
               <>
-                <button disabled={saving} onClick={() => save("published")} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-warm-white disabled:opacity-60">
+                <button disabled={saving} onClick={() => save("published")} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent disabled:opacity-60">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}
                 </button>
                 <button disabled={saving} onClick={() => save("draft")} className="rounded-md border border-gray-border px-3 py-1.5 text-sm text-warm-black disabled:opacity-60">

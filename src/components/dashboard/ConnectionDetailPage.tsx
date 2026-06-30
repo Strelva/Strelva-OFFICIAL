@@ -245,7 +245,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           {!isConnected && detail.connectionProvider === "google" && (
             <a
               href={dashboardHref("/api/oauth/google")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Google
             </a>
@@ -253,7 +253,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           {!isConnected && detail.connectionProvider === "calendly" && (
             <a
               href={dashboardHref("/api/oauth/calendly")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Calendly
             </a>
@@ -261,7 +261,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           {!isConnected && detail.connectionProvider === "instagram" && (
             <a
               href={dashboardHref("/api/oauth/instagram")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors inline-flex items-center"
+              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
             >
               Connect with Instagram
             </a>
@@ -399,7 +399,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             <button
               onClick={handleYelpConnect}
               disabled={saving || !yelpApiKey.trim() || !yelpBusinessId.trim()}
-              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {saving ? "Connecting..." : "Connect Yelp"}
@@ -451,7 +451,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             <button
               onClick={handleSaveCredentials}
               disabled={saving || !credentialsValue.trim()}
-              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-white hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {saving ? "Saving..." : "Save Credentials"}

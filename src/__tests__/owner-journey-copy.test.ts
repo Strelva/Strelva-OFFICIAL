@@ -12,7 +12,7 @@ describe("owner journey copy and links", () => {
     // sidebar). The pillars are owner-language; old-IA labels are gone.
     const surfaces = readRepoFile("src/lib/dashboard-surfaces.ts");
 
-    expect(surfaces).toContain('label: "Today"');
+    expect(surfaces).toContain('label: "Dashboard"');
     expect(surfaces).toContain('label: "Ask AI"');
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
@@ -63,14 +63,16 @@ describe("owner journey copy and links", () => {
     expect(dashboardPage).toContain("Draft first blog post");
   });
 
-  it("keeps rollback safety visible from the owner dashboard", () => {
-    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+  it("keeps rollback safety reachable under the Website History tab", () => {
+    // Safety net + recent changes moved off the dashboard into Website > History
+    // (site-management tools, not at-a-glance metrics).
+    const historyPage = readRepoFile("src/app/dashboard/history/page.tsx");
     const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
-    expect(dashboardPage).toContain("getLatestSiteSnapshot(tenant)");
-    expect(dashboardPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
+    expect(historyPage).toContain("getLatestSiteSnapshot(tenant)");
+    expect(historyPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
     expect(safetyPanel).toContain("Revert to a last good version");
     expect(safetyPanel).toContain("Save backup");
     expect(safetyPanel).toContain("Restore latest backup");
@@ -137,7 +139,7 @@ describe("owner journey copy and links", () => {
     expect(weeklyBrief).toContain("buildVerdict");
     expect(weeklyBrief).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
-    expect(weeklyBrief).toContain("Open Today");
+    expect(weeklyBrief).toContain("Open dashboard");
   });
 
   it("keeps the site editor focused on direct editing instead of embedded chat", () => {
@@ -221,8 +223,9 @@ describe("owner journey copy and links", () => {
     const ownershipPage = readRepoFile("src/components/dashboard/OwnershipSection.tsx");
     const settingsPage = readRepoFile("src/app/dashboard/settings/page.tsx");
 
-    expect(settingsPage).toContain('{ id: "ownership", label: "Ownership" }');
-    expect(settingsPage).toContain("/dashboard/settings#ownership");
+    // Ownership is intentionally dropped from the settings nav (kept as a
+    // component for later) — extensive and not needed in the day-to-day surface.
+    expect(settingsPage).not.toContain('{ id: "ownership", label: "Ownership" }');
     expect(ownershipPage).toContain("Your business owns");
     expect(ownershipPage).toContain("Strelva manages");
     expect(ownershipPage).toContain("Export content");

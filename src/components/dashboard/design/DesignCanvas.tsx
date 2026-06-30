@@ -150,7 +150,7 @@ export function DesignCanvas({
                 backgroundColor: "rgba(91, 141, 239, 0.04)",
               }}
             >
-              <div className="absolute -top-6 left-0 bg-accent/80 text-white text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+              <div className="absolute -top-6 left-0 bg-accent/80 text-on-accent text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
                 {sectionLabel(hoveredSection.id)}
               </div>
             </div>
@@ -183,7 +183,7 @@ export function DesignCanvas({
                   />
                 )
               )}
-              <div className="absolute -top-7 left-0 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
+              <div className="absolute -top-7 left-0 bg-accent text-on-accent text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
                 {sectionLabel(selectedId)}
               </div>
             </div>
@@ -191,7 +191,7 @@ export function DesignCanvas({
 
           {/* Fallback: show label without rect if no rect available */}
           {selectedId && (!displayRect || displayRect.width === 0) && (
-            <div className="absolute top-4 left-4 bg-accent text-white text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
+            <div className="absolute top-4 left-4 bg-accent text-on-accent text-[10px] font-medium px-2 py-0.5 rounded whitespace-nowrap">
               Selected: {sectionLabel(selectedId)}
             </div>
           )}

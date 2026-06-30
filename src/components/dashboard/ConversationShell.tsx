@@ -9,34 +9,46 @@ import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
   children: ReactNode;
-  ownerName: string;
+  businessName: string;
+  accountName: string;
+  accountEmail?: string | null;
+  isSuperAdmin?: boolean;
   pendingCount?: number;
-  valueProof?: string;
 }
 
 export function ConversationShell({
   children,
-  ownerName,
+  businessName,
+  accountName,
+  accountEmail,
+  isSuperAdmin = false,
   pendingCount = 0,
-  valueProof,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Admins can preview the dashboard exactly as the client sees it — hides the
+  // admin chrome (impersonation banner + Admin badge). Cosmetic only; it changes
+  // nothing about permissions or what the API will accept.
+  const [viewAsClient, setViewAsClient] = useState(false);
   const { impersonation } = useDashboard();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
       {/* Navigation sidebar */}
       <HistorySidebar
-        ownerName={ownerName}
+        businessName={businessName}
+        accountName={accountName}
+        accountEmail={accountEmail}
+        isSuperAdmin={isSuperAdmin}
+        viewAsClient={viewAsClient}
+        onToggleViewAsClient={isSuperAdmin ? () => setViewAsClient((v) => !v) : undefined}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}
-        valueProof={valueProof}
       />
 
       {/* Main content area */}
       <main id="main-content" className="flex-1 flex flex-col min-w-0 dashboard-gradient">
-        {impersonation.isActive && (
+        {impersonation.isActive && !viewAsClient && (
           <div className="shrink-0 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2 text-amber-100">
             <div className="flex items-center gap-2 text-[12px]">
               <ShieldAlert className="h-4 w-4 text-amber-200" strokeWidth={1.7} />
@@ -58,8 +70,8 @@ export function ConversationShell({
             <Menu className="w-5 h-5" strokeWidth={1.5} />
           </button>
           <div className="min-w-0">
-            <span className="block text-[13px] font-medium text-warm-black leading-tight">{ownerName || "Dashboard"}</span>
-            <span className="block text-[11px] text-gray-muted leading-tight truncate">{valueProof || "Business OS"}</span>
+            <span className="block text-[13px] font-medium text-warm-black leading-tight truncate">{businessName || "Dashboard"}</span>
+            <span className="block text-[11px] text-gray-muted leading-tight truncate">Hello, {accountName.trim().split(/\s+/)[0] || "there"}</span>
           </div>
         </header>
 
