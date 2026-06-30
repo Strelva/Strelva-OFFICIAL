@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/admin/onboard", label: "Onboard" },
   { href: "/admin/pay-links", label: "Pay Links" },
   { href: "/admin/ops", label: "Ops" },
+  { href: "/admin/digests", label: "Maintenance" },
   { href: "/admin/drafts", label: "Drafts" },
   { href: "/admin/audit", label: "Audit" },
 ];

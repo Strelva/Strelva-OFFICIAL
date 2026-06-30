@@ -9,6 +9,7 @@ import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
 import type { Goal } from "@/lib/goals";
 import type { TrafficAnomaly } from "@/lib/anomaly";
+import type { CompetitorBenchmark } from "@/lib/competitor-benchmark";
 import { useDashboardOptional } from "./DashboardContext";
 import { GoalCard } from "./GoalCard";
 
@@ -19,6 +20,14 @@ interface WeeklyBriefClientProps {
   proofCards?: ProofCard[];
   goal?: Goal | null;
   anomaly?: TrafficAnomaly | null;
+  benchmark?: CompetitorBenchmark | null;
+}
+
+/** "#3" / "map pack" / "not ranked" — a compact rank pill. */
+function rankLabel(rank: number | null, inPack: boolean): string {
+  if (rank !== null) return `#${rank}`;
+  if (inPack) return "map pack";
+  return "not ranked";
 }
 
 /** Plain-English verdict on whether the site is working, from the week's numbers. */
@@ -137,7 +146,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
 
   if (!brief) {
@@ -360,6 +369,48 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     </p>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Where you rank vs competitors, from the latest visibility scan */}
+          {benchmark && (
+            <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "138ms" }}>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+                Where you rank
+              </p>
+              <div className="rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
+                <p className="text-[14px] font-medium text-warm-black">{benchmark.headline}</p>
+                <div className="mt-4 space-y-3.5">
+                  {benchmark.rows.map((row) => (
+                    <div key={row.query} className="border-t border-glass-border pt-3 first:border-t-0 first:pt-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-[13px] font-medium text-warm-black">&ldquo;{row.query}&rdquo;</p>
+                        <span
+                          className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                            row.youLead ? "text-success" : "text-amber-500"
+                          }`}
+                        >
+                          {row.youLead ? "You lead" : "Behind"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-dim px-2.5 py-1 text-[11px] font-medium text-warm-black">
+                          You <span className="text-accent">{rankLabel(row.yourRank, row.yourInPack)}</span>
+                        </span>
+                        {row.competitors.map((c) => (
+                          <span
+                            key={c.name}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-gray-border px-2.5 py-1 text-[11px] text-gray-muted"
+                          >
+                            <span className="max-w-[120px] truncate text-warm-black">{c.name}</span>
+                            <span>{rankLabel(c.rank, c.inPack)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
