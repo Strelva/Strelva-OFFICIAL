@@ -148,7 +148,7 @@ describe("owner journey copy and links", () => {
     const properties = readRepoFile("src/components/dashboard/PropertiesEditor.tsx");
     const publishBar = readRepoFile("src/components/dashboard/design/PublishBar.tsx");
 
-    expect(workspace).toContain('label: "Content"');
+    expect(workspace).toContain('label: "Edit"');
     expect(workspace).toContain('label: "Layout"');
     expect(workspace).toContain("Ready to publish");
     expect(workspace).toContain("markDraftReceipts");

@@ -130,24 +130,67 @@ export function ContentWorkspace({
     return () => window.removeEventListener("resize", updateViewportMode);
   }, []);
 
+  const showSectionContext = rightTab === "properties" || rightTab === "layout";
+
   const rightPanelContent = (
     <>
-      <div className="border-b border-gray-border bg-surface p-2 shrink-0">
-        <div className="grid grid-cols-4 gap-1">
+      <div className="border-b border-gray-border bg-surface px-2.5 pb-2 pt-2.5 shrink-0 space-y-2">
+        {/* What you're editing — explicit section switcher */}
+        {showSectionContext && sectionOptions.length > 0 && (
+          <label className="flex items-center gap-2">
+            <span className="shrink-0 text-[9px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+              Editing
+            </span>
+            <select
+              value={activeSection ?? ""}
+              onChange={(event) => setActiveSection(event.target.value)}
+              className="min-w-0 flex-1 truncate rounded-md border border-gray-border bg-surface-raised px-2 py-1.5 text-[12px] font-medium text-warm-white outline-none transition-colors focus:border-gray-muted"
+            >
+              {sectionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {/* Primary: the two ways to change content */}
+        <div className="grid grid-cols-2 gap-1">
           {[
-            { value: "properties", label: "Content", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-            { value: "chat", label: "AI", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-            { value: "layout", label: "Layout", icon: <LayoutList className="h-3.5 w-3.5" strokeWidth={1.5} /> },
-            { value: "request", label: "Request", icon: <GitBranch className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "properties", label: "Edit", icon: <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} /> },
+            { value: "chat", label: "Ask AI", icon: <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /> },
           ].map((item) => (
             <button
               key={item.value}
               type="button"
               onClick={() => setRightTab(item.value as "properties" | "chat" | "layout" | "request")}
-              className={`flex h-8 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium transition-colors ${
+              className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium transition-colors ${
                 rightTab === item.value
-                  ? "bg-surface-raised text-warm-white shadow-sm"
+                  ? "bg-surface-raised text-warm-white shadow-sm ring-1 ring-gray-border"
                   : "text-gray-muted hover:bg-surface-raised/60 hover:text-warm-white"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Secondary: structure + custom work */}
+        <div className="flex items-center gap-1">
+          {[
+            { value: "layout", label: "Layout", icon: <LayoutList className="h-3 w-3" strokeWidth={1.5} /> },
+            { value: "request", label: "Request a change", icon: <GitBranch className="h-3 w-3" strokeWidth={1.5} /> },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setRightTab(item.value as "properties" | "chat" | "layout" | "request")}
+              className={`flex h-7 items-center gap-1.5 rounded-md px-2 text-[10.5px] font-medium transition-colors ${
+                rightTab === item.value
+                  ? "bg-surface-raised/80 text-warm-white"
+                  : "text-gray-faint hover:bg-surface-raised/40 hover:text-gray-muted"
               }`}
             >
               {item.icon}
@@ -161,11 +204,8 @@ export function ContentWorkspace({
         <ReadyToPublishPanel receipts={draftReceipts} draftSections={draftSections} hasPageConfigDraft={hasPageConfigDraft} />
       )}
 
-      {/* Tab content */}
       <div className="flex min-h-0 flex-1 flex-col">
-        {rightTab === "properties" ? (
-          <PropertiesEditor activeSection={activeSection} />
-        ) : rightTab === "chat" ? (
+        {rightTab === "chat" ? (
           <ChatPanel ownerName={ownerName || siteName} variant="compact" />
         ) : rightTab === "layout" ? (
           <LayoutPanel />
