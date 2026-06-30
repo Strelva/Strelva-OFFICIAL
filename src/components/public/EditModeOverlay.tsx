@@ -215,17 +215,11 @@ export function EditModeOverlay() {
     function handleFocus(e: Event) {
       const el = e.target as HTMLElement;
       el.dataset.rebOriginal = el.textContent || "";
-      el.style.outline = "2px solid var(--sage)";
-      el.style.outlineOffset = "2px";
-      el.style.borderRadius = "2px";
     }
 
     function handleBlur(e: Event) {
       const el = e.target as HTMLElement;
       delete el.dataset.rebOriginal;
-      el.style.outline = "";
-      el.style.outlineOffset = "";
-      el.style.borderRadius = "";
 
       const sectionEl = el.closest("[data-reb-section]");
       const section = sectionEl?.getAttribute("data-reb-editable") || sectionEl?.getAttribute("data-reb-section");

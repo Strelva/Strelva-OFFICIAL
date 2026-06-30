@@ -143,6 +143,38 @@ export function ContentWorkspace({
     return () => window.removeEventListener("resize", updateViewportMode);
   }, []);
 
+  // Arrow keys step through the current page's sections (ignored while typing).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (pageSections.length === 0) return;
+      event.preventDefault();
+      const idx = pageSections.findIndex((section) => section.value === activeSection);
+      const nextIdx =
+        event.key === "ArrowDown"
+          ? Math.min(pageSections.length - 1, idx < 0 ? 0 : idx + 1)
+          : Math.max(0, idx < 0 ? 0 : idx - 1);
+      const next = pageSections[nextIdx];
+      if (next) {
+        setActiveSection(next.value);
+        setScrollToSection(next.value);
+        setRightTab("properties");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pageSections, activeSection, setActiveSection, setScrollToSection, setRightTab]);
+
   const inRequest = rightTab === "request";
   const inChat = rightTab === "chat";
 
