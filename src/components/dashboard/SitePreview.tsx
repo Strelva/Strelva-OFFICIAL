@@ -547,15 +547,15 @@ export function SitePreview() {
         )}
       </div>
 
-      {/* Canvas */}
+      {/* Canvas — a recessed well the document floats in */}
       <div
         ref={canvasRef}
-        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-3 xl:p-4"
+        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-4 shadow-[inset_0_2px_6px_rgba(0,0,0,0.45)] xl:p-7"
       >
 
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full shrink-0 overflow-hidden rounded-lg bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_12px_rgba(0,0,0,0.4)] transition-[max-width] duration-200 ease-out xl:rounded-xl ${refreshKey > 0 ? "preview-flash" : ""}`}
+          className={`relative h-full w-full shrink-0 overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_60px_-16px_rgba(0,0,0,0.75),0_8px_20px_-8px_rgba(0,0,0,0.5)] transition-[max-width] duration-200 ease-out xl:rounded-2xl ${refreshKey > 0 ? "preview-flash" : ""}`}
           style={{
             width: breakpoint.width ? `${breakpoint.width}px` : "100%",
             maxWidth: breakpoint.width ? undefined : "100%",
