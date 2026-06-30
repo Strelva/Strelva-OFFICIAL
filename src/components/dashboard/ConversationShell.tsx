@@ -10,6 +10,7 @@ import { useDashboard } from "./DashboardContext";
 interface ConversationShellProps {
   children: ReactNode;
   businessName: string;
+  businessLogoUrl?: string;
   accountName: string;
   accountEmail?: string | null;
   isSuperAdmin?: boolean;
@@ -19,6 +20,7 @@ interface ConversationShellProps {
 export function ConversationShell({
   children,
   businessName,
+  businessLogoUrl,
   accountName,
   accountEmail,
   isSuperAdmin = false,
@@ -36,6 +38,7 @@ export function ConversationShell({
       {/* Navigation sidebar */}
       <HistorySidebar
         businessName={businessName}
+        businessLogoUrl={businessLogoUrl}
         accountName={accountName}
         accountEmail={accountEmail}
         isSuperAdmin={isSuperAdmin}
@@ -71,7 +74,7 @@ export function ConversationShell({
           </button>
           <div className="min-w-0">
             <span className="block text-[13px] font-medium text-warm-black leading-tight truncate">{businessName || "Dashboard"}</span>
-            <span className="block text-[11px] text-gray-muted leading-tight truncate">Hello, {accountName.trim().split(/\s+/)[0] || "there"}</span>
+            <span className="block text-[11px] text-gray-muted leading-tight truncate">Business OS</span>
           </div>
         </header>
 
