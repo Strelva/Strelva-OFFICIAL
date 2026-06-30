@@ -36,7 +36,7 @@ export const GROUP_LABELS: Record<"manage" | "presence", string> = {
 export const SURFACE_MATCH: Record<SurfaceId, string[]> = {
   "today": [],
   "ask-ai": ["/dashboard/chat"],
-  "website": ["/dashboard/site", "/dashboard/collections", "/dashboard/content", "/dashboard/assets", "/dashboard/history"],
+  "website": ["/dashboard/site", "/dashboard/build", "/dashboard/collections", "/dashboard/content", "/dashboard/assets", "/dashboard/history"],
   "store": ["/dashboard/store"],
   "google-business": ["/dashboard/google"],
   "analytics": ["/dashboard/reports"],
