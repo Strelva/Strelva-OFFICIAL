@@ -310,31 +310,35 @@ function SectionsRail({
 }) {
   if (sections.length === 0) return null;
   return (
-    <aside className="flex w-[196px] shrink-0 flex-col border-r border-gray-border bg-surface">
-      <div className="shrink-0 px-3 py-2.5">
-        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+    <aside className="flex w-[208px] shrink-0 flex-col border-r border-gray-border bg-surface">
+      <div className="flex shrink-0 items-center justify-between px-3.5 py-3">
+        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Sections
         </span>
+        <span className="text-[10px] tabular-nums text-gray-faint/70">{sections.length}</span>
       </div>
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-2">
-        {sections.map((section) => {
+      <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2 pb-2">
+        {sections.map((section, index) => {
           const active = section.value === activeSection;
           return (
             <button
               key={section.value}
               type="button"
               onClick={() => onSelect(section.value)}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
+              className={`group relative flex w-full items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-2.5 text-left text-[12.5px] transition-colors ${
                 active
-                  ? "bg-surface-raised text-warm-white"
+                  ? "bg-surface-raised font-medium text-warm-white"
                   : "text-gray-muted hover:bg-surface-raised/50 hover:text-warm-white"
               }`}
             >
               <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
-                  active ? "bg-accent" : "bg-gray-border"
+                className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
                 }`}
               />
+              <span className="w-3.5 shrink-0 text-[10px] tabular-nums text-gray-faint/60 group-hover:text-gray-faint">
+                {index + 1}
+              </span>
               <span className="truncate">{section.label}</span>
             </button>
           );
