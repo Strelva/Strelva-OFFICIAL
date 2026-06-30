@@ -54,7 +54,8 @@ export function metricVerdicts(stats: WeeklyBriefStats): MetricVerdict[] {
 
   // Bookings — the "did traffic turn into action" signal. Read as conversion.
   if (pageViews > 0) {
-    const rate = Math.round((bookingClicks / pageViews) * 100);
+    // Floor to 1% when there were any clicks — "About 0% clicked" reads wrong.
+    const rate = bookingClicks > 0 ? Math.max(1, Math.round((bookingClicks / pageViews) * 100)) : 0;
     out.push({
       key: "bookings",
       label: "Clicked to book",

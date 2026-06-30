@@ -35,6 +35,13 @@ describe("metricVerdicts", () => {
     expect(bookings!.verdict).toContain("10%");
   });
 
+  it("floors the conversion rate to 1% when there were clicks (never 'About 0%')", () => {
+    const v = metricVerdicts({ ...baseStats, pageViews: 300, bookingClicks: 1 });
+    const bookings = v.find((x) => x.key === "bookings")!;
+    expect(bookings.verdict).toContain("1%");
+    expect(bookings.verdict).not.toContain("0%");
+  });
+
   it("omits the bookings verdict entirely with no traffic", () => {
     const v = metricVerdicts(baseStats);
     expect(v.find((x) => x.key === "bookings")).toBeUndefined();
