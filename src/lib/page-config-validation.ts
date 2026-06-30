@@ -1,6 +1,7 @@
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { sitePageConfigSchema } from "@/lib/schemas";
 import { getSiteCapabilityManifest, manifestSupportsSection } from "@/lib/site-capabilities";
+import { isBlockType, validateBlockProps } from "@/lib/blocks/registry";
 import type { SitePageConfig } from "@/lib/types";
 
 export async function parseAndValidatePageConfig(
@@ -28,6 +29,14 @@ export async function parseAndValidatePageConfig(
   for (const [page, config] of Object.entries(pageConfig)) {
     const seen = new Set<string>();
     for (const section of config.sections) {
+      // Registered blocks are self-contained (data in props) and repeatable —
+      // multiple headings/text blocks on one page. Validate + coerce their props
+      // via the block registry at the save boundary, and skip the template-section
+      // gates (allowed-set, manifest, variant, single-instance dedup).
+      if (isBlockType(section.type)) {
+        section.props = validateBlockProps(section.type, section.props);
+        continue;
+      }
       if (!allowedSections.has(section.type) || !manifestSupportsSection(manifest, section.type)) {
         return {
           error: `${section.type} is not available for this site's capability manifest`,

@@ -6,6 +6,8 @@ import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
 import { isSuperAdmin, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { listBlocks, addBlock, updateBlock, removeBlock, moveBlock } from "@/lib/blocks/ops";
+import { BLOCK_TYPES } from "@/lib/blocks/registry";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
@@ -415,6 +417,79 @@ Only use tools for manifest-supported sections and actions. If the user requests
           } catch (err) {
             return { error: `Failed to read ${section}: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
+        },
+      }),
+    },
+    list_blocks: {
+      capability: "update_section",
+      def: tool({
+        description: "List the blocks on a page (position, type, current props). Call before adding, updating, moving, or removing blocks.",
+        inputSchema: z.object({ page: z.string().optional() }),
+        execute: async ({ page }) => {
+          try {
+            return { blocks: await listBlocks(tenant, page || "home") };
+          } catch (err) {
+            return { error: `Failed to list blocks: ${err instanceof Error ? err.message : "Unknown error"}` };
+          }
+        },
+      }),
+    },
+    add_block: {
+      capability: "update_section",
+      def: tool({
+        description:
+          `Add a block to a page. Saves to the draft — the owner publishes it in Website > Build. Available block types: ${BLOCK_TYPES.join(", ")}. Pass props matching the block (call list_blocks to see prop shapes).`,
+        inputSchema: z.object({
+          type: z.enum(BLOCK_TYPES as [string, ...string[]]),
+          props: z.record(z.string(), z.unknown()).optional(),
+          page: z.string().optional(),
+        }),
+        execute: async ({ type, props, page }) => {
+          const r = await addBlock(tenant, type, (props as Record<string, unknown>) || {}, page || "home");
+          return r.ok
+            ? { success: true, addedAtPosition: r.index, totalBlocks: r.blocks, note: "Saved to your draft — publish in Website > Build to go live." }
+            : { success: false, error: r.error };
+        },
+      }),
+    },
+    update_block: {
+      capability: "update_section",
+      def: tool({
+        description: "Update a block's props by its position (from list_blocks). Only the props you pass change.",
+        inputSchema: z.object({
+          index: z.number().int().min(0),
+          props: z.record(z.string(), z.unknown()),
+          page: z.string().optional(),
+        }),
+        execute: async ({ index, props, page }) => {
+          const r = await updateBlock(tenant, index, props as Record<string, unknown>, page || "home");
+          return r.ok ? { success: true, note: "Saved to draft — publish in Website > Build." } : { success: false, error: r.error };
+        },
+      }),
+    },
+    remove_block: {
+      capability: "update_section",
+      def: tool({
+        description: "Remove a block by its position (from list_blocks).",
+        inputSchema: z.object({ index: z.number().int().min(0), page: z.string().optional() }),
+        execute: async ({ index, page }) => {
+          const r = await removeBlock(tenant, index, page || "home");
+          return r.ok ? { success: true, totalBlocks: r.blocks } : { success: false, error: r.error };
+        },
+      }),
+    },
+    move_block: {
+      capability: "update_section",
+      def: tool({
+        description: "Move a block up or down by its position (from list_blocks).",
+        inputSchema: z.object({
+          index: z.number().int().min(0),
+          direction: z.enum(["up", "down"]),
+          page: z.string().optional(),
+        }),
+        execute: async ({ index, direction, page }) => {
+          const r = await moveBlock(tenant, index, direction, page || "home");
+          return r.ok ? { success: true } : { success: false, error: r.error };
         },
       }),
     },

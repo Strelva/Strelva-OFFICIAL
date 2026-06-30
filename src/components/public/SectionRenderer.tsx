@@ -1,6 +1,8 @@
 import type { ContentSection, SitePageConfig, PageSectionConfig } from "@/lib/types";
 import { getContent, getDraftPageConfig, getPageConfig } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
+import { isBlockType } from "@/lib/blocks/registry";
+import { BlockRenderer } from "./blocks";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 
 interface SectionRendererProps {
@@ -102,7 +104,26 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
 
   return (
     <>
-      {visibleSections.map((sectionConfig) => {
+      {visibleSections.map((sectionConfig, index) => {
+        const layoutClasses = getLayoutClasses(sectionConfig.layout);
+
+        // Self-contained block (data in props) → render generically via the
+        // block registry, no per-template content store needed.
+        if (isBlockType(sectionConfig.type)) {
+          return (
+            <div
+              key={`${sectionConfig.type}-${sectionConfig.order}-${index}`}
+              data-reb-section={sectionConfig.type}
+              data-reb-editable="block"
+              className={layoutClasses || undefined}
+            >
+              <SectionErrorBoundary>
+                <BlockRenderer block={sectionConfig} />
+              </SectionErrorBoundary>
+            </div>
+          );
+        }
+
         const Component = template.components[sectionConfig.type];
         if (!Component) return null;
 
@@ -110,11 +131,10 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
         if (!props) return null;
 
         const editableSection = template.editableSections[sectionConfig.type];
-        const layoutClasses = getLayoutClasses(sectionConfig.layout);
 
         return (
           <div
-            key={`${sectionConfig.type}-${sectionConfig.order}`}
+            key={`${sectionConfig.type}-${sectionConfig.order}-${index}`}
             data-reb-section={sectionConfig.type}
             data-reb-editable={editableSection || undefined}
             data-reb-label={template.labels[sectionConfig.type]}
