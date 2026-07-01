@@ -6,8 +6,11 @@ import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { listTenantDomainClaims, serializeDomainClaim } from "@/lib/domains";
 import { getLatestSnapshots, diffSnapshots } from "@/lib/visibility/snapshots";
 import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagnose";
+import { getReviews } from "@/lib/reviews";
+import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
+import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
 import { VisibilityPanel } from "./VisibilityPanel";
 
@@ -40,7 +43,7 @@ export default async function TenantDetailPage({
   const tenant = await getTenantConfig(id);
   if (!tenant) notFound();
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots] = await Promise.all([
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews] = await Promise.all([
     getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
     listDrafts(id).catch(() => ({} as Record<string, boolean>)),
@@ -49,12 +52,14 @@ export default async function TenantDetailPage({
     listTenantDomainClaims(id).catch(() => []),
     getScanHistory(id).catch(() => []),
     getLatestSnapshots(id, 2).catch(() => []),
+    getReviews(id).catch(() => []),
   ]);
 
   const latestVis = visSnapshots[0] ?? null;
   const visSummary = latestVis ? summarizeVisibility(latestVis) : null;
   const visFindings = latestVis ? diagnoseVisibility(latestVis) : [];
   const visDiff = latestVis ? diffSnapshots(visSnapshots[1] ?? null, latestVis) : null;
+  const reviewIntel = getAdminReviewIntelligence(reviews);
 
   return (
     <div className="space-y-8">
@@ -77,6 +82,8 @@ export default async function TenantDetailPage({
       </div>
 
       <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
+
+      <ReviewIntelPanel intel={reviewIntel} />
 
       <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
 
