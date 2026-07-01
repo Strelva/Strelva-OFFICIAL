@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Tablet } from "lucide-react";
+import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Sparkles, Tablet } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
@@ -215,6 +215,7 @@ export function SitePreview() {
   const isLivePreview = effectivePreviewSource === "live" && !!siteUrl;
   const previewKind = isLivePreview ? "Active site preview" : "Editable preview";
   const previewBadgeLabel = isLivePreview ? "Active site" : hasAnyDraft ? "Draft preview" : "Editable preview";
+  const activeSectionLabel = activeSection ? SECTION_LABELS[activeSection] || activeSection : null;
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource: effectivePreviewSource });
   if (
@@ -438,6 +439,12 @@ export function SitePreview() {
     triggerRefresh();
   }, [triggerRefresh]);
 
+  const askAIForActiveSection = useCallback(() => {
+    if (!activeSectionLabel) return;
+    setChatPrompt(buildAskAIPrompt(activeSectionLabel));
+    setRightTab("chat");
+  }, [activeSectionLabel, setChatPrompt, setRightTab]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Canvas chrome — one bar: status, view toggle, device, actions */}
@@ -600,6 +607,27 @@ export function SitePreview() {
             </div>
           )}
         </div>
+
+        {/* Floating selection bar — contextual action for the selected section */}
+        {activeSectionLabel && previewStatus === "ready" && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,10,12,0.82)] py-1.5 pl-3.5 pr-1.5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-overlay-enter">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                <span className="max-w-[180px] truncate">{activeSectionLabel}</span>
+              </span>
+              <span className="h-4 w-px bg-white/12" />
+              <button
+                type="button"
+                onClick={askAIForActiveSection}
+                className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-on-accent transition-transform hover:scale-[1.03]"
+              >
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
+                Ask AI to change this
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Glass context menu */}
         {contextMenu && (
