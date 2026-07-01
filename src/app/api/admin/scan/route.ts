@@ -3,6 +3,7 @@ import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { scanTenant } from "@/lib/scan";
 import { logAuditEvent } from "@/lib/storage";
+import { prioritizeIssues } from "@/lib/audit/prioritize";
 
 export const maxDuration = 60;
 
@@ -25,6 +26,17 @@ export async function POST(req: Request) {
   try {
     const { detail, ...summary } = await scanTenant(tenantId);
 
+    // Admin-only ranked action list — the raw failing/warning issues the client
+    // dashboard never shows. Client sees the grade/score; the operator sees what
+    // to fix first.
+    const prioritized = prioritizeIssues({
+      url: summary.url,
+      scannedAt: summary.scannedAt,
+      overallScore: summary.overallScore,
+      grade: summary.grade,
+      categories: detail,
+    });
+
     await logAuditEvent({
       tenant: tenantId,
       action: "scan.run",
@@ -34,7 +46,7 @@ export async function POST(req: Request) {
       metadata: { grade: summary.grade, overallScore: summary.overallScore },
     });
 
-    return NextResponse.json({ ...summary, categories: detail });
+    return NextResponse.json({ ...summary, categories: detail, prioritizedIssues: prioritized });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Scan failed";
     const status = message.startsWith("No tenant") ? 404 : 502;

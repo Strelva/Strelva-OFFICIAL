@@ -7,6 +7,8 @@ import { getEvents } from "./events";
 import { getSuggestions } from "./suggestions";
 import { detectStaleSections } from "./reports";
 import { getLatestSnapshots, diffSnapshots, type VisibilityDiff } from "./visibility/snapshots";
+import { getReviews } from "./reviews";
+import { getClientReviewSummary, type ClientReviewSummary } from "./reviews/intelligence";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
@@ -95,7 +97,7 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   // timeout, a Sanity hiccup) degrades the brief to partial data instead of
   // throwing the whole report away.
   const zeroClicks = { total: 0, today: 0, thisWeek: 0, lastWeek: 0 };
-  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots] = await Promise.all([
+  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots, reviews] = await Promise.all([
     getClickCounts("page-view", tenantId).catch(() => zeroClicks),
     getClickCounts("booking-click", tenantId).catch(() => zeroClicks),
     getEvents(tenantId, { limit: 100 }).catch(() => []),
@@ -107,7 +109,13 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     getSearchData(tenantId).catch(() => null),
     getSectionTimestamps(tenantId).catch(() => ({})),
     getLatestSnapshots(tenantId, 2).catch(() => []),
+    getReviews(tenantId).catch(() => []),
   ]);
+
+  // Positive, client-facing review numbers for the win column. Admin-only
+  // signal (concerns, the response queue) lives in getAdminReviewIntelligence
+  // and is never surfaced in the owner's weekly report.
+  const reviewSummary = getClientReviewSummary(reviews, 7);
 
   const weekStartDate = new Date(weekStart);
   const weekEndDate = new Date(weekEnd);
@@ -163,7 +171,7 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   const visibilityWins = visSnapshots[0]
     ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
     : [];
-  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity)].slice(0, 5);
+  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity, reviewSummary)].slice(0, 5);
   const summary = await buildSummary({
     stats,
     highlights,
@@ -220,7 +228,8 @@ export function visibilityProofHighlights(diff: VisibilityDiff): string[] {
 function buildHighlights(
   stats: WeeklyBriefStats,
   events: Array<{ type: string; title: string }>,
-  activity: Array<{ text: string; actor?: string }>
+  activity: Array<{ text: string; actor?: string }>,
+  reviewSummary?: ClientReviewSummary
 ): string[] {
   const highlights: string[] = [];
 
@@ -232,10 +241,20 @@ function buildHighlights(
     highlights.push(`${stats.bookingClicks} clicked your booking link`);
   }
 
-  if (stats.reviewsReceived > 0) {
+  // Prefer the richer review line (rating + praise) when we have reviews to
+  // analyze; fall back to the raw count from event metrics otherwise.
+  if (reviewSummary && reviewSummary.newFiveStarThisPeriod > 0) {
+    const n = reviewSummary.newFiveStarThisPeriod;
+    highlights.push(`${n} new 5-star review${n > 1 ? "s" : ""} this week`);
+  } else if (stats.reviewsReceived > 0) {
     highlights.push(
       `${stats.reviewsReceived} new review${stats.reviewsReceived > 1 ? "s" : ""} received`
     );
+  }
+
+  if (reviewSummary && reviewSummary.lovedFor.length > 0 && reviewSummary.averageRating >= 4) {
+    const praise = reviewSummary.lovedFor.slice(0, 2).map((t) => t.label).join(" and ");
+    highlights.push(`Customers love your ${praise}`);
   }
 
   const aiUpdates = activity.filter((a) => a.actor === "ai").slice(0, 2);
