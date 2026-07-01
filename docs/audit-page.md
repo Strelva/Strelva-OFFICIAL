@@ -63,7 +63,7 @@ Nothing writes the store directly. Everything goes through `src/lib/scan.ts`:
 | Free public audit | `POST /api/audit/scan` | `runAudit` directly (no tenant, no store); result cached 1h in Redis, rate-limited 3/day/IP |
 | "Save as PDF" one-pager | `POST /api/audit/report` | pure transform of a caller-supplied `AuditResult` via `renderAuditReport` |
 | Client site-health card | `GET /api/dashboard/site-audit` (+ `/history`) | `scanTenant` (writes scan-store), 24h cache; history reads `getScanHistory` |
-| Admin per-tenant manual scan | `POST /api/admin/scan` | `scanTenant` (writes scan-store) |
+| Admin per-tenant manual scan | `POST /api/admin/scan` | `scanTenant` (writes scan-store); also returns admin-only `prioritizedIssues` (`prioritizeIssues`) for the "Fix first" list |
 | Admin portfolio overview | `src/app/admin/page.tsx` | reads `getScanSummary` + `getScanHistory` |
 | Daily portfolio cron | `GET /api/cron/portfolio-scan` | `scanAllTenants` (writes scan-store for all tenants) |
 
@@ -115,6 +115,8 @@ Because it divides by the sum of the weights actually present, a category emitte
 - `priority` (`high` / `medium` / `low`) derived from status + how heavily the category counts.
 
 `topFixes(categories, limit)` flattens all non-passing checks into a prioritized list (high to low, worst score first). It powers the "Fix these first" block on the public results page, the client health card, and the PDF one-pager.
+
+`prioritizeIssues(audit)` (`src/lib/audit/prioritize.ts`) is the **admin-only** sibling of `topFixes`: a richer ranking that adds priority bands (`highCount`/`mediumCount`/`lowCount`) and a composite score (status × explicit `priority` × category weight × severity). `POST /api/admin/scan` returns it as `prioritizedIssues`, rendered as the "Fix first" list in the admin `SiteScan` view. It is a pure transform (no store/cron) and is kept separate from `topFixes` on purpose — the client sees `topFixes`; the raw ranked issue list stays admin-side. Ported/de-scoped from the OWSH issue-prioritization engine (revenue modeling omitted).
 
 ---
 

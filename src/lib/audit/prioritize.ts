@@ -10,6 +10,13 @@
  *
  * This is an ADMIN surface. The client dashboard shows positive health numbers;
  * the raw failing/warning issues live here, admin-side, per the product rule.
+ *
+ * Relationship to `impact.ts` `topFixes`: `topFixes` is the lighter,
+ * client-facing "Fix these first" list (flatten non-passing checks, worst score
+ * first) used on the public audit + client health card. `prioritizeIssues` is
+ * the richer ADMIN sibling — it adds priority bands + counts and a composite
+ * score (status × explicit priority × category weight × severity). Kept
+ * separate on purpose: different surface, different audience, different shape.
  */
 
 import type { AuditResult, CategoryResult, CheckResult, CheckStatus } from "./types";
