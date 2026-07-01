@@ -23,6 +23,8 @@ agent is missing obvious action-tools (run scan, revoke pay link, send invite).
 ## Phase 2 — Make the operator act
 
 - Domain-management panel on tenant detail (new super-admin `/api/admin/tenants/[id]/domains`).
+- Review operator view on tenant detail (`ReviewIntelPanel` + `GET /api/admin/tenants/[id]/reviews-intel`) — sentiment split, urgent-first needs-a-reply queue, unanswered-negative count, emerging concerns, at-risk flag. Admin-only; the client dashboard shows only the positive review summary. See `docs/features/review-engine.md`.
+- "Fix first" ranked issue list on the tenant `SiteScan` (a fresh scan returns `prioritizedIssues` via `src/lib/audit/prioritize.ts`) — the raw failing/warning checks, priority-badged, that the client health card no longer shows.
 - ~~Revalidation-status panel on Ops~~ — SKIPPED: the Ops page already surfaces the same `getRecentFailures()` data; a separate panel would be redundant UI.
 - Agent action-tools: `propose_run_scan`, `propose_revoke_pay_link`, `propose_send_invite`.
 - Audit filters (tenant / actor / action) — client-side over the fetched events.
