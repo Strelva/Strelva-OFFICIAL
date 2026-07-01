@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Star, Sparkles, Check, Copy, Loader2, MessageSquare } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
+import { getClientReviewSummary } from "@/lib/reviews/intelligence";
 import { useDashboard } from "./DashboardContext";
 
 interface ReviewsPanelProps {
@@ -273,6 +274,9 @@ function ReviewCard({ review }: { review: ReviewItem }) {
 
 export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
   const { dashboardHref } = useDashboard();
+  // Positive, client-facing summary only — the owner sees good numbers as good
+  // numbers. Concerns / the response queue live admin-side (reviews-intel API).
+  const summary = getClientReviewSummary(reviews);
   if (reviews.length === 0) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -319,25 +323,37 @@ export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
           <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
             What people are saying
           </h1>
-          <div className="mt-3 flex items-center gap-3">
-            {(() => {
-              const rated = reviews.filter((r) => r.rating > 0);
-              if (!rated.length) return null;
-              const avg = rated.reduce((sum, r) => sum + r.rating, 0) / rated.length;
-              return (
-                <span className="flex items-center gap-1.5">
-                  <Stars rating={avg} />
-                  <span className="text-[14px] font-medium text-warm-black">{avg.toFixed(1)}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {summary.averageRating > 0 && (
+              <span className="flex items-center gap-1.5">
+                <Stars rating={summary.averageRating} />
+                <span className="text-[14px] font-medium text-warm-black">
+                  {summary.averageRating.toFixed(1)}
                 </span>
-              );
-            })()}
+              </span>
+            )}
             <span className="text-[14px] text-gray-muted">
-              {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+              {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
             </span>
+            {summary.newThisPeriod > 0 && (
+              <span className="rounded-full bg-accent-dim px-2.5 py-0.5 text-[12px] font-medium text-accent">
+                {summary.newThisPeriod} new this month
+              </span>
+            )}
           </div>
-          <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
-            Draft a warm, on-brand reply for any of them, then copy it into Google.
-          </p>
+          {summary.lovedFor.length > 0 && summary.averageRating >= 4 ? (
+            <p className="mt-2 text-[14px] leading-relaxed text-warm-black">
+              Customers love your{" "}
+              <span className="font-medium">
+                {summary.lovedFor.slice(0, 2).map((t) => t.label).join(" and ")}
+              </span>
+              . Draft a warm reply to any review below, then copy it into Google.
+            </p>
+          ) : (
+            <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
+              Draft a warm, on-brand reply for any of them, then copy it into Google.
+            </p>
+          )}
         </div>
 
         {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
