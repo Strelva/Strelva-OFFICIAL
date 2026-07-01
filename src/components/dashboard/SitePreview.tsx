@@ -30,7 +30,7 @@ const PAGE_PATHS: Record<string, string> = {
   shop: "/shop",
 };
 
-const PREVIEW_TIMEOUT_MS = 12000;
+const PREVIEW_TIMEOUT_MS = 7000;
 const EDITABLE_NODE_TYPES = new Set<EditableNodeType>([
   "section",
   "text",

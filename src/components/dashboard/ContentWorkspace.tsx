@@ -10,7 +10,7 @@ import { ChatPanel } from "./ChatPanel";
 import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
 import { PublishBar, type PublishOutcome } from "./design/PublishBar";
 import type { SectionData } from "./ContentBrowser";
-import { SECTION_LABELS } from "@/components/ui/section-labels";
+import { SECTION_LABELS, COMPOSITE_SECTIONS } from "@/components/ui/section-labels";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 
 interface ContentWorkspaceProps {
@@ -135,7 +135,10 @@ export function ContentWorkspace({
 
   useEffect(() => {
     if (activeSection || pageSections.length === 0) return;
-    setActiveSection(pageSections[0].value);
+    // Prefer the first directly-editable section so a page never opens on a
+    // composite ("Page Header", "Call to Action") that only offers Ask AI.
+    const firstEditable = pageSections.find((section) => !COMPOSITE_SECTIONS.has(section.value));
+    setActiveSection((firstEditable ?? pageSections[0]).value);
   }, [activeSection, pageSections, setActiveSection]);
 
   useEffect(() => {
