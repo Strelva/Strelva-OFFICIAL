@@ -165,41 +165,97 @@ async function seedClicks(tenant: string): Promise<void> {
 
 async function seedReviews(tenant: string): Promise<void> {
   const { addReview } = await import("../src/lib/reviews");
+  // Every review carries an `externalId` so re-running the seeder is idempotent
+  // (the Postgres path upserts on tenant+source+external_id and ignores dupes) —
+  // without it a re-run silently doubled the demo's review count. The set is
+  // built to light up every surface: strong praise themes (service +
+  // cleanliness) for the client "customers love your…" line and average, two
+  // owner replies for reply-coverage, one constructive 3★, and one unanswered
+  // 1★ with an urgent phrase so the admin needs-a-reply queue + at-risk flag
+  // have something real to show. Dates span ~4 weeks; the three most recent
+  // 5★ land inside the weekly report's 7-day window.
   const reviews: Array<Parameters<typeof addReview>[1]> = [
     {
       source: "google",
+      externalId: "seed-hp-01",
       author: "Marcus T.",
       rating: 5,
-      text: "Booked in two minutes and the team was ready when I arrived. Site made it dead simple to find hours and services.",
-      date: dayKey(3),
+      text: "The staff here are wonderful and the studio is spotlessly clean. Best pilates classes I've taken in years.",
+      date: dayKey(2),
     },
     {
       source: "google",
+      externalId: "seed-hp-02",
       author: "Priya N.",
       rating: 5,
-      text: "Exactly what I needed. Found them on Google, the website answered every question before I even called.",
-      date: dayKey(8),
+      text: "Calm, cozy atmosphere and the team makes you feel welcome the moment you walk in. Highly recommend.",
+      date: dayKey(4),
+    },
+    {
+      source: "google",
+      externalId: "seed-hp-03",
+      author: "Alyssa M.",
+      rating: 5,
+      text: "Always clean, always friendly. The front staff are so helpful and booking a class online took two minutes.",
+      date: dayKey(6),
       reply:
-        "Thank you Priya — so glad the site made it easy. See you again soon!",
-      repliedAt: dayKey(7),
+        "Alyssa, means a lot to hear that — the whole team works hard to keep the studio calm and easy. See you in class.",
+      repliedAt: dayKey(5),
     },
     {
       source: "yelp",
+      externalId: "seed-hp-04",
       author: "Dan R.",
       rating: 4,
-      text: "Great experience overall. Quick to respond and easy to schedule online.",
-      date: dayKey(12),
+      text: "Great classes and easy to schedule online. Would love a few more evening slots during the week.",
+      date: dayKey(9),
     },
     {
       source: "google",
-      author: "Alyssa M.",
+      externalId: "seed-hp-05",
+      author: "Renee K.",
       rating: 5,
-      text: "Professional, fast, and the online booking just works. Highly recommend.",
-      date: dayKey(18),
+      text: "Professional, friendly staff and a genuinely relaxing space. My weekly reset — clean, quiet, and welcoming.",
+      date: dayKey(13),
+      reply:
+        "Thank you Renee — glad it's become part of your week. We'll keep the space calm and ready for you.",
+      repliedAt: dayKey(12),
+    },
+    {
+      source: "google",
+      externalId: "seed-hp-06",
+      author: "Sofia L.",
+      rating: 5,
+      text: "Spotless studio and the instructors clearly care. Quiet, peaceful, and the staff remember your name.",
+      date: dayKey(17),
+    },
+    {
+      source: "google",
+      externalId: "seed-hp-07",
+      author: "Tom B.",
+      rating: 3,
+      text: "Classes are good but the room gets warm and a little crowded at peak times. Staff are pleasant though.",
+      date: dayKey(21),
+    },
+    {
+      source: "google",
+      externalId: "seed-hp-08",
+      author: "Grace W.",
+      rating: 5,
+      text: "The team is fantastic and genuinely welcoming. Clean space, warm atmosphere, great value for the classes.",
+      date: dayKey(26),
+    },
+    {
+      source: "google",
+      externalId: "seed-hp-09",
+      author: "Jordan P.",
+      rating: 1,
+      text: "Waited 25 minutes past the class start time and the staff at the desk were dismissive when I asked. Never going back.",
+      date: dayKey(3),
     },
   ];
   for (const r of reviews) await addReview(tenant, r);
-  console.log(`  ✓ ${reviews.length} reviews (incl. 1 replied)`);
+  console.log(`  ✓ ${reviews.length} reviews (2 replied, 1 unanswered 1★ for the admin queue)`);
 }
 
 async function seedSearch(tenant: string): Promise<void> {
@@ -259,6 +315,15 @@ async function main(): Promise<void> {
   if (!config) {
     console.error(`Tenant "${TENANT}" is not registered in src/lib/tenants.ts.`);
     process.exit(1);
+  }
+
+  // `--reviews-only` seeds just the (idempotent) review set — handy for
+  // refreshing the demo's review surfaces without appending more activity/events.
+  if (process.argv.includes("--reviews-only")) {
+    console.log(`Seeding reviews only for tenant: ${TENANT}\n`);
+    await seedReviews(TENANT);
+    console.log(`\nDone. View it at the demo dashboard (admin host for "${TENANT}") -> Reviews.`);
+    return;
   }
 
   console.log(`Seeding engagement for tenant: ${TENANT} (template: ${config.template})\n`);
