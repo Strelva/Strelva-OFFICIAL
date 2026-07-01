@@ -119,7 +119,13 @@ function toEditableNode(data: Record<string, unknown>): EditableNode | null {
   };
 }
 
-export function SitePreview() {
+export function SitePreview({
+  isEditing = false,
+  onToggleEdit,
+}: {
+  isEditing?: boolean;
+  onToggleEdit?: () => void;
+} = {}) {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
     BREAKPOINTS[2]
   );
@@ -187,7 +193,7 @@ export function SitePreview() {
     editableParams.set("tenant", tenantId);
   }
   editableParams.set("preview", "true");
-  if (editMode === "draft") {
+  if (isEditing && editMode === "draft") {
     editableParams.set("edit", "true");
   }
   editableParams.set("refresh", String(refreshKey));
@@ -214,7 +220,13 @@ export function SitePreview() {
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
   const isLivePreview = effectivePreviewSource === "live" && !!siteUrl;
   const previewKind = isLivePreview ? "Active site preview" : "Editable preview";
-  const previewBadgeLabel = isLivePreview ? "Active site" : hasAnyDraft ? "Draft preview" : "Editable preview";
+  const previewBadgeLabel = !isEditing
+    ? "Preview"
+    : isLivePreview
+      ? "Active site"
+      : hasAnyDraft
+        ? "Draft preview"
+        : "Editable preview";
   const activeSectionLabel = activeSection ? SECTION_LABELS[activeSection] || activeSection : null;
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource: effectivePreviewSource });
@@ -264,7 +276,7 @@ export function SitePreview() {
   // overlay will post click/select messages back. Without this the overlay
   // silently drops every canvas interaction.
   useEffect(() => {
-    if (previewStatus !== "ready" || effectivePreviewSource !== "editable") return;
+    if (!isEditing || previewStatus !== "ready" || effectivePreviewSource !== "editable") return;
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
     let targetOrigin = window.location.origin;
@@ -281,7 +293,7 @@ export function SitePreview() {
     send();
     const timers = [200, 500, 1000].map((ms) => window.setTimeout(send, ms));
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [previewStatus, effectivePreviewSource, iframeSrc]);
+  }, [isEditing, previewStatus, effectivePreviewSource, iframeSrc]);
 
   // Send highlight to iframe when activeSection changes
   useEffect(() => {
@@ -458,35 +470,39 @@ export function SitePreview() {
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
-          {[
-            { value: "editable", label: "Edit" },
-            { value: "live", label: "Live" },
-          ].map((source) => {
-            const active = effectivePreviewSource === source.value;
-            const disabled = source.value === "live" && !siteUrl;
-            return (
-              <button
-                key={source.value}
-                type="button"
-                disabled={disabled}
-                onClick={() => setPreviewSource(source.value as PreviewSource)}
-                aria-pressed={active}
-                className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
-                  active
-                    ? "bg-surface text-warm-white shadow-sm"
-                    : disabled
-                      ? "cursor-not-allowed text-gray-faint/60"
-                      : "text-gray-muted hover:text-warm-white"
-                }`}
-              >
-                {source.label}
-              </button>
-            );
-          })}
-        </div>
+        {isEditing && (
+          <>
+            <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
+              {[
+                { value: "editable", label: "Edit" },
+                { value: "live", label: "Live" },
+              ].map((source) => {
+                const active = effectivePreviewSource === source.value;
+                const disabled = source.value === "live" && !siteUrl;
+                return (
+                  <button
+                    key={source.value}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setPreviewSource(source.value as PreviewSource)}
+                    aria-pressed={active}
+                    className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
+                      active
+                        ? "bg-surface text-warm-white shadow-sm"
+                        : disabled
+                          ? "cursor-not-allowed text-gray-faint/60"
+                          : "text-gray-muted hover:text-warm-white"
+                    }`}
+                  >
+                    {source.label}
+                  </button>
+                );
+              })}
+            </div>
 
-        <span className="mx-0.5 h-5 w-px bg-gray-border" />
+            <span className="mx-0.5 h-5 w-px bg-gray-border" />
+          </>
+        )}
 
         <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
           {BREAKPOINTS.map((bp) => {
@@ -529,6 +545,29 @@ export function SitePreview() {
             <ExternalLink className="h-[13px] w-[13px]" strokeWidth={1.5} />
           </a>
         )}
+
+        <span className="mx-0.5 h-5 w-px bg-gray-border" />
+        <button
+          type="button"
+          onClick={onToggleEdit}
+          className={
+            isEditing
+              ? "flex h-7 items-center gap-1.5 rounded-md border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+              : "flex h-7 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent transition-colors hover:bg-accent/85"
+          }
+        >
+          {isEditing ? (
+            <>
+              <Eye className="h-3.5 w-3.5" strokeWidth={1.6} />
+              Preview
+            </>
+          ) : (
+            <>
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.6} />
+              Edit site
+            </>
+          )}
+        </button>
       </div>
 
       {/* Canvas — a recessed well the document floats in */}
@@ -609,7 +648,7 @@ export function SitePreview() {
         </div>
 
         {/* Floating selection bar — contextual action for the selected section */}
-        {activeSectionLabel && previewStatus === "ready" && (
+        {isEditing && activeSectionLabel && previewStatus === "ready" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
             <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,10,12,0.82)] py-1.5 pl-3.5 pr-1.5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-overlay-enter">
               <span className="flex items-center gap-1.5 text-[11px] font-medium">

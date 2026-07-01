@@ -59,6 +59,8 @@ export function ContentWorkspace({
   } = useDashboard();
   void timestamps;
   const [viewportMode, setViewportMode] = useState<WorkspaceViewport | null>(null);
+  // Land on preview (see your site) — editing tooling appears only when asked for.
+  const [isEditing, setIsEditing] = useState(false);
 
   const sectionOptions = useMemo(
     () =>
@@ -146,6 +148,7 @@ export function ContentWorkspace({
   // Arrow keys step through the current page's sections (ignored while typing).
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (!isEditing) return;
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       const target = event.target as HTMLElement | null;
       if (
@@ -173,7 +176,7 @@ export function ContentWorkspace({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pageSections, activeSection, setActiveSection, setScrollToSection, setRightTab]);
+  }, [isEditing, pageSections, activeSection, setActiveSection, setScrollToSection, setRightTab]);
 
   const inRequest = rightTab === "request";
   const inChat = rightTab === "chat";
@@ -273,48 +276,60 @@ export function ContentWorkspace({
       )}
 
       {viewportMode === "desktop" && (
-        <div className="flex flex-1 min-h-0">
-          <SectionsRail
-            pages={pageOptions}
-            activePage={activePage}
-            onPageChange={(value) => {
-              setActivePage(value);
-              setActiveSection(null);
-            }}
-            sections={pageSections}
-            activeSection={activeSection}
-            onSelect={(value) => {
-              setActiveSection(value);
-              setScrollToSection(value);
-              setRightTab("properties");
-            }}
-          />
+        isEditing ? (
+          <div className="flex flex-1 min-h-0">
+            <SectionsRail
+              pages={pageOptions}
+              activePage={activePage}
+              onPageChange={(value) => {
+                setActivePage(value);
+                setActiveSection(null);
+              }}
+              sections={pageSections}
+              activeSection={activeSection}
+              onSelect={(value) => {
+                setActiveSection(value);
+                setScrollToSection(value);
+                setRightTab("properties");
+              }}
+            />
 
-          <main className="flex-1 flex flex-col min-w-0">
-            <SitePreview />
+            <main className="flex-1 flex flex-col min-w-0">
+              <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
+            </main>
+
+            <aside
+              className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
+                rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
+              }`}
+            >
+              {rightCollapsed ? <CollapsedRight /> : rightPanelContent}
+            </aside>
+          </div>
+        ) : (
+          <main className="flex flex-1 min-w-0 flex-col">
+            <SitePreview isEditing={false} onToggleEdit={() => setIsEditing(true)} />
           </main>
-
-          <aside
-            className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
-              rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
-            }`}
-          >
-            {rightCollapsed ? <CollapsedRight /> : rightPanelContent}
-          </aside>
-        </div>
+        )
       )}
 
       {viewportMode === "tablet" && (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="h-[60%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
-            <div className="min-h-0 flex-1">
-              <SitePreview />
+        isEditing ? (
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="h-[58%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
+              <div className="min-h-0 flex-1">
+                <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col min-h-0">
+              {rightPanelContent}
             </div>
           </div>
-          <div className="flex-1 flex flex-col min-h-0">
-            {rightPanelContent}
+        ) : (
+          <div className="flex flex-1 min-h-0 flex-col">
+            <SitePreview isEditing={false} onToggleEdit={() => setIsEditing(true)} />
           </div>
-        </div>
+        )
       )}
 
       {viewportMode === "mobile" && (
