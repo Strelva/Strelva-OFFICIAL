@@ -134,7 +134,7 @@ Because it divides by the sum of the weights actually present, a category emitte
 - Page: `src/app/dashboard/health/page.tsx` ("Site Health", access-gated) renders `src/components/dashboard/SiteHealthCard.tsx`.
 - API: `GET /api/dashboard/site-audit` (auth-gated: `verifyAuth` + `requireTenantAccess`) resolves the tenant's best public URL and routes through `scanTenant`, so the client view writes to the SAME scan-store the admin overview reads. Result cached 24h per tenant (`reb:site-audit:{tenant}`); `?refresh=1` forces a re-scan. Returns the full per-category detail plus `topFixes`.
 - History: `GET /api/dashboard/site-audit/history` reads `getScanHistory` (the same store the admin sparkline uses, populated by the daily cron) for the card's trend band.
-- Card: score + grade ring, a re-scan button, a trend band (when >= 2 history points), the "Fix these first" list, and per-category bars (filtered to `weight > 0`).
+- Card: score + grade ring, a re-scan button, a trend band (when >= 2 history points), a **positive quick-wins** list (`topFixes` reframed as "Quick wins to reach an A" / "Ways to stay ahead" at an A grade — managed framing, "ask the AI to handle these"), and per-category bars (filtered to `weight > 0`). Deliberately NOT a red problem list: category rows show a green check on strong areas and a calm neutral dot otherwise (no amber-triangle / red-X `fail` icons). The raw pass/warn/fail per-check breakdown + the priority-scored issue list are admin-side only (the tenant `SiteScan` view), per the product rule that the client sees good numbers, not issues.
 
 ### Admin (super-admin portfolio + per-tenant)
 
