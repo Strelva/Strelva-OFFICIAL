@@ -225,7 +225,7 @@ export function visibilityProofHighlights(diff: VisibilityDiff): string[] {
   return out.slice(0, 2);
 }
 
-function buildHighlights(
+export function buildHighlights(
   stats: WeeklyBriefStats,
   events: Array<{ type: string; title: string }>,
   activity: Array<{ text: string; actor?: string }>,
