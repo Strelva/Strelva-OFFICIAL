@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
-import type { AuditResult, CategoryResult, CheckStatus } from "@/lib/audit/types";
+import type { AuditResult, CategoryResult } from "@/lib/audit/types";
 
 type Fix = {
   category: string;
@@ -39,11 +39,17 @@ function barColor(score: number): string {
   return "#dc2626";
 }
 
-const statusIcon: Record<CheckStatus, React.ReactNode> = {
-  pass: <CheckCircle2 className="h-4 w-4 text-green-600" strokeWidth={2} />,
-  warn: <AlertTriangle className="h-4 w-4 text-amber-500" strokeWidth={2} />,
-  fail: <XCircle className="h-4 w-4 text-red-500" strokeWidth={2} />,
-};
+/** Client-facing category marker. A green check celebrates a strong area; every
+ *  other level gets a calm neutral dot — never a red "fail" X. The score number
+ *  and bar color still carry the honest signal; the raw pass/warn/fail per-check
+ *  breakdown lives admin-side (the tenant SiteScan view), per the product rule
+ *  that the client sees good numbers, not a problem list. */
+function categoryMarker(score: number): React.ReactNode {
+  if (score >= 80) {
+    return <CheckCircle2 className="h-4 w-4 text-green-600" strokeWidth={2} />;
+  }
+  return <span className="inline-block h-2 w-2 rounded-full bg-gray-muted/50" aria-hidden />;
+}
 
 type TrendPoint = { overallScore: number; scannedAt: string };
 
@@ -225,23 +231,25 @@ export function SiteHealthCard() {
       {/* Weekly trend */}
       {history.length >= 2 && <TrendBand history={history} />}
 
-      {/* Top fixes — MANAGED framing. The owner sees WHAT we're watching, but the
-          action is "ask the AI", not a DIY how-to guide. This is a managed
-          service; DIY "here's how YOU fix it" links contradicted the pitch. */}
+      {/* Quick wins — MANAGED, forward-looking framing. The client sees
+          opportunities to climb, not a red problem list (the raw issue detail is
+          admin-side). The action is "ask the AI", never a DIY how-to. */}
       {audit.topFixes.length > 0 && (
         <div className="border-b border-glass-border px-5 py-4">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[13px] font-semibold text-warm-black">What to fix first</p>
+            <p className="text-[13px] font-semibold text-warm-black">
+              {audit.grade === "A" ? "Ways to stay ahead" : "Quick wins to reach an A"}
+            </p>
             <Link
               href={dashboardHref("/dashboard/chat")}
               className="shrink-0 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
             >
-              Ask the AI to fix these -&gt;
+              Ask the AI to handle these -&gt;
             </Link>
           </div>
           <p className="mt-0.5 text-[12px] text-gray-muted">
-            Strelva keeps an eye on these — ask the AI to handle one in chat, or it
-            gets picked up as we manage your site.
+            Small boosts we&apos;re already watching — ask the AI to knock one out in
+            chat, or we&apos;ll pick it up as we manage your site.
           </p>
           <ul className="mt-3 grid gap-2">
             {audit.topFixes.map((fix) => (
@@ -273,7 +281,9 @@ export function SiteHealthCard() {
           .filter((c: CategoryResult) => c.weight > 0)
           .map((cat: CategoryResult) => (
             <div key={cat.slug} className="flex items-center gap-3">
-              {statusIcon[cat.score >= 80 ? "pass" : cat.score >= 50 ? "warn" : "fail"]}
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {categoryMarker(cat.score)}
+              </span>
               <span className="w-40 shrink-0 truncate text-[13px] text-warm-black">{cat.name}</span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-glass">
                 <div
