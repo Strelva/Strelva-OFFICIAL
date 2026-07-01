@@ -17,6 +17,31 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getRedis } from "./redis";
 import type { TenantConfig } from "./types";
+import { analyzeReview, TOPIC_LABELS } from "./reviews/sentiment";
+
+/**
+ * A one-line hint about what the reviewer actually talked about, derived from
+ * the dependency-free sentiment engine. Feeding this into the draft prompt
+ * makes replies acknowledge the specific concern/praise (a filter-safe way to
+ * be "specific") instead of generic boilerplate. Empty string when there's no
+ * comment or no clear signal — the prompt then just omits the hint.
+ */
+function buildReplyContextHint(rating: number, comment: string): string {
+  const trimmed = comment.trim();
+  if (!trimmed) return "";
+  const analysis = analyzeReview(trimmed, rating);
+  const topic = analysis.topics[0];
+  const topicLabel = topic ? TOPIC_LABELS[topic] : null;
+  if (analysis.sentiment.label === "negative" || rating <= 2) {
+    return topicLabel
+      ? `The reviewer's main concern is ${topicLabel}. Acknowledge that specific concern directly, without excuses.`
+      : `The reviewer is unhappy. Acknowledge their experience directly, without excuses.`;
+  }
+  if (topicLabel) {
+    return `The reviewer specifically praised ${topicLabel}. Reference that in a natural, non-generic way.`;
+  }
+  return "";
+}
 
 // ─── Banned phrases & patterns ────────────────────────────────────────────────
 // Exported as data so tests can assert exhaustive coverage.
@@ -248,13 +273,17 @@ export async function draftReviewReply(
 ): Promise<string> {
   const businessName = tenantConfig.siteName || tenantConfig.id;
   const comment = review.comment?.trim() || "(no comment left)";
+  const contextHint = buildReplyContextHint(review.rating, review.comment?.trim() || "");
+  const basePrompt =
+    DRAFT_PROMPT(review.reviewerName, review.rating, comment, businessName) +
+    (contextHint ? `\n\n8. ${contextHint}` : "");
 
   // ── First AI pass ──────────────────────────────────────────────────────────
   let firstDraft: string | null = null;
   try {
     const { text } = await generateText({
       model: google("gemini-2.5-flash"),
-      prompt: DRAFT_PROMPT(review.reviewerName, review.rating, comment, businessName),
+      prompt: basePrompt,
       maxOutputTokens: 200,
     });
     firstDraft = text.trim();
@@ -281,7 +310,7 @@ export async function draftReviewReply(
       const { text: secondText } = await generateText({
         model: google("gemini-2.5-flash"),
         prompt:
-          DRAFT_PROMPT(review.reviewerName, review.rating, comment, businessName) +
+          basePrompt +
           `\n\nIMPORTANT FEEDBACK ON YOUR PREVIOUS ATTEMPT: ${violationFeedback}`,
         maxOutputTokens: 200,
       });
