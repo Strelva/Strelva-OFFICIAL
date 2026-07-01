@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ScanSummary } from "@/lib/scan-store";
+import type { PrioritizedActionList, PrioritizedIssue } from "@/lib/audit/prioritize";
 import { TONE_PILL, TONE_DOT, gradeTone, scoreTone } from "@/lib/status-colors";
 import { Sparkline } from "../../Sparkline";
 
@@ -15,6 +16,12 @@ interface FreshCategory {
   score: number;
   checks: FreshCheck[];
 }
+
+const PRIORITY_PILL: Record<PrioritizedIssue["priority"], string> = {
+  high: "bg-red-500/15 text-red-300 border-red-500/30",
+  medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  low: "bg-gray-bg text-gray-muted border-glass-border",
+};
 
 function ago(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -38,6 +45,7 @@ export function SiteScan({
   // the full per-check breakdown, available only after a fresh in-session scan.
   const [scan, setScan] = useState<ScanSummary | null>(initialScan);
   const [detail, setDetail] = useState<FreshCategory[] | null>(null);
+  const [issues, setIssues] = useState<PrioritizedActionList | null>(null);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +69,7 @@ export function SiteScan({
         categories: cats.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
       });
       setDetail(cats);
+      setIssues(data.prioritizedIssues ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -143,6 +152,41 @@ export function SiteScan({
               );
             })}
           </div>
+
+          {issues && issues.total > 0 && (
+            <div className="mt-6 border-t border-glass-border pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-warm-white">Fix first</h3>
+                <span className="text-[10px] text-gray-faint">
+                  {issues.highCount} high · {issues.mediumCount} medium · {issues.lowCount} low
+                </span>
+              </div>
+              <ol className="mt-2 space-y-1.5">
+                {issues.issues.slice(0, 6).map((issue, i) => (
+                  <li
+                    key={`${issue.categorySlug}-${issue.check}-${i}`}
+                    className="flex items-start gap-2.5 text-xs"
+                  >
+                    <span className="mt-0.5 w-4 shrink-0 text-right tabular-nums text-gray-faint">
+                      {i + 1}
+                    </span>
+                    <span
+                      className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_PILL[issue.priority]}`}
+                    >
+                      {issue.priority}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="text-warm-white">{issue.message}</span>
+                      <span className="text-gray-faint"> · {issue.category}</span>
+                      {issue.impact && (
+                        <span className="block text-[11px] text-gray-muted">{issue.impact}</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       )}
     </div>
