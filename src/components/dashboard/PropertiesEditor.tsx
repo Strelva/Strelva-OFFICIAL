@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Save, Check, RotateCcw, AlertCircle, MessageCircle, History } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Check, RotateCcw, AlertCircle, MessageCircle, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { StringArrayEditor } from "./StringArrayEditor";
@@ -274,7 +274,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     selectedNode,
     setChatPrompt,
     addEditReceipts,
+    refreshKey,
   } = useDashboard();
+  const dirtyRef = useRef(false);
+  const prevSectionRef = useRef<string | null>(null);
+  const pendingRef = useRef<{ section: string; data: Record<string, unknown> } | null>(null);
   const siteModelSchema = useMemo(() => getSiteModelSchema(siteModel), [siteModel]);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown> | null>(null);
@@ -317,16 +321,48 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     ];
   }, [fields, legacyArrayConfig, siteModelArrays]);
 
-  // Fetch section data when activeSection changes (skip composites)
+  // Load section data on section change, and re-sync when the canvas changes
+  // (refreshKey) so an inline edit shows up in the inspector — without clobbering
+  // an in-progress local edit.
   useEffect(() => {
+    const sectionChanged = prevSectionRef.current !== activeSection;
+
+    // Leaving a section mid-edit: flush the pending edit to the draft (fire and
+    // forget) so navigating away never drops work.
+    if (sectionChanged && pendingRef.current && dirtyRef.current) {
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      dirtyRef.current = false;
+      const isDraft = editMode === "draft";
+      const flushUrl = isDraft
+        ? dashboardHref(`/api/content/${pending.section}?draft=true`)
+        : dashboardHref(`/api/content/${pending.section}`);
+      fetch(flushUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(pending.data),
+      })
+        .then((res) => {
+          if (res.ok && isDraft) setHasDraft((prev) => ({ ...prev, [pending.section]: true }));
+        })
+        .catch(() => {});
+    }
+
     if (!activeSection || activeSection in COMPOSITE_SECTION_INFO) {
       setData(null);
       setOriginal(null);
+      prevSectionRef.current = activeSection;
       return;
     }
 
-    setLoading(true);
-    setSaved(false);
+    if (!sectionChanged && dirtyRef.current) return;
+    prevSectionRef.current = activeSection;
+
+    if (sectionChanged) {
+      setLoading(true);
+      setSaved(false);
+    }
     const url = editMode === "draft"
       ? dashboardHref(`/api/content/${activeSection}?draft=true`)
       : dashboardHref(`/api/content/${activeSection}`);
@@ -335,19 +371,25 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       .then((d) => {
         setData(d);
         setOriginal(d);
+        pendingRef.current = null;
       })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [activeSection, dashboardHref, editMode]);
+      .catch(() => {
+        if (sectionChanged) setData(null);
+      })
+      .finally(() => {
+        if (sectionChanged) setLoading(false);
+      });
+  }, [activeSection, dashboardHref, editMode, refreshKey, setHasDraft]);
 
   const handleFieldChange = useCallback((key: string, value: unknown) => {
     setData((prev) => {
       if (!prev) return prev;
-      if (key.includes(".")) return setNestedValue(prev, key, value);
-      return { ...prev, [key]: value };
+      const next = key.includes(".") ? setNestedValue(prev, key, value) : { ...prev, [key]: value };
+      if (activeSection) pendingRef.current = { section: activeSection, data: next };
+      return next;
     });
     setSaved(false);
-  }, []);
+  }, [activeSection]);
 
   const handleSave = useCallback(async () => {
     if (!activeSection || !data) return;
@@ -374,6 +416,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         body: JSON.stringify(data),
       });
       if (res.ok) {
+        pendingRef.current = null;
         addEditReceipts(receipts);
         if (isDraft) {
           setHasDraft((prev) => ({ ...prev, [activeSection]: true }));
@@ -417,6 +460,20 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   }, [setChatPrompt]);
 
   const hasChanges = data && original && JSON.stringify(data) !== JSON.stringify(original);
+
+  useEffect(() => {
+    dirtyRef.current = !!hasChanges;
+  }, [hasChanges]);
+
+  // Auto-save: inspector edits commit to the draft on their own — same model as
+  // the inline canvas editor, so there's no manual Save step and no lost work.
+  useEffect(() => {
+    if (!hasChanges || saving) return;
+    const timer = setTimeout(() => {
+      void handleSave();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [hasChanges, saving, handleSave]);
 
   // No section selected
   if (!activeSection) {
@@ -530,32 +587,21 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         />
       ) : (
         <>
-      {/* Save bar */}
+      {/* Auto-save status — edits commit to the draft on their own */}
       {hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-amber-500/[0.05] shrink-0 animate-fade-in-up">
-          <div>
-            <p className="text-[11px] font-medium text-amber-300">Unsaved draft changes</p>
-            <p className="text-[10px] text-gray-faint">Save this section to update the draft preview.</p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<RotateCcw className="w-3 h-3" strokeWidth={1.5} />}
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={saving}
-              icon={!saving ? <Save className="w-3 h-3" strokeWidth={1.5} /> : undefined}
-              onClick={handleSave}
-            >
-              {editMode === "draft" ? "Save Draft" : "Save"}
-            </Button>
-          </div>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-surface shrink-0 animate-fade-in-up">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+            Saving changes…
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RotateCcw className="w-3 h-3" strokeWidth={1.5} />}
+            onClick={handleReset}
+          >
+            Undo
+          </Button>
         </div>
       )}
 

@@ -184,7 +184,15 @@ export function SitePreview({
       if (!sectionToPage[s.type]) sectionToPage[s.type] = page;
     }
   }
-  const currentPage = activeSection
+  // The Page selector is the source of truth for which page the canvas shows.
+  // Only fall back to a section's canonical page when the selected section does
+  // NOT live on the active page — otherwise sections shared across pages (Page
+  // Header, Call to Action) would drag the canvas back to whichever page
+  // declares them first (e.g. Contact's Page Header showing the About page).
+  const activePageHasActiveSection = activeSection
+    ? (siteModelPages[activePage]?.sections?.some((s) => s.type === activeSection) ?? false)
+    : false;
+  const currentPage = activeSection && !activePageHasActiveSection
     ? (sectionToPage[activeSection] || activePage || "home")
     : (activePage || "home");
   const pagePath = PAGE_PATHS[currentPage] || (currentPage === "home" ? "/" : `/${currentPage}`);
@@ -478,12 +486,23 @@ export function SitePreview({
                 { value: "live", label: "Live" },
               ].map((source) => {
                 const active = effectivePreviewSource === source.value;
-                const disabled = source.value === "live" && !siteUrl;
+                // Live is unavailable with no live URL, and while unpublished
+                // draft changes exist the preview is forced to Edit — so disable
+                // (rather than silently ignore) the toggle and say why.
+                const disabled =
+                  source.value === "live" && (!siteUrl || hasAnyDraft);
+                const disabledReason =
+                  source.value === "live" && hasAnyDraft
+                    ? "Publish your draft changes to view the live site"
+                    : source.value === "live" && !siteUrl
+                      ? "Your live site isn't connected yet"
+                      : undefined;
                 return (
                   <button
                     key={source.value}
                     type="button"
                     disabled={disabled}
+                    title={disabledReason}
                     onClick={() => setPreviewSource(source.value as PreviewSource)}
                     aria-pressed={active}
                     className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
@@ -601,9 +620,8 @@ export function SitePreview({
               <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center">
                 <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
                 <span className="text-[11px] text-gray-muted">
-                  Loading {isLivePreview ? "active site" : "editable preview"} for {pagePath === "/" ? "home" : pagePath}
+                  Loading {isLivePreview ? "your live site" : "your site"}
                 </span>
-                <span className="max-w-full truncate text-[10px] text-gray-faint">{iframeSrc}</span>
               </div>
             </div>
           )}
@@ -611,12 +629,9 @@ export function SitePreview({
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
               <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
                 <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-warm-white">{previewKind} is taking longer than expected</p>
+                <p className="text-sm font-medium text-warm-white">Your preview is taking longer than expected</p>
                 <p className="mt-2 text-xs leading-5 text-gray-muted">
-                  This is usually a DNS, auth, or network delay. You can still edit the selected section on the right or open the active site directly.
-                </p>
-                <p className="mt-3 truncate rounded-md bg-surface-base px-3 py-2 font-mono text-[10px] text-gray-faint">
-                  {iframeSrc}
+                  This is usually a brief network hiccup. You can still edit the selected section on the right, retry, or open your live site directly.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   <button
