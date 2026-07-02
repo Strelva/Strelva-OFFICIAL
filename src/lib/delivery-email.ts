@@ -230,6 +230,125 @@ export async function sendNewLeadEmail(params: {
   }
 }
 
+/**
+ * Every field that comes in on the /access-request intake form. Carried whole
+ * into the team-notification email so nobody has to open a screen to triage.
+ */
+export interface IntakeLeadFields {
+  businessName: string;
+  description?: string | null;
+  location?: string | null;
+  email: string;
+  phone?: string | null;
+  currentWebsite?: string | null;
+  plan?: string | null;
+  planLabel: string;
+  referredBy?: string | null;
+}
+
+/**
+ * Who gets the "new lead" notification. Reads LEAD_NOTIFY_EMAILS (comma-
+ * separated) and DEFAULTS to jacob@strelva.com when it's unset or empty — the
+ * whole point of this path is that an unset env can never silence a lead.
+ * Exported so the fallback behavior is directly testable.
+ */
+export function resolveLeadNotifyRecipients(): string[] {
+  const parsed = (process.env.LEAD_NOTIFY_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : ["jacob@strelva.com"];
+}
+
+function buildIntakeLeadRows(lead: IntakeLeadFields): Array<[string, string]> {
+  return [
+    ["Business", lead.businessName],
+    ["Email", lead.email],
+    ["Phone", lead.phone || "—"],
+    ["Location", lead.location || "—"],
+    ["Current site", lead.currentWebsite || "—"],
+    ["Wants", lead.planLabel],
+    ["Referred by", lead.referredBy || "Direct"],
+    ["What they want", lead.description || "—"],
+  ];
+}
+
+function buildNewIntakeLeadEmailHtml(params: {
+  lead: IntakeLeadFields;
+  leadsUrl: string;
+}): string {
+  const leadsUrl = escapeHtml(params.leadsUrl);
+  const rows = buildIntakeLeadRows(params.lead)
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding: 6px 12px 6px 0; color: #5b6f68; font-size: 13px; vertical-align: top; white-space: nowrap;">${escapeHtml(label)}</td><td style="padding: 6px 0; color: #151515; font-size: 15px; line-height: 1.5;">${escapeHtml(cleanSubjectText(value))}</td></tr>`,
+    )
+    .join("");
+  return `
+    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
+      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
+      <h1 style="font-size: 26px; line-height: 1.15; margin: 0 0 18px;">New lead: ${escapeHtml(cleanSubjectText(params.lead.businessName))}</h1>
+      <table style="border-collapse: collapse; width: 100%; margin: 0 0 24px;">${rows}</table>
+      <a href="${leadsUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
+        Open the leads board
+      </a>
+    </div>
+  `;
+}
+
+function buildNewIntakeLeadEmailText(params: {
+  lead: IntakeLeadFields;
+  leadsUrl: string;
+}): string {
+  const rows = buildIntakeLeadRows(params.lead).map(
+    ([label, value]) => `${label}: ${cleanSubjectText(value)}`,
+  );
+  return [
+    `New lead: ${cleanSubjectText(params.lead.businessName)}`,
+    "",
+    ...rows,
+    "",
+    `Open the leads board: ${params.leadsUrl}`,
+  ].join("\n");
+}
+
+/**
+ * "New lead: {businessName}" — notifies the team the moment a genuinely-new
+ * marketing lead lands, carrying every intake field plus a link to the admin
+ * leads board. Slack-independent by design: this is the notification path that
+ * must work with no env configured (recipients default to jacob@strelva.com).
+ * Fails soft: returns false on any error (missing API key, Resend failure) so a
+ * failed notification can never fail the intake response.
+ */
+export async function sendNewIntakeLeadEmail(params: {
+  lead: IntakeLeadFields;
+  leadsUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: resolveLeadNotifyRecipients(),
+      subject: `New lead: ${cleanSubjectText(params.lead.businessName)}`,
+      html: buildNewIntakeLeadEmailHtml({ lead: params.lead, leadsUrl: params.leadsUrl }),
+      text: buildNewIntakeLeadEmailText({ lead: params.lead, leadsUrl: params.leadsUrl }),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-intake-lead email failed:`, err);
+    return false;
+  }
+}
+
 export async function sendDeliveryStatusEmail(params: {
   businessName: string;
   email: string;

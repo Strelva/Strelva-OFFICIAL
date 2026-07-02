@@ -8,7 +8,7 @@ import {
   saveDeliveryLead,
   type DeliveryPlan,
 } from "@/lib/access-request-delivery";
-import { sendDeliveryStatusEmail } from "@/lib/delivery-email";
+import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
 
 export async function POST(req: Request) {
   if (await isRateLimitedWindowedAsync(rateLimitKey(req, "access-request-intake"), 5, 3600_000)) {
@@ -104,6 +104,30 @@ export async function POST(req: Request) {
     businessName: normalizedBusinessName,
     email: normalizedEmail,
     statusUrl,
+    logPrefix: "[access-request]",
+  });
+
+  // Notify the team on every genuinely-new lead. Slack-independent: this fires
+  // with no env configured (recipients default to jacob@strelva.com), closing
+  // the "lands in a DB nobody watches" gap. Best-effort — a failed team email
+  // never fails the intake response.
+  const leadsUrl = new URL(
+    "/admin/leads",
+    process.env.NEXT_PUBLIC_SITE_URL || requestOrigin,
+  ).toString();
+  await sendNewIntakeLeadEmail({
+    lead: {
+      businessName: normalizedBusinessName,
+      description: safeDescription || null,
+      location: safeLocation || null,
+      email: normalizedEmail,
+      phone: safePhone || null,
+      currentWebsite: safeCurrentWebsite || null,
+      plan: planValue,
+      planLabel,
+      referredBy: safeReferredBy || null,
+    },
+    leadsUrl,
     logPrefix: "[access-request]",
   });
 
