@@ -34,6 +34,40 @@ describe("getPresenceProfile", () => {
   it("honors an explicit businessModel override over the template", () => {
     expect(getPresenceProfile({ template: "wellness", businessModel: "online" })).toBe("online");
     expect(getPresenceProfile({ template: "food-brand", businessModel: "local" })).toBe("local");
+    expect(getPresenceProfile({ template: "food-brand", businessModel: "hybrid" })).toBe("hybrid");
+  });
+
+  it('falls back to template inference when businessModel is "" (not answered) or unrecognized', () => {
+    expect(getPresenceProfile({ template: "wellness", businessModel: "" })).toBe("local");
+    expect(getPresenceProfile({ template: "food-brand", businessModel: "" })).toBe("online");
+    expect(getPresenceProfile({ template: "food-brand", businessModel: "storefront" })).toBe("online");
+  });
+});
+
+describe("getDashboardSurfaces — businessModel drives the presence tabs", () => {
+  it('businessModel="online" hides Google Business and Reviews even on a local template', () => {
+    const s = getDashboardSurfaces({
+      tenantConfig: { template: "wellness", businessModel: "online" },
+      connections: [],
+    });
+    expect(at(s, "google-business").state).toBe("hidden");
+    expect(at(s, "reviews").state).toBe("hidden");
+  });
+
+  it('businessModel="local" surfaces Google Business and Reviews even on an online template', () => {
+    const s = getDashboardSurfaces({
+      tenantConfig: { template: "food-brand", businessModel: "local" },
+      connections: [],
+    });
+    expect(at(s, "google-business").state).toBe("connect");
+    expect(at(s, "reviews").state).toBe("connect");
+  });
+
+  it("unset businessModel infers from the template", () => {
+    const local = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
+    expect(at(local, "google-business").state).toBe("connect");
+    const online = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [] });
+    expect(at(online, "google-business").state).toBe("hidden");
   });
 });
 
