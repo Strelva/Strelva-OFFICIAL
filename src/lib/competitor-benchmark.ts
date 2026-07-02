@@ -1,4 +1,5 @@
 import type { VisibilitySnapshot } from "./visibility/snapshots";
+import type { AiAnswerResult } from "./visibility/ai-answers";
 
 /**
  * Competitor benchmark — "where you rank vs your competitors" for the local
@@ -16,6 +17,10 @@ export interface CompetitorRankRow {
   competitors: { name: string; rank: number | null; inPack: boolean }[];
   /** True when you out-rank every tracked competitor on this query. */
   youLead: boolean;
+  /** Whether the business is named when someone asks an AI assistant this query.
+   *  true = named, false = not named, null = the AI answer wasn't probed for this
+   *  query (no data — never render a claim). Additive: SERP fields are unchanged. */
+  aiAnswerMentioned: boolean | null;
 }
 
 export interface CompetitorBenchmark {
@@ -40,15 +45,24 @@ export function buildCompetitorBenchmark(snapshot: VisibilitySnapshot | null): C
   const usable = snapshot.serpResults.filter((r) => !r.skipped && r.competitors.length > 0);
   if (usable.length === 0) return null;
 
+  // AI-answer presence, keyed by the same query the SERP check used (the cron
+  // probes both surfaces over one query list). Only probed answers are claimable.
+  const aiByQuery = new Map<string, AiAnswerResult>();
+  for (const ai of snapshot.aiResults ?? []) {
+    if (ai.probed) aiByQuery.set(ai.query, ai);
+  }
+
   const rows: CompetitorRankRow[] = usable.map((r) => {
     const yours = effectiveRank(r.tenantPosition, r.tenantInLocalPack);
     const bestCompetitor = Math.min(...r.competitors.map((c) => effectiveRank(c.position, c.inLocalPack)));
+    const ai = aiByQuery.get(r.query);
     return {
       query: r.query,
       yourRank: r.tenantPosition,
       yourInPack: r.tenantInLocalPack,
       competitors: r.competitors.map((c) => ({ name: c.name, rank: c.position, inPack: c.inLocalPack })),
       youLead: yours < bestCompetitor,
+      aiAnswerMentioned: ai ? ai.tenantMentioned : null,
     };
   });
 

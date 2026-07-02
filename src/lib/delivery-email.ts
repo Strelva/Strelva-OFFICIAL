@@ -135,6 +135,101 @@ export async function sendUpdateLiveEmail(params: {
   }
 }
 
+function buildNewLeadEmailHtml(params: {
+  name: string;
+  email?: string;
+  message?: string;
+  dashboardUrl: string;
+}): string {
+  const name = escapeHtml(cleanSubjectText(params.name));
+  const email = params.email ? escapeHtml(cleanSubjectText(params.email)) : "";
+  const message = params.message ? escapeHtml(cleanSubjectText(params.message)) : "";
+  const dashboardUrl = escapeHtml(params.dashboardUrl);
+  const contactLine = email
+    ? `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 8px;"><strong>${name}</strong> &lt;${email}&gt;</p>`
+    : `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 8px;"><strong>${name}</strong></p>`;
+  const messageBlock = message
+    ? `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px; padding: 14px 16px; background: #f5f4f2; border-radius: 8px;">${message}</p>`
+    : "";
+  return `
+    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
+      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
+      <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Someone reached out through your website.</h1>
+      ${contactLine}
+      ${messageBlock}
+      <a href="${dashboardUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
+        See it in your dashboard
+      </a>
+    </div>
+  `;
+}
+
+function buildNewLeadEmailText(params: {
+  name: string;
+  email?: string;
+  message?: string;
+  dashboardUrl: string;
+}): string {
+  const name = cleanSubjectText(params.name);
+  const email = params.email ? cleanSubjectText(params.email) : "";
+  const message = params.message ? cleanSubjectText(params.message) : "";
+  return [
+    "Someone reached out through your website.",
+    "",
+    email ? `${name} <${email}>` : name,
+    ...(message ? ["", message] : []),
+    "",
+    `See it in your dashboard: ${params.dashboardUrl}`,
+  ].join("\n");
+}
+
+/**
+ * "Someone reached out through your website" — tells the owner a customer
+ * submitted the site's contact/booking form the moment it lands, so they don't
+ * have to open the dashboard to find out. Fails soft: returns false on any error
+ * (missing API key, Resend failure) so it can never block lead capture.
+ */
+export async function sendNewLeadEmail(params: {
+  email: string;
+  siteName: string;
+  lead: { name: string; email?: string; message?: string };
+  dashboardUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: "Someone reached out through your website",
+      html: buildNewLeadEmailHtml({
+        name: params.lead.name,
+        email: params.lead.email,
+        message: params.lead.message,
+        dashboardUrl: params.dashboardUrl,
+      }),
+      text: buildNewLeadEmailText({
+        name: params.lead.name,
+        email: params.lead.email,
+        message: params.lead.message,
+        dashboardUrl: params.dashboardUrl,
+      }),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-lead email failed:`, err);
+    return false;
+  }
+}
+
 export async function sendDeliveryStatusEmail(params: {
   businessName: string;
   email: string;

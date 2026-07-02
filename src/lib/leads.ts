@@ -11,6 +11,9 @@
  * submission hash so a double-submit doesn't double-count.
  */
 import { getRedis } from "./redis";
+import { getTenantConfig } from "./tenants";
+import { getTenantDashboardUrl } from "./tenant-urls";
+import { sendNewLeadEmail } from "./delivery-email";
 
 const LEAD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const LEAD_KEEP = 500;
@@ -85,7 +88,34 @@ export async function recordLead(
     await redis.del(dedupKey).catch(() => {});
     throw err;
   }
+
+  // Notify the owner a customer reached out — best-effort, only for genuinely
+  // new leads (the dedup guard above already returned on a re-submission). A
+  // failed email must never fail the capture, so it's isolated and logged.
+  await notifyOwnerOfLead(tenant, lead);
   return lead;
+}
+
+/**
+ * Email the tenant's owner that someone reached out. Resolves owner + dashboard
+ * the same way the weekly-report cron does. Fully swallowed-but-logged: the
+ * lead is already captured, so notification failure can never surface to the
+ * caller. Resend errors are counted (logged), not silently dropped.
+ */
+async function notifyOwnerOfLead(tenant: string, lead: LeadRecord): Promise<void> {
+  try {
+    const config = await getTenantConfig(tenant);
+    if (!config?.ownerEmail) return;
+    await sendNewLeadEmail({
+      email: config.ownerEmail,
+      siteName: config.siteName,
+      lead: { name: lead.name, email: lead.email, message: lead.message },
+      dashboardUrl: getTenantDashboardUrl(config, "/dashboard"),
+      logPrefix: "[leads]",
+    });
+  } catch (err) {
+    console.error(`[leads] Owner notification failed for tenant ${tenant}:`, err);
+  }
 }
 
 /** Most recent leads, newest first. */

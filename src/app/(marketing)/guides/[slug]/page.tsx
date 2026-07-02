@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Clock } from "lucide-react";
 import { getGuide, listGuides } from "@/lib/guides";
+import { MARKETING_URL } from "@/lib/brand";
 
 // Serialize JSON-LD safely: JSON.stringify escapes quotes but NOT `<`, so a
 // `</script>` in the data would close the tag. Mirrors the escaper in
@@ -30,11 +31,12 @@ export async function generateMetadata({
   if (!guide) return { title: "Guide not found - Strelva" };
   const title = guide.seoTitle || `${guide.title} - Strelva`;
   const description = guide.seoDescription || guide.excerpt;
+  const url = `${MARKETING_URL}/guides/${guide.slug}`;
   return {
     title,
     description,
-    alternates: { canonical: `/guides/${guide.slug}` },
-    openGraph: { title, description, type: "article", siteName: "Strelva" },
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "article", siteName: "Strelva" },
   };
 }
 
@@ -55,7 +57,7 @@ export default async function GuidePage({
     dateModified: guide.updatedAt,
     author: { "@type": "Organization", name: "Strelva" },
     publisher: { "@type": "Organization", name: "Strelva" },
-    mainEntityOfPage: { "@type": "WebPage", "@id": `https://strelva.com/guides/${guide.slug}` },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${MARKETING_URL}/guides/${guide.slug}` },
   };
 
   const faqLd =

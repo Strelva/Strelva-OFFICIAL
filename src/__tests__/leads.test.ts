@@ -2,13 +2,21 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { makeRedisMock } from "./support/redis-mock";
 
 const mockRedis = makeRedisMock();
+const mockGetTenantConfig = vi.fn();
+const mockSendNewLeadEmail = vi.fn();
 let clock = Date.UTC(2026, 5, 1);
 
 vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a) }));
+vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: (...a: unknown[]) => mockSendNewLeadEmail(...a) }));
 
 beforeEach(() => {
   mockRedis.store.clear();
   mockRedis.zsets.clear();
+  mockGetTenantConfig.mockReset();
+  mockGetTenantConfig.mockResolvedValue({ id: "t1", subdomain: "t1", siteName: "Test Site", ownerEmail: "owner@example.com" });
+  mockSendNewLeadEmail.mockReset();
+  mockSendNewLeadEmail.mockResolvedValue(true);
   clock = Date.UTC(2026, 5, 1);
   vi.spyOn(Date, "now").mockImplementation(() => clock);
   vi.useFakeTimers();
@@ -47,6 +55,29 @@ describe("leads store", () => {
     const s = await getLeadSummary("t1", 30);
     expect(s.count).toBe(2);
     expect(s.recent[0].name).toBe("B"); // newest first
+  });
+
+  it("emails the owner when a genuinely new lead comes in", async () => {
+    await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?", source: "contact-form" });
+    expect(mockSendNewLeadEmail).toHaveBeenCalledTimes(1);
+    const arg = mockSendNewLeadEmail.mock.calls[0][0];
+    expect(arg.email).toBe("owner@example.com");
+    expect(arg.lead.name).toBe("Sarah Chen");
+    expect(arg.lead.email).toBe("s@x.com");
+    expect(arg.lead.message).toBe("Saturday?");
+  });
+
+  it("does not re-email the owner on a duplicate re-submission", async () => {
+    await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });
+    await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });
+    expect(mockSendNewLeadEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures the lead even when the owner notification throws", async () => {
+    mockSendNewLeadEmail.mockRejectedValue(new Error("resend down"));
+    const lead = await recordLead("t1", { name: "Sarah", email: "s@x.com", message: "hi" });
+    expect(lead).not.toBeNull();
+    expect(await getLeads("t1")).toHaveLength(1);
   });
 
   it("releases the dedup lock when indexing fails, so a retry isn't swallowed", async () => {

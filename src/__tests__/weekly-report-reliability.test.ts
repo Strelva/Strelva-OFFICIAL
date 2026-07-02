@@ -28,6 +28,7 @@ vi.mock("../lib/storage", () => ({
     return { siteName: "Test Site" };
   }),
   getSearchData: vi.fn(async () => ({ queries: [] })),
+  getDailyMetrics: vi.fn(async () => []),
 }));
 
 import {
@@ -64,6 +65,7 @@ const baseSummaryInput = {
   verifiedChanges: [],
   failedVerifications: 0,
   visibilityLines: "",
+  anomalyNarrative: "",
 };
 
 afterEach(() => {
@@ -90,6 +92,21 @@ describe("buildReportFallbackSummary (deterministic, claims-safe)", () => {
     const out = buildReportFallbackSummary(baseSummaryInput);
     expect(out).toContain("Morning Flow");
     expect(out).toContain("yoga near me");
+  });
+
+  it("carries the traffic-anomaly story into the body when one is present", () => {
+    const narrative =
+      "Traffic is down 40% from your usual. You're averaging 5 visitors a day this week versus 9 before. Ask the AI to post this week's update.";
+    const out = buildReportFallbackSummary({ ...baseSummaryInput, anomalyNarrative: narrative });
+    expect(out).toContain(narrative);
+  });
+
+  it("omits the traffic story cleanly when there is no anomaly", () => {
+    const out = buildReportFallbackSummary({ ...baseSummaryInput, anomalyNarrative: "" });
+    expect(out).not.toContain("Traffic is down");
+    expect(out).not.toContain("Traffic jumped");
+    // No dangling blank paragraph from an empty narrative.
+    expect(out).not.toContain("\n\n\n");
   });
 
   it("handles a zero-traffic week without inventing activity", () => {
