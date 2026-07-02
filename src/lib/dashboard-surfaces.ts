@@ -15,7 +15,8 @@ import type { Connection, TenantConfig } from "./types";
 
 /** The slice of tenant config the surface resolver actually reads. */
 export type SurfaceTenantConfig = Pick<TenantConfig, "template" | "reviewsConfig"> & {
-  businessModel?: PresenceProfile;
+  /** Raw `settings.businessModel` — `""`/unrecognized means infer from template. */
+  businessModel?: string;
   features?: string[];
 };
 
@@ -59,14 +60,16 @@ const LOCAL_TEMPLATES = new Set(["wellness", "restaurant", "trades", "profession
 const ONLINE_TEMPLATES = new Set(["food-brand", "fashion-stylist"]);
 
 /**
- * Derive how the business is found. Prefers an explicit `businessModel` on the
- * tenant if one is ever set (forward-compatible — the field doesn't exist yet),
- * otherwise infers from the template. Unknown templates default to `local` —
+ * Derive how the business is found. The owner's own answer wins:
+ * `settings.businessModel` (the first-run "Tell us how customers find you" /
+ * Business info field, `""` = not answered — infer from template). Only falls
+ * back to template inference when unset. Unknown templates default to `local` —
  * the ICP is overwhelmingly local, and the cost of a wrong guess is a "connect
  * Google Business" nudge an online brand ignores, not a broken tab.
  */
-export function getPresenceProfile(tenantConfig: Pick<TenantConfig, "template"> & { businessModel?: PresenceProfile }): PresenceProfile {
-  if (tenantConfig.businessModel) return tenantConfig.businessModel;
+export function getPresenceProfile(tenantConfig: Pick<TenantConfig, "template"> & { businessModel?: string }): PresenceProfile {
+  const model = tenantConfig.businessModel;
+  if (model === "local" || model === "online" || model === "hybrid") return model;
   const template = tenantConfig.template;
   if (ONLINE_TEMPLATES.has(template)) return "online";
   if (LOCAL_TEMPLATES.has(template)) return "local";

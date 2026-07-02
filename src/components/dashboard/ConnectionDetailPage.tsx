@@ -172,7 +172,6 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         yelp: "/api/connections/yelp",
         calendly: "/api/connections/calendly",
         instagram: "/api/connections/instagram",
-        vegaro: "/api/connections/vegaro",
       };
       const endpoint = endpointMap[detail.connectionProvider] || "/api/connections/google";
       const res = await fetch(dashboardHref(endpoint), { method: "DELETE" });
@@ -206,17 +205,15 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
     intelligenceStatus === "signal_available";
   const setupPath = status === "connected"
     ? "Connected and available according to the current sync status."
-    : status === "coming_soon"
-      ? "This integration is planned. It is not available for setup yet."
-      : detail.connectionProvider === "google"
-        ? "Connect Google once, then the AI can use this as trusted business context."
-        : detail.id === "google-search-console"
-          ? "This integration uses manual Search Console credential setup today, not OAuth."
-          : detail.connectionProvider
-            ? "Connect the provider before this integration influences AI decisions."
-            : detail.builtIn
-              ? "This is a built-in Strelva signal."
-              : "Set this up before it influences AI decisions.";
+    : detail.connectionProvider === "google"
+      ? "Connect Google once, then the AI can use this as trusted business context."
+      : detail.id === "google-search-console"
+        ? "This integration uses manual Search Console credential setup today, not OAuth."
+        : detail.connectionProvider
+          ? "Connect the provider before this integration influences AI decisions."
+          : detail.builtIn
+            ? "This is a built-in Strelva signal."
+            : "Set this up before it influences AI decisions.";
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
@@ -289,9 +286,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             </p>
           ) : (
             <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
-              {status === "coming_soon"
-                ? "Not available for setup yet — listed here so you know it's planned."
-                : "Connect this integration before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers."}
+              Connect this integration before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers.
             </p>
           )}
         </div>
@@ -417,16 +412,6 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
               . Your Business ID is the last part of your Yelp page URL.
             </p>
           </div>
-        </div>
-      )}
-
-      {/* Coming soon */}
-      {status === "coming_soon" && (
-        <div className="mb-8 max-w-[600px] rounded-2xl border border-glass-border bg-surface-raised px-5 py-4">
-          <h3 className="text-[13px] font-medium text-warm-black mb-1">Connection coming soon</h3>
-          <p className="text-[12px] text-gray-muted leading-relaxed">
-            This integration is visible so you can see what it will support, but setup is not available yet.
-          </p>
         </div>
       )}
 

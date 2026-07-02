@@ -42,6 +42,7 @@ function rowToReview(r: Row<"reviews">): ReviewItem {
     date: r.review_date ?? r.created_at,
     reply: r.reply ?? undefined,
     repliedAt: r.replied_at ?? undefined,
+    externalId: r.external_id ?? undefined,
   };
 }
 

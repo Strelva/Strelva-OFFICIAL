@@ -50,13 +50,6 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
     text: "text-amber-500",
     dot: "bg-amber-500",
   },
-  coming_soon: {
-    icon: Clock,
-    label: "Coming soon",
-    bg: "bg-gray-bg",
-    text: "text-gray-muted",
-    dot: "bg-gray-muted",
-  },
   unknown: {
     icon: AlertCircle,
     label: "Unknown",

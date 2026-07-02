@@ -58,8 +58,8 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
   },
   social: {
     name: "Social Media",
-    description: "Draft and schedule social media posts from site content",
-    tools: ["draft_social_post", "list_social_posts", "schedule_social_post"],
+    description: "Draft social media posts from site content",
+    tools: ["draft_social_post", "list_social_posts"],
   },
 };
 

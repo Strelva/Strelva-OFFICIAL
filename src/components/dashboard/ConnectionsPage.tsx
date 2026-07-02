@@ -59,17 +59,15 @@ function ConnectionRow({
     connection.intelligenceStatus === "signal_available";
   const setupCopy = connection.status === "connected"
     ? "Connected account"
-    : connection.status === "coming_soon"
-      ? "Coming soon"
-      : connection.providerId === "google-business"
-        ? "OAuth ready"
-        : connection.providerId === "google-search-console"
-          ? "Manual Search Console setup"
-          : connection.connected
-            ? "Available"
-            : needsSetup
-              ? "Setup required"
-              : "Available";
+    : connection.providerId === "google-business"
+      ? "OAuth ready"
+      : connection.providerId === "google-search-console"
+        ? "Manual Search Console setup"
+        : connection.connected
+          ? "Available"
+          : needsSetup
+            ? "Setup required"
+            : "Available";
   const actionCopy = canUseNow ? "Ask AI" : "Connect first";
 
   return (
