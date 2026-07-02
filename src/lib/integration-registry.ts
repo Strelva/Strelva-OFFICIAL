@@ -5,7 +5,6 @@ export type IntegrationStatus =
   | "not_configured"
   | "sync_failed"
   | "needs_reauth"
-  | "coming_soon"
   | "unknown";
 
 export type IntelligenceCategory =
@@ -67,7 +66,6 @@ export interface IntegrationDefinition {
   connectionProvider?: IntegrationProvider;
   settingsKey?: string;
   configField?: string;
-  availability?: "available" | "coming_soon";
   /** @deprecated Do not render. Real insights come from tenant data. */
   exampleInsight?: string;
   /** @deprecated Do not render. */
@@ -680,10 +678,6 @@ export function normalizeIntegrationStatus(
     return "sync_failed";
   }
 
-  if (definition.availability === "coming_soon") {
-    return "coming_soon";
-  }
-
   if (definition.builtIn) {
     return "connected";
   }
@@ -715,10 +709,6 @@ export function deriveIntelligenceStatus(
 ): IntelligenceStatus {
   if (status === "needs_reauth" || status === "sync_failed") {
     return "needs_attention";
-  }
-
-  if (definition.availability === "coming_soon" || status === "coming_soon") {
-    return "no_signal";
   }
 
   if (definition.builtIn) {
