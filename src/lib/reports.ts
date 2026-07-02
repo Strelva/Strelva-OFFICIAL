@@ -1,8 +1,10 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
-import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData } from "./storage";
+import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
+import { detectTrafficAnomaly } from "./anomaly";
+import type { TrafficAnomaly } from "./anomaly";
 import { STALE_DAYS } from "./utils";
 import type { TenantConfig, ContentSection, SearchQuery, UnifiedEvent } from "./types";
 import type { ActivityEntry } from "./storage";
@@ -186,6 +188,17 @@ export function formatVisibilityLines(diff: VisibilityDiff | null): string {
   return lines.join("\n");
 }
 
+/**
+ * Format the traffic-anomaly story for the weekly email — the same "traffic
+ * down 40%, likely because…" narrative the dashboard shows. Returns an empty
+ * string when there's no anomaly, so it renders cleanly only when present.
+ * Deterministic: reuses the anomaly's own owner-facing copy verbatim.
+ */
+export function formatAnomalyNarrative(anomaly: TrafficAnomaly | null): string {
+  if (!anomaly) return "";
+  return `${anomaly.headline}. ${anomaly.why} ${anomaly.suggestion}`;
+}
+
 export function detectStaleSections(
   timestamps: Record<string, string>,
   sections: string[],
@@ -218,6 +231,7 @@ interface ReportSummaryInput {
   verifiedChanges: VerifiedChangeItem[];
   failedVerifications: number;
   visibilityLines: string;
+  anomalyNarrative: string;
 }
 
 /**
@@ -280,6 +294,10 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
     paragraphs.push(data.visibilityLines);
   }
 
+  if (data.anomalyNarrative) {
+    paragraphs.push(data.anomalyNarrative);
+  }
+
   return paragraphs.join("\n\n");
 }
 
@@ -308,6 +326,10 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
     ? `\nVisibility changes this week (Google + AI, directional only):\n${data.visibilityLines}`
     : "";
 
+  const anomalyBlock = data.anomalyNarrative
+    ? `\nTraffic trend this week:\n${data.anomalyNarrative}`
+    : "";
+
   let text: string;
   try {
     ({ text } = await generateText({
@@ -325,7 +347,7 @@ ${data.topSearchQueries.length > 0 ? `Top searches that found the site:\n${data.
 ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : "All sections are up to date."}
 
 ${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent activity."}
-${verificationBlock}${visibilityBlock}
+${verificationBlock}${visibilityBlock}${anomalyBlock}
 Rules:
 - 3-5 short paragraphs max
 - Lead with the most interesting metric
@@ -335,6 +357,7 @@ Rules:
 - If verified site changes are listed, include them with their timestamps — these are proof of work, use the exact phrasing provided
 - If a change could not be confirmed live, include that honest line verbatim
 - If visibility changes are listed, include them as-is — these are position moves in Google or AI, use the exact phrasing provided
+- If a traffic trend is listed, include it — it explains a meaningful rise or drop in visits and the next move; use the exact phrasing provided
 - Use "you" not "your site" — make it personal
 - Sound like a helpful coworker texting an update, not a marketing email
 - No subject line, no greeting, no sign-off — just the body
@@ -363,7 +386,7 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events] =
+  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics] =
     await Promise.all([
       getClickCounts("page-view", tenantId),
       getClickCounts("booking-click", tenantId),
@@ -374,6 +397,7 @@ export async function generateWeeklyReport(
       getClickCountsByPrefix("booking-click:", tenantId),
       getSearchData(tenantId),
       getEvents(tenantId, { limit: 200 }),
+      getDailyMetrics(tenantId, 30),
     ]);
 
   const staleSections = detectStaleSections(
@@ -423,6 +447,9 @@ export async function generateWeeklyReport(
   const visibilityDiff = await extractVisibilityDiff(tenantId);
   const visibilityLines = formatVisibilityLines(visibilityDiff);
 
+  // Same anomaly the dashboard shows (reports/page.tsx), carried into the email.
+  const anomalyNarrative = formatAnomalyNarrative(detectTrafficAnomaly(dailyMetrics));
+
   const summary = await generateReportSummary({
     siteName: settings.siteName || tenant.siteName,
     ownerName: tenant.ownerName,
@@ -436,6 +463,7 @@ export async function generateWeeklyReport(
     verifiedChanges,
     failedVerifications,
     visibilityLines,
+    anomalyNarrative,
   });
 
   return {
