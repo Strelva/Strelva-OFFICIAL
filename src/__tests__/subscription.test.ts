@@ -306,13 +306,10 @@ describe("billing webhook event mapping", () => {
     });
   });
 
-  it("webhook skips update when tenantId is missing from metadata", () => {
-    // The webhook handler checks `if (tenantId)` before calling updateTenant.
-    // With null tenantId, updateTenant should never be called.
-    const tenantId = null;
-    if (tenantId) {
-      mockUpdateTenant(tenantId, { subscriptionStatus: "active" });
-    }
-    expect(mockUpdateTenant).not.toHaveBeenCalled();
-  });
+  // NOTE: for invoice events a missing metadata tenantId does NOT mean "skip" —
+  // the webhook falls back to the stored Stripe subscription/customer id
+  // (Basil moved invoice subscription_details under `invoice.parent`). Only when
+  // BOTH metadata and the stored-id lookup fail is the event a true no-op. The
+  // real route-level resolution + fallback is proven in
+  // billing-webhook-mode-guard.test.ts, not by re-deriving the guard here.
 });

@@ -244,6 +244,34 @@ export async function getAllTenants(): Promise<TenantConfig[]> {
   return loadTenants();
 }
 
+/**
+ * Resolve a tenant by the Stripe subscription id stored on it at checkout
+ * (Postgres `stripe_subscription_id` -> TenantConfig.stripeSubscriptionId).
+ * The billing webhook's stripe-id fallback: when a Basil invoice event carries
+ * no tenantId metadata, this recovers the tenant so a renewal/failure is never
+ * silently dropped. Scans the same Redis-cached list as getTenantConfig.
+ */
+export async function getTenantByStripeSubscriptionId(
+  subscriptionId: string
+): Promise<TenantConfig | undefined> {
+  if (!subscriptionId) return undefined;
+  const tenants = await loadTenants();
+  return tenants.find((t) => t.stripeSubscriptionId === subscriptionId);
+}
+
+/**
+ * Resolve a tenant by the Stripe customer id (Postgres `stripe_customer_id` ->
+ * TenantConfig.stripeCustomerId). Last-resort fallback for the billing webhook
+ * when neither the invoice metadata nor the subscription id resolves.
+ */
+export async function getTenantByStripeCustomerId(
+  customerId: string
+): Promise<TenantConfig | undefined> {
+  if (!customerId) return undefined;
+  const tenants = await loadTenants();
+  return tenants.find((t) => t.stripeCustomerId === customerId);
+}
+
 export function isActiveTenant(tenant: Pick<TenantConfig, "active">): boolean {
   return tenant.active !== false;
 }

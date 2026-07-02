@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { updateTenant, getTenantConfig } from "@/lib/tenants";
+import {
+  updateTenant,
+  getTenantConfig,
+  getTenantByStripeSubscriptionId,
+  getTenantByStripeCustomerId,
+} from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { isProductionEnv } from "@/lib/production-guard";
 import { addEvent } from "@/lib/events";
@@ -116,15 +121,50 @@ function extractTenantId(object: unknown): string | null {
   const obj = object as {
     metadata?: Record<string, string>;
     subscription_details?: { metadata?: Record<string, string> };
+    parent?: { subscription_details?: { metadata?: Record<string, string> } };
     lines?: { data?: Array<{ metadata?: Record<string, string> }> };
   };
 
   return (
     obj.metadata?.tenantId ||
+    // Basil (2025-03-31) moved invoice subscription details under `parent`.
+    // Real invoice.paid / invoice.payment_failed events carry the subscription
+    // metadata here, not at the top level — check both. (extractInvoiceSubscriptionId
+    // reads the sibling `parent.subscription_details.subscription` for the same reason.)
+    obj.parent?.subscription_details?.metadata?.tenantId ||
     obj.subscription_details?.metadata?.tenantId ||
     obj.lines?.data?.find((line) => line.metadata?.tenantId)?.metadata?.tenantId ||
     null
   );
+}
+
+/**
+ * Stripe-id fallback for invoice events. A metadata gap must NEVER silently drop
+ * a money event: if extractTenantId found nothing, resolve the tenant from the
+ * subscription id (then the customer id) stored on the tenant at checkout. Only
+ * when BOTH the metadata and the stored-id lookups fail is the tenant truly
+ * unknown. Returns the metadata id unchanged when it's already present.
+ */
+async function resolveInvoiceTenantId(
+  invoice: Stripe.Invoice,
+  metaTenantId: string | null
+): Promise<string | null> {
+  if (metaTenantId) return metaTenantId;
+
+  const subscriptionId = extractInvoiceSubscriptionId(invoice);
+  if (subscriptionId) {
+    const tenant = await getTenantByStripeSubscriptionId(subscriptionId).catch(() => undefined);
+    if (tenant) return tenant.id;
+  }
+
+  const customerId =
+    typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  if (customerId) {
+    const tenant = await getTenantByStripeCustomerId(customerId).catch(() => undefined);
+    if (tenant) return tenant.id;
+  }
+
+  return null;
 }
 
 /**
@@ -420,7 +460,11 @@ export async function POST(req: Request) {
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
         const subscriptionId = extractInvoiceSubscriptionId(invoice);
-        await applyTenantSubscriptionStatus(tenantId, {
+        // Real Basil invoice events carry the tenant under invoice.parent (not the
+        // top level); resolve there first, then fall back to the stored Stripe ids
+        // so a converted trial never fails to flip trialing -> active (lost MRR).
+        const invoiceTenantId = await resolveInvoiceTenantId(invoice, tenantId);
+        await applyTenantSubscriptionStatus(invoiceTenantId, {
           subscriptionStatus: "active",
           subscriptionPastDueSince: undefined,
           ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
@@ -429,20 +473,24 @@ export async function POST(req: Request) {
       }
 
       case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Same Basil/stored-id resolution as invoice.paid — without it a real
+        // failed renewal never sets past_due and the client keeps full access free.
+        const invoiceTenantId = await resolveInvoiceTenantId(invoice, tenantId);
         // Preserve the FIRST failure's timestamp across a continuous past-due
         // streak — resetting it on every failure would let a customer with
         // payments spaced just under 3 days apart dodge the grace window forever
         // and keep free access. invoice.paid clears it, so a recovered-then-failed
         // sub correctly starts a fresh streak.
-        const existing = tenantId ? await getTenantConfig(tenantId).catch(() => null) : null;
-        await applyTenantSubscriptionStatus(tenantId, {
+        const existing = invoiceTenantId ? await getTenantConfig(invoiceTenantId).catch(() => null) : null;
+        await applyTenantSubscriptionStatus(invoiceTenantId, {
           subscriptionStatus: "past_due",
           subscriptionPastDueSince: existing?.subscriptionPastDueSince || new Date().toISOString(),
         }, event);
         // alert() now routes to Slack AND Sentry — a failed customer payment
         // must not be invisible if Sentry is unconfigured (it usually is).
         alert("billing_payment_failed", "critical", {
-          tenantId: tenantId ?? "unknown",
+          tenantId: invoiceTenantId ?? "unknown",
           hint: "Check the Stripe dashboard.",
         });
         break;
