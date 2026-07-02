@@ -254,6 +254,37 @@ export async function getDeliveryLeadByToken(token: string): Promise<DeliveryLea
   return coerceLead(raw);
 }
 
+/**
+ * Read the most recent delivery leads, newest-first, from the `leads:all` Redis
+ * zset. Each member is a `lead:{email}` key hydrated to the full DeliveryLead.
+ * Degrades to [] when Redis is absent — the admin leads board renders an honest
+ * empty state rather than erroring.
+ */
+export async function getDeliveryLeads(limit = 100): Promise<DeliveryLead[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+
+  const memberKeys = await redis.zrange<string[]>("leads:all", 0, limit - 1, { rev: true });
+  if (!memberKeys.length) return [];
+
+  const leads: DeliveryLead[] = [];
+  for (const leadKey of memberKeys) {
+    const raw = await redis.get<unknown>(leadKey);
+    const lead =
+      typeof raw === "string"
+        ? (() => {
+            try {
+              return coerceLead(JSON.parse(raw));
+            } catch {
+              return null;
+            }
+          })()
+        : coerceLead(raw);
+    if (lead) leads.push(lead);
+  }
+  return leads;
+}
+
 export async function getExistingLeadToken(email: string): Promise<string | null> {
   if (hasLeadSanity) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
