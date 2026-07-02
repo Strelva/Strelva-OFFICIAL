@@ -37,6 +37,7 @@ export type SurfaceState = "shown" | "connect" | "hidden";
 export type SurfaceId =
   | "today"
   | "ask-ai"
+  | "leads"
   | "website"
   | "store"
   | "google-business"
@@ -117,6 +118,10 @@ export function getDashboardSurfaces({
   return [
     { id: "today", label: "Dashboard", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
+    // The owner's inbox of people who reached out through the site's contact
+    // form. Always on — every business wants to see who's asking, and it's the
+    // full view behind Today's "Who reached out" preview.
+    { id: "leads", label: "Leads", href: "/dashboard/leads", state: "shown", group: "manage" },
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
     // Store — the primary surface for a commerce tenant (orders, revenue,
     // products). Hidden entirely for non-commerce sites.

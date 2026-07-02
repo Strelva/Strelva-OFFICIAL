@@ -1,6 +1,7 @@
 import {
   House,
   MessageCircle,
+  Inbox,
   Globe,
   MapPin,
   BarChart3,
@@ -15,6 +16,7 @@ import type { SurfaceId } from "@/lib/dashboard-surfaces";
 export const SURFACE_ICONS: Record<SurfaceId, LucideIcon> = {
   "today": House,
   "ask-ai": MessageCircle,
+  "leads": Inbox,
   "website": Globe,
   "store": ShoppingBag,
   "google-business": MapPin,
@@ -36,6 +38,7 @@ export const GROUP_LABELS: Record<"manage" | "presence", string> = {
 export const SURFACE_MATCH: Record<SurfaceId, string[]> = {
   "today": [],
   "ask-ai": ["/dashboard/chat"],
+  "leads": ["/dashboard/leads"],
   "website": ["/dashboard/site", "/dashboard/collections", "/dashboard/content", "/dashboard/assets", "/dashboard/history"],
   "store": ["/dashboard/store"],
   "google-business": ["/dashboard/google"],

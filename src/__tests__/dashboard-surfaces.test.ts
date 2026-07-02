@@ -166,6 +166,23 @@ describe("getDashboardSurfaces — Store", () => {
   });
 });
 
+describe("getDashboardSurfaces — Leads", () => {
+  it("is an always-shown Manage surface pointing at the leads inbox", () => {
+    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
+    const leads = at(s, "leads");
+    expect(leads.state).toBe("shown");
+    expect(leads.group).toBe("manage");
+    expect(leads.href).toBe("/dashboard/leads");
+  });
+
+  it("appears in the visible nav for every business type", () => {
+    for (const template of ["wellness", "food-brand", "trades", "professional", "fashion-stylist"]) {
+      const ids = getVisibleSurfaces({ tenantConfig: { template }, connections: [] }).map((x) => x.id);
+      expect(ids).toContain("leads");
+    }
+  });
+});
+
 describe("getDashboardSurfaces — always-on pillars", () => {
   it("today / ask-ai / website / analytics / health are always shown", () => {
     const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [] });
