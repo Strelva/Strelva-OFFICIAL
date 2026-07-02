@@ -15,15 +15,9 @@ import {
 } from "./content-cache";
 import { addSentryBreadcrumb } from "../sentry-context";
 import { getContentData, upsertContentData } from "../db/repositories";
+import { contentSourceIsPostgres } from "../db/source-flags";
 
 export { DEFAULT_TENANT };
-
-/** Phase 3: when CONTENT_SOURCE=postgres, read content sections from the Postgres
- *  `content` table instead of Sanity. Opt-in + env-gated so the live app stays on
- *  Sanity until the migration is flipped. */
-function contentSourceIsPostgres(): boolean {
-  return process.env.CONTENT_SOURCE === "postgres";
-}
 
 // --- Sanity document type mapping ---
 
