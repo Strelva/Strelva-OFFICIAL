@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
-import type { WeeklyBrief } from "@/lib/types";
+import type { WeeklyBrief, SearchData } from "@/lib/types";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
@@ -21,6 +21,7 @@ interface WeeklyBriefClientProps {
   goal?: Goal | null;
   anomaly?: TrafficAnomaly | null;
   benchmark?: CompetitorBenchmark | null;
+  searchData?: SearchData | null;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -146,7 +147,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
 
   if (!brief) {
@@ -229,6 +230,13 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
   const topSearchQueries = brief.topSearchQueries ?? [];
   const staleSections = brief.staleSections ?? [];
   const verdicts = metricVerdicts(brief.stats);
+
+  // Full Search Console query list — the exact phrases people typed to find the
+  // site. Sorted by clicks, capped so the table stays scannable. When empty we
+  // fall back to the single Search Signal tile below.
+  const searchRows = [...(searchData?.queries ?? [])]
+    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
+    .slice(0, 15);
 
   return (
     <div className="flex flex-col h-full animate-route-enter">
@@ -408,10 +416,52 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                           </span>
                         ))}
                       </div>
+                      {row.aiAnswerMentioned !== null && (
+                        <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">
+                          When people ask AI for this:{" "}
+                          {row.aiAnswerMentioned ? (
+                            <span className="font-medium text-success">you get named</span>
+                          ) : (
+                            <span className="text-warm-black">you&apos;re not named yet</span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* What people search to find you — the full Search Console query list */}
+          {searchRows.length > 0 && (
+            <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "142ms" }}>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+                What people search to find you
+              </p>
+              <div className="overflow-hidden rounded-xl border border-glass-border bg-glass">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-glass-border text-[11px] uppercase tracking-wide text-gray-muted">
+                      <th scope="col" className="px-4 py-2.5 font-medium">Search</th>
+                      <th scope="col" className="px-4 py-2.5 text-right font-medium">Visits</th>
+                      <th scope="col" className="px-4 py-2.5 text-right font-medium">Times shown</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchRows.map((q) => (
+                      <tr key={q.query} className="border-t border-glass-border first:border-t-0">
+                        <td className="px-4 py-2.5 text-warm-black">{q.query}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.clicks.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.impressions.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[12px] leading-relaxed text-gray-muted">
+                The exact phrases people typed into Google before they landed on your site. Visits are the times they clicked through.
+              </p>
             </div>
           )}
 
@@ -453,7 +503,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                   </p>
                 </div>
               )}
-              {topSearchQueries[0] && (
+              {searchRows.length === 0 && topSearchQueries[0] && (
                 <div className="rounded-xl border border-glass-border bg-glass p-4">
                   <p className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
                     Search Signal

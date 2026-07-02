@@ -1,6 +1,6 @@
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getWeeklyBrief, getWeeklyBriefs } from "@/lib/weekly-brief";
-import { getDailyMetrics, getActivity } from "@/lib/storage";
+import { getDailyMetrics, getActivity, getSearchData } from "@/lib/storage";
 import { getGoal } from "@/lib/goals";
 import { buildProofCards } from "@/lib/proof";
 import { detectTrafficAnomaly } from "@/lib/anomaly";
@@ -14,13 +14,14 @@ export default async function ReportsPage() {
 
   // Degrade to the empty state on a transient backend error rather than
   // escalating a recoverable null into the full error boundary.
-  const [brief, history, dailyMetrics, activity, goal, snapshots] = await Promise.all([
+  const [brief, history, dailyMetrics, activity, goal, snapshots, searchData] = await Promise.all([
     getWeeklyBrief(tenant).catch(() => null),
     getWeeklyBriefs(tenant).catch(() => []),
     getDailyMetrics(tenant, 30).catch(() => []),
     getActivity(tenant, { actor: "ai" }).catch(() => []),
     getGoal(tenant).catch(() => null),
     getLatestSnapshots(tenant, 1).catch(() => []),
+    getSearchData(tenant).catch(() => null),
   ]);
 
   // Correlate AI changes with the traffic that followed → before/after proof.
@@ -41,6 +42,7 @@ export default async function ReportsPage() {
         goal={goal}
         anomaly={anomaly}
         benchmark={benchmark}
+        searchData={searchData}
       />
     </>
   );
