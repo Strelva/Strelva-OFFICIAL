@@ -82,6 +82,21 @@ function sourceLabel(source: ReviewItem["source"]): string {
   return "Manual";
 }
 
+/**
+ * Where a copy-pasted reply should be pasted, named by the reviews on screen.
+ * When every review is from one platform we name it ("Google"/"Yelp"); a mixed
+ * list or manual reviews fall back to a platform-neutral phrase so the guidance
+ * never tells a Yelp owner to "copy it into Google".
+ */
+export function copyDestination(reviews: ReviewItem[]): string {
+  const sources = new Set(reviews.map((r) => r.source));
+  if (sources.size === 1) {
+    if (sources.has("google")) return "Google";
+    if (sources.has("yelp")) return "Yelp";
+  }
+  return "the platform";
+}
+
 function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected: boolean }) {
   const { dashboardHref, readOnly } = useDashboard();
   const [draft, setDraft] = useState<string | null>(review.reply ?? null);
@@ -314,6 +329,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
   const summary = getClientReviewSummary(reviews);
+  const copyDest = copyDestination(reviews);
   if (reviews.length === 0) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -387,13 +403,13 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
               .{" "}
               {gbpConnected
                 ? "Draft a warm reply to any review below — Google reviews publish straight to your listing."
-                : "Draft a warm reply to any review below, then copy it into Google."}
+                : `Draft a warm reply to any review below, then copy it into ${copyDest}.`}
             </p>
           ) : (
             <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
               {gbpConnected
                 ? "Draft a warm, on-brand reply for any of them — Google reviews publish straight to your listing."
-                : "Draft a warm, on-brand reply for any of them, then copy it into Google."}
+                : `Draft a warm, on-brand reply for any of them, then copy it into ${copyDest}.`}
             </p>
           )}
         </div>
