@@ -17,6 +17,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockUpdateTenant = vi.fn();
 const mockGetTenantConfig = vi.fn();
+const mockGetTenantBySubId = vi.fn();
+const mockGetTenantByCustomerId = vi.fn();
 const mockAddEvent = vi.fn();
 const mockConstructEvent = vi.fn();
 const mockSubRetrieve = vi.fn();
@@ -31,6 +33,8 @@ let redisHandle: unknown = null;
 vi.mock("@/lib/tenants", () => ({
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
   getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args),
+  getTenantByStripeSubscriptionId: (...args: unknown[]) => mockGetTenantBySubId(...args),
+  getTenantByStripeCustomerId: (...args: unknown[]) => mockGetTenantByCustomerId(...args),
 }));
 
 vi.mock("@/lib/events", () => ({
@@ -67,6 +71,9 @@ beforeEach(() => {
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
   mockUpdateTenant.mockResolvedValue({ id: "acme" });
   mockGetTenantConfig.mockResolvedValue(null);
+  // Default: no stored-id match. Tests that exercise the fallback opt in.
+  mockGetTenantBySubId.mockResolvedValue(undefined);
+  mockGetTenantByCustomerId.mockResolvedValue(undefined);
   mockSubRetrieve.mockResolvedValue({ status: "active" });
   mockAddEvent.mockResolvedValue({ id: "evt_fake" });
   mockRedisSet.mockResolvedValue("OK");
@@ -373,6 +380,94 @@ describe("billing webhook checkout.session.completed mode guard", () => {
     expect(mockUpdateTenant).toHaveBeenCalledWith(
       "acme",
       expect.objectContaining({ subscriptionStatus: "past_due", subscriptionPastDueSince: firstFailure }),
+    );
+  });
+
+  // --- Basil (2025-03-31) invoice shape: subscription_details live under
+  // `invoice.parent`, NOT at the top level. These are the REAL money events. If
+  // the tenant can't be resolved from `parent`, a failed renewal never sets
+  // past_due (client keeps free access) and a converted trial never flips to
+  // active MRR. metadata:{} at the top level mirrors what Stripe actually sends.
+  it("Basil invoice.payment_failed (subscription_details under parent) resolves tenant and sets past_due", async () => {
+    const res = await postEvent({
+      id: "evt_basil_fail",
+      type: "invoice.payment_failed",
+      created: 1_700_600_000,
+      data: {
+        object: {
+          id: "in_basil_fail",
+          metadata: {}, // Basil: nothing at the top level
+          parent: {
+            subscription_details: { subscription: "sub_basil", metadata: { tenantId: "acme" } },
+          },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "past_due" }),
+    );
+    // The stored-id fallback isn't needed — parent metadata resolved it.
+    expect(mockGetTenantBySubId).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_payment_failed",
+      "critical",
+      expect.objectContaining({ tenantId: "acme" }),
+    );
+  });
+
+  it("Basil invoice.paid (parent metadata) flips a converted trial to active", async () => {
+    const res = await postEvent({
+      id: "evt_basil_paid",
+      type: "invoice.paid",
+      created: 1_700_600_500,
+      data: {
+        object: {
+          id: "in_basil_paid",
+          metadata: {},
+          parent: {
+            subscription_details: { subscription: "sub_basil", metadata: { tenantId: "acme" } },
+          },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({
+        subscriptionStatus: "active",
+        subscriptionPastDueSince: undefined,
+        stripeSubscriptionId: "sub_basil",
+      }),
+    );
+  });
+
+  it("stripe-id fallback: invoice with NO tenantId metadata anywhere resolves via the stored subscription id", async () => {
+    // No metadata on the invoice OR its parent — only the subscription id. The
+    // tenant was stored with this stripeSubscriptionId at checkout, so a
+    // metadata gap must NOT drop the money event.
+    mockGetTenantBySubId.mockResolvedValue({ id: "acme" });
+    const res = await postEvent({
+      id: "evt_id_fallback",
+      type: "invoice.paid",
+      created: 1_700_601_000,
+      data: {
+        object: {
+          id: "in_no_meta",
+          metadata: {},
+          parent: { subscription_details: { subscription: "sub_stored" } },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetTenantBySubId).toHaveBeenCalledWith("sub_stored");
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "active", stripeSubscriptionId: "sub_stored" }),
     );
   });
 });

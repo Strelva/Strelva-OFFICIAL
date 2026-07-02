@@ -95,10 +95,11 @@ describe("billing webhook signature verification", () => {
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", SECRET);
   });
 
-  // An invoice.paid is a no-op (no tenantId metadata path we assert against),
-  // but reaches the switch only if the signature verifies. We use a benign
-  // event type and assert acceptance via status code + that we got past
-  // verification (no "Invalid signature" body).
+  // This suite only proves the signature gate, so we use an event type that
+  // reaches the switch's default branch (no tenant mutation) once the signature
+  // verifies. Acceptance is asserted via status code + absence of the "Invalid
+  // signature" body. (The tenant-resolution paths for invoice.paid /
+  // invoice.payment_failed are covered in billing-webhook-mode-guard.test.ts.)
   const validEvent = JSON.stringify({
     id: "evt_sig_ok",
     type: "customer.subscription.updated", // hits default branch -> 200, no side effects
