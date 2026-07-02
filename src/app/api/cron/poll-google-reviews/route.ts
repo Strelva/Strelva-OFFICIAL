@@ -177,6 +177,12 @@ async function pollTenant(tenantId: string): Promise<number> {
   // Get tenant config for reply drafting (best-effort; drafting degrades gracefully)
   const tenantConfig = await getTenantConfig(tenantId).catch(() => null);
 
+  // Track new reviewIds whose reviews-table mirror (addReview) failed this poll
+  // so we can EXCLUDE them from the seen-set write below — a transient mirror
+  // failure must leave the id unseen so the next poll retries it. Otherwise the
+  // review lands in the activity feed but is lost from the Reviews tab forever.
+  const mirrorFailed = new Set<string>();
+
   // Emit events for new reviews and queue drafted replies for human approval.
   // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
   for (const review of newReviews) {
@@ -207,9 +213,13 @@ async function pollTenant(tenantId: string): Promise<number> {
       text: review.comment || "",
       date: review.createTime,
       externalId: review.reviewId,
-    }).catch((err) =>
-      console.error(`[poll-google-reviews] addReview failed for ${tenantId}/${review.reviewId}:`, err),
-    );
+    }).catch((err) => {
+      // Do NOT mark this reviewId seen — leave it out of the cursor so the next
+      // poll re-mirrors it. Losing a review from the Reviews tab is worse than a
+      // duplicate activity event on retry.
+      mirrorFailed.add(review.reviewId);
+      console.error(`[poll-google-reviews] addReview failed for ${tenantId}/${review.reviewId}:`, err);
+    });
 
     // Draft a filter-safe reply and queue it for human approval.
     // This is fire-and-recover: a draft failure must not block the review event.
@@ -253,11 +263,17 @@ async function pollTenant(tenantId: string): Promise<number> {
     }
   }
 
-  // Update cache with all current review IDs
+  // Update cache with the current review IDs, minus any whose Reviews-tab mirror
+  // failed this poll. Previously-seen ids stay (they aren't re-mirrored, so they
+  // can't be in mirrorFailed); only newly-seen ids that mirrored cleanly are
+  // persisted, so a failed mirror is retried next poll instead of lost.
   if (reviews.length > 0) {
+    const seenReviewIds = reviews
+      .map((r) => r.reviewId)
+      .filter((id) => !mirrorFailed.has(id));
     await redis.set(
       lastReviewsKey(tenantId),
-      reviews.map((r) => r.reviewId),
+      seenReviewIds,
       { ex: 60 * 60 * 24 * 30 } // 30 days TTL
     );
   }
