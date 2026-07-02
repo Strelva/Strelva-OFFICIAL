@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Star, Sparkles, Check, Copy, Loader2, MessageSquare } from "lucide-react";
+import { Star, Sparkles, Check, Copy, Loader2, MessageSquare, Send } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
 import { getClientReviewSummary } from "@/lib/reviews/intelligence";
 import { useDashboard } from "./DashboardContext";
@@ -10,6 +10,8 @@ import { useDashboard } from "./DashboardContext";
 interface ReviewsPanelProps {
   reviews: ReviewItem[];
   googlePlaceId?: string;
+  /** True when the tenant's Google Business connection is live — Google reviews then publish replies directly. */
+  gbpConnected?: boolean;
 }
 
 /** A shareable Google "write a review" link — owners need more reviews, not more reply tools. */
@@ -80,7 +82,7 @@ function sourceLabel(source: ReviewItem["source"]): string {
   return "Manual";
 }
 
-function ReviewCard({ review }: { review: ReviewItem }) {
+function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected: boolean }) {
   const { dashboardHref, readOnly } = useDashboard();
   const [draft, setDraft] = useState<string | null>(review.reply ?? null);
   const [loading, setLoading] = useState(false);
@@ -89,11 +91,14 @@ function ReviewCard({ review }: { review: ReviewItem }) {
   const [copied, setCopied] = useState(false);
   // Locally track the saved reply so the card can flip to the locked "Your
   // reply" state right after a save without waiting for a full page refresh.
-  const [savedReply, setSavedReply] = useState<{ reply: string; repliedAt?: string } | null>(
+  const [savedReply, setSavedReply] = useState<{ reply: string; repliedAt?: string; published?: boolean } | null>(
     review.reply ? { reply: review.reply, repliedAt: review.repliedAt } : null,
   );
 
   const hasExistingReply = Boolean(savedReply);
+  // Google reviews publish straight to the listing through the governed
+  // approval path when GBP is connected; everything else stays copy-paste.
+  const canPublish = gbpConnected && review.source === "google" && Boolean(review.externalId);
 
   async function generateDraft() {
     setLoading(true);
@@ -139,14 +144,19 @@ function ReviewCard({ review }: { review: ReviewItem }) {
         body: JSON.stringify({ reviewId: review.id, reply: draft }),
       });
       if (!res.ok) throw new Error("Could not save the reply");
-      const data = (await res.json()) as { review?: ReviewItem };
+      const data = (await res.json()) as { review?: ReviewItem; published?: boolean };
       const saved = data.review;
       setSavedReply({
         reply: saved?.reply ?? draft,
         repliedAt: saved?.repliedAt,
+        published: data.published === true,
       });
     } catch {
-      setError("Could not save the reply. Try again.");
+      setError(
+        canPublish
+          ? "Couldn't publish to Google — nothing was posted. Try again."
+          : "Could not save the reply. Try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -178,6 +188,12 @@ function ReviewCard({ review }: { review: ReviewItem }) {
             Your reply
           </p>
           <p className="text-[13px] leading-relaxed text-warm-black">{savedReply?.reply}</p>
+          {savedReply?.published && (
+            <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-accent">
+              <Check className="h-3 w-3" strokeWidth={2} />
+              Published to your Google listing
+            </p>
+          )}
           {savedReply?.repliedAt && (
             <p className="mt-2 text-[11px] text-gray-muted">Replied {formatDate(savedReply.repliedAt)}</p>
           )}
@@ -196,24 +212,45 @@ function ReviewCard({ review }: { review: ReviewItem }) {
             aria-label="Edit drafted reply"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={copyDraft}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  Copy reply
-                </>
-              )}
-            </button>
-            {!readOnly && (
+            {canPublish && !readOnly ? (
+              <button
+                type="button"
+                onClick={saveReply}
+                disabled={saving}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    Reply on Google
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={copyDraft}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    Copy reply
+                  </>
+                )}
+              </button>
+            )}
+            {!canPublish && !readOnly && (
               <button
                 type="button"
                 onClick={saveReply}
@@ -272,7 +309,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
   );
 }
 
-export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
+export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: ReviewsPanelProps) {
   const { dashboardHref } = useDashboard();
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
@@ -347,11 +384,16 @@ export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
               <span className="font-medium">
                 {summary.lovedFor.slice(0, 2).map((t) => t.label).join(" and ")}
               </span>
-              . Draft a warm reply to any review below, then copy it into Google.
+              .{" "}
+              {gbpConnected
+                ? "Draft a warm reply to any review below — Google reviews publish straight to your listing."
+                : "Draft a warm reply to any review below, then copy it into Google."}
             </p>
           ) : (
             <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
-              Draft a warm, on-brand reply for any of them, then copy it into Google.
+              {gbpConnected
+                ? "Draft a warm, on-brand reply for any of them — Google reviews publish straight to your listing."
+                : "Draft a warm, on-brand reply for any of them, then copy it into Google."}
             </p>
           )}
         </div>
@@ -360,7 +402,7 @@ export function ReviewsPanel({ reviews, googlePlaceId }: ReviewsPanelProps) {
 
         <div className="space-y-3">
           {reviews.map((review) => (
-            <ReviewCard key={review.id} review={review} />
+            <ReviewCard key={review.id} review={review} gbpConnected={gbpConnected} />
           ))}
         </div>
       </div>
