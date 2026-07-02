@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageCircle,
+  Mic,
+  MicOff,
   X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -61,6 +63,26 @@ const INPUT_QUICK_ACTIONS = [
     message: "Check my site health. Look for stale content, missing business details, weak calls to action, broken or risky areas, and the next practical fix.",
   },
 ];
+
+// Minimal Web Speech API shape — webkitSpeechRecognition isn't in every TS DOM
+// lib, so we type only what we touch and feature-detect at runtime.
+interface SpeechRecognitionResultLike {
+  0: { transcript: string };
+}
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 interface ToolCall {
   id: string;
@@ -168,6 +190,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   // Rich inline tool cards (report/content/photos/connections) streamed via __CARD__.
   const [toolCards, setToolCards] = useState<{ id: string; tool: string; data: unknown }[]>([]);
   const [needsDrawerOpen, setNeedsDrawerOpen] = useState(Boolean(needsYou?.openInitially));
+  const [micSupported, setMicSupported] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentThreadRef = useRef<string | undefined>(threadId);
@@ -290,6 +315,74 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     if (typeof window !== "undefined" && window.innerWidth < 768) return;
     inputRef.current?.focus();
   }, []);
+
+  // Voice input via the Web Speech API. Feature-detected so the mic button is
+  // hidden entirely on browsers without it (Firefox, some Safari builds).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Ctor) return;
+
+    const recognition = new Ctor();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
+        .join(" ")
+        .trim();
+      if (transcript) {
+        setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        requestAnimationFrame(() => inputRef.current?.focus());
+      }
+    };
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      // Permission denied is terminal — hide the button rather than leave a
+      // control that will only ever error.
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setMicSupported(false);
+      }
+    };
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    setMicSupported(true);
+    return () => {
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped.
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    if (isListening) {
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped.
+      }
+      setIsListening(false);
+      return;
+    }
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      // start() throws if called while already running — reset state.
+      setIsListening(false);
+    }
+  }, [isListening]);
 
   useEffect(() => {
     if (needsYou?.openInitially) setNeedsDrawerOpen(true);
@@ -855,22 +948,46 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               ))}
             </div>
           )}
-          <PromptInputBox
-            ref={inputRef}
-            value={input}
-            onValueChange={setInput}
-            onSend={sendChat}
-            onFilesUploaded={(files) => setAttachments((current) => [...current, ...files])}
-            onStop={handleStop}
-            isLoading={isLoading}
-            placeholder={
-              variant === "compact" && selectedObjectLabel
-                ? `Ask AI about ${selectedObjectLabel}`
-                : "Tell me what you need..."
-            }
-            quickActions={INPUT_QUICK_ACTIONS}
-            className={variant === "compact" ? "rounded-2xl" : undefined}
-          />
+          <div className="flex items-end gap-2">
+            {micSupported && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                aria-pressed={isListening}
+                aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                title={isListening ? "Stop voice input" : "Speak your message"}
+                className={`mb-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                  isListening
+                    ? "animate-pulse border-accent/40 bg-accent/15 text-accent"
+                    : "border-gray-border bg-surface-raised text-gray-muted hover:border-accent/35 hover:text-warm-black"
+                }`}
+              >
+                {isListening ? (
+                  <MicOff className="h-4 w-4" strokeWidth={1.5} />
+                ) : (
+                  <Mic className="h-4 w-4" strokeWidth={1.5} />
+                )}
+              </button>
+            )}
+            <div className="min-w-0 flex-1">
+              <PromptInputBox
+                ref={inputRef}
+                value={input}
+                onValueChange={setInput}
+                onSend={sendChat}
+                onFilesUploaded={(files) => setAttachments((current) => [...current, ...files])}
+                onStop={handleStop}
+                isLoading={isLoading}
+                placeholder={
+                  variant === "compact" && selectedObjectLabel
+                    ? `Ask AI about ${selectedObjectLabel}`
+                    : "Tell me what you need..."
+                }
+                quickActions={INPUT_QUICK_ACTIONS}
+                className={variant === "compact" ? "rounded-2xl" : undefined}
+              />
+            </div>
+          </div>
           <p className={`${variant === "compact" ? "hidden" : ""} text-[11px] text-gray-subtle text-center mt-2`}>
             Update your site, write content, check analytics
           </p>
