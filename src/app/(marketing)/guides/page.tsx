@@ -2,15 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 import { listGuides, guidesByCategory } from "@/lib/guides";
+import { MARKETING_URL } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Website Guides - Strelva",
   description:
     "Plain-English guides for local businesses: fix your site speed, schema, AI visibility, security, and more. Or run a free audit and we will find the issues for you.",
+  alternates: { canonical: `${MARKETING_URL}/guides` },
   openGraph: {
     title: "Website Guides - Strelva",
     description:
       "Plain-English guides for local businesses on website speed, schema, AI visibility, security, and trust.",
+    url: `${MARKETING_URL}/guides`,
     type: "website",
     siteName: "Strelva",
   },
