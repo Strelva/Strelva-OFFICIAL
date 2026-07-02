@@ -920,7 +920,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
     draft_social_post: {
       capability: "draft_social_post",
       def: tool({
-        description: "Draft a social media post. Creates it as a draft that the owner can review, schedule, or publish.",
+        description: "Draft a social media post. Creates it as a draft that the owner can review and publish.",
         inputSchema: z.object({
           platform: z.enum(["instagram", "facebook", "x"]).describe("Target social platform"),
           content: z.string().describe("The post content/caption"),
@@ -985,31 +985,6 @@ Only use tools for manifest-supported sections and actions. If the user requests
             };
           } catch (err) {
             return { error: err instanceof Error ? err.message : "Failed to list posts" };
-          }
-        },
-      }),
-    },
-    schedule_social_post: {
-      capability: "schedule_social_post",
-      def: tool({
-        description: "Schedule a draft social post for a specific date and time",
-        inputSchema: z.object({
-          postId: z.string().describe("The ID of the draft post to schedule"),
-          scheduledFor: z.string().describe("ISO date string for when to publish (e.g. 2026-04-15T10:00:00Z)"),
-        }),
-        execute: async ({ postId, scheduledFor }) => {
-          try {
-            const { getSocialPosts, setSocialPosts } = await import("@/lib/storage");
-            const posts = await getSocialPosts(tenant);
-            const post = posts.find((p) => p.id === postId);
-            if (!post) return { success: false, error: "Post not found" };
-            if (post.status !== "draft") return { success: false, error: `Post is ${post.status}, not a draft` };
-            post.status = "scheduled";
-            post.scheduledFor = scheduledFor;
-            await setSocialPosts(tenant, posts);
-            return { success: true, post };
-          } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : "Failed to schedule" };
           }
         },
       }),
@@ -1165,13 +1140,63 @@ Only use tools for manifest-supported sections and actions. If the user requests
     reply_to_review: {
       capability: "respond_review",
       def: tool({
-        description: "Reply to a customer review by ID. Use get_reviews first to find the review ID.",
+        description:
+          "Draft a reply to a customer review by ID. Google review replies are queued for the owner to APPROVE before publishing to Google — never posted directly. Replies on other platforms are saved in the dashboard only. Use get_reviews first to find the review ID.",
         inputSchema: z.object({
           reviewId: z.string().min(1).max(200).describe("The review ID to reply to"),
           replyText: z.string().min(1).max(4096).describe("The reply text"),
         }),
         execute: async ({ reviewId, replyText }) => {
           try {
+            const { getReviews } = await import("@/lib/reviews");
+            const reviews = await getReviews(tenant);
+            const review = reviews.find((r) => r.id === reviewId);
+            if (!review) {
+              return { success: false, error: "Review not found" };
+            }
+
+            // Google reviews with a connected Google account go through the
+            // governed path: queue a review_reply_draft the owner must APPROVE
+            // before it publishes to Google (same pattern as create_gbp_post;
+            // the actual write happens in event-actions via publishReviewReply).
+            if (review.source === "google" && review.externalId) {
+              const { getConnection } = await import("@/lib/connections");
+              const connection = await getConnection(tenant, "google");
+              if (connection?.status === "connected") {
+                const { addEvent } = await import("@/lib/events");
+                const event = await addEvent({
+                  tenantId: tenant,
+                  source: "ai",
+                  type: "review",
+                  title: `Drafted reply for ${review.author}'s ${review.rating}-star review`,
+                  body: replyText,
+                  status: "pending",
+                  metadata: {
+                    kind: "review_reply_draft",
+                    reviewId: review.externalId,
+                    rating: review.rating,
+                    author: review.author,
+                    draftedReply: replyText,
+                    reviewCreatedAt: review.date,
+                  },
+                });
+                recordActionResult({
+                  status: "queued",
+                  eventIds: [event.id],
+                  message: `Reply to ${review.author}'s review drafted — approve it to publish to Google.`,
+                });
+                return {
+                  success: true,
+                  eventId: event.id,
+                  eventIds: [event.id],
+                  agentResultStatus: "queued" as const,
+                  message: `I've drafted a reply to ${review.author}'s review and queued it for your approval. It won't appear on Google until you approve it in the dashboard.`,
+                };
+              }
+            }
+
+            // No publish path (Yelp/manual, or Google without a connected
+            // account): save the reply in the dashboard and say so honestly.
             const { replyToReview } = await import("@/lib/reviews");
             const updated = await replyToReview(tenant, reviewId, replyText);
             if (!updated) {
@@ -1181,17 +1206,25 @@ Only use tools for manifest-supported sections and actions. If the user requests
             try {
               const { logActivity } = await import("@/lib/storage");
               await logActivity({
-                text: `AI replied to ${updated.author}'s ${updated.rating}-star review`,
+                text: `AI saved a reply to ${updated.author}'s ${updated.rating}-star review (dashboard only)`,
                 time: new Date().toISOString(),
                 type: "review-reply",
                 actor: "ai",
               }, tenant);
             } catch {}
 
+            const platform = updated.source === "google" ? "Google" : updated.source === "yelp" ? "Yelp" : null;
+            recordActionResult({
+              status: "drafted",
+              message: `Reply to ${updated.author}'s review saved in the dashboard.`,
+            });
             return {
               success: true,
               review: updated,
-              message: `Replied to ${updated.author}'s review`,
+              agentResultStatus: "drafted" as const,
+              message: platform
+                ? `I saved the reply to ${updated.author}'s review in your dashboard. I can't publish replies to ${platform} from here, so you'll need to post it on ${platform} yourself.`
+                : `I saved the reply to ${updated.author}'s review in your dashboard.`,
             };
           } catch (err) {
             const error = `Failed to reply: ${err instanceof Error ? err.message : "Unknown error"}`;
@@ -1572,9 +1605,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
               toolName === "update_business_hours" ? "Drafting your hours update..." :
               toolName === "draft_social_post" ? "Drafting social post..." :
               toolName === "list_social_posts" ? "Checking social posts..." :
-              toolName === "schedule_social_post" ? "Scheduling social post..." :
               toolName === "get_reviews" ? "Checking your reviews..." :
-              toolName === "reply_to_review" ? "Replying to review..." :
+              toolName === "reply_to_review" ? "Drafting review reply..." :
               toolName === "toggle_section_visibility" ? "Updating section visibility..." :
               toolName === "reorder_sections" ? "Reordering sections..." :
               toolName === "show_report" ? "Loading your report..." :
