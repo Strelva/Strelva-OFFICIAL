@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
+import type { TenantConfig } from "@/lib/types";
 import {
   getTenantDashboardFallbackUrl,
   getTenantDashboardUrl,
@@ -24,7 +25,13 @@ import { Sparkline } from "./Sparkline";
 import { ScanAllButton } from "./ScanAllButton";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { buildRevenueSummary } from "@/lib/revenue";
+import { getDeliveryLeads } from "@/lib/access-request-delivery";
+import { listPendingDigests } from "@/lib/maintenance-digest";
+import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
+import type { DeliveryLead } from "@/lib/access-request-delivery";
+import type { MaintenanceDigest } from "@/lib/maintenance-digest";
 import { OperatorConsole } from "./OperatorConsole";
+import { TodayFeed } from "./TodayFeed";
 import { TONE_PILL, launchTone, gradeTone } from "@/lib/status-colors";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +47,25 @@ function formatTime(iso: string): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay}d ago`;
+}
+
+/** Tenants that signed up in the last 7 days, newest first. Kept at module
+ *  scope so the `Date.now()` read stays out of the component render. */
+function recentSignups(tenants: TenantConfig[]) {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return tenants
+    .filter((t) => {
+      const created = new Date(t.createdAt).getTime();
+      return !Number.isNaN(created) && created >= cutoff;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+    .map((t) => ({
+      tenantId: t.id,
+      siteName: t.siteName || t.id,
+      ownerName: t.ownerName,
+      createdAt: t.createdAt,
+    }));
 }
 
 export default async function AdminPage() {
@@ -115,6 +141,43 @@ export default async function AdminPage() {
 
   const revenue = await buildRevenueSummary();
 
+  // Operator "needs you" aggregation — the work waiting on Jacob, led ahead of
+  // any financial number (MRR is deprioritized). Each source degrades to empty.
+  const [deliveryLeads, pendingDigests, atRiskSignals] = await Promise.all([
+    getDeliveryLeads().catch((): DeliveryLead[] => []),
+    listPendingDigests().catch((): MaintenanceDigest[] => []),
+    getAtRiskTenants().catch((): AtRiskSignal[] => []),
+  ]);
+
+  const unworkedLeads = deliveryLeads.filter((l) => l.deliveryStatus === "received");
+  const todayLeads = {
+    total: deliveryLeads.length,
+    unworked: unworkedLeads.length,
+    recent: deliveryLeads.slice(0, 4).map((l) => ({
+      businessName: l.businessName,
+      location: l.location,
+      submittedAt: l.submittedAt,
+      isNew: l.deliveryStatus === "received",
+    })),
+  };
+
+  const todayApprovals = {
+    drafts: totalDrafts,
+    digests: pendingDigests.length,
+    total: totalDrafts + pendingDigests.length,
+  };
+
+  const tenantById = new Map(ALL_TENANTS.map((t) => [t.id, t]));
+  const todayAtRisk = atRiskSignals.map((s) => ({
+    tenantId: s.tenantId,
+    siteName: tenantById.get(s.tenantId)?.siteName || s.tenantId,
+    reasons: s.reasons,
+    daysSinceActivity: s.daysSinceActivity,
+    subscriptionStatus: s.subscriptionStatus,
+  }));
+
+  const todaySignups = recentSignups(TENANTS);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -125,6 +188,13 @@ export default async function AdminPage() {
           portfolio{archivedTenantCount ? ` · ${archivedTenantCount} archived hidden` : ""}
         </p>
       </div>
+
+      <TodayFeed
+        leads={todayLeads}
+        approvals={todayApprovals}
+        atRisk={todayAtRisk}
+        signups={todaySignups}
+      />
 
       <OperatorConsole />
 
