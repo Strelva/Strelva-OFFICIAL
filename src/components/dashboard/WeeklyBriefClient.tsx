@@ -58,6 +58,29 @@ function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
   const max = Math.max(1, ...values);
   const w = 300;
   const h = 56;
+
+  // Below a handful of visitors, a real chart is a single spike on a flat line —
+  // it reads as a rendering glitch, not data. Show a calm baseline + a plain note
+  // so an early, low-traffic week looks deliberate.
+  if (total < 5) {
+    return (
+      <div className="rounded-xl border border-glass-border bg-glass p-4">
+        <div className="mb-3 flex items-baseline justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
+          <p className="text-[12px] text-gray-muted">
+            <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> {total === 1 ? "visitor" : "visitors"}
+          </p>
+        </div>
+        <div className="flex h-14 items-center justify-center">
+          <div className="w-full border-t border-dashed border-glass-border" />
+        </div>
+        <p className="mt-2 text-center text-[11px] text-gray-muted">
+          Not enough traffic yet to chart — this fills in as more people find you.
+        </p>
+      </div>
+    );
+  }
+
   const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * w;
     const y = h - (v / max) * (h - 4) - 2;

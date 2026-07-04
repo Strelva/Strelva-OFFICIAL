@@ -17,6 +17,10 @@ const ALLOWED_EVENTS = new Set([
   "dashboard-open",
   "ai-chat-open",
   "report-view",
+  "health-view",
+  "gbp-view",
+  "brand-kit-view",
+  "store-view",
   "referral-click",
 ]);
 

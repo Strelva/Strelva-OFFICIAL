@@ -10,7 +10,7 @@ export const gldfContentDefaults: ContentMap = {
     ctaText: "See Our Products",
     ctaLink: "#products",
     backgroundImageUrl: "",
-    logoUrl: "/images/logo.webp",
+    logoUrl: "",
   },
   services: {
     sectionLabel: "Services",
@@ -74,7 +74,7 @@ export const gldfContentDefaults: ContentMap = {
       "dried apples, apple snacks, New York apples, no added sugar snacks, dried fruit, Great Lakes Dried Fruit",
     ownerName: "Great Lakes Dried Fruit",
     ownerTitle: "Small-batch snack maker",
-    logoUrl: "/images/logo.webp",
+    logoUrl: "",
     footerTagline: "NYS Grown & Certified. 2 natural ingredients.",
     copyrightText: "Great Lakes Dried Fruit",
     bookingUrl: "#products",

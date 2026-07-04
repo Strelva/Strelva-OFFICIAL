@@ -70,3 +70,25 @@ describe("buildHighlights — review lines", () => {
     expect(out).toContain("2 new reviews received");
   });
 });
+
+describe("buildHighlights — system activity is never client-facing", () => {
+  it("never surfaces a cache/revalidation activity as a highlight", () => {
+    const activity = [
+      { actor: "ai", type: "cache-invalidation", text: "Cache invalidation: hero change triggered revalidation" },
+      { actor: "ai", type: "content_update", text: "Updated your hours for the holiday weekend" },
+    ];
+    const out = buildHighlights(stats(), [], activity);
+    expect(out).toContain("Updated your hours for the holiday weekend");
+    expect(out.some((h) => /cache|revalidat|invalidat/i.test(h))).toBe(false);
+  });
+
+  it("filters system phrases even without an explicit cache-invalidation type", () => {
+    const activity = [
+      { actor: "ai", text: "Webhook deploy synced to the CDN edge" },
+      { actor: "ai", text: "Added a new apple maple product to your store" },
+    ];
+    const out = buildHighlights(stats(), [], activity);
+    expect(out).toContain("Added a new apple maple product to your store");
+    expect(out.some((h) => /webhook|deploy|cdn|edge|sync/i.test(h))).toBe(false);
+  });
+});

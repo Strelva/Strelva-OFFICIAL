@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Inbox, Link2,
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
 import { getQueueCount } from "@/lib/events";
-import { getWeeklyBrief } from "@/lib/weekly-brief";
+import { getWeeklyBrief, isOwnerLegibleHighlight } from "@/lib/weekly-brief";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
@@ -96,7 +96,8 @@ async function DashboardHome({
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
   const showWelcome =
     searchValue(params.welcome) === "1" || searchValue(params.checkout) === "success";
-  const briefHeadline = brief?.highlights?.find((line) => line.trim().length > 0) || brief?.summary?.trim() || null;
+  const briefHeadline =
+    brief?.highlights?.find((line) => isOwnerLegibleHighlight(line)) || brief?.summary?.trim() || null;
   const nextAction = brief?.nextAction?.title || (pendingCount > 0 ? "Review what needs you" : "Make one useful site update");
   const nextActionDetail = brief?.nextAction?.description ||
     (pendingCount > 0
