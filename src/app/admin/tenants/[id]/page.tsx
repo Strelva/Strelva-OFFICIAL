@@ -67,7 +67,7 @@ export default async function TenantDetailPage({
         <Link href="/admin" className="text-sm text-gray-muted hover:text-warm-white">
           ← Overview
         </Link>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white mt-2">{tenant.siteName}</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white mt-2">{tenant.siteName || tenant.ownerName || tenant.id}</h1>
         <p className="text-sm text-gray-muted mt-1">
           {tenant.id} · {tenant.deliveryModel ?? "custom_repo"} ·{" "}
           {tenant.active ? "active" : "archived"}
@@ -95,6 +95,7 @@ export default async function TenantDetailPage({
       <TenantEditor
         tenant={{
           id: tenant.id,
+          siteName: tenant.siteName ?? "",
           ownerName: tenant.ownerName ?? "",
           ownerEmail: tenant.ownerEmail ?? "",
           productionDomain: tenant.productionDomain ?? "",

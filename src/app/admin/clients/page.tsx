@@ -5,6 +5,7 @@ import { getAllTenantCrm } from "@/lib/tenant-crm";
 import { getActivity } from "@/lib/storage";
 import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
+import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { ClientsCrm } from "./ClientsCrm";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export default async function AdminClientsPage() {
       lastActivity: signal?.lastActivity ?? null,
       subscriptionStatus: signal?.subscriptionStatus ?? null,
       atRiskReason: atRisk?.reasons[0] ?? null,
+      dashboardUrl: getTenantDashboardFallbackUrl(t),
     };
   });
 

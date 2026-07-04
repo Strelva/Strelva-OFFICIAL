@@ -43,7 +43,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
         severity: "high",
         kind: "launch",
         tenant: t.id,
-        message: `Launch blocked — ${t.siteName} (readiness ${t.launchScore}/100)`,
+        message: `Launch blocked — ${t.siteName || t.ownerName || t.id} (readiness ${t.launchScore}/100)`,
         href: `/admin/tenants/${t.id}`,
       });
     }
@@ -72,7 +72,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
           severity: "low",
           kind: "stale",
           tenant: t.id,
-          message: `No activity in ${days}d — ${t.siteName}`,
+          message: `No activity in ${days}d — ${t.siteName || t.ownerName || t.id}`,
           href: `/admin/tenants/${t.id}`,
         });
       }
@@ -90,7 +90,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
         severity: "high",
         kind: "visibility",
         tenant: t.id,
-        message: `Invisible in AI answers — ${t.siteName} (cited 0/${v.aiProbed})`,
+        message: `Invisible in AI answers — ${t.siteName || t.ownerName || t.id} (cited 0/${v.aiProbed})`,
         href: `/admin/tenants/${t.id}`,
       });
     } else if (v.problemCount > 0) {
@@ -98,7 +98,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
         severity: v.problemCount >= 3 ? "medium" : "low",
         kind: "visibility",
         tenant: t.id,
-        message: `${v.problemCount} visibility gap(s) — ${t.siteName}`,
+        message: `${v.problemCount} visibility gap(s) — ${t.siteName || t.ownerName || t.id}`,
         href: `/admin/tenants/${t.id}`,
       });
     }
@@ -111,7 +111,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
         severity: t.draftCount >= 3 ? "medium" : "low",
         kind: "drafts",
         tenant: t.id,
-        message: `${t.draftCount} draft(s) waiting — ${t.siteName}`,
+        message: `${t.draftCount} draft(s) waiting — ${t.siteName || t.ownerName || t.id}`,
         href: "/admin/drafts",
       });
     }

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 interface EditableTenant {
   id: string;
+  siteName: string;
   ownerName: string;
   ownerEmail: string;
   productionDomain: string;
@@ -39,6 +40,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: form.id,
+          siteName: form.siteName,
           ownerName: form.ownerName,
           ownerEmail: form.ownerEmail || undefined,
           productionDomain: form.productionDomain || undefined,
@@ -110,6 +112,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
         <h2 className="text-sm font-semibold text-warm-white">Tenant config</h2>
+        <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
         <Field label="Owner name" value={form.ownerName} onChange={(v) => setForm({ ...form, ownerName: v })} />
         <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
@@ -119,7 +122,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           <select
             value={form.subscriptionStatus}
             onChange={(e) => setForm({ ...form, subscriptionStatus: e.target.value })}
-            className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+            className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
           >
             {SUB_STATUSES.map((s) => (
               <option key={s} value={s}>{s}</option>
@@ -164,7 +167,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           <select
             value={assignRole}
             onChange={(e) => setAssignRole(e.target.value as typeof assignRole)}
-            className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+            className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
           >
             {(["owner", "admin", "editor", "viewer"] as const).map((r) => (
               <option key={r} value={r}>{r}</option>

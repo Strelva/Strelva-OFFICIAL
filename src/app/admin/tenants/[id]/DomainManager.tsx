@@ -167,7 +167,7 @@ export function DomainManager({
           value={newRole}
           onChange={(e) => setNewRole(e.target.value)}
           aria-label="Domain role"
-          className="rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+          className="rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>{r}</option>
