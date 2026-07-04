@@ -40,19 +40,34 @@ export function OnboardingWizard() {
   const [voice, setVoice] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  // Decide whether to show: brand-new owner (no business type set) who hasn't
-  // dismissed it. Read-only viewers (the public demo) never see it.
+  // Decide whether to show: a genuinely brand-new owner only. Two gates so it
+  // never re-fires for a returning, already-set-up client:
+  //  1. localStorage dismiss (fast, per-device once completed/skipped here), and
+  //  2. the server onboarding-status — if the tenant has ANY real progress
+  //     (connected an account, made an AI edit, or received a weekly report),
+  //     they're an established client, so the "welcome, let's set up" modal must
+  //     not appear even on a fresh browser where businessModel was never set.
+  // Read-only viewers (the public demo) never see it.
   useEffect(() => {
     if (readOnly) return;
     if (typeof window !== "undefined" && localStorage.getItem(DISMISS_KEY(tenant))) return;
-    fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        setSettings(data);
-        if (!data.businessModel) setShow(true);
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      fetch(apiPath("/api/dashboard/onboarding-status"), { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]).then(([data, status]) => {
+      if (!data) return;
+      setSettings(data);
+      const established = Array.isArray(status?.steps)
+        ? status.steps.some(
+            (s: { key?: string; done?: boolean }) => s.key !== "business_type" && s.done,
+          )
+        : false;
+      if (!data.businessModel && !established) setShow(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

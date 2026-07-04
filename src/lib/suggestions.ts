@@ -6,7 +6,8 @@ import { detectStaleSections } from "./reports";
 import { sanitizePromptValue } from "./capabilities";
 import { addEvent, getEvents, resolveEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
-import { getAllTenants } from "./tenants";
+import { getProducts } from "./products";
+import { getAllTenants, getTenantConfig } from "./tenants";
 import type { ContentSection } from "./types";
 import { dataSourceIsPostgres } from "./db/source-flags";
 import { getSupabase, type Row, type Insert } from "./db/client";
@@ -356,7 +357,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     "providers", "contact", "settings", "faq",
   ];
 
-  const [timestamps, bookingClicks, settings, testimonials, events, services, dailyMetrics] =
+  const [timestamps, bookingClicks, settings, testimonials, events, services, dailyMetrics, products, tenantConfig] =
     await Promise.all([
       getSectionTimestamps(tenantId),
       getClickCounts("booking-click", tenantId),
@@ -365,7 +366,17 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       getContent("events", tenantId),
       getContent("services", tenantId),
       getDailyMetrics(tenantId, 14),
+      getProducts(tenantId).catch(() => []),
+      getTenantConfig(tenantId).catch(() => null),
     ]);
+
+  // What the site already has, so we never recommend "enabling" something that's
+  // already live (e.g. telling a store owner with 4 products to "enable e-commerce").
+  const capabilities = {
+    hasStore: products.length > 0,
+    productCount: products.length,
+    hasBlog: new Set(tenantConfig?.features ?? []).has("blog"),
+  };
 
   const created: Suggestion[] = [];
 
@@ -512,6 +523,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       tenantId,
       settings,
       services,
+      capabilities,
       staleSections: stale,
       bookingClicks,
       searchQueries: searchData?.queries || [],
@@ -526,10 +538,35 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
   return created;
 }
 
+export interface TenantCapabilities {
+  hasStore: boolean;
+  productCount: number;
+  hasBlog: boolean;
+}
+
+// Recommendations that ask the owner to "add a store / sell online" only make
+// sense if they DON'T already have one. GLDF has 4 products live, so a "set up
+// online sales" nudge reads as the AI not knowing the business. Gate on the real
+// capability rather than trusting the model to notice.
+const STORE_RECOMMENDATION_PATTERN =
+  /\b(e-?commerce|online store|online shop|sell(ing)? (online|products)|online sales|shopping cart|storefront|set up (a )?(shop|store)|checkout)\b/i;
+
+/** True when a generated recommendation should be dropped because the site
+ *  already has the capability it's proposing (avoids "enable what exists"). */
+export function recommendationConflictsWithCapabilities(
+  reco: { title: string; description: string },
+  capabilities: TenantCapabilities,
+): boolean {
+  const text = `${reco.title} ${reco.description}`;
+  if (capabilities.hasStore && STORE_RECOMMENDATION_PATTERN.test(text)) return true;
+  return false;
+}
+
 async function generateLlmSuggestion(data: {
   tenantId: string;
   settings: { siteName?: string; siteDescription?: string };
   services: { services?: Array<{ name: string }> };
+  capabilities: TenantCapabilities;
   staleSections: Array<{ section: string; daysSinceUpdate: number }>;
   bookingClicks: { total: number; thisWeek: number };
   searchQueries: Array<{ query: string; clicks: number; impressions: number }>;
@@ -537,30 +574,50 @@ async function generateLlmSuggestion(data: {
   lastWeekViews: number;
 }): Promise<Omit<Suggestion, "id" | "createdAt" | "status"> | null> {
   try {
+    const alreadyHas = [
+      data.capabilities.hasStore
+        ? `an online store with ${data.capabilities.productCount} product${data.capabilities.productCount === 1 ? "" : "s"} already for sale`
+        : null,
+      data.capabilities.hasBlog ? "a blog / content section" : null,
+      (data.services.services || []).length ? "a services section" : null,
+    ].filter(Boolean);
+
     const { text } = await generateText({
       model: google("gemini-2.5-flash"),
-      prompt: `What is the single most impactful proactive improvement for this local business website?
+      prompt: `You help a local business owner get more customers from their website. Suggest the single most useful next thing for them to do.
 
-Business: ${data.settings.siteName || "Unknown"}
-Description: ${data.settings.siteDescription || "Not set"}
-Services: ${(data.services.services || []).map((service) => service.name).join(", ") || "None listed"}
-Booking clicks this week: ${data.bookingClicks.thisWeek}
-Page views this week: ${data.thisWeekViews}
-Page views last week: ${data.lastWeekViews}
-Stale sections: ${data.staleSections.map((section) => `${section.section} (${section.daysSinceUpdate} days)`).join(", ") || "none"}
-Search queries: ${data.searchQueries.map((query) => `${query.query} (${query.clicks} clicks, ${query.impressions} impressions)`).join(", ") || "none"}
+Business: ${data.settings.siteName || "this business"}
+What they sell / do: ${data.settings.siteDescription || "not set"}
+Services listed: ${(data.services.services || []).map((service) => service.name).join(", ") || "none listed"}
+What the site ALREADY has: ${alreadyHas.length ? alreadyHas.join("; ") : "a basic site"}
+Booking/CTA clicks this week: ${data.bookingClicks.thisWeek}
+Visitors this week: ${data.thisWeekViews} (last week: ${data.lastWeekViews})
+Sections needing a refresh: ${data.staleSections.map((section) => `${section.section} (${section.daysSinceUpdate} days)`).join(", ") || "none"}
+What people search to find them: ${data.searchQueries.map((query) => `${query.query} (${query.clicks} clicks, ${query.impressions} impressions)`).join(", ") || "none"}
 
-Return strict JSON with:
+Write it the way you'd text the owner — plain, warm, and specific to their business. Rules:
+- Talk about their actual products/customers, e.g. "Show off your best-selling apple snaps", not "optimize conversions".
+- NEVER use tech or feature-spec words: no "enable", "implement", "functionality", "integrate", "leverage", "utilize", "e-commerce", "solution".
+- NEVER suggest adding something they already have (see "What the site ALREADY has"). If they already sell online, help them sell MORE, don't tell them to set up a store.
+
+Return strict JSON:
 {
-  "title": "short action title",
-  "description": "one sentence explaining why it matters",
-  "prompt": "owner-approved instruction for the AI to execute"
+  "title": "short, plain action in the owner's world",
+  "description": "one warm sentence on why it helps them get more customers",
+  "prompt": "the instruction for the AI to carry out once the owner approves"
 }
 
 No markdown. No extra text.`,
     });
     const parsed = JSON.parse(text.trim()) as { title?: string; description?: string; prompt?: string };
     if (!parsed.title || !parsed.description || !parsed.prompt) return null;
+
+    // Post-filter guard: even with the prompt guidance, suppress any recommendation
+    // that proposes a capability the site already has.
+    if (recommendationConflictsWithCapabilities({ title: parsed.title, description: parsed.description }, data.capabilities)) {
+      return null;
+    }
+
     return {
       tenantId: data.tenantId,
       type: "growth",

@@ -225,10 +225,23 @@ export function visibilityProofHighlights(diff: VisibilityDiff): string[] {
   return out.slice(0, 2);
 }
 
+// System / infrastructure activity that keeps the site running but means nothing
+// to a business owner. These are logged with actor="ai" (cache invalidation from
+// the Sanity webhook, revalidation, deploys, syncs) and must NEVER surface in the
+// owner's weekly report — "Cache invalidation: hero change triggered revalidation"
+// is the machine talking, not a win. The owner only ever sees real changes.
+const SYSTEM_ACTIVITY_PATTERN =
+  /\b(cache|revalidat|invalidat|webhook|deploy|redeploy|sync(ed|ing)?|purge|rebuild|cron|redis|cdn|edge|propagat|index(ed|ing)?)\w*/i;
+
+function isOwnerLegibleActivity(a: { text: string; actor?: string; type?: string }): boolean {
+  if (a.type === "cache-invalidation") return false;
+  return typeof a.text === "string" && a.text.trim().length > 0 && !SYSTEM_ACTIVITY_PATTERN.test(a.text);
+}
+
 export function buildHighlights(
   stats: WeeklyBriefStats,
   events: Array<{ type: string; title: string }>,
-  activity: Array<{ text: string; actor?: string }>,
+  activity: Array<{ text: string; actor?: string; type?: string }>,
   reviewSummary?: ClientReviewSummary
 ): string[] {
   const highlights: string[] = [];
@@ -257,7 +270,7 @@ export function buildHighlights(
     highlights.push(`Customers love your ${praise}`);
   }
 
-  const aiUpdates = activity.filter((a) => a.actor === "ai").slice(0, 2);
+  const aiUpdates = activity.filter((a) => a.actor === "ai" && isOwnerLegibleActivity(a)).slice(0, 2);
   for (const update of aiUpdates) {
     highlights.push(update.text);
   }
