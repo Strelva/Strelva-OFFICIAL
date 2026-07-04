@@ -34,8 +34,10 @@ export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
   "poll-google-reviews": 26 * 3600, // daily
   "poll-instagram": 26 * 3600, // daily
   "attention-digest": 26 * 3600, // daily
+  "ops-digest": 26 * 3600, // daily
   "maintenance-digest": 8 * 24 * 3600, // weekly (Mon)
   "weekly-report": 8 * 24 * 3600, // weekly (Mon)
+  "review-nudge": 8 * 24 * 3600, // weekly (Mon)
   visibility: 8 * 24 * 3600, // weekly (Tue)
   "revalidation-reconcile": 7 * 3600, // every 6h
   "portfolio-snapshot": 5 * 3600, // every 4h
