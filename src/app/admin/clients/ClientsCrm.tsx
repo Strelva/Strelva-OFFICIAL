@@ -60,6 +60,14 @@ const ACTIVITY_KINDS: { value: CrmActivityKind; label: string; icon: string }[] 
 
 const ACTIVITY_LABEL = new Map(ACTIVITY_KINDS.map((k) => [k.value, k]));
 
+type LifecycleEmailType = "welcome" | "site-live" | "review-request";
+
+const LIFECYCLE_EMAILS: { type: LifecycleEmailType; label: string }[] = [
+  { type: "welcome", label: "Send welcome" },
+  { type: "site-live", label: "Send site-live" },
+  { type: "review-request", label: "Send review request" },
+];
+
 function formatUpdated(iso: string | null): string {
   if (!iso) return "never";
   const d = new Date(iso);
@@ -94,6 +102,14 @@ export function ClientsCrm({
   const [activityDraft, setActivityDraft] = useState<
     Record<string, { kind: CrmActivityKind; summary: string }>
   >({});
+  const [emailBusy, setEmailBusy] = useState<Record<string, boolean>>({});
+  const [emailResult, setEmailResult] = useState<
+    Record<string, { tone: "ok" | "paused" | "error"; msg: string }>
+  >({});
+  const [reviewUrlDraft, setReviewUrlDraft] = useState<Record<string, string>>({});
+  const [showReviewInput, setShowReviewInput] = useState<Record<string, boolean>>({});
+  // Two-tap confirm — the pending "click to confirm" button, keyed `${id}:${type}`.
+  const [confirmKey, setConfirmKey] = useState<string | null>(null);
 
   const getCrm = (id: string): TenantCrm => crm[id] ?? emptyCrm(id);
 
@@ -196,6 +212,64 @@ export function ClientsCrm({
     const kind = draft?.kind ?? "call";
     setActivityDraft((d) => ({ ...d, [id]: { kind, summary: "" } }));
     void write(id, { activity: { kind, summary } });
+  }
+
+  async function sendEmail(id: string, type: LifecycleEmailType, reviewUrl?: string) {
+    setEmailBusy((s) => ({ ...s, [id]: true }));
+    setEmailResult((r) => {
+      const next = { ...r };
+      delete next[id];
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/admin/tenants/${id}/lifecycle-email`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, reviewUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      if (data.paused) {
+        setEmailResult((r) => ({
+          ...r,
+          [id]: { tone: "paused", msg: "Email is paused — turn it on to send." },
+        }));
+      } else if (data.sent) {
+        setEmailResult((r) => ({ ...r, [id]: { tone: "ok", msg: "Sent ✓" } }));
+        if (type === "review-request") {
+          setShowReviewInput((s) => ({ ...s, [id]: false }));
+          setReviewUrlDraft((d) => ({ ...d, [id]: "" }));
+        }
+      } else {
+        setEmailResult((r) => ({ ...r, [id]: { tone: "error", msg: "Send failed." } }));
+      }
+    } catch (err) {
+      setEmailResult((r) => ({
+        ...r,
+        [id]: { tone: "error", msg: err instanceof Error ? err.message : "Send failed." },
+      }));
+    } finally {
+      setEmailBusy((s) => ({ ...s, [id]: false }));
+      setConfirmKey(null);
+    }
+  }
+
+  function onEmailClick(id: string, type: LifecycleEmailType) {
+    const key = `${id}:${type}`;
+    if (type === "review-request") {
+      if (!showReviewInput[id]) {
+        setShowReviewInput((s) => ({ ...s, [id]: true }));
+        return;
+      }
+      if (!(reviewUrlDraft[id] ?? "").trim()) return;
+    }
+    if (confirmKey !== key) {
+      setConfirmKey(key);
+      return;
+    }
+    const reviewUrl =
+      type === "review-request" ? (reviewUrlDraft[id] ?? "").trim() : undefined;
+    void sendEmail(id, type, reviewUrl);
   }
 
   const filtersActive = stageFilter !== "all" || tagFilter !== null;
@@ -653,6 +727,62 @@ export function ClientsCrm({
                           ))}
                       </ul>
                     )}
+                    </section>
+
+                    {/* Client emails */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">
+                        Client emails
+                      </h3>
+                      {!c.ownerEmail && (
+                        <p className="text-xs text-gray-faint">
+                          No owner email on file — add one to send.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {LIFECYCLE_EMAILS.map(({ type, label }) => {
+                          const key = `${c.id}:${type}`;
+                          const pending = confirmKey === key;
+                          return (
+                            <button
+                              key={type}
+                              onClick={() => onEmailClick(c.id, type)}
+                              disabled={emailBusy[c.id] || !c.ownerEmail}
+                              className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                                pending
+                                  ? "bg-accent border-accent text-on-accent hover:opacity-90"
+                                  : "bg-surface-base border-glass-border text-warm-white hover:border-accent/50"
+                              }`}
+                            >
+                              {pending ? "Click to confirm" : label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {showReviewInput[c.id] && (
+                        <input
+                          value={reviewUrlDraft[c.id] ?? ""}
+                          onChange={(e) =>
+                            setReviewUrlDraft((d) => ({ ...d, [c.id]: e.target.value }))
+                          }
+                          placeholder="Review URL (e.g. https://g.page/r/…/review)"
+                          className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                        />
+                      )}
+                      {emailResult[c.id] && (
+                        <p
+                          className={`text-xs ${
+                            emailResult[c.id].tone === "ok"
+                              ? "text-emerald-400"
+                              : emailResult[c.id].tone === "paused"
+                                ? "text-amber-400"
+                                : "text-rose-400"
+                          }`}
+                          role="status"
+                        >
+                          {emailResult[c.id].msg}
+                        </p>
+                      )}
                     </section>
                   </div>
                 )}
