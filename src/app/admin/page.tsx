@@ -13,7 +13,7 @@ import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getCustomRepoMetadata, getTenantDeliveryModel, summarizeCustomRepo } from "@/lib/custom-repos";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
-import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
+import { getEffectiveSubscriptionStatus, isGrandfathered } from "@/lib/subscription";
 import {
   buildTenantLaunchReadiness,
   tenantHasOwnerMessage,
@@ -124,6 +124,11 @@ export default async function AdminPage() {
   const activeSubscriptions = SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS
     ? Math.round(mrr / SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS)
     : 0;
+  // Tenants with full access but $0 (grandfathered or founder-comp). Surfaced on
+  // the MRR card so a $0 total reads as intentional, not a billing failure.
+  const grandfatheredCount = TENANTS.filter(
+    (t) => isGrandfathered(t.id) || t.planOverride === "founder_comp",
+  ).length;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
   const customRepoCount = TENANTS.filter((t) => getTenantDeliveryModel(t) === "custom_repo").length;
   const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;
@@ -249,8 +254,8 @@ export default async function AdminPage() {
             ${mrr.toLocaleString()}
           </p>
           <p className="text-xs text-gray-faint mt-1">
-            {activeSubscriptions} active subscription
-            {activeSubscriptions !== 1 ? "s" : ""} x ${SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS}
+            {activeSubscriptions} paid
+            {grandfatheredCount > 0 ? ` · ${grandfatheredCount} grandfathered` : ""}
           </p>
         </div>
         <Link
@@ -368,7 +373,7 @@ export default async function AdminPage() {
                           href={`/admin/tenants/${t.id}`}
                           className="font-medium text-warm-white hover:text-accent transition-colors"
                         >
-                          {t.siteName}
+                          {t.siteName || t.ownerName || t.id}
                         </Link>
                         <p className="mt-1 text-xs text-gray-muted">{t.ownerName}</p>
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">

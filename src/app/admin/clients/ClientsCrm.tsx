@@ -16,6 +16,9 @@ interface ClientRow {
   subscriptionStatus: string | null;
   /** Top at-risk reason from getAtRiskTenants, or null if not at risk. */
   atRiskReason: string | null;
+  /** Proxy-resolvable dashboard URL (getTenantDashboardFallbackUrl), computed
+   *  server-side so the link opens the client's dashboard on the app host. */
+  dashboardUrl: string;
 }
 
 const STAGES: { value: CrmStage; label: string; dot: string }[] = [
@@ -302,7 +305,7 @@ export function ClientsCrm({
           <select
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value as CrmStage | "all")}
-            className="rounded-md bg-gray-bg border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50"
+            className="rounded-md bg-surface-base border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50"
           >
             <option value="all">All</option>
             {STAGES.map((s) => (
@@ -378,7 +381,7 @@ export function ClientsCrm({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-warm-white truncate">
-                        {c.siteName}
+                        {c.siteName || c.ownerName || c.id}
                       </span>
                       {!c.active && (
                         <span className="text-[10px] uppercase tracking-wide text-gray-faint border border-glass-border rounded px-1 py-0.5">
@@ -479,7 +482,7 @@ export function ClientsCrm({
                         onChange={(e) =>
                           write(c.id, { stage: e.target.value as CrmStage })
                         }
-                        className="rounded-md bg-gray-bg border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50 disabled:opacity-40"
+                        className="rounded-md bg-surface-base border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50 disabled:opacity-40"
                       >
                         <option value="" disabled>
                           Set stage…
@@ -493,7 +496,7 @@ export function ClientsCrm({
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <Link
-                        href={`/dashboard?tenant=${c.id}`}
+                        href={c.dashboardUrl}
                         className="text-accent hover:underline"
                       >
                         Open dashboard →
@@ -503,6 +506,7 @@ export function ClientsCrm({
                         onClick={() => setExpanded(isOpen ? null : c.id)}
                         className="text-gray-muted hover:text-warm-white transition-colors"
                         aria-expanded={isOpen}
+                        title="contacts · activity · notes"
                       >
                         Details ({rec.contacts.length} · {rec.activity.length} · {rec.notes.length})
                       </button>

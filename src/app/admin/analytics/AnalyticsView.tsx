@@ -62,12 +62,10 @@ function ConnectPrompt({ service }: { service: string }) {
         Connect this client&apos;s {service}
       </p>
       <p className="mt-1.5 text-xs leading-5 text-gray-muted">
-        Add the Strelva reporting service account as a user on their {service}{" "}
-        property, then set the property below and save.
+        Add the Strelva reporting service account (the address shown in the
+        Connection card above) as a user on their {service} property, then set
+        the property below and save.
       </p>
-      <code className="mt-3 inline-block rounded bg-surface-base border border-glass-border px-2 py-1 font-mono text-[11px] text-accent">
-        {SERVICE_ACCOUNT}
-      </code>
     </div>
   );
 }

@@ -66,7 +66,7 @@ export default async function AdminTenantsPage() {
                           href={`/admin/tenants/${t.id}`}
                           className="font-medium text-warm-white hover:text-accent transition-colors"
                         >
-                          {t.siteName}
+                          {t.siteName || t.ownerName || t.id}
                         </Link>
                       </td>
                       <td className="px-6 py-4">

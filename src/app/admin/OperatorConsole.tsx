@@ -26,6 +26,21 @@ interface Proposal {
 
 type ProposalState = "pending" | "committing" | "done" | "error";
 
+/**
+ * The agent replies in light markdown; the panel renders plain text. Strip the
+ * few tokens it actually emits (bold/italic markers, bullet dashes, heading
+ * hashes) so `**foo**` and `* item` don't show as literal syntax. Not a full
+ * markdown parser — just the tokens that leak.
+ */
+function toPlainText(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, "") // ### heading → heading
+    .replace(/^\s*[*-]\s+/gm, "• ") // "* item" / "- item" → "• item"
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **bold** → bold
+    .replace(/__(.+?)__/g, "$1") // __bold__ → bold
+    .replace(/(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?![*\w])/g, "$1"); // *italic* → italic
+}
+
 // The console — not the LLM — owns the action→endpoint mapping, so the agent
 // can never target an arbitrary endpoint. Every endpoint gates + audits.
 const COMMIT_MAP: Record<ProposalAction, { endpoint: string; method: string }> = {
@@ -220,7 +235,7 @@ export function OperatorConsole() {
             <span className="text-xs uppercase tracking-wide text-gray-faint mr-2">
               {m.role === "user" ? "You" : "Agent"}
             </span>
-            {m.content}
+            {m.role === "assistant" ? toPlainText(m.content) : m.content}
           </div>
         ))}
         {toolStatus && (
