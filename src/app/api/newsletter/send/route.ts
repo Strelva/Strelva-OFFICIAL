@@ -8,6 +8,7 @@ import { readJsonObject } from "@/lib/request-body";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "@/lib/email-html";
+import { emailSendingPaused } from "@/lib/email-enabled";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
     const safeHtml = sanitizeEmailHtml(body);
     const safeText = htmlToPlainText(body);
 
-    // Use Resend if configured, otherwise log to console (dev mode)
-    if (process.env.RESEND_API_KEY) {
+    // Use Resend if configured and sending isn't paused, else log (dev/paused).
+    if (process.env.RESEND_API_KEY && !emailSendingPaused()) {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
 

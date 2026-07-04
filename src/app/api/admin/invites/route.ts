@@ -15,6 +15,7 @@ import { createInvite } from "@/lib/invites";
 import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { emailSendingPaused } from "@/lib/email-enabled";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -130,6 +131,15 @@ export async function POST(req: Request) {
     email,
   );
   const siteNameText = sanitizeEmailSubjectText(tenantConfig.siteName);
+
+  if (emailSendingPaused()) {
+    console.warn(`[invites] email paused (EMAIL_SENDING_ENABLED != true) — invite recorded but not emailed to ${email}`);
+    return NextResponse.json({
+      success: true,
+      emailed: false,
+      reason: "email_sending_paused",
+    });
+  }
 
   if (process.env.RESEND_API_KEY) {
     try {

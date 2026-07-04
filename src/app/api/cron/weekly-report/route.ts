@@ -8,6 +8,7 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText, escapeHtml } from "@/lib/invite-email";
+import { emailSendingPaused } from "@/lib/email-enabled";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -55,6 +56,14 @@ function reportToText(summary: string, dashboardUrl: string): string {
 
 export async function GET() {
   // Auth handled by proxy (CRON_SECRET check)
+
+  // Global email kill-switch: while sending is paused (domain cutover / test
+  // tenants) the report's only purpose — the email — can't go out, so skip the
+  // whole run rather than build reports nothing sends.
+  if (emailSendingPaused()) {
+    console.warn("[weekly-report] skipped — email sending paused (EMAIL_SENDING_ENABLED != true)");
+    return NextResponse.json({ status: "skipped", reason: "email_sending_paused" });
+  }
 
   const { reports: allReports, skipped: generationSkips } = await generateAllReports();
 
