@@ -2,6 +2,7 @@ import { getSubscribers, getContent } from "./storage";
 import { EMAIL_DOMAIN } from "./brand";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
+import { emailSendingPaused } from "./email-enabled";
 
 export interface SendNewsletterInput {
   subject: string;
@@ -13,7 +14,7 @@ export interface SendNewsletterResult {
   success: boolean;
   subscriberCount: number;
   devMode?: boolean;
-  reason?: "no_subscribers";
+  reason?: "no_subscribers" | "paused";
 }
 
 /**
@@ -38,6 +39,11 @@ export async function sendNewsletter(
   const safeHtml = sanitizeEmailHtml(body);
   const safeText = htmlToPlainText(body);
   const safeSubject = sanitizeEmailSubjectText(subject);
+
+  if (emailSendingPaused()) {
+    console.warn("[newsletter] sending paused (EMAIL_SENDING_ENABLED != true) — not sent");
+    return { success: false, subscriberCount: 0, reason: "paused" };
+  }
 
   if (process.env.RESEND_API_KEY) {
     const { Resend } = await import("resend");

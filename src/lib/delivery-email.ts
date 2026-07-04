@@ -2,6 +2,7 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
+import { emailSendingPaused } from "@/lib/email-enabled";
 
 function cleanSubjectText(value: string): string {
   return value
@@ -99,6 +100,10 @@ export async function sendUpdateLiveEmail(params: {
    */
   rollingOut?: boolean;
 }): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
   if (!process.env.RESEND_API_KEY) return false;
 
   try {
@@ -196,6 +201,10 @@ export async function sendNewLeadEmail(params: {
   dashboardUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
   if (!process.env.RESEND_API_KEY) return false;
 
   try {
@@ -325,6 +334,10 @@ export async function sendNewIntakeLeadEmail(params: {
   leadsUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`${params.logPrefix ?? "[email]"} sending paused (EMAIL_SENDING_ENABLED != true) — team lead notification skipped`);
+    return false;
+  }
   if (!process.env.RESEND_API_KEY) return false;
 
   try {
@@ -355,6 +368,10 @@ export async function sendDeliveryStatusEmail(params: {
   statusUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
   if (!process.env.RESEND_API_KEY) return false;
 
   try {

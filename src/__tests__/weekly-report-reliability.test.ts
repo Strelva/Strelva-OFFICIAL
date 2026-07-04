@@ -109,7 +109,7 @@ describe("buildReportFallbackSummary (deterministic, claims-safe)", () => {
     expect(out).not.toContain("\n\n\n");
   });
 
-  it("handles a zero-traffic week without inventing activity", () => {
+  it("does not assert '0 visitors' when there is no tracking data at all", () => {
     const out = buildReportFallbackSummary({
       ...baseSummaryInput,
       pageViews: { total: 0, thisWeek: 0 },
@@ -118,8 +118,24 @@ describe("buildReportFallbackSummary (deterministic, claims-safe)", () => {
       topSearchQueries: [],
       staleSections: [],
     });
-    expect(out).toContain("no new visits");
+    // No tracking ever recorded -> "coming online", never a measured zero that
+    // reads as failure to the owner.
+    expect(out).toContain("visitor tracking");
+    expect(out).not.toContain("no new visits");
+    expect(out).not.toMatch(/0 (people|visits|person)/);
     expect(out.toLowerCase()).not.toContain("lead");
+  });
+
+  it("says 'no new visits' only when tracking has real history but a flat week", () => {
+    const out = buildReportFallbackSummary({
+      ...baseSummaryInput,
+      pageViews: { total: 120, thisWeek: 0 },
+      bookingClicks: { total: 0, thisWeek: 0 },
+      topServices: [],
+      topSearchQueries: [],
+      staleSections: [],
+    });
+    expect(out).toContain("no new visits");
   });
 });
 

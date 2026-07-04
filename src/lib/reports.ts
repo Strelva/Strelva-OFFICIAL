@@ -44,54 +44,52 @@ export interface WeeklyReportData {
   summary: string;
 }
 
+// Sections that are operator/plumbing concepts, not something an owner would
+// recognize on their own site — never name these in a client-facing report.
+const NON_CLIENT_SECTIONS = new Set([
+  "settings",
+  "config",
+  "seo",
+  "meta",
+  "navigation",
+  "capabilities",
+  "components",
+]);
+
 /**
- * Build plain-English verification lines for a report.
- * NEVER claims verified when it isn't — only renders if verifiedChanges is
- * non-empty; always renders a discrete honest line for failures.
+ * Build a single client-facing proof-of-work line: which of THEIR sections we
+ * refreshed this week, in plain language. Deliberately NOT a debug log — no
+ * internal verification timestamps ("checked live 3:06 PM"), no operator
+ * sections, and NO "could not be confirmed" failure line. A paying client's
+ * value report must never read like internal plumbing or admit an internal
+ * verification miss; unconfirmed changes are an operator concern (the
+ * change_verify_failed event), surfaced admin-side, not to the owner.
+ * `_failedVerifications` is intentionally ignored here.
  */
 export function formatVerificationLines(
   verifiedChanges: VerifiedChangeItem[],
-  failedVerifications: number
+  _failedVerifications: number
 ): string {
-  const lines: string[] = [];
+  const sections = Array.from(
+    new Set(
+      verifiedChanges
+        .map((c) => c.section.trim().toLowerCase())
+        .filter((s) => s.length > 0 && !NON_CLIENT_SECTIONS.has(s))
+    )
+  ).map(capitalise);
 
-  for (const item of verifiedChanges) {
-    const writtenLabel = formatDay(item.writtenAt);
-    const verifiedLabel = formatDayTime(item.verifiedAt);
-    lines.push(`${capitalise(item.section)} updated ${writtenLabel} — checked live ${verifiedLabel}.`);
-  }
+  if (sections.length === 0) return "";
 
-  if (failedVerifications > 0) {
-    const plural = failedVerifications === 1 ? "change" : "changes";
-    lines.push(
-      `${failedVerifications} ${plural} could not be confirmed live — we're on it.`
-    );
-  }
+  let list: string;
+  if (sections.length === 1) list = sections[0];
+  else if (sections.length === 2) list = `${sections[0]} and ${sections[1]}`;
+  else list = `${sections.slice(0, -1).join(", ")}, and ${sections[sections.length - 1]}`;
 
-  return lines.join("\n");
+  return `We refreshed your ${list} this week.`;
 }
 
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function formatDay(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
-  } catch {
-    return iso;
-  }
-}
-
-function formatDayTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    const day = d.toLocaleDateString("en-US", { weekday: "long" });
-    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    return `${day} ${time}`;
-  } catch {
-    return iso;
-  }
 }
 
 /**
@@ -245,14 +243,21 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
 
   const greeting = data.ownerName ? `Hi ${data.ownerName},` : "Hi,";
 
+  const hasTrafficData = data.pageViews.total > 0 || data.bookingClicks.total > 0;
   if (data.pageViews.thisWeek > 0) {
     const plural = data.pageViews.thisWeek === 1 ? "person" : "people";
     paragraphs.push(
       `${greeting} ${data.pageViews.thisWeek} ${plural} found you this week (${data.pageViews.total} total so far).`,
     );
-  } else {
+  } else if (hasTrafficData) {
     paragraphs.push(
       `${greeting} no new visits landed this week — a good moment to share your site or freshen up a section.`,
+    );
+  } else {
+    // No data ever recorded — visitor tracking is still coming online. Don't
+    // assert "0 visitors" as a measured fact to the owner.
+    paragraphs.push(
+      `${greeting} we're getting your visitor tracking wired up, so next week's report will start showing who's finding you.`,
     );
   }
 
@@ -302,11 +307,6 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
 }
 
 async function generateReportSummary(data: ReportSummaryInput): Promise<string> {
-  const activitySummary = data.recentActivity
-    .slice(0, 10)
-    .map((a) => `- ${a.text}`)
-    .join("\n");
-
   const staleSummary = data.staleSections
     .map((s) => `- ${s.section} (${s.daysSinceUpdate} days)`)
     .join("\n");
@@ -318,9 +318,20 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
     .map((s) => `- ${sanitizeEmailSubjectText(data.serviceNames[s.serviceId] || s.serviceId)}: ${s.thisWeek} clicks this week (${s.total} total)`)
     .join("\n");
 
-  const verificationBlock = data.verifiedChanges.length > 0 || data.failedVerifications > 0
-    ? `\nVerified site changes this week:\n${formatVerificationLines(data.verifiedChanges, data.failedVerifications)}`
+  // Client-facing proof of work: which of the owner's sections we refreshed.
+  // Never the raw admin activity feed or internal verification timestamps.
+  const workBlock = formatVerificationLines(data.verifiedChanges, data.failedVerifications)
+    ? `\nWhat we did on the site this week:\n${formatVerificationLines(data.verifiedChanges, data.failedVerifications)}`
     : "";
+
+  // When there is no visit data at all (total 0), tracking is still coming
+  // online — do NOT assert "0 people found you" as a measured fact.
+  const hasTrafficData = data.pageViews.total > 0 || data.bookingClicks.total > 0;
+  const statsBlock = hasTrafficData
+    ? `Traffic this week:
+- ${data.pageViews.thisWeek} people found the site (${data.pageViews.total} total)
+- ${data.bookingClicks.thisWeek} booking clicks (${data.bookingClicks.total} total)`
+    : `Visitor tracking is still coming online for this site — there is no visit data to report yet. Do NOT state a visitor or click count.`;
 
   const visibilityBlock = data.visibilityLines
     ? `\nVisibility changes this week (Google + AI, directional only):\n${data.visibilityLines}`
@@ -336,26 +347,23 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
       model: google("gemini-2.5-flash"),
       prompt: `Write a short, warm weekly report email for ${data.ownerName} about their business website "${data.siteName}".
 
-Stats this week:
-- ${data.pageViews.thisWeek} people found the site (${data.pageViews.total} total)
-- ${data.bookingClicks.thisWeek} booking clicks (${data.bookingClicks.total} total)
+${statsBlock}
 
 ${serviceSummary ? `Top services by booking clicks:\n${serviceSummary}` : ""}
 
 ${data.topSearchQueries.length > 0 ? `Top searches that found the site:\n${data.topSearchQueries.map((q) => `- "${sanitizeEmailSubjectText(q.query)}" (${q.clicks} clicks, ${q.impressions} impressions)`).join("\n")}` : ""}
 
-${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : "All sections are up to date."}
-
-${activitySummary ? `Recent site activity:\n${activitySummary}` : "No recent activity."}
-${verificationBlock}${visibilityBlock}${anomalyBlock}
+${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary}` : ""}
+${workBlock}${visibilityBlock}${anomalyBlock}
 Rules:
 - 3-5 short paragraphs max
-- Lead with the most interesting metric
+- This goes to a non-technical business owner. NEVER mention internal settings, admin actions, dashboards, verification checks, timestamps, or whether a change was "confirmed live" — those are our concern, not theirs.
+- If there is real traffic or click data, lead with the most interesting number. If there is NO visit data yet, do NOT lead with or dwell on zero and do NOT imply the site is failing — open with what we did on the site and one concrete next step.
 - If search query data is available, mention what people are searching to find the site — use their exact words
 - If per-service data is available, mention the most popular service by name
 - If sections are stale, suggest updating one specific section with a concrete idea
-- If verified site changes are listed, include them with their timestamps — these are proof of work, use the exact phrasing provided
-- If a change could not be confirmed live, include that honest line verbatim
+- If a "what we did on the site" line is provided, include it as-is — it's honest proof of work in the owner's own terms
+- No filler or vague reassurance ("working behind the scenes", "building your presence"). Every sentence must say something concrete.
 - If visibility changes are listed, include them as-is — these are position moves in Google or AI, use the exact phrasing provided
 - If a traffic trend is listed, include it — it explains a meaningful rise or drop in visits and the next move; use the exact phrasing provided
 - Use "you" not "your site" — make it personal

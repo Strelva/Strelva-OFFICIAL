@@ -170,7 +170,7 @@ describe("scheduleVerification — event emission", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatVerificationLines", () => {
-  it("renders a verified-live line with weekday and time", () => {
+  it("renders a client-facing proof-of-work line for a refreshed section — no internal timestamps", () => {
     const verifiedAt = new Date("2026-06-10T16:12:00.000Z").toISOString();
     const writtenAt = new Date("2026-06-10T15:00:00.000Z").toISOString();
 
@@ -179,41 +179,59 @@ describe("formatVerificationLines", () => {
       0
     );
 
-    // Must mention section name and time
-    expect(lines).toContain("Hours updated");
-    expect(lines).toContain("checked live");
-    // Must not claim "verified" if it isn't — this was actually verified
-    expect(lines).toContain("Hours updated");
+    expect(lines).toBe("We refreshed your Hours this week.");
+    // Internal verification plumbing must never reach the owner.
+    expect(lines).not.toContain("checked live");
+    expect(lines).not.toMatch(/\d:\d\d/);
   });
 
-  it("renders the honest failure line for unverified changes", () => {
-    const lines = formatVerificationLines([], 2);
-    expect(lines).toContain("2 changes could not be confirmed live");
-    expect(lines).toContain("we're on it");
-  });
-
-  it("renders both verified and failure lines when both exist", () => {
-    const verifiedAt = new Date("2026-06-10T16:12:00.000Z").toISOString();
-    const writtenAt = new Date("2026-06-10T15:00:00.000Z").toISOString();
-
+  it("groups multiple refreshed sections into one natural sentence", () => {
+    const at = new Date("2026-06-10T16:12:00.000Z").toISOString();
     const lines = formatVerificationLines(
-      [{ section: "services", writtenAt, verifiedAt }],
+      [
+        { section: "hours", writtenAt: at, verifiedAt: at },
+        { section: "services", writtenAt: at, verifiedAt: at },
+      ],
+      0
+    );
+    expect(lines).toBe("We refreshed your Hours and Services this week.");
+  });
+
+  it("NEVER surfaces an internal verification failure to the client", () => {
+    // failedVerifications is an operator concern (change_verify_failed event),
+    // never a line in the owner's report.
+    expect(formatVerificationLines([], 2)).toBe("");
+    expect(formatVerificationLines([], 3)).not.toContain("could not be confirmed");
+    const at = new Date("2026-06-10T16:12:00.000Z").toISOString();
+    const withFailure = formatVerificationLines(
+      [{ section: "services", writtenAt: at, verifiedAt: at }],
       1
     );
-    expect(lines).toContain("Services updated");
-    expect(lines).toContain("1 change could not be confirmed live");
+    expect(withFailure).toBe("We refreshed your Services this week.");
+    expect(withFailure).not.toContain("could not be confirmed");
   });
 
-  it("returns empty string when there are no changes and no failures", () => {
-    const lines = formatVerificationLines([], 0);
-    expect(lines).toBe("");
+  it("filters operator-only sections the owner wouldn't recognize", () => {
+    const at = new Date("2026-06-10T16:12:00.000Z").toISOString();
+    // "settings" is operator plumbing — must not appear; only real sections do.
+    const onlyOperator = formatVerificationLines(
+      [{ section: "settings", writtenAt: at, verifiedAt: at }],
+      0
+    );
+    expect(onlyOperator).toBe("");
+
+    const mixed = formatVerificationLines(
+      [
+        { section: "settings", writtenAt: at, verifiedAt: at },
+        { section: "hours", writtenAt: at, verifiedAt: at },
+      ],
+      0
+    );
+    expect(mixed).toBe("We refreshed your Hours this week.");
   });
 
-  it("NEVER claims verified when failedVerifications > 0 and verifiedChanges is empty", () => {
-    const lines = formatVerificationLines([], 3);
-    // Must not say "verified" in a positive context — only the honest failure line
-    expect(lines).not.toContain("checked live");
-    expect(lines).toContain("could not be confirmed");
+  it("returns empty string when there are no changes", () => {
+    expect(formatVerificationLines([], 0)).toBe("");
   });
 });
 
