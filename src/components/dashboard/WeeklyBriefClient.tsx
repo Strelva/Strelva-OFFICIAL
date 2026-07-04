@@ -10,8 +10,10 @@ import { metricVerdicts } from "@/lib/proof";
 import type { Goal } from "@/lib/goals";
 import type { TrafficAnomaly } from "@/lib/anomaly";
 import type { CompetitorBenchmark } from "@/lib/competitor-benchmark";
+import type { SearchPerf, GaPerf } from "@/lib/analytics";
 import { useDashboardOptional } from "./DashboardContext";
 import { GoalCard } from "./GoalCard";
+import { SearchAnalyticsPanel } from "./SearchAnalyticsPanel";
 
 interface WeeklyBriefClientProps {
   brief: WeeklyBrief | null;
@@ -22,6 +24,12 @@ interface WeeklyBriefClientProps {
   anomaly?: TrafficAnomaly | null;
   benchmark?: CompetitorBenchmark | null;
   searchData?: SearchData | null;
+  /** Live Search Console performance for this tenant. */
+  searchPerf?: SearchPerf | null;
+  /** Live GA4 performance for this tenant. */
+  gaPerf?: GaPerf | null;
+  /** Where the Search & Analytics panel's Connect Google CTA points. */
+  analyticsConnectHref?: string;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -147,8 +155,10 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
+  const connectHref =
+    analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
 
   if (!brief) {
     return (
@@ -220,6 +230,12 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
               View your live site
             </a>
+          </div>
+
+          {/* Search & Analytics stands on its own data (Google), so it shows even
+              before the first weekly report has warmed up. */}
+          <div className="mt-8">
+            <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           </div>
         </div>
       </div>
@@ -352,6 +368,12 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Live Search Console + GA4 for this tenant — what Google shows about
+              how people find and move through the site. */}
+          <div className="animate-fade-in-up" style={{ animationDelay: "112ms" }}>
+            <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           </div>
 
           {/* Weekly goal + progress */}

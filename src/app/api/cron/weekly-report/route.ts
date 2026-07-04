@@ -10,6 +10,7 @@ import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import type { EmailRow } from "@/lib/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
@@ -28,21 +29,25 @@ function reportSummaryParagraphs(summary: string): string[] {
     .filter(Boolean);
 }
 
-function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
+function reportToHtml(summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
   const paragraphs = reportSummaryParagraphs(summary);
   return renderEmailHtml({
     preheader: paragraphs[0],
     heading: "Your weekly report",
     paragraphs,
+    // Compact Search & Analytics block — only present when a Google surface read
+    // "ok" (buildAnalyticsRows returns []), so unconnected tenants omit it.
+    rows: analyticsRows.length ? analyticsRows : undefined,
     button: { label: "See your full report", url: dashboardUrl },
     footerNote: `Sent for ${siteName}`,
   });
 }
 
-function reportToText(summary: string, dashboardUrl: string): string {
+function reportToText(summary: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
   return renderEmailText({
     heading: "Your weekly report",
     paragraphs: reportSummaryParagraphs(summary),
+    rows: analyticsRows.length ? analyticsRows : undefined,
     button: { label: "See your full report", url: dashboardUrl },
   });
 }
@@ -118,10 +123,12 @@ await mapPool(reports, 8, async (report) => {
         report.summary,
         report.tenant.siteName,
         getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        report.analyticsRows,
       );
       const text = reportToText(
         report.summary,
         getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        report.analyticsRows,
       );
       await generateWeeklyBrief(report.tenant.id);
 
