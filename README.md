@@ -22,19 +22,21 @@ pulls content from Strelva over a versioned contract.
    /api/v1/*  ── frozen, additive-only contract
         │ pull (ISR 60s)        ▲ push (HMAC-signed revalidate)
         ▼                       │
- Sanity (source of truth) + Redis (cache + operational data)
+ Supabase Postgres (source of truth) + Redis (cache + operational data)
         │
         ▼
  CUSTOM CLIENT REPOS — one per paid client, own domain, own Vercel project
 ```
 
-- **Source of truth:** Sanity for content/config; Upstash Redis as a write-through cache
-  and the operational store (events, clicks, bookings, reviews, pay-links, rewards).
+- **Source of truth:** Supabase Postgres for content/config/tenants (flipped 2026-06-20;
+  Sanity is being decommissioned); Upstash Redis as a write-through cache and the
+  operational store (events, clicks, bookings, reviews, pay-links, rewards).
 - **Sync contract (`/api/v1/*`):** client repos pull content (ISR) and receive
   HMAC-signed revalidation pushes. The contract is versioned (`v1`) and changed only
   additively — deployed client sites can't break.
 - **Stack:** Next.js 16 (App Router, `proxy.ts` routing), React 19, TypeScript, Tailwind 4,
-  Clerk (multi-host auth), Vercel AI SDK + Gemini, Stripe, Resend, Vercel Blob.
+  Supabase Auth (multi-host), Supabase Postgres, Vercel AI SDK + Gemini, Stripe (billing
+  live), Resend, Vercel Blob.
 
 ## The AI systems
 

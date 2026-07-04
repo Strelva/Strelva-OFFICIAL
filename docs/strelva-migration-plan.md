@@ -12,8 +12,10 @@ rebrand**, still parked)
 > `docs/supabase-migration-plan.md` / `docs/post-cutover-runbook.md`. Concretely
 > that changes two assumptions in §5 below: the **Clerk** cutover step is moot
 > (auth is Supabase now, dead-pathed Clerk), and the **Supabase** "if used" note
-> is now "in use, primary." Everything else here (the 518-literal rebrand, the
-> repo split, Resend/Stripe/OAuth re-pointing) is still pending and accurate.
+> is now "in use, primary." The **Resend sender domain is also already
+> re-pointed** — `RESEND_DOMAIN=updates.strelva.com` is live in prod (was
+> `updates.scaffoldweb.com`). Everything else here (the 518-literal rebrand, the
+> repo split, Stripe/OAuth re-pointing) is still pending and accurate.
 
 ## Locked decisions
 
@@ -44,7 +46,7 @@ One Next.js 16 codebase, multi-tenant, **host-routed** via `src/proxy.ts` + `src
 | `admin.<tenant>.scaffoldweb.com`, `/dashboard`, `/admin`, `/studio` | dashboard/admin | The app |
 | `/api/*` | `src/app/api` | Backend |
 
-`scaffoldweb.com` / "Scaffold Web" is wired into **~518 references** across source, config, and docs — proxy host matching, the tenant subdomain pattern `<tenant>.scaffoldweb.com`, Clerk (`clerk.scaffoldweb.com`), Resend (`updates.scaffoldweb.com`), CSP headers, env defaults, and marketing copy. This is a rebrand, not a DNS change.
+`scaffoldweb.com` / "Scaffold Web" is wired into **~518 references** across source, config, and docs — proxy host matching, the tenant subdomain pattern `<tenant>.scaffoldweb.com`, Clerk (`clerk.scaffoldweb.com`), Resend (sender domain now re-pointed — `RESEND_DOMAIN=updates.strelva.com` is live in prod, was `updates.scaffoldweb.com`), CSP headers, env defaults, and marketing copy. This is a rebrand, not a DNS change.
 
 ---
 

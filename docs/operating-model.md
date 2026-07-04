@@ -79,7 +79,7 @@ CONTROL PLANE (this repo, → app.strelva.com)
    ▼                         │
  Postgres (truth, RLS) + Redis (cache+ops)   CUSTOM CLIENT REPOS (1 per client, own domain)
    (Sanity dual-written as rollback mirror)
-External: Supabase(auth+db) · Stripe(off) · Resend · Gemini · Vercel Blob · Slack · Yelp/Google/IG/GSC
+External: Supabase(auth+db) · Stripe(billing live) · Resend(updates.strelva.com) · Gemini · Vercel Blob · Slack · Yelp/Google/IG/GSC · PageSpeed
           (Clerk + Sanity retained until post-cutover teardown)
 ```
 
