@@ -601,7 +601,7 @@ function UtilitiesSection() {
       icon: Sparkles,
     },
     {
-      title: "Integrations",
+      title: "Connections",
       description: "Connect the accounts Strelva manages — Google Business, reviews, booking.",
       href: "/dashboard/integrations",
       icon: Link2,

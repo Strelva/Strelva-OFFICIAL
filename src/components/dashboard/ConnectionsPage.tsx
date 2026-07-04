@@ -68,7 +68,7 @@ function ConnectionRow({
           : needsSetup
             ? "Setup required"
             : "Available";
-  const actionCopy = canUseNow ? "Ask AI" : "Connect first";
+  const actionCopy = canUseNow ? "Ask Strelva" : "Connect first";
 
   return (
     <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-gray-border bg-surface-raised p-3.5 transition-colors hover:border-accent/25">

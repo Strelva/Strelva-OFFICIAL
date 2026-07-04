@@ -3,7 +3,8 @@ import type { ComponentType } from "react";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileText, Inbox, Link2, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
-import { getQueueCount } from "@/lib/events";
+import { getNeedsYouData } from "@/lib/needs-you";
+import { QueuePage } from "@/components/dashboard/QueuePage";
 import { getWeeklyBrief, isOwnerLegibleHighlight } from "@/lib/weekly-brief";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
@@ -58,7 +59,7 @@ async function DashboardHome({
   const [
     pageViews,
     customerActions,
-    pendingCount,
+    needsYou,
     activity,
     brief,
     tenantConfig,
@@ -68,7 +69,9 @@ async function DashboardHome({
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
-    getQueueCount(tenant).catch(() => 0),
+    // The approval queue, surfaced inline on Today (folds the separate "Needs
+    // you" route into the home). Degrades to an empty queue on a backend blip.
+    getNeedsYouData(tenant).catch(() => ({ pending: [], resolved: [], pendingCount: 0, staleSectionCount: 0 })),
     getActivity(tenant, { actor: "ai" }).catch(() => []),
     getWeeklyBrief(tenant).catch(() => null),
     getTenantConfig(tenant).catch(() => null),
@@ -90,6 +93,7 @@ async function DashboardHome({
     })),
     getLeadSummary(tenant, 30).catch(() => ({ count: 0, recent: [] })),
   ]);
+  const pendingCount = needsYou.pendingCount;
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : getTenantPublicUrlFromDomainMap(tenant);
@@ -155,7 +159,7 @@ async function DashboardHome({
               className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
-              Ask AI
+              Ask Strelva
             </Link>
             <Link
               href={dashboardHref("/dashboard/site")}
@@ -169,6 +173,23 @@ async function DashboardHome({
 
           <OnboardingWizard />
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
+
+          {/* Needs you — the approval queue, front and center on Today (the
+              separate route is folded in here; the sidebar keeps a count badge).
+              Approve/skip inline without leaving home. Only when something waits. */}
+          {pendingCount > 0 ? (
+            <section className="overflow-hidden rounded-2xl border border-accent/25 bg-glass">
+              <div className="h-[520px]">
+                <QueuePage
+                  initialPending={needsYou.pending}
+                  initialResolved={needsYou.resolved}
+                  pendingCount={needsYou.pendingCount}
+                  staleSectionCount={needsYou.staleSectionCount}
+                  compact
+                />
+              </div>
+            </section>
+          ) : null}
 
           {isFresh ? (
           <section className="rounded-2xl border border-accent/25 bg-accent-dim/30 p-5">
@@ -216,7 +237,7 @@ async function DashboardHome({
               <QuickWinLink
                 href={dashboardHref("/dashboard/chat")}
                 icon={MessageCircle}
-                title="Ask AI for an update"
+                title="Ask Strelva for an update"
                 description="Tell it what changed this week and it turns it into fresh site content."
               />
               <QuickWinLink
@@ -250,7 +271,7 @@ async function DashboardHome({
 
           {briefHeadline ? (
           <Link
-            href={dashboardHref("/dashboard/reports")}
+            href={dashboardHref("/dashboard/analytics")}
             className="group flex items-start justify-between gap-4 rounded-2xl border border-accent/25 bg-accent-dim/30 p-4 transition-colors hover:bg-accent-dim/45"
           >
             <div className="min-w-0">
@@ -325,6 +346,13 @@ async function DashboardHome({
                   </li>
                 ))}
               </ul>
+              <Link
+                href={dashboardHref("/dashboard/leads")}
+                className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:text-accent/80"
+              >
+                See everyone who reached out
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </Link>
             </section>
           ) : null}
 

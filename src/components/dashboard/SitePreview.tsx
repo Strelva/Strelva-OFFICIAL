@@ -677,7 +677,7 @@ export function SitePreview({
                 className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-on-accent transition-transform hover:scale-[1.03]"
               >
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
-                Ask AI to change this
+                Ask Strelva to change this
               </button>
             </div>
           </div>
@@ -709,7 +709,7 @@ export function SitePreview({
                 className="glass-menu-item"
               >
                 <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Ask AI to update
+                Ask Strelva to update
               </button>
               <button
                 onClick={handleViewSection}

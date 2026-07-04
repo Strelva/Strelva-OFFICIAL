@@ -518,7 +518,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
             <MessageCircle className="w-[18px] h-[18px] text-sage" strokeWidth={1.5} />
           </div>
           <p className="text-[12px] text-gray-fg mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
-          <p className="text-[11px] text-gray-muted mb-4">Ask AI to make changes</p>
+          <p className="text-[11px] text-gray-muted mb-4">Ask Strelva to make changes</p>
           <Button
             variant="secondary"
             size="sm"
@@ -529,7 +529,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
               );
             }}
           >
-            Ask AI
+            Ask Strelva
           </Button>
         </div>
       </div>
@@ -661,7 +661,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                   )
                 }
               >
-                Ask AI
+                Ask Strelva
               </Button>
             </div>
           </div>

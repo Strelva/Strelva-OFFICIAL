@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
@@ -30,6 +30,9 @@ interface WeeklyBriefClientProps {
   gaPerf?: GaPerf | null;
   /** Where the Search & Analytics panel's Connect Google CTA points. */
   analyticsConnectHref?: string;
+  /** Extra content rendered at the bottom of the report scroll (e.g. the site-health
+   *  section on the merged Analytics surface), so every number stays in one scroll. */
+  footerSlot?: ReactNode;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -178,7 +181,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
     analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
@@ -224,7 +227,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               </div>
               <h2 className="text-[14px] font-medium text-warm-black">Stay in control</h2>
               <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
-                When something needs your review, it opens in Needs You from Ask AI before it goes live.
+                When something needs your review, it opens in Needs You from Ask Strelva before it goes live.
               </p>
             </div>
           </div>
@@ -242,7 +245,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-5 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
             >
               <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
-              Ask AI for a small change
+              Ask Strelva for a small change
             </Link>
             <a
               href={dashboard?.siteUrl || dashboard?.dashboardHref("/dashboard/site") || "/dashboard/site"}
@@ -260,6 +263,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           <div className="mt-8">
             <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           </div>
+          {footerSlot && <div className="mt-8">{footerSlot}</div>}
         </div>
       </div>
     );
@@ -624,6 +628,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               </div>
             </div>
           )}
+
+          {footerSlot}
         </div>
       </div>
     </div>

@@ -136,7 +136,7 @@ export function ContentWorkspace({
   useEffect(() => {
     if (activeSection || pageSections.length === 0) return;
     // Prefer the first directly-editable section so a page never opens on a
-    // composite ("Page Header", "Call to Action") that only offers Ask AI.
+    // composite ("Page Header", "Call to Action") that only offers Ask Strelva.
     const firstEditable = pageSections.find((section) => !COMPOSITE_SECTIONS.has(section.value));
     setActiveSection((firstEditable ?? pageSections[0]).value);
   }, [activeSection, pageSections, setActiveSection]);
@@ -191,7 +191,7 @@ export function ContentWorkspace({
         <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
           {[
             { value: "properties", label: "Edit" },
-            { value: "chat", label: "Ask AI" },
+            { value: "chat", label: "Ask Strelva" },
           ].map((item) => {
             const active = item.value === "chat" ? inChat : !inChat && !inRequest;
             return (
@@ -355,7 +355,7 @@ export function ContentWorkspace({
               href={dashboardHref("/dashboard/chat")}
               className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
             >
-              Ask AI
+              Ask Strelva
             </Link>
             <Link
               href={dashboardHref("/dashboard")}

@@ -37,13 +37,10 @@ export type SurfaceState = "shown" | "connect" | "hidden";
 export type SurfaceId =
   | "today"
   | "ask-ai"
-  | "leads"
   | "website"
-  | "store"
   | "google-business"
   | "analytics"
-  | "reviews"
-  | "health";
+  | "reviews";
 
 export interface DashboardSurface {
   id: SurfaceId;
@@ -90,42 +87,68 @@ function hasReviewsSource(tenantConfig: SurfaceTenantConfig, connections: Connec
 }
 
 /**
+ * Does this tenant run a storefront? ORs a caller truth-signal (e.g. it has
+ * published products) with the config features flag, so Store shows for a real
+ * ecom tenant even when the features array isn't set on the record. Store is no
+ * longer a top-level tab — it's a sub-section inside Website (`getWebsiteSections`).
+ */
+export function tenantHasStore({
+  tenantConfig,
+  hasCommerce,
+}: {
+  tenantConfig: Pick<SurfaceTenantConfig, "features">;
+  hasCommerce?: boolean;
+}): boolean {
+  return (
+    hasCommerce === true ||
+    (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f))
+  );
+}
+
+/** One sub-tab inside the Website surface. */
+export interface WebsiteSection {
+  id: "site" | "store";
+  label: string;
+  href: string;
+}
+
+/**
+ * The sub-tabs shown INSIDE Website. Site is the spine; Store folds in as a
+ * sub-section only when the site has a store (Blog / Photos slot in here later,
+ * so the shape is a list, not a boolean). Fewer than two → the caller hides the
+ * strip entirely (nothing to switch between), so a plain site is unchanged.
+ */
+export function getWebsiteSections({ hasStore }: { hasStore: boolean }): WebsiteSection[] {
+  const sections: WebsiteSection[] = [
+    { id: "site", label: "Site", href: "/dashboard/site" },
+  ];
+  if (hasStore) sections.push({ id: "store", label: "Store", href: "/dashboard/store" });
+  return sections;
+}
+
+/**
  * Resolve the full ordered surface list for a tenant. Routes point at the
- * consolidated tabs (Website folds Site/Content/Assets, Analytics folds
- * Reports/Health) — Phase 2 builds those route contents out; Phase 1 ships the
- * structure + the conditional states.
+ * consolidated tabs (Website folds Site/Content/Assets/Store, Analytics folds
+ * Reports/Health). The seventh nav item — Settings — is the always-present gear
+ * in the identity footer, not part of this presence list.
  */
 export function getDashboardSurfaces({
   tenantConfig,
   connections,
-  hasCommerce: hasCommerceSignal,
 }: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
-  /** Truth signal from the caller (e.g. the tenant has published products).
-   *  ORed with the config features flag so Store shows for a real ecom tenant
-   *  even when the features array isn't set on the record. */
-  hasCommerce?: boolean;
 }): DashboardSurface[] {
   const presence = getPresenceProfile(tenantConfig);
   const local = presence === "local" || presence === "hybrid";
   const gbpConnected = isConnected(connections, "google");
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
-  const hasCommerce =
-    hasCommerceSignal === true ||
-    (tenantConfig.features ?? []).some((f) => COMMERCE_FEATURES.has(f));
 
   return [
-    { id: "today", label: "Dashboard", href: "/dashboard", state: "shown", group: "manage" },
-    { id: "ask-ai", label: "Ask AI", href: "/dashboard/chat", state: "shown", group: "manage" },
-    // The owner's inbox of people who reached out through the site's contact
-    // form. Always on — every business wants to see who's asking, and it's the
-    // full view behind Today's "Who reached out" preview.
-    { id: "leads", label: "Leads", href: "/dashboard/leads", state: "shown", group: "manage" },
+    { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+    { id: "ask-ai", label: "Ask Strelva", href: "/dashboard/chat", state: "shown", group: "manage" },
+    // Website is the spine — Site editor + Store/Blog/Photos as sub-tabs inside it.
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
-    // Store — the primary surface for a commerce tenant (orders, revenue,
-    // products). Hidden entirely for non-commerce sites.
-    { id: "store", label: "Store", href: "/dashboard/store", state: hasCommerce ? "shown" : "hidden", group: "presence" },
     {
       id: "google-business",
       label: "Google Business",
@@ -135,10 +158,12 @@ export function getDashboardSurfaces({
       state: !local ? "hidden" : gbpConnected ? "shown" : "connect",
       group: "presence",
     },
+    // Analytics — the merged Reports + Health surface: one verdict, then the full
+    // weekly report and the site-health detail in one scroll.
+    { id: "analytics", label: "Analytics", href: "/dashboard/analytics", state: "shown", group: "presence" },
     {
       id: "reviews",
       label: "Reviews",
-      // Sits right under Google Business (reviews come from the GBP listing).
       // Always the Reviews surface — its empty state pitches connecting Google,
       // so a "connect" tab lands on reviews (not the generic integrations list).
       href: "/dashboard/reviews",
@@ -146,12 +171,6 @@ export function getDashboardSurfaces({
       state: reviewsReady ? "shown" : local ? "connect" : "hidden",
       group: "presence",
     },
-    // Labeled "Reports" (not "Analytics") — for a non-technical owner the weekly
-    // report is the retention artifact; "Analytics" buried it behind data jargon.
-    { id: "analytics", label: "Reports", href: "/dashboard/reports", state: "shown", group: "presence" },
-    // Site health — the daily scan engine (speed, security, SEO, accessibility),
-    // the same checks behind the public audit. Always relevant: every site is scanned.
-    { id: "health", label: "Health", href: "/dashboard/health", state: "shown", group: "presence" },
   ];
 }
 
@@ -159,7 +178,6 @@ export function getDashboardSurfaces({
 export function getVisibleSurfaces(args: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
-  hasCommerce?: boolean;
 }): DashboardSurface[] {
   return getDashboardSurfaces(args).filter((s) => s.state !== "hidden");
 }
