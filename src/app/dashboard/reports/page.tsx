@@ -6,15 +6,17 @@ import { buildProofCards } from "@/lib/proof";
 import { detectTrafficAnomaly } from "@/lib/anomaly";
 import { getLatestSnapshots } from "@/lib/visibility/snapshots";
 import { buildCompetitorBenchmark } from "@/lib/competitor-benchmark";
+import { getSearchConsolePerf, getGa4Perf } from "@/lib/analytics";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
+import { withClientFallbackRoot } from "@/lib/client-fallback";
 
 export default async function ReportsPage() {
-  const { tenant } = await requireDashboardView();
+  const { tenant, clientFallbackRoot } = await requireDashboardView();
 
   // Degrade to the empty state on a transient backend error rather than
   // escalating a recoverable null into the full error boundary.
-  const [brief, history, dailyMetrics, activity, goal, snapshots, searchData] = await Promise.all([
+  const [brief, history, dailyMetrics, activity, goal, snapshots, searchData, searchPerf, gaPerf] = await Promise.all([
     getWeeklyBrief(tenant).catch(() => null),
     getWeeklyBriefs(tenant).catch(() => []),
     getDailyMetrics(tenant, 30).catch(() => []),
@@ -22,6 +24,10 @@ export default async function ReportsPage() {
     getGoal(tenant).catch(() => null),
     getLatestSnapshots(tenant, 1).catch(() => []),
     getSearchData(tenant).catch(() => null),
+    // Live Search Console + GA4 for THIS tenant. Fail-soft: these never throw and
+    // always return a status, so a bad read degrades to the panel's connect nudge.
+    getSearchConsolePerf(tenant).catch(() => null),
+    getGa4Perf(tenant).catch(() => null),
   ]);
 
   // Correlate AI changes with the traffic that followed → before/after proof.
@@ -43,6 +49,9 @@ export default async function ReportsPage() {
         anomaly={anomaly}
         benchmark={benchmark}
         searchData={searchData}
+        searchPerf={searchPerf}
+        gaPerf={gaPerf}
+        analyticsConnectHref={withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations")}
       />
     </>
   );

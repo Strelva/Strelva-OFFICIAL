@@ -11,6 +11,9 @@ import type { ActivityEntry } from "./storage";
 import { getLatestSnapshots, diffSnapshots } from "./visibility/snapshots";
 import type { VisibilityDiff } from "./visibility/snapshots";
 import { sanitizeEmailSubjectText } from "./invite-email";
+import { getSearchConsolePerf, getGa4Perf } from "./analytics";
+import type { SearchPerf, GaPerf } from "./analytics";
+import type { EmailRow } from "./email/layout";
 
 export interface ServiceClickData {
   serviceId: string;
@@ -41,7 +44,38 @@ export interface WeeklyReportData {
   failedVerifications: number;
   /** Plain-English visibility position changes, or empty string when no signal. */
   visibilityLines: string;
+  /**
+   * Compact Search Console + GA4 highlights as email label/value rows — only the
+   * surfaces whose live read came back "ok". Empty when nothing is connected
+   * (the common case), so the report simply omits the Search & Analytics block.
+   */
+  analyticsRows: EmailRow[];
   summary: string;
+}
+
+/**
+ * Build the client-facing "Search & Analytics" rows for the monthly report from
+ * the live Google reads. Plain owner language ("Found you on Google", not "GSC
+ * clicks"). Only includes a surface when its status is "ok"; returns [] when
+ * neither is connected so the caller omits the whole block.
+ */
+export function buildAnalyticsRows(search: SearchPerf, ga: GaPerf): EmailRow[] {
+  const rows: EmailRow[] = [];
+
+  if (search.status === "ok") {
+    rows.push({ label: "Found you on Google", value: `${search.clicks.toLocaleString()} clicks` });
+    rows.push({ label: "Shown on Google", value: `${search.impressions.toLocaleString()} times` });
+    const topQuery = search.topQueries[0];
+    if (topQuery) {
+      rows.push({ label: "Top search", value: `"${topQuery.query}"` });
+    }
+  }
+
+  if (ga.status === "ok") {
+    rows.push({ label: "Visitors", value: ga.users.toLocaleString() });
+  }
+
+  return rows;
 }
 
 // Sections that are operator/plumbing concepts, not something an owner would
@@ -394,7 +428,7 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics] =
+  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics, searchPerf, gaPerf] =
     await Promise.all([
       getClickCounts("page-view", tenantId),
       getClickCounts("booking-click", tenantId),
@@ -406,7 +440,13 @@ export async function generateWeeklyReport(
       getSearchData(tenantId),
       getEvents(tenantId, { limit: 200 }),
       getDailyMetrics(tenantId, 30),
+      // Live Search Console + GA4 for the report's Search & Analytics block.
+      // Fail-soft by contract (always returns a status, never throws).
+      getSearchConsolePerf(tenantId),
+      getGa4Perf(tenantId),
     ]);
+
+  const analyticsRows = buildAnalyticsRows(searchPerf, gaPerf);
 
   const staleSections = detectStaleSections(
     timestamps,
@@ -485,6 +525,7 @@ export async function generateWeeklyReport(
     verifiedChanges,
     failedVerifications,
     visibilityLines,
+    analyticsRows,
     summary,
   };
 }
