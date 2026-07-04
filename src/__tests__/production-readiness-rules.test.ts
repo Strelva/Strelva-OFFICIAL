@@ -312,16 +312,19 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(invite).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
     expect(invite).toContain("buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })");
     expect(invite).toContain("buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })");
+    // escapeHtml stays exported (weekly-report cron imports it); the two invite
+    // builders now render through the shared email design system, which
+    // auto-escapes the content they pass in. Dynamic values are still sanitized
+    // (markup + newlines stripped) via sanitizeEmailSubjectText before handoff.
     expect(inviteEmail).toContain("function escapeHtml");
     expect(inviteEmail).toContain("buildInviteEmailText");
-    expect(inviteEmail).toContain("safeSiteName");
-    expect(inviteEmail).toContain("safeSignUpUrl");
-    expect(inviteEmail).toContain("safeEmail");
-    expect(inviteEmail).toContain("Use <strong>${safeEmail}</strong>");
+    expect(inviteEmail).toContain("renderEmailHtml");
+    expect(inviteEmail).toContain("renderEmailText");
+    expect(inviteEmail).toContain("sanitizeEmailSubjectText(params.siteName)");
     expect(inviteEmail).toContain("replace(/<[^>]*>/g");
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
-    expect(inviteEmail).toContain("<strong>${safeSiteName}</strong>");
-    expect(inviteEmail).toContain('href="${safeSignUpUrl}"');
+    expect(inviteEmail).toContain('heading: "Your dashboard is ready"');
+    expect(inviteEmail).toContain('label: "Set up your login"');
     expect(adminPage).toContain("<InviteButton");
     expect(adminPage).toContain("ownerEmail={t.ownerEmail}");
     expect(inviteButton).toContain('fetch("/api/admin/invites"');

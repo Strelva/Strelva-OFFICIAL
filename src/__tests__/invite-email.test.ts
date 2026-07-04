@@ -36,7 +36,7 @@ describe("invite email rendering", () => {
 
     expect(text).toContain("Your dashboard is ready");
     expect(text).toContain("You now have access to manage Client Bcc: attacker@example.com.");
-    expect(text).toContain("Create your account: https://admin.example.com/sign-up");
+    expect(text).toContain("Set up your login: https://admin.example.com/sign-up");
     expect(text).toContain(
       "Use owner@example.com when signing up so your dashboard access connects automatically.",
     );

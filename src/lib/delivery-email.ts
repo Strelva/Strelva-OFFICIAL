@@ -3,6 +3,7 @@ import {
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
 import { emailSendingPaused } from "@/lib/email-enabled";
+import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/lib/email/layout";
 
 function cleanSubjectText(value: string): string {
   return value
@@ -12,21 +13,26 @@ function cleanSubjectText(value: string): string {
     .trim();
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
+function buildUpdateLiveEmailOptions(params: {
+  whatChanged: string;
+  siteUrl: string;
+  rollingOut?: boolean;
+}): EmailOptions {
+  const whatChanged = cleanSubjectText(params.whatChanged);
+  // When revalidation hasn't confirmed, soften the claim: don't promise it's
+  // visible "right now" if the client site may not have picked it up yet.
+  const heading = params.rollingOut ? "Your update is approved." : "Your update is live.";
+  const lead = params.rollingOut
+    ? `We just approved an update to ${whatChanged} on your site. It's rolling out now — it can take a few minutes to appear.`
+    : `We just updated ${whatChanged} on your site. It's published and live for visitors right now.`;
+  return {
+    heading,
+    paragraphs: [
+      lead,
+      "Want something else changed? Just reply or tell the assistant in your dashboard.",
+    ],
+    button: { label: "See it on your site", url: params.siteUrl },
+  };
 }
 
 function buildUpdateLiveEmailHtml(params: {
@@ -34,29 +40,7 @@ function buildUpdateLiveEmailHtml(params: {
   siteUrl: string;
   rollingOut?: boolean;
 }): string {
-  const whatChanged = escapeHtml(cleanSubjectText(params.whatChanged));
-  const siteUrl = escapeHtml(params.siteUrl);
-  // When revalidation hasn't confirmed, soften the claim: don't promise it's
-  // visible "right now" if the client site may not have picked it up yet.
-  const headline = params.rollingOut ? "Your update is approved." : "Your update is live.";
-  const lead = params.rollingOut
-    ? `We just approved an update to <strong>${whatChanged}</strong> on your site. It's rolling out now — it can take a few minutes to appear.`
-    : `We just updated <strong>${whatChanged}</strong> on your site. It's published and live for visitors right now.`;
-  return `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
-      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
-      <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">${headline}</h1>
-      <p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px;">
-        ${lead}
-      </p>
-      <a href="${siteUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
-        See it on your site
-      </a>
-      <p style="font-size: 14px; line-height: 1.6; color: #666; margin: 24px 0 0;">
-        Want something else changed? Just reply or tell the assistant in your dashboard.
-      </p>
-    </div>
-  `;
+  return renderEmailHtml(buildUpdateLiveEmailOptions(params));
 }
 
 function buildUpdateLiveEmailText(params: {
@@ -64,20 +48,7 @@ function buildUpdateLiveEmailText(params: {
   siteUrl: string;
   rollingOut?: boolean;
 }): string {
-  const whatChanged = cleanSubjectText(params.whatChanged);
-  const headline = params.rollingOut ? "Your update is approved." : "Your update is live.";
-  const lead = params.rollingOut
-    ? `We just approved an update to ${whatChanged} on your site. It's rolling out now — it can take a few minutes to appear.`
-    : `We just updated ${whatChanged} on your site. It's published and live for visitors right now.`;
-  return [
-    headline,
-    "",
-    lead,
-    "",
-    `See it on your site: ${params.siteUrl}`,
-    "",
-    "Want something else changed? Just reply or tell the assistant in your dashboard.",
-  ].join("\n");
+  return renderEmailText(buildUpdateLiveEmailOptions(params));
 }
 
 /**
@@ -140,33 +111,29 @@ export async function sendUpdateLiveEmail(params: {
   }
 }
 
+function buildNewLeadEmailOptions(params: {
+  name: string;
+  email?: string;
+  message?: string;
+  dashboardUrl: string;
+}): EmailOptions {
+  const rows = [{ label: "Name", value: cleanSubjectText(params.name) }];
+  if (params.email) rows.push({ label: "Email", value: cleanSubjectText(params.email) });
+  if (params.message) rows.push({ label: "Message", value: cleanSubjectText(params.message) });
+  return {
+    heading: "Someone reached out",
+    rows,
+    button: { label: "See it in your dashboard", url: params.dashboardUrl },
+  };
+}
+
 function buildNewLeadEmailHtml(params: {
   name: string;
   email?: string;
   message?: string;
   dashboardUrl: string;
 }): string {
-  const name = escapeHtml(cleanSubjectText(params.name));
-  const email = params.email ? escapeHtml(cleanSubjectText(params.email)) : "";
-  const message = params.message ? escapeHtml(cleanSubjectText(params.message)) : "";
-  const dashboardUrl = escapeHtml(params.dashboardUrl);
-  const contactLine = email
-    ? `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 8px;"><strong>${name}</strong> &lt;${email}&gt;</p>`
-    : `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 8px;"><strong>${name}</strong></p>`;
-  const messageBlock = message
-    ? `<p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px; padding: 14px 16px; background: #f5f4f2; border-radius: 8px;">${message}</p>`
-    : "";
-  return `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
-      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
-      <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Someone reached out through your website.</h1>
-      ${contactLine}
-      ${messageBlock}
-      <a href="${dashboardUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
-        See it in your dashboard
-      </a>
-    </div>
-  `;
+  return renderEmailHtml(buildNewLeadEmailOptions(params));
 }
 
 function buildNewLeadEmailText(params: {
@@ -175,17 +142,7 @@ function buildNewLeadEmailText(params: {
   message?: string;
   dashboardUrl: string;
 }): string {
-  const name = cleanSubjectText(params.name);
-  const email = params.email ? cleanSubjectText(params.email) : "";
-  const message = params.message ? cleanSubjectText(params.message) : "";
-  return [
-    "Someone reached out through your website.",
-    "",
-    email ? `${name} <${email}>` : name,
-    ...(message ? ["", message] : []),
-    "",
-    `See it in your dashboard: ${params.dashboardUrl}`,
-  ].join("\n");
+  return renderEmailText(buildNewLeadEmailOptions(params));
 }
 
 /**
@@ -282,43 +239,34 @@ function buildIntakeLeadRows(lead: IntakeLeadFields): Array<[string, string]> {
   ];
 }
 
+function buildNewIntakeLeadEmailOptions(params: {
+  lead: IntakeLeadFields;
+  leadsUrl: string;
+}): EmailOptions {
+  return {
+    heading: `New lead: ${cleanSubjectText(params.lead.businessName)}`,
+    paragraphs: ["A new lead just came in through the Strelva site."],
+    rows: buildIntakeLeadRows(params.lead).map(([label, value]) => ({
+      label,
+      value: cleanSubjectText(value),
+    })),
+    button: { label: "Open the leads board", url: params.leadsUrl },
+    footerNote: "Operator notification",
+  };
+}
+
 function buildNewIntakeLeadEmailHtml(params: {
   lead: IntakeLeadFields;
   leadsUrl: string;
 }): string {
-  const leadsUrl = escapeHtml(params.leadsUrl);
-  const rows = buildIntakeLeadRows(params.lead)
-    .map(
-      ([label, value]) =>
-        `<tr><td style="padding: 6px 12px 6px 0; color: #5b6f68; font-size: 13px; vertical-align: top; white-space: nowrap;">${escapeHtml(label)}</td><td style="padding: 6px 0; color: #151515; font-size: 15px; line-height: 1.5;">${escapeHtml(cleanSubjectText(value))}</td></tr>`,
-    )
-    .join("");
-  return `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
-      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
-      <h1 style="font-size: 26px; line-height: 1.15; margin: 0 0 18px;">New lead: ${escapeHtml(cleanSubjectText(params.lead.businessName))}</h1>
-      <table style="border-collapse: collapse; width: 100%; margin: 0 0 24px;">${rows}</table>
-      <a href="${leadsUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
-        Open the leads board
-      </a>
-    </div>
-  `;
+  return renderEmailHtml(buildNewIntakeLeadEmailOptions(params));
 }
 
 function buildNewIntakeLeadEmailText(params: {
   lead: IntakeLeadFields;
   leadsUrl: string;
 }): string {
-  const rows = buildIntakeLeadRows(params.lead).map(
-    ([label, value]) => `${label}: ${cleanSubjectText(value)}`,
-  );
-  return [
-    `New lead: ${cleanSubjectText(params.lead.businessName)}`,
-    "",
-    ...rows,
-    "",
-    `Open the leads board: ${params.leadsUrl}`,
-  ].join("\n");
+  return renderEmailText(buildNewIntakeLeadEmailOptions(params));
 }
 
 /**
