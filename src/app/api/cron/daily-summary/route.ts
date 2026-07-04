@@ -15,6 +15,7 @@ import { recordHeartbeat } from "@/lib/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { postSlack, readAndResetDailyCounts } from "@/lib/proof-signals";
+import { recordDailyEngagement } from "@/lib/churn";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -39,6 +40,10 @@ export async function GET() {
 
   await mapPool(active, 8, async (tenant) => {
     const { owner, jacob } = await readAndResetDailyCounts(tenant.id, day);
+    // Persist the owner engagement into the 7-day rolling churn store BEFORE the
+    // per-day counter expires — otherwise the best churn leading indicator is
+    // thrown away every night (it was only Slacked, never retained).
+    await recordDailyEngagement(tenant.id, owner, day);
     totalOwner += owner;
     totalJacob += jacob;
     // Only report tenants with any activity — a zero line per tenant
