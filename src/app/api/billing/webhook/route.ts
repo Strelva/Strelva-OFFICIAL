@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger";
 import { alert } from "@/lib/monitoring";
 import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositories";
 import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
+import { sendNewSignupEmail, sendPaymentFailedEmail } from "@/lib/delivery-email";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -114,6 +115,12 @@ async function markEventFailed(eventId: string, error: string): Promise<void> {
     // Don't let a Redis hiccup silently erase the payment-failure trail.
     logger.error("[billing/webhook] failed to record event failure", { eventId, err });
   }
+}
+
+/** Admin URL for a tenant, used in the operator notification emails. */
+function buildTenantAdminUrl(tenantId: string): string {
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com").replace(/\/$/, "");
+  return `${base}/admin/tenants/${tenantId}`;
 }
 
 function extractTenantId(object: unknown): string | null {
@@ -447,6 +454,24 @@ export async function POST(req: Request) {
             },
             event
           );
+          // Operator notification (Noah + Jacob) on the SIGNUP moment. Checkout
+          // completes once per subscription creation — renewals arrive as
+          // invoice.paid, NOT here — so this fires on the first activation only
+          // and never on a renewal. Best-effort: the sender fails soft, and this
+          // try/catch guarantees a send failure can't affect the 200 response.
+          if (tenantId) {
+            try {
+              const config = await getTenantConfig(tenantId).catch(() => null);
+              await sendNewSignupEmail({
+                businessName: config?.siteName || tenantId,
+                ownerEmail: config?.ownerEmail,
+                tenantUrl: buildTenantAdminUrl(tenantId),
+                logPrefix: "[billing webhook]",
+              });
+            } catch (err) {
+              console.error(`[billing webhook] new-signup operator email failed for ${tenantId}:`, err);
+            }
+          }
         } else if (session.mode === "payment") {
           // One-time charge, e.g. the Rohlax build payment. Do NOT flip
           // subscription status; record a build-payment trail. A mode:"setup"
@@ -493,6 +518,22 @@ export async function POST(req: Request) {
           tenantId: invoiceTenantId ?? "unknown",
           hint: "Check the Stripe dashboard.",
         });
+        // Operator notification (Noah + Jacob) — reuses the `existing` config
+        // already fetched above (no extra lookup). Best-effort: the sender fails
+        // soft, and this try/catch guarantees a send failure can't affect the
+        // 200 response or the past_due status logic.
+        if (invoiceTenantId) {
+          try {
+            await sendPaymentFailedEmail({
+              businessName: existing?.siteName || invoiceTenantId,
+              ownerEmail: existing?.ownerEmail,
+              tenantUrl: buildTenantAdminUrl(invoiceTenantId),
+              logPrefix: "[billing webhook]",
+            });
+          } catch (err) {
+            console.error(`[billing webhook] payment-failed operator email failed for ${invoiceTenantId}:`, err);
+          }
+        }
         break;
       }
 

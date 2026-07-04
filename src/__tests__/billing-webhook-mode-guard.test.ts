@@ -54,6 +54,13 @@ vi.mock("@/lib/monitoring", () => ({
   alert: (...args: unknown[]) => mockAlert(...args),
 }));
 
+const mockSendNewSignupEmail = vi.fn();
+const mockSendPaymentFailedEmail = vi.fn();
+vi.mock("@/lib/delivery-email", () => ({
+  sendNewSignupEmail: (...args: unknown[]) => mockSendNewSignupEmail(...args),
+  sendPaymentFailedEmail: (...args: unknown[]) => mockSendPaymentFailedEmail(...args),
+}));
+
 vi.mock("stripe", () => {
   class FakeStripe {
     webhooks = { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) };
@@ -77,6 +84,8 @@ beforeEach(() => {
   mockSubRetrieve.mockResolvedValue({ status: "active" });
   mockAddEvent.mockResolvedValue({ id: "evt_fake" });
   mockRedisSet.mockResolvedValue("OK");
+  mockSendNewSignupEmail.mockResolvedValue(true);
+  mockSendPaymentFailedEmail.mockResolvedValue(true);
   // Default: no Redis (matches non-prod idempotency short-circuit).
   redisHandle = null;
 });
@@ -468,6 +477,71 @@ describe("billing webhook checkout.session.completed mode guard", () => {
     expect(mockUpdateTenant).toHaveBeenCalledWith(
       "acme",
       expect.objectContaining({ subscriptionStatus: "active", stripeSubscriptionId: "sub_stored" }),
+    );
+  });
+
+  it("fires the operator new-signup email on a new subscription (checkout.session.completed)", async () => {
+    mockGetTenantConfig.mockResolvedValue({ siteName: "Acme Co", ownerEmail: "owner@acme.com" });
+    const res = await postEvent({
+      id: "evt_signup_email",
+      type: "checkout.session.completed",
+      created: 1_700_000_000,
+      data: {
+        object: {
+          id: "cs_signup",
+          mode: "subscription",
+          subscription: "sub_new",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(mockSendNewSignupEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendNewSignupEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessName: "Acme Co",
+        ownerEmail: "owner@acme.com",
+        tenantUrl: expect.stringContaining("/admin/tenants/acme"),
+      }),
+    );
+    // Renewal safety: nothing here should fire the payment-failed alert.
+    expect(mockSendPaymentFailedEmail).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire the signup email on a subscription renewal (invoice.paid)", async () => {
+    // Renewals arrive as invoice.paid, never checkout.session.completed — so the
+    // signup email must not fire here. This is the double-fire guard.
+    const res = await postEvent({
+      id: "evt_renewal",
+      type: "invoice.paid",
+      created: 1_700_700_000,
+      data: {
+        object: {
+          id: "in_renewal",
+          parent: { subscription_details: { subscription: "sub_new", metadata: { tenantId: "acme" } } },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(mockSendNewSignupEmail).not.toHaveBeenCalled();
+  });
+
+  it("fires the operator payment-failed email on invoice.payment_failed", async () => {
+    mockGetTenantConfig.mockResolvedValue({ siteName: "Acme Co", ownerEmail: "owner@acme.com" });
+    const res = await postEvent({
+      id: "evt_fail_email",
+      type: "invoice.payment_failed",
+      created: 1_700_800_000,
+      data: { object: { id: "in_fail_email", metadata: { tenantId: "acme" } } },
+    });
+    expect(res.status).toBe(200);
+    expect(mockSendPaymentFailedEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendPaymentFailedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessName: "Acme Co",
+        ownerEmail: "owner@acme.com",
+        tenantUrl: expect.stringContaining("/admin/tenants/acme"),
+      }),
     );
   });
 });

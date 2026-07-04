@@ -2,7 +2,7 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { emailSendingPaused, operatorEmailsEnabled } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/lib/email/layout";
 
 function cleanSubjectText(value: string): string {
@@ -274,16 +274,19 @@ function buildNewIntakeLeadEmailText(params: {
  * marketing lead lands, carrying every intake field plus a link to the admin
  * leads board. Slack-independent by design: this is the notification path that
  * must work with no env configured (recipients default to jacob@strelva.com).
- * Fails soft: returns false on any error (missing API key, Resend failure) so a
- * failed notification can never fail the intake response.
+ * This is an OPERATOR notification, so it gates on operatorEmailsEnabled() (ON
+ * by default) — NOT the client `emailSendingPaused()` switch — and keeps firing
+ * to the team while customer email stays paused. Fails soft: returns false on
+ * any error (missing API key, Resend failure) so a failed notification can
+ * never fail the intake response.
  */
 export async function sendNewIntakeLeadEmail(params: {
   lead: IntakeLeadFields;
   leadsUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`${params.logPrefix ?? "[email]"} sending paused (EMAIL_SENDING_ENABLED != true) — team lead notification skipped`);
+  if (!operatorEmailsEnabled()) {
+    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — team lead notification skipped`);
     return false;
   }
   if (!process.env.RESEND_API_KEY) return false;
@@ -306,6 +309,139 @@ export async function sendNewIntakeLeadEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-intake-lead email failed:`, err);
+    return false;
+  }
+}
+
+function buildNewSignupEmailOptions(params: {
+  businessName: string;
+  plan?: string;
+  ownerEmail?: string;
+  mrrDollars?: number;
+  tenantUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const rows = [{ label: "Client", value: business }];
+  if (params.plan) rows.push({ label: "Plan", value: cleanSubjectText(params.plan) });
+  if (params.ownerEmail) rows.push({ label: "Owner", value: cleanSubjectText(params.ownerEmail) });
+  if (typeof params.mrrDollars === "number") {
+    rows.push({
+      label: "MRR",
+      value: `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(params.mrrDollars)}/mo`,
+    });
+  }
+  return {
+    heading: "New paying signup 🎉",
+    paragraphs: [`${business} just started a paid subscription.`],
+    rows,
+    button: { label: "Open the tenant", url: params.tenantUrl },
+    footerNote: "Operator notification",
+  };
+}
+
+/**
+ * "New paying signup 🎉" — alerts the operators (Noah + Jacob) the moment a
+ * client starts a paid subscription, so a new paying customer is never a silent
+ * row in Stripe. OPERATOR notification: gates on operatorEmailsEnabled() (ON by
+ * default), independent of the client email pause. Recipients default to
+ * jacob@strelva.com via resolveLeadNotifyRecipients(). Fails soft: returns false
+ * on any error so a failed alert can never affect the billing webhook.
+ */
+export async function sendNewSignupEmail(params: {
+  businessName: string;
+  plan?: string;
+  ownerEmail?: string;
+  mrrDollars?: number;
+  tenantUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (!operatorEmailsEnabled()) {
+    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — new-signup notification skipped`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildNewSignupEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: resolveLeadNotifyRecipients(),
+      subject: `New paying signup: ${cleanSubjectText(params.businessName)}`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-signup email failed:`, err);
+    return false;
+  }
+}
+
+function buildPaymentFailedEmailOptions(params: {
+  businessName: string;
+  ownerEmail?: string;
+  tenantUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const rows = [{ label: "Client", value: business }];
+  if (params.ownerEmail) rows.push({ label: "Owner", value: cleanSubjectText(params.ownerEmail) });
+  return {
+    heading: `Payment failed: ${business}`,
+    paragraphs: [
+      `A subscription payment for ${business} failed. They're now past due — check the Stripe dashboard and follow up before access lapses.`,
+    ],
+    rows,
+    button: { label: "Open the tenant", url: params.tenantUrl },
+    footerNote: "Operator notification",
+  };
+}
+
+/**
+ * "Payment failed: {business}" — alerts the operators (Noah + Jacob) when a
+ * client's subscription payment fails, so a lapsing paying customer is never
+ * silent. OPERATOR notification: gates on operatorEmailsEnabled() (ON by
+ * default), independent of the client email pause. Recipients default to
+ * jacob@strelva.com via resolveLeadNotifyRecipients(). Fails soft: returns false
+ * on any error so a failed alert can never affect the billing webhook.
+ */
+export async function sendPaymentFailedEmail(params: {
+  businessName: string;
+  ownerEmail?: string;
+  tenantUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (!operatorEmailsEnabled()) {
+    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — payment-failed notification skipped`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildPaymentFailedEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: resolveLeadNotifyRecipients(),
+      subject: `Payment failed: ${cleanSubjectText(params.businessName)}`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Payment-failed email failed:`, err);
     return false;
   }
 }
