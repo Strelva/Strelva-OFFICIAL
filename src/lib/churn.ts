@@ -46,6 +46,16 @@ const INACTIVITY_DAYS = 21;
 const ENGAGEMENT_WINDOW_DAYS = 7;
 
 /**
+ * Minimum recorded days before "no AI use" can fire. Without this, the signal
+ * cold-starts wrong: right after the feature ships (or Redis is wiped) there is
+ * no engagement history yet, `engagement7d` reads 0, and every active client
+ * looks idle. We only claim "no AI use in 7 days" once the daily cron has
+ * actually recorded most of the window, so 0 means real inactivity, not "no
+ * data yet".
+ */
+const MIN_ENGAGEMENT_HISTORY_DAYS = 5;
+
+/**
  * Each daily count lives ~10 days — 3 days of slack past the 7-day window so a
  * late-running or re-run cron still finds every day it needs to sum.
  */
@@ -95,18 +105,38 @@ export async function recordDailyEngagement(
   }
 }
 
-/** Sum of the last 7 daily owner-engagement counts (0 if none / no Redis). */
-export async function getEngagement7d(tenantId: string): Promise<number> {
+/**
+ * Read the engagement window: the summed count AND how many days were actually
+ * recorded (a non-null key). `recordedDays` is what tells cold-start ("no data
+ * yet", key absent) apart from real inactivity ("recorded a 0 that day").
+ */
+async function readEngagementWindow(
+  tenantId: string
+): Promise<{ sum: number; recordedDays: number }> {
   const redis = getRedis();
-  if (!redis) return 0;
+  if (!redis) return { sum: 0, recordedDays: 0 };
 
   try {
-    const values = await redis.mget<Array<number | null>>(...recentDayKeys(tenantId, ENGAGEMENT_WINDOW_DAYS));
-    return values.reduce<number>((sum, v) => sum + Number(v || 0), 0);
+    const values = await redis.mget<Array<number | null>>(
+      ...recentDayKeys(tenantId, ENGAGEMENT_WINDOW_DAYS)
+    );
+    let sum = 0;
+    let recordedDays = 0;
+    for (const v of values) {
+      if (v === null || v === undefined) continue;
+      recordedDays += 1;
+      sum += Number(v) || 0;
+    }
+    return { sum, recordedDays };
   } catch (err) {
-    console.warn("[churn] getEngagement7d failed:", err instanceof Error ? err.message : err);
-    return 0;
+    console.warn("[churn] readEngagementWindow failed:", err instanceof Error ? err.message : err);
+    return { sum: 0, recordedDays: 0 };
   }
+}
+
+/** Sum of the last 7 daily owner-engagement counts (0 if none / no Redis). */
+export async function getEngagement7d(tenantId: string): Promise<number> {
+  return (await readEngagementWindow(tenantId)).sum;
 }
 
 function daysSince(iso: string | null | undefined): number | null {
@@ -117,14 +147,15 @@ function daysSince(iso: string | null | undefined): number | null {
 }
 
 async function computeAtRisk(tenant: TenantConfig): Promise<AtRiskSignal> {
-  const [engagement7d, activity, subscriptionStatus] = await Promise.all([
-    getEngagement7d(tenant.id),
+  const [engagementWindow, activity, subscriptionStatus] = await Promise.all([
+    readEngagementWindow(tenant.id),
     // Newest-first — activity[0] is the last activity, same signal the portfolio
     // snapshot / attention panel use for "last activity".
     getActivity(tenant.id).catch(() => []),
     getEffectiveSubscriptionStatus(tenant.id).catch(() => tenant.subscriptionStatus ?? null),
   ]);
 
+  const engagement7d = engagementWindow.sum;
   const daysSinceActivity = daysSince(activity[0]?.time);
   const reasons: string[] = [];
 
@@ -132,8 +163,11 @@ async function computeAtRisk(tenant: TenantConfig): Promise<AtRiskSignal> {
     reasons.push(`No owner activity in ${daysSinceActivity} days`);
   }
 
+  // Only flag "no AI use" once we have enough recorded history for 0 to mean
+  // real inactivity rather than a cold start (see MIN_ENGAGEMENT_HISTORY_DAYS).
   if (
     engagement7d === 0 &&
+    engagementWindow.recordedDays >= MIN_ENGAGEMENT_HISTORY_DAYS &&
     isActiveTenant(tenant) &&
     subscriptionStatus !== null &&
     SUBSCRIBED_STATES.has(subscriptionStatus)
