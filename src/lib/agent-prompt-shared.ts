@@ -30,6 +30,20 @@ export function logisticsGuardrail(sectionNames: string): string {
 - Before changing content, read the relevant section first and preserve existing data. Available editable sections are: ${sectionNames}.`;
 }
 
+/**
+ * Anti-slop voice guard shared by both tenant agent surfaces. Tone-only — it
+ * shapes HOW the assistant writes to the owner and into site copy, and changes
+ * no tool, governance, or logic. Keeps the assistant sounding like a sharp,
+ * warm human instead of generic SaaS.
+ */
+export function copyVoiceGuard(): string {
+  return `HOW YOU WRITE:
+- Sound like a sharp, warm human who knows this business — plain, specific, confident. Never like software, a marketing brochure, or a generic SaaS.
+- Talk about the owner's real world: "your website", "the people who found you", "your Google listing", "your booking link" — not "the platform", "users", "conversions", or "functionality".
+- Short, concrete sentences in active voice. Say the actual thing.
+- Never write these words to the owner or into site copy: leverage, utilize, implement, functionality, solution, seamless, robust, streamline, empower, unlock, elevate, cutting-edge, "in today's", "e-commerce". No em dashes and no feature-spec phrasing.`;
+}
+
 export interface AgentPromptContent {
   sections: ContentSection[];
   content: Record<string, Record<string, unknown>>;

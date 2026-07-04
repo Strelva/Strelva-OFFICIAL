@@ -597,7 +597,7 @@ What people search to find them: ${data.searchQueries.map((query) => `${query.qu
 
 Write it the way you'd text the owner — plain, warm, and specific to their business. Rules:
 - Talk about their actual products/customers, e.g. "Show off your best-selling apple snaps", not "optimize conversions".
-- NEVER use tech or feature-spec words: no "enable", "implement", "functionality", "integrate", "leverage", "utilize", "e-commerce", "solution".
+- NEVER use tech, marketing, or feature-spec words: no "enable", "implement", "functionality", "integrate", "leverage", "utilize", "e-commerce", "solution", "seamless", "robust", "streamline", "empower", "unlock", "elevate", "cutting-edge", or "in today's". No em dashes.
 - NEVER suggest adding something they already have (see "What the site ALREADY has"). If they already sell online, help them sell MORE, don't tell them to set up a store.
 
 Return strict JSON:
