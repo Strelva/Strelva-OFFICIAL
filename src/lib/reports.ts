@@ -398,6 +398,7 @@ Rules:
 - If sections are stale, suggest updating one specific section with a concrete idea
 - If a "what we did on the site" line is provided, include it as-is — it's honest proof of work in the owner's own terms
 - No filler or vague reassurance ("working behind the scenes", "building your presence"). Every sentence must say something concrete.
+- Never use these words: leverage, utilize, implement, functionality, solution, seamless, robust, streamline, empower, unlock, elevate, cutting-edge, "in today's", "e-commerce". No em dashes and no feature-spec phrasing. Say the actual thing in plain words.
 - If visibility changes are listed, include them as-is — these are position moves in Google or AI, use the exact phrasing provided
 - If a traffic trend is listed, include it — it explains a meaningful rise or drop in visits and the next move; use the exact phrasing provided
 - Use "you" not "your site" — make it personal

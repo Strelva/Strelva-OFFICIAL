@@ -22,6 +22,7 @@ import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilitie
 import {
   logisticsGuardrail,
   loadAgentPromptContent,
+  copyVoiceGuard,
   aboutBlock,
   heroBlock,
   storyBlock,
@@ -257,6 +258,8 @@ Available sections: ${sectionNames}.`;
 
   const personalityDesc = sanitizePromptValue(tenantCfg?.personality) || "conversational, warm, and helpful";
   prompt += `\n\nBe ${personalityDesc} — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.`;
+
+  prompt += `\n\n${copyVoiceGuard()}`;
 
   if (tenantCfg?.businessRules) {
     prompt += `\n\nBUSINESS RULES (always follow these):\n${tenantCfg.businessRules}`;

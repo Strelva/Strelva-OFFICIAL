@@ -85,6 +85,7 @@ vi.mock("@/lib/agent-prompt-shared", () => ({
       ownerName: "Jacob",
     }),
   logisticsGuardrail: () => "",
+  copyVoiceGuard: () => "",
   aboutBlock: () => "ABOUT",
   heroBlock: () => null,
   storyBlock: () => null,

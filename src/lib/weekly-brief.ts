@@ -316,6 +316,9 @@ Rules:
 - 1 short paragraph, 2 sentences max
 - Lead with value proof, using "people found you" if page views are available
 - Mention one concrete thing the AI handled or recommends
+- Write like a sharp, warm human texting the owner an update — plain, specific, confident. Never like software or a marketing email.
+- Talk about their real world: "your website", "the people who found you", "your booking link" — not "users", "conversions", "traffic", or "functionality"
+- Never use these words: leverage, utilize, implement, functionality, solution, seamless, robust, streamline, empower, unlock, elevate, cutting-edge, "in today's", "e-commerce". No em dashes.
 - No greeting, no markdown, no sign-off`,
     });
     return text.trim();
