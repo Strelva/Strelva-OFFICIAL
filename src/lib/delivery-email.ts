@@ -3,7 +3,7 @@ import {
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
 import { emailSendingPaused, operatorEmailsEnabled } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/lib/email/layout";
 
 function cleanSubjectText(value: string): string {
   return value
@@ -672,6 +672,94 @@ export async function sendDeliveryStatusEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Delivery status email failed:`, err);
+    return false;
+  }
+}
+
+/** One at-risk client line in the ops digest: business name + its top reason. */
+export interface OpsDigestAtRisk {
+  name: string;
+  reason: string;
+}
+
+function buildOpsDigestEmailOptions(params: {
+  totalLeads: number;
+  unworkedLeads: number;
+  atRisk: OpsDigestAtRisk[];
+  recentSignups: string[];
+  opsUrl: string;
+}): EmailOptions {
+  const plural = (n: number) => (n === 1 ? "" : "s");
+  const rows: EmailRow[] = [
+    { label: "Unworked leads", value: `${params.unworkedLeads} of ${params.totalLeads}` },
+    { label: "At-risk clients", value: String(params.atRisk.length) },
+  ];
+  // One row per at-risk client (name → top reason), capped so a bad day can't
+  // blow the email up.
+  for (const client of params.atRisk.slice(0, 12)) {
+    rows.push({ label: cleanSubjectText(client.name), value: cleanSubjectText(client.reason) });
+  }
+  rows.push({
+    label: "New signups (7d)",
+    value: params.recentSignups.length
+      ? params.recentSignups.map((n) => cleanSubjectText(n)).join(", ")
+      : "None",
+  });
+  const summary =
+    `${params.unworkedLeads} unworked lead${plural(params.unworkedLeads)} of ${params.totalLeads} total · ` +
+    `${params.atRisk.length} client${plural(params.atRisk.length)} at risk · ` +
+    `${params.recentSignups.length} new signup${plural(params.recentSignups.length)} this week.`;
+  return {
+    heading: "Strelva daily ops",
+    paragraphs: [summary],
+    rows,
+    button: { label: "Open the ops board", url: params.opsUrl },
+    footerNote: "Operator notification",
+  };
+}
+
+/**
+ * "Strelva daily ops" — one digest a day summarizing the portfolio for the
+ * operators (Noah + Jacob): unworked leads, at-risk clients (with the top
+ * reason), and recent signups. OPERATOR notification: gates on
+ * operatorEmailsEnabled() (ON by default), independent of the client email
+ * pause. Recipients default to jacob@strelva.com via resolveLeadNotifyRecipients().
+ * Fails soft: returns false on any error so a failed digest can never affect the
+ * cron's 200.
+ */
+export async function sendOpsDigestEmail(params: {
+  totalLeads: number;
+  unworkedLeads: number;
+  atRisk: OpsDigestAtRisk[];
+  recentSignups: string[];
+  opsUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (!operatorEmailsEnabled()) {
+    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — ops digest skipped`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildOpsDigestEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: resolveLeadNotifyRecipients(),
+      subject: "Strelva daily ops",
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Ops-digest email failed:`, err);
     return false;
   }
 }

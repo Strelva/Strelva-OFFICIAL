@@ -16,6 +16,7 @@ import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
+import { sendWelcomeEmail } from "@/lib/delivery-email";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -124,6 +125,23 @@ export async function POST(req: Request) {
       { error: "Invite could not be stored. No email was sent." },
       { status: 500 }
     );
+  }
+
+  // A brand-new OWNER is being granted dashboard access here (the existing-user
+  // branch above returned already, so this only runs for a not-yet-registered
+  // owner — never a re-invite/re-assign, which is why we don't double-send). The
+  // welcome sets the "we manage, you ask, you get a monthly report" expectation.
+  // Best-effort and gated on the client emailSendingPaused() switch inside the
+  // sender, so it stays silent during the test-tenant phase and can never block
+  // the invite.
+  if (role === "owner") {
+    await sendWelcomeEmail({
+      email,
+      businessName: tenantConfig.siteName,
+      ownerName: tenantConfig.ownerName?.trim() || undefined,
+      dashboardUrl: getTenantDashboardUrl(tenantConfig, "/dashboard", "production"),
+      logPrefix: "[invite]",
+    }).catch(() => false);
   }
 
   const signUpUrl = getInviteSignUpUrl(
