@@ -22,8 +22,7 @@ import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { getRedis } from "./redis";
 import { GBP_WRITE_SCOPE, connectionHasWriteScope } from "./gbp-replies";
-
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+import { refreshAccessToken } from "./google-token";
 
 // ─── GBP API base URLs ────────────────────────────────────────────────────────
 
@@ -101,33 +100,7 @@ export interface GbpManagementResult {
   evidence: string;
 }
 
-// ─── Token helpers (mirrors gbp-replies.ts) ───────────────────────────────────
-
-async function refreshAccessToken(
-  refreshToken: string
-): Promise<string | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  try {
-    const res = await fetch(GOOGLE_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.access_token as string;
-  } catch {
-    return null;
-  }
-}
+// ─── Token helpers (refreshAccessToken shared via google-token.ts) ────────────
 
 async function getValidToken(tenantId: string): Promise<string | null> {
   const connection = await getConnection(tenantId, "google");

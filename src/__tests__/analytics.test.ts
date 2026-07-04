@@ -4,6 +4,8 @@ const mockGetRedis = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetCredential = vi.hoisted(() => vi.fn());
 const mockGetAccessToken = vi.hoisted(() => vi.fn());
+const mockGetGoogleScopeGrants = vi.hoisted(() => vi.fn());
+const mockGetGoogleAccessToken = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({
@@ -12,6 +14,10 @@ vi.mock("@/lib/tenants", () => ({
 vi.mock("@/lib/search-console", () => ({
   getServiceAccountCredential: (...a: unknown[]) => mockGetCredential(...a),
   getAccessToken: (...a: unknown[]) => mockGetAccessToken(...a),
+}));
+vi.mock("@/lib/google-token", () => ({
+  getGoogleScopeGrants: (...a: unknown[]) => mockGetGoogleScopeGrants(...a),
+  getGoogleAccessToken: (...a: unknown[]) => mockGetGoogleAccessToken(...a),
 }));
 
 import {
@@ -42,6 +48,13 @@ beforeEach(() => {
   mockGetTenantConfig.mockResolvedValue({ id: "gldf", siteUrl: "https://www.gldf.com" });
   mockGetCredential.mockReturnValue(CRED);
   mockGetAccessToken.mockResolvedValue("token-123");
+  // Default: no tenant OAuth connection → every read uses the service account.
+  mockGetGoogleScopeGrants.mockResolvedValue({
+    connected: false,
+    hasGscScope: false,
+    hasGa4Scope: false,
+  });
+  mockGetGoogleAccessToken.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -221,5 +234,105 @@ describe("getGa4Perf", () => {
     expect(perf.status).toBe("unavailable");
     expect(perf.users).toBe(0);
     expect(perf.topPages).toEqual([]);
+  });
+});
+
+describe("OAuth-first token selection", () => {
+  // The file-level beforeEach uses restoreAllMocks (implementations) but not
+  // clearAllMocks (call history), so reset call counts here for the
+  // toHaveBeenCalled / not.toHaveBeenCalled assertions below.
+  beforeEach(() => {
+    mockGetCredential.mockClear();
+    mockGetAccessToken.mockClear();
+    mockGetGoogleAccessToken.mockClear();
+    mockGetGoogleScopeGrants.mockClear();
+  });
+
+  /** Capture the Authorization header the fetch was called with. */
+  function stubFetch(json: unknown) {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => json }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+  const authOf = (fetchMock: ReturnType<typeof vi.fn>) =>
+    (fetchMock.mock.calls[0][1] as { headers: Record<string, string> }).headers
+      .Authorization;
+
+  it("GSC: uses the tenant OAuth token when the GSC scope was granted", async () => {
+    mockGetGoogleScopeGrants.mockResolvedValue({
+      connected: true,
+      hasGscScope: true,
+      hasGa4Scope: false,
+    });
+    mockGetGoogleAccessToken.mockResolvedValue("oauth-gsc-token");
+    const fetchMock = stubFetch({ rows: [] });
+
+    const perf = await getSearchConsolePerf("gldf");
+
+    expect(perf.status).toBe("ok");
+    expect(authOf(fetchMock)).toBe("Bearer oauth-gsc-token");
+    // OAuth satisfied the read — the service account was never consulted.
+    expect(mockGetCredential).not.toHaveBeenCalled();
+  });
+
+  it("GSC: falls back to the service account when the tenant has no connection", async () => {
+    // Default beforeEach grants are all false (no connection).
+    const fetchMock = stubFetch({ rows: [] });
+
+    const perf = await getSearchConsolePerf("gldf");
+
+    expect(perf.status).toBe("ok");
+    expect(authOf(fetchMock)).toBe("Bearer token-123");
+    expect(mockGetGoogleAccessToken).not.toHaveBeenCalled();
+    expect(mockGetCredential).toHaveBeenCalled();
+  });
+
+  it("GSC: falls back to the service account when connected but scope not granted (pre-scope connection)", async () => {
+    mockGetGoogleScopeGrants.mockResolvedValue({
+      connected: true,
+      hasGscScope: false, // connected before GSC scope was added, hasn't reconnected
+      hasGa4Scope: false,
+    });
+    const fetchMock = stubFetch({ rows: [] });
+
+    const perf = await getSearchConsolePerf("gldf");
+
+    expect(perf.status).toBe("ok");
+    expect(authOf(fetchMock)).toBe("Bearer token-123");
+    expect(mockGetGoogleAccessToken).not.toHaveBeenCalled();
+  });
+
+  it("GSC: unavailable when OAuth refresh fails and there is no service account", async () => {
+    mockGetGoogleScopeGrants.mockResolvedValue({
+      connected: true,
+      hasGscScope: true,
+      hasGa4Scope: false,
+    });
+    mockGetGoogleAccessToken.mockResolvedValue(null); // refresh failed
+    mockGetCredential.mockReturnValue(null); // no service-account access either
+
+    const perf = await getSearchConsolePerf("gldf");
+
+    expect(perf.status).toBe("unavailable");
+  });
+
+  it("GA4: uses the tenant OAuth token when the GA4 scope was granted", async () => {
+    const redis = fakeRedis();
+    mockGetRedis.mockReturnValue(redis);
+    await setAnalyticsConfig("gldf", { ga4PropertyId: "123456789" });
+
+    mockGetGoogleScopeGrants.mockResolvedValue({
+      connected: true,
+      hasGscScope: false,
+      hasGa4Scope: true,
+    });
+    mockGetGoogleAccessToken.mockResolvedValue("oauth-ga4-token");
+    const fetchMock = stubFetch({ reports: [] });
+
+    const perf = await getGa4Perf("gldf");
+
+    expect(perf.status).toBe("ok");
+    expect(authOf(fetchMock)).toBe("Bearer oauth-ga4-token");
+    expect(mockGetCredential).not.toHaveBeenCalled();
   });
 });
