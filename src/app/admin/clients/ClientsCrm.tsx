@@ -10,6 +10,12 @@ interface ClientRow {
   ownerEmail: string | null;
   ownerName: string | null;
   active: boolean;
+  /** ISO of the owner's last activity (activity[0]?.time), or null. */
+  lastActivity: string | null;
+  /** Effective subscription status (founder-comp aware), or null. */
+  subscriptionStatus: string | null;
+  /** Top at-risk reason from getAtRiskTenants, or null if not at risk. */
+  atRiskReason: string | null;
 }
 
 const STAGES: { value: CrmStage; label: string; dot: string }[] = [
@@ -79,6 +85,19 @@ function formatUpdated(iso: string | null): string {
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 30) return `${diffDay}d ago`;
   return d.toLocaleDateString();
+}
+
+// Static Tailwind classes per subscription status (dynamic names don't survive
+// the build-time scan). Only healthy/known states get a chip.
+const SUBSCRIPTION_CHIP: Record<string, string> = {
+  active: "bg-emerald-500/15 text-emerald-300",
+  trialing: "bg-sky-500/15 text-sky-300",
+  past_due: "bg-rose-500/15 text-rose-300",
+  cancelled: "bg-gray-faint/15 text-gray-faint",
+};
+
+function subscriptionLabel(status: string): string {
+  return status === "past_due" ? "past due" : status;
 }
 
 export function ClientsCrm({
@@ -372,6 +391,35 @@ export function ClientsCrm({
                         <span className="text-gray-faint">no contact on file</span>
                       )}
                     </p>
+
+                    {/* Health + recency signals */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                      <span className="text-gray-faint">
+                        {c.lastActivity
+                          ? `active ${formatUpdated(c.lastActivity)}`
+                          : "no activity"}
+                      </span>
+                      {c.subscriptionStatus &&
+                        SUBSCRIPTION_CHIP[c.subscriptionStatus] && (
+                          <span
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 ${SUBSCRIPTION_CHIP[c.subscriptionStatus]}`}
+                          >
+                            {subscriptionLabel(c.subscriptionStatus)}
+                          </span>
+                        )}
+                      {c.atRiskReason && (
+                        <span
+                          className="inline-flex items-center gap-1 text-rose-300"
+                          title={c.atRiskReason}
+                        >
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-red-400"
+                            aria-hidden
+                          />
+                          {c.atRiskReason}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Tags */}
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
