@@ -26,6 +26,7 @@ import { ScanAllButton } from "./ScanAllButton";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { buildRevenueSummary } from "@/lib/revenue";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
+import { getAllLeadWorkflow } from "@/lib/lead-workflow";
 import { listPendingDigests } from "@/lib/maintenance-digest";
 import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
 import type { DeliveryLead } from "@/lib/access-request-delivery";
@@ -154,7 +155,18 @@ export default async function AdminPage() {
     getAtRiskTenants().catch((): AtRiskSignal[] => []),
   ]);
 
-  const unworkedLeads = deliveryLeads.filter((l) => l.deliveryStatus === "received");
+  // "Unworked" = still at the received delivery status AND the operator hasn't
+  // worked it yet (workflow status still "new"). Once the operator marks it
+  // contacted / converted / dismissed on the Leads console, it drops out of the
+  // count — the number now reflects real waiting work.
+  const leadWorkflow = await getAllLeadWorkflow(deliveryLeads.map((l) => l.statusToken)).catch(
+    () => ({} as Record<string, { status: string }>),
+  );
+  const unworkedLeads = deliveryLeads.filter(
+    (l) =>
+      l.deliveryStatus === "received" &&
+      (leadWorkflow[l.statusToken]?.status ?? "new") === "new",
+  );
   const todayLeads = {
     total: deliveryLeads.length,
     unworked: unworkedLeads.length,

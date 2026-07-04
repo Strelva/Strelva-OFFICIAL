@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface ProvisionStep {
   key: string;
@@ -41,7 +42,21 @@ const STATUS_MARK: Record<ProvisionStep["status"], string> = {
 };
 
 export default function OnboardPage() {
-  const [form, setForm] = useState(blank);
+  return (
+    <Suspense fallback={null}>
+      <OnboardForm />
+    </Suspense>
+  );
+}
+
+function OnboardForm() {
+  // Optional prefill when handed off from the Leads console "Convert" action.
+  const searchParams = useSearchParams();
+  const [form, setForm] = useState(() => ({
+    ...blank,
+    siteName: searchParams.get("siteName") ?? "",
+    ownerEmail: searchParams.get("ownerEmail") ?? "",
+  }));
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionResult | null>(null);
