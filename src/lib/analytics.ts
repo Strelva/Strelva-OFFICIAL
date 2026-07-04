@@ -11,19 +11,28 @@
  *       - "unavailable" on any auth/API failure (zeroed fields),
  *       - "ok" otherwise.
  *
- * Credential + JWT signing are reused from `search-console.ts`
- * (getServiceAccountCredential + getAccessToken) so GSC and GA4 share one
- * service-account credential and one RS256 signer — no duplication here.
+ * Auth is OAuth-first, service-account-fallback. Each read tries the tenant's
+ * own Google connection (the "Connect Google" button) when they granted the
+ * matching read scope — the token is minted from that connection's refresh
+ * grant. If the tenant has no connection, didn't grant the scope (e.g. connected
+ * before the scope was added and hasn't reconnected), or the refresh fails, the
+ * read falls back to the shared Strelva reporting service account. When neither
+ * path yields a token the read returns "unavailable" — it never throws.
  *
- * NOTE: real data requires the Strelva reporting service account
- * (strelva-reporting@strelva.iam.gserviceaccount.com) to be added as a user on
- * each client's GSC property AND GA4 property. Until that onboarding step is
- * done, reads return "unavailable" (the code path is live; the grant is not).
+ * Credential + JWT signing for the service-account path are reused from
+ * `search-console.ts` (getServiceAccountCredential + getAccessToken) so GSC and
+ * GA4 share one service-account credential and one RS256 signer.
+ *
+ * NOTE: the service-account fallback requires the Strelva reporting service
+ * account (strelva-reporting@strelva.iam.gserviceaccount.com) to be added as a
+ * user on each client's GSC + GA4 property. The OAuth path needs no such grant —
+ * it reads as the client themselves.
  */
 
 import { getRedis } from "./redis";
 import { getTenantConfig } from "./tenants";
 import { getAccessToken, getServiceAccountCredential } from "./search-console";
+import { getGoogleAccessToken, getGoogleScopeGrants } from "./google-token";
 
 /** GA4 Data API read scope for the shared JWT signer. */
 const SCOPE_ANALYTICS = "https://www.googleapis.com/auth/analytics.readonly";
@@ -166,16 +175,39 @@ interface GscRow {
   position: number;
 }
 
+/**
+ * Resolve a bearer token for a Google read surface: the tenant's own OAuth
+ * token when they granted the matching scope, else the shared service account.
+ * Returns null when neither is available (caller → "unavailable"). Only the
+ * service-account exchange can throw; that propagates to the caller's catch.
+ */
+async function resolveGoogleToken(
+  tenantId: string,
+  surface: "gsc" | "ga4"
+): Promise<string | null> {
+  const grants = await getGoogleScopeGrants(tenantId);
+  const granted = surface === "gsc" ? grants.hasGscScope : grants.hasGa4Scope;
+  if (granted) {
+    const oauthToken = await getGoogleAccessToken(tenantId);
+    if (oauthToken) return oauthToken;
+  }
+
+  const tenant = await getTenantConfig(tenantId).catch(() => undefined);
+  const cred = getServiceAccountCredential(tenant);
+  if (!cred) return null;
+  return surface === "gsc"
+    ? getAccessToken(cred)
+    : getAccessToken(cred, SCOPE_ANALYTICS);
+}
+
 export async function getSearchConsolePerf(tenantId: string, days = 28): Promise<SearchPerf> {
   const cfg = await getAnalyticsConfig(tenantId);
   if (!cfg.gscProperty) return { status: "unconfigured", ...EMPTY_SEARCH };
 
   try {
-    const tenant = await getTenantConfig(tenantId).catch(() => undefined);
-    const cred = getServiceAccountCredential(tenant);
-    if (!cred) return { status: "unavailable", ...EMPTY_SEARCH };
+    const token = await resolveGoogleToken(tenantId, "gsc");
+    if (!token) return { status: "unavailable", ...EMPTY_SEARCH };
 
-    const token = await getAccessToken(cred);
     const { startDate, endDate } = dateRange(days);
     const res = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
@@ -217,11 +249,9 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
   if (!cfg.ga4PropertyId) return { status: "unconfigured", ...EMPTY_GA };
 
   try {
-    const tenant = await getTenantConfig(tenantId).catch(() => undefined);
-    const cred = getServiceAccountCredential(tenant);
-    if (!cred) return { status: "unavailable", ...EMPTY_GA };
+    const token = await resolveGoogleToken(tenantId, "ga4");
+    if (!token) return { status: "unavailable", ...EMPTY_GA };
 
-    const token = await getAccessToken(cred, SCOPE_ANALYTICS);
     const { startDate, endDate } = dateRange(days);
     const property = cfg.ga4PropertyId.startsWith("properties/")
       ? cfg.ga4PropertyId

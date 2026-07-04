@@ -14,7 +14,18 @@ import { createOAuthState } from "@/lib/oauth-state";
 import { requireActiveSubscription } from "@/lib/subscription";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const SCOPES = ["https://www.googleapis.com/auth/business.manage"];
+// One consent grants everything the dashboard reads/writes for a tenant:
+//  - business.manage      → GBP write-side (hours, posts, review replies)
+//  - webmasters.readonly  → Search Console performance reads
+//  - analytics.readonly   → GA4 (Analytics Data API) reads
+// NOTE: these scopes must ALSO be registered on the OAuth consent screen in the
+// Google Cloud console (operator step) — Google rejects the consent redirect
+// for any scope not listed there.
+const SCOPES = [
+  "https://www.googleapis.com/auth/business.manage",
+  "https://www.googleapis.com/auth/webmasters.readonly",
+  "https://www.googleapis.com/auth/analytics.readonly",
+];
 
 export async function GET() {
   const authed = await verifyAuth();

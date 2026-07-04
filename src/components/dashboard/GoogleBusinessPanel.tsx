@@ -38,8 +38,9 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           Connect your Google listing
         </h1>
         <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-gray-muted">
-          Your Google Business Profile is how most local customers find you. Connect it and
-          Strelva keeps it in sync with your site — hours, posts, and reviews, all approved by you.
+          Connecting Google links your Business Profile, Search Console, and Analytics in one step.
+          Strelva keeps your listing in sync with your site — hours, posts, and reviews, all approved
+          by you — and shows how customers actually find you in your weekly report.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
