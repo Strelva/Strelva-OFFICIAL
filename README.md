@@ -67,9 +67,17 @@ target an arbitrary endpoint or mutate state on its own.
 - **Guided onboarding** — provisions a tenant end to end (record + revalidation secret +
   seeded content + owner invite + Vercel project/env/domain) and hands back the client-repo
   env to paste; the site stays a hand-built repo.
-- **Operator screens** — ops board (with live platform-dependency health), pay-links (mint +
-  revoke, with paid tracking), tenant detail (live pulse + activity + edit + access), draft
-  diff review, and a portfolio-wide audit trail.
+- **Operator screens** — the whole console is served on the bare admin host `admin.strelva.com`
+  (super-admin only; `proxy.ts` rewrites it onto `/admin`). A **"Needs you" overview** (leads /
+  approvals / at-risk / signups, led ahead of MRR), an **operator CRM** (`/admin/clients` —
+  per-tenant pipeline stage, tags, notes, contacts, activity), **Search + Analytics**
+  (`/admin/analytics` — Search Console + GA4 per client), ops board (with live
+  platform-dependency health), pay-links (mint + revoke, with paid tracking), tenant detail
+  (live pulse + activity + edit + access), draft diff review, and a portfolio-wide audit trail.
+  See [`docs/operator-command-center.md`](./docs/operator-command-center.md).
+- **Operator vs client email** — two independent switches: operator notifications (new-signup,
+  lead, payment-failed) default ON so the founders stay alerted, while all customer/prospect
+  mail stays paused behind `EMAIL_SENDING_ENABLED` during the test-tenant phase.
 
 ## Development
 

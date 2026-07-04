@@ -133,6 +133,36 @@ cleanup + dead-code deletion (C — has a test, needs a deliberate call),
 owner-notification on async approval (D), email-mismatch hard stop (A),
 durability backup + cron de-stampede (G), and the cutover (H, Jacob's).
 
+## Progress (updated 2026-07-04) — operator command center
+
+The operator layer grew a dedicated **command center** on the bare admin host
+`admin.strelva.com` (super-admin only; `proxy.ts` `isBareAdminHost` /
+`shouldRewriteBareAdminConsole` rewrites the host root onto `/admin`). New since
+the 2026-06-14 note:
+
+- **"Needs you" overview** (`src/app/admin/page.tsx` + `TodayFeed.tsx`) — leads /
+  approvals / at-risk / recent signups, surfaced ahead of MRR.
+- **Operator CRM** (`/admin/clients`, `src/lib/tenant-crm.ts`) — per-tenant
+  pipeline stage (lead/building/live/at_risk/churned), tags, notes, contacts, and
+  an activity timeline. Redis `crm:{tenantId}`; super-admin CRUD via
+  `/api/admin/tenants/[id]/crm` (audit-logged). Closes part of §E.
+- **At-risk / churn signal** (`src/lib/churn.ts`) — persists daily owner
+  agent-engagement (`reb:engagement:*`, written by the `daily-summary` cron) into a
+  7-day rolling store, composed with inactivity + subscription status into the
+  at-risk verdict the "Needs you" dashboard reads.
+- **Search + Analytics** (`/admin/analytics`, `src/lib/analytics.ts`) — per-tenant
+  Search Console + GA4 reads (`analytics:cfg:*`), OAuth-first with a shared
+  service-account fallback; config write via `/api/admin/tenants/[id]/analytics-config`.
+- **Operator vs client email split** (`operatorEmailsEnabled()` in
+  `src/lib/email-enabled.ts`) — operator notifications (new-signup + payment-failed
+  from the billing webhook, lead intake) default ON, independent of the client
+  `emailSendingPaused()` gate. Client lifecycle sends
+  (`sendWelcomeEmail`/`sendSiteLiveEmail`/`sendReviewRequestEmail`) plus per-tenant
+  report cadence (`src/lib/report-cadence.ts`, `reb:report-cadence:*`) exist behind
+  the client pause; the lifecycle sends are not yet wired to a live trigger.
+
+Full surface map: `docs/operator-command-center.md`.
+
 ## 4. Solidification punch list
 
 ### A. Correctness / security (do first)
