@@ -10,6 +10,7 @@ import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import { isReportDue, markReportSent } from "@/lib/report-cadence";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -66,13 +67,37 @@ export async function GET() {
     (s) => ({ tenantId: s.tenantId, reason: s.reason, detail: s.detail }),
   );
 
-  const reports = allReports.filter((r) => {
+  const activeReports = allReports.filter((r) => {
     if (r.tenant.subscriptionStatus === "cancelled") {
       skippedReasons.push({ tenantId: r.tenant.id, reason: "subscription_cancelled" });
       return false;
     }
     return true;
   });
+
+  // Cadence gate: the cron runs weekly, but most tenants are on a MONTHLY
+  // report (default) — only tenants explicitly flipped to "weekly" get a report
+  // every run. Persisted last-sent per tenant prevents a second send inside the
+  // same cycle. Tenants not due this run are recorded as a skip reason so "why
+  // no report?" stays answerable. (See src/lib/report-cadence.ts for the tier
+  // decision — tiers aren't code-enforced, so cadence is a per-tenant override.)
+  const now = new Date();
+  const dueDecisions = await Promise.all(
+    activeReports.map(async (r) => ({ report: r, decision: await isReportDue(r.tenant.id, now) })),
+  );
+  const reports = dueDecisions
+    .filter(({ report, decision }) => {
+      if (!decision.send) {
+        skippedReasons.push({
+          tenantId: report.tenant.id,
+          reason: "cadence_not_due",
+          detail: decision.cadence,
+        });
+        return false;
+      }
+      return true;
+    })
+    .map(({ report }) => report);
 
   const sent: string[] = [];
   const errors: string[] = [];
@@ -130,6 +155,10 @@ await mapPool(reports, 8, async (report) => {
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
       }
+
+      // Persist last-sent so the cadence gate can throttle the next run. Only
+      // reached on a successful send (the Resend-error path returns above).
+      await markReportSent(report.tenant.id);
 
       // Slack notification. Await it: on Vercel the serverless function can
       // freeze the moment the response is returned, so a fire-and-forget fetch

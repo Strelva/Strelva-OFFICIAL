@@ -446,6 +446,195 @@ export async function sendPaymentFailedEmail(params: {
   }
 }
 
+function buildWelcomeEmailOptions(params: {
+  businessName: string;
+  ownerName?: string;
+  dashboardUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const owner = params.ownerName ? cleanSubjectText(params.ownerName) : "";
+  const opener = owner
+    ? `Hi ${owner}, your Strelva dashboard for ${business} is ready.`
+    : `Your Strelva dashboard for ${business} is ready.`;
+  return {
+    preheader: "Your dashboard is ready. Here's what happens next.",
+    heading: "Welcome to Strelva",
+    paragraphs: [
+      opener,
+      "From here, we manage your site for you. Tell the assistant in your dashboard what you want changed, in plain words, and we handle the update.",
+      "Once a month you'll get a report showing what's working: who found you, what they clicked, and what we changed. Reply to any of our emails anytime and a real person will get back to you.",
+    ],
+    button: { label: "Open your dashboard", url: params.dashboardUrl },
+    footerNote: `For ${business}`,
+  };
+}
+
+/**
+ * "Welcome to Strelva" — the first email a client gets once they have dashboard
+ * access. Sets the expectation for how the service works (we manage, you ask,
+ * you get a monthly report). CLIENT email: gated on emailSendingPaused() so it
+ * stays silent during the test-tenant phase. Fails soft: returns false on any
+ * error so it can never block granting access.
+ */
+export async function sendWelcomeEmail(params: {
+  email: string;
+  businessName: string;
+  ownerName?: string;
+  dashboardUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildWelcomeEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: "Welcome to Strelva",
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Welcome email failed:`, err);
+    return false;
+  }
+}
+
+function buildSiteLiveEmailOptions(params: {
+  businessName: string;
+  siteUrl: string;
+  dashboardUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  return {
+    preheader: `${business} is live and ready for visitors.`,
+    heading: "Your site is live",
+    paragraphs: [
+      `${business}'s new site is live and ready for visitors. Take a look, and if anything needs a tweak, just tell the assistant in your dashboard.`,
+    ],
+    rows: [{ label: "Your site", value: params.siteUrl }],
+    button: { label: "View your site", url: params.siteUrl },
+    footerNote: `For ${business}`,
+    manageUrl: params.dashboardUrl,
+  };
+}
+
+/**
+ * "Your site is live" — tells the client their new site has gone live, with the
+ * live URL and a link back to the dashboard (footer Manage link). CLIENT email:
+ * gated on emailSendingPaused(). Fails soft: returns false on any error.
+ */
+export async function sendSiteLiveEmail(params: {
+  email: string;
+  businessName: string;
+  siteUrl: string;
+  dashboardUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildSiteLiveEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `${cleanSubjectText(params.businessName)} is live`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Site-live email failed:`, err);
+    return false;
+  }
+}
+
+function buildReviewRequestEmailOptions(params: {
+  businessName: string;
+  reviewUrl: string;
+  ownerName?: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const owner = params.ownerName ? cleanSubjectText(params.ownerName) : "";
+  const opener = owner
+    ? `Hi ${owner}, reviews are one of the strongest signals for ${business} in local search.`
+    : `Reviews are one of the strongest signals for ${business} in local search.`;
+  return {
+    preheader: "Your review link, ready to share with a few happy customers.",
+    heading: "A few reviews go a long way",
+    paragraphs: [
+      opener,
+      "Here's your review link. Send it to a few recent customers, or add it to your receipts and follow-up messages. A handful this month makes a real difference.",
+    ],
+    button: { label: "Open your review link", url: params.reviewUrl },
+    footerNote: `For ${business}`,
+  };
+}
+
+/**
+ * "A few reviews go a long way" — a gentle, occasional nudge giving the owner
+ * their review link to forward to happy customers. Deliberately short. CLIENT
+ * email: gated on emailSendingPaused(). Fails soft: returns false on any error.
+ */
+export async function sendReviewRequestEmail(params: {
+  email: string;
+  businessName: string;
+  reviewUrl: string;
+  ownerName?: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildReviewRequestEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `A few reviews go a long way for ${cleanSubjectText(params.businessName)}`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Review-request email failed:`, err);
+    return false;
+  }
+}
+
 export async function sendDeliveryStatusEmail(params: {
   businessName: string;
   email: string;
