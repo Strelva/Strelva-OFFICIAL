@@ -16,18 +16,29 @@
  */
 
 // --- Design tokens (the single source of email brand) ----------------------
+// Brand tokens (see ~/brain/1-projects/scaffold-web/branding.md). Dark is the
+// brand; on WHITE/light (email) the sage is the "ink sage" #447a4f, NOT the
+// dark-theme #96bd96 (too low contrast on white). Neutrals are cool to match
+// the brand's cool darks.
 const TOKENS = {
-  accent: "#5b6f68", // the one sage — replaces #5b6f68 / #7c9a8e / #5d7f70
-  ink: "#1a1510", // primary text
-  muted: "#6b6b63", // secondary text
-  faint: "#9a9a90", // footer text
-  hairline: "#e7e5e0",
-  page: "#f5f4f2", // outer page background
+  accent: "#447a4f", // ink sage — the brand sage on white
+  ink: "#14181c", // primary text
+  muted: "#565d64", // secondary text
+  faint: "#949aa1", // footer text
+  hairline: "#e6e7e9",
+  page: "#f3f4f5", // outer page background
   card: "#ffffff",
   buttonText: "#ffffff",
   width: 560,
   font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
 } as const;
+
+// Real logo lockup (cairn + Fraunces wordmark), light-bg version. Hosted so it
+// renders everywhere incl. Outlook and carries the exact wordmark. Overridable
+// via env (the preview gallery injects a data URI since it can't hit the URL).
+const EMAIL_LOGO_URL =
+  process.env.EMAIL_LOGO_URL || "https://strelva.com/brand/logo-full-light.png";
+const LOGO_RATIO = 336 / 972;
 
 export interface EmailRow {
   label: string;
@@ -67,31 +78,12 @@ export function escapeEmailHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/**
- * The real Strelva mark — the stacked-stone cairn with a single sage accent
- * pebble (from src/components/Logo.tsx), inlined as SVG so it renders with no
- * hosted asset. Stones in ink, pebble in sage. (Inline SVG renders in Apple
- * Mail / iOS / Gmail; Outlook-for-Windows is the known gap — swap to a hosted
- * PNG there when we have one.)
- */
-function logoMark(px: number): string {
-  return `<svg viewBox="0 0 48 48" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Strelva" style="display:inline-block;vertical-align:middle;">
-    <circle cx="24.5" cy="7.2" r="3.4" fill="${TOKENS.accent}"/>
-    <ellipse cx="20.5" cy="15.9" rx="6.6" ry="4" fill="${TOKENS.ink}" transform="rotate(-8 20.5 15.9)"/>
-    <ellipse cx="22.5" cy="26.4" rx="9.4" ry="4.9" fill="${TOKENS.ink}" transform="rotate(5 22.5 26.4)"/>
-    <ellipse cx="24" cy="38.5" rx="12.2" ry="5.6" fill="${TOKENS.ink}" transform="rotate(-3 24 38.5)"/>
-  </svg>`;
-}
-
-/** Full lockup: cairn mark + Strelva wordmark. `muted` = smaller footer variant. */
-function logo(muted = false): string {
-  const markPx = muted ? 18 : 26;
-  const size = muted ? 14 : 19;
-  const color = muted ? TOKENS.faint : TOKENS.ink;
-  return `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="padding-right:8px;">${logoMark(markPx)}</td>
-      <td style="font-family:Georgia,'Times New Roman',serif;font-size:${size}px;font-weight:500;letter-spacing:-0.01em;color:${color};vertical-align:middle;">Strelva</td>
-    </tr></table>`;
+/** The real Strelva logo (cairn + Fraunces wordmark) as a hosted image.
+ *  `footer` = the smaller footer variant. */
+function logo(footer = false): string {
+  const w = footer ? 92 : 132;
+  const h = Math.round(w * LOGO_RATIO);
+  return `<img src="${escapeEmailHtml(EMAIL_LOGO_URL)}" alt="Strelva" width="${w}" height="${h}" style="display:block;width:${w}px;height:${h}px;border:0;outline:none;text-decoration:none;">`;
 }
 
 function buttonHtml(button: EmailButton): string {

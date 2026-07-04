@@ -11,9 +11,9 @@ describe("email design system layout", () => {
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Your site is live");
     expect(html).toContain("Hi Chelsea, your site is live.");
-    // The one sage accent, the wordmark, and the CTA href.
-    expect(html).toContain("#5b6f68");
-    expect(html).toContain(">Strelva<");
+    // The one brand sage (ink sage on white), the real logo, and the CTA href.
+    expect(html).toContain("#447a4f");
+    expect(html).toContain('alt="Strelva"');
     expect(html).toContain('href="https://admin.example.com"');
     expect(html).toContain("View dashboard");
   });
