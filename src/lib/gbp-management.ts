@@ -98,6 +98,77 @@ export interface GbpManagementResult {
   success: boolean;
   verified: boolean;
   evidence: string;
+  /**
+   * True when the write did not go through only because the Business Profile
+   * API access grant / quota is not live yet (Google approval is still
+   * pending). This is an expected, temporary setup state — NOT a failure. The
+   * approval draft stays pending so it publishes automatically once access
+   * lands; owners see `ownerMessage`, never raw evidence.
+   */
+  pendingSetup?: boolean;
+  ownerMessage?: string;
+}
+
+/**
+ * Owner-facing copy for the pending-approval / quota-not-live state. The GBP
+ * (My Business) API quota is 0 until Google grants access (a 3–10 day
+ * application), so during that window every write is rejected. We surface this
+ * as "being set up", never a raw error or a crash.
+ */
+const SETUP_PENDING_MESSAGE =
+  "Your Google Business connection is being set up — this will publish automatically once Google approves access (usually within a few days).";
+
+/**
+ * True when a GBP API rejection is the "access not granted / quota 0" setup
+ * state rather than a real error. While the Business Profile API access grant
+ * is pending, Google returns 403 with reason `SERVICE_DISABLED` /
+ * `accessNotConfigured` ("… API has not been used in project … before or it is
+ * disabled"), or 429 `RESOURCE_EXHAUSTED` for the 0 quota. A generic 403
+ * (a genuine permission problem) is intentionally NOT matched — that stays a
+ * real failure that tells the owner to reconnect.
+ */
+function isSetupPendingError(status: number, body: string): boolean {
+  if (status !== 403 && status !== 429) return false;
+  const b = body.toLowerCase();
+  return (
+    b.includes("accessnotconfigured") ||
+    b.includes("service_disabled") ||
+    b.includes("service has been disabled") ||
+    b.includes("service is disabled") ||
+    b.includes("has not been used in project") ||
+    b.includes("not been used in project") ||
+    b.includes("business profile api") ||
+    b.includes("resource_exhausted") ||
+    b.includes("quota")
+  );
+}
+
+/**
+ * Emit a gentle, owner-facing "being set up" signal for the quota-pending
+ * window. Deliberately NOT the scary `emitFailure` path — no "FAILED" Slack
+ * ping, and a terminal (`auto_approved`) informational event so it never adds
+ * a second item to the approval queue. The owner's original draft stays
+ * pending (event-actions leaves it pending on a non-success write), so it
+ * publishes on a later approval once access is live.
+ */
+async function emitSetupPending(
+  tenantId: string,
+  operation: string,
+  evidence: string
+): Promise<void> {
+  try {
+    await addEvent({
+      tenantId,
+      source: "ai",
+      type: "change_verify_failed",
+      title: "Google Business connection is being set up",
+      body: SETUP_PENDING_MESSAGE,
+      status: "auto_approved",
+      metadata: { kind: "gbp_setup_pending", operation, evidence },
+    });
+  } catch {
+    // Informational only — never propagate.
+  }
 }
 
 // ─── Token helpers (refreshAccessToken shared via google-token.ts) ────────────
@@ -203,7 +274,13 @@ async function resolveWriteContext(
  * Update regular or special hours for a GBP location via the Business
  * Information API v1 locations.patch endpoint.
  *
- * Governance classification: factual change → auto-approved.
+ * Governance classification: hours are HIGH-RISK factual details (per
+ * ai-governance `HIGH_RISK_FACTUAL_FIELD_HINTS`) → review queue (pending),
+ * NEVER auto-published. This function performs the write only AFTER the owner
+ * approves the `gbp_hours_draft` (event-actions.ts) — it is never called on an
+ * unreviewed change. The `change_verified` event it emits below is a post-write
+ * audit record of that already-approved change (same shape as gbp-replies.ts),
+ * not a fresh auto-approval.
  *
  * After writing, re-reads the location to confirm the updateMask fields are
  * present in the response. A full deep-equal check is not feasible here since
@@ -271,6 +348,11 @@ export async function updateBusinessHours(
   }
 
   if (!patchOk) {
+    if (isSetupPendingError(patchStatus, patchBody)) {
+      const evidence = `tenant=${tenantId} operation=update_hours setup_pending=true status=${patchStatus}`;
+      await emitSetupPending(tenantId, "update_hours", evidence);
+      return { success: false, verified: false, evidence, pendingSetup: true, ownerMessage: SETUP_PENDING_MESSAGE };
+    }
     const evidence = `tenant=${tenantId} operation=update_hours error=api_error status=${patchStatus} body=${patchBody.slice(0, 200)}`;
     await emitFailure(tenantId, "update_hours", evidence);
     return { success: false, verified: false, evidence };
@@ -406,6 +488,11 @@ export async function createGbpPost(
   }
 
   if (!writeOk) {
+    if (isSetupPendingError(writeStatus, writeBody)) {
+      const evidence = `tenant=${tenantId} operation=create_post setup_pending=true status=${writeStatus}`;
+      await emitSetupPending(tenantId, "create_post", evidence);
+      return { success: false, verified: false, evidence, pendingSetup: true, ownerMessage: SETUP_PENDING_MESSAGE };
+    }
     const evidence = `tenant=${tenantId} operation=create_post error=api_error status=${writeStatus} body=${writeBody.slice(0, 200)}`;
     await emitFailure(tenantId, "create_post", evidence);
     return { success: false, verified: false, evidence };
@@ -531,6 +618,11 @@ export async function uploadGbpPhoto(
   }
 
   if (!writeOk) {
+    if (isSetupPendingError(writeStatus, writeBody)) {
+      const evidence = `tenant=${tenantId} operation=upload_photo setup_pending=true status=${writeStatus}`;
+      await emitSetupPending(tenantId, "upload_photo", evidence);
+      return { success: false, verified: false, evidence, pendingSetup: true, ownerMessage: SETUP_PENDING_MESSAGE };
+    }
     const evidence = `tenant=${tenantId} operation=upload_photo error=api_error status=${writeStatus} body=${writeBody.slice(0, 200)}`;
     await emitFailure(tenantId, "upload_photo", evidence);
     return { success: false, verified: false, evidence };

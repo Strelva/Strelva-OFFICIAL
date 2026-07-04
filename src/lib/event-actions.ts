@@ -153,6 +153,28 @@ export async function resolveEventAction(
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
+    // GBP photo draft: on approve, upload the photo to the Google listing.
+    // Governed the same way — queued, never auto-published. NON-IDEMPOTENT once
+    // the upload succeeds, so we resolve after a successful write (same rule as
+    // the post + hours branches above).
+    if (kind === "gbp_photo_draft") {
+      if (action === "approved") {
+        const photoUrl = typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : "";
+        if (!photoUrl) return { changed: false, reason: "gbp_photo_invalid" };
+        const category =
+          typeof event.metadata?.category === "string" ? event.metadata.category : "ADDITIONAL";
+        const { uploadGbpPhoto } = await import("./gbp-management");
+        const result = await uploadGbpPhoto(
+          tenantId,
+          photoUrl,
+          category as Parameters<typeof uploadGbpPhoto>[2],
+        );
+        if (!result.success) return { changed: false, reason: "gbp_photo_failed" };
+      }
+      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+
     // Structural change (H6): never auto-applied — it's queued manual work for
     // the builder. Resolve it, but signal the handoff so the UI doesn't claim
     // "Made live" for a change that hasn't shipped.

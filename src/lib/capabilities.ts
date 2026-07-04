@@ -18,9 +18,9 @@ export function sanitizePromptValue(value: unknown): string {
     .slice(0, 400);
 }
 
-export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social";
+export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social" | "google_business";
 
-const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social"];
+const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social", "google_business"];
 
 export interface Capability {
   id: CapabilityId;
@@ -60,6 +60,14 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
     name: "Social Media",
     description: "Draft social media posts from site content",
     tools: ["draft_social_post", "list_social_posts"],
+  },
+  google_business: {
+    name: "Google Business",
+    // Every Google-listing write is drafted and queued for the owner's
+    // approval before it publishes — the approve-before-live trust spine.
+    description:
+      "Draft Google Business posts, hours updates, and photos — each queued for your approval before it publishes to Google",
+    tools: ["create_gbp_post", "update_business_hours", "upload_gbp_photo"],
   },
 };
 
