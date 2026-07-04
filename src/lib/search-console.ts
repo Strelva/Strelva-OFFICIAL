@@ -1,10 +1,13 @@
 import crypto from "crypto";
 import type { SearchData, TenantConfig } from "./types";
 
-interface ServiceAccountKey {
+export interface ServiceAccountKey {
   client_email: string;
   private_key: string;
 }
+
+/** Read-only Search Console scope — the default for the shared JWT signer. */
+export const SCOPE_WEBMASTERS = "https://www.googleapis.com/auth/webmasters.readonly";
 
 function getSearchConsoleKey(tenantConfig?: TenantConfig | null): string | null {
   // Tenant-level config takes priority
@@ -15,18 +18,46 @@ function getSearchConsoleKey(tenantConfig?: TenantConfig | null): string | null 
   return process.env.GOOGLE_SEARCH_CONSOLE_KEY || null;
 }
 
+/**
+ * Resolve + parse the Google service-account credential for a tenant (or the
+ * platform default). Returns null when unset or unparseable — never throws.
+ * Shared by GSC (search-console) and GA4 (analytics) so both read one credential.
+ */
+export function getServiceAccountCredential(
+  tenantConfig?: TenantConfig | null
+): ServiceAccountKey | null {
+  const keyJson = getSearchConsoleKey(tenantConfig);
+  if (!keyJson) return null;
+  try {
+    const key = JSON.parse(keyJson) as ServiceAccountKey;
+    if (!key.client_email || !key.private_key) return null;
+    return key;
+  } catch {
+    console.error("Failed to parse Google service-account key");
+    return null;
+  }
+}
+
 function base64url(input: Buffer | string): string {
   const buf = typeof input === "string" ? Buffer.from(input) : input;
   return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-async function getAccessToken(key: ServiceAccountKey): Promise<string> {
+/**
+ * Mint a short-lived Google OAuth access token from a service-account key via a
+ * signed RS256 JWT. Exported + scope-parameterized so GSC and GA4 share one
+ * signer (GA4 passes the analytics.readonly scope). Defaults to the GSC scope.
+ */
+export async function getAccessToken(
+  key: ServiceAccountKey,
+  scope: string = SCOPE_WEBMASTERS
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64url(
     JSON.stringify({
       iss: key.client_email,
-      scope: "https://www.googleapis.com/auth/webmasters.readonly",
+      scope,
       aud: "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600,
@@ -65,16 +96,8 @@ export async function fetchSearchData(
   days = 7,
   tenantConfig?: TenantConfig | null
 ): Promise<SearchData> {
-  const keyJson = getSearchConsoleKey(tenantConfig);
-  if (!keyJson) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
-
-  let key: ServiceAccountKey;
-  try {
-    key = JSON.parse(keyJson);
-  } catch {
-    console.error("Failed to parse Google Search Console key");
-    return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
-  }
+  const key = getServiceAccountCredential(tenantConfig);
+  if (!key) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
 
   try {
     const token = await getAccessToken(key);
