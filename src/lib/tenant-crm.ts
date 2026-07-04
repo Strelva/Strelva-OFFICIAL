@@ -18,11 +18,31 @@ export interface CrmNote {
   createdAt: string;
 }
 
+export interface CrmContact {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+}
+
+export type CrmActivityKind = "call" | "email" | "meeting" | "note";
+
+export interface CrmActivity {
+  id: string;
+  kind: CrmActivityKind;
+  summary: string;
+  author: string;
+  at: string;
+}
+
 export interface TenantCrm {
   tenantId: string;
   tags: string[];
   stage: CrmStage | null;
   notes: CrmNote[];
+  contacts: CrmContact[];
+  activity: CrmActivity[];
   updatedAt: string | null;
 }
 
@@ -30,13 +50,31 @@ const MAX_TAGS = 20;
 const MAX_TAG_LEN = 40;
 const MAX_NOTES = 200;
 const MAX_NOTE_LEN = 2000;
+const MAX_CONTACTS = 20;
+const MAX_CONTACT_FIELD_LEN = 120;
+const MAX_ACTIVITY = 200;
+const MAX_ACTIVITY_LEN = 500;
+const ACTIVITY_KINDS: CrmActivityKind[] = ["call", "email", "meeting", "note"];
 
 function key(tenantId: string): string {
   return `crm:${tenantId}`;
 }
 
 function defaultCrm(tenantId: string): TenantCrm {
-  return { tenantId, tags: [], stage: null, notes: [], updatedAt: null };
+  return { tenantId, tags: [], stage: null, notes: [], contacts: [], activity: [], updatedAt: null };
+}
+
+function isContact(v: unknown): v is CrmContact {
+  return typeof v === "object" && v !== null && typeof (v as CrmContact).id === "string";
+}
+
+function isActivity(v: unknown): v is CrmActivity {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as CrmActivity).id === "string" &&
+    ACTIVITY_KINDS.includes((v as CrmActivity).kind)
+  );
 }
 
 /** Normalize a raw stored value (object or JSON string) into a full TenantCrm. */
@@ -56,8 +94,17 @@ function normalize(tenantId: string, raw: unknown): TenantCrm {
     tags: Array.isArray(r.tags) ? r.tags.filter((t): t is string => typeof t === "string") : [],
     stage: (r.stage as CrmStage | null) ?? null,
     notes: Array.isArray(r.notes) ? (r.notes as CrmNote[]) : [],
+    contacts: Array.isArray(r.contacts) ? r.contacts.filter(isContact) : [],
+    activity: Array.isArray(r.activity) ? r.activity.filter(isActivity) : [],
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : null,
   };
+}
+
+/** Trim a field to a bounded length; returns undefined when empty after trim. */
+function cleanField(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim().slice(0, MAX_CONTACT_FIELD_LEN);
+  return t || undefined;
 }
 
 function sanitizeTags(tags: string[]): string[] {
@@ -127,4 +174,45 @@ export async function addTenantNote(
   };
   const notes = [note, ...current.notes].slice(0, MAX_NOTES);
   return persist({ ...current, notes, updatedAt: new Date().toISOString() });
+}
+
+export async function addTenantContact(
+  tenantId: string,
+  contact: Omit<CrmContact, "id">,
+): Promise<TenantCrm> {
+  const current = await getTenantCrm(tenantId);
+  const entry: CrmContact = {
+    id: crypto.randomUUID(),
+    name: cleanField(contact.name) ?? "Unnamed",
+    email: cleanField(contact.email),
+    phone: cleanField(contact.phone),
+    role: cleanField(contact.role),
+  };
+  const contacts = [...current.contacts, entry].slice(0, MAX_CONTACTS);
+  return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+}
+
+export async function removeTenantContact(
+  tenantId: string,
+  contactId: string,
+): Promise<TenantCrm> {
+  const current = await getTenantCrm(tenantId);
+  const contacts = current.contacts.filter((c) => c.id !== contactId);
+  return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+}
+
+export async function addTenantActivity(
+  tenantId: string,
+  entry: { kind: CrmActivityKind; summary: string; author: string },
+): Promise<TenantCrm> {
+  const current = await getTenantCrm(tenantId);
+  const item: CrmActivity = {
+    id: crypto.randomUUID(),
+    kind: ACTIVITY_KINDS.includes(entry.kind) ? entry.kind : "note",
+    summary: entry.summary.trim().slice(0, MAX_ACTIVITY_LEN),
+    author: entry.author || "operator",
+    at: new Date().toISOString(),
+  };
+  const activity = [item, ...current.activity].slice(0, MAX_ACTIVITY);
+  return persist({ ...current, activity, updatedAt: new Date().toISOString() });
 }

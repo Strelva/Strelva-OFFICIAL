@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { CrmStage, TenantCrm } from "@/lib/tenant-crm";
+import type { CrmActivityKind, CrmStage, TenantCrm } from "@/lib/tenant-crm";
 
 interface ClientRow {
   id: string;
@@ -40,8 +40,25 @@ function tagColor(tag: string): string {
 }
 
 function emptyCrm(tenantId: string): TenantCrm {
-  return { tenantId, tags: [], stage: null, notes: [], updatedAt: null };
+  return {
+    tenantId,
+    tags: [],
+    stage: null,
+    notes: [],
+    contacts: [],
+    activity: [],
+    updatedAt: null,
+  };
 }
+
+const ACTIVITY_KINDS: { value: CrmActivityKind; label: string; icon: string }[] = [
+  { value: "call", label: "Call", icon: "☎" },
+  { value: "email", label: "Email", icon: "✉" },
+  { value: "meeting", label: "Meeting", icon: "◷" },
+  { value: "note", label: "Note", icon: "✎" },
+];
+
+const ACTIVITY_LABEL = new Map(ACTIVITY_KINDS.map((k) => [k.value, k]));
 
 function formatUpdated(iso: string | null): string {
   if (!iso) return "never";
@@ -71,6 +88,12 @@ export function ClientsCrm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
+  const [contactDraft, setContactDraft] = useState<
+    Record<string, { name: string; email: string; phone: string; role: string }>
+  >({});
+  const [activityDraft, setActivityDraft] = useState<
+    Record<string, { kind: CrmActivityKind; summary: string }>
+  >({});
 
   const getCrm = (id: string): TenantCrm => crm[id] ?? emptyCrm(id);
 
@@ -91,7 +114,14 @@ export function ClientsCrm({
 
   async function write(
     id: string,
-    body: { tags?: string[]; stage?: CrmStage; note?: string }
+    body: {
+      tags?: string[];
+      stage?: CrmStage;
+      note?: string;
+      contact?: { name: string; email?: string; phone?: string; role?: string };
+      removeContactId?: string;
+      activity?: { kind: CrmActivityKind; summary: string };
+    }
   ) {
     setSaving((s) => ({ ...s, [id]: true }));
     setErrors((e) => ({ ...e, [id]: "" }));
@@ -135,6 +165,37 @@ export function ClientsCrm({
     if (!text) return;
     setNoteDraft((d) => ({ ...d, [id]: "" }));
     void write(id, { note: text });
+  }
+
+  function addContact(id: string) {
+    const draft = contactDraft[id];
+    const name = (draft?.name ?? "").trim();
+    if (!name) return;
+    setContactDraft((d) => ({
+      ...d,
+      [id]: { name: "", email: "", phone: "", role: "" },
+    }));
+    void write(id, {
+      contact: {
+        name,
+        email: (draft?.email ?? "").trim() || undefined,
+        phone: (draft?.phone ?? "").trim() || undefined,
+        role: (draft?.role ?? "").trim() || undefined,
+      },
+    });
+  }
+
+  function removeContact(id: string, contactId: string) {
+    void write(id, { removeContactId: contactId });
+  }
+
+  function logActivity(id: string) {
+    const draft = activityDraft[id];
+    const summary = (draft?.summary ?? "").trim();
+    if (!summary) return;
+    const kind = draft?.kind ?? "call";
+    setActivityDraft((d) => ({ ...d, [id]: { kind, summary: "" } }));
+    void write(id, { activity: { kind, summary } });
   }
 
   const filtersActive = stageFilter !== "all" || tagFilter !== null;
@@ -321,7 +382,7 @@ export function ClientsCrm({
                         className="text-gray-muted hover:text-warm-white transition-colors"
                         aria-expanded={isOpen}
                       >
-                        Notes ({rec.notes.length})
+                        Details ({rec.contacts.length} · {rec.activity.length} · {rec.notes.length})
                       </button>
                     </div>
                     <span className="text-[11px] text-gray-faint">
@@ -338,10 +399,216 @@ export function ClientsCrm({
                   </div>
                 )}
 
-                {/* Notes drawer */}
+                {/* Detail drawer */}
                 {isOpen && (
-                  <div className="border-t border-glass-border bg-gray-bg/40 p-4 space-y-3">
-                    <div className="flex items-start gap-2">
+                  <div className="border-t border-glass-border bg-gray-bg/40 p-4 space-y-6">
+                    {/* Contacts */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">
+                        Contacts
+                      </h3>
+                      {rec.contacts.length === 0 ? (
+                        <p className="text-xs text-gray-faint">No contacts yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {rec.contacts.map((ct) => (
+                            <li
+                              key={ct.id}
+                              className="flex items-start justify-between gap-2 rounded-md bg-surface-base border border-glass-border px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm text-warm-white">
+                                  {ct.name}
+                                  {ct.role && (
+                                    <span className="text-gray-faint"> · {ct.role}</span>
+                                  )}
+                                </p>
+                                {(ct.email || ct.phone) && (
+                                  <p className="mt-0.5 text-[11px] text-gray-muted truncate">
+                                    {[ct.email, ct.phone].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => removeContact(c.id, ct.id)}
+                                disabled={busy}
+                                className="shrink-0 text-gray-faint hover:text-rose-400 transition-colors disabled:opacity-40"
+                                title="Remove contact"
+                                aria-label={`Remove ${ct.name}`}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <input
+                          value={contactDraft[c.id]?.name ?? ""}
+                          onChange={(e) =>
+                            setContactDraft((d) => ({
+                              ...d,
+                              [c.id]: {
+                                name: e.target.value,
+                                email: d[c.id]?.email ?? "",
+                                phone: d[c.id]?.phone ?? "",
+                                role: d[c.id]?.role ?? "",
+                              },
+                            }))
+                          }
+                          placeholder="Name"
+                          className="rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                        />
+                        <input
+                          value={contactDraft[c.id]?.role ?? ""}
+                          onChange={(e) =>
+                            setContactDraft((d) => ({
+                              ...d,
+                              [c.id]: {
+                                name: d[c.id]?.name ?? "",
+                                email: d[c.id]?.email ?? "",
+                                phone: d[c.id]?.phone ?? "",
+                                role: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Role (optional)"
+                          className="rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                        />
+                        <input
+                          value={contactDraft[c.id]?.email ?? ""}
+                          onChange={(e) =>
+                            setContactDraft((d) => ({
+                              ...d,
+                              [c.id]: {
+                                name: d[c.id]?.name ?? "",
+                                email: e.target.value,
+                                phone: d[c.id]?.phone ?? "",
+                                role: d[c.id]?.role ?? "",
+                              },
+                            }))
+                          }
+                          placeholder="Email (optional)"
+                          className="rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            value={contactDraft[c.id]?.phone ?? ""}
+                            onChange={(e) =>
+                              setContactDraft((d) => ({
+                                ...d,
+                                [c.id]: {
+                                  name: d[c.id]?.name ?? "",
+                                  email: d[c.id]?.email ?? "",
+                                  phone: e.target.value,
+                                  role: d[c.id]?.role ?? "",
+                                },
+                              }))
+                            }
+                            placeholder="Phone (optional)"
+                            className="flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                          />
+                          <button
+                            onClick={() => addContact(c.id)}
+                            disabled={busy || !(contactDraft[c.id]?.name ?? "").trim()}
+                            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* Activity */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">
+                        Activity
+                      </h3>
+                      <div className="flex items-start gap-2">
+                        <select
+                          value={activityDraft[c.id]?.kind ?? "call"}
+                          onChange={(e) =>
+                            setActivityDraft((d) => ({
+                              ...d,
+                              [c.id]: {
+                                kind: e.target.value as CrmActivityKind,
+                                summary: d[c.id]?.summary ?? "",
+                              },
+                            }))
+                          }
+                          className="rounded-md bg-surface-base border border-glass-border px-2 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+                        >
+                          {ACTIVITY_KINDS.map((k) => (
+                            <option key={k.value} value={k.value}>
+                              {k.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          value={activityDraft[c.id]?.summary ?? ""}
+                          onChange={(e) =>
+                            setActivityDraft((d) => ({
+                              ...d,
+                              [c.id]: {
+                                kind: d[c.id]?.kind ?? "call",
+                                summary: e.target.value,
+                              },
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              logActivity(c.id);
+                            }
+                          }}
+                          placeholder="Log a touchpoint… (↵ to save)"
+                          className="flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+                        />
+                        <button
+                          onClick={() => logActivity(c.id)}
+                          disabled={busy || !(activityDraft[c.id]?.summary ?? "").trim()}
+                          className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
+                        >
+                          Log
+                        </button>
+                      </div>
+                      {rec.activity.length === 0 ? (
+                        <p className="text-xs text-gray-faint">No activity logged yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {rec.activity.map((a) => {
+                            const meta = ACTIVITY_LABEL.get(a.kind);
+                            return (
+                              <li key={a.id} className="flex gap-2.5">
+                                <span
+                                  className="mt-0.5 text-sm text-gray-muted"
+                                  aria-hidden
+                                  title={meta?.label}
+                                >
+                                  {meta?.icon ?? "•"}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm text-warm-white whitespace-pre-wrap">
+                                    {a.summary}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] text-gray-faint">
+                                    {meta?.label ?? a.kind} · {a.author} ·{" "}
+                                    {formatUpdated(a.at)}
+                                  </p>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+
+                    {/* Notes */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">
+                        Notes
+                      </h3>
+                      <div className="flex items-start gap-2">
                       <textarea
                         value={noteDraft[c.id] ?? ""}
                         onChange={(e) =>
@@ -386,6 +653,7 @@ export function ClientsCrm({
                           ))}
                       </ul>
                     )}
+                    </section>
                   </div>
                 )}
               </div>
