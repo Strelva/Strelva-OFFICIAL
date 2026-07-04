@@ -22,3 +22,24 @@ export function emailSendingEnabled(): boolean {
 export function emailSendingPaused(): boolean {
   return !emailSendingEnabled();
 }
+
+/**
+ * OPERATOR notifications (new signup, lead intake, failed payment) are on a
+ * SEPARATE switch from the client `emailSendingPaused()` gate above. Operators
+ * (Noah + Jacob) must keep getting alerted about what's happening even while
+ * customer/prospect email stays paused during the test-tenant phase — that's
+ * the entire point of an operator notification. So this DEFAULTS ON and is only
+ * silenced by an explicit `OPERATOR_EMAILS_ENABLED="false"` (a deliberate kill
+ * switch), never by the unset-env default that pauses client mail.
+ */
+export function operatorEmailsEnabled(): boolean {
+  return process.env.OPERATOR_EMAILS_ENABLED !== "false";
+}
+
+/**
+ * True when operator notifications are explicitly disabled. Convenience inverse
+ * for guard sites that read better as an early-return.
+ */
+export function operatorEmailsPaused(): boolean {
+  return !operatorEmailsEnabled();
+}
