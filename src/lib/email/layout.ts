@@ -67,10 +67,31 @@ export function escapeEmailHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function wordmark(): string {
-  // Text wordmark with a sage mark. No hosted logo asset yet; a text mark is
-  // reliable across clients and swappable for an <img> later.
-  return `<span style="display:inline-block;height:10px;width:10px;border-radius:50%;background:${TOKENS.accent};margin-right:9px;vertical-align:middle;"></span><span style="font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${TOKENS.ink};vertical-align:middle;">Strelva</span>`;
+/**
+ * The real Strelva mark — the stacked-stone cairn with a single sage accent
+ * pebble (from src/components/Logo.tsx), inlined as SVG so it renders with no
+ * hosted asset. Stones in ink, pebble in sage. (Inline SVG renders in Apple
+ * Mail / iOS / Gmail; Outlook-for-Windows is the known gap — swap to a hosted
+ * PNG there when we have one.)
+ */
+function logoMark(px: number): string {
+  return `<svg viewBox="0 0 48 48" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Strelva" style="display:inline-block;vertical-align:middle;">
+    <circle cx="24.5" cy="7.2" r="3.4" fill="${TOKENS.accent}"/>
+    <ellipse cx="20.5" cy="15.9" rx="6.6" ry="4" fill="${TOKENS.ink}" transform="rotate(-8 20.5 15.9)"/>
+    <ellipse cx="22.5" cy="26.4" rx="9.4" ry="4.9" fill="${TOKENS.ink}" transform="rotate(5 22.5 26.4)"/>
+    <ellipse cx="24" cy="38.5" rx="12.2" ry="5.6" fill="${TOKENS.ink}" transform="rotate(-3 24 38.5)"/>
+  </svg>`;
+}
+
+/** Full lockup: cairn mark + Strelva wordmark. `muted` = smaller footer variant. */
+function logo(muted = false): string {
+  const markPx = muted ? 18 : 26;
+  const size = muted ? 14 : 19;
+  const color = muted ? TOKENS.faint : TOKENS.ink;
+  return `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td style="padding-right:8px;">${logoMark(markPx)}</td>
+      <td style="font-family:Georgia,'Times New Roman',serif;font-size:${size}px;font-weight:500;letter-spacing:-0.01em;color:${color};vertical-align:middle;">Strelva</td>
+    </tr></table>`;
 }
 
 function buttonHtml(button: EmailButton): string {
@@ -98,11 +119,15 @@ function footerHtml(opts: EmailOptions): string {
   const links: string[] = [];
   if (opts.manageUrl) links.push(`<a href="${escapeEmailHtml(opts.manageUrl)}" style="color:${TOKENS.faint};text-decoration:underline;">Manage</a>`);
   if (opts.unsubscribeUrl) links.push(`<a href="${escapeEmailHtml(opts.unsubscribeUrl)}" style="color:${TOKENS.faint};text-decoration:underline;">Unsubscribe</a>`);
-  const linkRow = links.length ? ` &nbsp;·&nbsp; ${links.join(" &nbsp;·&nbsp; ")}` : "";
-  const note = opts.footerNote ? `<div style="margin-bottom:6px;">${escapeEmailHtml(opts.footerNote)}</div>` : "";
-  return `<div style="padding:24px 0 8px;font-size:12px;line-height:1.5;color:${TOKENS.faint};">
-      ${note}Strelva${linkRow}
-    </div>`;
+  // Brand is carried by the logo, not a repeated "Strelva" word. footerNote is
+  // context (e.g. "for {business}") and should not itself name Strelva.
+  const meta: string[] = [];
+  if (opts.footerNote) meta.push(escapeEmailHtml(opts.footerNote));
+  meta.push(...links);
+  const metaRow = meta.length
+    ? `<div style="margin-top:10px;font-size:12px;line-height:1.5;color:${TOKENS.faint};">${meta.join(" &nbsp;·&nbsp; ")}</div>`
+    : "";
+  return `<div style="padding:24px 0 8px;">${logo(true)}${metaRow}</div>`;
 }
 
 /** Full branded HTML email document. */
@@ -126,7 +151,7 @@ ${preheader}
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${TOKENS.page};padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" cellpadding="0" cellspacing="0" width="${TOKENS.width}" style="max-width:${TOKENS.width}px;width:100%;background:${TOKENS.card};border:1px solid ${TOKENS.hairline};border-radius:14px;font-family:${TOKENS.font};">
-      <tr><td style="padding:28px 32px 0;">${wordmark()}</td></tr>
+      <tr><td style="padding:28px 32px 0;">${logo()}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
         ${paragraphs}${rows}${button}
