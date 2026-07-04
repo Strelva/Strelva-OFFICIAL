@@ -121,7 +121,7 @@ describe("admin invites route", () => {
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),
       text: expect.stringContaining(
-        "Create your account: https://admin.greatlakesdriedfruit.com/sign-up?email=owner%40example.com",
+        "Set up your login: https://admin.greatlakesdriedfruit.com/sign-up?email=owner%40example.com",
       ),
     }));
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({

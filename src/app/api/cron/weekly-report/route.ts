@@ -7,51 +7,43 @@ import { generateAllReports } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
-import { sanitizeEmailSubjectText, escapeHtml } from "@/lib/invite-email";
+import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
+import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
 export const maxDuration = 300;
 
-function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
-  // The summary can echo tenant-authored content (service names, search queries)
-  // via the deterministic fallback or the Gemini output, and siteName is
-  // tenant-set — escape both before interpolating into HTML so a renamed service
-  // like `<a href="evil">…</a>` can't become a live link in the owner's email
-  // sent from Strelva's verified domain. Escape THEN convert newlines to <br>.
-  const paragraphs = summary
-    .split("\n\n")
-    .filter(Boolean)
-    .map((p) => `<p style="margin: 0 0 16px; line-height: 1.6; color: #1a1a1a;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-  const safeSiteName = escapeHtml(siteName);
+// The upstream summary (Gemini output or the deterministic fallback in
+// reports.ts) is a plain-text string with blank lines between paragraphs. Split
+// it into the paragraph list the shared layout expects. The layout escapes each
+// paragraph, so tenant-authored content (service names, search queries) that the
+// summary echoes can't inject markup into the owner's email.
+function reportSummaryParagraphs(summary: string): string[] {
+  return summary
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
 
-  return `<!DOCTYPE html>
-<html>
-<body style="margin: 0; padding: 0; background: #f5f4f2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-  <div style="max-width: 520px; margin: 0 auto; padding: 40px 24px;">
-    <div style="background: #fff; border-radius: 12px; padding: 32px; border: 1px solid #e8e6e3;">
-      <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #7c9a8e; margin: 0 0 24px; font-weight: 700;">Weekly Update</p>
-      <h1 style="font-size: 22px; line-height: 1.2; color: #1a1510; margin: 0 0 20px; font-weight: 700;">Your weekly report</h1>
-      ${paragraphs}
-      <p style="margin: 24px 0 0;">
-        <a href="${dashboardUrl}" style="display: inline-block; color: #5d7f70; font-size: 18px; font-weight: 700; text-decoration: none;">
-          View your weekly report &rarr;
-        </a>
-      </p>
-      <hr style="border: none; border-top: 1px solid #e8e6e3; margin: 24px 0;">
-      <p style="font-size: 13px; color: #77716a; margin: 0;">
-        Sent by Strelva for ${safeSiteName}
-      </p>
-    </div>
-  </div>
-</body>
-</html>`;
+function reportToHtml(summary: string, siteName: string, dashboardUrl: string): string {
+  const paragraphs = reportSummaryParagraphs(summary);
+  return renderEmailHtml({
+    preheader: paragraphs[0],
+    heading: "Your weekly report",
+    paragraphs,
+    button: { label: "See your full report", url: dashboardUrl },
+    footerNote: `Sent for ${siteName}`,
+  });
 }
 
 function reportToText(summary: string, dashboardUrl: string): string {
-  return `${summary}\n\nView your weekly report: ${dashboardUrl}`;
+  return renderEmailText({
+    heading: "Your weekly report",
+    paragraphs: reportSummaryParagraphs(summary),
+    button: { label: "See your full report", url: dashboardUrl },
+  });
 }
 
 export async function GET() {

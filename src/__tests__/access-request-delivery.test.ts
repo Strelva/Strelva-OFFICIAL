@@ -75,7 +75,7 @@ describe("access request delivery flow", () => {
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
       html: expect.stringContaining(`href="${body.statusUrl}"`),
-      text: expect.stringContaining(`Track site delivery: ${body.statusUrl}`),
+      text: expect.stringContaining(`Track your request: ${body.statusUrl}`),
     }));
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       html: expect.stringContaining("No login is needed yet"),
@@ -183,7 +183,7 @@ describe("access request delivery flow", () => {
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "owner@example.com",
       html: expect.stringContaining(`href="${firstBody.statusUrl}"`),
-      text: expect.stringContaining(`Track site delivery: ${firstBody.statusUrl}`),
+      text: expect.stringContaining(`Track your request: ${firstBody.statusUrl}`),
     }));
   });
 
@@ -199,9 +199,12 @@ describe("access request delivery flow", () => {
       statusUrl: "https://strelva.com/delivery/abc",
     });
 
+    expect(html).toContain("We&#39;ve got your request");
     expect(html).toContain("A&amp;B alert(&quot;x&quot;)");
     expect(html).toContain("https://strelva.com/delivery/abc&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("Track your request");
     expect(html).not.toContain("<script>");
+    expect(text).toContain("We've got your request");
     expect(text).toContain("A&B Bcc: attacker@example.com");
     expect(text).not.toContain("\r");
   });

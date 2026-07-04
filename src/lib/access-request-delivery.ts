@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { getRedis } from "@/lib/redis";
 import { getSanityClient } from "@/lib/sanity";
 import { upsertLead } from "@/lib/db/repositories";
@@ -109,23 +110,6 @@ export function buildDeliveryStatusUrl(origin: string, token: string): string {
   return new URL(`/delivery/${token}`, base).toString();
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
-}
-
 function cleanSubjectText(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -134,45 +118,36 @@ function cleanSubjectText(value: string): string {
     .trim();
 }
 
+function deliveryStatusEmailOptions(params: {
+  businessName: string;
+  statusUrl: string;
+}) {
+  // Sanitize the dynamic name (strip markup + newlines); the shared layout
+  // auto-escapes everything we pass, so we don't pre-escape here.
+  const businessName = cleanSubjectText(params.businessName);
+  return {
+    preheader: "Your site request is in the queue.",
+    heading: "We've got your request",
+    paragraphs: [
+      `We received the request for ${businessName}. The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.`,
+      "No login is needed yet. This private tracking link shows where the request stands and what happens next.",
+    ],
+    button: { label: "Track your request", url: params.statusUrl },
+  };
+}
+
 export function buildDeliveryStatusEmailHtml(params: {
   businessName: string;
   statusUrl: string;
 }): string {
-  const businessName = escapeHtml(cleanSubjectText(params.businessName));
-  const statusUrl = escapeHtml(params.statusUrl);
-
-  return `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; color: #151515;">
-      <p style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5b6f68; margin: 0 0 18px;">Strelva</p>
-      <h1 style="font-size: 28px; line-height: 1.15; margin: 0 0 18px;">Your site request is in the queue.</h1>
-      <p style="font-size: 16px; line-height: 1.65; color: #444; margin: 0 0 24px;">
-        We received the request for <strong>${businessName}</strong>. The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.
-      </p>
-      <a href="${statusUrl}" style="display: inline-block; border-radius: 999px; background: #111; color: #fff; padding: 13px 20px; text-decoration: none; font-weight: 600; font-size: 15px;">
-        Track site delivery
-      </a>
-      <p style="font-size: 14px; line-height: 1.6; color: #666; margin: 24px 0 0;">
-        No login is needed yet. This private tracking link shows where the request stands and what happens next.
-      </p>
-    </div>
-  `;
+  return renderEmailHtml(deliveryStatusEmailOptions(params));
 }
 
 export function buildDeliveryStatusEmailText(params: {
   businessName: string;
   statusUrl: string;
 }): string {
-  const businessName = cleanSubjectText(params.businessName);
-  return [
-    "Your site request is in the queue.",
-    "",
-    `We received the request for ${businessName}.`,
-    "The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.",
-    "",
-    `Track site delivery: ${params.statusUrl}`,
-    "",
-    "No login is needed yet. This private tracking link shows where the request stands and what happens next.",
-  ].join("\n");
+  return renderEmailText(deliveryStatusEmailOptions(params));
 }
 
 function validToken(token: string): boolean {
