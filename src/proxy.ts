@@ -146,6 +146,41 @@ export function shouldRewriteMarketingRoot(host: string, pathname: string): bool
   return isMarketingHost(host) && pathname === "/";
 }
 
+// Root domains under which `admin.<root>` is the OPERATOR console host (not a
+// client's admin dashboard). Mirrors the suffixes extractTenantFromHost keys on.
+const ADMIN_HOST_ROOT_SUFFIXES = [".strelva.com", ".localhost"] as const;
+
+// True only for the BARE admin subdomain of a root domain (admin.strelva.com,
+// admin.localhost[:port]). NOT admin.<tenant>.strelva.com — that is a client's
+// admin dashboard (subdomain "admin.<tenant>"), handled by the isAdminSubdomain
+// flow in extractTenantFromHost and left untouched here.
+export function isBareAdminHost(host: string): boolean {
+  const hostWithoutPort = host.toLowerCase().split(":")[0];
+  for (const suffix of ADMIN_HOST_ROOT_SUFFIXES) {
+    if (hostWithoutPort.endsWith(suffix)) {
+      return hostWithoutPort.slice(0, -suffix.length) === "admin";
+    }
+  }
+  return false;
+}
+
+// Paths on the bare admin host that must pass through untouched instead of being
+// rewritten under /admin: the operator console itself, plus API, Next internals,
+// and the auth callback surface. Static assets never reach the proxy (matcher).
+const BARE_ADMIN_PASSTHROUGH_PREFIXES = ["/api", "/_next", "/auth"] as const;
+
+export function shouldRewriteBareAdminConsole(host: string, pathname: string): boolean {
+  if (!isBareAdminHost(host)) return false;
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
+  return !BARE_ADMIN_PASSTHROUGH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+export function bareAdminConsoleRewritePath(pathname: string): string {
+  return pathname === "/" ? "/admin" : `/admin${pathname}`;
+}
+
 export function getLegacyPublicSiteRedirect(host: string): string | null {
   const normalizedHost = host.toLowerCase().split(":")[0];
   return LEGACY_PUBLIC_SITE_REDIRECTS[normalizedHost] || null;
@@ -483,6 +518,27 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (!devPreviewRequest && shouldRewriteMarketingRoot(host, pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/home";
+    return applySecurityHeaders(NextResponse.rewrite(url), req);
+  }
+
+  // Bare admin host (admin.strelva.com / admin.localhost) -> the operator console
+  // served by the /admin PATH. Rewrite so the operator lands on the console at the
+  // host root, while /api, /_next, /auth, and already-/admin paths pass through.
+  if (shouldRewriteBareAdminConsole(host, pathname)) {
+    // Loop-break: the /admin layout redirects unauthorized users to "/", which on
+    // THIS host would rewrite straight back to /admin -> infinite loop. So gate the
+    // rewrite on super-admin here and send everyone else to the app-host sign-in (a
+    // different host that actually serves /sign-in, so it can't re-enter the rewrite
+    // and can't 404 on the marketing host). The layout's isSuperAdmin gate still runs
+    // after the rewrite as defense-in-depth.
+    if (!devAccessBypass && !(await requestIsSuperAdmin(req))) {
+      const appBase =
+        process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://app.strelva.com";
+      const signInUrl = new URL("/sign-in", appBase);
+      return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = bareAdminConsoleRewritePath(pathname);
     return applySecurityHeaders(NextResponse.rewrite(url), req);
   }
 

@@ -6,6 +6,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 import {
+  bareAdminConsoleRewritePath,
   buildContentSecurityPolicy,
   clearDomainResolutionCacheForTests,
   extractTenantFromClientPath,
@@ -13,11 +14,13 @@ import {
   getEnvDomainMap,
   getLegacyPublicSiteRedirect,
   getOwnershipSettingsRedirectPath,
+  isBareAdminHost,
   isMarketingHost,
   resolveTenantFromCustomDomain,
   resolveTenantFromDomainMap,
   shouldRedirectAdminRoot,
   shouldResolveCustomDomain,
+  shouldRewriteBareAdminConsole,
   shouldUseFallbackAuthForAdminHost,
   shouldRewriteMarketingRoot,
   validateCronRequest,
@@ -66,6 +69,49 @@ describe("proxy host routing helpers", () => {
       tenant: "rohlax",
       isAdminSubdomain: true,
     });
+  });
+
+  it("rewrites the bare admin host onto the operator console path", () => {
+    // admin.strelva.com stays tenant-less (admin is a reserved subdomain)...
+    expect(extractTenantFromHost("admin.strelva.com")).toEqual({
+      tenant: null,
+      isAdminSubdomain: false,
+    });
+    // ...and is recognized as the bare operator-console host in prod and dev.
+    expect(isBareAdminHost("admin.strelva.com")).toBe(true);
+    expect(isBareAdminHost("admin.localhost:3000")).toBe(true);
+
+    // Root/path requests rewrite under /admin.
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/")).toBe(true);
+    expect(bareAdminConsoleRewritePath("/")).toBe("/admin");
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/clients")).toBe(true);
+    expect(bareAdminConsoleRewritePath("/clients")).toBe("/admin/clients");
+
+    // Already-/admin paths never re-rewrite (loop guard).
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/admin")).toBe(false);
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/admin/clients")).toBe(false);
+
+    // API / Next-internal / auth paths pass through untouched.
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/api/admin/scan")).toBe(false);
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/_next/static/x.js")).toBe(false);
+    expect(shouldRewriteBareAdminConsole("admin.strelva.com", "/auth/callback")).toBe(false);
+  });
+
+  it("never treats a client admin dashboard or a plain tenant host as the operator console", () => {
+    // admin.<tenant>.strelva.com is the CLIENT admin dashboard — unchanged.
+    expect(extractTenantFromHost("admin.gldf.strelva.com")).toEqual({
+      tenant: "gldf",
+      isAdminSubdomain: true,
+    });
+    expect(isBareAdminHost("admin.gldf.strelva.com")).toBe(false);
+    expect(shouldRewriteBareAdminConsole("admin.gldf.strelva.com", "/")).toBe(false);
+
+    // A plain tenant host is unaffected.
+    expect(isBareAdminHost("gldf.strelva.com")).toBe(false);
+    expect(shouldRewriteBareAdminConsole("gldf.strelva.com", "/")).toBe(false);
+
+    // The marketing apex is not a bare admin host either.
+    expect(isBareAdminHost("strelva.com")).toBe(false);
   });
 
   it("routes /client tenant fallback paths to the dashboard surface", () => {
