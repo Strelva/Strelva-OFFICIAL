@@ -962,6 +962,56 @@ Only use tools for manifest-supported sections and actions. If the user requests
         },
       }),
     },
+    upload_gbp_photo: {
+      capability: "upload_gbp_photo",
+      def: tool({
+        description:
+          "Draft a photo to add to the Google Business listing (exterior, interior, product, cover, etc.). Creates a draft the owner must APPROVE before it publishes to Google — never uploads directly. Provide a hosted image URL (use upload_image first if the owner shared a file).",
+        inputSchema: z.object({
+          photoUrl: z.string().describe("Public URL of the image to add to the Google listing"),
+          category: z
+            .enum([
+              "COVER",
+              "PROFILE",
+              "LOGO",
+              "EXTERIOR",
+              "INTERIOR",
+              "PRODUCT",
+              "AT_WORK",
+              "FOOD_AND_DRINK",
+              "MENU",
+              "ADDITIONAL",
+            ])
+            .optional()
+            .describe("Which section of the Google profile the photo belongs in (default ADDITIONAL)"),
+        }),
+        execute: async ({ photoUrl, category }) => {
+          try {
+            const chosenCategory = category ?? "ADDITIONAL";
+            const { addEvent } = await import("@/lib/events");
+            const event = await addEvent({
+              tenantId: tenant,
+              source: "ai",
+              type: "content_update",
+              title: "Google photo upload",
+              body: `Add photo to Google listing (${chosenCategory}): ${photoUrl}`.slice(0, 500),
+              status: "pending",
+              metadata: { kind: "gbp_photo_draft", photoUrl, category: chosenCategory },
+            });
+            recordActionResult({
+              status: "queued",
+              eventIds: [event.id],
+              message: "Photo drafted — approve it to add it to your Google listing.",
+            });
+            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
+          } catch (err) {
+            const error = err instanceof Error ? err.message : "Failed to draft";
+            recordActionResult({ status: "failed", error });
+            return { success: false, error, agentResultStatus: "failed" as const };
+          }
+        },
+      }),
+    },
     list_subscribers: {
       capability: "list_subscribers",
       def: tool({
@@ -1605,10 +1655,42 @@ Only use tools for manifest-supported sections and actions. If the user requests
     },
   };
 
-  // Every active-subscription tenant gets every tool. No tier gating.
+  // Google Business write tools (post / hours / photo) are gated: they only
+  // appear for a LOCAL (or hybrid) business whose owner has connected a Google
+  // account that granted the `business.manage` write scope. An online-only
+  // brand has no listing to manage, and without the write scope every write
+  // would be rejected — so we don't dangle a tool that can't act. Mirrors the
+  // dashboard presence resolver (dashboard-surfaces) + the GBP write-scope
+  // check (gbp-replies). Belt-and-suspenders: the lib write functions still
+  // re-check scope at act time (on approval).
+  const gbpWriteAllowed = await (async () => {
+    const { getPresenceProfile } = await import("@/lib/dashboard-surfaces");
+    const { getContent } = await import("@/lib/storage");
+    const settings = (await getContent("settings", tenant).catch(() => null)) as
+      | { businessModel?: string }
+      | null;
+    const presence = getPresenceProfile({
+      template: tenantConfig?.template ?? "",
+      businessModel: settings?.businessModel,
+    });
+    if (presence === "online") return false;
+    const connections = await getConnections(tenant);
+    const google = Array.isArray(connections)
+      ? connections.find((c) => c.provider === "google" && c.status === "connected")
+      : undefined;
+    if (!google) return false;
+    const { connectionHasWriteScope } = await import("@/lib/gbp-replies");
+    return connectionHasWriteScope(google.scopes);
+  })();
+
+  const GBP_WRITE_TOOLS = new Set(["create_gbp_post", "update_business_hours", "upload_gbp_photo"]);
+
+  // Every active-subscription tenant gets every tool. No tier gating — the only
+  // conditional set is the Google Business write tools gated above.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {};
   for (const [name, { def }] of Object.entries(allTools)) {
+    if (GBP_WRITE_TOOLS.has(name) && !gbpWriteAllowed) continue;
     tools[name] = def;
   }
 
@@ -1670,6 +1752,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               toolName === "list_subscribers" ? "Checking subscribers..." :
               toolName === "create_gbp_post" ? "Drafting a Google post..." :
               toolName === "update_business_hours" ? "Drafting your hours update..." :
+              toolName === "upload_gbp_photo" ? "Drafting a photo for your listing..." :
               toolName === "draft_social_post" ? "Drafting social post..." :
               toolName === "list_social_posts" ? "Checking social posts..." :
               toolName === "get_reviews" ? "Checking your reviews..." :
