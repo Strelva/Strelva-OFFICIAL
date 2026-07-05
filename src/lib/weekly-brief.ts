@@ -97,9 +97,13 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   // timeout, a Sanity hiccup) degrades the brief to partial data instead of
   // throwing the whole report away.
   const zeroClicks = { total: 0, today: 0, thisWeek: 0, lastWeek: 0 };
-  const [pageViewCounts, bookingCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots, reviews] = await Promise.all([
+  const [pageViewCounts, bookingCounts, phoneCounts, events, activity, perServiceClicks, services, searchData, timestamps, visSnapshots, reviews] = await Promise.all([
     getClickCounts("page-view", tenantId).catch(() => zeroClicks),
     getClickCounts("booking-click", tenantId).catch(() => zeroClicks),
+    // Phone taps count as customer actions too — folded into the highlights /
+    // summary alongside booking clicks (the `bookingClicks` stat stays
+    // booking-only for the booking-specific proof surfaces that read it).
+    getClickCounts("phone-click", tenantId).catch(() => zeroClicks),
     getEvents(tenantId, { limit: 100 }).catch(() => []),
     getActivity(tenantId).catch(() => []),
     getClickCountsByPrefix("booking-click:", tenantId).catch(() => ({})),
@@ -136,6 +140,8 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     contentUpdates,
     pageViewsDelta: pageViewCounts.thisWeek - pageViewCounts.lastWeek,
     bookingClicksDelta: bookingCounts.thisWeek - bookingCounts.lastWeek,
+    phoneClicks: phoneCounts.thisWeek,
+    phoneClicksDelta: phoneCounts.thisWeek - phoneCounts.lastWeek,
   };
 
   const [suggestion] = await getSuggestions(tenantId);
@@ -171,9 +177,10 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   const visibilityWins = visSnapshots[0]
     ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
     : [];
-  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity, reviewSummary)].slice(0, 5);
+  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity, reviewSummary, phoneCounts.thisWeek)].slice(0, 5);
   const summary = await buildSummary({
     stats,
+    phoneClicks: phoneCounts.thisWeek,
     highlights,
     topServices,
     topSearchQueries,
@@ -252,7 +259,8 @@ export function buildHighlights(
   stats: WeeklyBriefStats,
   events: Array<{ type: string; title: string }>,
   activity: Array<{ text: string; actor?: string; type?: string }>,
-  reviewSummary?: ClientReviewSummary
+  reviewSummary?: ClientReviewSummary,
+  phoneClicks = 0
 ): string[] {
   const highlights: string[] = [];
 
@@ -262,6 +270,12 @@ export function buildHighlights(
 
   if (stats.bookingClicks > 0) {
     highlights.push(`${stats.bookingClicks} clicked your booking link`);
+  }
+
+  // Phone taps are a customer action too (often the top local conversion) —
+  // surfaced honestly as calls, never merged into the booking-click line.
+  if (phoneClicks > 0) {
+    highlights.push(`${phoneClicks} called you from your site`);
   }
 
   // Prefer the richer review line (rating + praise) when we have reviews to
@@ -290,6 +304,7 @@ export function buildHighlights(
 
 async function buildSummary(data: {
   stats: WeeklyBriefStats;
+  phoneClicks: number;
   highlights: string[];
   topServices: Array<{ name: string; clicks: number }>;
   topSearchQueries: Array<{ query: string; clicks: number; impressions: number }>;
@@ -303,7 +318,8 @@ async function buildSummary(data: {
 
 Stats:
 - ${data.stats.pageViews} people found the site (${formatDelta(data.stats.pageViewsDelta)} vs last week)
-- ${data.stats.bookingClicks} booking clicks (${formatDelta(data.stats.bookingClicksDelta)} vs last week)
+- ${data.stats.bookingClicks} clicked your booking link (${formatDelta(data.stats.bookingClicksDelta)} vs last week)
+- ${data.phoneClicks} called you from your site
 - ${data.stats.reviewsReceived} reviews received
 - ${data.stats.contentUpdates} AI site updates
 
@@ -323,11 +339,11 @@ Rules:
     });
     return text.trim();
   } catch {
-    return buildFallbackSummary(data.stats);
+    return buildFallbackSummary(data.stats, data.phoneClicks);
   }
 }
 
-function buildFallbackSummary(stats: WeeklyBriefStats): string {
+function buildFallbackSummary(stats: WeeklyBriefStats, phoneClicks = 0): string {
   const parts: string[] = [];
 
   if (stats.pageViews > 0) {
@@ -338,6 +354,10 @@ function buildFallbackSummary(stats: WeeklyBriefStats): string {
 
   if (stats.bookingClicks > 0) {
     parts.push(`${stats.bookingClicks} clicked to book`);
+  }
+
+  if (phoneClicks > 0) {
+    parts.push(`${phoneClicks} called you`);
   }
 
   if (stats.contentUpdates > 0) {

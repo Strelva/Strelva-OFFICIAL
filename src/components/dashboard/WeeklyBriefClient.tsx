@@ -294,8 +294,9 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             <StatTile
               countUp
               label="Customer actions"
-              value={brief.stats.bookingClicks}
-              delta={brief.stats.bookingClicksDelta ?? 0}
+              value={brief.stats.bookingClicks + (brief.stats.phoneClicks ?? 0)}
+              delta={(brief.stats.bookingClicksDelta ?? 0) + (brief.stats.phoneClicksDelta ?? 0)}
+              detail={(brief.stats.phoneClicks ?? 0) > 0 ? "Booked or called you" : undefined}
               icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile

@@ -34,6 +34,8 @@ export interface WeeklyReportData {
   tenant: TenantConfig;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
+  /** tel: taps — a customer action folded into the "booked or called" total. */
+  phoneClicks: { total: number; thisWeek: number };
   topServices: ServiceClickData[];
   topSearchQueries: SearchQuery[];
   staleSections: { section: string; daysSinceUpdate: number }[];
@@ -255,6 +257,9 @@ interface ReportSummaryInput {
   ownerName: string;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
+  /** tel: taps — folded into the "booked or called" line; optional for callers
+   * (defaults to zero) so a report built before phone tracking stays valid. */
+  phoneClicks?: { total: number; thisWeek: number };
   topServices: ServiceClickData[];
   topSearchQueries: SearchQuery[];
   staleSections: { section: string; daysSinceUpdate: number }[];
@@ -295,10 +300,25 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
     );
   }
 
-  if (data.bookingClicks.thisWeek > 0) {
+  // Customer actions = booking-link clicks + phone taps. Claims-safe: reports
+  // the CLICK / the call, never a won booking or a lead. Phone taps are folded
+  // in as calls, never relabeled as booking clicks.
+  const phone = data.phoneClicks ?? { total: 0, thisWeek: 0 };
+  if (data.bookingClicks.thisWeek > 0 && phone.thisWeek > 0) {
+    const total = data.bookingClicks.thisWeek + phone.thisWeek;
+    const grandTotal = data.bookingClicks.total + phone.total;
+    paragraphs.push(
+      `${total} people took action this week — ${data.bookingClicks.thisWeek} clicked to book and ${phone.thisWeek} called you (${grandTotal} total).`,
+    );
+  } else if (data.bookingClicks.thisWeek > 0) {
     const plural = data.bookingClicks.thisWeek === 1 ? "click" : "clicks";
     paragraphs.push(
       `${data.bookingClicks.thisWeek} booking ${plural} came through this week (${data.bookingClicks.total} total).`,
+    );
+  } else if (phone.thisWeek > 0) {
+    const plural = phone.thisWeek === 1 ? "person" : "people";
+    paragraphs.push(
+      `${phone.thisWeek} ${plural} called you this week (${phone.total} total).`,
     );
   }
 
@@ -360,11 +380,14 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
 
   // When there is no visit data at all (total 0), tracking is still coming
   // online — do NOT assert "0 people found you" as a measured fact.
-  const hasTrafficData = data.pageViews.total > 0 || data.bookingClicks.total > 0;
+  const phone = data.phoneClicks ?? { total: 0, thisWeek: 0 };
+  const hasTrafficData = data.pageViews.total > 0 || data.bookingClicks.total > 0 || phone.total > 0;
   const statsBlock = hasTrafficData
     ? `Traffic this week:
 - ${data.pageViews.thisWeek} people found the site (${data.pageViews.total} total)
-- ${data.bookingClicks.thisWeek} booking clicks (${data.bookingClicks.total} total)`
+- ${data.bookingClicks.thisWeek} clicked to book (${data.bookingClicks.total} total)
+- ${phone.thisWeek} tapped to call you (${phone.total} total)
+- Customer actions (clicked to book or called) this week: ${data.bookingClicks.thisWeek + phone.thisWeek}`
     : `Visitor tracking is still coming online for this site — there is no visit data to report yet. Do NOT state a visitor or click count.`;
 
   const visibilityBlock = data.visibilityLines
@@ -429,10 +452,12 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics, searchPerf, gaPerf] =
+  const [pageViews, bookingClicks, phoneClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics, searchPerf, gaPerf] =
     await Promise.all([
       getClickCounts("page-view", tenantId),
       getClickCounts("booking-click", tenantId),
+      // Phone taps fold into the "booked or called" customer-actions total.
+      getClickCounts("phone-click", tenantId),
       getSectionTimestamps(tenantId),
       getActivity(tenantId),
       getContent("settings", tenantId),
@@ -504,6 +529,7 @@ export async function generateWeeklyReport(
     ownerName: tenant.ownerName,
     pageViews,
     bookingClicks,
+    phoneClicks,
     topServices,
     topSearchQueries,
     staleSections,
@@ -519,6 +545,7 @@ export async function generateWeeklyReport(
     tenant,
     pageViews,
     bookingClicks,
+    phoneClicks,
     topServices,
     topSearchQueries,
     staleSections,
