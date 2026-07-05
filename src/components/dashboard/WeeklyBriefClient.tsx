@@ -11,10 +11,12 @@ import { metricVerdicts } from "@/lib/proof";
 import type { Goal } from "@/lib/goals";
 import type { TrafficAnomaly } from "@/lib/anomaly";
 import type { CompetitorBenchmark } from "@/lib/competitor-benchmark";
+import type { AiVisibilityScorecard as AiVisibilityScorecardData } from "@/lib/ai-visibility-scorecard";
 import type { SearchPerf, GaPerf } from "@/lib/analytics";
 import { useDashboardOptional } from "./DashboardContext";
 import { GoalCard } from "./GoalCard";
 import { SearchAnalyticsPanel } from "./SearchAnalyticsPanel";
+import { AiVisibilityScorecard } from "./AiVisibilityScorecard";
 import { StatTile } from "./StatTile";
 
 interface WeeklyBriefClientProps {
@@ -25,6 +27,8 @@ interface WeeklyBriefClientProps {
   goal?: Goal | null;
   anomaly?: TrafficAnomaly | null;
   benchmark?: CompetitorBenchmark | null;
+  /** "You in AI answers" scorecard — the AI-search visibility wedge, owner-facing. */
+  aiVisibility?: AiVisibilityScorecardData | null;
   searchData?: SearchData | null;
   /** Live Search Console performance for this tenant. */
   searchPerf?: SearchPerf | null;
@@ -105,7 +109,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
     analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
@@ -187,6 +191,11 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           <div className="mt-8">
             <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           </div>
+          {aiVisibility && (
+            <div className="mt-8">
+              <AiVisibilityScorecard data={aiVisibility} />
+            </div>
+          )}
           {footerSlot && <div className="mt-8">{footerSlot}</div>}
         </div>
       </div>
@@ -355,6 +364,13 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* You in AI answers — the AI-search visibility wedge, owner-facing */}
+          {aiVisibility && (
+            <div className="animate-fade-in-up" style={{ animationDelay: "134ms" }}>
+              <AiVisibilityScorecard data={aiVisibility} />
             </div>
           )}
 

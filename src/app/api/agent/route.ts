@@ -231,6 +231,8 @@ ${sectionSummaries.join("\n\n")}
 
 You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
 
+If the owner asks to undo, revert, or "put it back the way it was", use the undo_last_change tool for the affected section — it drafts a revert to the previous version and queues it for approval (it does not go live on its own).
+
 Available sections: ${sectionNames}.`;
 
   prompt += `\n\n${logisticsGuardrail(sectionNames)}`;
@@ -507,6 +509,120 @@ Only use tools for manifest-supported sections and actions. If the user requests
             };
           } catch (err) {
             const error = `Failed to update ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
+            recordActionResult({ status: "failed", sectionIds: [section], error });
+            return { success: false, error, section, agentResultStatus: "failed" as const };
+          }
+        },
+      }),
+    },
+    undo_last_change: {
+      capability: "undo_last_change",
+      def: tool({
+        description:
+          "Undo the most recent change to a website section, or restore a specific earlier version by id. Use when the owner says things like \"undo that\", \"revert\", or \"put it back the way it was\". A revert is a real change: it drafts the restore and routes it through the SAME approval queue as any edit — it never publishes to the live site on its own. Read/identify the section first.",
+        inputSchema: z.object({
+          section: sectionEnum,
+          versionId: z
+            .string()
+            .optional()
+            .describe(
+              "Optional: restore this specific earlier version id (from the section's history) instead of undoing only the last change."
+            ),
+        }),
+        execute: async ({ section, versionId }) => {
+          try {
+            const { getVersions } = await import("@/lib/storage");
+            // Newest-first: versions[0] is the current live content (the most
+            // recent change); versions[1] is what it looked like before it.
+            const versions = await getVersions(section as ContentSection, tenant);
+
+            let target: (typeof versions)[number] | undefined;
+            if (versionId) {
+              target = versions.find((v) => v.id === versionId);
+              if (!target) {
+                const message = `I couldn't find that saved version of your ${section} to restore.`;
+                recordActionResult({ status: "no-op", sectionIds: [section], message });
+                return {
+                  success: false,
+                  section,
+                  nothingToUndo: true,
+                  message,
+                  agentResultStatus: "no-op" as const,
+                };
+              }
+            } else {
+              if (versions.length < 2) {
+                const message = `There's no earlier version of your ${section} to go back to yet.`;
+                recordActionResult({ status: "no-op", sectionIds: [section], message });
+                return {
+                  success: false,
+                  section,
+                  nothingToUndo: true,
+                  message,
+                  agentResultStatus: "no-op" as const,
+                };
+              }
+              target = versions[1];
+            }
+
+            // Draft the revert through the SAME governed content path as
+            // update_section, forcing the review queue so an undo is always
+            // owner-approved before it goes live (never auto-published).
+            const result = await applySectionUpdate({
+              tenantId: tenant,
+              section: section as ContentSection,
+              data: target.data as Record<string, unknown>,
+              tenantConfig: tenantConfig ?? null,
+              siteManifest,
+              forceReview: true,
+            });
+
+            if (result.status === "failed") {
+              recordActionResult({ status: "failed", sectionIds: [section], error: result.error });
+              return { success: false, error: result.error, section, agentResultStatus: "failed" as const };
+            }
+            if (result.status === "blocked") {
+              recordActionResult({ status: "blocked", sectionIds: [section], message: result.message });
+              return {
+                success: false,
+                blocked: true,
+                section,
+                message: result.message,
+                reason: result.reason,
+                agentResultStatus: "blocked" as const,
+                risk: result.risk,
+                diffs: result.diffs,
+              };
+            }
+
+            // forceReview guarantees the queued branch; the published arm is
+            // defensive so the shape stays coherent if governance ever changes.
+            const eventId = result.status === "queued" ? result.eventId : undefined;
+            const message = `I've drafted a revert of your ${section} back to the earlier version. It'll go live once you approve it — nothing changes on your site until then.`;
+            const sourceProof = `Source: ${section} version history (restoring ${target.id})`;
+            recordActionResult({
+              status: "queued",
+              sectionIds: [section],
+              eventIds: eventId ? [eventId] : undefined,
+              message,
+              sourceProof,
+            });
+            return {
+              success: true,
+              section,
+              restoredFromVersionId: target.id,
+              eventId,
+              eventIds: eventId ? [eventId] : undefined,
+              governance: result.governance,
+              risk: result.risk,
+              diffs: result.diffs,
+              applied: false,
+              agentResultStatus: "queued" as const,
+              message,
+              sourceProof,
+            };
+          } catch (err) {
+            const error = `Failed to undo ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
             recordActionResult({ status: "failed", sectionIds: [section], error });
             return { success: false, error, section, agentResultStatus: "failed" as const };
           }
@@ -1745,6 +1861,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             const label =
               toolName === "read_section" ? `Reading your ${section || "content"}...` :
               toolName === "update_section" ? `Updating your ${section || "content"}...` :
+              toolName === "undo_last_change" ? `Drafting an undo of your ${section || "content"}...` :
               toolName === "upload_image" ? "Uploading image..." :
               toolName === "get_metrics" ? "Checking your metrics..." :
               toolName === "explain_traffic" ? "Diagnosing your traffic..." :
