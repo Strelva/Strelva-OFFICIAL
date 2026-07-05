@@ -25,7 +25,9 @@ import {
   setAnalyticsConfig,
   getSearchConsolePerf,
   getGa4Perf,
+  registerHostedSiteWithSearchConsole,
 } from "@/lib/analytics";
+import type { TenantConfig } from "@/lib/types";
 
 /** A Map-backed fake of the Upstash client (get/set of JSON objects). */
 function fakeRedis() {
@@ -234,6 +236,73 @@ describe("getGa4Perf", () => {
     expect(perf.status).toBe("unavailable");
     expect(perf.users).toBe(0);
     expect(perf.topPages).toEqual([]);
+  });
+});
+
+describe("registerHostedSiteWithSearchConsole (GROUNDWORK — gated, never auto-invoked)", () => {
+  const tenant = { id: "gldf", siteUrl: "https://www.gldf.com" } as TenantConfig;
+
+  it("is a no-op that fires NO network call unless explicitly opted in", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await registerHostedSiteWithSearchConsole(
+      tenant,
+      "https://www.gldf.com",
+      { allow: false },
+    );
+
+    expect(result.status).toBe("skipped");
+    expect(result.property).toBe("sc-domain:gldf.com");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("issues the Sites: add PUT with the service account when opted in", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await registerHostedSiteWithSearchConsole(
+      tenant,
+      "https://www.gldf.com",
+      { allow: true },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.property).toBe("sc-domain:gldf.com");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { method: string }];
+    expect(url).toContain("/webmasters/v3/sites/");
+    expect(url).toContain(encodeURIComponent("sc-domain:gldf.com"));
+    expect(init.method).toBe("PUT");
+  });
+
+  it("returns unavailable (never a false success) when no service account is configured", async () => {
+    mockGetCredential.mockReturnValue(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await registerHostedSiteWithSearchConsole(
+      tenant,
+      "https://www.gldf.com",
+      { allow: true },
+    );
+
+    expect(result.status).toBe("unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces an error (not a fake verified state) when Google rejects the add", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 403, text: async () => "forbidden" })),
+    );
+
+    const result = await registerHostedSiteWithSearchConsole(
+      tenant,
+      "https://www.gldf.com",
+      { allow: true },
+    );
+
+    expect(result.status).toBe("error");
   });
 });
 

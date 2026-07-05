@@ -8,6 +8,7 @@ const mockIsVercelConfigured = vi.hoisted(() => vi.fn());
 const mockCreateVercelProject = vi.hoisted(() => vi.fn());
 const mockSetVercelEnv = vi.hoisted(() => vi.fn());
 const mockAddVercelDomain = vi.hoisted(() => vi.fn());
+const mockSetAnalyticsConfig = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tenants", () => ({
   createTenant: mockCreateTenant,
@@ -15,6 +16,12 @@ vi.mock("@/lib/tenants", () => ({
 }));
 vi.mock("@/lib/invites", () => ({ createInvite: mockCreateInvite }));
 vi.mock("@/lib/storage", () => ({ setContent: mockSetContent }));
+// Spy on the analytics auto-write but keep deriveScDomain real so the test
+// verifies provisioning persists the ACTUAL siteUrl-derived GSC property.
+vi.mock("@/lib/analytics", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/analytics")>();
+  return { ...actual, setAnalyticsConfig: mockSetAnalyticsConfig };
+});
 vi.mock("@/lib/vercel", () => ({
   isVercelConfigured: mockIsVercelConfigured,
   createVercelProject: mockCreateVercelProject,
@@ -43,6 +50,12 @@ beforeEach(() => {
   mockGetTenantConfig.mockResolvedValue(null);
   mockCreateInvite.mockResolvedValue(true);
   mockSetContent.mockResolvedValue(undefined);
+  mockSetAnalyticsConfig.mockResolvedValue({
+    tenantId: "acme",
+    gscProperty: "sc-domain:acmehvac.com",
+    ga4PropertyId: null,
+    updatedAt: new Date().toISOString(),
+  });
   mockIsVercelConfigured.mockReturnValue(true);
   mockCreateVercelProject.mockResolvedValue({ ok: true, data: { id: "prj_1", name: "acme-site" } });
   mockSetVercelEnv.mockResolvedValue({ ok: true, data: { set: ["TENANT_ID"] } });
@@ -79,6 +92,26 @@ describe("provisionTenant", () => {
     expect(result.clientEnv.REVALIDATION_SECRET).toMatch(/^[a-f0-9]{64}$/);
     expect(result.clientEnv.SCAFFOLD_API_URL).toBe("https://scaffoldweb.com");
     expect(result.clientEnv.TENANT_ID).toBe("acme");
+  });
+
+  it("persists the siteUrl-derived GSC analytics config so reads need no manual admin step", async () => {
+    const result = await provisionTenant(baseInput);
+
+    // GSC property derived from the production domain, GA4 left ready to fill.
+    expect(mockSetAnalyticsConfig).toHaveBeenCalledWith("acme", {
+      gscProperty: "sc-domain:acmehvac.com",
+      ga4PropertyId: null,
+    });
+    expect(stepStatus(result.steps, "analytics")).toBe("ok");
+  });
+
+  it("reports the analytics step as failed without aborting when the config write throws", async () => {
+    mockSetAnalyticsConfig.mockRejectedValue(new Error("redis down"));
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "analytics")).toBe("failed");
+    // Provisioning still completes the later steps (fail-soft).
+    expect(stepStatus(result.steps, "vercel_project")).toBe("ok");
   });
 
   it("skips Vercel steps when no token is configured", async () => {

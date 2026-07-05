@@ -13,6 +13,7 @@ import { randomBytes } from "node:crypto";
 import { createTenant, getTenantConfig } from "./tenants";
 import { createInvite } from "./invites";
 import { setContent } from "./storage";
+import { setAnalyticsConfig, deriveScDomain } from "./analytics";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
 import type { ContentSection, ContentMap } from "./types";
@@ -218,6 +219,35 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       : `${seeded}/${SEED_SECTIONS.length} sections — failed: ${seedFailures.join(", ")}. Re-run provision to retry (safe; overwrites).`,
   });
 
+  // 2b. Analytics config — persist the siteUrl-derived GSC property (and leave a
+  //     GA4 field ready to fill) so the reporting service account read works with
+  //     NO manual admin step. getAnalyticsConfig already DERIVES this default at
+  //     read time; we persist it explicitly here so a newly provisioned tenant
+  //     has a concrete, stored config from day one (the "we host, so analytics
+  //     sets itself up" promise). Best-effort + fail-soft: setAnalyticsConfig
+  //     degrades to defaults without Redis and never throws, but we still guard
+  //     so a config-store hiccup can't abort onboarding.
+  const gscProperty = deriveScDomain(siteUrl);
+  try {
+    await setAnalyticsConfig(tenantId, { gscProperty, ga4PropertyId: null });
+    steps.push({
+      key: "analytics",
+      label: "Configure analytics reads",
+      status: "ok",
+      detail: gscProperty
+        ? `GSC property ${gscProperty} persisted · GA4 property ready to fill`
+        : "GA4 property ready to fill (no GSC property derivable from siteUrl)",
+    });
+  } catch (err) {
+    // Non-fatal: reads fall back to the derived default even if the write failed.
+    steps.push({
+      key: "analytics",
+      label: "Configure analytics reads",
+      status: "failed",
+      detail: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+
   // 3. Owner invite (createTenant already assigns if they already have an account).
   if (input.ownerEmail) {
     try {
@@ -299,6 +329,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // email says "no visits" every week — the client pays and the product looks
     // dead, with no alert. Verify it BEFORE handing over the dashboard.
     `CRITICAL: confirm the tracking beacon fires — load the live ${tenantId} site, then check /admin/tenants/${tenantId} shows a page-view (the repo must include ScaffoldTracker with NEXT_PUBLIC_SCAFFOLD_API_URL + NEXT_PUBLIC_TENANT_ID set)`,
+    // Search Console read access is a one-time manual grant on purpose — there is
+    // no safe public API to add another account as a *user* (auto-verification
+    // could mis-verify a property). Since we host, this is a single click.
+    `Grant Search Console reads: in the ${gscProperty ?? "client's"} property → Settings → Users and permissions, add strelva-reporting@strelva.iam.gserviceaccount.com as a Full/Restricted user (one-time; GA4: paste the Measurement ID + property id in /admin/tenants/${tenantId})`,
     `Customize the seeded starter content in the dashboard or via the AI agent`,
     input.ownerEmail
       ? `Send the owner invite email from /admin/tenants/${tenantId}`
