@@ -103,6 +103,8 @@ export async function GET() {
         businessName: tenant.siteName,
         reviewUrl,
         ownerName: tenant.ownerName?.trim() || undefined,
+        // Opt in to the CRM comms log so a real send accrues on the tenant timeline.
+        tenantId: tenant.id,
         logPrefix: "[cron order-review-request]",
       });
 

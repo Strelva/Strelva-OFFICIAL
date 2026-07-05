@@ -58,6 +58,8 @@ describe("GET /api/cron/portfolio-scan — health regression alert", () => {
         previousGrade: "B",
         currentGrade: "C",
         healthUrl: "https://admin.gldf.strelva.com/dashboard/health",
+        // Opts into the CRM comms log so the alert accrues on the tenant timeline.
+        tenantId: "gldf",
       }),
     );
     expect(mockRedisSet).toHaveBeenCalledWith(

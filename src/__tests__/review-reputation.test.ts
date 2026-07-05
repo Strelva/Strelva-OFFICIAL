@@ -3,9 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 import {
   buildReputationSummary,
+  buildGoogleReviewLink,
+  buildReviewShareMessage,
   computeReviewVelocity,
 } from "@/lib/reviews/reputation";
 import { ReputationHeader } from "@/components/dashboard/ReputationHeader";
+import { ReviewRequestCard } from "@/components/dashboard/ReviewsPanel";
 import type { ReviewItem } from "@/lib/types";
 
 const NOW = new Date("2026-06-30T12:00:00Z").getTime();
@@ -124,6 +127,55 @@ describe("buildReputationSummary — client-safe shape", () => {
     expect(keys).not.toContain("unansweredNegative");
     // The nested client summary is likewise concern-free.
     expect(Object.keys(rep.summary)).not.toContain("concerns");
+  });
+});
+
+describe("buildGoogleReviewLink — the get-more-reviews action", () => {
+  it("builds the canonical Google write-a-review deep link from a Place ID", () => {
+    expect(buildGoogleReviewLink("ChIJabc123")).toBe(
+      "https://search.google.com/local/writereview?placeid=ChIJabc123",
+    );
+  });
+
+  it("url-encodes the Place ID", () => {
+    expect(buildGoogleReviewLink("a b/c")).toBe(
+      "https://search.google.com/local/writereview?placeid=a%20b%2Fc",
+    );
+  });
+
+  it("returns null (never a faked URL) when no Place ID is configured", () => {
+    expect(buildGoogleReviewLink(undefined)).toBeNull();
+    expect(buildGoogleReviewLink(null)).toBeNull();
+    expect(buildGoogleReviewLink("")).toBeNull();
+    expect(buildGoogleReviewLink("   ")).toBeNull();
+  });
+});
+
+describe("buildReviewShareMessage", () => {
+  it("wraps the link in a warm, ready-to-send message", () => {
+    const link = "https://search.google.com/local/writereview?placeid=X";
+    expect(buildReviewShareMessage(link)).toBe(`Loved working with us? A quick review helps: ${link}`);
+  });
+});
+
+function renderCard(props: Parameters<typeof ReviewRequestCard>[0]): string {
+  return renderToStaticMarkup(createElement(ReviewRequestCard, props));
+}
+
+describe("ReviewRequestCard render", () => {
+  it("shows the real Google review link + shareable message when a Place ID is configured", () => {
+    const html = renderCard({ placeId: "ChIJabc123", connectHref: "/dashboard/sources/google-business" });
+    expect(html).toContain("Get more reviews");
+    expect(html).toContain("https://search.google.com/local/writereview?placeid=ChIJabc123");
+    expect(html).toContain("Loved working with us? A quick review helps:");
+    expect(html).toContain("Copy message");
+  });
+
+  it("shows the honest connect state (no faked URL) when no Place ID is configured", () => {
+    const html = renderCard({ connectHref: "/dashboard/sources/google-business" });
+    expect(html).toContain("Connect your Google listing");
+    // Never invents a review URL when there's no listing to point at.
+    expect(html).not.toContain("writereview");
   });
 });
 

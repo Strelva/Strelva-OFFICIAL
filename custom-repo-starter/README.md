@@ -12,8 +12,13 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") |
 | `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
 | `ScaffoldGA4.tsx` | Fail-silent GA4 tag → sends pageviews to the client's GA4 property (auto-wires from one env var) |
+| `ScaffoldReviews.tsx` | Server-rendered review-showcase grid (stars + source badge) — puts the 4.9★ social proof ON the live site |
+| `ScaffoldMap.tsx` | Server-rendered, keyless, lazy Google Maps embed (address / place query / lat-lng) |
+| `ScaffoldBooking.tsx` | Server-rendered, lazy booking iframe (Calendly inline or any iframe-embeddable scheduler) |
+| `scaffold-seo.ts` | Pure `buildMetadata` / `buildSitemap` / `buildRobots` mappers → Next.js `<head>` + sitemap + robots |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
+| `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
 | `README.md` | This file |
 
 ## Quick Start
@@ -293,6 +298,169 @@ of schema.org `openingHours` strings), `sameAs`.
 **Honesty rule:** any prop you don't pass is omitted from the output — it never
 emits an empty string, a placeholder, or a fabricated value. No CSP change is
 needed (it is a static JSON-LD block, not an executable script).
+
+### Reviews showcase (social proof on the live site)
+
+The dashboard shows the client their reviews; `ScaffoldReviews` puts them on the
+public site — the "4.9★ · 40 reviews" proof a stranger sees before they book.
+
+It is **prop-driven**: there is no public reviews endpoint in the v1 contract
+today (the control plane's `/api/reviews` is authenticated/admin-side), so you
+pass the reviews in. The `ScaffoldReview` shape mirrors the control plane's
+`ReviewItem` (`author` / `rating` / `text` / `date` / `source`), so a future
+public feed drops straight in.
+
+It is **server-rendered** (no `"use client"`) — no hydration mismatch, no client
+JS, no CSP change.
+
+```bash
+cp ScaffoldReviews.tsx my-client-site/components/ScaffoldReviews.tsx
+```
+
+```tsx
+import { ScaffoldReviews } from "@/components/ScaffoldReviews";
+
+<ScaffoldReviews
+  title="What our clients say"
+  reviews={[
+    { author: "Dana R.", rating: 5, text: "Best haircut in Buffalo.",
+      date: "2024-05-01", source: "google" },
+  ]}
+/>
+```
+
+**Props:** `reviews` (required), `title`, `showSummary` (default true — the
+aggregate `4.9 ★ · N reviews` line), `maxItems`, `emptyMessage`, and class hooks
+(`className`, `titleClassName`, `summaryClassName`, `gridClassName`,
+`cardClassName`, `starsClassName`, `textClassName`, `authorClassName`,
+`sourceClassName`).
+
+**Fail-silent / honesty:** a non-array or empty `reviews` never throws; with no
+reviews AND no `emptyMessage` it renders **nothing** (a fresh site never
+advertises that it has no reviews yet). Ratings are clamped to 0–5. Dates render
+as a deterministic `Month Year` (no locale/timezone hydration drift). The pure
+helpers `summarizeReviews`, `starParts`, and `clampRating` are exported for reuse
+and are unit-tested.
+
+### Map embed (find us)
+
+`ScaffoldMap` renders a lazy, responsive Google Maps embed with **no API key**
+(the keyless `maps.google.com/maps?...&output=embed` iframe). Server-rendered,
+self-contained.
+
+```bash
+cp ScaffoldMap.tsx my-client-site/components/ScaffoldMap.tsx
+```
+
+```tsx
+import { ScaffoldMap } from "@/components/ScaffoldMap";
+
+<ScaffoldMap address="12 Main St, Buffalo, NY 14201" />
+<ScaffoldMap lat={42.8864} lng={-78.8784} zoom={15} height={360} />
+```
+
+**Props:** `address`, `query`, `lat` + `lng` (coordinates win over address, which
+wins over query), `zoom` (default 14), `title`, `aspectRatio` (default 16/9),
+`height` (fixed px instead of an aspect ratio), `className`.
+
+**Fail-silent:** with no address, query, or coordinate pair it renders
+**nothing** — never a broken map. The pure `buildMapEmbedUrl` helper is exported
+and unit-tested.
+
+**CSP:** allow `https://maps.google.com` (and `https://www.google.com`) in
+`frame-src`. No `script-src` change needed.
+
+### Booking embed (book online)
+
+`ScaffoldBooking` wraps a scheduler in a lazy, responsive iframe — Calendly or
+any iframe-embeddable booking URL (Acuity, Cal.com, SavvyCal, …). This is the
+Growth-tier "transact" surface. Server-rendered, self-contained.
+
+It embeds via **iframe, not the provider's widget script** — so there is no extra
+`script-src` to allow and nothing to load-and-init on the client. For Calendly it
+adds `embed_type=Inline` (and hides the GDPR banner) for you.
+
+```bash
+cp ScaffoldBooking.tsx my-client-site/components/ScaffoldBooking.tsx
+```
+
+```tsx
+import { ScaffoldBooking } from "@/components/ScaffoldBooking";
+
+<ScaffoldBooking url="https://calendly.com/green-leaf/cleaning" />
+<ScaffoldBooking provider="iframe"
+  url="https://app.acuityscheduling.com/schedule.php?owner=123" />
+```
+
+**Props:** `url` (required to render), `provider` (`"calendly"` | `"iframe"`;
+inferred from the url host when omitted), `title`, `height` (default 700),
+`hideGdprBanner` (Calendly, default true), `hideEventTypeDetails` (Calendly),
+`className`.
+
+**Fail-silent:** with no `url` — or a non-`http(s)` url — it renders **nothing**.
+The pure `buildBookingEmbedUrl` / `resolveBookingProvider` helpers are exported
+and unit-tested.
+
+**CSP:** allow the provider host in `frame-src` (e.g. `https://calendly.com`). No
+`script-src` change needed.
+
+### SEO helpers (head, sitemap, robots)
+
+`scaffold-seo.ts` is pure, IO-free mappers from a Scaffold-shaped SEO config to
+Next.js metadata primitives — so every repo builds its `<head>`, `sitemap.ts`,
+and `robots.ts` the same way. The `ScaffoldSeoConfig` is a superset of the
+control plane's `PageConfig.seo` (`{ title, description, ogImage }`) plus
+`canonical` / `url` / `siteName` / `noindex`, so a fetched page config feeds
+straight in.
+
+```bash
+cp scaffold-seo.ts my-client-site/lib/scaffold-seo.ts
+```
+
+```tsx
+// app/page.tsx (or generateMetadata)
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/scaffold-seo";
+
+export const metadata: Metadata = buildMetadata({
+  title: "Green Leaf Dental",
+  description: "Family dentistry in Buffalo.",
+  ogImage: "https://greenleafdental.com/og.jpg",
+  canonical: "https://greenleafdental.com/",
+  siteName: "Green Leaf Dental",
+});
+```
+
+```ts
+// app/sitemap.ts
+import type { MetadataRoute } from "next";
+import { buildSitemap } from "@/lib/scaffold-seo";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return buildSitemap(
+    [{ url: "/", priority: 1 }, { url: "/services", changeFrequency: "weekly" }],
+    { baseUrl: "https://greenleafdental.com" },
+  );
+}
+```
+
+```ts
+// app/robots.ts
+import type { MetadataRoute } from "next";
+import { buildRobots } from "@/lib/scaffold-seo";
+
+export default function robots(): MetadataRoute.Robots {
+  return buildRobots({ disallow: ["/admin"], sitemap: "https://greenleafdental.com/sitemap.xml" });
+}
+```
+
+**Honesty rule:** every mapper OMITS any field you don't provide — no empty
+strings, no fabricated defaults. `buildMetadata` emits `openGraph` only when an
+OG-relevant field is set and `robots: { index:false }` only when `noindex` is
+passed. `buildSitemap` absolutizes path urls against `baseUrl`, clamps
+`priority` to 0–1, drops empty urls, and de-dupes. `buildRobots` defaults the
+user-agent to `*` and supports a `disallowAll` staging switch. All three are
+unit-tested.
 
 ## Required Contract
 

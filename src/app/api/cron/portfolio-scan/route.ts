@@ -82,6 +82,8 @@ export async function GET() {
       previousScore: prior.overallScore,
       currentScore: s.score,
       healthUrl: getTenantDashboardUrl(tenant, "/dashboard/health"),
+      // Opt in to the CRM comms log so a real health-drop alert accrues on the timeline.
+      tenantId: tenant.id,
       logPrefix: "[cron portfolio-scan]",
     });
     if (ok) regressionAlerts++;

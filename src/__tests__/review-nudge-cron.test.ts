@@ -59,6 +59,8 @@ describe("GET /api/cron/review-nudge", () => {
         email: "owner@t1.com",
         businessName: "GLDF",
         reviewUrl: "https://search.google.com/local/writereview?placeid=PLACE_123",
+        // Opts into the CRM comms log so a real nudge accrues on the tenant timeline.
+        tenantId: "gldf",
       }),
     );
     expect(mockRedisSet).toHaveBeenCalledWith("reb:review-nudge-sent:gldf", expect.any(Number));

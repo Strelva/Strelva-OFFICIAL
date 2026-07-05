@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Star, Sparkles, Check, Copy, Loader2, MessageSquare, Send } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
+import { buildGoogleReviewLink, buildReviewShareMessage } from "@/lib/reviews/reputation";
 import { ReputationHeader } from "./ReputationHeader";
 import { useDashboard } from "./DashboardContext";
 
@@ -14,26 +15,82 @@ interface ReviewsPanelProps {
   gbpConnected?: boolean;
 }
 
-/** A shareable Google "write a review" link — owners need more reviews, not more reply tools. */
-function ReviewRequestCard({ placeId }: { placeId: string }) {
+/** Small copy-to-clipboard button with a "Copied" flip; falls back silently to
+ *  the still-visible text when the clipboard API is unavailable. */
+function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
-  const url = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard unavailable — the link is still visible to copy manually
+      // clipboard unavailable — the text stays visible to copy manually
     }
   };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-on-accent transition-opacity hover:opacity-90"
+    >
+      {copied ? <Check className="h-3.5 w-3.5" strokeWidth={2} /> : <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />}
+      {copied ? "Copied" : label}
+    </button>
+  );
+}
+
+/**
+ * The one-tap "get more reviews" action — more reviews is the #1 reputation
+ * lever, so this hands the owner a ready-to-send message plus the raw Google
+ * review link. When no Google listing is connected there's no link to fake, so
+ * it degrades to an honest "connect your listing" state rather than a dead URL.
+ */
+export function ReviewRequestCard({
+  placeId,
+  connectHref,
+}: {
+  placeId?: string;
+  connectHref: string;
+}) {
+  const url = buildGoogleReviewLink(placeId);
+
+  if (!url) {
+    return (
+      <div className="mb-6 rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
+        <h2 className="text-[14px] font-medium text-warm-black">Get more reviews</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
+          Connect your Google listing to share a review link with happy customers — more reviews is
+          the strongest thing you can do for your reputation.
+        </p>
+        <Link
+          href={connectHref}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
+        >
+          Connect your Google listing
+        </Link>
+      </div>
+    );
+  }
+
+  const message = buildReviewShareMessage(url);
   return (
     <div className="mb-6 rounded-xl border border-accent/20 bg-accent-dim/40 p-4 sm:p-5">
       <h2 className="text-[14px] font-medium text-warm-black">Get more reviews</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-        Share this link with happy customers — it opens straight to your Google review form.
+        Send a happy customer this message — the link opens straight to your Google review form.
       </p>
-      <div className="mt-3 flex items-center gap-2">
+
+      {/* Ready-to-send message the owner can paste into a text or email. */}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+        <p className="min-w-0 flex-1 rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[13px] leading-relaxed text-warm-black">
+          {message}
+        </p>
+        <CopyButton text={message} label="Copy message" />
+      </div>
+
+      {/* The bare link on its own, for owners who want just the URL. */}
+      <div className="mt-2 flex items-center gap-2">
         <a
           href={url}
           target="_blank"
@@ -42,14 +99,7 @@ function ReviewRequestCard({ placeId }: { placeId: string }) {
         >
           {url}
         </a>
-        <button
-          type="button"
-          onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-on-accent transition-opacity hover:opacity-90"
-        >
-          {copied ? <Check className="h-3.5 w-3.5" strokeWidth={2} /> : <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />}
-          {copied ? "Copied" : "Copy link"}
-        </button>
+        <CopyButton text={url} label="Copy link" />
       </div>
     </div>
   );
@@ -330,6 +380,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
   const copyDest = copyDestination(reviews);
+  const connectHref = dashboardHref("/dashboard/sources/google-business");
   if (reviews.length === 0) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -342,7 +393,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
               No reviews yet
             </h1>
           </div>
-          {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
+          {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} connectHref={connectHref} />}
           <div className="rounded-xl dashboard-panel p-6 text-center">
             <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
               <MessageSquare className="h-5 w-5" strokeWidth={1.5} />
@@ -371,7 +422,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
       <div className="mx-auto w-full max-w-3xl">
         <ReputationHeader reviews={reviews} gbpConnected={gbpConnected} copyDest={copyDest} />
 
-        {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
+        <ReviewRequestCard placeId={googlePlaceId} connectHref={connectHref} />
 
         <div className="space-y-3">
           {reviews.map((review) => (
