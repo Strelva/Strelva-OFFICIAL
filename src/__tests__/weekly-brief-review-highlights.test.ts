@@ -26,6 +26,25 @@ const summary = (over: Partial<ClientReviewSummary> = {}): ClientReviewSummary =
   ...over,
 });
 
+describe("buildHighlights — phone calls fold into customer actions", () => {
+  it("adds a 'called you' highlight from phone clicks, separate from booking clicks", () => {
+    const out = buildHighlights(stats({ bookingClicks: 4 }), [], [], undefined, 3);
+    expect(out).toContain("4 clicked your booking link");
+    expect(out).toContain("3 called you from your site");
+  });
+
+  it("omits the calls line when there are no phone clicks", () => {
+    const out = buildHighlights(stats({ bookingClicks: 4 }), [], [], undefined, 0);
+    expect(out.some((h) => h.includes("called you"))).toBe(false);
+  });
+
+  it("never relabels a call as a booking click", () => {
+    const out = buildHighlights(stats({ bookingClicks: 0 }), [], [], undefined, 5);
+    expect(out.some((h) => h.includes("booking link"))).toBe(false);
+    expect(out).toContain("5 called you from your site");
+  });
+});
+
 describe("buildHighlights — review lines", () => {
   it("leads with the 5-star line when the summary has new 5-star reviews", () => {
     const out = buildHighlights(stats({ reviewsReceived: 5 }), [], [], summary({ newFiveStarThisPeriod: 3 }));

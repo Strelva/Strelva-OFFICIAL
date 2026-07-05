@@ -780,6 +780,10 @@ export interface WeeklyBriefStats {
   contentUpdates: number;
   pageViewsDelta: number;
   bookingClicksDelta: number;
+  /** Phone taps (tel: clicks). Optional so older briefs/tests stay valid. A call
+   *  is a customer action too, so surfaces total booking + phone clicks. */
+  phoneClicks?: number;
+  phoneClicksDelta?: number;
 }
 
 export interface WeeklyBriefNextAction {

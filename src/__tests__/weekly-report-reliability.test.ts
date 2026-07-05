@@ -88,6 +88,32 @@ describe("buildReportFallbackSummary (deterministic, claims-safe)", () => {
     expect(out).toContain("booking click");
   });
 
+  it("folds phone calls into customer actions alongside booking clicks", () => {
+    const out = buildReportFallbackSummary({
+      ...baseSummaryInput,
+      bookingClicks: { total: 30, thisWeek: 6 },
+      phoneClicks: { total: 12, thisWeek: 4 },
+    });
+    // Combined top-line = 6 + 4, with the split spelled out honestly.
+    expect(out).toContain("10 people took action this week");
+    expect(out).toContain("6 clicked to book");
+    expect(out).toContain("4 called you");
+    expect(out).toContain("42 total");
+  });
+
+  it("reports calls even when no one clicked to book (calls are customer actions)", () => {
+    const out = buildReportFallbackSummary({
+      ...baseSummaryInput,
+      bookingClicks: { total: 0, thisWeek: 0 },
+      phoneClicks: { total: 9, thisWeek: 3 },
+    });
+    expect(out).toContain("3 people called you this week");
+    expect(out).toContain("9 total");
+    // The call is reported as a call — never as a booking/booking click.
+    expect(out).not.toContain("3 booking");
+    expect(out).not.toContain("3 clicked to book");
+  });
+
   it("names the top service and the search term verbatim", () => {
     const out = buildReportFallbackSummary(baseSummaryInput);
     expect(out).toContain("Morning Flow");

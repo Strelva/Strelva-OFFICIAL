@@ -32,6 +32,7 @@ async function DashboardHome() {
     tenantConfig,
     retentionSignals,
     leadSummary,
+    phoneActions,
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
     getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -60,8 +61,15 @@ async function DashboardHome() {
       ownerNextAction: "Check back shortly.",
     })),
     getLeadSummary(tenant, 30).catch(() => ({ count: 0, recent: [] })),
+    // A tel: tap is a customer action too — often the #1 local conversion — so it
+    // folds into the top-line "Customer actions" total alongside booking clicks.
+    getClickCounts("phone-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
   ]);
   const pendingCount = needsYou.pendingCount;
+  // Customer actions = booking clicks + phone taps (booking's per-service
+  // breakdown stays booking-only elsewhere; this is just the top-line total).
+  const customerActionsTotal = customerActions.total + phoneActions.total;
+  const customerActionsThisWeek = customerActions.thisWeek + phoneActions.thisWeek;
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : getTenantPublicUrlFromDomainMap(tenant);
@@ -77,7 +85,7 @@ async function DashboardHome() {
   // nothing in the review queue, no AI changes yet, and no weekly report.
   const isFresh =
     pageViews.total === 0 &&
-    customerActions.total === 0 &&
+    customerActionsTotal === 0 &&
     pendingCount === 0 &&
     aiActivity.length === 0 &&
     !brief;
@@ -191,8 +199,12 @@ async function DashboardHome() {
           />
           <StatTile
             label="Customer actions"
-            value={customerActions.total}
-            detail={`${customerActions.thisWeek} in the last 7 days`}
+            value={customerActionsTotal}
+            detail={
+              phoneActions.total > 0
+                ? `${customerActions.thisWeek} clicked to book · ${phoneActions.thisWeek} called in the last 7 days`
+                : `${customerActionsThisWeek} in the last 7 days`
+            }
             icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
           />
           {/* "Needs you" already headlines the approval queue right above, so the
