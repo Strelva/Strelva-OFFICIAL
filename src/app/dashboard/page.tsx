@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink, FileText, Inbox, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
+import { ArrowRight, ExternalLink, FileText, Inbox, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
@@ -195,11 +195,18 @@ async function DashboardHome() {
             detail={`${customerActions.thisWeek} in the last 7 days`}
             icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
           />
+          {/* "Needs you" already headlines the approval queue right above, so the
+              third tile carries the managed-service proof instead: how much
+              Strelva did to the site this week. */}
           <StatTile
-            label="Needs you"
-            value={pendingCount}
-            detail={pendingCount > 0 ? "Review before anything goes live" : "Nothing is waiting on approval"}
-            icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.5} />}
+            label="Site updates"
+            value={retentionSignals.aiChangesThisWeek}
+            detail={
+              retentionSignals.aiChangesThisWeek > 0
+                ? "Strelva handled these for you this week"
+                : "No updates needed this week"
+            }
+            icon={<Sparkles className="h-4 w-4" strokeWidth={1.5} />}
           />
           </section>
           ) : null}

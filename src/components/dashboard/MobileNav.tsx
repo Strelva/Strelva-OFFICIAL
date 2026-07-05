@@ -6,14 +6,14 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useDashboard } from "./DashboardContext";
 import { useDashboardSurfaces } from "./DashboardSurfacesContext";
 import { SURFACE_ICONS, SURFACE_MATCH } from "./surface-nav";
-import type { SurfaceId } from "@/lib/dashboard-surfaces";
+import type { DashboardSurface, SurfaceId } from "@/lib/dashboard-surfaces";
 
 // What a phone owner actually reaches for, highest-priority first. A phone bar
 // fits 5, and a fully-connected local business has 6 shown tabs — so when we
 // have to drop one, we keep Reviews (owners check reviews on their phone) and
 // let the Website site-editor fall back to the hamburger (rarely edited from a
 // phone). Any id not listed sorts last.
-const MOBILE_KEEP_PRIORITY: SurfaceId[] = [
+export const MOBILE_KEEP_PRIORITY: SurfaceId[] = [
   "today",
   "ask-ai",
   "reviews",
@@ -22,30 +22,33 @@ const MOBILE_KEEP_PRIORITY: SurfaceId[] = [
   "website",
 ];
 
+/** The phone bottom bar shows only fully-active tabs, capped at 5 so a
+ *  fully-connected business doesn't overflow. We pick the 5 by owner priority
+ *  (so Reviews survives, not just the first five in nav order) but return them
+ *  in the natural nav order left-to-right. */
+export function pickMobileNavSurfaces(surfaces: DashboardSurface[]): DashboardSurface[] {
+  const shown = surfaces.filter((s) => s.state === "shown");
+  const rank = (id: SurfaceId) => {
+    const i = MOBILE_KEEP_PRIORITY.indexOf(id);
+    return i === -1 ? MOBILE_KEEP_PRIORITY.length : i;
+  };
+  const keep = new Set(
+    [...shown]
+      .sort((a, b) => rank(a.id) - rank(b.id))
+      .slice(0, 5)
+      .map((s) => s.id),
+  );
+  return shown.filter((s) => keep.has(s.id));
+}
+
 export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const surfaces = useDashboardSurfaces();
-  // The bottom bar shows only fully-active tabs, capped at 5 so a fully-connected
-  // business doesn't overflow a phone bar. We pick the 5 by owner priority (so
-  // Reviews survives, not just the first five in nav order) but render them in
-  // the natural nav order left-to-right. "Connect to unlock" nudges live in
-  // Today/desktop. Memoized so it's a stable reference — otherwise the
+  // "Connect to unlock" nudges live in Today/desktop, so the bar carries only
+  // fully-active tabs. Memoized so it's a stable reference — otherwise the
   // active-pill effect loops forever.
-  const navItems = useMemo(() => {
-    const shown = surfaces.filter((s) => s.state === "shown");
-    const rank = (id: SurfaceId) => {
-      const i = MOBILE_KEEP_PRIORITY.indexOf(id);
-      return i === -1 ? MOBILE_KEEP_PRIORITY.length : i;
-    };
-    const keep = new Set(
-      [...shown]
-        .sort((a, b) => rank(a.id) - rank(b.id))
-        .slice(0, 5)
-        .map((s) => s.id),
-    );
-    return shown.filter((s) => keep.has(s.id));
-  }, [surfaces]);
+  const navItems = useMemo(() => pickMobileNavSurfaces(surfaces), [surfaces]);
   const effectivePathname =
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"

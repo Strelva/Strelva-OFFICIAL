@@ -256,8 +256,9 @@ export function ClientsCrm({
                   aria-label={`Open ${c.siteName || c.ownerName || c.id}`}
                 />
 
-                {/* Identity */}
-                <div className="pointer-events-none relative z-[1] min-w-0 flex-1">
+                {/* Identity — bounded so it doesn't hog the row and fling the
+                    signals to the far edge; long names truncate. */}
+                <div className="pointer-events-none relative z-[1] min-w-0 max-w-[15rem] sm:max-w-[17rem]">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-warm-white truncate">
                       {c.siteName || c.ownerName || c.id}
@@ -303,13 +304,13 @@ export function ClientsCrm({
                   <span className="text-gray-faint whitespace-nowrap">{activeAgo(c.lastActivity)}</span>
                 </div>
 
-                {/* The one inline control: stage */}
+                {/* The one inline control: stage — pinned to the right rail. */}
                 <select
                   value={rec.stage ?? ""}
                   disabled={busy}
                   onChange={(e) => writeStage(c.id, e.target.value as CrmStage)}
                   onClick={(e) => e.stopPropagation()}
-                  className="pointer-events-auto relative z-[2] shrink-0 rounded-md bg-surface-base border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50 disabled:opacity-40"
+                  className="pointer-events-auto relative z-[2] ml-auto shrink-0 rounded-md bg-surface-base border border-glass-border px-2 py-1 text-xs text-warm-white focus:outline-none focus:border-accent/50 disabled:opacity-40"
                   aria-label={`Stage for ${c.siteName || c.id}`}
                 >
                   <option value="" disabled>
