@@ -71,19 +71,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let sent = false;
   if (type === "welcome") {
-    sent = await sendWelcomeEmail({ email, businessName, ownerName, dashboardUrl });
+    sent = await sendWelcomeEmail({ email, businessName, ownerName, dashboardUrl, tenantId: id });
   } else if (type === "site-live") {
     const siteUrl = config.siteUrl?.trim();
     if (!siteUrl) {
       return NextResponse.json({ error: "This client has no site URL on file." }, { status: 400 });
     }
-    sent = await sendSiteLiveEmail({ email, businessName, siteUrl, dashboardUrl });
+    sent = await sendSiteLiveEmail({ email, businessName, siteUrl, dashboardUrl, tenantId: id });
   } else {
     const url = typeof reviewUrl === "string" ? reviewUrl.trim() : "";
     if (!url) {
       return NextResponse.json({ error: "A review URL is required." }, { status: 400 });
     }
-    sent = await sendReviewRequestEmail({ email, businessName, reviewUrl: url, ownerName });
+    sent = await sendReviewRequestEmail({ email, businessName, reviewUrl: url, ownerName, tenantId: id });
   }
 
   // A false return can mean "paused" or "send failed". Surface paused distinctly

@@ -6,7 +6,80 @@ import { QueueCard } from "./QueueCard";
 import { EmptyQueue } from "./EmptyQueue";
 import { SuggestionCard } from "./SuggestionCard";
 import type { UnifiedEvent } from "@/lib/types";
+import type { PreviewDiff } from "@/lib/agent-risk";
 import { useDashboardOptional } from "./DashboardContext";
+
+/**
+ * Field-level BEFORE→AFTER diff for a pending content-change event. The AI's
+ * proposed edit already computes these (`metadata.diffs`, from
+ * `generatePreviewDiffs`), so an approver — especially one bulk-approving —
+ * glances at what actually changed instead of trusting the title's label.
+ * Read-only: the approve/skip actions live on the card above and are untouched.
+ */
+function readDiffs(event: UnifiedEvent): PreviewDiff[] {
+  if (event.type !== "content_update") return [];
+  const raw = event.metadata?.diffs;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (d): d is PreviewDiff =>
+      Boolean(d) &&
+      typeof d === "object" &&
+      typeof (d as PreviewDiff).field === "string" &&
+      (["added", "removed", "changed"] as const).includes((d as PreviewDiff).type),
+  );
+}
+
+const MAX_DIFF_ROWS = 6;
+const MAX_DIFF_VALUE = 160;
+
+function truncate(value: string): string {
+  const v = value.replace(/\s+/g, " ").trim();
+  return v.length > MAX_DIFF_VALUE ? `${v.slice(0, MAX_DIFF_VALUE)}…` : v;
+}
+
+function QueueDiff({ diffs }: { diffs: PreviewDiff[] }) {
+  if (diffs.length === 0) return null;
+  const shown = diffs.slice(0, MAX_DIFF_ROWS);
+  const extra = diffs.length - shown.length;
+
+  return (
+    <div className="mt-1.5 ml-11 rounded-lg border border-glass-border bg-surface-inset px-3 py-2.5">
+      <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+        What changed
+      </p>
+      <ul className="space-y-2">
+        {shown.map((d, i) => (
+          <li key={`${d.field}-${i}`} className="text-[12px] leading-snug">
+            <span className="font-mono text-[11px] text-gray-muted">{d.field}</span>
+            {d.type === "added" ? (
+              <div className="mt-0.5 rounded bg-success-dim px-1.5 py-0.5 text-success">
+                + {truncate(d.after)}
+              </div>
+            ) : d.type === "removed" ? (
+              <div className="mt-0.5 rounded bg-red-500/10 px-1.5 py-0.5 text-red-500 line-through">
+                − {truncate(d.before)}
+              </div>
+            ) : (
+              <div className="mt-0.5 space-y-0.5">
+                <div className="rounded bg-red-500/10 px-1.5 py-0.5 text-red-500 line-through">
+                  {truncate(d.before)}
+                </div>
+                <div className="rounded bg-success-dim px-1.5 py-0.5 text-success">
+                  {truncate(d.after)}
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {extra > 0 && (
+        <p className="mt-2 text-[11px] text-gray-subtle">
+          +{extra} more field{extra === 1 ? "" : "s"} changed
+        </p>
+      )}
+    </div>
+  );
+}
 
 type QueueAction =
   | "approved"
@@ -245,13 +318,16 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                       disabled={processingIds.has(event.id)}
                     />
                   ) : (
-                    <QueueCard
-                      event={event}
-                      onApprove={handleApprove}
-                      onDismiss={handleDismiss}
-                      onWorkflowAction={handleWorkflowAction}
-                      disabled={processingIds.has(event.id)}
-                    />
+                    <>
+                      <QueueCard
+                        event={event}
+                        onApprove={handleApprove}
+                        onDismiss={handleDismiss}
+                        onWorkflowAction={handleWorkflowAction}
+                        disabled={processingIds.has(event.id)}
+                      />
+                      <QueueDiff diffs={readDiffs(event)} />
+                    </>
                   )}
                 </div>
               ))}

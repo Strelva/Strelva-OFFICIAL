@@ -40,6 +40,9 @@ export interface TodayFeedProps {
   /** Portfolio-wide attention items (merged in from the old "Needs attention"
    *  list — one attention surface, not two). */
   flags?: TodayFlag[];
+  /** Aggregated pending approvals across every client — links to the portfolio
+   *  actions "clear everything" screen. */
+  portfolioActions?: { items: number; clients: number };
 }
 
 function timeAgo(iso: string): string {
@@ -67,11 +70,12 @@ function Dot({ tone }: { tone: "red" | "amber" | "emerald" | "muted" }) {
   return <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cls}`} />;
 }
 
-export function TodayFeed({ leads, approvals, atRisk, signups, flags = [] }: TodayFeedProps) {
+export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portfolioActions }: TodayFeedProps) {
   const highFlags = flags.filter((f) => f.severity !== "low");
   const nothingWaiting =
     leads.unworked === 0 &&
     approvals.total === 0 &&
+    (portfolioActions?.items ?? 0) === 0 &&
     atRisk.length === 0 &&
     highFlags.length === 0;
 
@@ -133,7 +137,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [] }: Tod
         <div className="px-5 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Dot tone={approvals.total > 0 ? "amber" : "muted"} />
+              <Dot tone={approvals.total > 0 || (portfolioActions?.items ?? 0) > 0 ? "amber" : "muted"} />
               <span className="text-sm text-warm-white">Waiting for you</span>
               <span className="text-xs text-gray-muted">
                 {approvals.total > 0
@@ -141,7 +145,26 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [] }: Tod
                   : "nothing pending"}
               </span>
             </div>
+            {(portfolioActions?.items ?? 0) > 0 && (
+              <Link href="/admin/actions" className="text-xs text-accent hover:underline">
+                Clear portfolio →
+              </Link>
+            )}
           </div>
+          {(portfolioActions?.items ?? 0) > 0 && (
+            <Link
+              href="/admin/actions"
+              className="mt-2 flex items-center gap-2 rounded-lg border border-glass-border bg-glass px-3 py-2 text-xs transition-colors hover:border-gray-border"
+            >
+              <Dot tone="amber" />
+              <span className="text-warm-white">{portfolioActions!.items}</span>
+              <span className="text-gray-muted">
+                approval{portfolioActions!.items === 1 ? "" : "s"} across{" "}
+                {portfolioActions!.clients} client{portfolioActions!.clients === 1 ? "" : "s"}
+              </span>
+              <span className="ml-auto text-accent">Approve →</span>
+            </Link>
+          )}
           {approvals.total > 0 && (
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
               {approvals.drafts > 0 && (

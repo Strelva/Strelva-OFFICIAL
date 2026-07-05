@@ -23,6 +23,7 @@ import type { MaintenanceDigest } from "@/lib/maintenance-digest";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { OperatorConsole } from "./OperatorConsole";
 import { TodayFeed, type TodayFlag } from "./TodayFeed";
+import { getPortfolioActions } from "./actions/portfolio-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,14 @@ export default async function AdminPage() {
 
   const todaySignups = recentSignups(TENANTS);
 
+  // Aggregated pending approvals across every client — the count links into the
+  // portfolio "clear everything" screen. Degrades to zero on any read failure.
+  const portfolioActions = await getPortfolioActions().catch(() => ({
+    groups: [],
+    totalItems: 0,
+    totalClients: 0,
+  }));
+
   return (
     <div className="max-w-5xl space-y-8">
       {/* Header */}
@@ -168,6 +177,10 @@ export default async function AdminPage() {
         atRisk={todayAtRisk}
         signups={todaySignups}
         flags={flags}
+        portfolioActions={{
+          items: portfolioActions.totalItems,
+          clients: portfolioActions.totalClients,
+        }}
       />
 
       {/* One link into the single client list */}

@@ -13,6 +13,7 @@ import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { MilestonePanel } from "@/components/dashboard/MilestonePanel";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 import { SiteHealthCard } from "@/components/dashboard/SiteHealthCard";
+import { TrafficSourcesPanel } from "@/components/dashboard/TrafficSourcesPanel";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 
 // Analytics = the merged Reports + Health surface. The weekly report leads with a
@@ -53,6 +54,8 @@ export default async function AnalyticsPage() {
   // "You in AI answers" scorecard — the AI-search wedge, surfaced to the owner.
   const aiVisibility = buildAiVisibilityScorecard(snapshots[0] ?? null, snapshots[1] ?? null);
 
+  const connectHref = withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations");
+
   return (
     <>
       <EngagementTracker event="report-view" />
@@ -81,25 +84,31 @@ export default async function AnalyticsPage() {
             searchData={searchData}
             searchPerf={searchPerf}
             gaPerf={gaPerf}
-            analyticsConnectHref={withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations")}
+            analyticsConnectHref={connectHref}
             footerSlot={
-          <details className="group rounded-2xl border border-glass-border bg-glass">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-                  Site health
-                </p>
-                <p className="mt-1 text-[13px] text-gray-muted">
-                  The daily check of your live site — speed, security, SEO, accessibility.
-                </p>
+          <div className="space-y-8">
+            {/* Where your visitors come from — GA4 traffic sources. Totals + top
+                pages already render mid-brief in the Search & Analytics panel;
+                this fills the missing "which channels" view in the same scroll. */}
+            <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
+            <details className="group rounded-2xl border border-glass-border bg-glass">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
+                    Site health
+                  </p>
+                  <p className="mt-1 text-[13px] text-gray-muted">
+                    The daily check of your live site — speed, security, SEO, accessibility.
+                  </p>
+                </div>
+                <span className="shrink-0 text-[12px] font-medium text-accent group-open:hidden">Show</span>
+                <span className="hidden shrink-0 text-[12px] font-medium text-accent group-open:inline">Hide</span>
+              </summary>
+              <div className="px-4 pb-4">
+                <SiteHealthCard />
               </div>
-              <span className="shrink-0 text-[12px] font-medium text-accent group-open:hidden">Show</span>
-              <span className="hidden shrink-0 text-[12px] font-medium text-accent group-open:inline">Hide</span>
-            </summary>
-            <div className="px-4 pb-4">
-              <SiteHealthCard />
-            </div>
-          </details>
+            </details>
+          </div>
             }
           />
         </div>

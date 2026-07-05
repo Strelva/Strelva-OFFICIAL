@@ -87,6 +87,7 @@ describe("POST /api/admin/tenants/[id]/lifecycle-email", () => {
       businessName: "Demo Co",
       ownerName: "Sam",
       dashboardUrl: "https://admin.demo.com/dashboard",
+      tenantId: "demo",
     });
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({

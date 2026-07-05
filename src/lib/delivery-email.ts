@@ -13,6 +13,27 @@ function cleanSubjectText(value: string): string {
     .trim();
 }
 
+/**
+ * Log a real client-comms send into the tenant's operator CRM activity timeline
+ * so comms history accrues automatically ("Sent: welcome email"). Called ONLY
+ * after a send actually goes out — every sender returns early (false) when
+ * paused or missing an API key, so a suppressed send is never recorded as sent.
+ * A no-op when no `tenantId` is passed. Fail-soft by contract: a CRM-log failure
+ * must never break the send, so it swallows every error.
+ */
+async function logSentEmailToCrm(
+  tenantId: string | undefined,
+  summary: string,
+): Promise<void> {
+  if (!tenantId) return;
+  try {
+    const { addTenantActivity } = await import("@/lib/tenant-crm");
+    await addTenantActivity(tenantId, { kind: "email", summary, author: "Strelva" });
+  } catch (err) {
+    console.error("[delivery-email] CRM comms log failed (non-fatal):", err);
+  }
+}
+
 function buildUpdateLiveEmailOptions(params: {
   whatChanged: string;
   siteUrl: string;
@@ -62,6 +83,8 @@ export async function sendUpdateLiveEmail(params: {
   siteName: string;
   whatChanged: string;
   siteUrl: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
   /**
    * When true, the change is approved but its propagation to the live client
@@ -104,6 +127,7 @@ export async function sendUpdateLiveEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(params.tenantId, "Sent: update-live email");
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Update-live email failed:`, err);
@@ -481,6 +505,8 @@ export async function sendWelcomeEmail(params: {
   businessName: string;
   ownerName?: string;
   dashboardUrl: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   if (emailSendingPaused()) {
@@ -505,6 +531,7 @@ export async function sendWelcomeEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(params.tenantId, "Sent: welcome email");
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Welcome email failed:`, err);
@@ -541,6 +568,8 @@ export async function sendSiteLiveEmail(params: {
   businessName: string;
   siteUrl: string;
   dashboardUrl: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   if (emailSendingPaused()) {
@@ -565,6 +594,7 @@ export async function sendSiteLiveEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(params.tenantId, "Sent: site-live email");
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Site-live email failed:`, err);
@@ -604,6 +634,8 @@ export async function sendReviewRequestEmail(params: {
   businessName: string;
   reviewUrl: string;
   ownerName?: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   if (emailSendingPaused()) {
@@ -628,6 +660,7 @@ export async function sendReviewRequestEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(params.tenantId, "Sent: review-request email");
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Review-request email failed:`, err);
@@ -700,6 +733,8 @@ export async function sendReviewNeedsReplyEmail(params: {
   draftedReply?: string;
   approveUrl?: string;
   notYetUrl?: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   if (emailSendingPaused()) {
@@ -724,6 +759,10 @@ export async function sendReviewNeedsReplyEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(
+      params.tenantId,
+      `Sent: review-reply alert (${params.review.rating}-star from ${cleanSubjectText(params.review.author)})`,
+    );
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Review-needs-reply email failed:`, err);
@@ -775,6 +814,8 @@ export async function sendHealthRegressionEmail(params: {
   previousScore: number;
   currentScore: number;
   healthUrl: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   if (emailSendingPaused()) {
@@ -799,6 +840,10 @@ export async function sendHealthRegressionEmail(params: {
     if (result.error || !result.data?.id) {
       throw new Error(result.error?.message || "Resend did not return an email id.");
     }
+    await logSentEmailToCrm(
+      params.tenantId,
+      `Sent: health-drop alert (${params.previousGrade} → ${params.currentGrade})`,
+    );
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Health-regression email failed:`, err);
