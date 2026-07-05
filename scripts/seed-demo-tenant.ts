@@ -411,6 +411,7 @@ interface DayCounts {
   day: string;
   pageViews: number;
   bookingClicks: number;
+  phoneClicks: number;
 }
 
 function buildTraffic(days = 90): DayCounts[] {
@@ -425,7 +426,10 @@ function buildTraffic(days = 90): DayCounts[] {
     const pageViews = Math.max(1, Math.round(base * weekend * noise));
     const bookingRate = 0.16 + hashFloat("bk" + day) * 0.12;
     const bookingClicks = Math.max(0, Math.round(pageViews * bookingRate));
-    out.push({ day, pageViews, bookingClicks });
+    // Calls are the #1 HVAC conversion — a touch more common than online booking.
+    const phoneRate = 0.2 + hashFloat("ph" + day) * 0.13;
+    const phoneClicks = Math.max(0, Math.round(pageViews * phoneRate));
+    out.push({ day, pageViews, bookingClicks, phoneClicks });
   }
   return out;
 }
@@ -436,8 +440,10 @@ async function seedTraffic(tenant: string): Promise<void> {
 
   const pvTotal = traffic.reduce((s, r) => s + r.pageViews, 0);
   const bcTotal = traffic.reduce((s, r) => s + r.bookingClicks, 0);
+  const pcTotal = traffic.reduce((s, r) => s + r.phoneClicks, 0);
   const pvWeek = traffic.slice(-7).reduce((s, r) => s + r.pageViews, 0);
   const bcWeek = traffic.slice(-7).reduce((s, r) => s + r.bookingClicks, 0);
+  const pcWeek = traffic.slice(-7).reduce((s, r) => s + r.phoneClicks, 0);
 
   if (dataSourceIsPostgres()) {
     const { getSupabase } = await import("../src/lib/db/client");
@@ -448,6 +454,8 @@ async function seedTraffic(tenant: string): Promise<void> {
         rows.push({ tenant_id: tenant, metric: "page-view", day: r.day, count: r.pageViews });
         if (r.bookingClicks > 0)
           rows.push({ tenant_id: tenant, metric: "booking-click", day: r.day, count: r.bookingClicks });
+        if (r.phoneClicks > 0)
+          rows.push({ tenant_id: tenant, metric: "phone-click", day: r.day, count: r.phoneClicks });
       }
       // Upsert absolute counts (idempotent on re-run) in batches.
       for (let i = 0; i < rows.length; i += 200) {
@@ -466,15 +474,17 @@ async function seedTraffic(tenant: string): Promise<void> {
     for (const r of traffic) {
       clicks[`page-view:${r.day}`] = r.pageViews;
       if (r.bookingClicks > 0) clicks[`booking-click:${r.day}`] = r.bookingClicks;
+      if (r.phoneClicks > 0) clicks[`phone-click:${r.day}`] = r.phoneClicks;
     }
     clicks["page-view:total"] = pvTotal;
     clicks["booking-click:total"] = bcTotal;
+    clicks["phone-click:total"] = pcTotal;
     store.__clicks = clicks;
     await writeDevContent(store, tenant);
   }
 
   console.log(
-    `  ✓ traffic: ${pvTotal} page-views (${pvWeek} this week), ${bcTotal} booking clicks (${bcWeek} this week) across 90 days`
+    `  ✓ traffic: ${pvTotal} page-views (${pvWeek} this week), ${bcTotal} booking clicks (${bcWeek} this week), ${pcTotal} calls (${pcWeek} this week) across 90 days`
   );
 }
 
@@ -492,9 +502,9 @@ type SeedReview = {
 };
 
 const REVIEWS: SeedReview[] = [
-  { source: "google", author: "Katie R.", rating: 5, daysAgo: 2, text: "AC quit during the heatwave with a two-week-old at home. Summit had Mike out the same afternoon, fixed it in under an hour, and charged exactly what they quoted. Cannot thank them enough.", reply: "Thank you Katie — so glad we could get you cool fast with the little one home. Call us anytime." },
+  { source: "google", author: "Katie R.", rating: 5, daysAgo: 2, text: "AC quit during the heatwave with a two-week-old at home. Summit had Mike out the same afternoon, fixed it in under an hour, and charged exactly what they quoted. Cannot thank them enough." },
   { source: "google", author: "Thomas D.", rating: 5, daysAgo: 4, text: "Another shop said I needed a whole new furnace. Summit found a cracked igniter, replaced it for a fraction of the price, and showed me the old part. Honest people." },
-  { source: "google", author: "Angela M.", rating: 5, daysAgo: 5, text: "On time, clean, and explained everything without the pressure. Signed up for the yearly tune-up plan right there.", reply: "Appreciate you, Angela! We'll see you in the fall for the furnace check." },
+  { source: "google", author: "Angela M.", rating: 5, daysAgo: 5, text: "On time, clean, and explained everything without the pressure. Signed up for the yearly tune-up plan right there." },
   { source: "google", author: "Rob S.", rating: 5, daysAgo: 8, text: "Called at 8am with no cooling, tech was in my driveway by 11. Dave's crew is the real deal — fair, fast, and friendly." },
   { source: "yelp", author: "Priya N.", rating: 5, daysAgo: 11, text: "New central air install in our Amherst home. They sized it properly, cleaned up completely, and registered the warranty for us. House has never been this comfortable." },
   { source: "google", author: "Mark H.", rating: 4, daysAgo: 13, text: "Good work and fair price on our furnace repair. Only reason for four stars is the first appointment window slipped a bit, but they called ahead to let me know." },
@@ -503,35 +513,35 @@ const REVIEWS: SeedReview[] = [
   { source: "google", author: "Maria L.", rating: 5, daysAgo: 19, text: "Wore boot covers, laid down a mat, and left my basement cleaner than they found it. Fixed the AC and explained how to keep the filter right. Wonderful crew." },
   { source: "google", author: "Dan P.", rating: 5, daysAgo: 21, text: "Third summer in a row using Summit for the tune-up. They always find the little stuff before it turns into a breakdown. Worth every penny." },
   { source: "yelp", author: "Corey B.", rating: 5, daysAgo: 23, text: "Replaced a 22-year-old furnace with a high-efficiency unit. Quote was clear, no hidden fees, and the install crew was in and out in a day. Bills already dropped." },
-  { source: "google", author: "Ashley T.", rating: 5, daysAgo: 25, text: "Mike is fantastic. Diagnosed a refrigerant leak other techs missed, sealed it, and the AC has been perfect since. Ask for him." },
-  { source: "google", author: "Greg F.", rating: 4, daysAgo: 27, text: "Solid repair on our West Seneca rental. Reasonable price and they coordinated with my tenant directly, which I appreciated." },
-  { source: "google", author: "Nicole R.", rating: 5, daysAgo: 29, text: "I never leave reviews but these guys earned it. No heat on a Sunday, they came out, no gouging, just fixed it and were kind about it." },
-  { source: "google", author: "Bill M.", rating: 5, daysAgo: 32, text: "Family-owned and it shows. You talk to a real person who knows the area, not some call center three states away. Fixed our furnace right the first time.", reply: "Thanks Bill — that's exactly what we're going for. Grateful for your business." },
-  { source: "google", author: "Sandra V.", rating: 5, daysAgo: 34, text: "Prompt, professional, and honest about what our aging AC needed. Didn't try to sell us a whole system. We'll be back." },
-  { source: "google", author: "Kevin O.", rating: 5, daysAgo: 36, text: "Orchard Park homeowner here. Summit put in our central air two years ago and just did the spring tune-up. Consistent, dependable, fairly priced." },
-  { source: "yelp", author: "Hannah G.", rating: 5, daysAgo: 39, text: "Same-day AC repair in July, which felt like a miracle. Tech was respectful, quick, and the price didn't move from the quote. Highly recommend." },
-  { source: "google", author: "Paul D.", rating: 5, daysAgo: 41, text: "Had them out for a second opinion after a big-box company quoted me $9k. Summit fixed the actual problem for under $400. Enough said." },
-  { source: "google", author: "Renee C.", rating: 4, daysAgo: 44, text: "Good experience overall. Furnace runs great now. Would have liked a little more notice before arrival, but the work was excellent." },
-  { source: "google", author: "Jim B.", rating: 5, daysAgo: 46, text: "Tony found a venting issue our last company created and fixed it properly. Clearly knows what he's doing. House is warm and safe now." },
-  { source: "google", author: "Lauren S.", rating: 5, daysAgo: 48, text: "Booked the maintenance membership and it's already paid off — they caught a failing capacitor during the tune-up before it left us without AC in August." },
-  { source: "google", author: "Andrew K.", rating: 5, daysAgo: 51, text: "Cheektowaga local. These are your neighbors and they treat you like it. No heat call handled fast and cheerfully at 6am. Can't beat that." },
-  { source: "google", author: "Michelle P.", rating: 5, daysAgo: 53, text: "Clean, courteous, and they texted when the tech was on the way. AC blowing cold again same day. This is how service should be." },
-  { source: "yelp", author: "Derek W.", rating: 5, daysAgo: 56, text: "Got three quotes for a furnace replacement. Summit was fair, explained the efficiency tradeoffs honestly, and didn't upsell. Chose them and no regrets." },
-  { source: "google", author: "Karen H.", rating: 5, daysAgo: 58, text: "They squeezed us in during a cold snap when everyone else was booked a week out. Fixed the furnace and only charged for what they did." },
-  { source: "google", author: "Frank T.", rating: 4, daysAgo: 61, text: "Reliable and honest. Repair held up great. Minor scheduling hiccup on the front end but the tech more than made up for it." },
-  { source: "google", author: "Diana M.", rating: 5, daysAgo: 63, text: "Mike replaced our thermostat and took ten minutes to teach me how to program it. Little things like that keep me coming back." },
-  { source: "google", author: "Chris L.", rating: 5, daysAgo: 66, text: "Williamsville install. On time both days, spotless work, and the new system is whisper quiet compared to the old beast. Great crew." },
-  { source: "google", author: "Sara J.", rating: 5, daysAgo: 68, text: "No cooling upstairs for weeks and two other companies couldn't figure it out. Summit found a duct problem in one visit. Finally comfortable." },
-  { source: "google", author: "Tony R.", rating: 5, daysAgo: 71, text: "Honest, fast, fair. Called for a furnace that wouldn't stay lit, fixed the flame sensor same day, didn't try to sell me anything extra." },
-  { source: "yelp", author: "Beth A.", rating: 5, daysAgo: 74, text: "The whole team is professional and kind. From the person who answered the phone to the tech who did the work — top notch. Supporting local was easy here." },
-  { source: "google", author: "Nate F.", rating: 4, daysAgo: 77, text: "Quality AC repair at a fair price. Took slightly longer than estimated but they kept me updated the whole time." },
-  { source: "google", author: "Olivia D.", rating: 5, daysAgo: 80, text: "Summit did our seasonal furnace tune-up and found a small carbon monoxide risk we had no idea about. Fixed it on the spot. Genuinely grateful.", reply: "Olivia, safety comes first every time — so glad we caught it. Thank you for trusting us." },
-  { source: "google", author: "Ryan M.", rating: 5, daysAgo: 83, text: "Hamburg homeowner. New AC install went perfectly, and they haul away the old unit and clean up like they were never there. Highly recommend." },
-  { source: "google", author: "Gina P.", rating: 5, daysAgo: 85, text: "Fair, friendly, and they actually answer the phone. Fixed our AC before the big July heat hit. This is our HVAC company from now on." },
-  { source: "google", author: "Walter S.", rating: 5, daysAgo: 87, text: "Been using Summit since Dave had one truck. Fifteen years of honest work. They've never once steered me wrong. That loyalty is earned." },
-  { source: "google", author: "Emily K.", rating: 5, daysAgo: 88, text: "Prompt emergency furnace repair in the dead of winter. Kind, competent, and reasonably priced when they easily could have gouged us. Real ones." },
-  { source: "yelp", author: "Marcus J.", rating: 5, daysAgo: 89, text: "Switched to Summit after a bad experience with a national chain. Night and day. Local, honest, and they stand behind their work." },
-  { source: "google", author: "Patricia L.", rating: 5, daysAgo: 90, text: "Tune-up membership is the best money we spend on the house. Two visits a year and we've never had a surprise breakdown since we signed up." },
+  { source: "google", author: "Ashley T.", rating: 5, daysAgo: 25, text: "Mike is fantastic. Diagnosed a refrigerant leak other techs missed, sealed it, and the AC has been perfect since. Ask for him.", reply: "So glad Mike got to the bottom of that leak, Ashley. He is one of the best. Enjoy the cold air and thanks for the shout-out." },
+  { source: "google", author: "Greg F.", rating: 4, daysAgo: 27, text: "Solid repair on our West Seneca rental. Reasonable price and they coordinated with my tenant directly, which I appreciated.", reply: "Happy to work directly with your tenant, Greg. Glad the West Seneca repair held up. Call us anytime you need us." },
+  { source: "google", author: "Nicole R.", rating: 5, daysAgo: 29, text: "I never leave reviews but these guys earned it. No heat on a Sunday, they came out, no gouging, just fixed it and were kind about it.", reply: "No heat on a Sunday is no fun, Nicole. Glad we could get you warm without the runaround, and thank you for taking the time to write this." },
+  { source: "google", author: "Bill M.", rating: 5, daysAgo: 32, text: "Family-owned and it shows. You talk to a real person who knows the area, not some call center three states away. Fixed our furnace right the first time.", reply: "Thanks Bill, that is exactly what we are going for. Grateful for your business and for being a good neighbor." },
+  { source: "google", author: "Sandra V.", rating: 5, daysAgo: 34, text: "Prompt, professional, and honest about what our aging AC needed. Didn't try to sell us a whole system. We'll be back.", reply: "Appreciate you, Sandra. We would rather keep your AC running than sell you a system you do not need yet. See you next time." },
+  { source: "google", author: "Kevin O.", rating: 5, daysAgo: 36, text: "Orchard Park homeowner here. Summit put in our central air two years ago and just did the spring tune-up. Consistent, dependable, fairly priced.", reply: "Two years and still going strong, Kevin. Thanks for having us back for the tune-up. Orchard Park treats us well." },
+  { source: "yelp", author: "Hannah G.", rating: 5, daysAgo: 39, text: "Same-day AC repair in July, which felt like a miracle. Tech was respectful, quick, and the price didn't move from the quote. Highly recommend.", reply: "Same-day in July is the promise, Hannah. So glad we kept the quote steady and got you cool. Thank you." },
+  { source: "google", author: "Paul D.", rating: 5, daysAgo: 41, text: "Had them out for a second opinion after a big-box company quoted me $9k. Summit fixed the actual problem for under $400. Enough said.", reply: "Second opinions are free for a reason, Paul. Glad we found the real fix and saved you thousands. Grateful you called us." },
+  { source: "google", author: "Renee C.", rating: 4, daysAgo: 44, text: "Good experience overall. Furnace runs great now. Would have liked a little more notice before arrival, but the work was excellent.", reply: "Fair point on the notice, Renee, and we are tightening up our arrival texts. Thank you for trusting us with the furnace." },
+  { source: "google", author: "Jim B.", rating: 5, daysAgo: 46, text: "Tony found a venting issue our last company created and fixed it properly. Clearly knows what he's doing. House is warm and safe now.", reply: "Tony takes venting seriously because safety comes first. So glad your home is warm and safe now, Jim. Thank you." },
+  { source: "google", author: "Lauren S.", rating: 5, daysAgo: 48, text: "Booked the maintenance membership and it's already paid off — they caught a failing capacitor during the tune-up before it left us without AC in August.", reply: "That is exactly why the membership exists, Lauren. Catching that capacitor before August saved you a rough day. Thank you for signing up." },
+  { source: "google", author: "Andrew K.", rating: 5, daysAgo: 51, text: "Cheektowaga local. These are your neighbors and they treat you like it. No heat call handled fast and cheerfully at 6am. Can't beat that.", reply: "6am no-heat calls are what neighbors do for each other, Andrew. Proud to serve Cheektowaga. Stay warm out there." },
+  { source: "google", author: "Michelle P.", rating: 5, daysAgo: 53, text: "Clean, courteous, and they texted when the tech was on the way. AC blowing cold again same day. This is how service should be.", reply: "Glad the heads-up text helped, Michelle. Same-day cold air is the goal every time. Thank you for the kind review." },
+  { source: "yelp", author: "Derek W.", rating: 5, daysAgo: 56, text: "Got three quotes for a furnace replacement. Summit was fair, explained the efficiency tradeoffs honestly, and didn't upsell. Chose them and no regrets.", reply: "We would rather explain the tradeoffs than upsell you, Derek. Thrilled you chose us for the furnace. Enjoy the savings." },
+  { source: "google", author: "Karen H.", rating: 5, daysAgo: 58, text: "They squeezed us in during a cold snap when everyone else was booked a week out. Fixed the furnace and only charged for what they did.", reply: "Cold snaps are all hands on deck here, Karen. Glad we could fit you in and only charge for the work. Thank you." },
+  { source: "google", author: "Frank T.", rating: 4, daysAgo: 61, text: "Reliable and honest. Repair held up great. Minor scheduling hiccup on the front end but the tech more than made up for it.", reply: "Thanks for the honesty on the scheduling, Frank, we are working on that. Glad the repair is holding up strong." },
+  { source: "google", author: "Diana M.", rating: 5, daysAgo: 63, text: "Mike replaced our thermostat and took ten minutes to teach me how to program it. Little things like that keep me coming back.", reply: "Mike loves teaching the little things, Diana. Glad the new thermostat is treating you well. See you next season." },
+  { source: "google", author: "Chris L.", rating: 5, daysAgo: 66, text: "Williamsville install. On time both days, spotless work, and the new system is whisper quiet compared to the old beast. Great crew.", reply: "Williamsville install done right, Chris. Nothing better than a quiet new system. Thank you for having us out." },
+  { source: "google", author: "Sara J.", rating: 5, daysAgo: 68, text: "No cooling upstairs for weeks and two other companies couldn't figure it out. Summit found a duct problem in one visit. Finally comfortable.", reply: "Two companies missed it and we are glad we did not, Sara. Comfort upstairs at last. Thank you for your patience." },
+  { source: "google", author: "Tony R.", rating: 5, daysAgo: 71, text: "Honest, fast, fair. Called for a furnace that wouldn't stay lit, fixed the flame sensor same day, didn't try to sell me anything extra.", reply: "Flame sensor sorted, no upsell, just the fix, Tony. That is how we like to do it. Thanks for the call." },
+  { source: "yelp", author: "Beth A.", rating: 5, daysAgo: 74, text: "The whole team is professional and kind. From the person who answered the phone to the tech who did the work — top notch. Supporting local was easy here.", reply: "That means a lot, Beth. From the phones to the truck, we try to treat you like family. Thank you for supporting local." },
+  { source: "google", author: "Nate F.", rating: 4, daysAgo: 77, text: "Quality AC repair at a fair price. Took slightly longer than estimated but they kept me updated the whole time.", reply: "Appreciate your patience when it ran long, Nate, and glad we kept you posted. Thank you for the fair review." },
+  { source: "google", author: "Olivia D.", rating: 5, daysAgo: 80, text: "Summit did our seasonal furnace tune-up and found a small carbon monoxide risk we had no idea about. Fixed it on the spot. Genuinely grateful.", reply: "Olivia, safety comes first every time, so we are glad we caught it. Thank you for trusting us with your family's home." },
+  { source: "google", author: "Ryan M.", rating: 5, daysAgo: 83, text: "Hamburg homeowner. New AC install went perfectly, and they haul away the old unit and clean up like they were never there. Highly recommend.", reply: "A clean job site is non-negotiable for us, Ryan. Glad the new Hamburg system is treating you right. Thank you." },
+  { source: "google", author: "Gina P.", rating: 5, daysAgo: 85, text: "Fair, friendly, and they actually answer the phone. Fixed our AC before the big July heat hit. This is our HVAC company from now on.", reply: "We will always answer the phone, Gina. So glad we beat the July heat for you. Welcome to the family." },
+  { source: "google", author: "Walter S.", rating: 5, daysAgo: 87, text: "Been using Summit since Dave had one truck. Fifteen years of honest work. They've never once steered me wrong. That loyalty is earned.", reply: "Fifteen years means the world to us, Walter. Dave still talks about the one-truck days. Thank you for your loyalty." },
+  { source: "google", author: "Emily K.", rating: 5, daysAgo: 88, text: "Prompt emergency furnace repair in the dead of winter. Kind, competent, and reasonably priced when they easily could have gouged us. Real ones.", reply: "The dead of winter is no time to gouge anyone, Emily. Glad we got your heat back fast. Thank you for trusting us." },
+  { source: "yelp", author: "Marcus J.", rating: 5, daysAgo: 89, text: "Switched to Summit after a bad experience with a national chain. Night and day. Local, honest, and they stand behind their work.", reply: "Welcome aboard, Marcus. Local and honest is the whole idea. Glad the switch paid off, and we will keep earning it." },
+  { source: "google", author: "Patricia L.", rating: 5, daysAgo: 90, text: "Tune-up membership is the best money we spend on the house. Two visits a year and we've never had a surprise breakdown since we signed up.", reply: "No surprise breakdowns is exactly the promise, Patricia. Thank you for being a member and for the kind words." },
 ];
 
 async function seedReviews(tenant: string): Promise<void> {
