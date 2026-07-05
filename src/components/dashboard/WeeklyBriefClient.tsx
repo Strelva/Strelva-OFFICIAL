@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
+import { buildVerdict } from "@/lib/weekly-verdict";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
@@ -41,17 +42,6 @@ function rankLabel(rank: number | null, inPack: boolean): string {
   if (rank !== null) return `#${rank}`;
   if (inPack) return "map pack";
   return "not ranked";
-}
-
-/** Plain-English verdict on whether the site is working, from the week's numbers. */
-export function buildVerdict(stats: WeeklyBrief["stats"]): string {
-  const views = stats.pageViews;
-  const delta = stats.pageViewsDelta ?? 0;
-  if (views === 0) return "A quiet week — no visitors yet. Let's change that.";
-  const people = `${views.toLocaleString()} ${views === 1 ? "person" : "people"} found you`;
-  if (delta > 0) return `It's working — ${people}, up from last week.`;
-  if (delta < 0) return `${people} this week — down from last week.`;
-  return `${people} this week.`;
 }
 
 /** A lightweight 30-day traffic sparkline (no chart dependency). */
@@ -290,26 +280,26 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               label="People found you"
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
-              icon={TrendingUp}
+              icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
               countUp
               label="Customer actions"
               value={brief.stats.bookingClicks}
               delta={brief.stats.bookingClicksDelta ?? 0}
-              icon={MousePointerClick}
+              icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
               countUp
               label="Reviews"
               value={brief.stats.reviewsReceived}
-              icon={Star}
+              icon={<Star className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
               countUp
               label="Site updates"
               value={brief.stats.contentUpdates}
-              icon={FileText}
+              icon={<FileText className="h-4 w-4" strokeWidth={1.5} />}
             />
           </div>
 

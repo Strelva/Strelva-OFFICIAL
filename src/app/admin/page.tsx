@@ -183,28 +183,28 @@ export default async function AdminPage() {
 
       {/* Portfolio roll-ups */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatTile icon={Users} label="Active" value={activeTenants} detail="clients live" />
+        <StatTile icon={<Users className="h-4 w-4" strokeWidth={1.5} />} label="Active" value={activeTenants} detail="clients live" />
         <StatTile
-          icon={Banknote}
+          icon={<Banknote className="h-4 w-4" strokeWidth={1.5} />}
           label="Collected"
           value={`$${Math.round(revenue.totalCents / 100).toLocaleString()}`}
           detail={`${revenue.count} build payment${revenue.count !== 1 ? "s" : ""}`}
         />
         <StatTile
-          icon={TrendingUp}
+          icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
           label="MRR"
           value={`$${mrr.toLocaleString()}`}
           detail={`${activeSubscriptions} paid${grandfatheredCount > 0 ? ` · ${grandfatheredCount} grandfathered` : ""}`}
         />
         <Link href="/admin/drafts">
           <StatTile
-            icon={FileText}
+            icon={<FileText className="h-4 w-4" strokeWidth={1.5} />}
             label="Drafts"
             value={totalDrafts}
             detail={totalDrafts > 0 ? "review needed" : "all clear"}
           />
         </Link>
-        <StatTile icon={Boxes} label="Custom repos" value={customRepoCount} detail="delivery path" />
+        <StatTile icon={<Boxes className="h-4 w-4" strokeWidth={1.5} />} label="Custom repos" value={customRepoCount} detail="delivery path" />
       </div>
 
       {/* Launch readiness — one line, no internal-doc copy */}

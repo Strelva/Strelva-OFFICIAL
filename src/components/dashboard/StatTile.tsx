@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** The ONE metric primitive. Both Today's stat grid and the weekly brief render
  *  through this — one padding, one 28px number, one eyebrow. Pass `countUp` to
@@ -43,14 +43,17 @@ export function StatTile({
   value,
   detail,
   delta,
-  icon: Icon,
+  icon,
   countUp = false,
 }: {
   label: string;
   value: string | number;
   detail?: string;
   delta?: number;
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  /** A rendered icon element (e.g. `<Users className="h-4 w-4" />`), NOT a
+   *  component reference — server pages render this tile, and component
+   *  functions can't cross the server→client boundary; elements can. */
+  icon: ReactNode;
   countUp?: boolean;
 }) {
   const showDelta = typeof delta === "number" && delta !== 0;
@@ -58,7 +61,7 @@ export function StatTile({
   return (
     <div className="rounded-xl border border-glass-border bg-glass p-4">
       <div className="mb-3 flex items-center gap-2 text-gray-muted">
-        <Icon className="h-4 w-4" strokeWidth={1.5} />
+        {icon}
         <span className="text-[11px] font-medium uppercase tracking-[0.14em]">{label}</span>
       </div>
       <p className="text-[28px] font-semibold leading-none text-warm-black">

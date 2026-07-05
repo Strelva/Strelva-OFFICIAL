@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, FileText, Inbox, MessageCircle, MousePointerClick, ShieldCheck, TrendingUp, Wand2 } from "lucide-react";
 import { StatTile } from "@/components/dashboard/StatTile";
-import { buildVerdict } from "@/components/dashboard/WeeklyBriefClient";
+import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getClickCounts, getActivity } from "@/lib/storage";
 import { getNeedsYouData } from "@/lib/needs-you";
@@ -176,19 +176,19 @@ async function DashboardHome() {
             label="People found you"
             value={pageViews.total}
             detail={`${pageViews.thisWeek} in the last 7 days`}
-            icon={TrendingUp}
+            icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
           />
           <StatTile
             label="Customer actions"
             value={customerActions.total}
             detail={`${customerActions.thisWeek} in the last 7 days`}
-            icon={MousePointerClick}
+            icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
           />
           <StatTile
             label="Needs you"
             value={pendingCount}
             detail={pendingCount > 0 ? "Review before anything goes live" : "Nothing is waiting on approval"}
-            icon={ShieldCheck}
+            icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.5} />}
           />
           </section>
           ) : null}
