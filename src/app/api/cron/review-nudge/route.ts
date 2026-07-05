@@ -90,6 +90,8 @@ export async function GET() {
       businessName: tenant.siteName,
       reviewUrl,
       ownerName: tenant.ownerName?.trim() || undefined,
+      // Opt in to the CRM comms log so a real nudge accrues on the tenant timeline.
+      tenantId: tenant.id,
       logPrefix: "[cron review-nudge]",
     });
 

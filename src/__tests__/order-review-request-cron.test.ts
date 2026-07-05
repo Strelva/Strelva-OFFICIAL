@@ -74,6 +74,8 @@ describe("GET /api/cron/order-review-request", () => {
         email: "owner@gldf.com",
         businessName: "GLDF",
         reviewUrl: "https://search.google.com/local/writereview?placeid=PLACE_123",
+        // Opts into the CRM comms log so a real send accrues on the tenant timeline.
+        tenantId: "gldf",
       }),
     );
     expect(mockRedisSet).toHaveBeenCalledWith(
