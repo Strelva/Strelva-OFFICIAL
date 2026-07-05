@@ -37,7 +37,11 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
   there's enough history) and the **AI-visibility scorecard** "You in AI answers"
   (`AiVisibilityScorecard.tsx` + `src/lib/ai-visibility-scorecard.ts`, built off the weekly
   visibility snapshot — probed answers only, never shames a gap). Both are honesty-railed:
-  no fabricated baselines, only genuinely positive moves become headline copy.
+  no fabricated baselines, only genuinely positive moves become headline copy. It also carries
+  the **"Where your visitors come from" GA4 traffic panel** (`TrafficSourcesPanel.tsx`, rendered
+  in `WeeklyBriefClient`'s `footerSlot`): top sources + landing pages from `getGa4Perf`
+  (`src/lib/analytics.ts`), with a Connect-Google state when GA4 is unconfigured and a quiet
+  "coming soon" when configured-but-empty — never an API error.
 - **Store folds INTO Website.** Store is no longer a top-level tab. Website is the spine;
   Store appears as a sub-tab only when the tenant runs a storefront (`getWebsiteSections`
   returns a `store` section when `tenantHasStore` is true). A plain site shows no sub-nav
@@ -45,6 +49,20 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
   `/dashboard/site`, `/collections`, `/content`, `/assets`, `/history`, `/store`.
 - **Leads folded into Today.** No standalone Leads tab — inbound form submissions surface as
   "Who reached out" on Today.
+- **Calls count as customer actions.** The tracker's `phone-click` beacon (tel: taps) folds into
+  the "Customer actions" total on both Today and Analytics — honest "booked or called" copy — via
+  an optional `phoneClicks` on `WeeklyBriefStats`. The booking-specific `bookingClicks` field is
+  kept intact for `proof.ts` / `goals.ts`.
+- **Reviews reputation header.** The Reviews surface leads with a verdict-first reputation summary
+  (`ReputationHeader.tsx` + `src/lib/reviews/reputation.ts` `buildReputationSummary`): rating +
+  response rate + review velocity + praise themes, built ONLY on the client-safe
+  `getClientReviewSummary` (no admin intelligence). A low response rate reads as an opportunity
+  ("reply to N waiting"), few reviews as "let's get more" — never shame. Plus a **"get more
+  reviews" share action** (`ReviewsPanel.tsx`): a copyable Google review link from
+  `reviewsConfig.googlePlaceId` (`buildGoogleReviewLink`) + a paste-ready share message, with an
+  honest "connect your Google listing" state when there's no Place ID. A competitor star-rating
+  benchmark was deliberately NOT built — no real local-average data exists, so it was omitted
+  rather than fabricated.
 - **"What Strelva did for you" activity feed on Today** (`ActivityFeed.tsx` +
   `src/lib/activity-feed.ts`). An owner-facing, past-tense timeline of the managed
   done-for-you work — the anti-churn proof surface. `selectStrelvaWork` scopes it to

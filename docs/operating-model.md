@@ -205,6 +205,16 @@ Full surface map: `docs/operator-command-center.md`.
   one AI edit. A new client currently lands on an empty all-zeros dashboard.
 - [ ] **Seed the demo dashboard** (N) — `scripts/seed-demo-engagement.ts` (built,
   branch `feat/demo-engagement-seed`) so the product demos like it's alive.
+  **Now superseded by `scripts/seed-demo-tenant.ts`** (`pnpm tsx scripts/seed-demo-tenant.ts
+  [tenant-id]`, default `summit`) — the full sales-demo seeder. It provisions a coherent
+  90-day story for **Summit Heating & Cooling** (a Buffalo HVAC business, summithvacwny.com)
+  across every dashboard store — content, reviews, traffic trend, "what Strelva did for you"
+  activity, leads, a few "Needs you" items, an AI-visibility scorecard, an improving health
+  grade — tuned for the milestone + scorecard + activity-feed surfaces. Re-runnable (clears
+  the demo tenant's operational data first); writes straight to prod Postgres/Redis when run
+  with the prod env, isolated by tenant id so it never touches a paying client.
+  `seed-demo-engagement.ts` fills the operational stores for an existing tenant; this one
+  provisions the tenant first.
 - [ ] **Owner notification on async approval** (N) — email/in-app when a queued
   change is approved/published (today the owner gets only a passive badge). The
   `sendUpdateLiveEmail` path in `delivery-email.ts` already exists — wire it.

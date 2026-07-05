@@ -21,7 +21,7 @@ rewrites the bare admin host root onto the `/admin` path:
 
 Nav (`src/app/admin/NavLinks.tsx`) is grouped to **five primary links** — Overview,
 Clients, Leads, Analytics, Ops — plus a **"More"** dropdown for the operator-technical
-surfaces (Onboard, Pay Links, Maintenance, Drafts, Audit), so the top bar stays scannable.
+surfaces (Actions, Onboard, Pay Links, Maintenance, Drafts, Audit), so the top bar stays scannable.
 
 ## Consolidation (one list, one detail)
 
@@ -45,7 +45,51 @@ signups** (last 7 days). Portfolio attention flags fold into the same feed. Belo
 feed: a single **"View all clients"** link into `/admin/clients`, the portfolio
 roll-up StatTiles (Active / Collected / MRR / Drafts / Custom repos), a one-line
 launch-readiness summary, and **Mission Control** demoted to a collapsed
-ask-the-portfolio console. There is no tenant table.
+ask-the-portfolio console. There is no tenant table. When any client has a pending
+approval the feed shows a **"Clear portfolio →"** link + count into `/admin/actions`.
+
+### Portfolio actions — `/admin/actions`
+`src/app/admin/actions/` — the operator's single "clear the whole portfolio" screen for
+one operator managing many sites. Two stacked layers, both governed:
+
+1. **Proactive "Ready to work"** (`portfolio-opportunities.ts` + `PortfolioOpportunitiesClient.tsx`).
+   Scans every active client for latent, **not-yet-drafted** work, grouped by kind:
+   - **unreplied reviews** — reviews with no owner reply (`getReviews`),
+   - **sites gone quiet** — no owner AI activity for 30+ days (`getOwnerRetentionSignals`),
+   - **health slipping** — a D/F site-health grade (`getScanSummaries` from `scan-store`).
+
+   Each group's one-click **"Draft these"** fans the selected clients through an EXISTING
+   governed draft path — `draftReviewReply` → a pending `review_reply_draft` event for
+   reviews; `generateProactiveSuggestions` → pending suggestion cards for stale / low-health
+   — so every draft lands PENDING for approval, **nothing is published**. Idempotent: skips a
+   review that already has a pending draft; `generateProactiveSuggestions` never floods on a
+   re-click. Per-tenant isolated (one client failing degrades that client, not the pass).
+
+2. **Pending approvals** (`portfolio-actions.ts` + `PortfolioActionsClient.tsx`). Every
+   PENDING approvable event across all active clients (content updates, GBP post/hours drafts,
+   review-reply drafts, newsletter drafts — custom-build change requests and raw signal events
+   are excluded), grouped by client, busiest client first. Bulk-approve resolves each item
+   through the SAME governed spine as the dashboard (`bulkResolvePortfolioActions` →
+   `resolveEventAction`), sequentially so concurrent external writes don't stampede an
+   integration. **Honest partial failure**: a write that fails comes back `changed:false` with
+   the reason and the item stays pending — never silently marked done.
+
+Both reads degrade to empty (a backend blip can't 500 the overview). The server actions
+(`actions.ts`) **re-verify super-admin independently** — the `/admin` layout gate does NOT
+protect a server action's POST surface — then call the draft dispatcher / bulk resolver.
+
+### Approval diffs (what you're approving)
+`src/components/dashboard/QueuePage.tsx` (`QueueEventDetail`). A pending event now renders,
+under its approve/skip card, the actual change it publishes — not just the title's label — so
+an approver (especially one bulk-approving) sees the real thing:
+
+- **content update** → a field-level before→after diff (`metadata.diffs`, from `generatePreviewDiffs`),
+- **`gbp_post_draft`** → the drafted post text + CTA link ("What will be posted to Google"),
+- **`gbp_hours_draft`** → the proposed hours in 12h format ("New hours for Google"; no invented
+  before-column — the event only carries the proposed hours).
+
+Read-only (the approve/skip actions are untouched). The same component backs the client Today
+queue, so this renders on both the client side and any operator surface that shows the queue.
 
 ### Operator CRM — client list — `/admin/clients`
 `src/app/admin/clients/page.tsx` + `ClientsCrm.tsx`, backed by
@@ -143,8 +187,20 @@ Two independent switches in `src/lib/email-enabled.ts`:
 
 Client lifecycle emails (`sendWelcomeEmail` / `sendSiteLiveEmail` /
 `sendReviewRequestEmail` in `src/lib/delivery-email.ts`) sit behind the client
-`emailSendingPaused()` gate. These send functions exist but are not yet wired to a
-live trigger surface.
+`emailSendingPaused()` gate. An operator triggers one for a specific client via
+**`POST /api/admin/tenants/[id]/lifecycle-email`** (`type: "welcome" | "site-live" |
+"review-request"`; super-admin, audit-logged). Contact + URLs resolve from the trusted
+tenant config, never request input. A `false` return means either "paused" or "send
+failed", so when a send returns false AND client email is paused the route returns
+`200 { sent: false, paused: true }` — the UI reads it as an off-switch, not an error.
+
+**CRM comms auto-log.** Every real send passes its `tenantId` to the sender, which logs
+an `email` activity into the operator CRM timeline (`src/lib/tenant-crm.ts`
+`addTenantActivity`, via `logSentEmailToCrm` in `delivery-email.ts`). It's a no-op when no
+`tenantId` is passed and fail-soft (a CRM-log failure never breaks the send), and it fires
+**only after a send actually goes out** — every sender returns early when paused or missing
+a key, so a suppressed send is never recorded as sent. Wired from the lifecycle-email route
+plus the review-alert, order-review-request, review-nudge, and portfolio-scan send sites.
 
 **Owner alert emails (client email, but wired to live triggers).** Two owner-facing
 alerts, both behind the client `emailSendingPaused()` gate, deduped once per event
