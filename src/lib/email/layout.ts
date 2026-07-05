@@ -61,6 +61,9 @@ export interface EmailOptions {
   rows?: EmailRow[];
   /** Optional primary call-to-action button. */
   button?: EmailButton;
+  /** Optional secondary action, rendered as an outline pill under the primary
+   *  (e.g. a "Not yet" next to a primary "Approve"). */
+  secondaryButton?: EmailButton;
   /** Small print under the body, above the footer (e.g. "for {business}"). */
   footerNote?: string;
   /** When set, renders a "Manage" link in the footer. */
@@ -91,6 +94,15 @@ function buttonHtml(button: EmailButton): string {
   // Bulletproof-ish button: padded anchor with a solid background.
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;"><tr><td style="border-radius:999px;background:${TOKENS.accent};">
       <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:12px 26px;font-size:15px;font-weight:600;color:${TOKENS.buttonText};text-decoration:none;border-radius:999px;">${label}</a>
+    </td></tr></table>`;
+}
+
+function secondaryButtonHtml(button: EmailButton): string {
+  const label = escapeEmailHtml(button.label);
+  // Outline pill: sage border + sage text on the white card, so it reads as the
+  // quieter of the two actions without a second filled color.
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 4px;"><tr><td style="border-radius:999px;border:1px solid ${TOKENS.accent};">
+      <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:11px 25px;font-size:15px;font-weight:600;color:${TOKENS.accent};text-decoration:none;border-radius:999px;">${label}</a>
     </td></tr></table>`;
 }
 
@@ -135,6 +147,7 @@ export function renderEmailHtml(opts: EmailOptions): string {
     .join("");
   const rows = opts.rows && opts.rows.length ? rowsHtml(opts.rows) : "";
   const button = opts.button ? buttonHtml(opts.button) : "";
+  const secondaryButton = opts.secondaryButton ? secondaryButtonHtml(opts.secondaryButton) : "";
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
@@ -146,7 +159,7 @@ ${preheader}
       <tr><td style="padding:28px 32px 0;">${logo()}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
-        ${paragraphs}${rows}${button}
+        ${paragraphs}${rows}${button}${secondaryButton}
       </td></tr>
       <tr><td style="padding:12px 32px 26px;"><div style="border-top:1px solid ${TOKENS.hairline};">${footerHtml(opts)}</div></td></tr>
     </table>
@@ -162,6 +175,7 @@ export function renderEmailText(opts: EmailOptions): string {
   if (opts.rows) for (const r of opts.rows) parts.push(`${r.label}: ${r.value}`);
   if (opts.rows && opts.rows.length) parts.push("");
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
+  if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);
   parts.push("— Strelva");
   if (opts.manageUrl) parts.push(`Manage: ${opts.manageUrl}`);

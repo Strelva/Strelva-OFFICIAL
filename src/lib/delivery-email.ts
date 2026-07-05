@@ -635,6 +635,177 @@ export async function sendReviewRequestEmail(params: {
   }
 }
 
+function buildReviewNeedsReplyEmailOptions(params: {
+  businessName: string;
+  ownerName?: string;
+  review: { author: string; rating: number; text?: string };
+  reviewsUrl: string;
+  draftedReply?: string;
+  approveUrl?: string;
+  notYetUrl?: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const author = cleanSubjectText(params.review.author);
+  const stars = "★".repeat(Math.max(0, Math.min(5, params.review.rating)));
+  const greeting = params.ownerName ? `Hi ${cleanSubjectText(params.ownerName)}, ` : "";
+  const paragraphs = [
+    `${greeting}${author} left ${business} a new ${params.review.rating}-star review. A quick reply — especially in the first day or two — is one of the best local-SEO signals you can send, and it shows customers you're paying attention.`,
+  ];
+  const rows: EmailRow[] = [
+    { label: "From", value: author },
+    { label: "Rating", value: `${stars} (${params.review.rating}/5)` },
+  ];
+  if (params.review.text) rows.push({ label: "Review", value: cleanSubjectText(params.review.text) });
+
+  // When a filter-safe reply has been drafted, show it and let the owner post it
+  // in one click. The Approve button resolves the pending reply-draft event via
+  // the governed approval path — no auto-publish, the owner is the approver.
+  if (params.draftedReply) {
+    paragraphs.push("We drafted a reply you can post as-is, or tweak in your dashboard:");
+    rows.push({ label: "Suggested reply", value: cleanSubjectText(params.draftedReply) });
+  }
+
+  const opts: EmailOptions = {
+    preheader: `${author} left ${business} a ${params.review.rating}-star review.`,
+    heading: "A new review needs your reply",
+    paragraphs,
+    rows,
+    footerNote: `For ${business}`,
+    manageUrl: params.reviewsUrl,
+  };
+
+  if (params.approveUrl && params.draftedReply) {
+    opts.button = { label: "Approve & post this reply", url: params.approveUrl };
+    if (params.notYetUrl) opts.secondaryButton = { label: "Not yet", url: params.notYetUrl };
+  } else {
+    opts.button = { label: "Reply in your dashboard", url: params.reviewsUrl };
+  }
+  return opts;
+}
+
+/**
+ * "A new review needs your reply" — tells the owner the moment a genuinely-new
+ * review lands, with the review, an optional AI-drafted reply, and (when a draft
+ * exists) one-click Approve / Not-yet links that resolve the pending reply-draft
+ * through the governed approval path. CLIENT email: gated on emailSendingPaused()
+ * so it stays silent during the test-tenant phase. Fails soft: returns false on
+ * any error so a failed alert can never break the review poll.
+ */
+export async function sendReviewNeedsReplyEmail(params: {
+  email: string;
+  businessName: string;
+  ownerName?: string;
+  review: { author: string; rating: number; text?: string };
+  reviewsUrl: string;
+  draftedReply?: string;
+  approveUrl?: string;
+  notYetUrl?: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildReviewNeedsReplyEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `New ${params.review.rating}-star review for ${cleanSubjectText(params.businessName)}`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Review-needs-reply email failed:`, err);
+    return false;
+  }
+}
+
+function buildHealthRegressionEmailOptions(params: {
+  businessName: string;
+  ownerName?: string;
+  previousGrade: string;
+  currentGrade: string;
+  previousScore: number;
+  currentScore: number;
+  healthUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const greeting = params.ownerName ? `Hi ${cleanSubjectText(params.ownerName)}, ` : "";
+  return {
+    preheader: `${business}'s site health slipped to a ${params.currentGrade}.`,
+    heading: "Your site health dropped",
+    paragraphs: [
+      `${greeting}our latest scan of ${business} found the site-health grade slipped from ${params.previousGrade} to ${params.currentGrade}. This usually means something changed — a slower page, a broken link, or an SEO signal that regressed.`,
+      "You don't need to do anything technical. Open your dashboard to see what changed, or just tell the assistant and we'll look into it for you.",
+    ],
+    rows: [
+      { label: "Previous", value: `${params.previousGrade} (${params.previousScore})` },
+      { label: "Now", value: `${params.currentGrade} (${params.currentScore})` },
+    ],
+    button: { label: "See what changed", url: params.healthUrl },
+    footerNote: `For ${business}`,
+    manageUrl: params.healthUrl,
+  };
+}
+
+/**
+ * "Your site health dropped" — alerts the owner when a scheduled scan finds the
+ * site-health grade regressed materially vs the last stored grade. Plain,
+ * non-technical copy pointing at the dashboard. CLIENT email: gated on
+ * emailSendingPaused(). Fails soft: returns false on any error so a failed alert
+ * can never break the portfolio scan.
+ */
+export async function sendHealthRegressionEmail(params: {
+  email: string;
+  businessName: string;
+  ownerName?: string;
+  previousGrade: string;
+  currentGrade: string;
+  previousScore: number;
+  currentScore: number;
+  healthUrl: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildHealthRegressionEmailOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `${cleanSubjectText(params.businessName)}'s site health dropped to ${params.currentGrade}`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Health-regression email failed:`, err);
+    return false;
+  }
+}
+
 export async function sendDeliveryStatusEmail(params: {
   businessName: string;
   email: string;

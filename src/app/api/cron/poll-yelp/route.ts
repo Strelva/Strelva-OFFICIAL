@@ -6,6 +6,8 @@ import { getConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
+import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { maybeAlertNewReview } from "@/lib/review-alert";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -105,6 +107,21 @@ await mapPool(active, 8, async (tenant) => {
           // invisible. The event was already queued; this just mirrors to the table.
           console.error(`[poll-yelp] addReview failed for ${tenant.id}/${review.id}:`, err),
         );
+
+        // Alert the owner (once per review, client-gated). Yelp has no governed
+        // reply-publish path, so this carries the dashboard link, not one-click
+        // approve links. Best-effort — never blocks the poll.
+        try {
+          await maybeAlertNewReview({
+            tenant,
+            reviewId: review.id,
+            review: { author: review.user.name, rating: review.rating, text: review.text },
+            reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+            logPrefix: "[cron poll-yelp]",
+          });
+        } catch (err) {
+          console.error(`[poll-yelp] Owner alert failed for ${tenant.id}/${review.id}:`, err);
+        }
       }
 
       // Cache the CURRENT review-id snapshot (30-day TTL), unconditionally —

@@ -19,8 +19,10 @@ import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
-import { getTenantConfig } from "@/lib/tenants";
-import type { Connection } from "@/lib/types";
+import { buildApproveUrl } from "@/lib/approve-link";
+import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { maybeAlertNewReview } from "@/lib/review-alert";
+import type { Connection, TenantConfig } from "@/lib/types";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -127,7 +129,8 @@ async function fetchGoogleReviews(
   return data.reviews ?? [];
 }
 
-async function pollTenant(tenantId: string): Promise<number> {
+async function pollTenant(tenant: TenantConfig): Promise<number> {
+  const tenantId = tenant.id;
   const connection = await getConnection(tenantId, "google");
   if (!connection || connection.status !== "connected") return 0;
 
@@ -173,9 +176,6 @@ async function pollTenant(tenantId: string): Promise<number> {
 
   // Find new reviews
   const newReviews = reviews.filter((r) => !lastReviewIds.has(r.reviewId));
-
-  // Get tenant config for reply drafting (best-effort; drafting degrades gracefully)
-  const tenantConfig = await getTenantConfig(tenantId).catch(() => null);
 
   // Track new reviewIds whose reviews-table mirror (addReview) failed this poll
   // so we can EXCLUDE them from the seen-set write below — a transient mirror
@@ -223,19 +223,20 @@ async function pollTenant(tenantId: string): Promise<number> {
 
     // Draft a filter-safe reply and queue it for human approval.
     // This is fire-and-recover: a draft failure must not block the review event.
+    let draftedReply: string | undefined;
+    let draftEventId: string | undefined;
     try {
-      const draftConfig = tenantConfig ?? { id: tenantId, siteName: tenantId };
-      const draftedReply = await draftReviewReply(
+      draftedReply = await draftReviewReply(
         {
           reviewId: review.reviewId,
           reviewerName: review.reviewer.displayName,
           rating,
           comment: review.comment,
         },
-        draftConfig
+        tenant
       );
 
-      await addEvent({
+      const draftEvent = await addEvent({
         tenantId,
         source: "ai",
         type: "review",
@@ -252,6 +253,7 @@ async function pollTenant(tenantId: string): Promise<number> {
           reviewCreatedAt: review.createTime,
         },
       });
+      draftEventId = draftEvent.id;
 
       // Store in recent-replies for near-duplicate detection on future drafts.
       await storeRecentReply(tenantId, draftedReply);
@@ -260,6 +262,31 @@ async function pollTenant(tenantId: string): Promise<number> {
         `[poll-google-reviews] Reply drafting failed for ${tenantId} reviewId=${review.reviewId}:`,
         err
       );
+    }
+
+    // Alert the owner (once per review, client-gated). When a reply draft exists,
+    // carry one-click Approve / Not-yet links that resolve that pending draft
+    // through the governed approval path. Best-effort — never blocks the poll.
+    try {
+      const origin = getTenantDashboardUrl(tenant, "/");
+      const approveUrl = draftEventId
+        ? buildApproveUrl(origin, { eventId: draftEventId, tenantId, action: "approve" })
+        : undefined;
+      const notYetUrl = draftEventId
+        ? buildApproveUrl(origin, { eventId: draftEventId, tenantId, action: "not-yet" })
+        : undefined;
+      await maybeAlertNewReview({
+        tenant,
+        reviewId: review.reviewId,
+        review: { author: review.reviewer.displayName, rating, text: review.comment },
+        reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+        draftedReply,
+        approveUrl,
+        notYetUrl,
+        logPrefix: "[cron poll-google-reviews]",
+      });
+    } catch (err) {
+      console.error(`[poll-google-reviews] Owner alert failed for ${tenantId}/${review.reviewId}:`, err);
     }
   }
 
@@ -296,7 +323,7 @@ export async function GET() {
 
   await mapPool(active, 8, async (tenant) => {
     try {
-      const newCount = await pollTenant(tenant.id);
+      const newCount = await pollTenant(tenant);
       if (newCount > 0) {
         totalNewReviews += newCount;
         processed.push(`${tenant.id}: ${newCount} new`);
