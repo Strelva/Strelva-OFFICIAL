@@ -62,9 +62,15 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
   chat endpoint is `src/app/api/agent/route.ts`; it emits `__TOOL__<label>` status,
   text deltas, `__RESULT__<json>`, and `__CARD__<json>` (rich inline tool cards) —
   ChatPanel + DesignPropertiesPanel both consume the same protocol.
-- Content tools: `read_section`, `update_section`, `get_suggestions`, `create_suggestion`,
-  `create_blog_post`, `list_blog_posts`, `draft_newsletter`. Inline-display tools return
-  `{ __inlineTool, ... }` → streamed as `__CARD__` (e.g. `show_report`, `show_content`).
+- Content tools: `read_section`, `update_section`, `undo_last_change`, `get_suggestions`,
+  `create_suggestion`, `create_blog_post`, `list_blog_posts`, `draft_newsletter`.
+  Inline-display tools return `{ __inlineTool, ... }` → streamed as `__CARD__`
+  (e.g. `show_report`, `show_content`).
+- `undo_last_change` (`src/app/api/agent/route.ts`) is the **governed revert** — "undo
+  that" / "put it back" restores the previous section version (or a named `versionId` from
+  history) through the SAME `applySectionUpdate` path as any edit, but with the additive
+  `forceReview: true` knob so a revert **always drafts into the approval queue and never
+  auto-publishes**, even a low-risk one. It no-ops honestly when there's no earlier version.
 - Google Business tools (`create_gbp_post`, `update_business_hours`) NEVER write to Google
   directly — they queue a `status:"pending"` event (`metadata.kind` of `gbp_post_draft` /
   `gbp_hours_draft`); the real write happens on owner approval in `src/lib/event-actions.ts`,
@@ -90,7 +96,10 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 ## Operational systems
 
 - Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log. `event:{id}` bodies carry a 90-day TTL; `addEvent` prunes the per-tenant index zset by score on every write so the index can't outgrow the record TTL (dangling members would otherwise dilute the recency window `getEvents`/`getOpenChangeRequest` scan).
-- Crons in `src/app/api/cron/` (see `vercel.json`): maintenance, weekly-report, staleness, search-console, daily-summary, poll-yelp, poll-google-reviews, poll-instagram.
+- Crons in `src/app/api/cron/` (see `vercel.json`): maintenance, weekly-report, staleness, search-console, daily-summary, poll-yelp, poll-google-reviews, poll-instagram, portfolio-scan, visibility, order-review-request.
+- Owner alert emails: `sendReviewNeedsReplyEmail` (a genuinely-new review) + `sendHealthRegressionEmail` (site-health grade slipped) in `src/lib/delivery-email.ts`. Both are **client** email (behind `emailSendingPaused()`, fail-soft) and **deduped once per event** via a persistent NX marker that is **rolled back on suppression/failure**, so a paused alert reaches the owner the day client email is switched on rather than being lost. Triggers: the review-needs-reply alert fires from the `poll-google-reviews` + `poll-yelp` crons via the shared `maybeAlertNewReview` (`src/lib/review-alert.ts`, `reb:review-alert-sent:*`); the health-regression alert fires from the `portfolio-scan` cron on a grade drop (`reb:health-alert-sent:{tenant}:{prev}>{cur}`).
+- One-click approve-from-email: `GET /api/approve` (`src/app/api/approve/route.ts` + `src/lib/approve-link.ts`). The review-needs-reply email carries "Approve" / "Not yet" links the owner clicks without signing in. Each link is an **HMAC-signed token** binding `{eventId, tenantId, action}` + a 14-day expiry (secret reuses the oauth-state chain: `APPROVE_LINK_SECRET` → `OAUTH_STATE_SECRET` → `INTERNAL_API_SECRET`). The route is public (token is the only auth), **tenant-scoped twice** (token binds the tenant + `resolveEventAction` rejects a `wrong_tenant` mismatch), **idempotent** (a replayed/double-clicked link hits an already-resolved event → friendly "already handled" page), and resolves through the SAME governance spine as the dashboard (`resolveEventAction`: approve → "approved" which performs the external write, not-yet → "dismissed"). No new external-write path — it drives the existing governed one.
+- Order-triggered review requests: `src/app/api/cron/order-review-request/route.ts` (schedule in `vercel.json`). A few days after a storefront order lands (via the `/api/v1/track` beacon → `src/lib/orders.ts`), emails the OWNER their Google review link (`sendReviewRequestEmail`) to forward to the customer. Guards mirror the review-nudge cron: **skips any tenant with no derivable review URL** (no `reviewsConfig.googlePlaceId` ⇒ no request — never invents a link), respects the client email pause, and **dedupes per order** with a bounded delay window (`REVIEW_REQUEST_DELAY_DAYS`, default 3) + a rolled-back-on-failure `reb:order-review-request-sent:*` marker.
 - Integrations registry: `src/lib/integration-registry.ts` (UI metadata) + `src/lib/connections.ts` (live API access).
 - Weekly brief: `src/lib/weekly-brief.ts` + `src/lib/reports.ts` (per-tenant error isolation; deterministic claims-safe fallback when Gemini fails; Resend errors are counted, not swallowed). The win column pulls the positive `getClientReviewSummary` (new 5-star, praise themes) — admin-only review signal never enters the owner's report.
 - Pay links: `src/lib/pay-links.ts` + `/pay/[slug]` + super-admin `POST/GET /api/admin/pay-links` — per-client payment-before-work links (Redis `reb:paylink:*`). Submitted amounts are **whole dollars** (number or string) on the public API. `/pay/rohlax` is a grandfathered one-off (her deal is one-time, "no monthly fees ever" — never use it as the template).
@@ -103,6 +112,8 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 - Report cadence: `src/lib/report-cadence.ts` — decides WHEN the weekly-report cron emails a tenant (not what's in it). Per-tenant override in Redis (`reb:report-cadence:{tenant}`, default `monthly`; last-sent throttle at `reb:report-sent:{tenant}`); tiers aren't a code signal, so an operator flips a high-touch client to `weekly`. The `weekly-report` cron gates each send on `isReportDue`.
 - Client lifecycle emails: `sendWelcomeEmail`/`sendSiteLiveEmail`/`sendReviewRequestEmail` in `src/lib/delivery-email.ts` (all behind the client `emailSendingPaused()` gate, fail-soft). NOTE: these send functions exist but are not yet wired to a live trigger surface (only tests call them today) — do not document an operator "send lifecycle email" route; none exists in `src/app`.
 - Search Console + GA4 analytics: `src/lib/analytics.ts` — per-tenant analytics config (which GSC property + GA4 property to read) in Redis at `analytics:cfg:{tenantId}` (GSC default derived from the tenant's siteUrl); fail-soft reads that always return a status (`ok`/`unconfigured`/`unavailable`) and never throw. **Auth is OAuth-first, service-account-fallback** — each read tries the tenant's own Google connection when they granted the matching scope (`getGoogleScopeGrants`/`getGoogleAccessToken` in `src/lib/google-token.ts`), else falls back to the shared Strelva reporting service account (JWT signer reused from `search-console.ts`). Admin view at `src/app/admin/analytics/`; config write via `POST /api/admin/tenants/[id]/analytics-config` (super-admin, audit-logged).
+  - **Auto-setup because we host** (the "analytics wires itself up" promise): (1) GA4 pageview tag `custom-repo-starter/ScaffoldGA4.tsx` — a self-contained, fail-silent, CSP-friendly drop-in (mirrors `ScaffoldTracker`) that loads gtag.js only when `NEXT_PUBLIC_GA4_MEASUREMENT_ID` is set and is a complete no-op when unset; the operator just sets the one env var. (2) Provision-time analytics config: `src/lib/provisioning.ts` best-effort `setAnalyticsConfig` writes `analytics:cfg` with the siteUrl-derived GSC property (`deriveScDomain`) so a tenant has stored config from day one. (3) `registerHostedSiteWithSearchConsole` in `analytics.ts` is **GATED-OFF groundwork** — never auto-invoked, no-ops unless `opts.allow === true`, writes no verification token so it **cannot fabricate a verified state** (the Sites:add call only succeeds if the reporting service account is already a verified owner). The supported grant path is still the manual "add the reporting service account as a GSC/GA4 user" step provisioning surfaces.
+- Visibility cron gating (`src/app/api/cron/visibility/route.ts`): derives the probe `trade` from the tenant's `industry` field when no `visibility.trade` is hand-set (a real field, not a guess) so a tenant that never had a `visibility` block still collects wedge data — instead of silently skipping. `towns` are never invented; a tenant missing a real trade/town is recorded as `missing_*` and surfaced to an operator (deduped `alertOnce`), never a silent no-op.
 - Site health / audit: `src/lib/scan.ts` (`scanTenant`/`scanAllTenants`) wraps the audit engine (`src/lib/audit/checks.ts` `runAudit`) and is the ONLY writer to `scan-store` (`src/lib/scan-store.ts`, Redis) — the single source of truth for per-tenant health + history. The daily `portfolio-scan` cron (`0 5 * * *`) populates every tenant; the client `/dashboard/health` and the admin overview grade/score/sparkline read the SAME store. **Do NOT add a parallel audit-history store or cron** — a duplicate was built and removed; all health work goes through `scan.ts`/`scan-store`. Public free tool at `/audit` (rate-limited); sendable one-pager via `src/lib/audit/html.ts` + `/api/audit/report`. The admin scan (`POST /api/admin/scan`) also returns `prioritizedIssues` (via `src/lib/audit/prioritize.ts`) — the ranked "fix first" list rendered admin-side in the tenant `SiteScan` view; the client only ever sees grade/score. Full: `docs/audit-page.md`.
 
 ## Key lib files
@@ -168,12 +179,26 @@ Local-business owners will pay for a dashboard that proves their website is work
    (`src/lib/dashboard-surfaces.ts`) and rendered by `HistorySidebar.tsx` / `MobileNav.tsx`
    via `surface-nav.ts`. Full map: **[docs/client-dashboard-ia.md](./docs/client-dashboard-ia.md)**.
    - **Manage** — **Today** (`/dashboard`, at-a-glance + next action; inbound leads fold in
-     here as "Who reached out"), **Ask Strelva** (`/dashboard/chat`, the agent chat).
+     here as "Who reached out"; the **"What Strelva did for you" activity feed**
+     (`ActivityFeed.tsx` + `src/lib/activity-feed.ts`) — an owner-facing, past-tense timeline
+     of the managed done-for-you work, the anti-churn proof surface. `selectStrelvaWork`
+     scopes it to `actor:"ai"` + `actor:"admin"` + posted review replies (`type:"review-reply"`)
+     and **excludes the owner's own manual edits**; only genuinely-live work is shown
+     (pending drafts / "dashboard only" reply drafts are skipped), with an honest empty state.
+     Known gap: GBP posts aren't in the feed yet), **Ask Strelva** (`/dashboard/chat`, the
+     agent chat).
    - **Your presence** — **Website** (spine; Site + Content/Assets/**History**/Store as
      sub-tabs — History holds the change log + revert-to-last-good; **Store folds in** as a
      sub-tab only when the tenant runs a storefront, never a top-level tab), **Google
      Business**, **Analytics** (the merged **Reports + Health** surface — verdict-first
-     `WeeklyBriefClient` + `SiteHealthCard`; the old separate Health tab is gone), **Reviews**.
+     `WeeklyBriefClient` + `SiteHealthCard`; the old separate Health tab is gone. Also carries
+     the **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`) — a
+     real then→now recap (traffic, review count + rating, health grade) built only from stored
+     history; "tracking since {date}" when a metric has no baseline, a forward-looking
+     "building" state until enough history — and the **AI-visibility scorecard** "You in AI
+     answers" (`AiVisibilityScorecard.tsx` + `src/lib/ai-visibility-scorecard.ts`) which reuses
+     the weekly visibility snapshot, counts only probed answers, and never shames a gap),
+     **Reviews**.
      Each presence surface has a `state` (`shown` / `connect` / `hidden`): Google Business +
      Reviews resolve by business type (`getPresenceProfile` → local/online/hybrid) plus
      connections, so an online-only brand never sees local-SEO framing it can't use, and a
@@ -182,7 +207,12 @@ Local-business owners will pay for a dashboard that proves their website is work
      customers find you" so business type is set on day one — `settings.businessModel` drives
      it (`""` = infer from template).
    - **Settings** — the always-present seventh surface (gear in the identity footer, not in
-     the resolver list).
+     the resolver list). Consolidated to **4 top-level sections** (`Business` · `Account` ·
+     `Domains` · `Plan`, `src/app/dashboard/settings/page.tsx`): the previously-thin
+     business/site sections (Business info, Branding, Site config, Connected services,
+     Shortcuts) **plus Ownership** now fold into `Business` as labeled in-page bands, with a
+     legacy-hash map (`LEGACY_HASH_TO_SECTION`) so old deep links (`#profile`, `#ownership`,
+     `#billing`, …) still land. Ownership/handoff is recovered as the `ownership` band.
    - Identity split (founder feedback): top-left = the **business** (logo + name + domain);
      bottom-left = the **signed-in person** ("Hello, {name}", login identity, with an Admin
      badge + a "view as client" toggle for super-admins). Settings separates **Account**
