@@ -6,6 +6,7 @@ import { buildProofCards } from "@/lib/proof";
 import { detectTrafficAnomaly } from "@/lib/anomaly";
 import { getLatestSnapshots } from "@/lib/visibility/snapshots";
 import { buildCompetitorBenchmark } from "@/lib/competitor-benchmark";
+import { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
 import { getSearchConsolePerf, getGa4Perf } from "@/lib/analytics";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
@@ -28,7 +29,9 @@ export default async function AnalyticsPage() {
     getDailyMetrics(tenant, 30).catch(() => []),
     getActivity(tenant, { actor: "ai" }).catch(() => []),
     getGoal(tenant).catch(() => null),
-    getLatestSnapshots(tenant, 1).catch(() => []),
+    // Two snapshots: latest powers the benchmark + AI scorecard, previous gives
+    // the week-over-week "new this week" trend. Reuses data already collected.
+    getLatestSnapshots(tenant, 2).catch(() => []),
     getSearchData(tenant).catch(() => null),
     // Live Search Console + GA4 for THIS tenant. Fail-soft: these never throw and
     // always return a status, so a bad read degrades to the panel's connect nudge.
@@ -42,6 +45,8 @@ export default async function AnalyticsPage() {
   const anomaly = detectTrafficAnomaly(dailyMetrics);
   // Where you rank vs competitors, from the latest visibility scan.
   const benchmark = buildCompetitorBenchmark(snapshots[0] ?? null);
+  // "You in AI answers" scorecard — the AI-search wedge, surfaced to the owner.
+  const aiVisibility = buildAiVisibilityScorecard(snapshots[0] ?? null, snapshots[1] ?? null);
 
   return (
     <>
@@ -54,6 +59,7 @@ export default async function AnalyticsPage() {
         goal={goal}
         anomaly={anomaly}
         benchmark={benchmark}
+        aiVisibility={aiVisibility}
         searchData={searchData}
         searchPerf={searchPerf}
         gaPerf={gaPerf}

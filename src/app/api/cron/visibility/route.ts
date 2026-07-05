@@ -84,25 +84,40 @@ export async function GET() {
   await mapPool(toRun, 4, async (tenant) => {
     const cfg = tenant.visibility;
 
-    if (!cfg) {
-      results.push({ tenantId: tenant.id, status: "skipped", reason: "no_visibility_config" });
-      return;
-    }
-
-    if (cfg.enabled === false) {
+    // Explicit opt-out is always honored — never override a client who turned this off.
+    if (cfg?.enabled === false) {
+      console.log(`[visibility-cron] SKIP ${tenant.id}: disabled_in_config`);
       results.push({ tenantId: tenant.id, status: "skipped", reason: "disabled_in_config" });
       return;
     }
 
-    if (!cfg.trade || !cfg.towns?.length) {
-      results.push({ tenantId: tenant.id, status: "skipped", reason: "missing_trade_or_towns" });
+    // Derive probe inputs from real tenant fields so a tenant that never had a
+    // `visibility` block hand-set still collects wedge data. `trade` falls back to
+    // the tenant's declared `industry` — a real field, not a guess. `towns` MUST be
+    // real: we NEVER invent a service area, because a wrong town corrupts the wedge
+    // data. A tenant with no real town is flagged for an operator, not probed blind.
+    const trade = (cfg?.trade || tenant.industry || "").trim();
+    const towns = (cfg?.towns ?? []).map((t) => t.trim()).filter(Boolean);
+
+    if (!trade || towns.length === 0) {
+      const missing = [!trade ? "trade" : null, towns.length === 0 ? "towns" : null]
+        .filter(Boolean)
+        .join("+");
+      // Do NOT skip silently — log which tenant and why so the gap is visible in
+      // the cron output, and surface it to an operator below (never a no-op).
+      console.warn(
+        `[visibility-cron] SKIP ${tenant.id}: no probe inputs (missing ${missing}; ` +
+        `industry=${JSON.stringify(tenant.industry ?? "")}, towns=${towns.length}) — ` +
+        `set tenant.visibility.${!trade ? "trade" : "towns"} to probe`
+      );
+      results.push({ tenantId: tenant.id, status: "skipped", reason: `missing_${missing}` });
       return;
     }
 
     try {
-      const queriesPerWeek = cfg.queriesPerWeek ?? DEFAULT_QUERIES_PER_WEEK;
-      const queries = buildVisibilityQueries(cfg.trade, cfg.towns, queriesPerWeek);
-      const competitors = cfg.competitors ?? [];
+      const queriesPerWeek = cfg?.queriesPerWeek ?? DEFAULT_QUERIES_PER_WEEK;
+      const queries = buildVisibilityQueries(trade, towns, queriesPerWeek);
+      const competitors = cfg?.competitors ?? [];
 
       // SERP checks
       const serpResults: SerpResult[] = [];
@@ -141,8 +156,8 @@ export async function GET() {
 
       const snapshot: VisibilitySnapshot = {
         tenantId: tenant.id,
-        trade: cfg.trade,
-        towns: cfg.towns,
+        trade,
+        towns,
         queriesPerWeek,
         serpResults,
         aiResults,
@@ -176,6 +191,26 @@ export async function GET() {
   const skipped = results.filter((r) => r.status === "skipped").length;
   const errors = results.filter((r) => r.status === "error").length;
 
+  // A tenant that can't be probed for lack of a real trade/town is a wedge-data
+  // gap, not a no-op. Surface the list to an operator (deduped, non-paging) so the
+  // config gap gets closed instead of quietly starving the wedge.
+  const unconfigured = results.filter(
+    (r) => r.status === "skipped" && r.reason?.startsWith("missing_")
+  );
+  if (unconfigured.length > 0) {
+    const ids = unconfigured.map((r) => r.tenantId);
+    console.warn(
+      `[visibility-cron] ${unconfigured.length} tenant(s) have no probe inputs ` +
+      `(missing trade/towns): ${ids.join(", ")}`
+    );
+    await alertOnce(
+      "visibility_tenants_unconfigured",
+      "medium",
+      { count: unconfigured.length, tenantIds: ids.join(",") },
+      24 * 3600
+    );
+  }
+
   console.log(
     `[visibility-cron] Done. ok=${ok} skipped=${skipped} errors=${errors} ` +
     `totalEstCostUsd=${totalEstimatedCostUsd.toFixed(4)}`
@@ -202,6 +237,7 @@ export async function GET() {
     ok,
     deferred,
     skipped,
+    unconfigured: unconfigured.length,
     errors,
     totalEstimatedMonthlyCostUsd: parseFloat(totalEstimatedCostUsd.toFixed(4)),
     results,
