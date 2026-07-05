@@ -33,9 +33,13 @@ import { getRedis } from "./redis";
 import { getTenantConfig } from "./tenants";
 import { getAccessToken, getServiceAccountCredential } from "./search-console";
 import { getGoogleAccessToken, getGoogleScopeGrants } from "./google-token";
+import type { TenantConfig } from "./types";
 
 /** GA4 Data API read scope for the shared JWT signer. */
 const SCOPE_ANALYTICS = "https://www.googleapis.com/auth/analytics.readonly";
+/** Search Console read-WRITE scope — required by the Sites: add call. The
+ *  read paths above only ever use the read-only scope. */
+const SCOPE_WEBMASTERS_WRITE = "https://www.googleapis.com/auth/webmasters";
 
 export interface TenantAnalyticsConfig {
   tenantId: string;
@@ -72,8 +76,9 @@ interface StoredConfig {
 
 const cfgKey = (tenantId: string) => `analytics:cfg:${tenantId}`;
 
-/** Derive a GSC domain property (`sc-domain:example.com`) from a site URL. */
-function deriveScDomain(siteUrl?: string | null): string | null {
+/** Derive a GSC domain property (`sc-domain:example.com`) from a site URL.
+ *  Exported so the provisioning path can persist the same default it would read. */
+export function deriveScDomain(siteUrl?: string | null): string | null {
   if (!siteUrl) return null;
   try {
     const url = new URL(siteUrl.includes("://") ? siteUrl : `https://${siteUrl}`);
@@ -318,5 +323,79 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
     };
   } catch {
     return { status: "unavailable", ...EMPTY_GA };
+  }
+}
+
+export interface GscRegistrationResult {
+  status: "ok" | "skipped" | "unavailable" | "error";
+  property: string | null;
+  detail: string;
+}
+
+/**
+ * GROUNDWORK — NOT auto-invoked anywhere. Registers a Strelva-hosted site with
+ * the shared reporting service account's Search Console via the Sites: add API
+ * (`PUT /webmasters/v3/sites/{property}`). Because we host the site we CAN grant
+ * the reporting account access, but this call is deliberately left un-wired:
+ *
+ *   - It is GATED behind an explicit `opts.allow === true`. A default/stray call
+ *     is a no-op ("skipped") and issues NO network request, so it can never fire
+ *     a live Search Console write by accident.
+ *   - It performs NO ownership verification and writes NO verification token, so
+ *     it cannot produce a false "verified" state. The API only SUCCEEDS if the
+ *     service account is already a verified owner of the property; otherwise
+ *     Google rejects it and we surface "error" — we never fake success.
+ *   - It requires the reporting service account's JWT to carry the read-WRITE
+ *     `webmasters` scope (the read paths use `webmasters.readonly`).
+ *
+ * The supported, zero-risk way to grant read access remains the manual one-liner
+ * (there is no public API to add another account as a *user* of a property you
+ * own): in Search Console → Settings → Users and permissions, add
+ *   strelva-reporting@strelva.iam.gserviceaccount.com
+ * as a Full/Restricted user on the client's property. Provisioning surfaces this
+ * as a manual step. Use this function only when you deliberately opt in and the
+ * service account is already a verified owner. Never throws.
+ */
+export async function registerHostedSiteWithSearchConsole(
+  tenant: TenantConfig | null | undefined,
+  siteUrl: string,
+  opts: { allow: boolean },
+): Promise<GscRegistrationResult> {
+  const property = deriveScDomain(siteUrl);
+  if (!opts.allow) {
+    return {
+      status: "skipped",
+      property,
+      detail:
+        "opt-in flag not set — no live Search Console call made (this is the safe default)",
+    };
+  }
+  if (!property) {
+    return { status: "error", property: null, detail: "could not derive a GSC property from siteUrl" };
+  }
+  const cred = getServiceAccountCredential(tenant);
+  if (!cred) {
+    return { status: "unavailable", property, detail: "no reporting service account configured" };
+  }
+  try {
+    const token = await getAccessToken(cred, SCOPE_WEBMASTERS_WRITE);
+    const res = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(property)}`,
+      { method: "PUT", headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      return {
+        status: "error",
+        property,
+        detail: `Sites: add rejected (${res.status}) — the service account is likely not a verified owner`,
+      };
+    }
+    return { status: "ok", property, detail: `${property} added to the reporting service account` };
+  } catch (err) {
+    return {
+      status: "error",
+      property,
+      detail: err instanceof Error ? err.message : "Sites: add failed",
+    };
   }
 }

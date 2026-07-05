@@ -9,6 +9,7 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 |------|---------|
 | `scaffold-client.ts` | Typed fetch client for Scaffold Web's `/api/v1/*` contract |
 | `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (powers the weekly report) |
+| `ScaffoldGA4.tsx` | Fail-silent GA4 tag → sends pageviews to the client's GA4 property (auto-wires from one env var) |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
 | `README.md` | This file |
@@ -44,6 +45,10 @@ REVALIDATION_SECRET=shared-secret-from-scaffold     # Required
 # Tracking beacon (browser) — required only if you mount <ScaffoldTracker />:
 NEXT_PUBLIC_TENANT_ID=client-slug                   # Same slug as TENANT_ID
 NEXT_PUBLIC_SCAFFOLD_API_URL=https://app.strelva.com # Same URL as SCAFFOLD_API_URL
+
+# GA4 (browser) — the ONLY var needed to turn on Google Analytics. Set it and
+# <ScaffoldGA4 /> auto-sends pageviews; leave it unset and the tag is a no-op:
+NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX          # GA4 Measurement ID
 ```
 
 `scaffold-client.ts` also accepts the legacy `REB_API_URL` env var. New repos
@@ -138,6 +143,51 @@ network error or missing env var can never break the client site.
 See `docs/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
 roll this into the live GLDF and Rohlax repos plus how to verify the report
 picks it up.
+
+### Google Analytics (GA4)
+
+The internal beacon above powers the weekly report; GA4 is the client's own
+industry-standard analytics. Because Strelva hosts the site, turning GA4 on is
+**one env var** — no per-build hand-wiring.
+
+Copy `ScaffoldGA4.tsx` into the repo and mount it once, next to the tracker:
+
+```bash
+cp ScaffoldGA4.tsx my-client-site/components/ScaffoldGA4.tsx
+```
+
+```tsx
+// app/layout.tsx
+import { ScaffoldTracker } from "@/components/ScaffoldTracker";
+import { ScaffoldGA4 } from "@/components/ScaffoldGA4";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <ScaffoldTracker />
+        <ScaffoldGA4 />
+      </body>
+    </html>
+  );
+}
+```
+
+Set `NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX` and GA4 pageviews start
+flowing on the next deploy. Leave it unset and `<ScaffoldGA4 />` is a complete
+no-op (renders nothing, loads nothing). It renders `null` on both server and
+client (no hydration mismatch) and injects only the external
+`googletagmanager.com` loader — no inline script. Under a strict CSP, allow
+`https://www.googletagmanager.com` in `script-src` (required by any GA4 install).
+
+**Reporting service account (control-plane reads):** the Strelva dashboard's
+Search + Analytics panel reads the client's GSC/GA4 data using a shared
+reporting service account. To grant it, add
+`strelva-reporting@strelva.iam.gserviceaccount.com` as a user on the client's
+Search Console property (Settings → Users and permissions) and on the GA4
+property. Provisioning prints this as a one-time manual step — it is intentionally
+manual so nothing can mis-verify a property.
 
 ## Required Contract
 

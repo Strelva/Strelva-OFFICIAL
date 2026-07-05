@@ -14,6 +14,8 @@ import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { selectStrelvaWork } from "@/lib/activity-feed";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
@@ -36,7 +38,10 @@ async function DashboardHome() {
     // The approval queue, surfaced inline on Today (folds the separate "Needs
     // you" route into the home). Degrades to an empty queue on a backend blip.
     getNeedsYouData(tenant).catch(() => ({ pending: [], resolved: [], pendingCount: 0, staleSectionCount: 0 })),
-    getActivity(tenant, { actor: "ai" }).catch(() => []),
+    // The full log — split below into Strelva's own work (for the feed, which
+    // then includes posted review replies logged actor:"user") and the AI-only
+    // slice (for day-one detection).
+    getActivity(tenant).catch(() => []),
     getWeeklyBrief(tenant).catch(() => null),
     getTenantConfig(tenant).catch(() => null),
     getOwnerRetentionSignals(tenant).catch(() => ({
@@ -62,13 +67,19 @@ async function DashboardHome() {
     : getTenantPublicUrlFromDomainMap(tenant);
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
 
+  // Strelva's own work (AI updates + posted review replies) feeds the "what we
+  // did for you" timeline; the owner's own manual edits are excluded so we never
+  // claim their work as ours. The AI-only slice still drives day-one detection.
+  const strelvaWork = selectStrelvaWork(activity);
+  const aiActivity = activity.filter((a) => a.actor === "ai");
+
   // Day-one detection: a brand-new client has no traffic, no customer actions,
   // nothing in the review queue, no AI changes yet, and no weekly report.
   const isFresh =
     pageViews.total === 0 &&
     customerActions.total === 0 &&
     pendingCount === 0 &&
-    activity.length === 0 &&
+    aiActivity.length === 0 &&
     !brief;
 
   // Lead with the verdict — the weekly-report headline via the same buildVerdict
@@ -192,6 +203,11 @@ async function DashboardHome() {
           />
           </section>
           ) : null}
+
+          {/* "What Strelva did for you" — the anti-churn proof timeline. The
+              managed service made visible. Only past day-one (its own honest
+              empty state covers a new-but-not-day-one client). */}
+          {!isFresh ? <ActivityFeed activity={strelvaWork} /> : null}
 
           {leadSummary.recent.length > 0 ? (
             <section className="rounded-2xl border border-glass-border bg-glass p-5">
