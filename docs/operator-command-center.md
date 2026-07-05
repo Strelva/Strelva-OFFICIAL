@@ -107,6 +107,15 @@ top pages / sources).
 - Per-tenant config (which GSC property + GA4 property id to read) in Redis at
   `analytics:cfg:{tenantId}`; the GSC property defaults to `sc-domain:<host>`
   derived from the tenant's `siteUrl` when unset.
+- **Auto-setup because we host.** Provisioning (`src/lib/provisioning.ts`) best-effort
+  writes `analytics:cfg` at provision time with the siteUrl-derived GSC property, so a
+  tenant has stored config from day one. GA4 auto-wires on the hosted site via the
+  fail-silent `custom-repo-starter/ScaffoldGA4.tsx` tag (loads gtag.js only when
+  `NEXT_PUBLIC_GA4_MEASUREMENT_ID` is set) — the operator just sets the one env var.
+  `registerHostedSiteWithSearchConsole` (`analytics.ts`) is GATED-OFF groundwork: never
+  auto-invoked, no-ops unless `opts.allow === true`, and writes no verification token so it
+  cannot fabricate a verified state. The supported grant path stays the manual "add the
+  reporting service account as a GSC/GA4 user" step provisioning surfaces.
 - **Auth is OAuth-first, service-account-fallback.** Each read tries the tenant's
   own Google connection when they granted the matching read scope
   (`getGoogleScopeGrants` / `getGoogleAccessToken`, `src/lib/google-token.ts`),
@@ -137,6 +146,34 @@ Client lifecycle emails (`sendWelcomeEmail` / `sendSiteLiveEmail` /
 `emailSendingPaused()` gate. These send functions exist but are not yet wired to a
 live trigger surface.
 
+**Owner alert emails (client email, but wired to live triggers).** Two owner-facing
+alerts, both behind the client `emailSendingPaused()` gate, deduped once per event
+with a persistent NX marker that rolls back on suppression/failure (so a paused alert
+reaches the owner the day client email is switched on):
+
+- `sendReviewNeedsReplyEmail` — a genuinely-new review. Fired from the
+  `poll-google-reviews` + `poll-yelp` crons via `maybeAlertNewReview`
+  (`src/lib/review-alert.ts`, `reb:review-alert-sent:*`). The email carries the
+  one-click **Approve / Not yet** links.
+- `sendHealthRegressionEmail` — the site-health grade slipped. Fired from the
+  `portfolio-scan` cron on a grade drop (`reb:health-alert-sent:{tenant}:{prev}>{cur}`).
+
+**One-click approve-from-email — `GET /api/approve`** (`src/app/api/approve/route.ts`
++ `src/lib/approve-link.ts`). The review alert's Approve / Not yet links let the owner
+resolve a pending review-reply without signing in. Each link is an HMAC-signed token
+binding `{eventId, tenantId, action}` + a 14-day expiry (secret reuses the oauth-state
+chain). Public route (token is the only auth), tenant-scoped twice (token binds tenant
++ `resolveEventAction` rejects `wrong_tenant`), idempotent (replay → "already handled"),
+and resolves through the SAME governance spine as the dashboard — approve → "approved"
+(performs the external write), not-yet → "dismissed".
+
+**Order-triggered review requests — `order-review-request` cron**
+(`src/app/api/cron/order-review-request/route.ts`). A few days after a storefront order
+lands, emails the owner their Google review link (`sendReviewRequestEmail`) to forward
+to the customer. Skips any tenant with no `reviewsConfig.googlePlaceId` (never invents a
+link), respects the client email pause, dedupes per order
+(`reb:order-review-request-sent:*`, rolled back on failure).
+
 ## At-risk / churn signal
 
 `src/lib/churn.ts` feeds the "at risk" column of the "Needs you" dashboard. The
@@ -160,7 +197,10 @@ The cron gates each send on `isReportDue` and records `markReportSent`.
 | `reb:engagement:{tenantId}:{day}` | `daily-summary` cron → `src/lib/churn.ts` | Daily owner agent-engagement count (7-day rolling, ~10-day TTL) |
 | `reb:report-cadence:{tenant}` | operator override | Per-tenant report cadence (`weekly` / `monthly`) |
 | `reb:report-sent:{tenant}` | `weekly-report` cron | Last report-sent timestamp (cadence throttle) |
-| `analytics:cfg:{tenantId}` | `src/lib/analytics.ts` | Per-tenant GSC property + GA4 property id |
+| `analytics:cfg:{tenantId}` | `src/lib/analytics.ts` (+ provision-time in `provisioning.ts`) | Per-tenant GSC property + GA4 property id |
+| `reb:review-alert-sent:{tenantId}:{reviewId}` | `poll-google-reviews` / `poll-yelp` crons → `src/lib/review-alert.ts` | Dedup marker for the review-needs-reply owner alert (rolled back on suppress/fail) |
+| `reb:health-alert-sent:{tenantId}:{prev}>{cur}` | `portfolio-scan` cron | Dedup marker for the health-regression owner alert (per grade transition) |
+| `reb:order-review-request-sent:{tenantId}:{orderId}` | `order-review-request` cron | Dedup marker for the order-triggered review request (rolled back on suppress/fail) |
 
 (`reb:` is the frozen wire/persistent-data prefix — see AGENTS.md. `crm:` and
 `analytics:cfg:` are new operator-only keys.)

@@ -31,7 +31,13 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
 - **Analytics = Reports + Health.** The old separate Reports and Health tabs are gone. One
   verdict-first surface: `WeeklyBriefClient` (the weekly report) + `SiteHealthCard` (the
   audit grade/score/detail) in one scroll. `SURFACE_MATCH["analytics"]` lights the tab for
-  `/dashboard/analytics`, `/dashboard/reports`, and `/dashboard/health`.
+  `/dashboard/analytics`, `/dashboard/reports`, and `/dashboard/health`. It also carries the
+  **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`, a stored-
+  history then→now recap of traffic / reviews / rating / health, with a "building" state until
+  there's enough history) and the **AI-visibility scorecard** "You in AI answers"
+  (`AiVisibilityScorecard.tsx` + `src/lib/ai-visibility-scorecard.ts`, built off the weekly
+  visibility snapshot — probed answers only, never shames a gap). Both are honesty-railed:
+  no fabricated baselines, only genuinely positive moves become headline copy.
 - **Store folds INTO Website.** Store is no longer a top-level tab. Website is the spine;
   Store appears as a sub-tab only when the tenant runs a storefront (`getWebsiteSections`
   returns a `store` section when `tenantHasStore` is true). A plain site shows no sub-nav
@@ -39,6 +45,14 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
   `/dashboard/site`, `/collections`, `/content`, `/assets`, `/history`, `/store`.
 - **Leads folded into Today.** No standalone Leads tab — inbound form submissions surface as
   "Who reached out" on Today.
+- **"What Strelva did for you" activity feed on Today** (`ActivityFeed.tsx` +
+  `src/lib/activity-feed.ts`). An owner-facing, past-tense timeline of the managed
+  done-for-you work — the anti-churn proof surface. `selectStrelvaWork` scopes it to
+  `actor:"ai"` + `actor:"admin"` (the team's work; from the client's side there's no
+  AI-vs-human line) + posted review replies (`type:"review-reply"`), and **excludes the
+  owner's own manual edits**. Only genuinely-live work shows (pending drafts and
+  "dashboard only" reply drafts are skipped); honest empty state. Known gap: GBP posts
+  aren't in the feed yet.
 - **The assistant is "Strelva".** The chat tab is **"Ask Strelva"**, not "Ask AI". The agent
   refers to itself as Strelva — persona is set in the system prompt in
   `src/app/api/agent/route.ts` ("You are Strelva, the assistant that manages the website
@@ -122,3 +136,16 @@ Founder-feedback split (see `AGENTS.md` "What The Client Sees"): top-left = the 
 identity, Admin badge + "view as client" toggle for super-admins). Settings separates
 **Account** (read-only login identity) from **Business info** (the editable business fields,
 including the `businessModel` that drives the presence resolver).
+
+## Settings structure
+
+`src/app/dashboard/settings/page.tsx` is consolidated to **4 top-level sections**:
+**Business · Account · Domains · Plan**. The previously-thin business/site sections
+(Business info, Branding, Site config, Connected services, Shortcuts) **plus Ownership** now
+render as labeled in-page bands stacked inside **Business** (`BUSINESS_SECTION_META` →
+anchors `profile` / `branding` / `site-config` / `dependencies` / `utilities` / `ownership`).
+`LEGACY_HASH_TO_SECTION` maps old settings hashes (deep links from `proxy.ts`, onboarding, the
+ownership redirect) onto the new sections — a Business sub-hash resolves to the Business group
+then scrolls to its anchor; `#billing` → Plan — so every existing link still lands.
+**Account** is read-only login identity; **Business info** (the `profile` band) holds the
+editable business fields including the `businessModel` that drives the presence resolver.
