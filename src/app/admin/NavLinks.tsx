@@ -21,6 +21,7 @@ const PRIMARY: NavItem[] = [
 ];
 
 const MORE: NavItem[] = [
+  { href: "/admin/actions", label: "Actions" },
   { href: "/admin/onboard", label: "Onboard" },
   { href: "/admin/pay-links", label: "Pay Links" },
   { href: "/admin/digests", label: "Maintenance" },

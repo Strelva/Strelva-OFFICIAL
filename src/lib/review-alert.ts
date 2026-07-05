@@ -50,6 +50,7 @@ export async function maybeAlertNewReview(params: {
     draftedReply: params.draftedReply,
     approveUrl: params.approveUrl,
     notYetUrl: params.notYetUrl,
+    tenantId: params.tenant.id,
     logPrefix: params.logPrefix,
   });
 
