@@ -108,14 +108,14 @@ export default function PayLinksPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Pay Links</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Pay Links</h1>
         <p className="text-sm text-gray-muted mt-1">
           Mint a per-client payment link to send before work starts.
         </p>
       </div>
 
       <div className="rounded-xl bg-glass border border-glass-border p-5">
-        <h2 className="text-sm font-semibold text-warm-white mb-4">New pay link</h2>
+        <h2 className="text-[15px] font-medium text-warm-white mb-4">New pay link</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="acme-coffee" />
           <Field label="Client name" value={form.clientName} onChange={(v) => setForm({ ...form, clientName: v })} placeholder="Acme Coffee" />
@@ -137,7 +137,7 @@ export default function PayLinksPage() {
         <button
           onClick={() => void submit()}
           disabled={submitting}
-          className="mt-4 rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium disabled:opacity-40"
+          className="mt-4 rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
           {submitting ? "Minting…" : "Mint pay link"}
         </button>
@@ -145,7 +145,7 @@ export default function PayLinksPage() {
 
       <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
         <div className="px-5 py-4 border-b border-glass-border">
-          <h2 className="text-sm font-semibold text-warm-white">
+          <h2 className="text-[15px] font-medium text-warm-white">
             Outstanding links {links.length > 0 && <span className="text-gray-muted">({links.length})</span>}
           </h2>
         </div>
@@ -162,7 +162,7 @@ export default function PayLinksPage() {
                     {l.clientName}{" "}
                     <span className="text-gray-faint">· {l.door}</span>
                     {paidSlugs.has(l.slug) && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
                         Paid
                       </span>
                     )}

@@ -288,7 +288,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("normalizes invite emails before access assignment", () => {
     const invite = readFileSync(path.join(process.cwd(), "src/app/api/admin/invites/route.ts"), "utf8");
     const assign = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/assign/route.ts"), "utf8");
-    const adminPage = readFileSync(path.join(process.cwd(), "src/app/admin/page.tsx"), "utf8");
+    // InviteButton lives on the single client detail page (/admin/clients/[id]),
+    // where the operator invites a tenant's owner.
+    const clientDetailPage = readFileSync(path.join(process.cwd(), "src/app/admin/clients/[id]/page.tsx"), "utf8");
     const inviteButton = readFileSync(path.join(process.cwd(), "src/app/admin/InviteButton.tsx"), "utf8");
 
     for (const source of [invite, assign]) {
@@ -325,8 +327,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
     expect(inviteEmail).toContain('heading: "Your dashboard is ready"');
     expect(inviteEmail).toContain('label: "Set up your login"');
-    expect(adminPage).toContain("<InviteButton");
-    expect(adminPage).toContain("ownerEmail={t.ownerEmail}");
+    expect(clientDetailPage).toContain("<InviteButton");
+    expect(clientDetailPage).toContain("ownerEmail={tenant.ownerEmail}");
     expect(inviteButton).toContain('fetch("/api/admin/invites"');
     expect(inviteButton).toContain("Access is assigned to this exact email on signup");
     expect(inviteButton).toContain("signUpUrl?: string");

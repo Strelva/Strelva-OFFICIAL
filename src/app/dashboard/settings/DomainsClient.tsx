@@ -326,12 +326,12 @@ export function DomainsClient({ initialDomains }: Props) {
                       {entry.domain}
                     </span>
                     {entry.status === "connected" ? (
-                      <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10">
+                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10">
                         <CheckCircle2 className="w-3 h-3" strokeWidth={2} />
                         Connected
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
+                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
                         <Clock className="w-3 h-3" strokeWidth={2} />
                         Pending DNS
                       </span>

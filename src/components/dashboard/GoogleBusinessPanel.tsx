@@ -61,7 +61,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
         <Link
           href={dashboardHref("/dashboard/sources/google-business")}
           prefetch={false}
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[14px] font-medium text-surface-base transition-opacity hover:opacity-90"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[14px] font-medium text-on-accent transition-opacity hover:opacity-90"
         >
           Connect Google Business
           <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
@@ -113,7 +113,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           </ul>
         ) : (
           <p className="mt-2 text-[13px] text-gray-muted">
-            Hours haven&apos;t synced yet. Ask the AI to set them and approve the change.
+            Hours haven&apos;t synced yet. Ask Strelva to set them and approve the change.
           </p>
         )}
       </section>
@@ -139,7 +139,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           </ul>
         ) : (
           <p className="mt-2 text-[13px] text-gray-muted">
-            No posts yet. Ask the AI to draft one from a recent update — you approve before it publishes.
+            No posts yet. Ask Strelva to draft one from a recent update — you approve before it publishes.
           </p>
         )}
       </section>

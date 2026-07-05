@@ -20,7 +20,7 @@ export default function AdminError({
       )}
       <button
         onClick={reset}
-        className="mt-4 rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium"
+        className="mt-4 rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium"
       >
         Try again
       </button>

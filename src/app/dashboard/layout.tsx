@@ -7,7 +7,8 @@ import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfa
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
-import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
+import { getVisibleSurfaces, tenantHasStore } from "@/lib/dashboard-surfaces";
+import { getProducts } from "@/lib/products";
 import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
@@ -97,10 +98,19 @@ export default async function DashboardLayout({
   // Fetch queue count and connections. Each read is independently guarded: this
   // runs in the dashboard LAYOUT, so an unguarded throw (a Redis/Sanity blip)
   // would 500 every dashboard route at once. Degrade to safe defaults instead.
-  const [pendingCount, connections] = await Promise.all([
+  const [pendingCount, connections, products] = await Promise.all([
     getQueueCount(tenant).catch(() => 0),
     getConnections(tenant).catch(() => []),
+    getProducts(tenant).catch(() => []),
   ]);
+
+  // Whether this tenant runs a storefront — drives the Store sub-tab in the one
+  // Website sub-nav (rendered once in the shell so it's stable across every
+  // Website sub-route, including /dashboard/store).
+  const hasStore = tenantHasStore({
+    tenantConfig: { features: tenantConfig?.features },
+    hasCommerce: products.length > 0,
+  });
 
   // The conditional tab set — the presence pillars shown by business type +
   // what's connected. Falls back to a local-business default if config is missing.
@@ -181,6 +191,7 @@ export default async function DashboardLayout({
           accountEmail={accountEmail}
           isSuperAdmin={isAdmin}
           pendingCount={pendingCount}
+          hasStore={hasStore}
         >
           {children}
         </ConversationShell>

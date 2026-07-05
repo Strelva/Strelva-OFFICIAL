@@ -114,7 +114,7 @@ export function PublishBar({
         {lastPublished && (
           <div className="flex items-center gap-1.5 text-gray-faint">
             <Clock className="w-3 h-3" strokeWidth={1.5} />
-            <span className="text-[10px]">Published {formatTime(lastPublished)}</span>
+            <span className="text-[11px]">Published {formatTime(lastPublished)}</span>
           </div>
         )}
       </div>

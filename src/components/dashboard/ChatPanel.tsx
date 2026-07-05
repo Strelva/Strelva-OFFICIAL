@@ -53,7 +53,7 @@ const INPUT_QUICK_ACTIONS = [
   {
     label: "Show recent changes",
     icon: CalendarPlus,
-    description: "Review what the AI or team changed lately.",
+    description: "Review what Strelva or your team changed lately.",
     message: "Show me the recent changes made to my site and call out anything that belongs in Needs You or needs a closer look.",
   },
   {
@@ -942,7 +942,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((file) => (
-                <span key={file.url} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] text-amber-200">
+                <span key={file.url} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[11px] text-amber-200">
                   {file.name}
                 </span>
               ))}

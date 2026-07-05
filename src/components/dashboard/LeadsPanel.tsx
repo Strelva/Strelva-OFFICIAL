@@ -32,7 +32,7 @@ function LeadCard({ lead }: { lead: LeadRecord }) {
           <p className="mt-1 text-[11px] text-gray-muted">{formatWhen(lead.createdAt)}</p>
         </div>
         {lead.source && (
-          <span className="shrink-0 rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-muted">
+          <span className="shrink-0 rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
             {sourceLabel(lead.source)}
           </span>
         )}

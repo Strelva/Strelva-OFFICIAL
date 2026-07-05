@@ -211,7 +211,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
               <Clock className="w-3 h-3" strokeWidth={1.5} />
               Recent
               {recentCount > 0 && (
-                <span className="ml-0.5 px-1 py-0.5 text-[9px] rounded bg-sage/20 text-sage">
+                <span className="ml-0.5 px-1 py-0.5 text-[11px] rounded bg-sage/20 text-sage">
                   {recentCount}
                 </span>
               )}
@@ -312,7 +312,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
                       className="object-cover"
                     />
                     {isRecent && (
-                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-accent/90 text-on-accent text-[9px] font-medium">
+                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-accent/90 text-on-accent text-[11px] font-medium">
                         New
                       </span>
                     )}

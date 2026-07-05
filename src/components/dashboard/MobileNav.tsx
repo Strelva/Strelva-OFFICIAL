@@ -6,16 +6,46 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useDashboard } from "./DashboardContext";
 import { useDashboardSurfaces } from "./DashboardSurfacesContext";
 import { SURFACE_ICONS, SURFACE_MATCH } from "./surface-nav";
+import type { SurfaceId } from "@/lib/dashboard-surfaces";
 
-export function MobileNav() {
+// What a phone owner actually reaches for, highest-priority first. A phone bar
+// fits 5, and a fully-connected local business has 6 shown tabs — so when we
+// have to drop one, we keep Reviews (owners check reviews on their phone) and
+// let the Website site-editor fall back to the hamburger (rarely edited from a
+// phone). Any id not listed sorts last.
+const MOBILE_KEEP_PRIORITY: SurfaceId[] = [
+  "today",
+  "ask-ai",
+  "reviews",
+  "analytics",
+  "google-business",
+  "website",
+];
+
+export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const surfaces = useDashboardSurfaces();
   // The bottom bar shows only fully-active tabs, capped at 5 so a fully-connected
-  // business doesn't overflow a phone bar — the rest stay in the hamburger nav.
-  // "Connect to unlock" nudges live in Today/desktop. Memoized so it's a stable
-  // reference — otherwise the active-pill effect loops forever.
-  const navItems = useMemo(() => surfaces.filter((s) => s.state === "shown").slice(0, 5), [surfaces]);
+  // business doesn't overflow a phone bar. We pick the 5 by owner priority (so
+  // Reviews survives, not just the first five in nav order) but render them in
+  // the natural nav order left-to-right. "Connect to unlock" nudges live in
+  // Today/desktop. Memoized so it's a stable reference — otherwise the
+  // active-pill effect loops forever.
+  const navItems = useMemo(() => {
+    const shown = surfaces.filter((s) => s.state === "shown");
+    const rank = (id: SurfaceId) => {
+      const i = MOBILE_KEEP_PRIORITY.indexOf(id);
+      return i === -1 ? MOBILE_KEEP_PRIORITY.length : i;
+    };
+    const keep = new Set(
+      [...shown]
+        .sort((a, b) => rank(a.id) - rank(b.id))
+        .slice(0, 5)
+        .map((s) => s.id),
+    );
+    return shown.filter((s) => keep.has(s.id));
+  }, [surfaces]);
   const effectivePathname =
     dashboardBasePath && pathname?.startsWith(dashboardBasePath)
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"
@@ -68,6 +98,10 @@ export function MobileNav() {
             ? effectivePathname === "/dashboard"
             : SURFACE_MATCH[item.id].some((m) => effectivePathname?.startsWith(m));
           const Icon = SURFACE_ICONS[item.id];
+          // Surface the approval queue on the phone bar — an owner needs to know
+          // something is waiting on them without opening the hamburger. Rides on
+          // Today, which is always the first kept tab.
+          const showBadge = item.id === "today" && pendingCount > 0;
           return (
             <Link
               key={item.id}
@@ -80,8 +114,16 @@ export function MobileNav() {
             >
               <div className="relative">
                 <Icon className="w-5 h-5" strokeWidth={1.5} />
+                {showBadge && (
+                  <span
+                    className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-on-accent"
+                    aria-label={`${pendingCount} waiting for approval`}
+                  >
+                    {pendingCount > 9 ? "9+" : pendingCount}
+                  </span>
+                )}
               </div>
-              <span className="max-w-[54px] truncate text-[10px] font-medium">{item.label}</span>
+              <span className="max-w-[54px] truncate text-[11px] font-medium">{item.label}</span>
             </Link>
           );
         })}

@@ -33,10 +33,13 @@ describe("owner journey copy and links", () => {
     // a top-level pillar — so it isn't guarded here.
   });
 
-  it("keeps the dashboard root focused on proof and next action", () => {
+  it("leads the dashboard root with the verdict, not a static slogan", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
 
-    expect(dashboardPage).toContain("See what is working. Change what is next.");
+    // The old static slogan is gone; Today now leads with the weekly-report
+    // verdict via the same buildVerdict pattern Analytics uses.
+    expect(dashboardPage).not.toContain("See what is working. Change what is next.");
+    expect(dashboardPage).toContain("buildVerdict");
     expect(dashboardPage).toContain("People found you");
     expect(dashboardPage).toContain("Customer actions");
     expect(dashboardPage).toContain("Needs you");
@@ -60,14 +63,18 @@ describe("owner journey copy and links", () => {
     expect(signUpPage).toContain("Request your build");
   });
 
-  it("lands welcomed owners on first-run quick wins", () => {
+  it("lands new owners on a single onboarding card, not a wall of welcome panels", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
 
-    expect(dashboardPage).toContain("searchValue(params.welcome) === \"1\"");
-    expect(dashboardPage).toContain("Your starter site is ready. Make the first useful wins.");
-    expect(dashboardPage).toContain("Update hours");
-    expect(dashboardPage).toContain("Connect Google Business");
-    expect(dashboardPage).toContain("Draft first blog post");
+    // Onboarding/welcome/retention are demoted to at most one contextual card:
+    // fresh owners get the self-gating OnboardingChecklist (opened on day one),
+    // established owners get the RetentionPanel — never both, no duplicate
+    // welcome/next-move walls.
+    expect(dashboardPage).toContain("OnboardingChecklist");
+    expect(dashboardPage).toContain("defaultOpen={isFresh}");
+    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}");
+    expect(dashboardPage).not.toContain("Your starter site is ready. Make the first useful wins.");
+    expect(dashboardPage).not.toContain("Next useful move");
   });
 
   it("keeps rollback safety reachable under the Website History tab", () => {

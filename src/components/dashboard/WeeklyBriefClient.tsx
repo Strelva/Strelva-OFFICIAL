@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
@@ -14,6 +14,7 @@ import type { SearchPerf, GaPerf } from "@/lib/analytics";
 import { useDashboardOptional } from "./DashboardContext";
 import { GoalCard } from "./GoalCard";
 import { SearchAnalyticsPanel } from "./SearchAnalyticsPanel";
+import { StatTile } from "./StatTile";
 
 interface WeeklyBriefClientProps {
   brief: WeeklyBrief | null;
@@ -107,73 +108,6 @@ function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
   );
 }
 
-function CountUp({ end, duration = 800 }: { end: number; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const hasAnimated = useRef(false);
-
-  useEffect(() => {
-    if (hasAnimated.current || end === 0) {
-      const frame = requestAnimationFrame(() => setCount(end));
-      return () => cancelAnimationFrame(frame);
-    }
-
-    const startTime = performance.now();
-    let frame = 0;
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(eased * end));
-
-      if (progress < 1) {
-        frame = requestAnimationFrame(animate);
-      } else {
-        hasAnimated.current = true;
-      }
-    };
-
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [end, duration]);
-
-  return <span ref={ref}>{count}</span>;
-}
-
-function StatCard({
-  label,
-  value,
-  delta,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  delta?: number;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-}) {
-  const showDelta = typeof delta === "number" && delta !== 0;
-
-  return (
-    <div className="flex-1 min-w-[140px] rounded-xl dashboard-panel p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
-        <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
-          {label}
-        </span>
-      </div>
-      <div className="text-[28px] font-semibold text-warm-black leading-none">
-        <CountUp end={value} />
-      </div>
-      {showDelta && (
-        <p className={`text-[11px] mt-2 ${delta > 0 ? "text-success" : "text-gray-muted"}`}>
-          {delta > 0 ? "+" : ""}
-          {delta} vs last week
-        </p>
-      )}
-    </div>
-  );
-}
-
 function formatWeekRange(start: string, end: string): string {
   const startDate = new Date(start + "T00:00:00");
   const endDate = new Date(end + "T00:00:00");
@@ -189,12 +123,12 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
   if (!brief) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
-        <div className="mx-auto w-full max-w-4xl">
+        <div className="mx-auto w-full max-w-5xl">
           <div className="mb-5 max-w-2xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Reports
+              Analytics
             </p>
-            <h1 className="text-[24px] sm:text-[30px] font-semibold text-warm-black tracking-[-0.02em]">
+            <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-black tracking-[-0.02em]">
               Your first weekly report is still warming up
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
@@ -216,7 +150,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-dim text-accent">
                 <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
               </div>
-              <h2 className="text-[14px] font-medium text-warm-black">Tell AI what to change</h2>
+              <h2 className="text-[14px] font-medium text-warm-black">Tell Strelva what to change</h2>
               <p className="mt-1 text-[12px] leading-relaxed text-gray-fg">
                 Ask for a small update, like new hours, a service tweak, or a timely announcement.
               </p>
@@ -290,7 +224,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[24px] font-normal leading-snug text-warm-black tracking-[-0.01em] sm:text-[30px]">
+              <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug text-warm-black tracking-[-0.01em] sm:text-[32px]">
                 {buildVerdict(brief.stats)}
               </h1>
             </div>
@@ -327,7 +261,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}
                     className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
                   >
-                    Ask the AI to handle it &rarr;
+                    Ask Strelva to handle it &rarr;
                   </Link>
                 </div>
               </div>
@@ -351,24 +285,28 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             className="grid grid-cols-2 xl:grid-cols-4 gap-3 animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
-            <StatCard
+            <StatTile
+              countUp
               label="People found you"
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
               icon={TrendingUp}
             />
-            <StatCard
+            <StatTile
+              countUp
               label="Customer actions"
               value={brief.stats.bookingClicks}
               delta={brief.stats.bookingClicksDelta ?? 0}
               icon={MousePointerClick}
             />
-            <StatCard
+            <StatTile
+              countUp
               label="Reviews"
               value={brief.stats.reviewsReceived}
               icon={Star}
             />
-            <StatCard
+            <StatTile
+              countUp
               label="Site updates"
               value={brief.stats.contentUpdates}
               icon={FileText}

@@ -37,7 +37,7 @@ export function AgentPreview({
             Preview Changes to {section}
           </h3>
           <div
-            className={`inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${riskColors[risk.level]}`}
+            className={`inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${riskColors[risk.level]}`}
           >
             <RiskIcon className="w-3 h-3" />
             {risk.level.toUpperCase()} RISK
@@ -61,11 +61,11 @@ export function AgentPreview({
             {diffs.map((diff, i) => (
               <div key={i} className="px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-medium text-gray-faint uppercase tracking-wider">
+                  <span className="text-[11px] font-medium text-gray-faint uppercase tracking-wider">
                     {diff.field}
                   </span>
                   <span
-                    className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    className={`text-[11px] px-1.5 py-0.5 rounded ${
                       diff.type === "added"
                         ? "bg-green-100 text-green-700"
                         : diff.type === "removed"

@@ -153,7 +153,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           >
             Needs You
             {pendingCount > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-accent-dim text-accent rounded-full">
+              <span className="ml-2 px-1.5 py-0.5 text-[11px] font-semibold bg-accent-dim text-accent rounded-full">
                 {pendingCount}
               </span>
             )}
@@ -213,7 +213,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                           <span className="min-w-0 truncate text-[13px] text-warm-black">
                             {event.title}
                           </span>
-                          <span className="shrink-0 rounded-full bg-success-dim px-2 py-0.5 text-[10px] font-medium text-success">
+                          <span className="shrink-0 rounded-full bg-success-dim px-2 py-0.5 text-[11px] font-medium text-success">
                             {event.status === "approved" ? "Approved" : "Handled"}
                           </span>
                         </div>

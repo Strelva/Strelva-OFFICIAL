@@ -53,7 +53,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
   if (!summary) {
     return (
       <div role="status" className="rounded-xl bg-glass border border-glass-border p-5">
-        <h2 className="text-sm font-semibold text-warm-white mb-1">AI-search visibility</h2>
+        <h2 className="text-[15px] font-medium text-warm-white mb-1">AI-search visibility</h2>
         <p className="text-sm text-gray-muted">
           No visibility data yet. The weekly visibility cron measures this once the tenant has a
           <code className="mx-1 text-gray-faint">visibility</code>config block and the SERP/AI keys are set.
@@ -67,7 +67,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-warm-white">AI-search visibility</h2>
+        <h2 className="text-[15px] font-medium text-warm-white">AI-search visibility</h2>
         <span className="text-xs text-gray-faint">
           checked {new Date(summary.checkedAt).toLocaleDateString()}
         </span>
@@ -107,7 +107,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
             <li key={i} className="rounded-lg bg-glass border border-glass-border p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="text-[10px] uppercase tracking-wide text-gray-faint">
+                  <span className="text-[11px] uppercase tracking-wide text-gray-faint">
                     {SURFACE_LABEL[f.surface]} · {f.severity}
                   </span>
                   <p className="text-sm text-warm-white mt-0.5">{f.problem}</p>

@@ -5,20 +5,22 @@ import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
 
 /**
- * The secondary nav for the Website tab, which folds Preview + Content + Media
- * behind one top-level pillar. Rendered once in the shell and shown only on those
- * routes; null everywhere else. Routes are unchanged — this just groups them.
+ * The ONE sub-nav for the Website pillar. Folds every Website sub-section —
+ * Preview (the site editor), Content, Media, Store (only when the tenant runs a
+ * storefront), and History — behind a single strip, rendered once in the shell
+ * and shown only on those routes; null everywhere else. This is the only Website
+ * sub-nav (the old per-page WebsiteSubnav was removed), so nothing means
+ * "editor" twice. Routes are unchanged — this just groups them.
  */
-const SUBNAVS: { href: string; label: string }[][] = [
-  [
-    { href: "/dashboard/site", label: "Preview" },
-    { href: "/dashboard/collections", label: "Content" },
-    { href: "/dashboard/assets", label: "Media" },
-    { href: "/dashboard/history", label: "History" },
-  ],
+const WEBSITE_ROUTES = [
+  "/dashboard/site",
+  "/dashboard/collections",
+  "/dashboard/assets",
+  "/dashboard/store",
+  "/dashboard/history",
 ];
 
-export function SectionSubNav() {
+export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
   const pathname = usePathname();
   const { dashboardBasePath, dashboardHref } = useDashboard();
   const eff =
@@ -26,12 +28,22 @@ export function SectionSubNav() {
       ? pathname.slice(dashboardBasePath.length) || "/dashboard"
       : pathname || "";
 
-  const items = SUBNAVS.find((group) => group.some((i) => eff.startsWith(i.href)));
-  if (!items) return null;
+  if (!WEBSITE_ROUTES.some((r) => eff.startsWith(r))) return null;
+
+  const items = [
+    { href: "/dashboard/site", label: "Preview" },
+    { href: "/dashboard/collections", label: "Content" },
+    { href: "/dashboard/assets", label: "Media" },
+    ...(hasStore ? [{ href: "/dashboard/store", label: "Store" }] : []),
+    { href: "/dashboard/history", label: "History" },
+  ];
 
   return (
-    <nav className="shrink-0 border-b border-glass-border bg-surface-base/70 px-4 lg:px-6" aria-label="Section">
-      <div className="flex h-11 items-center gap-1">
+    <nav
+      className="shrink-0 overflow-x-auto border-b border-glass-border bg-surface-base/70 px-2 sm:px-4 lg:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Website sections"
+    >
+      <div className="flex items-center gap-1">
         {items.map((item) => {
           const isActive = eff.startsWith(item.href);
           return (
@@ -39,7 +51,7 @@ export function SectionSubNav() {
               key={item.href}
               href={dashboardHref(item.href)}
               prefetch={false}
-              className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`inline-flex min-h-[44px] shrink-0 items-center rounded-lg px-3 text-[13px] font-medium transition-colors lg:min-h-[38px] ${
                 isActive
                   ? "bg-gray-bg-hover text-warm-black"
                   : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"

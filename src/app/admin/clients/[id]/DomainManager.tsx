@@ -69,7 +69,7 @@ export function DomainManager({
 
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-5">
-      <h2 className="text-sm font-semibold text-warm-white">Domains</h2>
+      <h2 className="text-[15px] font-medium text-warm-white">Domains</h2>
       <p className="mt-0.5 text-xs text-gray-muted">
         DNS + SSL status per claimed domain. Refresh re-checks verification.
       </p>
@@ -86,7 +86,7 @@ export function DomainManager({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-mono text-xs text-warm-white">{d.domain}</span>
-                  <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${TONE_PILL[d.role === "production" ? "info" : "neutral"]}`}>
+                  <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] ${TONE_PILL[d.role === "production" ? "info" : "neutral"]}`}>
                     {d.role}
                   </span>
                 </div>
@@ -143,7 +143,7 @@ export function DomainManager({
             </div>
             {d.verification.length > 0 && (
               <div className="mt-2 rounded-md bg-surface-inset p-2">
-                <p className="text-[10px] uppercase tracking-wide text-gray-faint">Verification records</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-faint">Verification records</p>
                 {d.verification.map((v, i) => (
                   <p key={i} className="mt-0.5 break-all font-mono text-[11px] text-gray-muted">{v}</p>
                 ))}
@@ -176,7 +176,7 @@ export function DomainManager({
         <button
           onClick={() => void add()}
           disabled={busy !== null || !newDomain.trim()}
-          className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {busy === "add" ? "Adding…" : "Add"}
         </button>

@@ -468,7 +468,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                             >
                               <Icon className="w-[14px] h-[14px] text-gray-subtle" strokeWidth={1.5} />
                               <span className="text-[12px] text-gray-muted">{SECTION_LABELS[type] || type}</span>
-                              <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-subtle font-medium">
+                              <span className="ml-auto flex items-center gap-1 text-[11px] text-gray-subtle font-medium">
                                 <Check className="w-3 h-3" strokeWidth={2} />
                                 On page
                               </span>

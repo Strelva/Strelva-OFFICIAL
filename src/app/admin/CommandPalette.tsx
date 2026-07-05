@@ -33,7 +33,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
         id: `tenant-${t.id}`,
         label: t.siteName,
         hint: "Client",
-        href: `/admin/tenants/${t.id}`,
+        href: `/admin/clients/${t.id}`,
       })),
     ],
     [tenants]
@@ -134,7 +134,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
                 }`}
               >
                 <span>{c.label}</span>
-                <span className="text-[10px] uppercase tracking-wide text-gray-faint">{c.hint}</span>
+                <span className="text-[11px] uppercase tracking-wide text-gray-faint">{c.hint}</span>
               </button>
             </li>
           ))}

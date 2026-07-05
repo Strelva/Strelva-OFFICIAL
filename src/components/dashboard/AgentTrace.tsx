@@ -38,7 +38,7 @@ export function AgentTrace({ steps, isRunning }: AgentTraceProps) {
           <Loader2 className="w-3 h-3 text-accent animate-spin ml-auto" />
         )}
         {!isRunning && steps.length > 0 && (
-          <span className="text-[10px] text-gray-faint ml-auto">
+          <span className="text-[11px] text-gray-faint ml-auto">
             {steps.length} step{steps.length !== 1 ? "s" : ""}
           </span>
         )}
@@ -94,10 +94,10 @@ function TraceStepRow({ step, isLast }: { step: TraceStep; isLast: boolean }) {
       <div className="flex-1 min-w-0">
         <p className="text-[11px] text-warm-black">{step.label}</p>
         {step.detail && (
-          <p className="text-[10px] text-gray-faint mt-0.5 truncate">{step.detail}</p>
+          <p className="text-[11px] text-gray-faint mt-0.5 truncate">{step.detail}</p>
         )}
       </div>
-      <span className="text-[9px] text-gray-faint tabular-nums shrink-0">
+      <span className="text-[11px] text-gray-faint tabular-nums shrink-0">
         {formatTime(step.timestamp)}
       </span>
     </div>

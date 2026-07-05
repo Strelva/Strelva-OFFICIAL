@@ -111,7 +111,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-warm-white">Tenant config</h2>
+        <h2 className="text-[15px] font-medium text-warm-white">Tenant config</h2>
         <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
         <Field label="Owner name" value={form.ownerName} onChange={(v) => setForm({ ...form, ownerName: v })} />
         <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
@@ -153,14 +153,14 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <button
           onClick={() => void save()}
           disabled={saving}
-          className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium disabled:opacity-40"
+          className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
         </button>
       </div>
 
       <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3 self-start">
-        <h2 className="text-sm font-semibold text-warm-white">Grant access</h2>
+        <h2 className="text-[15px] font-medium text-warm-white">Grant access</h2>
         <Field label="Email" value={assignEmail} onChange={setAssignEmail} placeholder="owner@business.com" />
         <div>
           <label className="block text-xs text-gray-muted mb-1">Role</label>

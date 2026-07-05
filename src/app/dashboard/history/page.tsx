@@ -19,12 +19,12 @@ export default async function SiteHistoryPage() {
 
   return (
     <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
-      <div className="mx-auto w-full max-w-3xl space-y-5">
+      <div className="mx-auto w-full max-w-5xl space-y-5">
         <div>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
             Website
           </p>
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-warm-black sm:text-[28px]">
+          <h1 className="font-[family-name:var(--font-display)] text-[28px] font-medium tracking-[-0.02em] text-warm-black sm:text-[32px]">
             History &amp; safety
           </h1>
           <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">
@@ -59,13 +59,13 @@ export default async function SiteHistoryPage() {
                   className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-2"
                 >
                   <p className="line-clamp-2 text-[13px] text-warm-black">{entry.text}</p>
-                  <p className="mt-1 text-[10px] text-gray-faint">{new Date(entry.time).toLocaleDateString()}</p>
+                  <p className="mt-1 text-[11px] text-gray-faint">{new Date(entry.time).toLocaleDateString()}</p>
                 </div>
               ))}
             </div>
           ) : (
             <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-              No updates yet. Ask the AI for one small update or edit the site directly, then every
+              No updates yet. Ask Strelva for one small update or edit the site directly, then every
               change shows up here as your proof trail.
             </p>
           )}

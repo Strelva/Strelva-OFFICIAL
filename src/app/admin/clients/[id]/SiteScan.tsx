@@ -87,7 +87,7 @@ export function SiteScan({
     <div className="rounded-xl bg-glass border border-glass-border p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-warm-white">SEO + site health</h2>
+          <h2 className="text-[15px] font-medium text-warm-white">SEO + site health</h2>
           <p className="mt-0.5 text-xs text-gray-muted">
             {scan
               ? `Last scanned ${ago(scan.scannedAt)} · ${scan.url.replace(/^https?:\/\//, "")}`
@@ -98,7 +98,7 @@ export function SiteScan({
           onClick={() => void runScan()}
           disabled={scanning}
           aria-busy={scanning}
-          className="shrink-0 rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="shrink-0 rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {scanning ? "Scanning…" : scan ? "Re-scan" : "Run scan"}
         </button>
@@ -123,7 +123,7 @@ export function SiteScan({
             {history.length >= 2 && (
               <div className="ml-auto flex flex-col items-end">
                 <Sparkline values={history} width={120} height={28} />
-                <span className="mt-1 text-[10px] text-gray-faint">{history.length} scans</span>
+                <span className="mt-1 text-[11px] text-gray-faint">{history.length} scans</span>
               </div>
             )}
           </div>
@@ -157,7 +157,7 @@ export function SiteScan({
             <div className="mt-6 border-t border-glass-border pt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-warm-white">Fix first</h3>
-                <span className="text-[10px] text-gray-faint">
+                <span className="text-[11px] text-gray-faint">
                   {issues.highCount} high · {issues.mediumCount} medium · {issues.lowCount} low
                 </span>
               </div>
@@ -171,7 +171,7 @@ export function SiteScan({
                       {i + 1}
                     </span>
                     <span
-                      className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_PILL[issue.priority]}`}
+                      className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium ${PRIORITY_PILL[issue.priority]}`}
                     >
                       {issue.priority}
                     </span>

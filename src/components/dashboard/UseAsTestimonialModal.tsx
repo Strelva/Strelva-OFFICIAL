@@ -158,7 +158,7 @@ export function UseAsTestimonialModal({
               className="w-full px-3 py-2 rounded-lg border border-gray-border bg-surface text-[13px] text-warm-black resize-none outline-none focus:border-sage transition-colors"
               placeholder="Customer quote..."
             />
-            <p className="text-[10px] text-gray-muted mt-1">
+            <p className="text-[11px] text-gray-muted mt-1">
               You can edit the quote before adding
             </p>
           </div>

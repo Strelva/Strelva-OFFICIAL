@@ -26,11 +26,20 @@ export interface TodaySignup {
   createdAt: string;
 }
 
+export interface TodayFlag {
+  message: string;
+  href: string;
+  severity: "high" | "medium" | "low";
+}
+
 export interface TodayFeedProps {
   leads: { total: number; unworked: number; recent: TodayLead[] };
   approvals: { drafts: number; digests: number; total: number };
   atRisk: TodayAtRisk[];
   signups: TodaySignup[];
+  /** Portfolio-wide attention items (merged in from the old "Needs attention"
+   *  list — one attention surface, not two). */
+  flags?: TodayFlag[];
 }
 
 function timeAgo(iso: string): string {
@@ -58,11 +67,13 @@ function Dot({ tone }: { tone: "red" | "amber" | "emerald" | "muted" }) {
   return <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cls}`} />;
 }
 
-export function TodayFeed({ leads, approvals, atRisk, signups }: TodayFeedProps) {
+export function TodayFeed({ leads, approvals, atRisk, signups, flags = [] }: TodayFeedProps) {
+  const highFlags = flags.filter((f) => f.severity !== "low");
   const nothingWaiting =
     leads.unworked === 0 &&
     approvals.total === 0 &&
-    atRisk.length === 0;
+    atRisk.length === 0 &&
+    highFlags.length === 0;
 
   return (
     <section className="rounded-xl border border-glass-border bg-glass overflow-hidden">
@@ -79,6 +90,8 @@ export function TodayFeed({ leads, approvals, atRisk, signups }: TodayFeedProps)
             {approvals.total > 0 && `${approvals.total} to approve`}
             {approvals.total > 0 && atRisk.length > 0 && " · "}
             {atRisk.length > 0 && `${atRisk.length} at risk`}
+            {(leads.unworked > 0 || approvals.total > 0 || atRisk.length > 0) && highFlags.length > 0 && " · "}
+            {highFlags.length > 0 && `${highFlags.length} flag${highFlags.length === 1 ? "" : "s"}`}
           </span>
         )}
       </div>
@@ -167,7 +180,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups }: TodayFeedProps)
                 <li key={t.tenantId} className="flex items-start gap-2 text-xs">
                   <Dot tone="red" />
                   <Link
-                    href={`/admin/tenants/${t.tenantId}`}
+                    href={`/admin/clients/${t.tenantId}`}
                     className="text-warm-white hover:text-accent"
                   >
                     {t.siteName}
@@ -184,6 +197,27 @@ export function TodayFeed({ leads, approvals, atRisk, signups }: TodayFeedProps)
           )}
         </div>
 
+        {/* Portfolio flags (merged from the old "Needs attention" list) */}
+        {highFlags.length > 0 && (
+          <div className="px-5 py-3">
+            <div className="flex items-center gap-2">
+              <Dot tone="amber" />
+              <span className="text-sm text-warm-white">Portfolio flags</span>
+              <span className="text-xs text-gray-muted">{highFlags.length} to review</span>
+            </div>
+            <ul className="mt-2 space-y-1.5">
+              {highFlags.slice(0, 6).map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs">
+                  <Dot tone={f.severity === "high" ? "red" : "amber"} />
+                  <Link href={f.href} className="text-gray-muted hover:text-warm-white">
+                    {f.message}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Recent signups */}
         {signups.length > 0 && (
           <div className="px-5 py-3">
@@ -199,7 +233,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups }: TodayFeedProps)
                 <li key={s.tenantId} className="flex items-center gap-2 text-xs text-gray-muted">
                   <Dot tone="emerald" />
                   <Link
-                    href={`/admin/tenants/${s.tenantId}`}
+                    href={`/admin/clients/${s.tenantId}`}
                     className="text-warm-white hover:text-accent"
                   >
                     {s.siteName}

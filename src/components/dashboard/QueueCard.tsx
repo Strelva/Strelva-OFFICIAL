@@ -210,15 +210,15 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-medium text-gray-muted uppercase tracking-wide">
+            <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
               {isCustomRequest ? "custom repo request" : event.source}
             </span>
-            <span className="text-[10px] text-gray-subtle">
+            <span className="text-[11px] text-gray-subtle">
               {formatTimestamp(event.createdAt)}
             </span>
             {!isPending && (
               <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
                   event.status === "approved" || event.status === "auto_approved"
                     ? "bg-success-dim text-success"
                     : "bg-gray-bg text-gray-muted"
@@ -238,16 +238,16 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
           )}
           {isCustomRequest && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                 {formatWorkflowStatus(workflowStatus)}
               </span>
               {repoName && (
-                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
                   Repo: {repoName}
                 </span>
               )}
               {triageDueAt && workflowStatus === "requested" && (
-                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
                   Triage by {new Date(triageDueAt).toLocaleDateString()}
                 </span>
               )}
