@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Star, Sparkles, Check, Copy, Loader2, MessageSquare, Send } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
-import { getClientReviewSummary } from "@/lib/reviews/intelligence";
+import { ReputationHeader } from "./ReputationHeader";
 import { useDashboard } from "./DashboardContext";
 
 interface ReviewsPanelProps {
@@ -329,7 +329,6 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
   const { dashboardHref } = useDashboard();
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
-  const summary = getClientReviewSummary(reviews);
   const copyDest = copyDestination(reviews);
   if (reviews.length === 0) {
     return (
@@ -370,65 +369,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
   return (
     <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            Reviews
-          </p>
-          <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
-            What people are saying
-          </h1>
-          {/* The average rating is the verdict on this surface — lead with it as a
-              large display number, stars + supporting count beneath. */}
-          {summary.averageRating > 0 ? (
-            <div className="mt-4 flex items-center gap-4">
-              <span className="text-[30px] font-semibold leading-none tabular-nums text-warm-black">
-                {summary.averageRating.toFixed(1)}
-              </span>
-              <div className="min-w-0">
-                <Stars rating={summary.averageRating} size="lg" />
-                <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-gray-muted">
-                  <span>
-                    {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
-                  </span>
-                  {summary.newThisPeriod > 0 && (
-                    <span className="rounded-full bg-accent-dim px-2 py-0.5 font-medium text-accent">
-                      {summary.newThisPeriod} new this month
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="text-[14px] text-gray-muted">
-                {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
-              </span>
-              {summary.newThisPeriod > 0 && (
-                <span className="rounded-full bg-accent-dim px-2.5 py-0.5 text-[12px] font-medium text-accent">
-                  {summary.newThisPeriod} new this month
-                </span>
-              )}
-            </div>
-          )}
-          {summary.lovedFor.length > 0 && summary.averageRating >= 4 ? (
-            <p className="mt-2 text-[14px] leading-relaxed text-warm-black">
-              Customers love your{" "}
-              <span className="font-medium">
-                {summary.lovedFor.slice(0, 2).map((t) => t.label).join(" and ")}
-              </span>
-              .{" "}
-              {gbpConnected
-                ? "Draft a warm reply to any review below — Google reviews publish straight to your listing."
-                : `Draft a warm reply to any review below, then copy it into ${copyDest}.`}
-            </p>
-          ) : (
-            <p className="mt-2 text-[14px] leading-relaxed text-gray-muted">
-              {gbpConnected
-                ? "Draft a warm, on-brand reply for any of them — Google reviews publish straight to your listing."
-                : `Draft a warm, on-brand reply for any of them, then copy it into ${copyDest}.`}
-            </p>
-          )}
-        </div>
+        <ReputationHeader reviews={reviews} gbpConnected={gbpConnected} copyDest={copyDest} />
 
         {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} />}
 
