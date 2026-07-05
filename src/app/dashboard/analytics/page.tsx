@@ -8,7 +8,9 @@ import { getLatestSnapshots } from "@/lib/visibility/snapshots";
 import { buildCompetitorBenchmark } from "@/lib/competitor-benchmark";
 import { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
 import { getSearchConsolePerf, getGa4Perf } from "@/lib/analytics";
+import { buildMilestone } from "@/lib/milestone";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
+import { MilestonePanel } from "@/components/dashboard/MilestonePanel";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 import { SiteHealthCard } from "@/components/dashboard/SiteHealthCard";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
@@ -23,7 +25,7 @@ export default async function AnalyticsPage() {
 
   // Degrade to the empty state on a transient backend error rather than
   // escalating a recoverable null into the full error boundary.
-  const [brief, history, dailyMetrics, activity, goal, snapshots, searchData, searchPerf, gaPerf] = await Promise.all([
+  const [brief, history, dailyMetrics, activity, goal, snapshots, searchData, searchPerf, gaPerf, milestone] = await Promise.all([
     getWeeklyBrief(tenant).catch(() => null),
     getWeeklyBriefs(tenant).catch(() => []),
     getDailyMetrics(tenant, 30).catch(() => []),
@@ -37,6 +39,9 @@ export default async function AnalyticsPage() {
     // always return a status, so a bad read degrades to the panel's connect nudge.
     getSearchConsolePerf(tenant).catch(() => null),
     getGa4Perf(tenant).catch(() => null),
+    // The 90-day "prove it" recap: real then -> now deltas from stored history
+    // (scans, reviews, traffic). Fail-soft so a blip drops the panel, never the page.
+    buildMilestone(tenant).catch(() => null),
   ]);
 
   // Correlate AI changes with the traffic that followed → before/after proof.
@@ -51,20 +56,33 @@ export default async function AnalyticsPage() {
   return (
     <>
       <EngagementTracker event="report-view" />
-      <WeeklyBriefClient
-        brief={brief}
-        history={history}
-        dailyMetrics={dailyMetrics}
-        proofCards={proofCards}
-        goal={goal}
-        anomaly={anomaly}
-        benchmark={benchmark}
-        aiVisibility={aiVisibility}
-        searchData={searchData}
-        searchPerf={searchPerf}
-        gaPerf={gaPerf}
-        analyticsConnectHref={withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations")}
-        footerSlot={
+      {/* The 90-day "prove it" recap pins above the weekly brief as a sibling
+          section. The brief owns the full-height scroll, so it stays in its own
+          flex-1 region below and the milestone sits as a shrink-0 band on top —
+          the brief component itself is untouched. */}
+      <div className="flex h-full flex-col">
+        {milestone && (
+          <div className="shrink-0 px-4 pt-5 sm:px-8 sm:pt-7">
+            <div className="mx-auto w-full max-w-5xl">
+              <MilestonePanel milestone={milestone} />
+            </div>
+          </div>
+        )}
+        <div className="min-h-0 flex-1">
+          <WeeklyBriefClient
+            brief={brief}
+            history={history}
+            dailyMetrics={dailyMetrics}
+            proofCards={proofCards}
+            goal={goal}
+            anomaly={anomaly}
+            benchmark={benchmark}
+            aiVisibility={aiVisibility}
+            searchData={searchData}
+            searchPerf={searchPerf}
+            gaPerf={gaPerf}
+            analyticsConnectHref={withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations")}
+            footerSlot={
           <details className="group rounded-2xl border border-glass-border bg-glass">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
               <div className="min-w-0">
@@ -82,8 +100,10 @@ export default async function AnalyticsPage() {
               <SiteHealthCard />
             </div>
           </details>
-        }
-      />
+            }
+          />
+        </div>
+      </div>
     </>
   );
 }
