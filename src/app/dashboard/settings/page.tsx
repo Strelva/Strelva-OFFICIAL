@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
 
@@ -169,18 +169,39 @@ function setNestedValue(
 // Settings nav items
 // ---------------------------------------------------------------------------
 
+// Four top-level groups. The five previously-thin business/site sections
+// (Business info, Branding, Site config, Connected services, Shortcuts) — plus
+// Ownership — now live as labeled in-page sections inside "Business".
 const SETTINGS_SECTIONS = [
+  { id: "business", label: "Business" },
   { id: "account", label: "Account" },
-  { id: "profile", label: "Business info" },
-  { id: "branding", label: "Branding" },
-  { id: "site-config", label: "Site config" },
-  { id: "dependencies", label: "Services" },
-  { id: "utilities", label: "Shortcuts" },
-  // Ownership intentionally dropped from the nav (kept as a component for later);
-  // it was extensive and not needed in the day-to-day surface right now.
   { id: "domains", label: "Domains" },
-  { id: "billing", label: "Billing" },
+  { id: "plan", label: "Plan" },
 ] as const;
+
+// In-page anchors within the Business group. Old settings hashes (deep links
+// from proxy.ts, onboarding, the ownership redirect) map onto these so existing
+// links keep landing on the right content.
+const BUSINESS_ANCHORS = [
+  "profile",
+  "branding",
+  "site-config",
+  "dependencies",
+  "utilities",
+  "ownership",
+] as const;
+
+// Legacy hash -> current top-level section. Business sub-hashes resolve to the
+// Business group and then scroll to their anchor; billing -> plan.
+const LEGACY_HASH_TO_SECTION: Record<string, string> = {
+  profile: "business",
+  branding: "business",
+  "site-config": "business",
+  dependencies: "business",
+  utilities: "business",
+  ownership: "business",
+  billing: "plan",
+};
 
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -1322,50 +1343,133 @@ function BillingSection() {
 // ---------------------------------------------------------------------------
 
 const SECTION_META: Record<string, { title: string; description: string }> = {
+  business: {
+    title: "Business",
+    description: "Everything about your site — details, branding, structure, connected services, and quick tools.",
+  },
   account: {
     title: "Account",
     description: "Your personal details on this dashboard — separate from the business you manage.",
-  },
-  profile: {
-    title: "Business info",
-    description: "Your business name, tagline, and the primary action visitors should take.",
-  },
-  branding: {
-    title: "Branding",
-    description: "The fonts and colors that define how your site looks.",
-  },
-  "site-config": {
-    title: "Site configurability",
-    description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
-  },
-  dependencies: {
-    title: "Connected services",
-    description: "Outside services your site relies on — like payments or email — with anything paused or failing flagged before it can affect your site.",
-  },
-  utilities: {
-    title: "Operations utilities",
-    description: "Useful tools that support Strelva, exports, and connection setup.",
-  },
-  ownership: {
-    title: "Ownership and handoff",
-    description: "Know what the business owns, what Strelva manages, and how to leave cleanly.",
   },
   domains: {
     title: "Domain health",
     description: "Production and admin domains, DNS records, SSL state, and repair steps.",
   },
-  billing: {
-    title: "Billing",
+  plan: {
+    title: "Plan",
     description: "One plan, one operating cost, no maintenance upsells.",
   },
 };
+
+// ---------------------------------------------------------------------------
+// In-page section eyebrow — labels each consolidated group inside Business.
+// ---------------------------------------------------------------------------
+
+const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: string; description: string }[] = [
+  {
+    id: "profile",
+    eyebrow: "Business info",
+    description: "Your business name, tagline, and the primary action visitors should take.",
+  },
+  {
+    id: "branding",
+    eyebrow: "Branding",
+    description: "The fonts and colors that define how your site looks.",
+  },
+  {
+    id: "site-config",
+    eyebrow: "Site config",
+    description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
+  },
+  {
+    id: "dependencies",
+    eyebrow: "Connected services",
+    description: "Outside services your site relies on — anything paused or failing is flagged before it can affect your site.",
+  },
+  {
+    id: "utilities",
+    eyebrow: "Shortcuts",
+    description: "Useful tools that support Strelva, exports, and connection setup.",
+  },
+  {
+    id: "ownership",
+    eyebrow: "Ownership & handoff",
+    description: "Know what the business owns, what Strelva manages, and how to leave cleanly.",
+  },
+];
+
+function SettingsGroup({
+  id,
+  eyebrow,
+  description,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-8">
+      <div className="mb-5 border-b border-glass-border pb-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">{eyebrow}</p>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-gray-faint">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function BusinessSettings({
+  settings,
+  setSettings,
+  readOnly,
+}: {
+  settings: SettingsData | null;
+  setSettings: (s: SettingsData) => void;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-14">
+      {BUSINESS_SECTION_META.map((section) => (
+        <SettingsGroup
+          key={section.id}
+          id={section.id}
+          eyebrow={section.eyebrow}
+          description={section.description}
+        >
+          {section.id === "profile" &&
+            (settings ? (
+              <ProfileSection
+                settings={settings}
+                setSettings={setSettings}
+                fields={BUSINESS_FIELDS}
+                readOnly={readOnly}
+              />
+            ) : (
+              <div className="space-y-4 animate-pulse">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-12 bg-glass rounded-lg" />
+                ))}
+              </div>
+            ))}
+          {section.id === "branding" && <BrandSection />}
+          {section.id === "site-config" && <SiteConfigSection />}
+          {section.id === "dependencies" && <DependencyHealthSection />}
+          {section.id === "utilities" && <UtilitiesSection />}
+          {section.id === "ownership" && <OwnershipSection />}
+        </SettingsGroup>
+      ))}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState("profile");
+  const [activeSection, setActiveSection] = useState("business");
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const apiPath = useDashboardApiPath();
@@ -1390,11 +1494,23 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const applyHashSection = () => {
-      const section = window.location.hash.replace("#", "");
-      if (SETTINGS_SECTIONS.some((item) => item.id === section)) {
-        setActiveSection(section);
-      } else if (section) {
-        setActiveSection("profile");
+      const raw = window.location.hash.replace("#", "");
+      if (!raw) {
+        setActiveSection("business");
+        return;
+      }
+      // A current top-level id wins outright; otherwise fall back to the legacy
+      // hash map, defaulting anything unknown to the Business group.
+      const isTopLevel = SETTINGS_SECTIONS.some((item) => item.id === raw);
+      const section = isTopLevel ? raw : LEGACY_HASH_TO_SECTION[raw] ?? "business";
+      setActiveSection(section);
+
+      // Old business sub-hashes (e.g. #profile, #ownership) scroll to their
+      // in-page anchor now that those sections live inside Business.
+      if (section === "business" && (BUSINESS_ANCHORS as readonly string[]).includes(raw)) {
+        window.setTimeout(() => {
+          document.getElementById(raw)?.scrollIntoView({ block: "start" });
+        }, 60);
       }
     };
     applyHashSection();
@@ -1465,13 +1581,7 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="min-w-0 flex-1 overflow-y-auto p-4 pb-28 md:p-8 lg:p-10">
-        <div className={
-          activeSection === "ownership"
-            ? "max-w-5xl"
-            : activeSection === "profile" || activeSection === "branding"
-              ? "max-w-3xl"
-              : "max-w-2xl"
-        }>
+        <div className={activeSection === "business" ? "max-w-3xl" : "max-w-2xl"}>
           {/* Section header — each tab owns its own framing now (no generic banner). */}
           {meta && (
             <div className="mb-8">
@@ -1481,29 +1591,12 @@ export default function SettingsPage() {
           )}
 
           {/* Section content */}
+          {activeSection === "business" && (
+            <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
+          )}
           {activeSection === "account" && <AccountSection />}
-          {activeSection === "profile" && settings && (
-            <ProfileSection
-              settings={settings}
-              setSettings={setSettings}
-              fields={BUSINESS_FIELDS}
-              readOnly={readOnly}
-            />
-          )}
-          {activeSection === "profile" && !settings && (
-            <div className="space-y-4 animate-pulse">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-12 bg-glass rounded-lg" />
-              ))}
-            </div>
-          )}
-          {activeSection === "branding" && <BrandSection />}
-          {activeSection === "site-config" && <SiteConfigSection />}
-          {activeSection === "dependencies" && <DependencyHealthSection />}
-          {activeSection === "utilities" && <UtilitiesSection />}
-          {activeSection === "ownership" && <OwnershipSection />}
           {activeSection === "domains" && <DomainsSection />}
-          {activeSection === "billing" && <BillingSection />}
+          {activeSection === "plan" && <BillingSection />}
         </div>
       </div>
     </div>
