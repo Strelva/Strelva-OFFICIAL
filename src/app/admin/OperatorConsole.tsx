@@ -253,7 +253,7 @@ export function OperatorConsole() {
               {st === "pending" && (
                 <button
                   onClick={() => commit(p)}
-                  className="mt-2 rounded-md bg-warm-white text-surface-base px-3 py-1 text-xs font-medium hover:opacity-90"
+                  className="mt-2 rounded-md bg-accent text-on-accent px-3 py-1 text-xs font-medium hover:opacity-90"
                 >
                   Confirm
                 </button>
@@ -291,7 +291,7 @@ export function OperatorConsole() {
         <button
           onClick={() => void send()}
           disabled={busy || !input.trim()}
-          className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium disabled:opacity-40"
+          className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
           {busy ? "…" : "Send"}
         </button>

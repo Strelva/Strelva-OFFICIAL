@@ -186,9 +186,9 @@ type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 function SaveStatusPill({ status }: { status: SaveStatus }) {
   const copy: Record<SaveStatus, { label: string; className: string }> = {
-    idle: { label: "Saved", className: "border-gray-border text-gray-faint" },
+    idle: { label: "Saved", className: "border-glass-border text-gray-faint" },
     dirty: { label: "Unsaved changes", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
-    saving: { label: "Saving...", className: "border-sky-400/30 bg-sky-400/10 text-sky-300" },
+    saving: { label: "Saving...", className: "border-accent/30 bg-accent-dim text-accent" },
     saved: { label: "Saved", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
     error: { label: "Could not save", className: "border-red-400/30 bg-red-400/10 text-red-300" },
   };
@@ -290,7 +290,7 @@ function ProfileSection({
         <SaveStatusPill status={saveStatus} />
       </div>
 
-      <div className="rounded-lg border border-gray-border overflow-hidden">
+      <div className="rounded-lg border border-glass-border overflow-hidden">
         {fields.map((field, i) => (
           <FormRow
             key={field.key}
@@ -315,7 +315,7 @@ function ProfileSection({
                 onBlur={() => handleBlurSave(field.key)}
                 disabled={readOnly}
                 rows={2}
-                className="w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors disabled:opacity-60"
+                className="w-full bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors disabled:opacity-60"
               />
             ) : (
               <input
@@ -327,11 +327,11 @@ function ProfileSection({
                   if (e.key === "Enter") (e.target as HTMLElement).blur();
                 }}
                 disabled={readOnly}
-                className={`w-full bg-surface-base border rounded-md px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors disabled:opacity-60 ${
-                  fieldErrors[field.key] ? "border-red-400/50" : "border-gray-border"
+                className={`w-full bg-surface-base border rounded-lg px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors disabled:opacity-60 ${
+                  fieldErrors[field.key] ? "border-red-400/50" : "border-glass-border"
                 } ${
                   field.mono
-                    ? "font-mono text-accent text-[12px]"
+                    ? "text-accent text-[12px]"
                     : "text-warm-white"
                 }`}
               />
@@ -357,7 +357,7 @@ function AccountSection() {
   const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
 
   return (
-    <div className="rounded-xl border border-gray-border bg-surface-raised p-5">
+    <div className="rounded-xl border border-glass-border bg-glass p-5">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-semibold text-accent">
           {(name[0] || "U").toUpperCase()}
@@ -366,7 +366,7 @@ function AccountSection() {
           <div className="flex items-center gap-2">
             <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
             {isAdmin && (
-              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
                 Strelva Admin
               </span>
             )}
@@ -488,9 +488,9 @@ function BrandSection() {
           {swatches.map((s) => (
             <div
               key={s.label}
-              className="flex items-center gap-2 rounded-lg border border-gray-border bg-surface-base px-2.5 py-1.5"
+              className="flex items-center gap-2 rounded-lg border border-glass-border bg-surface-base px-2.5 py-1.5"
             >
-              <span className="h-4 w-4 rounded-full border border-gray-border" style={{ backgroundColor: s.hex }} />
+              <span className="h-4 w-4 rounded-full border border-glass-border" style={{ backgroundColor: s.hex }} />
               <span className="text-[11px] text-gray-muted">{s.label}</span>
             </div>
           ))}
@@ -499,7 +499,7 @@ function BrandSection() {
 
       {/* Typography */}
       <h2 className="mb-2 text-[13px] font-medium text-warm-white">Typography</h2>
-      <div className="rounded-lg border border-gray-border overflow-hidden mb-6">
+      <div className="rounded-lg border border-glass-border overflow-hidden mb-6">
         {THEME_FONT_FIELDS.map((field, i) => {
           const current = (getNestedValue(theme, field.key) as string) || "";
           return (
@@ -532,7 +532,7 @@ function BrandSection() {
 
       {/* Brand colors */}
       <h2 className="mb-2 text-[13px] font-medium text-warm-white">Brand colors</h2>
-      <div className="rounded-lg border border-gray-border overflow-hidden">
+      <div className="rounded-lg border border-glass-border overflow-hidden">
         {THEME_COLOR_FIELDS.map((field, i) => {
           const hex = (getNestedValue(theme, field.key) as string) || "#000000";
           return (
@@ -548,7 +548,7 @@ function BrandSection() {
                   value={hex}
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
                   onBlur={handleBlurSave}
-                  className="h-8 w-8 rounded-md border border-gray-border bg-surface-base p-0.5 cursor-pointer shrink-0"
+                  className="h-8 w-8 rounded-lg border border-glass-border bg-surface-base p-0.5 cursor-pointer shrink-0"
                 />
                 <input
                   type="text"
@@ -558,7 +558,7 @@ function BrandSection() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLElement).blur();
                   }}
-                  className="w-28 bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[12px] text-warm-white font-mono outline-none focus:border-accent/40 transition-colors"
+                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-white outline-none focus:border-accent/40 transition-colors"
                 />
               </div>
             </FormRow>
@@ -596,19 +596,19 @@ function UtilitiesSection() {
   const utilities = [
     {
       title: "Brand Kit",
-      description: "Tell the AI about your business — what you do, your voice, and your media.",
+      description: "Tell Strelva about your business — what you do, your voice, and your media.",
       href: "/dashboard/brand-kit",
       icon: Sparkles,
     },
     {
-      title: "Integrations",
+      title: "Connections",
       description: "Connect the accounts Strelva manages — Google Business, reviews, booking.",
       href: "/dashboard/integrations",
       icon: Link2,
     },
     {
       title: "Photo library",
-      description: "Upload and reuse real photos, logos, and files the AI can reference in chat.",
+      description: "Upload and reuse real photos, logos, and files Strelva can reference in chat.",
       href: "/dashboard/assets",
       icon: ImageIcon,
     },
@@ -628,7 +628,7 @@ function UtilitiesSection() {
           <Link
             key={item.href}
             href={dashboardHref(item.href)}
-            className="group flex items-start gap-4 rounded-xl border border-gray-border bg-surface-raised px-4 py-4 transition-colors hover:border-accent/35"
+            className="group flex items-start gap-4 rounded-xl border border-glass-border bg-glass px-4 py-4 transition-colors hover:border-accent/35"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
               <Icon className="h-4 w-4" strokeWidth={1.5} />
@@ -665,10 +665,10 @@ function SiteConfigSection() {
             key={item}
             type="button"
             onClick={() => setTab(item)}
-            className={`h-8 rounded-md border px-3 text-[12px] capitalize transition-colors ${
+            className={`h-8 rounded-lg border px-3 text-[12px] capitalize transition-colors ${
               tab === item
                 ? "border-accent/40 bg-accent/15 text-warm-white"
-                : "border-gray-border text-gray-muted hover:text-warm-white"
+                : "border-glass-border text-gray-muted hover:text-warm-white"
             }`}
           >
             {item}
@@ -721,10 +721,10 @@ function NavigationFooterSection() {
 
   if (!navigation || !footer) {
     return (
-      <div className="rounded-lg border border-gray-border bg-surface-raised px-5 py-6 text-center">
+      <div className="rounded-lg border border-glass-border bg-glass px-5 py-6 text-center">
         <p className="text-[13px] font-medium text-warm-white">Navigation &amp; footer aren&apos;t editable here</p>
         <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
-          This site&apos;s menu and footer are managed in its code. Ask the AI in chat to change a
+          This site&apos;s menu and footer are managed in its code. Ask Strelva in chat to change a
           link or label and we&apos;ll handle it.
         </p>
       </div>
@@ -745,23 +745,23 @@ function NavigationFooterSection() {
       <div className="flex justify-end">
         <SaveStatusPill status={saveStatus} />
       </div>
-      <div className="rounded-lg border border-gray-border overflow-hidden">
-        <div className="border-b border-gray-border px-5 py-3">
-          <p className="text-[11px] font-mono uppercase tracking-wider text-gray-faint">Navigation</p>
+      <div className="rounded-lg border border-glass-border overflow-hidden">
+        <div className="border-b border-glass-border px-5 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Navigation</p>
         </div>
         {navigation.menuItems.map((item, index) => (
-          <div key={`${item.label}-${index}`} className="grid grid-cols-1 gap-2 border-b border-gray-border/50 px-5 py-3 sm:grid-cols-[1fr_1fr_auto]">
+          <div key={`${item.label}-${index}`} className="grid grid-cols-1 gap-2 border-b border-glass-border/50 px-5 py-3 sm:grid-cols-[1fr_1fr_auto]">
             <input
               value={item.label}
               onChange={(event) => updateNavItem(index, "label", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
-              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
             />
             <input
               value={item.href}
               onChange={(event) => updateNavItem(index, "href", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
-              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
             />
             <button
               type="button"
@@ -770,7 +770,7 @@ function NavigationFooterSection() {
                 setNavigation(next);
                 saveContent("navigation", next);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-border text-gray-muted hover:text-red-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-red-300"
               aria-label="Remove navigation item"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -785,7 +785,7 @@ function NavigationFooterSection() {
               setNavigation(next);
               saveContent("navigation", next);
             }}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+            className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             Add link
@@ -800,7 +800,7 @@ function NavigationFooterSection() {
               }}
               onBlur={() => saveContent("navigation", navigation)}
               placeholder="CTA label"
-              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
             />
             <input
               value={navigation.ctaHref}
@@ -811,13 +811,13 @@ function NavigationFooterSection() {
               }}
               onBlur={() => saveContent("navigation", navigation)}
               placeholder="CTA href"
-              className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
             />
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-border overflow-hidden">
+      <div className="rounded-lg border border-glass-border overflow-hidden">
         <FormRow label="Footer tagline" description="Short footer copy">
           <textarea
             value={footer.tagline}
@@ -827,7 +827,7 @@ function NavigationFooterSection() {
             }}
             onBlur={() => saveContent("footer", footer)}
             rows={2}
-            className="w-full resize-none rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            className="w-full resize-none rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
           />
         </FormRow>
         <FormRow label="Copyright" description="Bottom legal line" last>
@@ -838,7 +838,7 @@ function NavigationFooterSection() {
               setSaveStatus("dirty");
             }}
             onBlur={() => saveContent("footer", footer)}
-            className="w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            className="w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
           />
         </FormRow>
       </div>
@@ -888,7 +888,7 @@ function CapabilitiesSection() {
   if (loading) return <SkeletonLine width="w-full" height="h-20" />;
   if (!capabilities) {
     return (
-      <div className="rounded-lg border border-gray-border bg-surface-raised px-5 py-6 text-center">
+      <div className="rounded-lg border border-glass-border bg-glass px-5 py-6 text-center">
         <p className="text-[13px] font-medium text-warm-white">Couldn&apos;t load site capabilities</p>
         <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
           Refresh the page to try again.
@@ -915,7 +915,7 @@ function CapabilitiesSection() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {toggles.map(([key, label]) => (
-          <label key={key} className="flex items-center justify-between rounded-lg border border-gray-border bg-surface-raised px-4 py-3">
+          <label key={key} className="flex items-center justify-between rounded-lg border border-glass-border bg-glass px-4 py-3">
             <span className="text-[13px] text-warm-white">{label}</span>
             <input
               type="checkbox"
@@ -931,8 +931,8 @@ function CapabilitiesSection() {
           </label>
         ))}
       </div>
-      <div className="rounded-lg border border-gray-border p-4">
-        <label className="text-[11px] uppercase tracking-wider text-gray-faint">Custom-only features</label>
+      <div className="rounded-lg border border-glass-border p-4">
+        <label className="text-[11px] uppercase tracking-[0.14em] text-gray-muted">Custom-only features</label>
         <input
           value={(capabilities.customOnlyFeatures || []).join(", ")}
           disabled={readOnly}
@@ -946,7 +946,7 @@ function CapabilitiesSection() {
           }}
           onBlur={() => saveCapabilities(capabilities)}
           placeholder="cart, rewards, booking-flow"
-          className="mt-2 w-full rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+          className="mt-2 w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
         />
       </div>
     </div>
@@ -1002,10 +1002,10 @@ function CustomComponentsSection() {
         <p className="text-[12px] text-gray-muted">Admin-only custom components exposed to this site manifest.</p>
         <SaveStatusPill status={saveStatus} />
       </div>
-      {error && <p className="rounded-md border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">{error}</p>}
+      {error && <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">{error}</p>}
       <div className="space-y-3">
         {components.map((component, index) => (
-          <div key={`${component.id}-${index}`} className="rounded-lg border border-gray-border bg-surface-raised p-4">
+          <div key={`${component.id}-${index}`} className="rounded-lg border border-glass-border bg-glass p-4">
             <div className="mb-3 flex items-center justify-between gap-2 text-[11px] text-gray-faint">
               <span className="flex items-center gap-2">
                 <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1014,7 +1014,7 @@ function CustomComponentsSection() {
               <button
                 type="button"
                 onClick={() => setConfirmRemoveIndex(index)}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-border text-gray-muted hover:text-red-300"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-red-300"
                 aria-label="Remove component"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1030,7 +1030,7 @@ function CustomComponentsSection() {
                 }}
                 onBlur={() => saveComponents(components)}
                 placeholder="component-id"
-                className="rounded-md border border-gray-border bg-surface-base px-3 py-2 font-mono text-[12px] text-accent outline-none"
+                className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
               />
               <input
                 value={component.label}
@@ -1041,7 +1041,7 @@ function CustomComponentsSection() {
                 }}
                 onBlur={() => saveComponents(components)}
                 placeholder="Display label"
-                className="rounded-md border border-gray-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+                className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
               />
             </div>
           </div>
@@ -1054,7 +1054,7 @@ function CustomComponentsSection() {
           setComponents(next);
           saveComponents(next);
         }}
-        className="inline-flex items-center gap-2 rounded-md border border-gray-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+        className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
       >
         <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
         Add component
@@ -1085,7 +1085,7 @@ const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string 
   degraded: { label: "Degraded", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
   paused: { label: "Paused", className: "border-red-400/30 bg-red-400/10 text-red-300" },
   failing: { label: "Failing", className: "border-red-400/30 bg-red-400/10 text-red-300" },
-  unknown: { label: "Unknown", className: "border-gray-border text-gray-faint" },
+  unknown: { label: "Unknown", className: "border-glass-border text-gray-faint" },
 };
 
 function DependencyStatusPill({ status }: { status: string }) {
@@ -1132,7 +1132,7 @@ function DependencyHealthSection() {
 
   if (data.deliveryModel !== "custom_repo") {
     return (
-      <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
+      <div className="rounded-lg border border-glass-border bg-glass p-4">
         <p className="text-[13px] text-warm-white">No connected services to monitor</p>
         <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
           This site doesn&apos;t rely on any outside services we need to keep an eye on.
@@ -1162,7 +1162,7 @@ function DependencyHealthSection() {
       )}
 
       {!hasDependencies && (
-        <div className="rounded-lg border border-gray-border bg-surface-raised p-4">
+        <div className="rounded-lg border border-glass-border bg-glass p-4">
           <p className="text-[13px] text-warm-white">No external dependencies recorded</p>
           <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
             Add dependencies to the tenant custom repo metadata as they become operationally important.
@@ -1172,7 +1172,7 @@ function DependencyHealthSection() {
 
       <div className="space-y-3">
         {data.dependencies.map((dependency) => (
-          <div key={dependency.id} className="rounded-lg border border-gray-border bg-surface-raised p-4">
+          <div key={dependency.id} className="rounded-lg border border-glass-border bg-glass p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[14px] font-medium text-warm-white">{dependency.name}</p>
@@ -1254,17 +1254,17 @@ function BillingSection() {
   const copy = isFounderComp ? FOUNDER_COMP_COPY : BILLING_STATUS_COPY[status];
 
   return (
-    <div className="rounded-lg border border-gray-border overflow-hidden">
+    <div className="rounded-lg border border-glass-border overflow-hidden">
       <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-2">
+          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-gray-muted mb-2">
             Current plan
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[20px] font-medium text-warm-white">
               {isFounderComp ? "Founder comp" : SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}
             </span>
-            <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${copy.className}`}>
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}
             </span>
           </div>
@@ -1307,7 +1307,7 @@ function BillingSection() {
             }
           }}
           disabled={openingPortal || isFounderComp}
-          className="min-h-[38px] w-full rounded-md border border-gray-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-surface-raised disabled:opacity-60 sm:w-auto"
+          className="min-h-[38px] w-full rounded-lg border border-glass-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-glass disabled:opacity-60 sm:w-auto"
         >
           {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
         </button>
@@ -1344,7 +1344,7 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
   },
   utilities: {
     title: "Operations utilities",
-    description: "Useful tools that support the AI, exports, and connection setup.",
+    description: "Useful tools that support Strelva, exports, and connection setup.",
   },
   ownership: {
     title: "Ownership and handoff",
@@ -1418,7 +1418,7 @@ export default function SettingsPage() {
                 .then((data) => setSettings(data))
                 .catch(() => setLoadError(true));
             }}
-            className="px-4 py-2 rounded-md border border-gray-border text-xs text-gray-muted hover:bg-surface-raised transition-colors"
+            className="px-4 py-2 rounded-lg border border-glass-border text-xs text-gray-muted hover:bg-glass transition-colors"
           >
             Try again
           </button>
@@ -1432,18 +1432,18 @@ export default function SettingsPage() {
   return (
     <div className="flex h-full min-w-0 flex-col md:flex-row">
       {/* Settings nav */}
-      <nav className="w-[200px] shrink-0 border-r border-gray-border p-6 pt-8 space-y-1 hidden md:block">
-        <div className="text-[10px] font-mono tracking-wider uppercase text-gray-faint mb-3 px-3">
+      <nav className="w-[200px] shrink-0 border-r border-glass-border p-6 pt-8 space-y-1 hidden md:block">
+        <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-gray-muted mb-3 px-3">
           Settings
         </div>
         {SETTINGS_SECTIONS.map((item) => (
           <button
             key={item.id}
             onClick={() => setSection(item.id)}
-            className={`mb-1 w-full rounded-md border px-3 py-2 text-left text-[13px] transition-colors ${
+            className={`mb-1 w-full rounded-lg border px-3 py-2 text-left text-[13px] transition-colors ${
               activeSection === item.id
-                ? "border-gray-border bg-surface-raised text-warm-white"
-                : "border-transparent text-gray-muted hover:border-gray-border/60 hover:bg-surface-raised/50 hover:text-warm-white"
+                ? "border-glass-border bg-glass text-warm-white"
+                : "border-transparent text-gray-muted hover:border-glass-border/60 hover:bg-glass/50 hover:text-warm-white"
             }`}
           >
             {item.label}
@@ -1452,7 +1452,7 @@ export default function SettingsPage() {
       </nav>
 
       {/* Mobile section select */}
-      <div className="shrink-0 border-b border-gray-border px-4 py-3 md:hidden">
+      <div className="shrink-0 border-b border-glass-border px-4 py-3 md:hidden">
         <DashSelect
           value={activeSection}
           onChange={(e) => setSection(e.target.value)}
@@ -1475,7 +1475,7 @@ export default function SettingsPage() {
           {/* Section header — each tab owns its own framing now (no generic banner). */}
           {meta && (
             <div className="mb-8">
-              <h1 className="font-[family-name:var(--font-display)] text-[26px] font-normal text-warm-white">{meta.title}</h1>
+              <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">{meta.title}</h1>
               <p className="text-[13px] leading-relaxed text-gray-muted mt-1.5">{meta.description}</p>
             </div>
           )}
@@ -1493,7 +1493,7 @@ export default function SettingsPage() {
           {activeSection === "profile" && !settings && (
             <div className="space-y-4 animate-pulse">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-12 bg-surface-raised rounded-lg" />
+                <div key={i} className="h-12 bg-glass rounded-lg" />
               ))}
             </div>
           )}

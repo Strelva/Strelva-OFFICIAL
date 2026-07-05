@@ -133,7 +133,7 @@ export function OnboardingWizard() {
             </span>
             <h2 className="mt-4 text-[22px] font-semibold text-warm-black">Welcome, {firstName}.</h2>
             <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-gray-muted">
-              Three quick questions so the AI manages your site the way you&apos;d want. About 30 seconds.
+              Three quick questions so Strelva manages your site the way you&apos;d want. About 30 seconds.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <button
@@ -188,7 +188,7 @@ export function OnboardingWizard() {
 
         {step === "voice" && (
           <div>
-            <h2 className="text-[20px] font-semibold text-warm-black">How should the AI sound?</h2>
+            <h2 className="text-[20px] font-semibold text-warm-black">How should Strelva sound?</h2>
             <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">
               Pick a voice — we&apos;ll use it every time we write or update your site.
             </p>

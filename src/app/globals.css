@@ -68,8 +68,18 @@
   /* New dashboard tokens */
   --accent-dim:  oklch(73% 0.07 145 / 0.12);
   --accent-text: oklch(80% 0.08 145);
-  --success:     #34d399;
-  --success-dim: rgba(52, 211, 153, 0.09);
+  /* Positive/go — sage-family (hue 145), more vivid than --accent so it reads
+     "go". NOT emerald: kept on-hue so success and accent are one family. */
+  --success:     oklch(70% 0.14 145);
+  --success-dim: oklch(70% 0.14 145 / 0.12);
+
+  /* Semantic status set — the ONLY status hues allowed in the dashboard.
+     positive = sage-go (--success), warning = one amber, critical = one red,
+     neutral = gray. Anything else is off-brand; do not add a fourth hue. */
+  --positive: var(--success);
+  --warning:  #ca8a04;
+  --critical: var(--terra);
+  --neutral:  var(--gray-muted);
   --glass:       rgba(255, 255, 255, 0.035);
   --glass-border: rgba(255, 255, 255, 0.075);
   --glass-active: rgba(255, 255, 255, 0.075);
@@ -90,6 +100,29 @@
   --surface-inset:  #101012;
 }
 
+/* =============================================================================
+   DESIGN SYSTEM — foundation contract (dashboard + admin)
+
+   COLOR — one sage family, four status hues, nothing else:
+     accent   oklch(73% 0.07 145)  — brand sage (buttons, links, focus)
+     positive oklch(70% 0.14 145)  — sage-go (success, up-deltas, good health)
+     warning  #ca8a04              — the one amber (mid health)
+     critical --terra / #ef4444    — the one red (bad health, down-deltas)
+     neutral  --gray-muted         — inert / no-signal
+   Off-brand blue/gold/emerald are banned. Use text-positive / text-critical /
+   bg-warning etc., or var(--color-*) inline — never a raw hex ramp.
+
+   TYPE SCALE — one hierarchy, display face dominates:
+     Page H1     text-[28px] sm:text-[32px] font-medium   (dominant)
+     Section H2  text-[15px] font-medium                  (never out-weights H1)
+     Eyebrow     text-[11px] uppercase tracking-[0.14em]
+     Body        14px   Meta 12px   FLOOR 11px (no 9/10px)
+     Metric num  26-28px font-semibold (the only large non-display number)
+
+   BUTTON — PRIMARY = bg-accent text-on-accent (sage). SECONDARY = glass/outline.
+   CONTENT WIDTH — max-w-5xl for content columns (full-width panels opt out).
+   ============================================================================= */
+
 @theme inline {
   --color-cream: var(--cream);
   --color-cream-dark: var(--cream-dark);
@@ -108,12 +141,16 @@
   --color-warm-white: var(--warm-white);
   --color-on-warm-white: var(--on-warm-white);
   --color-warm-black: var(--warm-black);
-  --color-accent: var(--accent, #d4a052);
-  --color-accent-dim: var(--accent-dim, rgba(91, 141, 239, 0.1));
-  --color-accent-text: var(--accent-text, #5B8DEF);
+  --color-accent: var(--accent, #7fae7f);
+  --color-accent-dim: var(--accent-dim, rgba(127, 174, 127, 0.12));
+  --color-accent-text: var(--accent-text, #a7c9a7);
   --color-on-accent: var(--on-accent, #1a1510);
-  --color-success: var(--success, #34d399);
-  --color-success-dim: var(--success-dim, rgba(52, 211, 153, 0.09));
+  --color-success: var(--success, oklch(70% 0.14 145));
+  --color-success-dim: var(--success-dim, oklch(70% 0.14 145 / 0.12));
+  --color-positive: var(--positive, oklch(70% 0.14 145));
+  --color-warning: var(--warning, #ca8a04);
+  --color-critical: var(--critical, #ef4444);
+  --color-neutral: var(--neutral, #858585);
   --color-glass: var(--glass, rgba(255, 255, 255, 0.024));
   --color-glass-border: var(--glass-border, rgba(255, 255, 255, 0.04));
   --color-glass-active: var(--glass-active, rgba(255, 255, 255, 0.075));
@@ -1278,7 +1315,7 @@ body {
 
 .dashboard-gradient {
   background:
-    radial-gradient(circle at 26% -10%, rgba(109, 163, 255, 0.08), transparent 34rem),
+    radial-gradient(circle at 26% -10%, rgba(127, 174, 127, 0.08), transparent 34rem),
     linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 16rem),
     var(--surface);
 }
@@ -1537,9 +1574,9 @@ body {
 
 /* Preview save flash — green ring that pulses once */
 @keyframes preview-save-flash {
-  0% { box-shadow: 0 0 0 0px rgba(52, 211, 153, 0.4); }
-  50% { box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2); }
-  100% { box-shadow: 0 0 0 0px rgba(52, 211, 153, 0); }
+  0% { box-shadow: 0 0 0 0px oklch(70% 0.14 145 / 0.4); }
+  50% { box-shadow: 0 0 0 3px oklch(70% 0.14 145 / 0.2); }
+  100% { box-shadow: 0 0 0 0px oklch(70% 0.14 145 / 0); }
 }
 .preview-flash {
   animation: preview-save-flash 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -1712,8 +1749,8 @@ body {
 
 /* ===== CONNECTION STATUS ANIMATIONS ===== */
 @keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
-  50% { box-shadow: 0 0 0 4px rgba(52, 211, 153, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 oklch(70% 0.14 145 / 0.4); }
+  50% { box-shadow: 0 0 0 4px oklch(70% 0.14 145 / 0); }
 }
 .status-dot-pulse {
   animation: status-pulse 2s ease-in-out infinite;

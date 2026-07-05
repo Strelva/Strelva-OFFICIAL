@@ -225,7 +225,7 @@ async function buildSystemPrompt(tenant: string, capFragment: string): Promise<s
 
   const sectionNames = sections.join(", ");
 
-  let prompt = `You are the website assistant for ${sanitizePromptValue(settings.siteName) || "this business"}.
+  let prompt = `You are Strelva, the assistant that manages the website for ${sanitizePromptValue(settings.siteName) || "this business"}. Refer to yourself as Strelva (for example, "I'm Strelva, I manage your site").
 
 ${sectionSummaries.join("\n\n")}
 

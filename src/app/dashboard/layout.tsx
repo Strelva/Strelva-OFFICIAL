@@ -7,7 +7,7 @@ import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfa
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
-import { getVisibleSurfaces } from "@/lib/dashboard-surfaces";
+import { getVisibleSurfaces, tenantHasStore } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
 import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
@@ -104,13 +104,20 @@ export default async function DashboardLayout({
     getProducts(tenant).catch(() => []),
   ]);
 
-  // The conditional tab set — big-4 presence pillars shown by business type +
+  // Whether this tenant runs a storefront — drives the Store sub-tab in the one
+  // Website sub-nav (rendered once in the shell so it's stable across every
+  // Website sub-route, including /dashboard/store).
+  const hasStore = tenantHasStore({
+    tenantConfig: { features: tenantConfig?.features },
+    hasCommerce: products.length > 0,
+  });
+
+  // The conditional tab set — the presence pillars shown by business type +
   // what's connected. Falls back to a local-business default if config is missing.
-  // Store shows when the tenant actually has products (the truth signal), not
-  // just when a features flag is set — so a real ecom client always gets it.
   // An explicit "business type" from Business info (Local/Online/Both) wins over
   // the template guess, so an online-only brand never sees Google Business or
-  // Reviews surfaces it can't use.
+  // Reviews surfaces it can't use. (Store is a sub-tab inside Website, resolved
+  // per-page, not a top-level surface.)
   const businessModel =
     settingsBusinessModel === "local" || settingsBusinessModel === "online" || settingsBusinessModel === "hybrid"
       ? settingsBusinessModel
@@ -121,7 +128,6 @@ export default async function DashboardLayout({
       ...(businessModel ? { businessModel } : {}),
     },
     connections,
-    hasCommerce: products.length > 0,
   });
   // The signed-in PERSON, for the sidebar's "Hello, {name}" account footer —
   // this is the login identity, NOT the tenant's owner-name setting, so a
@@ -185,6 +191,7 @@ export default async function DashboardLayout({
           accountEmail={accountEmail}
           isSuperAdmin={isAdmin}
           pendingCount={pendingCount}
+          hasStore={hasStore}
         >
           {children}
         </ConversationShell>

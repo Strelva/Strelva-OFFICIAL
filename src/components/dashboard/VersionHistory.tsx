@@ -241,7 +241,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
             <ul className="divide-y divide-gray-border">
               {preview.map((row, i) => (
                 <li key={`${row.key}-${i}`} className="px-4 py-2">
-                  <div className="text-[10px] uppercase tracking-wider text-gray-muted truncate">
+                  <div className="text-[11px] uppercase tracking-wider text-gray-muted truncate">
                     {row.key}
                   </div>
                   <div className="text-[12px] text-warm-black break-words line-clamp-3">
@@ -281,7 +281,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
                   <span className="text-[12px] font-medium text-warm-black">
                     {relativeTime(entry.time)}
                   </span>
-                  <span className="text-[10px] text-gray-muted uppercase tracking-wider">
+                  <span className="text-[11px] text-gray-muted uppercase tracking-wider">
                     {entry.actor ?? "user"}
                   </span>
                 </div>

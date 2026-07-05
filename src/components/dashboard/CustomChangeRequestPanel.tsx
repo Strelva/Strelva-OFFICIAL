@@ -99,14 +99,14 @@ export function CustomChangeRequestPanel() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="rounded-lg border border-gray-border bg-surface-raised px-3 py-2">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-gray-faint">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">
             Selected
           </p>
           <p className="mt-1 truncate text-[12px] font-medium text-warm-white">
             {label || "Current page"}
           </p>
           {selectedNode?.field && (
-            <p className="mt-1 break-all font-mono text-[10px] text-gray-faint">
+            <p className="mt-1 break-all font-mono text-[11px] text-gray-faint">
               {selectedNode.field}
             </p>
           )}

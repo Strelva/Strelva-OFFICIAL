@@ -18,7 +18,7 @@ export default async function AuditPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Audit trail</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Audit trail</h1>
         <p className="text-sm text-gray-muted mt-1">
           Every operator action across the portfolio, newest first.
         </p>

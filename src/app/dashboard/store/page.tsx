@@ -4,6 +4,8 @@ import { getProducts } from "@/lib/products";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { StorePanel } from "@/components/dashboard/StorePanel";
 
+// Store is a sub-section inside Website (the shared Website sub-nav switches
+// Site <-> Store). Reaching this route means the tenant has a store.
 export default async function StorePage() {
   const { tenant } = await requireDashboardView();
 
@@ -14,9 +16,11 @@ export default async function StorePage() {
   ]);
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <EngagementTracker event="store-view" />
-      <StorePanel summary={summary} orders={orders} products={products} />
-    </>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <StorePanel summary={summary} orders={orders} products={products} />
+      </div>
+    </div>
   );
 }

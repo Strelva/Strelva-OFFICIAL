@@ -80,7 +80,7 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
             className="fixed z-[61] w-64 overflow-hidden rounded-xl border border-glass-border bg-[var(--cream-mid)] shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
             style={{ top: menuPos.top, left: menuPos.left }}
           >
-            <p className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-muted">
+            <p className="px-3 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-muted">
               Switch property
             </p>
             <div className="pb-1">

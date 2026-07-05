@@ -29,7 +29,7 @@ export function ReviewIntelPanel({ intel }: { intel: AdminReviewIntelligence }) 
     <div className="rounded-xl bg-glass border border-glass-border p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-warm-white">Reviews — operator view</h2>
+          <h2 className="text-[15px] font-medium text-warm-white">Reviews — operator view</h2>
           <p className="mt-0.5 text-xs text-gray-muted">
             {totalReviews === 0
               ? "No reviews pulled in yet."
@@ -53,7 +53,7 @@ export function ReviewIntelPanel({ intel }: { intel: AdminReviewIntelligence }) 
           <div className="mt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-warm-white">Needs a reply</h3>
-              <span className="text-[10px] text-gray-faint">
+              <span className="text-[11px] text-gray-faint">
                 {needsResponse.length} pending · {unansweredNegative} unanswered negative
               </span>
             </div>
@@ -65,7 +65,7 @@ export function ReviewIntelPanel({ intel }: { intel: AdminReviewIntelligence }) 
                 {needsResponse.slice(0, 5).map((flag) => (
                   <li key={flag.reviewId} className="flex items-start gap-2.5 text-xs">
                     <span
-                      className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${URGENCY_PILL[flag.urgency]}`}
+                      className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium ${URGENCY_PILL[flag.urgency]}`}
                     >
                       {flag.urgency}
                     </span>

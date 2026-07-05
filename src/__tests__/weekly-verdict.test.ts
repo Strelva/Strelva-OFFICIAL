@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildVerdict } from "@/components/dashboard/WeeklyBriefClient";
+import { buildVerdict } from "@/lib/weekly-verdict";
 import type { WeeklyBrief } from "@/lib/types";
 
 const stats = (pageViews: number, pageViewsDelta?: number): WeeklyBrief["stats"] =>

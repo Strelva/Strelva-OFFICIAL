@@ -18,25 +18,25 @@ type Fix = {
 };
 type SiteAudit = AuditResult & { topFixes: Fix[] };
 
+// Grade + bar color read the shared semantic tokens: positive (sage) for good,
+// the one warning amber for the middle, the one critical red for bad. No raw ramp.
 function gradeColor(grade: string): string {
   switch (grade) {
     case "A":
-      return "#16a34a";
     case "B":
-      return "#65a30d";
+      return "var(--color-positive)";
     case "C":
-      return "#ca8a04";
     case "D":
-      return "#ea580c";
+      return "var(--color-warning)";
     default:
-      return "#dc2626";
+      return "var(--color-critical)";
   }
 }
 
 function barColor(score: number): string {
-  if (score >= 80) return "#16a34a";
-  if (score >= 50) return "#ca8a04";
-  return "#dc2626";
+  if (score >= 80) return "var(--color-positive)";
+  if (score >= 50) return "var(--color-warning)";
+  return "var(--color-critical)";
 }
 
 /** Client-facing category marker. A green check celebrates a strong area; every
@@ -46,7 +46,7 @@ function barColor(score: number): string {
  *  that the client sees good numbers, not a problem list. */
 function categoryMarker(score: number): React.ReactNode {
   if (score >= 80) {
-    return <CheckCircle2 className="h-4 w-4 text-green-600" strokeWidth={2} />;
+    return <CheckCircle2 className="h-4 w-4 text-positive" strokeWidth={2} />;
   }
   return <span className="inline-block h-2 w-2 rounded-full bg-gray-muted/50" aria-hidden />;
 }
@@ -82,7 +82,7 @@ function TrendBand({ history }: { history: TrendPoint[] }) {
           "No change since last check"
         ) : (
           <>
-            <span className={delta > 0 ? "font-medium text-green-600" : "font-medium text-red-500"}>
+            <span className={delta > 0 ? "font-medium text-positive" : "font-medium text-critical"}>
               {delta > 0 ? "+" : ""}
               {delta}
             </span>{" "}
@@ -205,13 +205,13 @@ export function SiteHealthCard() {
               >
                 {audit.overallScore}
               </div>
-              <div className="text-[10px] font-semibold" style={{ color: gradeColor(audit.grade) }}>
+              <div className="text-[11px] font-semibold" style={{ color: gradeColor(audit.grade) }}>
                 {audit.grade}
               </div>
             </div>
           </div>
           <div>
-            <h2 className="text-[15px] font-semibold text-warm-black">Site Health</h2>
+            <h2 className="text-[15px] font-medium text-warm-black">Site Health</h2>
             <p className="text-[12px] text-gray-muted">
               Scanned {new Date(audit.scannedAt).toLocaleDateString()}
             </p>
@@ -233,7 +233,7 @@ export function SiteHealthCard() {
 
       {/* Quick wins — MANAGED, forward-looking framing. The client sees
           opportunities to climb, not a red problem list (the raw issue detail is
-          admin-side). The action is "ask the AI", never a DIY how-to. */}
+          admin-side). The action is "ask Strelva", never a DIY how-to. */}
       {audit.topFixes.length > 0 && (
         <div className="border-b border-glass-border px-5 py-4">
           <div className="flex items-baseline justify-between gap-3">
@@ -244,11 +244,11 @@ export function SiteHealthCard() {
               href={dashboardHref("/dashboard/chat")}
               className="shrink-0 text-[12px] font-medium text-accent transition-colors hover:text-warm-black"
             >
-              Ask the AI to handle these -&gt;
+              Ask Strelva to handle these -&gt;
             </Link>
           </div>
           <p className="mt-0.5 text-[12px] text-gray-muted">
-            Small boosts we&apos;re already watching — ask the AI to knock one out in
+            Small boosts we&apos;re already watching — ask Strelva to knock one out in
             chat, or we&apos;ll pick it up as we manage your site.
           </p>
           <ul className="mt-3 grid gap-2">

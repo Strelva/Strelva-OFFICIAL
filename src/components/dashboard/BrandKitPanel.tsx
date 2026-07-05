@@ -99,7 +99,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
             Brand Kit
           </div>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-[28px] font-normal leading-tight text-warm-black">
-            Teach the AI about your business
+            Teach Strelva about your business
           </h1>
           <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-gray-muted">
             This is what Strelva draws on to write and update your site. The clearer it is,
@@ -126,15 +126,15 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
         />
         <Field
           label="About your business"
-          hint="Who you serve, what makes you different, anything the AI should always know."
+          hint="Who you serve, what makes you different, anything Strelva should always know."
           value={settings.siteDescription ?? ""}
           onChange={(v) => onChange("siteDescription", v)}
           onBlur={save}
           multiline
         />
         <Field
-          label="How should the AI sound?"
-          hint="Your voice and tone — the AI writes everything this way."
+          label="How should Strelva sound?"
+          hint="Your voice and tone — Strelva writes everything this way."
           value={settings.brandVoice ?? ""}
           onChange={(v) => onChange("brandVoice", v)}
           onBlur={save}
@@ -150,7 +150,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
           <h2 className="text-[14px] font-medium text-warm-black">Your media</h2>
         </div>
         <p className="mt-1 text-[13px] text-gray-muted">
-          Photos, logo, and files the AI can pull into your site.
+          Photos, logo, and files Strelva can pull into your site.
         </p>
         <div className="mt-3 flex items-center gap-3">
           {logoUrl ? (

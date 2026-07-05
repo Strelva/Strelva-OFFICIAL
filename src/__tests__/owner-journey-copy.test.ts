@@ -7,29 +7,39 @@ function readRepoFile(filePath: string): string {
 }
 
 describe("owner journey copy and links", () => {
-  it("keeps the dashboard navigation in owner language with Ask AI visible", () => {
+  it("keeps the dashboard navigation in owner language with Ask Strelva visible", () => {
     // Nav labels live in the conditional surface resolver now (not inline in the
-    // sidebar). The pillars are owner-language; old-IA labels are gone.
+    // sidebar). The pillars are owner-language; old-IA labels are gone. Phase-1 IA:
+    // Today · Ask Strelva · Website · Google Business · Analytics · Reviews (+ Settings gear).
     const surfaces = readRepoFile("src/lib/dashboard-surfaces.ts");
 
-    expect(surfaces).toContain('label: "Dashboard"');
-    expect(surfaces).toContain('label: "Ask AI"');
+    expect(surfaces).toContain('label: "Today"');
+    expect(surfaces).toContain('label: "Ask Strelva"');
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
-    expect(surfaces).toContain('label: "Reports"');
+    expect(surfaces).toContain('label: "Analytics"');
     expect(surfaces).toContain('label: "Reviews"');
-    expect(surfaces).toContain('label: "Health"');
 
-    // Old IA names should not resurface as nav labels.
-    expect(surfaces).not.toContain('label: "Site"');
+    // Old IA names should not resurface as top-level nav labels. ("Site" is now a
+    // legitimate sub-tab label inside Website via getWebsiteSections, so it's not
+    // guarded here — the top-level pillar is "Website", asserted above.)
     expect(surfaces).not.toContain('label: "Sources"');
-    expect(surfaces).not.toContain('label: "Analytics"');
+    expect(surfaces).not.toContain('label: "Ask AI"');
+    expect(surfaces).not.toContain('label: "Dashboard"');
+    expect(surfaces).not.toContain('label: "Reports"');
+    expect(surfaces).not.toContain('label: "Health"');
+    expect(surfaces).not.toContain('label: "Leads"');
+    // "Store" is a legitimate Website sub-tab label (getWebsiteSections), just not
+    // a top-level pillar — so it isn't guarded here.
   });
 
-  it("keeps the dashboard root focused on proof and next action", () => {
+  it("leads the dashboard root with the verdict, not a static slogan", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
 
-    expect(dashboardPage).toContain("See what is working. Change what is next.");
+    // The old static slogan is gone; Today now leads with the weekly-report
+    // verdict via the same buildVerdict pattern Analytics uses.
+    expect(dashboardPage).not.toContain("See what is working. Change what is next.");
+    expect(dashboardPage).toContain("buildVerdict");
     expect(dashboardPage).toContain("People found you");
     expect(dashboardPage).toContain("Customer actions");
     expect(dashboardPage).toContain("Needs you");
@@ -53,14 +63,18 @@ describe("owner journey copy and links", () => {
     expect(signUpPage).toContain("Request your build");
   });
 
-  it("lands welcomed owners on first-run quick wins", () => {
+  it("lands new owners on a single onboarding card, not a wall of welcome panels", () => {
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
 
-    expect(dashboardPage).toContain("searchValue(params.welcome) === \"1\"");
-    expect(dashboardPage).toContain("Your starter site is ready. Make the first useful wins.");
-    expect(dashboardPage).toContain("Update hours");
-    expect(dashboardPage).toContain("Connect Google Business");
-    expect(dashboardPage).toContain("Draft first blog post");
+    // Onboarding/welcome/retention are demoted to at most one contextual card:
+    // fresh owners get the self-gating OnboardingChecklist (opened on day one),
+    // established owners get the RetentionPanel — never both, no duplicate
+    // welcome/next-move walls.
+    expect(dashboardPage).toContain("OnboardingChecklist");
+    expect(dashboardPage).toContain("defaultOpen={isFresh}");
+    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}");
+    expect(dashboardPage).not.toContain("Your starter site is ready. Make the first useful wins.");
+    expect(dashboardPage).not.toContain("Next useful move");
   });
 
   it("keeps rollback safety reachable under the Website History tab", () => {
@@ -88,7 +102,8 @@ describe("owner journey copy and links", () => {
     const rootLayout = readRepoFile("src/app/layout.tsx");
     const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
     const chatPage = readRepoFile("src/app/dashboard/chat/page.tsx");
-    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
+    // Report view moved onto the merged Analytics surface.
+    const analyticsPage = readRepoFile("src/app/dashboard/analytics/page.tsx");
     const tracker = readRepoFile("src/components/dashboard/EngagementTracker.tsx");
     const retentionPanel = readRepoFile("src/components/dashboard/RetentionPanel.tsx");
     const retention = readRepoFile("src/lib/retention.ts");
@@ -103,7 +118,7 @@ describe("owner journey copy and links", () => {
     expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
     expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");
     expect(chatPage).toContain('<EngagementTracker event="ai-chat-open" />');
-    expect(reportsPage).toContain('<EngagementTracker event="report-view" />');
+    expect(analyticsPage).toContain('<EngagementTracker event="report-view" />');
     expect(tracker).toContain('"dashboard-open"');
     expect(tracker).toContain('"ai-chat-open"');
     expect(tracker).toContain('"report-view"');
@@ -128,13 +143,14 @@ describe("owner journey copy and links", () => {
   });
 
   it("keeps weekly reports reachable as the proof surface", () => {
-    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
+    // Reports folded into the merged Analytics surface; /dashboard/reports aliases to it.
+    const analyticsPage = readRepoFile("src/app/dashboard/analytics/page.tsx");
     const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");
 
-    expect(reportsPage).toContain("getWeeklyBrief(tenant)");
-    expect(reportsPage).toContain("getWeeklyBriefs(tenant)");
-    expect(reportsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
-    expect(reportsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
+    expect(analyticsPage).toContain("getWeeklyBrief(tenant)");
+    expect(analyticsPage).toContain("getWeeklyBriefs(tenant)");
+    expect(analyticsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
+    expect(analyticsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
     // Verdict-first: lead with a plain-English verdict + the 30-day trend.
     expect(weeklyBrief).toContain("buildVerdict");
     expect(weeklyBrief).toContain("Last 30 days");
@@ -149,7 +165,7 @@ describe("owner journey copy and links", () => {
     const publishBar = readRepoFile("src/components/dashboard/design/PublishBar.tsx");
 
     expect(workspace).toContain('label: "Edit"');
-    expect(workspace).toContain('label: "Ask AI"');
+    expect(workspace).toContain('label: "Ask Strelva"');
     expect(workspace).toContain("PropertiesEditor");
     expect(workspace).toContain("hasDrafts={hasAnyDraft}");
     expect(workspace).toContain("markDraftReceipts");

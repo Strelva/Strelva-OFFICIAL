@@ -136,7 +136,7 @@ export function ContentWorkspace({
   useEffect(() => {
     if (activeSection || pageSections.length === 0) return;
     // Prefer the first directly-editable section so a page never opens on a
-    // composite ("Page Header", "Call to Action") that only offers Ask AI.
+    // composite ("Page Header", "Call to Action") that only offers Ask Strelva.
     const firstEditable = pageSections.find((section) => !COMPOSITE_SECTIONS.has(section.value));
     setActiveSection((firstEditable ?? pageSections[0]).value);
   }, [activeSection, pageSections, setActiveSection]);
@@ -191,7 +191,7 @@ export function ContentWorkspace({
         <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
           {[
             { value: "properties", label: "Edit" },
-            { value: "chat", label: "Ask AI" },
+            { value: "chat", label: "Ask Strelva" },
           ].map((item) => {
             const active = item.value === "chat" ? inChat : !inChat && !inRequest;
             return (
@@ -355,7 +355,7 @@ export function ContentWorkspace({
               href={dashboardHref("/dashboard/chat")}
               className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
             >
-              Ask AI
+              Ask Strelva
             </Link>
             <Link
               href={dashboardHref("/dashboard")}
@@ -401,7 +401,7 @@ function SectionsRail({
   return (
     <aside className="flex w-[212px] shrink-0 flex-col border-r border-gray-border bg-surface">
       <div className="shrink-0 border-b border-gray-border/60 px-4 py-3">
-        <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
+        <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Page
         </span>
         <div className="relative">
@@ -425,10 +425,10 @@ function SectionsRail({
       </div>
 
       <div className="flex shrink-0 items-center justify-between px-4 pb-1.5 pt-3.5">
-        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-faint">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-faint">
           Sections
         </span>
-        <span className="text-[10px] tabular-nums text-gray-faint/70">{sections.length}</span>
+        <span className="text-[11px] tabular-nums text-gray-faint/70">{sections.length}</span>
       </div>
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2.5 pb-2">
         {sections.map((section, index) => {
@@ -449,7 +449,7 @@ function SectionsRail({
                   active ? "opacity-100" : "opacity-0"
                 }`}
               />
-              <span className="w-3.5 shrink-0 text-[10px] tabular-nums text-gray-faint/60 group-hover:text-gray-faint">
+              <span className="w-3.5 shrink-0 text-[11px] tabular-nums text-gray-faint/60 group-hover:text-gray-faint">
                 {index + 1}
               </span>
               <span className="truncate">{section.label}</span>

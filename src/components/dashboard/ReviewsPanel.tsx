@@ -45,7 +45,7 @@ function ReviewRequestCard({ placeId }: { placeId: string }) {
         <button
           type="button"
           onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-surface-base transition-opacity hover:opacity-90"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-on-accent transition-opacity hover:opacity-90"
         >
           {copied ? <Check className="h-3.5 w-3.5" strokeWidth={2} /> : <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />}
           {copied ? "Copied" : "Copy link"}
@@ -55,14 +55,15 @@ function ReviewRequestCard({ placeId }: { placeId: string }) {
   );
 }
 
-function Stars({ rating }: { rating: number }) {
+function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "lg" }) {
   const filled = Math.round(Math.min(5, Math.max(0, rating)));
+  const dim = size === "lg" ? "h-5 w-5" : "h-3.5 w-3.5";
   return (
     <div className="flex items-center gap-0.5" aria-label={`${filled} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((n) => (
         <Star
           key={n}
-          className={`h-3.5 w-3.5 ${n <= filled ? "fill-accent text-accent" : "text-gray-border"}`}
+          className={`${dim} ${n <= filled ? "fill-accent text-accent" : "text-gray-border"}`}
           strokeWidth={1.5}
         />
       ))}
@@ -187,7 +188,7 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
             <span className="text-[11px] text-gray-muted">{formatDate(review.date)}</span>
           </div>
         </div>
-        <span className="shrink-0 rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-muted">
+        <span className="shrink-0 rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
           {sourceLabel(review.source)}
         </span>
       </div>
@@ -351,7 +352,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
               No reviews yet — connect Google to pull them in
             </p>
             <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
-              Once your Google Business Profile is connected, your reviews show up here and the AI
+              Once your Google Business Profile is connected, your reviews show up here and Strelva
               can draft a reply for each one.
             </p>
             <Link
@@ -376,24 +377,39 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
           <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
             What people are saying
           </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            {summary.averageRating > 0 && (
-              <span className="flex items-center gap-1.5">
-                <Stars rating={summary.averageRating} />
-                <span className="text-[14px] font-medium text-warm-black">
-                  {summary.averageRating.toFixed(1)}
+          {/* The average rating is the verdict on this surface — lead with it as a
+              large display number, stars + supporting count beneath. */}
+          {summary.averageRating > 0 ? (
+            <div className="mt-4 flex items-center gap-4">
+              <span className="text-[30px] font-semibold leading-none tabular-nums text-warm-black">
+                {summary.averageRating.toFixed(1)}
+              </span>
+              <div className="min-w-0">
+                <Stars rating={summary.averageRating} size="lg" />
+                <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-gray-muted">
+                  <span>
+                    {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
+                  </span>
+                  {summary.newThisPeriod > 0 && (
+                    <span className="rounded-full bg-accent-dim px-2 py-0.5 font-medium text-accent">
+                      {summary.newThisPeriod} new this month
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="text-[14px] text-gray-muted">
+                {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
+              </span>
+              {summary.newThisPeriod > 0 && (
+                <span className="rounded-full bg-accent-dim px-2.5 py-0.5 text-[12px] font-medium text-accent">
+                  {summary.newThisPeriod} new this month
                 </span>
-              </span>
-            )}
-            <span className="text-[14px] text-gray-muted">
-              {summary.totalReviews} {summary.totalReviews === 1 ? "review" : "reviews"}
-            </span>
-            {summary.newThisPeriod > 0 && (
-              <span className="rounded-full bg-accent-dim px-2.5 py-0.5 text-[12px] font-medium text-accent">
-                {summary.newThisPeriod} new this month
-              </span>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           {summary.lovedFor.length > 0 && summary.averageRating >= 4 ? (
             <p className="mt-2 text-[14px] leading-relaxed text-warm-black">
               Customers love your{" "}

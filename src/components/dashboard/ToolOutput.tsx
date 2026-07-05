@@ -187,7 +187,7 @@ function ReportOutput({ data }: { data: ReportData }) {
             <div className="rounded-lg bg-glass border border-glass-border p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <Eye className="w-3 h-3 text-gray-muted" strokeWidth={1.5} />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-muted">Visitors</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Visitors</span>
               </div>
               <div className="text-[20px] font-medium text-warm-black tracking-tight">
                 {data.pageViews.thisWeek}
@@ -201,7 +201,7 @@ function ReportOutput({ data }: { data: ReportData }) {
             <div className="rounded-lg bg-glass border border-glass-border p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <MousePointerClick className="w-3 h-3 text-gray-muted" strokeWidth={1.5} />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-muted">Clicks</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Clicks</span>
               </div>
               <div className="text-[20px] font-medium text-warm-black tracking-tight">
                 {data.bookingClicks.thisWeek}
@@ -215,7 +215,7 @@ function ReportOutput({ data }: { data: ReportData }) {
             <div className="rounded-lg bg-glass border border-glass-border p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <TrendIcon className={cn("w-3 h-3", trendColor)} strokeWidth={1.5} />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-muted">Trend</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Trend</span>
               </div>
               <div className={cn("text-[20px] font-medium tracking-tight", trendColor)}>
                 {data.trend?.percent ? `${data.trend.percent > 0 ? "+" : ""}${data.trend.percent}%` : "—"}
@@ -307,7 +307,7 @@ function ContentOutput({ data }: { data: ContentData }) {
                   <ChevronDown className="w-3 h-3 text-gray-muted rotate-[-90deg]" strokeWidth={1.5} />
                 )}
                 <span className="text-[12px] font-medium text-warm-black">{page.label}</span>
-                <span className="text-[10px] font-mono text-gray-muted">
+                <span className="text-[11px] font-mono text-gray-muted">
                   {page.sections.length} sections
                 </span>
               </button>
@@ -333,10 +333,10 @@ function ContentOutput({ data }: { data: ContentData }) {
                       />
                       <span className="text-[12px] text-warm-black flex-1">{section.label}</span>
                       {section.itemCount !== undefined && (
-                        <span className="text-[10px] font-mono text-gray-muted">{section.itemCount}</span>
+                        <span className="text-[11px] font-mono text-gray-muted">{section.itemCount}</span>
                       )}
                       {!section.visible && (
-                        <span className="text-[9px] font-mono uppercase text-gray-muted">hidden</span>
+                        <span className="text-[11px] font-mono uppercase text-gray-muted">hidden</span>
                       )}
                     </div>
                   ))}
@@ -475,7 +475,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[12px] font-medium text-warm-black block">{conn.name}</span>
                   {conn.status && (
-                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[10px] font-medium text-gray-muted">
+                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
                       {statusLabel[conn.status]}
                     </span>
                   )}
@@ -484,7 +484,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
                   <span className="text-[11px] text-gray-muted block leading-relaxed">{conn.description}</span>
                 )}
                 {conn.sourceProof && (
-                  <span className="mt-1 text-[10px] text-gray-faint block">{conn.sourceProof}</span>
+                  <span className="mt-1 text-[11px] text-gray-faint block">{conn.sourceProof}</span>
                 )}
               </div>
               {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (

@@ -53,7 +53,7 @@ export default async function AdminDraftsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Pending Drafts</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Pending Drafts</h1>
         <p className="text-sm text-gray-muted mt-1">
           Review AI-generated content changes before they go live
         </p>
@@ -87,13 +87,13 @@ export default async function AdminDraftsPage() {
                     <div className="flex items-center gap-2 border-b border-glass-border pb-2 mb-2">
                       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-warm-white">{draft.section}</span>
                       {typeof draft.data._updatedAt === "string" && (
-                        <span className="text-[10px] text-gray-faint">{new Date(draft.data._updatedAt as string).toLocaleString()}</span>
+                        <span className="text-[11px] text-gray-faint">{new Date(draft.data._updatedAt as string).toLocaleString()}</span>
                       )}
                     </div>
                     {draft.diffs.length > 0 ? (
                       draft.diffs.map((d) => (
                         <div key={d.field} className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-muted">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-gray-muted">
                             {d.field}
                             <span className="ml-1 text-gray-faint normal-case tracking-normal">({d.type})</span>
                           </span>
@@ -138,7 +138,7 @@ export default async function AdminDraftsPage() {
                         .filter(([key]) => !key.startsWith("_"))
                         .map(([key, value]) => (
                           <div key={key} className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-muted">{key}</span>
+                            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-gray-muted">{key}</span>
                             <span className="text-xs text-warm-white break-words">
                               {typeof value === "string"
                                 ? value.length > 200 ? `${value.slice(0, 200)}...` : value

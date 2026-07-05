@@ -17,7 +17,7 @@ export function EmptyQueue() {
       <div className="mt-5 grid w-full max-w-xl gap-2 sm:grid-cols-3">
         {[
           { label: "Edit site copy", icon: Pencil },
-          { label: "Ask AI for an update", icon: MessageCircle },
+          { label: "Ask Strelva for an update", icon: MessageCircle },
           { label: "Review larger changes", icon: ShieldCheck },
         ].map((item) => (
           <div

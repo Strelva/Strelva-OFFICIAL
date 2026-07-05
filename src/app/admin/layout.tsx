@@ -40,9 +40,6 @@ export default async function AdminLayout({
               <span className="font-display text-xl tracking-tight text-warm-white leading-none">
                 Strelva
               </span>
-              <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-[0.14em] text-gray-faint border-l border-glass-border pl-2.5">
-                Mission Control
-              </span>
             </Link>
             <div className="hidden md:block h-5 w-px bg-glass-border" />
             <div className="hidden md:block">

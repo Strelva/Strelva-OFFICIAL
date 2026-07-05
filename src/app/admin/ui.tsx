@@ -87,14 +87,15 @@ export function Checkbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-[#6da3ff]"
+        className="accent-[var(--color-accent)]"
       />
       {label}
     </label>
   );
 }
 
-/** Primary action button — the system CTA (warm-white on surface). */
+/** Primary action button — the system CTA. Sage fill with dark on-accent ink
+ *  (the ONE primary style; secondary actions use GhostButton). */
 export function PrimaryButton({
   children,
   onClick,
@@ -111,7 +112,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="rounded-md bg-warm-white px-4 py-2 text-sm font-medium text-surface-base transition-opacity hover:opacity-90 disabled:opacity-40"
+      className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
     >
       {children}
     </button>

@@ -15,6 +15,8 @@ interface ConversationShellProps {
   accountEmail?: string | null;
   isSuperAdmin?: boolean;
   pendingCount?: number;
+  /** Whether the tenant runs a storefront — adds the Store sub-tab to the Website sub-nav. */
+  hasStore?: boolean;
 }
 
 export function ConversationShell({
@@ -25,6 +27,7 @@ export function ConversationShell({
   accountEmail,
   isSuperAdmin = false,
   pendingCount = 0,
+  hasStore = false,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Admins can preview the dashboard exactly as the client sees it — hides the
@@ -78,15 +81,16 @@ export function ConversationShell({
           </div>
         </header>
 
-        {/* Secondary nav for consolidated tabs (Website / Analytics); null elsewhere */}
-        <SectionSubNav />
+        {/* The single Website sub-nav (Preview / Content / Media / Store / History);
+            null on every non-Website route. */}
+        <SectionSubNav hasStore={hasStore} />
 
         {/* Content — add bottom padding on mobile for tab bar */}
         <div className="flex-1 min-h-0 pb-16 lg:pb-0">{children}</div>
       </main>
 
       {/* Mobile bottom tab bar */}
-      <MobileNav />
+      <MobileNav pendingCount={pendingCount} />
     </div>
   );
 }

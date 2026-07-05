@@ -219,7 +219,7 @@ export function HistorySidebar({
           {navGroups.map((group) => (
             <li key={group.id}>
               <div className="px-5 pb-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-muted">{group.label}</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-muted">{group.label}</p>
               </div>
               <ul className="px-3 pb-5">
                 {group.id === "manage" && pendingCount > 0 && (
@@ -232,7 +232,7 @@ export function HistorySidebar({
                     >
                       <Inbox className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                       <span className="flex-1 truncate">Needs you</span>
-                      <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-surface-base">
+                      <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-on-accent">
                         {pendingCount}
                       </span>
                     </Link>
@@ -262,7 +262,7 @@ export function HistorySidebar({
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
                         {isConnect && (
-                          <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
+                          <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
                             Connect
                           </span>
                         )}
@@ -273,7 +273,7 @@ export function HistorySidebar({
                 {group.id === "manage" && isChatRoute && (
                   <li className="mt-2 rounded-lg border border-gray-border bg-surface-raised/45 p-2">
                     <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
-                      <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-faint">
+                      <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
                         AI history
                       </span>
                       <Link
@@ -309,7 +309,7 @@ export function HistorySidebar({
                                 <span className="block truncate text-[12px] font-medium">
                                   {thread.title || "New chat"}
                                 </span>
-                                <span className="block truncate text-[10px] text-gray-faint">
+                                <span className="block truncate text-[11px] text-gray-faint">
                                   {thread.preview}
                                 </span>
                               </Link>
@@ -357,12 +357,12 @@ export function HistorySidebar({
                 <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
               )}
               {isSuperAdmin && !viewAsClient && (
-                <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-accent">
+                <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
                   Admin
                 </span>
               )}
               {isSuperAdmin && viewAsClient && (
-                <span className="shrink-0 rounded-full bg-gray-bg px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-gray-muted">
+                <span className="shrink-0 rounded-full bg-gray-bg px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-muted">
                   Client view
                 </span>
               )}

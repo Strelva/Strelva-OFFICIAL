@@ -214,8 +214,8 @@ export function LayoutPanel() {
           ))}
         </select>
         <div className="mt-2 h-4">
-          {saving && <span className="text-[10px] text-accent">Saving draft...</span>}
-          {saveError && <span className="text-[10px] text-red-400">Layout draft could not save.</span>}
+          {saving && <span className="text-[11px] text-accent">Saving draft...</span>}
+          {saveError && <span className="text-[11px] text-red-400">Layout draft could not save.</span>}
         </div>
       </div>
 
@@ -243,7 +243,7 @@ export function LayoutPanel() {
                   <span className="truncate text-[12px] font-medium text-warm-white">
                     {SECTION_LABELS[section.type] || section.type}
                   </span>
-                  <span className="text-[10px] text-gray-faint">
+                  <span className="text-[11px] text-gray-faint">
                     {section.visible ? "Visible" : "Hidden"}
                   </span>
                 </button>
@@ -291,7 +291,7 @@ export function LayoutPanel() {
             </p>
             <div className="mt-3 space-y-3">
               <div>
-                <span className="mb-1.5 block text-[10px] text-gray-faint">Variant</span>
+                <span className="mb-1.5 block text-[11px] text-gray-faint">Variant</span>
                 <select
                   value={selectedSection.variant || "default"}
                   onChange={(event) => updateVariant(selectedSection.type, event.target.value)}
@@ -305,14 +305,14 @@ export function LayoutPanel() {
                 </select>
               </div>
               <div>
-                <span className="mb-1.5 block text-[10px] text-gray-faint">Gap</span>
+                <span className="mb-1.5 block text-[11px] text-gray-faint">Gap</span>
                 <div className="grid grid-cols-3 gap-1">
                   {GAP_OPTIONS.map((gap) => (
                     <button
                       key={gap}
                       type="button"
                       onClick={() => gap && updateLayout(selectedSection.type, { gap })}
-                      className={`h-8 rounded-md border text-[10px] font-medium capitalize transition-colors ${
+                      className={`h-8 rounded-md border text-[11px] font-medium capitalize transition-colors ${
                         (selectedSection.layout?.gap || "normal") === gap
                           ? "border-accent/40 bg-accent/15 text-accent"
                           : "border-gray-border text-gray-muted hover:text-warm-white"
@@ -324,14 +324,14 @@ export function LayoutPanel() {
                 </div>
               </div>
               <div>
-                <span className="mb-1.5 block text-[10px] text-gray-faint">Padding</span>
+                <span className="mb-1.5 block text-[11px] text-gray-faint">Padding</span>
                 <div className="grid grid-cols-3 gap-1">
                   {PADDING_OPTIONS.map((padding) => (
                     <button
                       key={padding}
                       type="button"
                       onClick={() => padding && updateLayout(selectedSection.type, { padding })}
-                      className={`h-8 rounded-md border text-[10px] font-medium capitalize transition-colors ${
+                      className={`h-8 rounded-md border text-[11px] font-medium capitalize transition-colors ${
                         (selectedSection.layout?.padding || "normal") === padding
                           ? "border-accent/40 bg-accent/15 text-accent"
                           : "border-gray-border text-gray-muted hover:text-warm-white"

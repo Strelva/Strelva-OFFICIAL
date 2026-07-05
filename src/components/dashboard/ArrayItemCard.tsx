@@ -70,7 +70,7 @@ function NestedArrayEditor({
         >
           {itemFields.map((f) => (
             <div key={f.key}>
-              <label className="block text-[10px] text-gray-muted mb-0.5">{f.label}</label>
+              <label className="block text-[11px] text-gray-muted mb-0.5">{f.label}</label>
               <FieldInput
                 field={f}
                 value={row[f.key]}

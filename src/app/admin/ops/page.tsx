@@ -55,7 +55,7 @@ export default async function OpsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Operational Health</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Operational Health</h1>
         <p className="text-sm text-gray-muted mt-1">
           {report.activeTenants} active tenants · refreshed{" "}
           {new Date(report.timestamp).toLocaleTimeString("en-US", {
@@ -67,7 +67,7 @@ export default async function OpsPage() {
 
       <div className="rounded-xl bg-glass border border-glass-border p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-warm-white">Platform health</h2>
+          <h2 className="text-[15px] font-medium text-warm-white">Platform health</h2>
           <span className={`text-xs font-medium uppercase tracking-wide ${healthTint}`}>
             {health.status}
           </span>
@@ -115,7 +115,7 @@ export default async function OpsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-xl bg-glass border border-glass-border p-5">
-          <h2 className="text-sm font-semibold text-warm-white mb-3">
+          <h2 className="text-[15px] font-medium text-warm-white mb-3">
             Recent revalidation failures
           </h2>
           {report.revalidationFailures.length === 0 ? (
@@ -133,7 +133,7 @@ export default async function OpsPage() {
         </div>
 
         <div className="rounded-xl bg-glass border border-glass-border p-5">
-          <h2 className="text-sm font-semibold text-warm-white mb-3">Domain drift</h2>
+          <h2 className="text-[15px] font-medium text-warm-white mb-3">Domain drift</h2>
           {m.tenantDomainDrift.length === 0 ? (
             <p className="text-sm text-gray-muted">No drift detected.</p>
           ) : (
@@ -150,7 +150,7 @@ export default async function OpsPage() {
 
       {pendingByTenant.length > 0 && (
         <div className="rounded-xl bg-glass border border-glass-border p-5">
-          <h2 className="text-sm font-semibold text-warm-white mb-3">
+          <h2 className="text-[15px] font-medium text-warm-white mb-3">
             Pending review queue by tenant
           </h2>
           <ul className="space-y-1">

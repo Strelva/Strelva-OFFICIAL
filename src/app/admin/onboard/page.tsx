@@ -102,7 +102,7 @@ function OnboardForm() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">Onboard a client</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Onboard a client</h1>
         <p className="text-sm text-gray-muted mt-1">
           Automates the tenant record, revalidation secret, owner invite, and the Vercel
           project/env/domain. The site itself stays a hand-built repo you connect after.
@@ -134,7 +134,7 @@ function OnboardForm() {
           <button
             onClick={() => void run()}
             disabled={running}
-            className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium disabled:opacity-40"
+            className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
           >
             {running ? "Provisioning…" : "Provision tenant"}
           </button>
@@ -144,7 +144,7 @@ function OnboardForm() {
       {result && (
         <div className="space-y-5">
           <div className="rounded-xl bg-glass border border-glass-border p-5">
-            <h2 className="text-sm font-semibold text-warm-white mb-3">
+            <h2 className="text-[15px] font-medium text-warm-white mb-3">
               {result.tenantId} · {result.siteUrl}
             </h2>
             <ul className="space-y-2">
@@ -159,7 +159,7 @@ function OnboardForm() {
           </div>
 
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-5">
-            <h2 className="text-sm font-semibold text-amber-100 mb-3">Still needs a human</h2>
+            <h2 className="text-[15px] font-medium text-amber-100 mb-3">Still needs a human</h2>
             <ul className="space-y-1.5">
               {result.manualNext.map((n, i) => (
                 <li key={i} className="text-sm text-amber-100/90">• {n}</li>
@@ -170,7 +170,7 @@ function OnboardForm() {
           {Object.keys(result.clientEnv).length > 0 && (
             <div className="rounded-xl bg-glass border border-glass-border p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-warm-white">Client repo env</h2>
+                <h2 className="text-[15px] font-medium text-warm-white">Client repo env</h2>
                 <button
                   onClick={copyEnv}
                   className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
@@ -190,10 +190,10 @@ function OnboardForm() {
 
           <div className="flex gap-3">
             <Link
-              href={`/admin/tenants/${result.tenantId}`}
-              className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium"
+              href={`/admin/clients/${result.tenantId}`}
+              className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium"
             >
-              Open tenant
+              Open client
             </Link>
             <button
               onClick={() => {

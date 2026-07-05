@@ -206,7 +206,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const setupPath = status === "connected"
     ? "Connected and available according to the current sync status."
     : detail.connectionProvider === "google"
-      ? "Connect Google once to link your Business Profile, Search Console, and Analytics — then the AI can use this as trusted business context."
+      ? "Connect Google once to link your Business Profile, Search Console, and Analytics — then Strelva can use this as trusted business context."
       : detail.id === "google-search-console"
         ? "This integration uses manual Search Console credential setup today, not OAuth."
         : detail.connectionProvider
@@ -286,7 +286,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
             </p>
           ) : (
             <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
-              Connect this integration before the AI uses it. Until then, it stays silent — no fabricated insights, no fake numbers.
+              Connect this integration before Strelva uses it. Until then, it stays silent — no fabricated insights, no fake numbers.
             </p>
           )}
         </div>

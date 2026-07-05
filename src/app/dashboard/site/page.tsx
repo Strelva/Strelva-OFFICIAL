@@ -29,11 +29,15 @@ export default async function SitePage() {
   const settings = sections.settings || {};
 
   return (
-    <ContentWorkspace
-      siteName={settings.siteName || "Your Business"}
-      ownerName={settings.ownerName || "there"}
-      sectionData={sectionData}
-      timestamps={timestamps}
-    />
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ContentWorkspace
+          siteName={settings.siteName || "Your Business"}
+          ownerName={settings.ownerName || "there"}
+          sectionData={sectionData}
+          timestamps={timestamps}
+        />
+      </div>
+    </div>
   );
 }

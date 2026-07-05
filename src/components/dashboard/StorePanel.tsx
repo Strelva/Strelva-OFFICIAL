@@ -90,7 +90,7 @@ export function StorePanel({
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-warm-black">{p.name}</span>
                   {!p.inStock && (
-                    <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
+                    <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
                       Sold out
                     </span>
                   )}

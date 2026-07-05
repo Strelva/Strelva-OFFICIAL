@@ -286,7 +286,7 @@ export function CreateTenantForm() {
                         ...form,
                         customRepo: { ...form.customRepo, [key]: e.target.checked },
                       })}
-                      className="accent-[#6da3ff]"
+                      className="accent-[var(--color-accent)]"
                     />
                     {label}
                   </label>
@@ -307,7 +307,7 @@ export function CreateTenantForm() {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-md bg-warm-white text-surface-base px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Client"}
           </button>

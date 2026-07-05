@@ -3,6 +3,8 @@ import {
   getDashboardSurfaces,
   getVisibleSurfaces,
   getPresenceProfile,
+  tenantHasStore,
+  getWebsiteSections,
   type DashboardSurface,
   type SurfaceId,
 } from "../lib/dashboard-surfaces";
@@ -41,6 +43,36 @@ describe("getPresenceProfile", () => {
     expect(getPresenceProfile({ template: "wellness", businessModel: "" })).toBe("local");
     expect(getPresenceProfile({ template: "food-brand", businessModel: "" })).toBe("online");
     expect(getPresenceProfile({ template: "food-brand", businessModel: "storefront" })).toBe("online");
+  });
+});
+
+describe("getDashboardSurfaces — the 6-item conditional nav", () => {
+  it("emits exactly the target surface set in order", () => {
+    const ids = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] }).map((s) => s.id);
+    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reviews"]);
+  });
+
+  it("uses owner-language labels (Today / Ask Strelva / Analytics)", () => {
+    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
+    expect(at(s, "today").label).toBe("Today");
+    expect(at(s, "ask-ai").label).toBe("Ask Strelva");
+    expect(at(s, "website").label).toBe("Website");
+    expect(at(s, "google-business").label).toBe("Google Business");
+    expect(at(s, "analytics").label).toBe("Analytics");
+    expect(at(s, "reviews").label).toBe("Reviews");
+  });
+
+  it("points Analytics at the merged /dashboard/analytics surface", () => {
+    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
+    expect(at(s, "analytics").href).toBe("/dashboard/analytics");
+    expect(at(s, "analytics").state).toBe("shown");
+  });
+
+  it("no longer exposes Leads, Store, or Health as top-level surfaces", () => {
+    const ids = getDashboardSurfaces({ tenantConfig: { template: "food-brand", features: ["commerce"] }, connections: [] }).map((s) => s.id);
+    expect(ids).not.toContain("leads");
+    expect(ids).not.toContain("store");
+    expect(ids).not.toContain("health");
   });
 });
 
@@ -128,65 +160,44 @@ describe("getDashboardSurfaces — Reviews", () => {
   });
 });
 
-describe("getDashboardSurfaces — Store", () => {
-  it("is hidden for a non-commerce site", () => {
-    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
-    expect(at(s, "store").state).toBe("hidden");
+describe("tenantHasStore — drives the Store sub-tab inside Website", () => {
+  it("is false for a plain site", () => {
+    expect(tenantHasStore({ tenantConfig: {} })).toBe(false);
   });
 
   for (const feature of ["commerce", "products", "shop"]) {
-    it(`is shown when the tenant has the "${feature}" feature`, () => {
-      const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand", features: [feature] }, connections: [] });
-      const store = at(s, "store");
-      expect(store.state).toBe("shown");
-      expect(store.href).toBe("/dashboard/store");
+    it(`is true when the tenant has the "${feature}" feature`, () => {
+      expect(tenantHasStore({ tenantConfig: { features: [feature] } })).toBe(true);
     });
   }
 
-  it("appears in the visible nav for a commerce tenant", () => {
-    const ids = getVisibleSurfaces({ tenantConfig: { template: "food-brand", features: ["products"] }, connections: [] }).map((x) => x.id);
-    expect(ids).toContain("store");
-  });
-
-  it("is dropped from the visible nav for a non-commerce tenant", () => {
-    const ids = getVisibleSurfaces({ tenantConfig: { template: "wellness" }, connections: [] }).map((x) => x.id);
-    expect(ids).not.toContain("store");
-  });
-
-  it("is shown when the caller passes hasCommerce (e.g. tenant has products) even without a features flag", () => {
-    const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [], hasCommerce: true });
-    expect(at(s, "store").state).toBe("shown");
+  it("is true when the caller passes hasCommerce (e.g. tenant has products)", () => {
+    expect(tenantHasStore({ tenantConfig: {}, hasCommerce: true })).toBe(true);
   });
 
   it("hasCommerce=false falls back to the features flag", () => {
-    const withFlag = getDashboardSurfaces({ tenantConfig: { template: "food-brand", features: ["shop"] }, connections: [], hasCommerce: false });
-    expect(at(withFlag, "store").state).toBe("shown");
-    const without = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [], hasCommerce: false });
-    expect(at(without, "store").state).toBe("hidden");
+    expect(tenantHasStore({ tenantConfig: { features: ["shop"] }, hasCommerce: false })).toBe(true);
+    expect(tenantHasStore({ tenantConfig: {}, hasCommerce: false })).toBe(false);
   });
 });
 
-describe("getDashboardSurfaces — Leads", () => {
-  it("is an always-shown Manage surface pointing at the leads inbox", () => {
-    const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
-    const leads = at(s, "leads");
-    expect(leads.state).toBe("shown");
-    expect(leads.group).toBe("manage");
-    expect(leads.href).toBe("/dashboard/leads");
+describe("getWebsiteSections — Website sub-tabs", () => {
+  it("is Site-only (no strip) for a plain site", () => {
+    const sections = getWebsiteSections({ hasStore: false });
+    expect(sections.map((x) => x.id)).toEqual(["site"]);
   });
 
-  it("appears in the visible nav for every business type", () => {
-    for (const template of ["wellness", "food-brand", "trades", "professional", "fashion-stylist"]) {
-      const ids = getVisibleSurfaces({ tenantConfig: { template }, connections: [] }).map((x) => x.id);
-      expect(ids).toContain("leads");
-    }
+  it("folds Store in as a sub-section when the site has a store", () => {
+    const sections = getWebsiteSections({ hasStore: true });
+    expect(sections.map((x) => x.id)).toEqual(["site", "store"]);
+    expect(sections.find((x) => x.id === "store")!.href).toBe("/dashboard/store");
   });
 });
 
 describe("getDashboardSurfaces — always-on pillars", () => {
-  it("today / ask-ai / website / analytics / health are always shown", () => {
+  it("today / ask-ai / website / analytics are always shown", () => {
     const s = getDashboardSurfaces({ tenantConfig: { template: "food-brand" }, connections: [] });
-    for (const id of ["today", "ask-ai", "website", "analytics", "health"] as SurfaceId[]) {
+    for (const id of ["today", "ask-ai", "website", "analytics"] as SurfaceId[]) {
       expect(at(s, id).state).toBe("shown");
     }
   });
@@ -197,7 +208,7 @@ describe("getVisibleSurfaces", () => {
     const ids = getVisibleSurfaces({ tenantConfig: { template: "food-brand" }, connections: [] }).map((s) => s.id);
     expect(ids).not.toContain("google-business");
     expect(ids).not.toContain("reviews");
-    expect(ids).toEqual(expect.arrayContaining(["today", "ask-ai", "website", "analytics", "health"]));
+    expect(ids).toEqual(expect.arrayContaining(["today", "ask-ai", "website", "analytics"]));
   });
 
   it("keeps connect-state surfaces for a local business", () => {
