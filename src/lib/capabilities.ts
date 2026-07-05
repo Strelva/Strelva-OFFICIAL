@@ -33,8 +33,9 @@ export interface Capability {
 const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string; tools: string[] }> = {
   website: {
     name: "Website Management",
-    description: "Read, update, and manage all sections of your website",
-    tools: ["read_section", "update_section", "upload_image"],
+    description:
+      "Read, update, and manage all sections of your website — including undoing the last change (revert to an earlier version), which is drafted for your approval before it goes live",
+    tools: ["read_section", "update_section", "undo_last_change", "upload_image"],
   },
   analytics: {
     name: "Analytics",

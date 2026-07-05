@@ -44,6 +44,14 @@ export interface ApplySectionUpdateInput {
   tenantConfig: TenantConfig | null;
   /** When set, the manifest gates draft/publish. Omit to skip the gate. */
   siteManifest?: SiteCapabilityManifest;
+  /**
+   * Force the change into the review queue instead of ever auto-publishing.
+   * Used by the agent's `undo_last_change` tool: a revert is a real change and
+   * must be owner-approved before it goes live, so it is never auto-applied —
+   * even a low-risk one — while still flowing through the identical governance,
+   * validation, draft, and versioning path as a normal edit.
+   */
+  forceReview?: boolean;
 }
 
 export type ApplySectionUpdateResult =
@@ -83,7 +91,7 @@ export type ApplySectionUpdateResult =
 export async function applySectionUpdate(
   input: ApplySectionUpdateInput
 ): Promise<ApplySectionUpdateResult> {
-  const { tenantId, section, data, tenantConfig, siteManifest } = input;
+  const { tenantId, section, data, tenantConfig, siteManifest, forceReview } = input;
 
   // Manifest gate (route only): a section the manifest forbids drafting can't
   // be edited by the agent — it needs a custom request instead.
@@ -148,6 +156,7 @@ export async function applySectionUpdate(
   // present) doesn't allow publishing this section.
   const shouldRouteToReview = risk.level === "high" || (risk.level === "medium" && !risk.autoApply);
   const autoPublish =
+    !forceReview &&
     governance.action === "publish" &&
     !shouldRouteToReview &&
     (!siteManifest || manifestAllowsAction(siteManifest, section, "publish"));
