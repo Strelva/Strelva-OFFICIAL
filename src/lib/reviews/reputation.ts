@@ -61,6 +61,24 @@ export interface ReputationSummary {
   lovedFor: ThemeCount[];
 }
 
+/**
+ * Canonical Google "write a review" deep link from a Place ID — the SAME link
+ * the order-review-request cron emails owners. Returns null when no Place ID is
+ * configured, so the surface shows an honest "connect your listing" state
+ * instead of inventing a URL. More reviews is the #1 reputation lever, so this
+ * powers the one-tap "get more reviews" action on the reputation view.
+ */
+export function buildGoogleReviewLink(placeId: string | undefined | null): string | null {
+  const id = placeId?.trim();
+  if (!id) return null;
+  return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(id)}`;
+}
+
+/** A warm, ready-to-send message an owner can paste to a happy customer. */
+export function buildReviewShareMessage(link: string): string {
+  return `Loved working with us? A quick review helps: ${link}`;
+}
+
 function monthKey(time: number): string {
   const d = new Date(time);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
