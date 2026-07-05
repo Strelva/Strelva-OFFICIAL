@@ -16,7 +16,7 @@ pulls content from Strelva over a versioned contract.
         │ lead
         ▼
  CONTROL PLANE  (this repo)
-   proxy.ts ── host → tenant routing, Clerk auth, CSP
+   proxy.ts ── host → tenant routing, Supabase auth, CSP
    /dashboard (owner) · /admin "Mission Control" (operator)
    AI agents + governance + risk engine
    /api/v1/*  ── frozen, additive-only contract
@@ -69,12 +69,16 @@ target an arbitrary endpoint or mutate state on its own.
   env to paste; the site stays a hand-built repo.
 - **Operator screens** — the whole console is served on the bare admin host `admin.strelva.com`
   (super-admin only; `proxy.ts` rewrites it onto `/admin`). A **"Needs you" overview** (leads /
-  approvals / at-risk / signups, led ahead of MRR), an **operator CRM** (`/admin/clients` —
-  per-tenant pipeline stage, tags, notes, contacts, activity), **Search + Analytics**
-  (`/admin/analytics` — Search Console + GA4 per client), ops board (with live
-  platform-dependency health), pay-links (mint + revoke, with paid tracking), tenant detail
-  (live pulse + activity + edit + access), draft diff review, and a portfolio-wide audit trail.
-  See [`docs/operator-command-center.md`](./docs/operator-command-center.md).
+  approvals / at-risk / signups, led ahead of MRR — no client table), **one client list**
+  (`/admin/clients` — per-tenant pipeline stage, tags, notes, contacts, activity + SEO grade /
+  launch % / at-risk) linking to **one merged detail** (`/admin/clients/[id]` — live pulse,
+  health scan, review intel, visibility, domains, config, CRM; the old `/admin/tenants` routes
+  now redirect here), a **Leads** board (`/admin/leads` — mark contacted / convert / dismiss),
+  **Search + Analytics** (`/admin/analytics` — Search Console + GA4 per client), ops board (with
+  live platform-dependency health), pay-links (mint + revoke, with paid tracking), draft diff
+  review, and a portfolio-wide audit trail. Nav is five primary links + a "More" menu.
+  See [`docs/operator-command-center.md`](./docs/operator-command-center.md) and
+  [`docs/client-dashboard-ia.md`](./docs/client-dashboard-ia.md).
 - **Operator vs client email** — two independent switches: operator notifications (new-signup,
   lead, payment-failed) default ON so the founders stay alerted, while all customer/prospect
   mail stays paused behind `EMAIL_SENDING_ENABLED` during the test-tenant phase.

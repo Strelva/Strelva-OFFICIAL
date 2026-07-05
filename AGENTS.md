@@ -79,6 +79,7 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
     approval pending instead would let a re-approval create a duplicate. Don't "fix" this to
     gate on `verified`.
 - Governance: `src/lib/ai-governance.ts` decides publish vs review-queue vs block.
+- The assistant's persona is **"Strelva"** — the system prompt in `src/app/api/agent/route.ts` opens "You are Strelva, the assistant that manages the website for …" and instructs it to refer to itself as Strelva. The client nav labels the chat "Ask Strelva".
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
 
@@ -95,7 +96,8 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 - Pay links: `src/lib/pay-links.ts` + `/pay/[slug]` + super-admin `POST/GET /api/admin/pay-links` — per-client payment-before-work links (Redis `reb:paylink:*`). Submitted amounts are **whole dollars** (number or string) on the public API. `/pay/rohlax` is a grandfathered one-off (her deal is one-time, "no monthly fees ever" — never use it as the template).
 - Build payments: the Stripe webhook records every completed `mode:"payment"` session as a durable no-TTL `reb:build-payment:{sessionId}` record + Slack ping (tenant events alone prune at 90 days).
 - One-active-request gate: `getOpenChangeRequest` in `src/lib/events.ts` — one open custom change request per tenant, enforced on both the dashboard route (409) and the agent's `request_custom_change` tool; offboarding handoff requests are excluded by `metadata.kind`.
-- Operator command center: the whole operator surface lives under the `/admin` path and is served on the **bare admin host** `admin.strelva.com` (and `admin.localhost`) — `src/proxy.ts` (`isBareAdminHost`/`shouldRewriteBareAdminConsole`) rewrites the bare admin host root onto `/admin`, gated on super-admin (non-admins bounce to the app-host `/sign-in`). NOT to be confused with `admin.<tenant>.strelva.com`, which is a client's own admin dashboard. Surfaces: the **"Needs you" overview** (`src/app/admin/page.tsx` + `TodayFeed.tsx` — leads / approvals / at-risk / recent signups, led ahead of MRR), the **operator CRM** at `/admin/clients` (`ClientsCrm.tsx`), and **Search + Analytics** at `/admin/analytics`. Nav in `src/app/admin/NavLinks.tsx`. Full map: `docs/operator-command-center.md`.
+- Operator command center: the whole operator surface lives under the `/admin` path and is served on the **bare admin host** `admin.strelva.com` (and `admin.localhost`) — `src/proxy.ts` (`isBareAdminHost`/`shouldRewriteBareAdminConsole`) rewrites the bare admin host root onto `/admin`, gated on super-admin (non-admins bounce to the app-host `/sign-in`). NOT to be confused with `admin.<tenant>.strelva.com`, which is a client's own admin dashboard. Surfaces: the **"Needs you" overview** (`src/app/admin/page.tsx` + `TodayFeed.tsx` — leads / approvals / at-risk / recent signups, led ahead of MRR; **no client table** — a "View all clients" link + portfolio roll-ups + a collapsed Mission Control console sit below), **ONE client list** at `/admin/clients` (`ClientsCrm.tsx` — calm rows carrying stage + SEO grade + launch % + at-risk, each linking to the detail page) and **ONE merged detail** at `/admin/clients/[id]` (the cockpit: KPI pulse, `SiteScan` health, `ReviewIntelPanel`, `VisibilityPanel`, `DomainManager`, `TenantEditor`, `ClientCrmSections`, activity), **Leads** at `/admin/leads` (`LeadRows.tsx`, backed by `src/lib/lead-workflow.ts`), and **Search + Analytics** at `/admin/analytics`. The old 4 separate lists collapsed to this one list + one detail; `/admin/tenants` and `/admin/tenants/[id]` are now thin **redirects** to the `/admin/clients` routes. Nav is grouped to ~5 primary links (Overview, Clients, Leads, Analytics, Ops) + a "More" menu in `src/app/admin/NavLinks.tsx`. Full map: `docs/operator-command-center.md`.
+- Lead workflow: `src/lib/lead-workflow.ts` — operator status (`new` / `contacted` / `converted` / `dismissed`) layered ON TOP of the migration-sensitive lead record, keyed by the lead's `statusToken` in Redis (`lead-workflow:{token}`; same read-modify-write blob pattern as the operator CRM, degrades to a `new` default without Redis). Drives the `/admin/leads` board and feeds the "unworked leads" count on the "Needs you" overview.
 - Operator CRM: `src/lib/tenant-crm.ts` — a lightweight per-tenant client record (pipeline `stage` = lead/building/live/at_risk/churned, `tags`, `notes`, `contacts`, `activity` timeline) as one JSON blob in Redis at `crm:{tenantId}` (same pattern as leads/pay-links; no DB migration — internal operator metadata for a handful of clients, read-modify-write, degrades to a default record without Redis). Super-admin CRUD via `GET/POST /api/admin/tenants/[id]/crm` (audit-logged); the `/admin/clients` page reads all records via `getAllTenantCrm`.
 - At-risk / churn signal: `src/lib/churn.ts` — persists each tenant's daily owner agent-engagement count into a 7-day rolling Redis store (`reb:engagement:{tenantId}:{day}`, ~10-day TTL) written by the `daily-summary` cron via `recordDailyEngagement`, and composes it with inactivity (>21 days no owner activity) + subscription status into a single at-risk verdict (`getTenantAtRisk`/`getAtRiskTenants`) that the operator "Needs you" dashboard reads.
 - Report cadence: `src/lib/report-cadence.ts` — decides WHEN the weekly-report cron emails a tenant (not what's in it). Per-tenant override in Redis (`reb:report-cadence:{tenant}`, default `monthly`; last-sent throttle at `reb:report-sent:{tenant}`); tiers aren't a code signal, so an operator flips a high-touch client to `weekly`. The `weekly-report` cron gates each send on `isReportDue`.
@@ -162,20 +164,31 @@ Local-business owners will pay for a dashboard that proves their website is work
 ## What The Client Sees
 1. **Custom website** built by Jacob, hosted in a separate per-client repo, served on the client's own domain.
 2. **Business OS Dashboard** at `admin.{client-domain}` (dark monochrome). The nav is a
-   conditional surface set (`src/lib/dashboard-surfaces.ts`), grouped:
-   - **Manage** — Dashboard (at-a-glance metrics + next action), Ask AI (the chat).
-   - **Your presence** — Website (Preview / Content / Media / **History**, where History
-     holds the change log + the revert-to-last-good safety net), Google Business, Reviews,
-     Analytics, Health. Google Business + Reviews are shown by business type: an
-     online-only brand (Business info → Business type = "online", or an online-only
-     template) never sees them. See the presence resolver in `dashboard-surfaces.ts`.
-     The first-run checklist (`/api/dashboard/onboarding-status`) leads with "Tell us
-     how customers find you" so business type is set on day one, before the presence
-     surfaces render — `settings.businessModel` drives it (`"" `= infer from template).
+   **conditional 7-surface set** resolved by `getDashboardSurfaces(tenant)`
+   (`src/lib/dashboard-surfaces.ts`) and rendered by `HistorySidebar.tsx` / `MobileNav.tsx`
+   via `surface-nav.ts`. Full map: **[docs/client-dashboard-ia.md](./docs/client-dashboard-ia.md)**.
+   - **Manage** — **Today** (`/dashboard`, at-a-glance + next action; inbound leads fold in
+     here as "Who reached out"), **Ask Strelva** (`/dashboard/chat`, the agent chat).
+   - **Your presence** — **Website** (spine; Site + Content/Assets/**History**/Store as
+     sub-tabs — History holds the change log + revert-to-last-good; **Store folds in** as a
+     sub-tab only when the tenant runs a storefront, never a top-level tab), **Google
+     Business**, **Analytics** (the merged **Reports + Health** surface — verdict-first
+     `WeeklyBriefClient` + `SiteHealthCard`; the old separate Health tab is gone), **Reviews**.
+     Each presence surface has a `state` (`shown` / `connect` / `hidden`): Google Business +
+     Reviews resolve by business type (`getPresenceProfile` → local/online/hybrid) plus
+     connections, so an online-only brand never sees local-SEO framing it can't use, and a
+     local business with no review source yet sees a "connect" tab instead of a dead one.
+     The first-run checklist (`/api/dashboard/onboarding-status`) leads with "Tell us how
+     customers find you" so business type is set on day one — `settings.businessModel` drives
+     it (`""` = infer from template).
+   - **Settings** — the always-present seventh surface (gear in the identity footer, not in
+     the resolver list).
    - Identity split (founder feedback): top-left = the **business** (logo + name + domain);
      bottom-left = the **signed-in person** ("Hello, {name}", login identity, with an Admin
      badge + a "view as client" toggle for super-admins). Settings separates **Account**
      (read-only login identity) from **Business info** (the editable business fields).
+   - The assistant is **"Strelva"** — the agent's persona (system prompt in
+     `src/app/api/agent/route.ts`) refers to itself as Strelva. Nav label is "Ask Strelva".
 3. **AI Agent** that manages the site ongoing (updates, blog, social drafts).
 4. **Weekly report** by email.
 

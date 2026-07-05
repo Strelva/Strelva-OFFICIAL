@@ -19,7 +19,20 @@ rewrites the bare admin host root onto the `/admin` path:
   `/sign-in` (a different host, so it can't re-enter the rewrite). The `/admin`
   layout re-checks `isSuperAdmin` as defense in depth.
 
-Nav lives in `src/app/admin/NavLinks.tsx`.
+Nav (`src/app/admin/NavLinks.tsx`) is grouped to **five primary links** — Overview,
+Clients, Leads, Analytics, Ops — plus a **"More"** dropdown for the operator-technical
+surfaces (Onboard, Pay Links, Maintenance, Drafts, Audit), so the top bar stays scannable.
+
+## Consolidation (one list, one detail)
+
+The console used to spread clients across **four** lists. That collapsed to **one client
+list** (`/admin/clients`) + **one detail page** (`/admin/clients/[id]`). The old routes stay
+only as thin redirects so bookmarks resolve:
+
+- `/admin/tenants` → `redirect("/admin/clients")`
+- `/admin/tenants/[id]` → `redirect("/admin/clients/{id}")`
+
+The Overview no longer renders a client table at all — it's pure triage.
 
 ## Surfaces
 
@@ -28,11 +41,20 @@ Nav lives in `src/app/admin/NavLinks.tsx`.
 page. `TodayFeed` leads with the work waiting on Jacob, ahead of any financial
 number: **new leads** (unworked delivery leads), **approvals** (pending drafts +
 maintenance digests), **at-risk** tenants (from the churn signal), and **recent
-signups** (last 7 days). MRR and the tenant table render below it.
+signups** (last 7 days). Portfolio attention flags fold into the same feed. Below the
+feed: a single **"View all clients"** link into `/admin/clients`, the portfolio
+roll-up StatTiles (Active / Collected / MRR / Drafts / Custom repos), a one-line
+launch-readiness summary, and **Mission Control** demoted to a collapsed
+ask-the-portfolio console. There is no tenant table.
 
-### Operator CRM — `/admin/clients`
+### Operator CRM — client list — `/admin/clients`
 `src/app/admin/clients/page.tsx` + `ClientsCrm.tsx`, backed by
-`src/lib/tenant-crm.ts`. A lightweight per-tenant client record:
+`src/lib/tenant-crm.ts`. The single list for everyone we manage a site for — calm
+rows that link to the detail page (`/admin/clients/[id]`). Each row carries the CRM
+record plus the health signals that used to live in the Overview table (SEO grade,
+launch %, at-risk reason), filterable/sortable by stage, tag, active, and at-risk.
+
+The per-tenant CRM record:
 
 - **stage** — pipeline: `lead` / `building` / `live` / `at_risk` / `churned`
 - **tags** — free-form, deduped, capped
@@ -45,8 +67,36 @@ and pay-links persist — no DB migration, since this is internal operator metad
 for a handful of clients. Degrades to a default empty record without Redis.
 
 CRUD: `GET/POST /api/admin/tenants/[id]/crm` (super-admin, audit-logged via
-`logAuditEvent`). The page reads every tenant's record in one shot via
+`logAuditEvent`). The list reads every tenant's record in one shot via
 `getAllTenantCrm`.
+
+### Client detail (merged cockpit) — `/admin/clients/[id]`
+`src/app/admin/clients/[id]/page.tsx`. The one place to work a single client —
+everything that used to be a separate tenant page now stacks here in one scroll:
+
+- **KPI pulse** — visits/wk, booking clicks/wk, drafts waiting, last activity.
+- **Site health** — `SiteScan` (grade/score/history + admin-only prioritized "fix
+  first" issues), reading the shared `scan-store`.
+- **Reviews** — `ReviewIntelPanel` (admin review intelligence: sentiment + urgent
+  needs-a-reply queue), from `getAdminReviewIntelligence`.
+- **Visibility** — `VisibilityPanel` (AI-visibility snapshot diagnosis + diff).
+- **Domains** — `DomainManager` (domain claims for the tenant).
+- **Tenant config** — `TenantEditor` (name, owner, domains, subscription, plan
+  override, revalidation).
+- **CRM** — `ClientCrmSections` (contacts / activity / notes for this tenant) +
+  a recent-activity feed.
+
+Header actions: invite owner, open the client dashboard, open the live site.
+
+### Leads — `/admin/leads`
+`src/app/admin/leads/page.tsx` + `LeadRows.tsx`, backed by
+`src/lib/lead-workflow.ts`. The marketing-site leads (contact / discovery /
+get-started submissions), newest first. Each lead gets an operator **workflow
+status** — `new` / `contacted` / `converted` / `dismissed` — layered on top of the
+lead record and keyed by its stable `statusToken` (Redis `lead-workflow:{token}`,
+same read-modify-write blob pattern as the CRM; degrades to `new` without Redis).
+The "unworked leads" count on the Overview reads this (`deliveryStatus === "received"`
+and workflow status still `new`).
 
 ### Search + Analytics — `/admin/analytics`
 `src/app/admin/analytics/page.tsx` + `AnalyticsView.tsx`, backed by
