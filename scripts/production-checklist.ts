@@ -65,16 +65,11 @@ const envSourceHints: Record<string, string> = {
   CALENDLY_CLIENT_ID: "Calendly OAuth app client ID",
   CALENDLY_CLIENT_SECRET: "Calendly OAuth app client secret",
   CALENDLY_WEBHOOK_SECRET: "Calendly webhook signing secret",
-  CLERK_SECRET_KEY: "Clerk dashboard live instance matching NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-  CLERK_WEBHOOK_SECRET: "Clerk webhook endpoint signing secret from the same live Clerk instance as the publishable/secret keys",
   GOOGLE_GENERATIVE_AI_API_KEY: "Google AI Studio production API key",
   GOOGLE_CLIENT_ID: "Google Cloud OAuth client ID",
   GOOGLE_CLIENT_SECRET: "Google Cloud OAuth client secret",
   INSTAGRAM_CLIENT_ID: "Meta app Instagram OAuth client ID",
   INSTAGRAM_CLIENT_SECRET: "Meta app Instagram OAuth client secret",
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "Clerk dashboard live instance",
-  NEXT_PUBLIC_CLERK_SIGN_IN_URL: "Set to /sign-in",
-  NEXT_PUBLIC_CLERK_SIGN_UP_URL: "Set to /sign-up",
   NEXT_PUBLIC_APP_URL: "https://strelva.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
   NEXT_PUBLIC_SITE_URL: "https://strelva.com",
@@ -165,12 +160,20 @@ console.log("\n═════════════════════�
 console.log("  Strelva Production Readiness Checklist");
 console.log("═══════════════════════════════════════════════════════════════\n");
 
-console.log("─── Core Auth (Clerk) ───────────────────────────────────────────");
-checkEnvVar("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", true);
-checkEnvVar("CLERK_SECRET_KEY", true);
-checkEnvVar("CLERK_WEBHOOK_SECRET", true);
-checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_IN_URL", true, false);
-checkEnvVar("NEXT_PUBLIC_CLERK_SIGN_UP_URL", true, false);
+console.log("─── Core Auth (Supabase) ────────────────────────────────────────");
+checkEnvVar("NEXT_PUBLIC_SUPABASE_URL", true);
+// Supabase renamed the anon key to "publishable"; the app reads either name.
+{
+  const hasPublicKey = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  log({
+    name: "ENV: NEXT_PUBLIC_SUPABASE_ANON_KEY (or PUBLISHABLE)",
+    status: hasPublicKey ? "ok" : "fail",
+    message: hasPublicKey ? "Set." : "Missing — set the Supabase anon/publishable key.",
+  });
+}
+checkEnvVar("SUPABASE_SERVICE_ROLE_KEY", true);
 checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
 
 // Dev-access bypass must never be enabled on a deployed environment: when
@@ -516,91 +519,73 @@ function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
     "admin tenant host sign-up uses the tenant invite context",
     "signed-out no-access recovery returns users to sign-in",
     "signup page explains invited email recovery",
-    "toHaveTitle(/Sign in to Strelva",
-    "toHaveTitle(/Sign in to Great Lakes Dried Fruit",
-    "toHaveTitle(/Create your dashboard account",
-    "toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account",
-    "Use the exact email address that received your invite",
-    "sign-in page allows Clerk JS to load",
     "cron maintenance endpoint is not public",
     "/api/cron/maintenance",
     "process.env.PLAYWRIGHT_BASE_URL",
-    "https://clerk.strelva.com",
     "not.toHaveURL(/\\/app/)",
   ];
   const missing = requiredTerms.filter((term) => !content.includes(term));
   const signupNoAppOk =
-    smoke.includes('test("signup page explains invited email recovery"') &&
-    smoke.indexOf('test("signup page explains invited email recovery"') <
+    smoke.includes('"signup page explains invited email recovery"') &&
+    smoke.indexOf('"signup page explains invited email recovery"') <
       smoke.indexOf("not.toHaveURL(/\\/app/)");
 
   if (missing.length || !signupNoAppOk) {
     log({
       name: "Access smoke coverage",
       status: "fail",
-      message: `${customerPath} and ${smokePath} must cover sign-in, sign-up, account handoff, no-access, admin-host, invited-email, Clerk JS CSP, cron protection, and no /app regressions, including public sign-up`,
+      message: `${customerPath} and ${smokePath} must cover sign-in, sign-up, account handoff, no-access, admin-host, invited-email, cron protection, and no /app regressions, including public sign-up`,
     });
     return;
   }
 
-  log({ name: "Access smoke coverage", status: "ok", message: `${customerPath} and ${smokePath} cover sign-in/sign-up recovery paths, account handoff, Clerk JS CSP, and cron protection` });
+  log({ name: "Access smoke coverage", status: "ok", message: `${customerPath} and ${smokePath} cover sign-in/sign-up recovery paths, account handoff, admin-host, and cron protection` });
 }
 
 checkAccessSmokeCoverage("tests/customer-frontend.spec.ts", "tests/smoke.spec.ts");
 
 function checkAuthAccessPages(
-  signInClientPath: string,
   signInPagePath: string,
   signUpPath: string,
   noAccessPath: string,
   accountPath: string,
   recoveryButtonPath: string,
 ) {
-  const missingFiles = [signInClientPath, signInPagePath, signUpPath, noAccessPath, accountPath, recoveryButtonPath].filter((path) => !existsSync(path));
+  const missingFiles = [signInPagePath, signUpPath, noAccessPath, accountPath, recoveryButtonPath].filter((path) => !existsSync(path));
   if (missingFiles.length) {
     log({ name: "Auth access pages", status: "fail", message: `${missingFiles.join(", ")} missing` });
     return;
   }
 
-  const signIn = readFileSync(signInClientPath, "utf8");
   const signInPage = readFileSync(signInPagePath, "utf8");
   const signUp = readFileSync(signUpPath, "utf8");
   const noAccess = readFileSync(noAccessPath, "utf8");
   const account = readFileSync(accountPath, "utf8");
   const recoveryButton = readFileSync(recoveryButtonPath, "utf8");
+  // Supabase Auth (magic link + Google OAuth). Both auth pages render
+  // <SupabaseSignIn>, prefill the invited email, send marketing-host auth to
+  // /account and tenant/admin-host auth to /dashboard via host-aware fallback.
   const authPagesOk =
-    signIn.includes("forceRedirectUrl={postSignInUrl}") &&
-    signIn.includes("fallbackRedirectUrl={postSignInUrl}") &&
-    signIn.includes('signUpUrl={getAuthSwitchUrl("/sign-up", invitedEmail)}') &&
-    signIn.includes("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}") &&
-    signIn.includes("Invited email:") &&
-    signInPage.includes("getInvitedEmail(params)") &&
+    signInPage.includes("SupabaseSignIn") &&
+    signInPage.includes("getInvite") &&
+    signInPage.includes("prefillEmail={invite.email}") &&
     signInPage.includes("getClientFallbackRoot(requestHeaders)") &&
-    signInPage.includes('withClientFallbackRoot(clientFallbackRoot, "/dashboard")') &&
-    signInPage.includes('"/account"') &&
-    signInPage.includes('"/dashboard"') &&
-    signUp.includes("forceRedirectUrl={postSignUpUrl}") &&
-    signUp.includes("fallbackRedirectUrl={postSignUpUrl}") &&
-    signUp.includes('signInUrl={getAuthSwitchUrl("/sign-in", invitedEmail)}') &&
-    signUp.includes("initialValues={invitedEmail ? { emailAddress: invitedEmail } : undefined}") &&
-    signUp.includes("Invited email:") &&
-    signUp.includes("getTenantFromHeaders") &&
+    signInPage.includes('withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard")') &&
+    signInPage.includes('next="/account"') &&
+    signUp.includes("SupabaseSignIn") &&
+    signUp.includes("getInvite") &&
+    signUp.includes("prefillEmail={invite.email}") &&
     signUp.includes("getTenantConfig") &&
-    signUp.includes("getSignUpTitle(siteName)") &&
     signUp.includes("getClientFallbackRoot(requestHeaders)") &&
-    signUp.includes('withClientFallbackRoot(clientFallbackRoot, "/dashboard")') &&
-    signUp.includes('"/account"') &&
-    signUp.includes('"/dashboard"') &&
-    [signIn, signUp].every((content) =>
-      content.includes("mailto:jacob@strelva.com") &&
-      content.includes("form is not loading") &&
-      !content.includes('"/app"')
-    );
+    signUp.includes('withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard")') &&
+    signUp.includes('next="/account"') &&
+    signUp.includes("/access-request") &&
+    [signInPage, signUp].every((content) => !content.includes('"/app"'));
   const metadataOk =
-    signInPage.includes("Sign in to ${siteName}") &&
-    signInPage.includes("email address from your invite") &&
-    signUp.includes("title: getSignUpTitle(siteName)") &&
-    signUp.includes("exact email address from your ${siteName} invite");
+    signInPage.includes("AuthDocumentTitle") &&
+    signInPage.includes("Sign in to ${tenantAuth.siteName}") &&
+    signUp.includes("AuthDocumentTitle") &&
+    signUp.includes("Create access for ${tenantAuth.siteName}");
   const noAccessOk =
     noAccess.includes("UseInvitedEmailButton") &&
     noAccess.includes("signs you out so you can choose that account") &&
@@ -618,26 +603,24 @@ function checkAuthAccessPages(
     account.includes("!tenantConfigs.some(({ config }) => config)") &&
     account.includes("return <NoAccessState />");
   const recoveryButtonOk =
-    recoveryButton.includes("SignOutButton") &&
+    recoveryButton.includes("createBrowserSupabase") &&
+    recoveryButton.includes("supabase.auth.signOut()") &&
     recoveryButton.includes('redirectUrl = "/sign-in"') &&
-    recoveryButton.includes("redirectUrl={redirectUrl}") &&
-    recoveryButton.includes("{button}</SignOutButton>") &&
     recoveryButton.includes("Use invited email");
 
   if (!authPagesOk || !metadataOk || !noAccessOk || !accountRecoveryOk || !recoveryButtonOk) {
     log({
       name: "Auth access pages",
       status: "fail",
-      message: "Auth pages must route marketing-host auth through /account, route tenant/admin auth to /dashboard, avoid /app, include support email, provide tenant-aware invite-focused metadata, and keep no-access/account recovery paths focused on the invited email",
+      message: "Auth pages must render SupabaseSignIn, prefill the invited email, route marketing-host auth through /account, route tenant/admin auth to /dashboard via host-aware redirects, avoid /app, and keep no-access/account recovery paths focused on the invited email",
     });
     return;
   }
 
-  log({ name: "Auth access pages", status: "ok", message: "Sign-in, sign-up, and no-access recovery are aligned with invite-focused metadata and host-aware redirects" });
+  log({ name: "Auth access pages", status: "ok", message: "Sign-in, sign-up, and no-access recovery use Supabase auth with invited-email context and host-aware redirects" });
 }
 
 checkAuthAccessPages(
-  "src/app/sign-in/[[...sign-in]]/SignInClient.tsx",
   "src/app/sign-in/[[...sign-in]]/page.tsx",
   "src/app/sign-up/[[...sign-up]]/page.tsx",
   "src/app/no-access/page.tsx",
@@ -842,40 +825,11 @@ checkOAuthCallbackState([
   "src/app/api/oauth/instagram/callback/route.ts",
 ]);
 
-function checkClerkWebhookRoute(path: string) {
-  if (!existsSync(path)) {
-    log({ name: "Clerk webhook route", status: "fail", message: `${path} is missing` });
-    return;
-  }
-
-  const content = readFileSync(path, "utf8");
-  const requiredTerms = [
-    "CLERK_WEBHOOK_SECRET",
-    "Webhook secret not configured",
-    "svix-id",
-    "svix-timestamp",
-    "svix-signature",
-    "wh.verify",
-    "Invalid signature",
-    "user.created",
-    "consumeInvite",
-    "assignUserToTenant",
-  ];
-  const missing = requiredTerms.filter((term) => !content.includes(term));
-
-  if (missing.length) {
-    log({
-      name: "Clerk webhook route",
-      status: "fail",
-      message: `${path} must fail closed and auto-assign invited users from signed Clerk user.created events`,
-    });
-    return;
-  }
-
-  log({ name: "Clerk webhook route", status: "ok", message: `${path} verifies signed user.created events` });
-}
-
-checkClerkWebhookRoute("src/app/api/clerk/webhook/route.ts");
+// The Clerk webhook route (src/app/api/clerk/webhook) was removed with the
+// Clerk→Supabase Auth migration (#83). New-user provisioning is now the
+// Supabase `handle_new_user` Postgres trigger plus SUPER_ADMIN_EMAILS seeding
+// (SUPER_ADMIN_EMAILS is enforced as a required env var in the Core Auth
+// section above), so there is no signed-webhook route to assert here.
 
 function checkStripeBillingWebhookRoute(path: string) {
   if (!existsSync(path)) {
@@ -1114,7 +1068,6 @@ console.log("\n─── Monitoring & Notifications ─────────�
 checkEnvVar("SENTRY_DSN", true, false);
 checkEnvVar("NEXT_PUBLIC_SENTRY_DSN", true, false);
 checkEnvVar("SLACK_WEBHOOK_URL", false, false);
-checkEnvVar("FOUNDER_CLERK_USER_ID", false, false);
 
 console.log("\n─── OAuth Connections ───────────────────────────────────────────");
 const hasGoogleOAuth = checkOptionalPair("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "Google");
@@ -1494,11 +1447,6 @@ function printWebhookUrls() {
   console.log("  Webhook URLs (configure in external services)");
   console.log("═══════════════════════════════════════════════════════════════\n");
 
-  console.log("Clerk Webhook:");
-  console.log(`  URL: ${baseUrl}/api/clerk/webhook`);
-  console.log("  Events: user.created");
-  console.log("  Secret: Set CLERK_WEBHOOK_SECRET to match\n");
-
   console.log("Stripe Webhook:");
   console.log(`  URL: ${baseUrl}/api/billing/webhook`);
   console.log("  Events: checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.deleted");
@@ -1737,20 +1685,15 @@ function printReleaseActions() {
     console.log();
   }
 
-  if (failedEnvs.includes("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") || failedEnvs.includes("CLERK_SECRET_KEY")) {
-    console.log("- Clerk: switch to live keys, then verify signed-out /dashboard and /no-access reach /sign-in, root marketing-host auth finishes at /account, and admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow before finishing at /dashboard.");
+  const supabaseAuthFailed =
+    failedEnvs.includes("NEXT_PUBLIC_SUPABASE_URL") ||
+    failedEnvs.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
+    failedEnvs.includes("SUPABASE_SERVICE_ROLE_KEY");
+  if (supabaseAuthFailed) {
+    console.log("- Supabase Auth: set the project URL plus the anon/publishable and service-role keys, then verify signed-out /dashboard and /no-access reach /sign-in, root marketing-host auth finishes at /account, and admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow before finishing at /dashboard.");
   }
-  if (
-    failedEnvs.includes("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ||
-    failedEnvs.includes("CLERK_SECRET_KEY") ||
-    failedEnvs.includes("CLERK_WEBHOOK_SECRET") ||
-    failedEnvs.includes("RESEND_API_KEY") ||
-    failedEnvs.includes("RESEND_DOMAIN")
-  ) {
-    console.log("- Customer access: after Clerk and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email, the email stays prefilled when switching between sign-up and sign-in, strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
-  }
-  if (failedEnvs.includes("CLERK_WEBHOOK_SECRET")) {
-    console.log("- Clerk webhook: configure https://strelva.com/api/clerk/webhook for user.created.");
+  if (supabaseAuthFailed || failedEnvs.includes("RESEND_API_KEY") || failedEnvs.includes("RESEND_DOMAIN")) {
+    console.log("- Customer access: after Supabase Auth and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email (magic link or Google OAuth), the email stays prefilled when switching between sign-up and sign-in, strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
   }
   if (failedEnvs.includes("SANITY_WEBHOOK_SECRET")) {
     console.log("- Sanity webhook: configure https://strelva.com/api/sanity/webhook for content create/update/delete events with the matching SANITY_WEBHOOK_SECRET.");

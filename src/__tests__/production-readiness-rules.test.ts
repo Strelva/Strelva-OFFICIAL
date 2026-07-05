@@ -515,7 +515,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("checkAccessSmokeCoverage");
     expect(source).toContain("checkAuthAccessPages");
     expect(source).toContain("checkAdminInviteFlow");
-    expect(source).toContain("checkClerkWebhookRoute");
     expect(source).toContain("checkStripeBillingWebhookRoute");
     expect(source).toContain("checkCronAuthCoverage");
     expect(source).toContain("Production readiness doc");
@@ -524,8 +523,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Tenant Deployment Checklist");
     expect(source).toContain("Customer Access Handoff");
     expect(source).toContain("vercel deploy --prod");
-    expect(source).toContain("matching NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
-    expect(source).toContain("same live Clerk instance as the publishable/secret keys");
     expect(source).toContain("git status --short");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("signed-out dashboard customers");
@@ -546,14 +543,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Access smoke coverage");
     expect(source).toContain("Auth access pages");
     expect(source).toContain("Admin invite flow");
-    expect(source).toContain("Clerk webhook route");
     expect(source).toContain("Stripe billing webhook route");
     expect(source).toContain("Cron auth coverage");
     expect(source).toContain(".github/workflows/release.yml");
     expect(source).toContain(".github/workflows/ci.yml");
     expect(source).toContain("tests/customer-frontend.spec.ts");
     expect(source).toContain("tests/smoke.spec.ts");
-    expect(source).toContain("src/app/sign-in/[[...sign-in]]/SignInClient.tsx");
     expect(source).toContain("src/app/sign-in/[[...sign-in]]/page.tsx");
     expect(source).toContain("src/app/sign-up/[[...sign-up]]/page.tsx");
     expect(source).toContain("src/app/no-access/page.tsx");
@@ -563,7 +558,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("src/app/admin/InviteButton.tsx");
     expect(source).toContain("src/app/api/admin/invites/route.ts");
     expect(source).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
-    expect(source).toContain("src/app/api/clerk/webhook/route.ts");
     expect(source).toContain("validateCronRequest(process.env.CRON_SECRET");
     expect(source).toContain("src/app${cron.path}/route.ts");
     expect(source).toContain("package.json");
@@ -574,10 +568,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("signed-out account handoff returns users to sign-in");
     expect(source).toContain("signup page explains invited email recovery");
     expect(source).toContain("admin tenant host sign-up uses the tenant invite context");
-    expect(source).toContain("toHaveTitle(/Sign in to Strelva");
-    expect(source).toContain("toHaveTitle(/Sign in to Great Lakes Dried Fruit");
-    expect(source).toContain("toHaveTitle(/Create your dashboard account");
-    expect(source).toContain("toHaveTitle(/Create your Great Lakes Dried Fruit dashboard account");
     expect(source).toContain("admin tenant host sign-in keeps the invited email context");
     expect(source).toContain("cron maintenance endpoint is not public");
     // The SignInClient.tsx assertions were dropped — the file was folded
@@ -590,13 +580,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     // string from the sign-in UI; that copy now lives in no-access/account
     // pages instead. The negative assertion still holds.
     expect(customerFrontendSmoke).not.toContain("Use the email address from your invite");
-    expect(source).toContain("sign-in page allows Clerk JS to load");
-    expect(source).toContain("https://clerk.strelva.com");
     expect(source).toContain("signupNoAppOk");
     expect(source).toContain("including public sign-up");
-    expect(source).toContain("cover sign-in/sign-up recovery paths, account handoff, Clerk JS CSP, and cron protection");
-    expect(source).toContain("tenant-aware invite-focused metadata");
-    expect(source).toContain("form is not loading");
+    expect(source).toContain("cover sign-in/sign-up recovery paths, account handoff, admin-host, and cron protection");
     expect(source).toContain("route marketing-host auth through /account");
     expect(source).toContain("route tenant/admin auth to /dashboard");
     expect(source).toContain("host-aware redirects");
@@ -607,9 +593,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Choose another site");
     expect(source).toContain("Request your build");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
-    expect(source).toContain("{button}</SignOutButton>");
-    expect(source).toContain("Sign-in, sign-up, and no-access recovery are aligned with invite-focused metadata");
-    expect(source).toContain("getSignUpTitle(siteName)");
+    expect(source).toContain("Sign-in, sign-up, and no-access recovery use Supabase auth with invited-email context and host-aware redirects");
     expect(source).toContain("Admin tenant rows expose owner-email invites through /api/admin/invites");
     expect(source).toContain("Tenant domain access");
     expect(source).toContain("checkTenantDomainDns");
@@ -632,7 +616,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("verifyOAuthState(state)");
     expect(source).toContain("const tenantId = verifiedState.tenantId");
     expect(source).toContain("OAuth callbacks verify signed state before saving tenant connections");
-    expect(source).toContain("verifies signed user.created events");
     expect(source).toContain("Vercel cron route(s) are covered by proxy CRON_SECRET validation");
     expect(source).toContain("Dependency audit");
     expect(source).toContain("Production site URL");
@@ -760,7 +743,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("signed-out /dashboard and /no-access reach /sign-in");
     expect(source).toContain("root marketing-host auth finishes at /account");
     expect(source).toContain("admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow");
-    expect(source).toContain("after Clerk and Resend are live");
+    expect(source).toContain("after Supabase Auth and Resend are live");
     expect(source).toContain("use Invite for each tenant ownerEmail");
     expect(source).toContain("signs up or signs in with the exact invited email");
     expect(source).toContain("email stays prefilled when switching between sign-up and sign-in");
