@@ -13,6 +13,12 @@
  * For a storefront, import `trackOrder` and call it on checkout success to
  * record an `order` (revenue shows on the owner's dashboard Store).
  *
+ * Phone taps are tracked automatically: mounting <ScaffoldTracker /> installs one
+ * global, capturing click listener that fires a `phone-click` beacon whenever a
+ * visitor taps any `<a href="tel:...">` anywhere on the page — the #1 local
+ * conversion, and untrackable before this. No per-link wiring needed; call
+ * `trackPhoneClick()` directly only for a non-anchor "call us" control.
+ *
  * Self-contained on purpose: this file imports only React + standard browser
  * APIs (no `@/lib/...`), so it is a true single-file drop-in and typechecks
  * inside this control-plane repo as well as inside any client repo.
@@ -34,7 +40,7 @@ import { useEffect } from "react";
 
 const CONTRACT_VERSION = "v1";
 
-type TrackEvent = "page-view" | "booking-click" | "order";
+type TrackEvent = "page-view" | "booking-click" | "phone-click" | "order";
 
 /** Payload for an `order` beacon — mirrors the v1 track contract's order shape. */
 export interface TrackOrder {
@@ -145,6 +151,16 @@ export function trackBookingClick(serviceId?: string): void {
 }
 
 /**
+ * Record a phone-call click. You rarely call this directly — mounting
+ * <ScaffoldTracker /> already fires it for every `<a href="tel:...">` tap via a
+ * global listener. Call it by hand only for a "call us" control that isn't a
+ * tel: anchor (e.g. a button that dials via JS).
+ */
+export function trackPhoneClick(): void {
+  sendEvent("phone-click");
+}
+
+/**
  * Record a completed order so the owner's dashboard Store shows revenue/orders.
  * Call it after a successful checkout:
  *
@@ -171,6 +187,24 @@ export function ScaffoldTracker() {
     // remounts the layout subtree's client components on route change for most
     // setups; if your repo keeps this mounted across soft navigations and you
     // want per-route views, move <ScaffoldTracker /> into the page instead.
+
+    // One global, capturing click listener turns any tel: link tap anywhere on
+    // the page into a tracked `phone-click` — no per-link wiring. Capture phase
+    // so it still fires if a handler stops propagation. Fail silent: a DOM error
+    // here must never break the client site.
+    if (typeof document === "undefined") return;
+    const onClick = (e: MouseEvent) => {
+      try {
+        const el = e.target as Element | null;
+        if (el && typeof el.closest === "function" && el.closest('a[href^="tel:"]')) {
+          sendEvent("phone-click");
+        }
+      } catch {
+        // never throw from a tracker
+      }
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
   }, []);
 
   return null;

@@ -36,7 +36,9 @@ import { getRedis } from "@/lib/redis";
 // The minimal public event vocabulary. Kept intentionally small: this is a
 // non-sensitive beacon, not the full internal event set. Maps 1:1 onto the
 // base event names `trackClick` already stores and `reports.ts` already reads.
-const ALLOWED_EVENTS = new Set(["page-view", "booking-click", "order"]);
+// `phone-click` is a tel: tap — the #1 local conversion — and stores through the
+// same base-counter path as page-view/booking-click (no serviceId, no order).
+const ALLOWED_EVENTS = new Set(["page-view", "booking-click", "phone-click", "order"]);
 
 const MAX_ORDER_CENTS = 100_000_000; // $1M — reject absurd/garbage amounts
 const MAX_ITEMS = 100;

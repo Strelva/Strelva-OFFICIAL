@@ -8,7 +8,9 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | File | Purpose |
 |------|---------|
 | `scaffold-client.ts` | Typed fetch client for Scaffold Web's `/api/v1/*` contract |
-| `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (powers the weekly report) |
+| `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (page views, booking clicks, **phone-call taps**, orders — powers the weekly report) |
+| `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") |
+| `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
 | `ScaffoldGA4.tsx` | Fail-silent GA4 tag → sends pageviews to the client's GA4 property (auto-wires from one env var) |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
@@ -136,6 +138,21 @@ import { trackBookingClick } from "@/components/ScaffoldTracker";
 <a href={bookingUrl} onClick={() => trackBookingClick()}>Book now</a>
 ```
 
+**Phone-call taps are tracked automatically.** Mounting `<ScaffoldTracker />`
+installs one global click listener that fires a `phone-click` event whenever a
+visitor taps any `<a href="tel:...">` link — the #1 local conversion, and
+invisible before this. No per-link wiring: any tel: anchor anywhere on the site
+is counted. For a "call us" control that isn't a tel: anchor (e.g. a button that
+dials via JS), call `trackPhoneClick()` from its `onClick`:
+
+```tsx
+import { trackPhoneClick } from "@/components/ScaffoldTracker";
+
+<button onClick={() => { trackPhoneClick(); window.location.href = "tel:+17165550100"; }}>
+  Call us
+</button>
+```
+
 The tracker fails silent, is non-blocking (`sendBeacon` / `keepalive` fetch),
 skips in development, and respects `prefers-reduced-data`. It never throws, so a
 network error or missing env var can never break the client site.
@@ -188,6 +205,94 @@ reporting service account. To grant it, add
 Search Console property (Settings → Users and permissions) and on the GA4
 property. Provisioning prints this as a one-time manual step — it is intentionally
 manual so nothing can mis-verify a property.
+
+### Lead capture (Who reached out)
+
+Analytics only ever shows anonymous clicks. `ScaffoldLeadForm` captures real
+submissions — name, email, phone, message — and POSTs them to the control
+plane's public `POST /api/v1/leads/{tenant}` contract, so the dashboard shows
+actual people under "Who reached out" with zero hand-wiring.
+
+Copy it in and render it wherever a contact/quote form belongs:
+
+```bash
+cp ScaffoldLeadForm.tsx my-client-site/components/ScaffoldLeadForm.tsx
+```
+
+```tsx
+import { ScaffoldLeadForm } from "@/components/ScaffoldLeadForm";
+
+<ScaffoldLeadForm
+  source="contact-form"          // where it came from (shows in the dashboard)
+  showPhone                       // default true
+  showMessage                     // default true
+  requireEmail={false}
+  submitLabel="Send message"
+  successMessage="Thanks — we'll be in touch shortly."
+  className="my-form"             // style with your own classes
+/>
+```
+
+**Env:** uses the same two browser vars as the tracker —
+`NEXT_PUBLIC_TENANT_ID` and `NEXT_PUBLIC_SCAFFOLD_API_URL`. If either is unset,
+submit fails soft with a friendly retry message (the site never crashes).
+
+**Props:** `source`, `showPhone`, `showMessage`, `requireEmail`, `submitLabel`,
+`successMessage`, `errorMessage`, per-field `labels`, and class hooks
+(`className`, `fieldClassName`, `labelClassName`, `buttonClassName`).
+
+Behavior:
+
+- **Fail-soft.** A network error or non-2xx response shows an inline message and
+  lets the visitor retry — it never throws or blanks the page.
+- **Success state.** On a 2xx the form is replaced with the thank-you message.
+- **Honeypot.** A hidden `company` field gives basic, dependency-free spam
+  resistance: if a bot fills it, we fake success and POST nothing. No captcha.
+- **Phone field note.** The v1 leads contract validates `name` / `email` /
+  `message` / `source` and has no top-level `phone`. An entered phone is folded
+  into the message as a `Phone: ...` line so it still lands in "Who reached out"
+  without changing the shared contract. Turn it off with `showPhone={false}`.
+
+### LocalBusiness structured data (JSON-LD)
+
+`ScaffoldLocalBusinessSchema` renders a single
+`<script type="application/ld+json">` LocalBusiness schema. Local-business sites
+that emit it get richer Google results (name, phone, hours, map pin) — and
+Strelva's own audit engine grades a site DOWN for missing it, so every
+local-business build should include it.
+
+It is **server-rendered** (no `"use client"`), so there is no hydration
+mismatch and no client JS is shipped. Drop it into a server component — the root
+layout or a page:
+
+```bash
+cp ScaffoldLocalBusinessSchema.tsx my-client-site/components/ScaffoldLocalBusinessSchema.tsx
+```
+
+```tsx
+import { ScaffoldLocalBusinessSchema } from "@/components/ScaffoldLocalBusinessSchema";
+
+<ScaffoldLocalBusinessSchema
+  name="Green Leaf Dental"
+  type="Dentist"                 // optional; defaults to "LocalBusiness"
+  url="https://greenleafdental.com"
+  phone="+1-716-555-0100"
+  priceRange="$$"
+  address={{ streetAddress: "12 Main St", addressLocality: "Buffalo",
+             addressRegion: "NY", postalCode: "14201", addressCountry: "US" }}
+  geo={{ latitude: 42.8864, longitude: -78.8784 }}
+  hours={["Mo-Fr 09:00-17:00", "Sa 10:00-14:00"]}
+  sameAs={["https://facebook.com/greenleaf", "https://instagram.com/greenleaf"]}
+/>
+```
+
+**Props:** `name` (required), `type`, `url`, `phone`, `email`, `description`,
+`image` (one URL or an array), `priceRange`, `address`, `geo`, `hours` (an array
+of schema.org `openingHours` strings), `sameAs`.
+
+**Honesty rule:** any prop you don't pass is omitted from the output — it never
+emits an empty string, a placeholder, or a fabricated value. No CSP change is
+needed (it is a static JSON-LD block, not an executable script).
 
 ## Required Contract
 

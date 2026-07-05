@@ -113,10 +113,35 @@ describe("v1 track beacon — POST /api/v1/track/:tenant", () => {
     expect(mockTrackClick).not.toHaveBeenCalled();
   });
 
-  it("rejects an event outside the allowed vocabulary with 400", async () => {
+  it("stores a phone-click as phone-click for the tenant", async () => {
     const { POST } = await import("@/app/api/v1/track/[tenant]/route");
 
     const response = await POST(post("gldf", { event: "phone-click" }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(mockTrackClick).toHaveBeenCalledTimes(1);
+    expect(mockTrackClick).toHaveBeenCalledWith("phone-click", "gldf");
+  });
+
+  it("rejects a serviceId attached to a phone-click with 400", async () => {
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(
+      post("gldf", { event: "phone-click", serviceId: "intro-call" }),
+      { params: Promise.resolve({ tenant: "gldf" }) }
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockTrackClick).not.toHaveBeenCalled();
+  });
+
+  it("rejects an event outside the allowed vocabulary with 400", async () => {
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", { event: "share-click" }), {
       params: Promise.resolve({ tenant: "gldf" }),
     });
 
