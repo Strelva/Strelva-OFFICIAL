@@ -43,3 +43,23 @@ export function operatorEmailsEnabled(): boolean {
 export function operatorEmailsPaused(): boolean {
   return !operatorEmailsEnabled();
 }
+
+/**
+ * END-CUSTOMER transactional email — e.g. a booking confirmation sent to the studio's
+ * CUSTOMER, not to the studio owner. This is a THIRD category, distinct from both the
+ * client `emailSendingPaused()` gate (owner/prospect mail) and `operatorEmailsEnabled()`
+ * (Noah/Jacob alerts): no existing sender ever emailed a tenant's end customer. It DEFAULTS
+ * OFF (set `CUSTOMER_EMAIL_ENABLED="true"` to enable) so turning it on is a deliberate call,
+ * per AGENTS.md ("the kill-switch guards all send sites"). Until then, any surface that
+ * promised the email (e.g. the booking widget) must tell the truth about not having sent it.
+ */
+export function customerEmailEnabled(): boolean {
+  return process.env.CUSTOMER_EMAIL_ENABLED === "true";
+}
+
+/**
+ * True when end-customer transactional email is paused. Convenience inverse.
+ */
+export function customerEmailPaused(): boolean {
+  return !customerEmailEnabled();
+}

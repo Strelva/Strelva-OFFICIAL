@@ -13,7 +13,7 @@ import { logger } from "@/lib/logger";
 import { alert } from "@/lib/monitoring";
 import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositories";
 import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
-import { sendNewSignupEmail, sendPaymentFailedEmail } from "@/lib/delivery-email";
+import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -508,9 +508,10 @@ export async function POST(req: Request) {
         // and keep free access. invoice.paid clears it, so a recovered-then-failed
         // sub correctly starts a fresh streak.
         const existing = invoiceTenantId ? await getTenantConfig(invoiceTenantId).catch(() => null) : null;
+        const pastDueSince = existing?.subscriptionPastDueSince || new Date().toISOString();
         await applyTenantSubscriptionStatus(invoiceTenantId, {
           subscriptionStatus: "past_due",
-          subscriptionPastDueSince: existing?.subscriptionPastDueSince || new Date().toISOString(),
+          subscriptionPastDueSince: pastDueSince,
         }, event);
         // alert() now routes to Slack AND Sentry — a failed customer payment
         // must not be invisible if Sentry is unconfigured (it usually is).
@@ -532,6 +533,32 @@ export async function POST(req: Request) {
             });
           } catch (err) {
             console.error(`[billing webhook] payment-failed operator email failed for ${invoiceTenantId}:`, err);
+          }
+        }
+        // Client dunning — tell the OWNER their payment failed (the in-app past-due banner
+        // already shows on the dashboard; this is the email nudge). Deduped per past-due
+        // streak on the PRESERVED first-failure timestamp, so Stripe's multiple failed-retry
+        // webhooks send exactly one email; the marker is released on a suppressed/failed send
+        // so it still reaches the owner the day client email is switched on. Fail-soft.
+        if (invoiceTenantId && existing?.ownerEmail) {
+          try {
+            const redis = getRedis();
+            const dedupeKey = `reb:past-due-email-sent:${invoiceTenantId}:${pastDueSince}`;
+            const fresh = redis
+              ? await redis.set(dedupeKey, "1", { nx: true, ex: 60 * 60 * 24 * 30 }).catch(() => null)
+              : "ok";
+            if (fresh) {
+              const ok = await sendPaymentPastDueEmail({
+                email: existing.ownerEmail,
+                businessName: existing.siteName || invoiceTenantId,
+                dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
+                tenantId: invoiceTenantId,
+                logPrefix: "[billing webhook]",
+              });
+              if (!ok && redis) await redis.del(dedupeKey).catch(() => {});
+            }
+          } catch (err) {
+            console.error(`[billing webhook] payment-past-due client email failed for ${invoiceTenantId}:`, err);
           }
         }
         break;

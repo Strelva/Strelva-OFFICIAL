@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import { requireActiveSubscription } from "@/lib/subscription";
+import { sendBookingConfirmation } from "@/lib/delivery-email";
 
 function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -95,7 +97,27 @@ export async function POST(request: Request) {
       tenant
     );
 
-    return NextResponse.json({ success: true, booking: result.booking });
+    // Confirm to the customer. Fail-soft: the booking already committed, so an email
+    // failure must never surface as an error. Gated by CUSTOMER_EMAIL_ENABLED (default
+    // off) — when it doesn't send, `confirmationSent` is false and the widget shows honest
+    // copy instead of claiming an email went out.
+    let confirmationSent = false;
+    try {
+      const config = await getTenantConfig(tenant);
+      confirmationSent = await sendBookingConfirmation({
+        to: clientEmail,
+        clientName,
+        serviceName: service.name,
+        date,
+        time: startTime,
+        businessName: config?.siteName ?? "",
+        tenantId: tenant,
+      });
+    } catch (err) {
+      console.error("[booking] confirmation email failed (non-fatal):", err);
+    }
+
+    return NextResponse.json({ success: true, booking: result.booking, confirmationSent });
   } catch {
     return NextResponse.json({ error: "Failed to create booking" }, { status: 500 });
   }

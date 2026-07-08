@@ -2,7 +2,7 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
-import { emailSendingPaused, operatorEmailsEnabled } from "@/lib/email-enabled";
+import { emailSendingPaused, operatorEmailsEnabled, customerEmailPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/lib/email/layout";
 
 function cleanSubjectText(value: string): string {
@@ -131,6 +131,144 @@ export async function sendUpdateLiveEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Update-live email failed:`, err);
+    return false;
+  }
+}
+
+function buildBookingConfirmationOptions(params: {
+  clientName: string;
+  serviceName: string;
+  date: string;
+  time: string;
+  businessName: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  const withBusiness = business ? ` with ${business}` : "";
+  const rows: EmailRow[] = [
+    { label: "Service", value: cleanSubjectText(params.serviceName) },
+    { label: "Date", value: cleanSubjectText(params.date) },
+    { label: "Time", value: cleanSubjectText(params.time) },
+  ];
+  return {
+    preheader: `Your ${cleanSubjectText(params.serviceName)} booking${withBusiness} is confirmed.`,
+    heading: "You're booked",
+    paragraphs: [
+      `Hi ${cleanSubjectText(params.clientName) || "there"}, your booking${withBusiness} is confirmed. Here are the details:`,
+      "Need to change or cancel? Just reply to this email.",
+    ],
+    rows,
+    footerNote: business ? `For ${business}` : undefined,
+  };
+}
+
+/**
+ * Booking confirmation — sent to the studio's END CUSTOMER (the person who booked), not the
+ * owner. This is the ONLY end-customer transactional send in the codebase, so it sits behind
+ * its OWN gate, `customerEmailPaused()` (default off), distinct from the owner/prospect pause.
+ * Fails soft: returns false on pause / missing key / Resend error so it can never block a
+ * booking that already committed.
+ */
+export async function sendBookingConfirmation(params: {
+  to: string;
+  clientName: string;
+  serviceName: string;
+  date: string;
+  time: string;
+  businessName: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (customerEmailPaused()) {
+    console.warn(`[email] customer email paused (CUSTOMER_EMAIL_ENABLED != true) — skipped ${params.to}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const business = cleanSubjectText(params.businessName);
+    // Send "from" the studio's name when we have it, but always over the verified domain.
+    const fromName = business || "Strelva";
+    const opts = buildBookingConfirmationOptions(params);
+
+    const result = await resend.emails.send({
+      from: `${fromName} <hello@${fromDomain}>`,
+      to: params.to,
+      subject: business ? `Your booking with ${business} is confirmed` : "Your booking is confirmed",
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    await logSentEmailToCrm(params.tenantId, "Sent: booking confirmation");
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Booking confirmation failed:`, err);
+    return false;
+  }
+}
+
+function buildPaymentPastDueOptions(params: {
+  businessName: string;
+  dashboardUrl: string;
+}): EmailOptions {
+  const business = cleanSubjectText(params.businessName);
+  return {
+    preheader: `We couldn't process your payment for ${business}.`,
+    heading: "Your payment didn't go through",
+    paragraphs: [
+      `We tried to charge your card for ${business} and it didn't go through. Your site is still live for now, but if the payment isn't updated in the next few days your dashboard access will pause.`,
+      "Updating your card takes a minute — open your dashboard and click Manage billing.",
+    ],
+    button: { label: "Update your card", url: params.dashboardUrl },
+    footerNote: `For ${business}`,
+  };
+}
+
+/**
+ * Client dunning — tells the site OWNER their subscription payment failed and how to fix it.
+ * Complements the in-app past-due banner (which already links to the Stripe portal). Client
+ * email (behind the `emailSendingPaused()` gate), fail-soft: returns false on pause / missing
+ * key / Resend error so it can never affect the billing webhook's response.
+ */
+export async function sendPaymentPastDueEmail(params: {
+  email: string;
+  businessName: string;
+  dashboardUrl: string;
+  /** When set, a real send is logged to this tenant's CRM comms timeline. */
+  tenantId?: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  if (emailSendingPaused()) {
+    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
+    return false;
+  }
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
+    const opts = buildPaymentPastDueOptions(params);
+
+    const result = await resend.emails.send({
+      from: `Strelva <hello@${fromDomain}>`,
+      to: params.email,
+      subject: `Action needed: your payment for ${cleanSubjectText(params.businessName)} didn't go through`,
+      html: renderEmailHtml(opts),
+      text: renderEmailText(opts),
+    });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message || "Resend did not return an email id.");
+    }
+    await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email");
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Payment-past-due email failed:`, err);
     return false;
   }
 }
