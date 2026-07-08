@@ -22,6 +22,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [booking, setBooking] = useState<{ id: string; date: string; startTime: string; serviceName: string } | null>(null);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   const bookableServices = services.filter((s) => !s.comingSoon);
   const priceDisplay = minPrice ? `$${minPrice}` : "$60";
@@ -79,6 +80,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
       }
 
       setBooking(data.booking);
+      setConfirmationSent(Boolean(data.confirmationSent));
       setStep("confirmed");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -107,6 +109,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
     setSlots([]);
     setForm({ name: "", email: "", phone: "", notes: "" });
     setBooking(null);
+    setConfirmationSent(false);
     setError("");
   }
 
@@ -357,7 +360,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                   {formatDate(booking.date)} at {formatTime(booking.startTime)}
                 </p>
                 <p className="text-xs mb-6" style={{ color: "var(--bark-faded)" }}>
-                  A confirmation has been sent to {form.email}
+                  {confirmationSent
+                    ? `A confirmation has been sent to ${form.email}`
+                    : "We've saved your booking."}
                 </p>
                 <button
                   onClick={reset}

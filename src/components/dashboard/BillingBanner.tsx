@@ -120,7 +120,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
         <p>
           {isCancelled
             ? "Your subscription has ended. Restart it to keep managing your site."
-            : "Your payment is past due. Please update your billing info."}
+            : "Your payment didn't go through. Update your card to keep your site running."}
           {" "}
           <button
             type="button"
@@ -135,13 +135,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
         </p>
         {error && <p className="mt-1 text-xs opacity-80">{error}</p>}
       </div>
-      <button
-        onClick={() => setDismissed(true)}
-        className="ml-4 shrink-0 text-lg leading-none opacity-60 hover:opacity-100"
-        aria-label="Dismiss"
-      >
-        x
-      </button>
+      {/* No dismiss button: a billing problem (past due / cancelled) must not be hideable. */}
     </div>
   );
 }
