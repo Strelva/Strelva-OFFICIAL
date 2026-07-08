@@ -1,8 +1,8 @@
-import { requireDashboardView } from "@/lib/dashboard-auth";
+import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { ComingSoonSurface } from "@/components/dashboard/ComingSoonSurface";
 
 export default async function SchedulePage() {
-  await requireDashboardView();
+  await requireDashboardFeature("schedule");
   return (
     <ComingSoonSurface
       title="Schedule"

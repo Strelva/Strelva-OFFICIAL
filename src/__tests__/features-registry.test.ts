@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ALL_TENANT_FEATURES } from "../lib/types";
 import {
   CORE_FEATURES,
   isCore,
@@ -30,6 +31,13 @@ describe("feature registry — isKnownFeature / cleanFeatureIds", () => {
   it("filters an arbitrary array to recognized ids", () => {
     expect(cleanFeatureIds(["schedule", "bogus", 42, "reviews"])).toEqual(["schedule", "reviews"]);
     expect(cleanFeatureIds("not-an-array")).toEqual([]);
+  });
+
+  it("never strips a valid TenantFeature — every union value round-trips (no drift possible)", () => {
+    for (const f of ALL_TENANT_FEATURES) {
+      expect(isKnownFeature(f)).toBe(true);
+    }
+    expect(cleanFeatureIds([...ALL_TENANT_FEATURES])).toEqual([...ALL_TENANT_FEATURES]);
   });
 });
 

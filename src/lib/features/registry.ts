@@ -17,7 +17,8 @@
  * (see AGENTS.md "The Model"); enabling a feature here does not change what a client pays.
  */
 
-import type { IntegrationProvider, TenantFeature } from "../types";
+import { ALL_TENANT_FEATURES } from "../types";
+import type { IntegrationProvider } from "../types";
 // Type-only imports (erased at runtime) so the registry ↔ dashboard-surfaces edge is not a
 // runtime cycle: dashboard-surfaces imports getSetSurfaces() as a value; we import its types.
 import type { DashboardSurface, SurfaceId } from "../dashboard-surfaces";
@@ -77,18 +78,15 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
 const REGISTRY_BY_ID = new Map(FEATURE_REGISTRY.map((f) => [f.id, f]));
 
 /**
- * Every feature id we recognize on write. Includes the registry ids, the set ids
- * (a set id expands to its members), and the legacy `TenantFeature` values so an
- * existing tenant's array is never silently dropped.
+ * Every feature id we recognize on write: the registry ids (core/conditional/set),
+ * the set ids (a set id expands to its members), and every `TenantFeature` value
+ * (derived from ALL_TENANT_FEATURES, so it can't drift from the union) — so an
+ * existing tenant's array is never silently dropped on save.
  */
-const LEGACY_FEATURES: TenantFeature[] = [
-  "commerce", "booking", "newsletter", "blog", "video", "events",
-  "shop", "products", "rewards", "providers", "instagram", "reviews",
-];
 const VALID_FEATURE_IDS = new Set<string>([
   ...FEATURE_REGISTRY.map((f) => f.id),
   ...Object.keys(SETS),
-  ...LEGACY_FEATURES,
+  ...ALL_TENANT_FEATURES,
 ]);
 
 export function isCore(id: string): boolean {
