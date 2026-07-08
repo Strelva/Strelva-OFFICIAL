@@ -33,7 +33,7 @@ import {
 } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
-import { resolveGbpWriteAllowed, resolveEditableSections } from "@/lib/agent-shared";
+import { resolveGbpWriteAllowed, resolveEditableSections, buildGbpTools, buildUndoTool } from "@/lib/agent-shared";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { applySectionUpdate } from "@/lib/apply-section-update";
@@ -396,6 +396,36 @@ Only use tools for manifest-supported sections and actions. If the user requests
 
   // sectionEnum is built above via resolveEditableSections (shared with the executor).
 
+  // GBP write tools — shared definitions with the background executor (B6) so the
+  // two agent paths can't drift. This path's side effect on queuing is a streamed
+  // result card via recordActionResult.
+  const gbpTools = buildGbpTools({
+    tenantId: tenant,
+    onQueued: (_toolName, eventId, message) =>
+      recordActionResult({ status: "queued", eventIds: [eventId], message }),
+    onError: (_toolName, error) => recordActionResult({ status: "failed", error }),
+  });
+
+  // undo_last_change — shared definition with the executor (B6). Streamed side
+  // effects per outcome via recordActionResult.
+  const undoTool = buildUndoTool({
+    tenantId: tenant,
+    tenantConfig,
+    siteManifest,
+    sectionEnum,
+    onNoOp: (section, message) => recordActionResult({ status: "no-op", sectionIds: [section], message }),
+    onFailed: (section, error) => recordActionResult({ status: "failed", sectionIds: [section], error }),
+    onBlocked: (section, message) => recordActionResult({ status: "blocked", sectionIds: [section], message }),
+    onQueued: (section, eventId, message, sourceProof) =>
+      recordActionResult({
+        status: "queued",
+        sectionIds: [section],
+        eventIds: eventId ? [eventId] : undefined,
+        message,
+        sourceProof,
+      }),
+  });
+
   // All tools are always available — single plan includes everything.
   // The `capability` key is legacy bookkeeping kept to minimize diff; see
   // the flatten step below where it is stripped before passing to streamText.
@@ -511,120 +541,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
         },
       }),
     },
-    undo_last_change: {
-      capability: "undo_last_change",
-      def: tool({
-        description:
-          "Undo the most recent change to a website section, or restore a specific earlier version by id. Use when the owner says things like \"undo that\", \"revert\", or \"put it back the way it was\". A revert is a real change: it drafts the restore and routes it through the SAME approval queue as any edit — it never publishes to the live site on its own. Read/identify the section first.",
-        inputSchema: z.object({
-          section: sectionEnum,
-          versionId: z
-            .string()
-            .optional()
-            .describe(
-              "Optional: restore this specific earlier version id (from the section's history) instead of undoing only the last change."
-            ),
-        }),
-        execute: async ({ section, versionId }) => {
-          try {
-            const { getVersions } = await import("@/lib/storage");
-            // Newest-first: versions[0] is the current live content (the most
-            // recent change); versions[1] is what it looked like before it.
-            const versions = await getVersions(section as ContentSection, tenant);
-
-            let target: (typeof versions)[number] | undefined;
-            if (versionId) {
-              target = versions.find((v) => v.id === versionId);
-              if (!target) {
-                const message = `I couldn't find that saved version of your ${section} to restore.`;
-                recordActionResult({ status: "no-op", sectionIds: [section], message });
-                return {
-                  success: false,
-                  section,
-                  nothingToUndo: true,
-                  message,
-                  agentResultStatus: "no-op" as const,
-                };
-              }
-            } else {
-              if (versions.length < 2) {
-                const message = `There's no earlier version of your ${section} to go back to yet.`;
-                recordActionResult({ status: "no-op", sectionIds: [section], message });
-                return {
-                  success: false,
-                  section,
-                  nothingToUndo: true,
-                  message,
-                  agentResultStatus: "no-op" as const,
-                };
-              }
-              target = versions[1];
-            }
-
-            // Draft the revert through the SAME governed content path as
-            // update_section, forcing the review queue so an undo is always
-            // owner-approved before it goes live (never auto-published).
-            const result = await applySectionUpdate({
-              tenantId: tenant,
-              section: section as ContentSection,
-              data: target.data as Record<string, unknown>,
-              tenantConfig: tenantConfig ?? null,
-              siteManifest,
-              forceReview: true,
-            });
-
-            if (result.status === "failed") {
-              recordActionResult({ status: "failed", sectionIds: [section], error: result.error });
-              return { success: false, error: result.error, section, agentResultStatus: "failed" as const };
-            }
-            if (result.status === "blocked") {
-              recordActionResult({ status: "blocked", sectionIds: [section], message: result.message });
-              return {
-                success: false,
-                blocked: true,
-                section,
-                message: result.message,
-                reason: result.reason,
-                agentResultStatus: "blocked" as const,
-                risk: result.risk,
-                diffs: result.diffs,
-              };
-            }
-
-            // forceReview guarantees the queued branch; the published arm is
-            // defensive so the shape stays coherent if governance ever changes.
-            const eventId = result.status === "queued" ? result.eventId : undefined;
-            const message = `I've drafted a revert of your ${section} back to the earlier version. It'll go live once you approve it — nothing changes on your site until then.`;
-            const sourceProof = `Source: ${section} version history (restoring ${target.id})`;
-            recordActionResult({
-              status: "queued",
-              sectionIds: [section],
-              eventIds: eventId ? [eventId] : undefined,
-              message,
-              sourceProof,
-            });
-            return {
-              success: true,
-              section,
-              restoredFromVersionId: target.id,
-              eventId,
-              eventIds: eventId ? [eventId] : undefined,
-              governance: result.governance,
-              risk: result.risk,
-              diffs: result.diffs,
-              applied: false,
-              agentResultStatus: "queued" as const,
-              message,
-              sourceProof,
-            };
-          } catch (err) {
-            const error = `Failed to undo ${section}: ${err instanceof Error ? err.message : "Unknown error"}`;
-            recordActionResult({ status: "failed", sectionIds: [section], error });
-            return { success: false, error, section, agentResultStatus: "failed" as const };
-          }
-        },
-      }),
-    },
+    // undo_last_change shares its definition with the executor (buildUndoTool).
+    undo_last_change: { capability: "undo_last_change", def: undoTool },
     request_custom_change: {
       capability: "request_custom_change",
       def: tool({
@@ -1000,133 +918,10 @@ Only use tools for manifest-supported sections and actions. If the user requests
         },
       }),
     },
-    create_gbp_post: {
-      capability: "create_gbp_post",
-      def: tool({
-        description:
-          "Draft a Google Business post (a 'What's new' update on the Google listing) for an offer, update, or announcement. Creates a draft the owner must APPROVE before it publishes to Google — never posts directly.",
-        inputSchema: z.object({
-          summary: z.string().describe("The post text"),
-          ctaUrl: z.string().optional().describe("Optional call-to-action link"),
-        }),
-        execute: async ({ summary, ctaUrl }) => {
-          try {
-            const { addEvent } = await import("@/lib/events");
-            const event = await addEvent({
-              tenantId: tenant,
-              source: "ai",
-              type: "content_update",
-              title: "Google post draft",
-              body: summary.slice(0, 500),
-              status: "pending",
-              metadata: { kind: "gbp_post_draft", summary, ctaUrl },
-            });
-            recordActionResult({
-              status: "queued",
-              eventIds: [event.id],
-              message: "Google post drafted — approve it to publish to your listing.",
-            });
-            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
-          } catch (err) {
-            const error = err instanceof Error ? err.message : "Failed to draft";
-            recordActionResult({ status: "failed", error });
-            return { success: false, error, agentResultStatus: "failed" as const };
-          }
-        },
-      }),
-    },
-    update_business_hours: {
-      capability: "update_business_hours",
-      def: tool({
-        description:
-          "Draft an update to the business hours on the Google listing. Creates a draft the owner must APPROVE before it publishes to Google — never updates directly. Give each open day's open/close in 24-hour HH:MM.",
-        inputSchema: z.object({
-          hours: z
-            .array(
-              z.object({
-                day: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
-                open: z.string().describe("Opening time, 24h HH:MM, e.g. 09:00"),
-                close: z.string().describe("Closing time, 24h HH:MM, e.g. 17:00"),
-              }),
-            )
-            .describe("One entry per open day"),
-        }),
-        execute: async ({ hours }) => {
-          try {
-            const { addEvent } = await import("@/lib/events");
-            const event = await addEvent({
-              tenantId: tenant,
-              source: "ai",
-              type: "content_update",
-              title: "Google hours update",
-              body: hours.map((h) => `${h.day}: ${h.open}-${h.close}`).join("\n").slice(0, 500),
-              status: "pending",
-              metadata: { kind: "gbp_hours_draft", hours },
-            });
-            recordActionResult({
-              status: "queued",
-              eventIds: [event.id],
-              message: "Hours update drafted — approve it to publish to Google.",
-            });
-            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
-          } catch (err) {
-            const error = err instanceof Error ? err.message : "Failed to draft";
-            recordActionResult({ status: "failed", error });
-            return { success: false, error, agentResultStatus: "failed" as const };
-          }
-        },
-      }),
-    },
-    upload_gbp_photo: {
-      capability: "upload_gbp_photo",
-      def: tool({
-        description:
-          "Draft a photo to add to the Google Business listing (exterior, interior, product, cover, etc.). Creates a draft the owner must APPROVE before it publishes to Google — never uploads directly. Provide a hosted image URL (use upload_image first if the owner shared a file).",
-        inputSchema: z.object({
-          photoUrl: z.string().describe("Public URL of the image to add to the Google listing"),
-          category: z
-            .enum([
-              "COVER",
-              "PROFILE",
-              "LOGO",
-              "EXTERIOR",
-              "INTERIOR",
-              "PRODUCT",
-              "AT_WORK",
-              "FOOD_AND_DRINK",
-              "MENU",
-              "ADDITIONAL",
-            ])
-            .optional()
-            .describe("Which section of the Google profile the photo belongs in (default ADDITIONAL)"),
-        }),
-        execute: async ({ photoUrl, category }) => {
-          try {
-            const chosenCategory = category ?? "ADDITIONAL";
-            const { addEvent } = await import("@/lib/events");
-            const event = await addEvent({
-              tenantId: tenant,
-              source: "ai",
-              type: "content_update",
-              title: "Google photo upload",
-              body: `Add photo to Google listing (${chosenCategory}): ${photoUrl}`.slice(0, 500),
-              status: "pending",
-              metadata: { kind: "gbp_photo_draft", photoUrl, category: chosenCategory },
-            });
-            recordActionResult({
-              status: "queued",
-              eventIds: [event.id],
-              message: "Photo drafted — approve it to add it to your Google listing.",
-            });
-            return { success: true, eventId: event.id, agentResultStatus: "queued" as const };
-          } catch (err) {
-            const error = err instanceof Error ? err.message : "Failed to draft";
-            recordActionResult({ status: "failed", error });
-            return { success: false, error, agentResultStatus: "failed" as const };
-          }
-        },
-      }),
-    },
+    // GBP write tools share their definitions with the executor (buildGbpTools).
+    create_gbp_post: { capability: "create_gbp_post", def: gbpTools.create_gbp_post },
+    update_business_hours: { capability: "update_business_hours", def: gbpTools.update_business_hours },
+    upload_gbp_photo: { capability: "upload_gbp_photo", def: gbpTools.upload_gbp_photo },
     list_subscribers: {
       capability: "list_subscribers",
       def: tool({

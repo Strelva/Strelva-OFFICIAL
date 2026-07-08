@@ -125,13 +125,19 @@ vi.mock("@/lib/site-capabilities", () => ({
   getSiteCapabilityManifest: () => Promise.resolve({ sections: {} }),
 }));
 
-vi.mock("@/lib/agent-shared", () => ({
-  resolveGbpWriteAllowed: () => Promise.resolve(true),
-  resolveEditableSections: (template: { contentSections: string[] }) => ({
-    agentEditableSections: template.contentSections,
-    sectionEnum: z.enum(template.contentSections as [string, ...string[]]),
-  }),
-}));
+// Stub only the gates; keep the REAL buildGbpTools so this test exercises the
+// shared GBP tool factory (the whole point of the B6 merge).
+vi.mock("@/lib/agent-shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/agent-shared")>();
+  return {
+    ...actual,
+    resolveGbpWriteAllowed: () => Promise.resolve(true),
+    resolveEditableSections: (template: { contentSections: string[] }) => ({
+      agentEditableSections: template.contentSections,
+      sectionEnum: z.enum(template.contentSections as [string, ...string[]]),
+    }),
+  };
+});
 
 describe("agent-executor update_business_hours", () => {
   beforeEach(() => {

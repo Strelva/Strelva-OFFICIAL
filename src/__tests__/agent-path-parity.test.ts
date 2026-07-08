@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import type { SiteCapabilityManifest } from "@/lib/types";
-import { resolveEditableSections, resolveGbpWriteAllowed } from "@/lib/agent-shared";
+import { resolveEditableSections, resolveGbpWriteAllowed, buildGbpTools } from "@/lib/agent-shared";
+
+// tool() passthrough so we can call .execute directly; events.addEvent mocked so
+// the shared GBP factory queues against a fake rather than Redis.
+const mockAddEvent = vi.hoisted(() => vi.fn());
+vi.mock("ai", () => ({ tool: (def: unknown) => def }));
+vi.mock("@/lib/events", () => ({ addEvent: (...a: unknown[]) => mockAddEvent(...a) }));
 
 /**
  * Parity between the two AI-agent execution paths (streaming route + background
@@ -38,6 +44,39 @@ describe("resolveEditableSections", () => {
     expect(agentEditableSections).toEqual([]);
     // The enum must never be empty — it falls back to the full list.
     expect(sectionEnum.options).toEqual(template.contentSections);
+  });
+
+  // ── B4: a custom repo can declare sections beyond the template ──────────────
+  it("makes a remote-declared section (not in the template) editable", () => {
+    const withExtra = manifest({
+      hero: { allowedActions: ["read", "draft"] },
+      // 'menu' is rendered by the live custom repo but isn't a template section.
+      menu: { allowedActions: ["read", "draft"] },
+    });
+    const { agentEditableSections } = resolveEditableSections(template, withExtra);
+    expect(agentEditableSections).toContain("menu");
+    // Template sections still present.
+    expect(agentEditableSections).toEqual(["hero", "story", "contact", "menu"]);
+  });
+
+  it("excludes component render-keys, not just template sections", () => {
+    const templateWithComponents = {
+      contentSections: ["hero", "story", "contact"],
+      components: { Header: () => null, Footer: () => null, hero: () => null },
+    };
+    // Manifest declares Header/Footer (component keys) — must NOT become editable.
+    const withComponentKeys = manifest({
+      hero: { allowedActions: ["read", "draft"] },
+      Header: { allowedActions: ["read", "draft"] },
+      Footer: { allowedActions: ["read", "draft"] },
+    });
+    const { agentEditableSections } = resolveEditableSections(
+      templateWithComponents,
+      withComponentKeys,
+    );
+    expect(agentEditableSections).not.toContain("Header");
+    expect(agentEditableSections).not.toContain("Footer");
+    expect(agentEditableSections).toEqual(["hero", "story", "contact"]);
   });
 });
 
@@ -97,5 +136,80 @@ describe("agent path parity (wiring)", () => {
     expect(executor).toContain("resolveEditableSections");
     expect(route).toContain("resolveEditableSections(template, siteManifest)");
     expect(route).toContain("resolveGbpWriteAllowed(tenant");
+  });
+
+  it("both paths build GBP tools from the shared factory (no hand-rolled defs)", () => {
+    expect(executor).toContain("buildGbpTools(");
+    expect(route).toContain("buildGbpTools(");
+    // The executor previously LACKED upload_gbp_photo — it must have it now.
+    expect(executor).toContain("tools.upload_gbp_photo = gbpTools.upload_gbp_photo");
+  });
+
+  it("both paths build undo_last_change from the shared factory (executor gained it)", () => {
+    expect(executor).toContain("buildUndoTool(");
+    expect(route).toContain("buildUndoTool(");
+    expect(executor).toContain("tools.undo_last_change = buildUndoTool");
+  });
+});
+
+// ── buildGbpTools: the shared factory itself (B6) ───────────────────────────
+describe("buildGbpTools", () => {
+  beforeEach(() => {
+    mockAddEvent.mockReset();
+    mockAddEvent.mockResolvedValue({ id: "evt1" });
+  });
+
+  it("exposes all three GBP tools, including upload_gbp_photo", () => {
+    const tools = buildGbpTools({ tenantId: "t", onQueued: () => {} });
+    expect(Object.keys(tools).sort()).toEqual([
+      "create_gbp_post",
+      "update_business_hours",
+      "upload_gbp_photo",
+    ]);
+  });
+
+  it("queues a pending gbp_post_draft and fires onQueued (never writes to Google)", async () => {
+    const queued: string[] = [];
+    const tools = buildGbpTools({
+      tenantId: "t",
+      onQueued: (name, id) => { queued.push(`${name}:${id}`); },
+    });
+    // tool() is passthrough in this file, so .execute is directly callable.
+    const def = tools.create_gbp_post as unknown as { execute: (a: unknown) => Promise<unknown> };
+    const out = await def.execute({ summary: "Fall sale", ctaUrl: "https://x.com", photoUrl: undefined });
+
+    expect(mockAddEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "pending",
+        metadata: expect.objectContaining({ kind: "gbp_post_draft", summary: "Fall sale" }),
+      }),
+    );
+    expect(out).toMatchObject({ success: true, eventId: "evt1", agentResultStatus: "queued" });
+    expect(queued).toEqual(["create_gbp_post:evt1"]);
+  });
+
+  it("defaults the photo category to ADDITIONAL", async () => {
+    const tools = buildGbpTools({ tenantId: "t", onQueued: () => {} });
+    const def = tools.upload_gbp_photo as unknown as { execute: (a: unknown) => Promise<unknown> };
+    await def.execute({ photoUrl: "https://x.com/p.jpg" });
+    expect(mockAddEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ kind: "gbp_photo_draft", category: "ADDITIONAL" }),
+      }),
+    );
+  });
+
+  it("returns a failed result and fires onError when queuing throws", async () => {
+    mockAddEvent.mockRejectedValueOnce(new Error("boom"));
+    const errors: string[] = [];
+    const tools = buildGbpTools({
+      tenantId: "t",
+      onQueued: () => {},
+      onError: (_n, e) => { errors.push(e); },
+    });
+    const def = tools.update_business_hours as unknown as { execute: (a: unknown) => Promise<unknown> };
+    const out = await def.execute({ hours: [{ day: "MONDAY", open: "09:00", close: "17:00" }] });
+    expect(out).toMatchObject({ success: false, agentResultStatus: "failed" });
+    expect(errors).toEqual(["boom"]);
   });
 });
