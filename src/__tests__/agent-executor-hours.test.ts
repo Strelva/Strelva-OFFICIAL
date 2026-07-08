@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 /**
  * Governance parity for update_business_hours: the programmatic executor
@@ -115,6 +116,21 @@ vi.mock("@/lib/sentry-context", () => ({
 
 vi.mock("@/lib/verify-live", () => ({
   scheduleVerification: vi.fn(),
+}));
+
+// The executor now honors the same manifest + GBP gates as the streaming route.
+// This test is about the hours-draft event shape, so allow the gate and pass the
+// section list through.
+vi.mock("@/lib/site-capabilities", () => ({
+  getSiteCapabilityManifest: () => Promise.resolve({ sections: {} }),
+}));
+
+vi.mock("@/lib/agent-shared", () => ({
+  resolveGbpWriteAllowed: () => Promise.resolve(true),
+  resolveEditableSections: (template: { contentSections: string[] }) => ({
+    agentEditableSections: template.contentSections,
+    sectionEnum: z.enum(template.contentSections as [string, ...string[]]),
+  }),
 }));
 
 describe("agent-executor update_business_hours", () => {
