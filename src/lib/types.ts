@@ -434,7 +434,9 @@ export interface BlogPost {
 
 export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "professional" | (string & {});
 
-export type TenantFeature = "commerce" | "booking" | "newsletter" | "blog" | "video" | "events" | "shop" | "products" | "rewards" | "providers" | "instagram" | "reviews";
+export type TenantFeature = "commerce" | "booking" | "newsletter" | "blog" | "video" | "events" | "shop" | "products" | "rewards" | "providers" | "instagram" | "reviews"
+  // Wellness vertical-set members (see src/lib/features/registry.ts). Each carries its own dashboard surface.
+  | "schedule" | "members" | "packages" | "roster";
 
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 

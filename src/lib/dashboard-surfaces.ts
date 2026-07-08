@@ -12,6 +12,7 @@
  */
 
 import type { Connection, TenantConfig } from "./types";
+import { getSetSurfaces } from "./features/registry";
 
 /** The slice of tenant config the surface resolver actually reads. */
 export type SurfaceTenantConfig = Pick<TenantConfig, "template" | "reviewsConfig"> & {
@@ -40,7 +41,12 @@ export type SurfaceId =
   | "website"
   | "google-business"
   | "analytics"
-  | "reviews";
+  | "reviews"
+  // Vertical-set member surfaces (appended by the feature registry — see src/lib/features/registry.ts).
+  | "schedule"
+  | "members"
+  | "packages"
+  | "roster";
 
 export interface DashboardSurface {
   id: SurfaceId;
@@ -48,8 +54,8 @@ export interface DashboardSurface {
   /** Route when shown, or where the connect CTA sends them when state is `connect`. */
   href: string;
   state: SurfaceState;
-  /** Which nav group it sits in. `manage` = always-on core; `presence` = the conditional pillars. */
-  group: "manage" | "presence";
+  /** Which nav group it sits in. `manage` = always-on core; `presence` = the conditional pillars; `set` = a vertical-set member. */
+  group: "manage" | "presence" | "set";
 }
 
 /** Templates whose customers find them locally (maps + GBP matter). */
@@ -144,7 +150,7 @@ export function getDashboardSurfaces({
   const gbpConnected = isConnected(connections, "google");
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
 
-  return [
+  const surfaces: DashboardSurface[] = [
     { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask Strelva", href: "/dashboard/chat", state: "shown", group: "manage" },
     // Website is the spine — Site editor + Store/Blog/Photos as sub-tabs inside it.
@@ -172,6 +178,13 @@ export function getDashboardSurfaces({
       group: "presence",
     },
   ];
+
+  // Append the vertical-set member surfaces this tenant has enabled (e.g. Wellness →
+  // Schedule/Members/Packages/Roster). Additive: the six surfaces above are unchanged,
+  // so a tenant with no set features resolves exactly as before. See features/registry.ts.
+  surfaces.push(...getSetSurfaces(tenantConfig.features ?? []));
+
+  return surfaces;
 }
 
 /** Just the surfaces that should render (drops `hidden`). Convenience for the nav. */

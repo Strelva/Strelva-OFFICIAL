@@ -3,13 +3,13 @@ import { z } from "zod";
 import { getActorContext, isSuperAdmin } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
-import { getAllTenants, createTenant, updateTenant, isActiveTenant } from "@/lib/tenants";
+import { getAllTenants, createTenant, updateTenant, isActiveTenant, getTenantConfig } from "@/lib/tenants";
+import { applyFeatureChange, cleanFeatureIds, expandSets, FeatureGuardError } from "@/lib/features/registry";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
 import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import type { DesignTokenScope, TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
 
-const TENANT_FEATURES = new Set<TenantFeature>(["commerce", "booking", "newsletter"]);
 const DELIVERY_MODELS = new Set<TenantDeliveryModel>(["custom_repo", "platform_template"]);
 const DESIGN_TOKENS = new Set<DesignTokenScope>(["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"]);
 
@@ -18,8 +18,9 @@ function cleanString(value: unknown): string {
 }
 
 function cleanFeatures(value: unknown): TenantFeature[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((feature): feature is TenantFeature => TENANT_FEATURES.has(feature as TenantFeature));
+  // Validate against the feature registry (single source of truth) + expand any set id
+  // (e.g. "wellness") into its member features. Replaces the old 3-value allow-list.
+  return expandSets(cleanFeatureIds(value)) as TenantFeature[];
 }
 
 function cleanDesignTokens(value: unknown): DesignTokenScope[] | undefined {
@@ -167,6 +168,8 @@ export async function PATCH(req: Request) {
       active: z.boolean(),
       subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
       planOverride: z.enum(["", "founder_comp"]),
+      // The enabled dashboard features. Validated + core-guarded below (not billing).
+      features: z.array(z.string()).max(64),
     })
     .partial();
   // Non-strict: unknown keys are stripped (not rejected) so this can't break a
@@ -180,7 +183,25 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const updated = await updateTenant(id, parsedUpdates.data as Partial<TenantConfig>);
+  const data = parsedUpdates.data as Partial<TenantConfig> & { features?: string[] };
+
+  // Feature toggle: validate + expand sets + refuse to remove a locked core feature.
+  if (data.features !== undefined) {
+    const currentTenant = await getTenantConfig(id);
+    if (!currentTenant) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+    try {
+      data.features = applyFeatureChange(currentTenant.features ?? [], data.features) as TenantFeature[];
+    } catch (err) {
+      if (err instanceof FeatureGuardError) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
+      throw err;
+    }
+  }
+
+  const updated = await updateTenant(id, data as Partial<TenantConfig>);
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }

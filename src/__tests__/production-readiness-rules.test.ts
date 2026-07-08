@@ -353,7 +353,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("cleanString(rawOwnerEmail)");
     expect(source).toContain("cleanString(rawSubdomain)");
     expect(source).toContain("cleanFeatures(features)");
-    expect(source).toContain("TENANT_FEATURES");
+    // Features are validated against the feature registry (was the inline TENANT_FEATURES set).
+    expect(source).toContain("cleanFeatureIds");
     expect(source).toContain("normalizeTenantDomain(productionDomain)");
     expect(source).toContain("normalizeTenantDomain(adminDomain)");
   });

@@ -137,6 +137,7 @@ export default async function ClientDetailPage({
           active: tenant.active,
           revalidateUrl: tenant.revalidateUrl ?? "",
           hasRevalidationSecret: Boolean(tenant.revalidationSecret),
+          features: tenant.features ?? [],
         }}
       />
 
