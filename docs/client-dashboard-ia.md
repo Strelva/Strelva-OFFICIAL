@@ -34,7 +34,13 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
   `/dashboard/analytics`, `/dashboard/reports`, and `/dashboard/health`. It also carries the
   **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`, a stored-
   history then→now recap of traffic / reviews / rating / health, with a "building" state until
-  there's enough history) and the **AI-visibility scorecard** "You in AI answers"
+  there's enough history — the "then" site-health value compares against a durable, set-once,
+  NO-TTL day-0 anchor (`saveScanBaseline` / `getScanBaseline` in `src/lib/scan-store.ts`, Redis
+  key `reb:scan:baseline:{tenant}`), captured by `scanTenant` and seeded from the earliest
+  retained point. It previously used the earliest point in the 12-point / 30-day scan-history
+  ring buffer, which only ever reached back ~12 days, so an aging client never got a true 90-day
+  health delta; the honest "tracking since {date}" still shows when there's no real earlier
+  baseline) and the **AI-visibility scorecard** "You in AI answers"
   (`AiVisibilityScorecard.tsx` + `src/lib/ai-visibility-scorecard.ts`, built off the weekly
   visibility snapshot — probed answers only, never shames a gap). Both are honesty-railed:
   no fabricated baselines, only genuinely positive moves become headline copy. It also carries
@@ -67,10 +73,12 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
   `src/lib/activity-feed.ts`). An owner-facing, past-tense timeline of the managed
   done-for-you work — the anti-churn proof surface. `selectStrelvaWork` scopes it to
   `actor:"ai"` + `actor:"admin"` (the team's work; from the client's side there's no
-  AI-vs-human line) + posted review replies (`type:"review-reply"`), and **excludes the
+  AI-vs-human line) + posted review replies (`type:"review-reply"`) + published Google
+  Business actions (`type` `gbp-post` / `gbp-hours` / `gbp-photo`), and **excludes the
   owner's own manual edits**. Only genuinely-live work shows (pending drafts and
-  "dashboard only" reply drafts are skipped); honest empty state. Known gap: GBP posts
-  aren't in the feed yet.
+  "dashboard only" reply drafts are skipped); honest empty state. GBP posts/hours/photos
+  now appear once published — the previous "GBP posts aren't in the feed yet" gap is closed
+  (`event-actions.ts` logs a `gbp-*` activity entry on a successful approval-write).
 - **The assistant is "Strelva".** The chat tab is **"Ask Strelva"**, not "Ask AI". The agent
   refers to itself as Strelva — persona is set in the system prompt in
   `src/app/api/agent/route.ts` ("You are Strelva, the assistant that manages the website

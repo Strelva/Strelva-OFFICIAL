@@ -49,11 +49,11 @@ Per client:
 
 ---
 
-## Queued for AFTER the data flows (in-repo code, separate follow-up — NOT this runbook)
+## Analytics-correctness code — BUILT (2026-07-08, Track B / B5). Just needs the data.
 
-Once tracking + grants are live and the surfaces read real data, these correctness fixes become worth doing (they polish surfaces that are dark today):
-- **GSC property totals** — query the property total, not just the top-20 queries (today's numbers understate real search traffic).
-- **Real 90-day baseline** — persist a start-of-relationship scan anchor so the "first 90 days" health delta isn't secretly a ~12-day delta (ring-buffer horizon).
-- **Cache the Google reads** — the Analytics page does 2 live Google round-trips per load; cache them.
-- **Real GA4 traffic in the dollar-impact** — swap the generic constants for the client's actual traffic on the authenticated health card.
-- **GBP posts in the Today activity feed** — its one known gap (once Google Business is live).
+These were the "queued for after data flows" follow-ups; they are now **shipped in code** (branch `feat/track-b`). They read real data the moment Track 1 + Track 2 above are done — no more code needed, just the ops grants:
+- **GSC property totals** — DONE. `getSearchConsolePerf` (+ cron twin `fetchSearchData`) now fires an un-dimensioned aggregate request for the TRUE property total; the top-20 query request is for the `topQueries` list only. No longer understates the long tail.
+- **Real 90-day baseline** — DONE. `scanTenant` captures a durable set-once day-0 health anchor (`saveScanBaseline`/`getScanBaseline`, `reb:scan:baseline:{tenant}`); `milestone.ts` compares against it instead of the ~12-day ring buffer. Honest "tracking since" until a real anchor exists.
+- **Cache the Google reads** — DONE. Read-through Redis cache around GSC/GA4 (`analytics:gsc/ga4:{tenant}:{days}`, ~15-min TTL), invalidated on a property repoint. The dashboard/admin/weekly-cron callers no longer each re-hit Google live.
+- **Real GA4 traffic in the dollar-impact** — DONE. `scanTenant` builds a real `TrafficProfile` (GA4 visitors + leads-based conversion) and threads it into `runAudit`/`impact.ts` for paying clients; the anonymous `/audit` keeps the generic prior. Fail-safe: no GA4 data → generic prior (so this is inert until Track 2 grants land).
+- **GBP posts in the Today activity feed** — DONE. `event-actions.ts` logs a `gbp-*` activity entry on a successful approval-write; the feed shows them (lights up once Google Business is live).

@@ -132,6 +132,19 @@ everything that used to be a separate tenant page now stacks here in one scroll:
 
 Header actions: invite owner, open the client dashboard, open the live site.
 
+**Custom-repo capability manifest.** For a custom-repo tenant, the operator points
+the tenant at the manifest its LIVE site publishes (the sections the AI is allowed
+to edit) by setting `customRepo.capabilityManifestUrl` via
+**`POST /api/admin/tenants/[id]/capability-manifest`** (body
+`{ capabilityManifestUrl: string | null }`; super-admin, audit-logged). This is
+now settable/updatable/clearable on EXISTING tenants — it was previously write-once
+at tenant-create, so pre-existing tenants (gldf, rohlax) predate the field. A
+non-empty value must be a public https URL that passes the same SSRF guard as the
+control-plane fetch; the value merges into the `customRepo` blob (other fields
+untouched) and null/`""` clears it. Once set, the control plane fetches + merges
+the remote manifest so the agent edits the sections the live site actually renders.
+See `docs/custom-repo-delivery-model.md`.
+
 ### Leads — `/admin/leads`
 `src/app/admin/leads/page.tsx` + `LeadRows.tsx`, backed by
 `src/lib/lead-workflow.ts`. The marketing-site leads (contact / discovery /
