@@ -33,6 +33,7 @@ import {
 } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
+import { resolveGbpWriteAllowed, resolveEditableSections } from "@/lib/agent-shared";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { applySectionUpdate } from "@/lib/apply-section-update";
@@ -379,9 +380,7 @@ export async function POST(req: Request) {
     systemPrompt += contextBlock;
   }
 
-  const agentEditableSections = template.contentSections.filter((section) =>
-    siteManifest.sections[section]?.allowedActions?.includes("draft") !== false
-  );
+  const { agentEditableSections, sectionEnum } = resolveEditableSections(template, siteManifest);
 
   systemPrompt += `\n\nSITE CONFIGURABILITY MANIFEST:
 - Page config: ${siteManifest.supportsPageConfig ? "supported" : "not supported"}
@@ -395,10 +394,7 @@ export async function POST(req: Request) {
 - Custom request endpoint: ${siteManifest.customRequestEndpoint || "(none)"}
 Only use tools for manifest-supported sections and actions. If the user requests cart, rewards, checkout, product-modal, email-popup, chat, or another custom-only feature, use request_custom_change instead of claiming it can be changed directly.`;
 
-  // Build dynamic section enum from the capability-filtered template sections.
-  const sectionEnum = z.enum(
-    (agentEditableSections.length > 0 ? agentEditableSections : template.contentSections) as [string, ...string[]]
-  );
+  // sectionEnum is built above via resolveEditableSections (shared with the executor).
 
   // All tools are always available — single plan includes everything.
   // The `capability` key is legacy bookkeeping kept to minimize diff; see
@@ -1782,25 +1778,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
   // dashboard presence resolver (dashboard-surfaces) + the GBP write-scope
   // check (gbp-replies). Belt-and-suspenders: the lib write functions still
   // re-check scope at act time (on approval).
-  const gbpWriteAllowed = await (async () => {
-    const { getPresenceProfile } = await import("@/lib/dashboard-surfaces");
-    const { getContent } = await import("@/lib/storage");
-    const settings = (await getContent("settings", tenant).catch(() => null)) as
-      | { businessModel?: string }
-      | null;
-    const presence = getPresenceProfile({
-      template: tenantConfig?.template ?? "",
-      businessModel: settings?.businessModel,
-    });
-    if (presence === "online") return false;
-    const connections = await getConnections(tenant);
-    const google = Array.isArray(connections)
-      ? connections.find((c) => c.provider === "google" && c.status === "connected")
-      : undefined;
-    if (!google) return false;
-    const { connectionHasWriteScope } = await import("@/lib/gbp-replies");
-    return connectionHasWriteScope(google.scopes);
-  })();
+  const gbpWriteAllowed = await resolveGbpWriteAllowed(tenant, tenantConfig);
 
   const GBP_WRITE_TOOLS = new Set(["create_gbp_post", "update_business_hours", "upload_gbp_photo"]);
 
