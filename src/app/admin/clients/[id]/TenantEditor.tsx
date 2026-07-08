@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Toggle } from "@/components/ui/Toggle";
+import { getToggleableRegistry } from "@/lib/features/registry";
 
 interface EditableTenant {
   id: string;
@@ -14,6 +16,8 @@ interface EditableTenant {
   active: boolean;
   revalidateUrl: string;
   hasRevalidationSecret: boolean;
+  /** Enabled dashboard features (see src/lib/features/registry.ts). */
+  features: string[];
 }
 
 const SUB_STATUSES = ["none", "active", "trialing", "past_due", "cancelled"];
@@ -51,6 +55,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           // so the row never got written back to "" and the comp never lifted.
           planOverride: form.planOverride,
           active: form.active,
+          features: form.features,
         }),
       });
       const data = await res.json();
@@ -109,7 +114,8 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
         <h2 className="text-[15px] font-medium text-warm-white">Tenant config</h2>
         <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
@@ -205,6 +211,104 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           </button>
         </div>
       </div>
+      </div>
+
+      <FeaturesPanel
+        features={form.features}
+        onChange={(f) => setForm({ ...form, features: f })}
+        onSave={() => void save()}
+        saving={saving}
+        saved={saved}
+        error={error}
+      />
+    </div>
+  );
+}
+
+function FeaturesPanel({
+  features,
+  onChange,
+  onSave,
+  saving,
+  saved,
+  error,
+}: {
+  features: string[];
+  onChange: (features: string[]) => void;
+  onSave: () => void;
+  saving: boolean;
+  saved: boolean;
+  error: string | null;
+}) {
+  const { core, sets } = getToggleableRegistry();
+  const has = (id: string) => features.includes(id);
+  const toggle = (id: string, on: boolean) => {
+    onChange(on ? Array.from(new Set([...features, id])) : features.filter((f) => f !== id));
+  };
+  const toggleSet = (memberIds: string[], on: boolean) => {
+    const next = new Set(features);
+    for (const m of memberIds) {
+      if (on) next.add(m);
+      else next.delete(m);
+    }
+    onChange(Array.from(next));
+  };
+
+  return (
+    <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-5">
+      <div>
+        <h2 className="text-[15px] font-medium text-warm-white">Features</h2>
+        <p className="text-xs text-gray-faint mt-1">Which dashboard tools this client sees. Not billing.</p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] uppercase tracking-[0.08em] text-gray-faint">Core · always on</p>
+        {core.map((f) => (
+          <div key={f.id} className="flex items-center justify-between">
+            <span className="text-sm text-gray-muted">🔒 {f.label}</span>
+            <Toggle checked disabled onChange={() => {}} size="sm" label={`${f.label} (core, locked)`} />
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-[11px] uppercase tracking-[0.08em] text-gray-faint">Vertical sets</p>
+        {sets.map((s) => {
+          const memberIds = s.members.map((m) => m.id);
+          const on = memberIds.some((m) => has(m));
+          return (
+            <div key={s.id} className="rounded-lg border border-glass-border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-warm-white">{s.label} set</span>
+                <Toggle checked={on} onChange={(v) => toggleSet(memberIds, v)} size="sm" label={`${s.label} set`} />
+              </div>
+              {on && s.members.length > 1 && (
+                <div className="space-y-1.5 border-l border-glass-border pl-3">
+                  {s.members.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-muted">{m.label}</span>
+                      <Toggle checked={has(m.id)} onChange={(v) => toggle(m.id, v)} size="sm" label={m.label} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-gray-faint">
+        Google Business &amp; Reviews appear automatically based on the client&apos;s business type and connections.
+      </p>
+
+      {error && <p className="text-sm text-red-300">{error}</p>}
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
+      >
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save features"}
+      </button>
     </div>
   );
 }

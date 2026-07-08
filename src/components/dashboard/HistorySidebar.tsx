@@ -117,7 +117,7 @@ export function HistorySidebar({
   }
   const firstName = accountName.trim().split(/\s+/)[0] || "there";
   const surfaces = useDashboardSurfaces();
-  const navGroups = (["manage", "presence"] as const)
+  const navGroups = (["manage", "presence", "set"] as const)
     .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
     .filter((g) => g.items.length > 0);
   const [threads, setThreads] = useState<Thread[]>([]);

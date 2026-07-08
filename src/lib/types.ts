@@ -434,7 +434,19 @@ export interface BlogPost {
 
 export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "professional" | (string & {});
 
-export type TenantFeature = "commerce" | "booking" | "newsletter" | "blog" | "video" | "events" | "shop" | "products" | "rewards" | "providers" | "instagram" | "reviews";
+/**
+ * The full set of tenant feature ids, as a runtime array so the feature registry can
+ * validate against it without a hand-copied duplicate. `TenantFeature` is derived from
+ * this, so the two can never drift. The wellness vertical-set members carry their own
+ * dashboard surfaces (see src/lib/features/registry.ts).
+ */
+export const ALL_TENANT_FEATURES = [
+  "commerce", "booking", "newsletter", "blog", "video", "events",
+  "shop", "products", "rewards", "providers", "instagram", "reviews",
+  "schedule", "members", "packages", "roster",
+] as const;
+
+export type TenantFeature = (typeof ALL_TENANT_FEATURES)[number];
 
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 
