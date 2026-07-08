@@ -44,11 +44,43 @@ function baseInput(overrides: Partial<MilestoneInput> = {}): MilestoneInput {
     startDate: daysAgoIso(60),
     now: NOW,
     scanHistory: [],
+    scanBaseline: null,
     reviews: [],
     dailyMetrics: [],
     ...overrides,
   };
 }
+
+describe("computeMilestone — durable day-0 health anchor (B5.4)", () => {
+  it("uses the baseline anchor as 'then', not the earliest ring-buffer point", () => {
+    // The ring buffer only reaches back ~12 days (D·55 → A·92), but the durable
+    // day-0 anchor captured at relationship start was F·40. The recap must
+    // compare against the true day-0 anchor.
+    const m = computeMilestone(
+      baseInput({
+        scanBaseline: scan(40, "F", 85),
+        scanHistory: [scan(55, "D", 12), scan(78, "C", 6), scan(92, "A", 1)],
+      })
+    );
+    const health = m.metrics.find((x) => x.key === "health")!;
+    expect(health.then).toBe("F · 40"); // the anchor, not "D · 55"
+    expect(health.now).toBe("A · 92");
+    expect(health.direction).toBe("up");
+    expect(health.trackingSince).toBeNull();
+  });
+
+  it("shows 'tracking since' when the anchor is the only measurement (brand-new tenant)", () => {
+    // First scan just captured: anchor == the single history point (same timestamp).
+    const only = scan(80, "B", 0);
+    const m = computeMilestone(
+      baseInput({ scanBaseline: only, scanHistory: [only] })
+    );
+    const health = m.metrics.find((x) => x.key === "health")!;
+    expect(health.then).toBeNull();
+    expect(health.direction).toBe("new");
+    expect(health.trackingSince).not.toBeNull();
+  });
+});
 
 describe("computeMilestone — real history produces correct deltas", () => {
   it("computes then -> now for health, reviews, and rating from stored history", () => {

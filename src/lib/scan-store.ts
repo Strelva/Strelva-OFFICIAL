@@ -36,6 +36,15 @@ export interface ScanSummary {
 const SCAN_HISTORY_PREFIX = "reb:scan:hist:";
 const SCAN_HISTORY_MAX = 12;
 
+/**
+ * The durable day-0 health anchor for the 90-day milestone. The history ring
+ * buffer above holds only ~12 points and expires in 30 days, so it can never be
+ * a real 90-day baseline. This is a single, set-once, NO-TTL record captured at
+ * the start of the relationship, so the milestone compares against a true
+ * day-0 "then" rather than the earliest incidentally-retained scan.
+ */
+const SCAN_BASELINE_PREFIX = "reb:scan:baseline:";
+
 export interface ScanHistoryPoint {
   scannedAt: string;
   overallScore: number;
@@ -48,6 +57,10 @@ function scanKey(tenant: string): string {
 
 function scanHistoryKey(tenant: string): string {
   return `${SCAN_HISTORY_PREFIX}${tenant}`;
+}
+
+function scanBaselineKey(tenant: string): string {
+  return `${SCAN_BASELINE_PREFIX}${tenant}`;
 }
 
 /** Persist the latest scan summary for a tenant. Null-safe (no-op without Redis). */
@@ -91,6 +104,34 @@ export async function getScanHistory(tenant: string): Promise<ScanHistoryPoint[]
   } catch (err) {
     console.warn("[scan-store] history read failed", tenant, err);
     return [];
+  }
+}
+
+/**
+ * Set the durable day-0 health anchor, ONCE. NX so a later scan never
+ * overwrites the real baseline; no TTL so it survives the 30-day history
+ * expiry and anchors the full 90-day milestone. No-op without Redis.
+ */
+export async function saveScanBaseline(tenant: string, point: ScanHistoryPoint): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(scanBaselineKey(tenant), point, { nx: true });
+  } catch (err) {
+    console.warn("[scan-store] baseline write failed", tenant, err);
+  }
+}
+
+/** Read the durable day-0 health anchor, or null if never captured. */
+export async function getScanBaseline(tenant: string): Promise<ScanHistoryPoint | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const cached = await redis.get<ScanHistoryPoint>(scanBaselineKey(tenant));
+    return cached ?? null;
+  } catch (err) {
+    console.warn("[scan-store] baseline read failed", tenant, err);
+    return null;
   }
 }
 

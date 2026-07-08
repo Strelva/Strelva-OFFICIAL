@@ -36,6 +36,37 @@ describe("attachImpact — quantified loss estimate", () => {
     expect(c.priority).toBe("high");
   });
 
+  it("uses a paying client's real traffic and labels it honestly", () => {
+    const cat = category("web-vitals", 0.2, [
+      check({ name: "Largest Contentful Paint (LCP)", status: "fail", score: 10, message: "LCP is 6.2s" }),
+    ]);
+
+    // 5000 real monthly visitors at a real 5% conversion — 10x the generic base.
+    attachImpact(cat, {
+      monthlyVisitors: 5000,
+      conversionRate: 0.05,
+      orderValue: 75,
+      source: "measured",
+    });
+
+    const c = cat.checks[0];
+    // 5000 * 0.35 * 0.05 = ~88 customers, vs ~5 on the generic prior.
+    expect(c.quantified).toMatch(/88 customers\/mo/);
+    // Honest qualifier flips from "estimated" to "based on your traffic".
+    expect(c.quantified).toMatch(/based on your traffic/);
+    expect(c.quantified).not.toMatch(/estimated/);
+  });
+
+  it("falls back to the generic 'estimated' prior when no traffic is supplied", () => {
+    const cat = category("web-vitals", 0.2, [
+      check({ name: "Largest Contentful Paint (LCP)", status: "fail", score: 10, message: "LCP is 6.2s" }),
+    ]);
+    attachImpact(cat); // no metrics → generic
+    // 500 * 0.35 * 0.03 = ~5 customers.
+    expect(cat.checks[0].quantified).toMatch(/5 customers\/mo/);
+    expect(cat.checks[0].quantified).toMatch(/\(estimated\)/);
+  });
+
   it("sets a figure on a missing-schema (AI readiness) check", () => {
     const cat = category("ai-readability", 0.15, [
       check({ name: "Business structured data", status: "fail", score: 0, message: "No LocalBusiness schema found" }),
@@ -109,7 +140,7 @@ describe("topFixes — ranking + quantified passthrough", () => {
       check({ name: "Customer testimonials", status: "fail", score: 0, message: "No testimonials found" }),
     ]);
 
-    [perf, a11y, trust].forEach(attachImpact);
+    [perf, a11y, trust].forEach((c) => attachImpact(c));
 
     const fixes = topFixes([a11y, trust, perf], 5);
 

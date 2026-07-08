@@ -7,6 +7,7 @@ import {
   clearDraft,
   getContent,
   getDraftContent,
+  logActivity,
   recordSectionUpdate,
   setContent,
 } from "./storage";
@@ -25,6 +26,28 @@ export type EventWorkflowAction =
   | "in_progress"
   | "shipped"
   | "declined";
+
+/**
+ * Record a published Google Business action in the owner-facing activity feed.
+ * A GBP post/hours/photo only reaches here after a SUCCESSFUL live write on the
+ * owner's approval, so it is genuinely-done Strelva work (actor:"admin" — from
+ * the client's side it's all "Strelva managed my listing"). Fail-soft: an
+ * activity-log blip must never break the approval that already succeeded.
+ */
+async function logGbpActivity(
+  tenantId: string,
+  type: "gbp-post" | "gbp-hours" | "gbp-photo",
+  text: string,
+): Promise<void> {
+  try {
+    await logActivity(
+      { type, text, time: new Date().toISOString(), actor: "admin", suppressEvent: true },
+      tenantId,
+    );
+  } catch {
+    // A feed-logging failure is never fatal to a completed publish.
+  }
+}
 
 const CUSTOM_WORKFLOW_ACTIONS = new Set<EventWorkflowAction>([
   "triaged",
@@ -113,8 +136,8 @@ export async function resolveEventAction(
     // that's the right signal, not a stuck approval. Same rule for the hours +
     // review-reply branches below.
     if (kind === "gbp_post_draft") {
+      const summary = typeof event.metadata?.summary === "string" ? event.metadata.summary : "";
       if (action === "approved") {
-        const summary = typeof event.metadata?.summary === "string" ? event.metadata.summary : "";
         if (!summary) return { changed: false, reason: "gbp_post_invalid" };
         const { createGbpPost } = await import("./gbp-management");
         const result = await createGbpPost(tenantId, {
@@ -125,6 +148,7 @@ export async function resolveEventAction(
         if (!result.success) return { changed: false, reason: "gbp_post_failed" };
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-post", summary);
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
@@ -150,6 +174,7 @@ export async function resolveEventAction(
         if (!result.success) return { changed: false, reason: "gbp_hours_failed" };
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-hours", "");
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
@@ -172,6 +197,7 @@ export async function resolveEventAction(
         if (!result.success) return { changed: false, reason: "gbp_photo_failed" };
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-photo", "");
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 

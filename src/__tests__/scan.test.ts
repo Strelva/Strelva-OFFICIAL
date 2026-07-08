@@ -11,6 +11,11 @@ const mockGetTenantPublicUrl = vi.hoisted(() => vi.fn());
 const mockRunAudit = vi.hoisted(() => vi.fn());
 const mockSaveScanSummary = vi.hoisted(() => vi.fn());
 const mockPushScanHistory = vi.hoisted(() => vi.fn());
+const mockSaveScanBaseline = vi.hoisted(() => vi.fn());
+const mockGetScanBaseline = vi.hoisted(() => vi.fn());
+const mockGetScanHistory = vi.hoisted(() => vi.fn());
+const mockGetGa4Perf = vi.hoisted(() => vi.fn());
+const mockGetLeadSummary = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tenants", () => ({
   getTenantConfig: mockGetTenantConfig,
@@ -25,6 +30,15 @@ vi.mock("@/lib/audit/checks", () => ({
 vi.mock("@/lib/scan-store", () => ({
   saveScanSummary: mockSaveScanSummary,
   pushScanHistory: mockPushScanHistory,
+  saveScanBaseline: mockSaveScanBaseline,
+  getScanBaseline: mockGetScanBaseline,
+  getScanHistory: mockGetScanHistory,
+}));
+vi.mock("@/lib/analytics", () => ({
+  getGa4Perf: mockGetGa4Perf,
+}));
+vi.mock("@/lib/leads", () => ({
+  getLeadSummary: mockGetLeadSummary,
 }));
 
 import { scanTenant, scanAllTenants } from "@/lib/scan";
@@ -50,6 +64,13 @@ function tenant(id: string, active = true): TenantConfig {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
+  // Default: no GA4 data yet (pre-activation) → audit stays on the generic
+  // prior, so scanTenant calls runAudit with `{ traffic: undefined }`.
+  mockGetGa4Perf.mockResolvedValue({ status: "unconfigured", users: 0 });
+  mockGetLeadSummary.mockResolvedValue({ count: 0 });
+  // No baseline yet → scanTenant seeds one from history.
+  mockGetScanBaseline.mockResolvedValue(null);
+  mockGetScanHistory.mockResolvedValue([]);
 });
 
 describe("scanTenant", () => {
@@ -63,7 +84,10 @@ describe("scanTenant", () => {
 
     // Live production URL, not the dev/localhost host.
     expect(mockGetTenantPublicUrl).toHaveBeenCalledWith(config, "production");
-    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com");
+    // No GA4 data → generic prior (traffic undefined).
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: undefined,
+    });
 
     // overallScore is the (real) weighted average; single weight-1 cat => 82.
     expect(result.overallScore).toBe(82);
@@ -93,6 +117,46 @@ describe("scanTenant", () => {
     // Return value = persisted summary PLUS the full category detail for the UI.
     expect(result).toEqual({ ...savedSummary, detail });
     expect(result.detail).toBe(detail);
+  });
+
+  it("threads a paying client's real GA4 + leads traffic into the audit (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // 2000 real monthly visitors, 40 real leads → conversion 40/2000 = 0.02.
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 2000 });
+    mockGetLeadSummary.mockResolvedValue({ count: 40 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 2000, conversionRate: 0.02, orderValue: 75, source: "measured" },
+    });
+  });
+
+  it("seeds the durable day-0 baseline once, from the earliest retained point (B5.4)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    mockGetScanBaseline.mockResolvedValue(null); // no anchor yet
+    const earliest = { scannedAt: "2026-04-01T00:00:00.000Z", overallScore: 55, grade: "D" as const };
+    mockGetScanHistory.mockResolvedValue([earliest, { scannedAt: "x", overallScore: 82, grade: "B" as const }]);
+
+    await scanTenant("gldf");
+
+    // Anchor seeded from the earliest point, not today's fresh scan.
+    expect(mockSaveScanBaseline).toHaveBeenCalledWith("gldf", earliest);
+  });
+
+  it("does not overwrite an existing baseline anchor", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    mockGetScanBaseline.mockResolvedValue({ scannedAt: "2026-01-01T00:00:00.000Z", overallScore: 40, grade: "F" });
+
+    await scanTenant("gldf");
+
+    expect(mockSaveScanBaseline).not.toHaveBeenCalled();
   });
 
   it("throws for an unknown tenant and never audits or persists", async () => {

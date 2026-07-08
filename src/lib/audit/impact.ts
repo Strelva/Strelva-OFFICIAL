@@ -100,11 +100,31 @@ function impactLineFor(categorySlug: string, checkName: string): string | undefi
 // customer estimate is genuinely credible. Anything speculative returns
 // undefined (no quantified line) so we never invent precision we don't have.
 // ---------------------------------------------------------------------------
-const GENERIC_METRICS = {
+/**
+ * The traffic profile the quantified estimates multiply against.
+ *  - `generic`  → the business-type-agnostic prior below. Used by the anonymous
+ *    `/audit` tool, which has no client analytics.
+ *  - `measured` → a paying client's REAL numbers (GA4 visitors, leads-based
+ *    conversion). Threaded in by `scanTenant`; the qualifier flips from
+ *    "estimated" to "based on your traffic" so we never claim precision we lack.
+ */
+export interface TrafficProfile {
+  monthlyVisitors: number;
+  conversionRate: number;
+  orderValue: number;
+  source: "generic" | "measured";
+}
+
+const GENERIC_METRICS: TrafficProfile = {
   monthlyVisitors: 500,
   conversionRate: 0.03,
   orderValue: 75,
-} as const;
+  source: "generic",
+};
+
+/** Honest qualifier: real traffic base vs a generic prior. */
+const qualifier = (m: TrafficProfile) =>
+  m.source === "measured" ? "based on your traffic" : "estimated";
 
 const usd = (n: number) => `~$${Math.round(n).toLocaleString()}/mo`;
 const customers = (n: number) =>
@@ -113,41 +133,41 @@ const customers = (n: number) =>
 // Keyword (matched against the check name) -> a function producing the
 // quantified string. First match wins, so order most-specific first. Only
 // issue types where a dollar/customer figure is credible appear here.
-const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
+const CHECK_QUANTIFIED: Array<[RegExp, (m: TrafficProfile) => string]> = [
   // Performance / load: ~35% of visitors abandon a slow page (conservative,
   // vs the often-cited 53% at 3s+). Lost = visitors * 0.35 * conversion.
   [
     /lcp|contentful paint|performance|load|speed|slow/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.35 * GENERIC_METRICS.conversionRate;
-      return `${customers(lost)} lost to slow load (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.35 * m.conversionRate;
+      return `${customers(lost)} lost to slow load (${qualifier(m)})`;
     },
   ],
   // Layout instability: ~40% leave after a jarring experience; only a slice of
   // those would have converted, so apply at half the abandonment weight.
   [
     /cls|layout shift/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.4 * 0.5 * GENERIC_METRICS.conversionRate;
-      return `${usd(lost * GENERIC_METRICS.orderValue)} estimated`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.4 * 0.5 * m.conversionRate;
+      return `${usd(lost * m.orderValue)} (${qualifier(m)})`;
     },
   ],
   // Mobile: ~60% of local searches are mobile; a poor mobile UX loses a
   // fraction (0.3) of those would-be customers.
   [
     /mobile|viewport|tap target|font size/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.6 * 0.3 * GENERIC_METRICS.conversionRate;
-      return `${customers(lost)} on mobile (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.6 * 0.3 * m.conversionRate;
+      return `${customers(lost)} on mobile (${qualifier(m)})`;
     },
   ],
   // HTTPS / Not Secure: 85% won't submit info on a flagged page; apply to the
   // ~20% of visitors who would have taken a form/contact action.
   [
     /https|ssl|not secure|mixed content/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.85 * 0.2 * GENERIC_METRICS.conversionRate;
-      return `${customers(lost)} who won't submit info (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.85 * 0.2 * m.conversionRate;
+      return `${customers(lost)} who won't submit info (${qualifier(m)})`;
     },
   ],
   // Schema / AI-readiness / structured data: ~30% of searches now involve AI
@@ -155,9 +175,9 @@ const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
   // at half weight (this is the emerging, not yet dominant, channel).
   [
     /structured data|business schema|schema|llms\.txt|ai readiness|ai[- ]?ready|ai[- ]?answer|discoverab/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.3 * 0.5 * GENERIC_METRICS.conversionRate;
-      return `${customers(lost)} via AI search (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.3 * 0.5 * m.conversionRate;
+      return `${customers(lost)} via AI search (${qualifier(m)})`;
     },
   ],
   // Crawl-blocked / not indexed: 92% of search traffic goes to page 1. If
@@ -166,9 +186,9 @@ const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
   // quoting a dollar figure for ranking loss, so we keep that restraint.
   [
     /robots|crawler|blocked|index/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.92 * 0.5 * GENERIC_METRICS.conversionRate;
-      return `${customers(lost)} from organic search (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.92 * 0.5 * m.conversionRate;
+      return `${customers(lost)} from organic search (${qualifier(m)})`;
     },
   ],
   // Trust / reviews / testimonials / conversion CTA: visible proof and a clear
@@ -176,21 +196,22 @@ const CHECK_QUANTIFIED: Array<[RegExp, () => string]> = [
   // converting visitors.
   [
     /testimonial|review|trust|badge|credential|cta|call to action|contact|phone|click[- ]?to[- ]?call/i,
-    () => {
-      const lost = GENERIC_METRICS.monthlyVisitors * 0.2 * GENERIC_METRICS.conversionRate;
-      return `${usd(lost * GENERIC_METRICS.orderValue)} in conversions (estimated)`;
+    (m) => {
+      const lost = m.monthlyVisitors * 0.2 * m.conversionRate;
+      return `${usd(lost * m.orderValue)} in conversions (${qualifier(m)})`;
     },
   ],
 ];
 
 /**
  * A conservative dollar/customer loss estimate for a check, or undefined when
- * no credible figure exists. Uses GENERIC_METRICS only (no client analytics).
+ * no credible figure exists. Multiplies against `metrics` — the generic prior
+ * for the anonymous audit, or a paying client's real GA4/leads numbers.
  * Only failing/warning checks should be passed in; the caller guards status.
  */
-function quantifiedFor(checkName: string): string | undefined {
+function quantifiedFor(checkName: string, metrics: TrafficProfile = GENERIC_METRICS): string | undefined {
   for (const [re, fn] of CHECK_QUANTIFIED) {
-    if (re.test(checkName)) return fn();
+    if (re.test(checkName)) return fn(metrics);
   }
   return undefined;
 }
@@ -207,14 +228,14 @@ function priorityFor(status: CheckResult["status"], categoryWeight: number): Che
  * Passing checks are left untouched. Returns the same category (mutated in place)
  * for convenient chaining in the runner.
  */
-export function attachImpact(category: CategoryResult): CategoryResult {
+export function attachImpact(category: CategoryResult, metrics?: TrafficProfile): CategoryResult {
   for (const check of category.checks) {
     if (check.status === "pass") continue;
     // Informational placeholders (e.g. a metric we could not measure) are not
     // real findings, so they get no "what this costs you" line or priority.
     if (/not measured|not configured|coming soon/i.test(check.message)) continue;
     if (!check.impact) check.impact = impactLineFor(category.slug, check.name);
-    if (!check.quantified) check.quantified = quantifiedFor(check.name);
+    if (!check.quantified) check.quantified = quantifiedFor(check.name, metrics);
     check.priority = priorityFor(check.status, category.weight);
   }
   return category;

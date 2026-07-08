@@ -117,6 +117,19 @@ export function translateActivityEntry(entry: ActivityEntry): ActivityFeedItem |
     return mk(line.label, line.kind, quotedTitle(text));
   }
 
+  // Google Business Profile actions Strelva published on the owner's approval.
+  // These are only logged after a SUCCESSFUL live write (event-actions.ts), so
+  // reaching here means the update is genuinely live on Google.
+  if (type === "gbp-post") {
+    return mk("Posted an update to your Google listing", "post", text?.trim() || undefined);
+  }
+  if (type === "gbp-hours") {
+    return mk("Updated your hours on Google", "site");
+  }
+  if (type === "gbp-photo") {
+    return mk("Added a photo to your Google listing", "look");
+  }
+
   // Review replies. In this feed they arrive as AI-saved drafts ("dashboard
   // only") — not posted publicly yet, so skip them. A genuinely-posted reply
   // (no "dashboard only" marker) is a real win worth showing.
@@ -152,7 +165,11 @@ export function translateActivityEntry(entry: ActivityEntry): ActivityFeedItem |
  */
 export function selectStrelvaWork(entries: ActivityEntry[]): ActivityEntry[] {
   return entries.filter(
-    (e) => e.actor === "ai" || e.actor === "admin" || e.type === "review-reply"
+    (e) =>
+      e.actor === "ai" ||
+      e.actor === "admin" ||
+      e.type === "review-reply" ||
+      e.type.startsWith("gbp-")
   );
 }
 

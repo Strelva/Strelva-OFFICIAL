@@ -127,6 +127,36 @@ describe("translateActivityEntry — noise & not-done filtering", () => {
   });
 });
 
+describe("translateActivityEntry — Google Business posts (B5.5)", () => {
+  it("renders a published GBP post with its text as detail", () => {
+    const item = translateActivityEntry(
+      entry({ type: "gbp-post", text: "Fall special: 20% off", actor: "admin" })
+    );
+    expect(item?.label).toBe("Posted an update to your Google listing");
+    expect(item?.kind).toBe("post");
+    expect(item?.detail).toBe("Fall special: 20% off");
+  });
+
+  it("renders GBP hours and photo updates", () => {
+    expect(translateActivityEntry(entry({ type: "gbp-hours", text: "", actor: "admin" }))?.label).toBe(
+      "Updated your hours on Google"
+    );
+    expect(translateActivityEntry(entry({ type: "gbp-photo", text: "", actor: "admin" }))?.label).toBe(
+      "Added a photo to your Google listing"
+    );
+  });
+
+  it("selectStrelvaWork keeps GBP entries even without an ai/admin actor", () => {
+    const entries = [
+      entry({ type: "gbp-post", text: "New post", actor: undefined }),
+      entry({ type: "content", text: "owner edit", actor: "user" }),
+    ];
+    const selected = selectStrelvaWork(entries);
+    expect(selected).toHaveLength(1);
+    expect(selected[0].type).toBe("gbp-post");
+  });
+});
+
 describe("buildActivityFeed — grouping & empty state", () => {
   const iso = (d: string) => new Date(d).toISOString();
 

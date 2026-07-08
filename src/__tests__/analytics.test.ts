@@ -120,19 +120,33 @@ describe("getSearchConsolePerf", () => {
     expect(perf.topQueries).toEqual([]);
   });
 
-  it("returns ok with computed totals on a successful fetch", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
-          rows: [
-            { keys: ["plumber near me"], clicks: 8, impressions: 100, position: 3.2 },
-            { keys: ["emergency plumber"], clicks: 2, impressions: 100, position: 5.8 },
-          ],
-        }),
-      }))
-    );
+  /**
+   * getSearchConsolePerf now fires TWO GSC reads: an un-dimensioned request for
+   * true property totals, and a dimensioned top-20 request for the query list.
+   * This router returns the totals row for the request with no `dimensions` and
+   * the query list otherwise — matching the real API's two response shapes.
+   */
+  function stubGscTwoReads(opts: {
+    totals: { clicks: number; impressions: number; ctr: number; position: number } | null;
+    queries: { keys: string[]; clicks: number; impressions: number; position: number }[];
+  }) {
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body);
+      const rows = body.dimensions ? opts.queries : opts.totals ? [opts.totals] : [];
+      return { ok: true, json: async () => ({ rows }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("returns ok with property totals on a successful fetch", async () => {
+    stubGscTwoReads({
+      totals: { clicks: 10, impressions: 200, ctr: 0.05, position: 4.5 },
+      queries: [
+        { keys: ["plumber near me"], clicks: 8, impressions: 100, position: 3.2 },
+        { keys: ["emergency plumber"], clicks: 2, impressions: 100, position: 5.8 },
+      ],
+    });
 
     const perf = await getSearchConsolePerf("gldf");
     expect(perf.status).toBe("ok");
@@ -147,6 +161,41 @@ describe("getSearchConsolePerf", () => {
       impressions: 100,
       position: 3.2,
     });
+  });
+
+  it("takes totals from the aggregate row, not the top-20 sum (long-tail not understated)", async () => {
+    // The top-20 query rows sum to only 7 clicks / 100 impressions, but the real
+    // property total (long tail included) is 250 clicks / 9000 impressions.
+    stubGscTwoReads({
+      totals: { clicks: 250, impressions: 9000, ctr: 0.0278, position: 12.4 },
+      queries: [
+        { keys: ["a"], clicks: 5, impressions: 60, position: 3 },
+        { keys: ["b"], clicks: 2, impressions: 40, position: 7 },
+      ],
+    });
+
+    const perf = await getSearchConsolePerf("gldf");
+    expect(perf.clicks).toBe(250);
+    expect(perf.impressions).toBe(9000);
+    // Would be 0.07 if summed over the top-20; the aggregate CTR is the truth.
+    expect(perf.ctr).toBe(0.0278);
+    expect(perf.position).toBe(12.4);
+  });
+
+  it("serves a second call from the Redis cache without re-fetching Google", async () => {
+    const fetchMock = stubGscTwoReads({
+      totals: { clicks: 10, impressions: 200, ctr: 0.05, position: 4.5 },
+      queries: [{ keys: ["x"], clicks: 10, impressions: 200, position: 4.5 }],
+    });
+
+    const first = await getSearchConsolePerf("gldf");
+    expect(first.status).toBe("ok");
+    const callsAfterFirst = fetchMock.mock.calls.length; // 2 (totals + queries)
+
+    const second = await getSearchConsolePerf("gldf");
+    expect(second).toEqual(first);
+    // No additional Google reads — the cache served it.
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
   });
 
   it("returns unavailable when the fetch throws", async () => {
