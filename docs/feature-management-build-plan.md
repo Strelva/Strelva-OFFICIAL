@@ -1,5 +1,7 @@
 # Feature Management — Build Plan
 
+> **STATUS: SHIPPED (Jul 8 2026) → PR [#141](https://github.com/Strelva/REB/pull/141), branch `feat/feature-management`.** All 5 steps built. Green: typecheck + 1573 tests + lint + prod build, plus a live DB test on the `summit` demo tenant (toggle Wellness → persisted → 4 tabs appeared additively → core-lock guard fired → restored). Adversarial review found + fixed one real bug (TenantFeature now derived from a single array, so the validation list can't drift). Awaiting Jacob's review; not merged. **Next: the studio module** (the actual class/member/pack content behind the tabs) is the separate, validation-gated build.
+
 **Date:** Jul 8 2026 · **Scope:** turn the demo's model (core-locked / conditional / vertical-set features + an operator toggle) into working code. Grounded in the real files. Demo: `strelva-feature-toggle` artifact.
 
 > **What this build IS:** the plumbing to turn a client's dashboard features on/off cleanly, with core locked. **What it is NOT:** the wellness *content* (Schedule/Members/Packages pages = the `studio/` module, a separate build gated on validation). This build makes the tabs toggleable and appear; the studio module fills them in. So this is decoupled infra, useful for every vertical, and safe to build independently.
