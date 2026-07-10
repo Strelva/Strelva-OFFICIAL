@@ -15,7 +15,7 @@ import type {
 type GroupResult = { drafted: number; skipped: number; failed: number };
 
 /** Reasons that are "nothing to do", not a failure, so we don't alarm the operator. */
-const BENIGN_REASONS = new Set(["already_drafted", "no_unreplied_review"]);
+const BENIGN_REASONS = new Set(["already_drafted", "no_unreplied_review", "nothing_to_draft"]);
 
 export function PortfolioOpportunitiesClient({
   snapshot,
@@ -129,13 +129,17 @@ export function PortfolioOpportunitiesClient({
                 <div className="border-t border-glass-border px-5 py-2.5 text-[12px]">
                   {result.drafted > 0 ? (
                     <p className="text-emerald-300">
-                      Drafted for {result.drafted} client{result.drafted === 1 ? "" : "s"} — waiting
-                      for approval below.
-                      {result.skipped > 0 ? ` ${result.skipped} already had a draft.` : ""}
+                      Drafted for {result.drafted} of {result.drafted + result.skipped + result.failed}{" "}
+                      client{result.drafted + result.skipped + result.failed === 1 ? "" : "s"} —
+                      waiting for approval below.
+                      {result.skipped > 0
+                        ? ` ${result.skipped} had nothing to draft or already had one.`
+                        : ""}
                     </p>
                   ) : (
                     <p className="text-gray-muted">
-                      Nothing new to draft — these clients already have a pending draft.
+                      Nothing new to draft — these clients had nothing to draft or already have a
+                      pending draft.
                     </p>
                   )}
                   {result.failed > 0 && (

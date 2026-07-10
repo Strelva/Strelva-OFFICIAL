@@ -24,7 +24,7 @@ export async function GET() {
     const connections = await getConnections(tenant);
 
     // Build status map for all providers
-    const providers: IntegrationProvider[] = ["google", "yelp", "calendly", "instagram", "vegaro"];
+    const providers: IntegrationProvider[] = ["google", "yelp", "calendly", "instagram"];
     const statuses: ConnectionStatus[] = providers.map((provider) => {
       const conn = connections.find((c) => c.provider === provider);
       return {

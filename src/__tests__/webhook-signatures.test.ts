@@ -4,7 +4,7 @@ import crypto from "crypto";
 /**
  * P0: spoofed-webhook coverage.
  *
- * Each external webhook (Stripe billing, Calendly, Vegaro) verifies an HMAC
+ * Each external webhook (Stripe billing, Calendly) verifies an HMAC
  * signature header before it mutates tenant data. Previously NONE of these
  * verification paths had a test, so a regression that weakened/removed the
  * check (e.g. always-true verify, wrong algorithm, missing-header bypass)
@@ -242,102 +242,6 @@ describe("calendly webhook signature verification", () => {
     const header = calendlySignatureHeader(body);
     const res = await post(
       { "Calendly-Webhook-Signature": header, "content-type": "application/json" },
-      body
-    );
-    expect(res.status).toBe(500);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Vegaro webhook — header "X-Vegaro-Signature" (or "X-Webhook-Signature"),
-// sig = HMAC-SHA256(body) hex, compared via timingSafeEqual against the hex
-// digest string bytes. Hand-rolled verifier in the route.
-// ---------------------------------------------------------------------------
-describe("vegaro webhook signature verification", () => {
-  const SECRET = "vegaro_test_secret";
-
-  function vegaroSignature(payload: string, secret = SECRET): string {
-    return crypto.createHmac("sha256", secret).update(payload).digest("hex");
-  }
-
-  async function post(headers: Record<string, string>, body: string) {
-    const { POST } = await import("@/app/api/webhooks/vegaro/route");
-    const req = new Request("https://admin.strelva.com/api/webhooks/vegaro", {
-      method: "POST",
-      headers,
-      body,
-    });
-    return POST(req);
-  }
-
-  // A non-booking event: passes the signature gate then short-circuits to
-  // { received: true } before any tenant lookup, isolating the signature gate.
-  const body = JSON.stringify({ event: "booking.cancelled", data: {} });
-
-  beforeEach(() => {
-    vi.stubEnv("VEGARO_WEBHOOK_SECRET", SECRET);
-  });
-
-  it("(a) rejects a request with no signature header (401)", async () => {
-    const res = await post({ "content-type": "application/json" }, body);
-    expect(res.status).toBe(401);
-    const json = await res.json();
-    expect(json.error).toMatch(/missing signature/i);
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("(b) rejects a forged signature (401)", async () => {
-    // Same byte length as a sha256 hex digest so timingSafeEqual compares
-    // rather than throwing — proves a value-mismatch is still rejected.
-    const forged = "a".repeat(64);
-    const res = await post(
-      { "X-Vegaro-Signature": forged, "content-type": "application/json" },
-      body
-    );
-    expect(res.status).toBe(401);
-    const json = await res.json();
-    expect(json.error).toMatch(/invalid signature/i);
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("(b2) rejects a signature computed with the wrong secret", async () => {
-    const sig = vegaroSignature(body, "attacker_secret");
-    const res = await post(
-      { "X-Vegaro-Signature": sig, "content-type": "application/json" },
-      body
-    );
-    expect(res.status).toBe(401);
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("(c) accepts a correctly-signed payload via X-Vegaro-Signature", async () => {
-    const sig = vegaroSignature(body);
-    const res = await post(
-      { "X-Vegaro-Signature": sig, "content-type": "application/json" },
-      body
-    );
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.received).toBe(true);
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("(c2) also accepts the fallback X-Webhook-Signature header", async () => {
-    const sig = vegaroSignature(body);
-    const res = await post(
-      { "X-Webhook-Signature": sig, "content-type": "application/json" },
-      body
-    );
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.received).toBe(true);
-  });
-
-  it("returns 500 when the webhook secret is not configured", async () => {
-    vi.stubEnv("VEGARO_WEBHOOK_SECRET", "");
-    const sig = vegaroSignature(body);
-    const res = await post(
-      { "X-Vegaro-Signature": sig, "content-type": "application/json" },
       body
     );
     expect(res.status).toBe(500);
