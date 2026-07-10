@@ -8,8 +8,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import { useDashboardOptional } from "./DashboardContext";
+import { AssetPickerModal } from "./AssetPickerModal";
 
 type CollectionType = "blog" | "video" | "product";
 
@@ -26,9 +27,15 @@ interface FieldDef {
   kind: "text" | "textarea" | "number" | "tags" | "url" | "bool";
   /** Required on save (mirrors the non-optional fields in the Zod registry). */
   required?: boolean;
+  /** Holds an image URL — gets a "Choose from your photos" media picker. For a
+   *  `tags` field this means the list is image URLs (product `images`). */
+  image?: boolean;
 }
 
 // Client-side mirror of the field shapes in src/lib/cms/collection-types.ts.
+// The Zod registry (collection-types.ts) owns the *validation* shape but not the
+// UI metadata below (label, textarea-vs-text, help text, which URL is an image),
+// so deriving this list from Zod would lose it — kept as an intentional mirror.
 // `required` mirrors the Zod registry: blog/video title and product name are
 // z.string().min(1); video.videoUrl is a required URL. URL-typed fields are
 // validated for URL shape (when present) regardless of required.
@@ -39,13 +46,13 @@ const FIELDS: Record<CollectionType, FieldDef[]> = {
     { name: "body", label: "Body", kind: "textarea" },
     { name: "author", label: "Author", kind: "text" },
     { name: "tags", label: "Tags (comma separated)", kind: "tags" },
-    { name: "coverImage", label: "Cover image URL", kind: "url" },
+    { name: "coverImage", label: "Cover image", kind: "url", image: true },
   ],
   video: [
     { name: "title", label: "Title", kind: "text", required: true },
     { name: "description", label: "Description", kind: "textarea" },
     { name: "videoUrl", label: "Video URL", kind: "url", required: true },
-    { name: "thumbnail", label: "Thumbnail URL", kind: "url" },
+    { name: "thumbnail", label: "Thumbnail", kind: "url", image: true },
     { name: "tags", label: "Tags (comma separated)", kind: "tags" },
   ],
   product: [
@@ -53,7 +60,7 @@ const FIELDS: Record<CollectionType, FieldDef[]> = {
     { name: "description", label: "Description", kind: "textarea" },
     { name: "priceCents", label: "Price in cents (2000 = $20.00)", kind: "number" },
     { name: "currency", label: "Currency", kind: "text" },
-    { name: "images", label: "Image URLs (comma separated)", kind: "tags" },
+    { name: "images", label: "Product photos", kind: "tags", image: true },
     { name: "inStock", label: "In stock", kind: "bool" },
     { name: "checkoutUrl", label: "Checkout URL", kind: "url" },
   ],
@@ -141,6 +148,29 @@ export function CollectionsManager({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // Transient confirmation after a successful save, distinguishing the action.
   const [savedAction, setSavedAction] = useState<"published" | "draft" | null>(null);
+  // The image field currently choosing from the media library (null = closed).
+  const [pickingField, setPickingField] = useState<FieldDef | null>(null);
+
+  // Insert a chosen photo URL into the active field: replace for a single URL
+  // field, append for an image list (product photos). Clears any stale error.
+  const onPickImage = useCallback((url: string) => {
+    setEditing((cur) => {
+      if (!cur || !pickingField) return cur;
+      const f = pickingField;
+      const next =
+        f.kind === "tags"
+          ? [...(Array.isArray(cur.data[f.name]) ? (cur.data[f.name] as string[]) : []), url]
+          : url;
+      return { ...cur, data: { ...cur.data, [f.name]: next } };
+    });
+    setFieldErrors((prev) => {
+      if (!pickingField || !prev[pickingField.name]) return prev;
+      const copy = { ...prev };
+      delete copy[pickingField.name];
+      return copy;
+    });
+    setPickingField(null);
+  }, [pickingField]);
 
   const load = useCallback(async (t: CollectionType) => {
     setLoading(true);
@@ -221,7 +251,7 @@ export function CollectionsManager({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-warm-black">Content</h1>
+        <h1 className="text-lg font-semibold text-warm-black">{TYPE_LABEL[type]}</h1>
         <div className="flex items-center gap-3">
           {savedAction && (
             <span
@@ -274,6 +304,8 @@ export function CollectionsManager({
                 field={f}
                 value={editing.data[f.name]}
                 invalid={Boolean(fieldErrors[f.name])}
+                readOnly={readOnly}
+                onPickImage={f.image ? () => setPickingField(f) : undefined}
                 onChange={(v) => {
                   setEditing({ ...editing, data: { ...editing.data, [f.name]: v } });
                   if (fieldErrors[f.name]) {
@@ -331,6 +363,12 @@ export function CollectionsManager({
           ))}
         </ul>
       )}
+
+      <AssetPickerModal
+        open={pickingField !== null}
+        onClose={() => setPickingField(null)}
+        onSelect={onPickImage}
+      />
     </div>
   );
 }
@@ -339,14 +377,32 @@ function FieldInput({
   field,
   value,
   invalid = false,
+  readOnly = false,
+  onPickImage,
   onChange,
 }: {
   field: FieldDef;
   value: unknown;
   invalid?: boolean;
+  readOnly?: boolean;
+  /** Present for image fields — opens the media library to insert a photo URL. */
+  onPickImage?: () => void;
   onChange: (v: unknown) => void;
 }) {
   const base = `w-full rounded-md border px-3 py-1.5 text-sm ${invalid ? "border-red-400/50" : "border-gray-border"}`;
+
+  // "Choose from your photos" — so an owner inserts an uploaded image URL instead
+  // of pasting one. Shared by the single-URL image fields and the image list.
+  const pickButton = onPickImage && !readOnly && (
+    <button
+      type="button"
+      onClick={onPickImage}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-border px-2.5 py-1.5 text-[12px] font-medium text-warm-black transition-colors hover:border-accent/40"
+    >
+      <ImageIcon className="h-3.5 w-3.5" strokeWidth={1.6} /> Choose from your photos
+    </button>
+  );
+
   if (field.kind === "textarea") {
     return <textarea rows={6} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
   }
@@ -370,12 +426,20 @@ function FieldInput({
   if (field.kind === "tags") {
     const arr = Array.isArray(value) ? (value as string[]) : [];
     return (
-      <input
-        className={base}
-        value={arr.join(", ")}
-        onChange={(e) => onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-      />
+      <>
+        <input
+          className={base}
+          value={arr.join(", ")}
+          onChange={(e) => onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+        />
+        {pickButton}
+      </>
     );
   }
-  return <input type={field.kind === "url" ? "url" : "text"} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <>
+      <input type={field.kind === "url" ? "url" : "text"} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
+      {pickButton}
+    </>
+  );
 }
