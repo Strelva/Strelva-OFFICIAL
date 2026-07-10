@@ -253,10 +253,10 @@ export function checkContent(ctx: AuditContext): CategoryResult {
     score: headingScore,
     message:
       a.headings.h1 === 1 && a.headings.h2 >= 2 && a.headings.total >= 3
-        ? "Clear heading structure with one H1 and supporting H2s."
+        ? "Clear heading structure with one main heading and supporting sub-headings."
         : a.headings.h1 === 0
-          ? "No H1 heading found. Add one main page heading."
-          : "Limited heading structure. Use H2 and H3 headings to organize the page.",
+          ? "This page has no main heading, so visitors and search can't tell its topic at a glance."
+          : "The page could use more sub-headings to break up the content and guide readers.",
     details: `H1: ${a.headings.h1}, H2: ${a.headings.h2}, H3: ${a.headings.h3}`,
   });
 
@@ -290,7 +290,7 @@ export function checkContent(ctx: AuditContext): CategoryResult {
         ? `Reading level is easy to follow (grade ${a.readingGrade}).`
         : a.readingGrade < 6
           ? `Reading level is very simple (grade ${a.readingGrade}).`
-          : `Reading level is high (grade ${a.readingGrade}). Consider simplifying.`,
+          : `Reading level is fairly advanced (grade ${a.readingGrade}). Simpler wording is easier for more visitors to follow.`,
     details: `Grade ${a.readingGrade}`,
   });
 
@@ -304,8 +304,8 @@ export function checkContent(ctx: AuditContext): CategoryResult {
       a.links.internal >= 10
         ? `Strong internal linking (${a.links.internal} links).`
         : a.links.internal >= 2
-          ? `Some internal linking (${a.links.internal} links). More helps visitors navigate.`
-          : "Limited internal linking. Link to other relevant pages on the site.",
+          ? `Some links between your pages (${a.links.internal}). A few more help visitors explore and help search understand your site.`
+          : "Few links between your pages. Linking related pages helps visitors explore and helps search understand your site.",
     details: `${a.links.internal} internal, ${a.links.external} external`,
   });
 
@@ -334,8 +334,8 @@ export function checkContent(ctx: AuditContext): CategoryResult {
       a.listCount >= 2
         ? `Content is organized with ${a.listCount} lists.`
         : a.listCount === 1
-          ? "One list found. Lists help break up dense content."
-          : "No lists found. Use bullet or numbered lists to organize content.",
+          ? "One list found. Lists help break up dense content and make it easy to scan."
+          : "No lists yet. Bullet or numbered lists make dense content easier to scan.",
     details: `${a.listCount} list(s)`,
   });
 
@@ -349,8 +349,8 @@ export function checkContent(ctx: AuditContext): CategoryResult {
       a.ctaCount >= 2
         ? `Clear calls to action present (${a.ctaCount} found).`
         : a.ctaCount === 1
-          ? "One call to action found. Add more to guide visitors to act."
-          : "No clear call to action detected. Tell visitors what to do next.",
+          ? "One clear next step found. Adding a few more guides visitors to act."
+          : "No clear next step for visitors. Tell them exactly what to do next (call, book, or get a quote) to turn interest into action.",
     details: `${a.ctaCount} CTA phrase(s)`,
   });
 
