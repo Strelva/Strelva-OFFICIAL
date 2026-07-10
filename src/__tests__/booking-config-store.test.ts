@@ -11,10 +11,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = vi.hoisted(() => new Map<string, unknown>());
+const redisState = vi.hoisted(() => ({ throwOnGet: false }));
 
 vi.mock("@/lib/redis", () => ({
   getRedis: () => ({
-    get: async (k: string) => (store.has(k) ? store.get(k) : null),
+    get: async (k: string) => {
+      if (redisState.throwOnGet) throw new Error("redis blip");
+      return store.has(k) ? store.get(k) : null;
+    },
     set: async (k: string, v: unknown) => {
       store.set(k, v);
       return "OK";
@@ -43,6 +47,7 @@ import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 
 beforeEach(() => {
   store.clear();
+  redisState.throwOnGet = false;
 });
 
 describe("booking config store (Redis-backed)", () => {
@@ -69,5 +74,14 @@ describe("booking config store (Redis-backed)", () => {
 
   it("returns [] for date overrides when none are set", async () => {
     expect(await getDateOverrides("gldf")).toEqual([]);
+  });
+
+  it("fails CLOSED on a Redis read error instead of serving default hours", async () => {
+    // A transient Redis blip must NOT silently return DEFAULT_BOOKING_CONFIG —
+    // default hours could offer/deny slots for the wrong days on a live booking
+    // surface. The error propagates so the caller fails the request.
+    redisState.throwOnGet = true;
+    await expect(getBookingConfig("gldf")).rejects.toThrow("redis blip");
+    await expect(getDateOverrides("gldf")).rejects.toThrow("redis blip");
   });
 });

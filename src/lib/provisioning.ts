@@ -86,9 +86,9 @@ const CONTROL_PLANE_API =
 // Auto-rollback is deliberately NOT done here: deleting a Vercel project / tenant
 // on any transient error is far more dangerous (it can destroy a live client's
 // resources) than leaving a resumable partial. To MANUALLY tear down a failed
-// test tenant: deactivate it in Sanity (active:false) and, if a Vercel project
-// was created, remove it via the Vercel dashboard/CLI — the returned steps[]
-// say exactly what was created.
+// test tenant, run `scripts/deprovision-tenant.ts <id>` (purges Postgres + Redis
+// and, unless --keep-vercel, the Vercel project) — the returned steps[] say
+// exactly what was created.
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: ProvisionStep[] = [];
   const subdomain = input.subdomain.trim();

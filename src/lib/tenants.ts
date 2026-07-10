@@ -383,9 +383,9 @@ export async function getTenantByDomain(
     return _domainMapCache[normalized] || _domainMapCache[lower] || null;
   }
 
-  // Rebuild map from the source of truth (Sanity/dev via loadTenants). If that
-  // ALSO fails (Sanity down at the same time as Redis), do NOT throw and break
-  // all custom-domain routing — serve the last-known-good in-memory map even if
+  // Rebuild map from the source of truth (Postgres/dev via loadTenants). If that
+  // ALSO throws (Postgres down at the same time as Redis), do NOT break all
+  // custom-domain routing — serve the last-known-good in-memory map even if
   // stale, then fall back to the static env map.
   let map: Record<string, { tenantId: string; isAdmin: boolean }>;
   try {
@@ -399,21 +399,27 @@ export async function getTenantByDomain(
     return envDomainLookup(normalized, lower);
   }
 
-  // Write to Redis
-  if (redis) {
-    try {
-      await redis.set(DOMAIN_CACHE_KEY, map, { ex: DOMAIN_CACHE_TTL });
-    } catch {
-      // Redis write failed, not fatal
+  // Cache ONLY a non-empty map. An empty map means `loadTenants()` returned []
+  // (a transient Postgres error, swallowed to [] upstream) — caching it would
+  // black out ALL custom-domain routing for the full TTL even after Postgres
+  // recovers. Skipping the cache on empty lets the next request self-heal
+  // (mirrors the loadTenants guard). A genuinely-empty map (fresh/local env with
+  // no custom domains) just costs a rebuild per request. This request still
+  // resolves via the static env map below.
+  if (Object.keys(map).length > 0) {
+    if (redis) {
+      try {
+        await redis.set(DOMAIN_CACHE_KEY, map, { ex: DOMAIN_CACHE_TTL });
+      } catch {
+        // Redis write failed, not fatal
+      }
     }
+    _domainMapCache = map;
+    _domainMapCacheTime = Date.now();
   }
 
-  // Update in-memory cache
-  _domainMapCache = map;
-  _domainMapCacheTime = Date.now();
-
   // A domain present only in the static env map (e.g. a freshly-pointed domain
-  // not yet in Sanity) still resolves.
+  // not yet in the tenant record) still resolves.
   return map[normalized] || map[lower] || envDomainLookup(normalized, lower);
 }
 

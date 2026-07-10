@@ -134,13 +134,13 @@ export async function getBookingConfig(
 ): Promise<BookingConfig> {
   const redis = getRedis();
   if (redis) {
-    try {
-      const raw = await redis.get<BookingConfig>(bookingConfigKey(tenant));
-      if (raw) return raw;
-    } catch {
-      // Redis blip — serve the default rather than crashing availability.
-    }
-    return DEFAULT_BOOKING_CONFIG;
+    // Fail CLOSED: let a Redis error propagate (the caller fails the request)
+    // rather than swallow it and serve DEFAULT_BOOKING_CONFIG — default hours
+    // could offer slots on a day the tenant is actually closed, or hide a day
+    // it's open, on a live booking surface. A genuine miss (null) means "no
+    // custom config yet" → DEFAULT is the correct answer.
+    const raw = await redis.get<BookingConfig>(bookingConfigKey(tenant));
+    return raw ?? DEFAULT_BOOKING_CONFIG;
   }
   const store = await readDevContent(tenant);
   return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
@@ -165,14 +165,19 @@ export async function setBookingConfig(
 export async function getDateOverrides(
   tenant: string = DEFAULT_TENANT
 ): Promise<DateOverride[]> {
+  // NOTE: there is currently NO app writer for date overrides — they were
+  // authored in Sanity Studio, which is decommissioned — so this returns [] in
+  // prod today. The getter + the availability path's override handling are kept
+  // intact for a future Redis-backed writer (config already lives here). If a
+  // client relied on Studio-authored holiday closures, those are no longer
+  // honored (see the Sanity teardown ops notes).
   const redis = getRedis();
   if (redis) {
-    try {
-      const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
-      return Array.isArray(raw) ? raw : [];
-    } catch {
-      return [];
-    }
+    // Fail CLOSED like getBookingConfig: propagate a Redis error rather than
+    // silently dropping a "closed" override and accepting a booking on a day the
+    // owner blocked off.
+    const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
+    return Array.isArray(raw) ? raw : [];
   }
   const store = await readDevContent(tenant);
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
