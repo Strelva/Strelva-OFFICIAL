@@ -111,7 +111,9 @@ export async function listTenantMedia(tenant: string): Promise<MediaAsset[]> {
 /**
  * Upload a verified image buffer to the tenant's Blob library. The caller does
  * size/type/raster-byte verification; this just stores it under the tenant
- * prefix. `put` adds a random suffix so same-name re-uploads don't collide.
+ * prefix. `addRandomSuffix` makes the pathname unique so a same-name re-upload
+ * gets its own URL instead of throwing (v2 Blob rejects a duplicate pathname by
+ * default). Requires BLOB_READ_WRITE_TOKEN — the media library is Blob-only now.
  */
 export async function uploadTenantMedia(
   tenant: string,
@@ -119,11 +121,15 @@ export async function uploadTenantMedia(
   filename: string,
   contentType: string,
 ): Promise<MediaAsset> {
+  if (!blobEnabled()) {
+    throw new Error("Media uploads require BLOB_READ_WRITE_TOKEN (Vercel Blob) to be configured.");
+  }
   const { put } = await import("@vercel/blob");
   const safe = sanitizeFilename(filename);
   const blob = await put(`${mediaPrefix(tenant)}${safe}`, buffer, {
     access: "public",
     contentType,
+    addRandomSuffix: true,
   });
   return {
     id: blob.url,

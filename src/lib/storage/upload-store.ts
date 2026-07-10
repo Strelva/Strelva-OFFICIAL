@@ -43,9 +43,12 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (hasBlob) {
     const { put } = await import("@vercel/blob");
+    // addRandomSuffix: a same-name re-upload gets a unique path instead of
+    // throwing (v2 Blob rejects a duplicate pathname by default).
     const blob = await put(safeName, buffer, {
       access: "public",
       contentType: file.type,
+      addRandomSuffix: true,
     });
     return { url: blob.url };
   }

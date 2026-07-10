@@ -66,9 +66,19 @@ describe("uploadTenantMedia", () => {
     expect(mockPut).toHaveBeenCalledWith(
       "media/gldf/photo.jpg",
       expect.any(Buffer),
-      expect.objectContaining({ access: "public", contentType: "image/jpeg" }),
+      // addRandomSuffix so a same-name re-upload gets a unique path (v2 Blob
+      // throws on a duplicate pathname otherwise).
+      expect.objectContaining({ access: "public", contentType: "image/jpeg", addRandomSuffix: true }),
     );
     expect(asset).toMatchObject({ url: `${BLOB}/media/gldf/photo-x1.jpg`, filename: "photo.jpg", size: 5 });
+  });
+
+  it("throws a clear error (not a cryptic BlobError) when the Blob token is missing", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    await expect(uploadTenantMedia("gldf", Buffer.from("b"), "x.jpg", "image/jpeg")).rejects.toThrow(
+      /BLOB_READ_WRITE_TOKEN/,
+    );
+    expect(mockPut).not.toHaveBeenCalled();
   });
 
   it("sanitizes the filename before using it as the blob path", async () => {
