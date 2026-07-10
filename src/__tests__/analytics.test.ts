@@ -11,10 +11,15 @@ vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({
   getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a),
 }));
-vi.mock("@/lib/search-console", () => ({
-  getServiceAccountCredential: (...a: unknown[]) => mockGetCredential(...a),
-  getAccessToken: (...a: unknown[]) => mockGetAccessToken(...a),
-}));
+// Keep the REAL queryGscTotals (it drives the stubbed fetch); mock only auth.
+vi.mock("@/lib/search-console", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/search-console")>();
+  return {
+    ...actual,
+    getServiceAccountCredential: (...a: unknown[]) => mockGetCredential(...a),
+    getAccessToken: (...a: unknown[]) => mockGetAccessToken(...a),
+  };
+});
 vi.mock("@/lib/google-token", () => ({
   getGoogleScopeGrants: (...a: unknown[]) => mockGetGoogleScopeGrants(...a),
   getGoogleAccessToken: (...a: unknown[]) => mockGetGoogleAccessToken(...a),

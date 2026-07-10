@@ -31,7 +31,7 @@
 
 import { getRedis } from "./redis";
 import { getTenantConfig } from "./tenants";
-import { getAccessToken, getServiceAccountCredential } from "./search-console";
+import { getAccessToken, getServiceAccountCredential, queryGscTotals } from "./search-console";
 import { getGoogleAccessToken, getGoogleScopeGrants } from "./google-token";
 import type { TenantConfig } from "./types";
 
@@ -201,7 +201,6 @@ function dateRange(days: number): { startDate: string; endDate: string } {
   return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) };
 }
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
 const num = (v: unknown) => Number(v) || 0;
 
 const EMPTY_SEARCH: Omit<SearchPerf, "status"> = {
@@ -219,13 +218,6 @@ const EMPTY_GA: Omit<GaPerf, "status"> = {
   topPages: [],
   topSources: [],
 };
-
-interface GscRow {
-  keys: string[];
-  clicks: number;
-  impressions: number;
-  position: number;
-}
 
 /**
  * Resolve a bearer token for a Google read surface: the tenant's own OAuth
@@ -264,60 +256,19 @@ export async function getSearchConsolePerf(tenantId: string, days = 28): Promise
     if (!token) return { status: "unavailable", ...EMPTY_SEARCH };
 
     const { startDate, endDate } = dateRange(days);
-    const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
-      cfg.gscProperty
-    )}/searchAnalytics/query`;
-    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    // Shared two-request read (true property totals + top-20 query list) — see
+    // queryGscTotals. Identical logic backs the search-console cron.
+    const totals = await queryGscTotals(cfg.gscProperty, token, startDate, endDate);
+    if (!totals) return { status: "unavailable", ...EMPTY_SEARCH };
 
-    // Two reads, in parallel:
-    //  - totalsRes: NO dimensions → one row of TRUE property totals (clicks,
-    //    impressions, ctr, position). Summing the top-20 query rows understates
-    //    the long tail and skews CTR/position; the un-dimensioned row is the fix.
-    //  - queriesRes: the top-20 query list, for the `topQueries` display only.
-    const [totalsRes, queriesRes] = await Promise.all([
-      fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ startDate, endDate }),
-      }),
-      fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 20 }),
-      }),
-    ]);
-    if (!totalsRes.ok || !queriesRes.ok) return { status: "unavailable", ...EMPTY_SEARCH };
-
-    const totalsData = await totalsRes.json();
-    const queriesData = await queriesRes.json();
-    const queryRows: GscRow[] = queriesData.rows || [];
-    const topQueries = queryRows.map((r) => ({
-      query: r.keys[0],
-      clicks: r.clicks,
-      impressions: r.impressions,
-      position: round1(r.position),
-    }));
-
-    // Property total from the un-dimensioned row. Fall back to the query-row sum
-    // only if that read came back empty, so an odd response still yields a value.
-    const totalRow: { clicks?: number; impressions?: number; ctr?: number; position?: number } | undefined =
-      totalsData.rows?.[0];
-    const clicks = totalRow ? num(totalRow.clicks) : queryRows.reduce((s, r) => s + r.clicks, 0);
-    const impressions = totalRow
-      ? num(totalRow.impressions)
-      : queryRows.reduce((s, r) => s + r.impressions, 0);
-    const ctr = totalRow
-      ? Math.round(num(totalRow.ctr) * 10000) / 10000
-      : impressions > 0
-        ? Math.round((clicks / impressions) * 10000) / 10000
-        : 0;
-    const position = totalRow
-      ? round1(num(totalRow.position))
-      : impressions > 0
-        ? round1(queryRows.reduce((s, r) => s + r.position * r.impressions, 0) / impressions)
-        : 0;
-
-    const result: SearchPerf = { status: "ok", clicks, impressions, ctr, position, topQueries };
+    const result: SearchPerf = {
+      status: "ok",
+      clicks: totals.clicks,
+      impressions: totals.impressions,
+      ctr: totals.ctr,
+      position: totals.position,
+      topQueries: totals.topQueries,
+    };
     await writeCachedPerf("gsc", tenantId, days, result);
     return result;
   } catch {

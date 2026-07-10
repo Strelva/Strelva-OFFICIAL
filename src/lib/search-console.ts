@@ -91,6 +91,83 @@ const EMPTY_DATA: SearchData = {
   fetchedAt: new Date().toISOString(),
 };
 
+export interface GscTotals {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  topQueries: { query: string; clicks: number; impressions: number; position: number }[];
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const num = (v: unknown) => Number(v) || 0;
+
+/**
+ * The two-request Search Analytics read shared by BOTH GSC readers — the
+ * dashboard perf reader (`analytics.getSearchConsolePerf`) and the cron
+ * `fetchSearchData` below. One un-dimensioned request yields the TRUE property
+ * totals (summing the top-20 query rows understates any long tail); a second
+ * dimensioned request yields the top-20 query list for display. Totals come from
+ * the aggregate row, falling back to the query-row sum only if that read is
+ * empty. Returns null on any non-ok response — callers map that to their own
+ * empty/unavailable shape. The caller supplies the resolved property + bearer
+ * token (each reader has its own auth strategy), so this is purely the
+ * query+parse that previously lived, drift-prone, in two places (Track B had to
+ * edit both copies identically — this centralizes it).
+ */
+export async function queryGscTotals(
+  property: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+): Promise<GscTotals | null> {
+  const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
+    property,
+  )}/searchAnalytics/query`;
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const [totalsRes, queriesRes] = await Promise.all([
+    fetch(endpoint, { method: "POST", headers, body: JSON.stringify({ startDate, endDate }) }),
+    fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 20 }),
+    }),
+  ]);
+  if (!totalsRes.ok || !queriesRes.ok) {
+    const failed = !totalsRes.ok ? totalsRes : queriesRes;
+    console.error(`Search Console API error: ${failed.status} ${await failed.text()}`);
+    return null;
+  }
+
+  const totalsData = await totalsRes.json();
+  const queriesData = await queriesRes.json();
+  const queryRows: { keys: string[]; clicks: number; impressions: number; position: number }[] =
+    queriesData.rows || [];
+  const topQueries = queryRows.map((r) => ({
+    query: r.keys[0],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    position: round1(r.position),
+  }));
+
+  const totalRow: { clicks?: number; impressions?: number; ctr?: number; position?: number } | undefined =
+    totalsData.rows?.[0];
+  const clicks = totalRow ? num(totalRow.clicks) : queryRows.reduce((s, r) => s + r.clicks, 0);
+  const impressions = totalRow ? num(totalRow.impressions) : queryRows.reduce((s, r) => s + r.impressions, 0);
+  const ctr = totalRow
+    ? Math.round(num(totalRow.ctr) * 10000) / 10000
+    : impressions > 0
+      ? Math.round((clicks / impressions) * 10000) / 10000
+      : 0;
+  const position = totalRow
+    ? round1(num(totalRow.position))
+    : impressions > 0
+      ? round1(queryRows.reduce((s, r) => s + r.position * r.impressions, 0) / impressions)
+      : 0;
+
+  return { clicks, impressions, ctr, position, topQueries };
+}
+
 export async function fetchSearchData(
   siteUrl: string,
   days = 7,
@@ -101,72 +178,21 @@ export async function fetchSearchData(
 
   try {
     const token = await getAccessToken(key);
-
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const encodedUrl = encodeURIComponent(siteUrl);
-    const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodedUrl}/searchAnalytics/query`;
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-    const startStr = startDate.toISOString().slice(0, 10);
-    const endStr = endDate.toISOString().slice(0, 10);
-
-    // Property totals come from an un-dimensioned request (one aggregate row);
-    // the dimensioned request only supplies the top-20 query list. Summing the
-    // top-20 rows for totals understates any site with a long tail.
-    const [totalsRes, queriesRes] = await Promise.all([
-      fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ startDate: startStr, endDate: endStr }),
-      }),
-      fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          startDate: startStr,
-          endDate: endStr,
-          dimensions: ["query"],
-          rowLimit: 20,
-        }),
-      }),
-    ]);
-
-    if (!totalsRes.ok || !queriesRes.ok) {
-      const failed = !totalsRes.ok ? totalsRes : queriesRes;
-      console.error(`Search Console API error: ${failed.status} ${await failed.text()}`);
-      return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
-    }
-
-    const totalsData = await totalsRes.json();
-    const queriesData = await queriesRes.json();
-    const rows = queriesData.rows || [];
-
-    const queries = rows.map((row: { keys: string[]; clicks: number; impressions: number; position: number }) => ({
-      query: row.keys[0],
-      clicks: row.clicks,
-      impressions: row.impressions,
-      position: Math.round(row.position * 10) / 10,
-    }));
-
-    // True property totals from the un-dimensioned row; fall back to the query
-    // sum only if that read came back empty.
-    const totalRow: { clicks?: number; impressions?: number } | undefined = totalsData.rows?.[0];
-    const totalClicks = totalRow
-      ? Number(totalRow.clicks) || 0
-      : queries.reduce((sum: number, q: { clicks: number }) => sum + q.clicks, 0);
-    const totalImpressions = totalRow
-      ? Number(totalRow.impressions) || 0
-      : queries.reduce((sum: number, q: { impressions: number }) => sum + q.impressions, 0);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const totals = await queryGscTotals(
+      siteUrl,
+      token,
+      start.toISOString().slice(0, 10),
+      end.toISOString().slice(0, 10),
+    );
+    if (!totals) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
 
     return {
-      queries,
-      totalClicks,
-      totalImpressions,
+      queries: totals.topQueries,
+      totalClicks: totals.clicks,
+      totalImpressions: totals.impressions,
       fetchedAt: new Date().toISOString(),
     };
   } catch (err) {
