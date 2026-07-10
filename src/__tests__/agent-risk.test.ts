@@ -63,6 +63,21 @@ describe("assessRisk", () => {
     expect(r).toMatchObject({ level: "medium", autoApply: false });
   });
 
+  it("routes a bare price/hours/date fact edit to review (2nd-gate backstop for governance)", () => {
+    // These plain-text facts carry no URL/markup, so only the field NAME flags them.
+    // assessRisk must catch them so they aren't left to the governance classifier alone.
+    for (const field of ["price", "hours", "openDate", "startTime"]) {
+      const r = assessRisk({
+        type: "rewrite",
+        section: "contact",
+        field,
+        before: "9",
+        after: "10",
+      });
+      expect(r).toMatchObject({ level: "medium", autoApply: false });
+    }
+  });
+
   it("never auto-applies a change that introduces markup/script", () => {
     const r = assessRisk({
       type: "rewrite",

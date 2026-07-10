@@ -7,9 +7,14 @@ import type { ContentSection } from "./types";
 
 export type RiskLevel = "low" | "medium" | "high";
 
-// A field name that carries a link, payment, or contact detail — changes to
-// these are never "minor", regardless of how few characters move.
-const SENSITIVE_FIELD = /url|link|href|booking|stripe|payment|email|phone|address|map/i;
+// A field name that carries a link, payment, contact detail, or a high-consequence
+// business FACT (price / hours / date / time) — changes to these are never "minor",
+// regardless of how few characters move. The fact terms (price|hours|date|time) are
+// the class the governance classifier used to guard ALONE; adding them here makes
+// the two gates overlap, so a bare price/hours edit is caught even if governance's
+// substring match misses it (defense-in-depth). Over-matching (e.g. "lastUpdated"
+// hitting "date") fails safe — it only routes MORE to review, never less.
+const SENSITIVE_FIELD = /url|link|href|booking|stripe|payment|email|phone|address|map|price|hours|date|time/i;
 // Markup/script tokens that must never auto-publish if newly introduced.
 const MARKUP_TOKEN = /<\s*(script|iframe|a|img|svg|object|embed|style)\b|javascript:|on\w+\s*=/i;
 
