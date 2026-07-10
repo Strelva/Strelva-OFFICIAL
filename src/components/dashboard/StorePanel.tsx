@@ -1,5 +1,6 @@
 import { ShoppingBag, TrendingUp, Package, Receipt, Tag } from "lucide-react";
 import { formatMoney, buildStoreVerdict, type OrderRecord, type OrderSummary } from "@/lib/orders";
+import { sanitizePromptValue } from "@/lib/capabilities";
 import type { Product } from "@/lib/products";
 import { StoreChatButton } from "./StoreChatButton";
 
@@ -7,7 +8,9 @@ import { StoreChatButton } from "./StoreChatButton";
 // hold no customer PII on an order (just items/amount/date), so the ask is
 // honest about that and hands the owner a message + their review link to send.
 function reviewPrompt(order: OrderRecord): string {
-  const names = order.items.map((i) => i.name).filter(Boolean).slice(0, 2);
+  // Item names come from the order beacon (untrusted). Sanitize before they enter
+  // the governed agent prompt so a crafted name can't inject instructions.
+  const names = order.items.map((i) => sanitizePromptValue(i.name)).filter(Boolean).slice(0, 2);
   const label = names.length ? names.join(" and ") : `${formatMoney(order.amountCents, order.currency)} order`;
   const date = new Date(order.createdAt).toLocaleDateString();
   return `Help me ask the customer who bought ${label} on ${date} for a Google review. Write a short, friendly message I can send them and include my review link.`;
