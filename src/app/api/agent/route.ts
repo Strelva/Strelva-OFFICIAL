@@ -1400,21 +1400,15 @@ Only use tools for manifest-supported sections and actions. If the user requests
         inputSchema: z.object({}),
         execute: async () => {
           try {
-            const { getSanityReadClient } = await import("@/lib/sanity");
-            const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) [0...20] {
-              _id,
-              url,
-              originalFilename
-            }`;
-            const raw = await getSanityReadClient().fetch(query, { tenant });
-            const assets = (raw || []) as Array<{ _id: string; url: string; originalFilename: string }>;
+            const { listTenantMedia } = await import("@/lib/media-store");
+            const assets = await listTenantMedia(tenant);
 
             return {
               __inlineTool: "show_photos",
               photos: assets.slice(0, 6).map((a) => ({
-                id: a._id,
+                id: a.id,
                 url: a.url,
-                filename: a.originalFilename || "untitled",
+                filename: a.filename,
               })),
               total: assets.length,
             };

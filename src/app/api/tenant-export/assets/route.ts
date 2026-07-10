@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
-import { getSanityReadClient } from "@/lib/sanity";
+import { listTenantMedia } from "@/lib/media-store";
 import type { ContentSection } from "@/lib/types";
 import type { MediaAsset } from "@/lib/media";
 
@@ -29,38 +29,6 @@ function collectUrls(value: unknown, urls = new Set<string>()): Set<string> {
     });
   }
   return urls;
-}
-
-async function listSanityAssets(tenant: string): Promise<MediaAsset[]> {
-  const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) {
-    _id,
-    _createdAt,
-    url,
-    originalFilename,
-    metadata { dimensions { width, height }, lqip },
-    size
-  }`;
-
-  const raw = await getSanityReadClient().fetch(query, { tenant });
-  return (raw || []).map(
-    (doc: {
-      _id: string;
-      _createdAt: string;
-      url: string;
-      originalFilename?: string;
-      metadata?: { dimensions?: { width: number; height: number }; lqip?: string };
-      size?: number;
-    }) => ({
-      id: doc._id,
-      url: doc.url,
-      filename: doc.originalFilename || "untitled",
-      width: doc.metadata?.dimensions?.width || 0,
-      height: doc.metadata?.dimensions?.height || 0,
-      size: doc.size || 0,
-      lqip: doc.metadata?.lqip || undefined,
-      createdAt: doc._createdAt,
-    }),
-  );
 }
 
 function jsonAttachment(body: unknown, filename: string) {
@@ -96,7 +64,7 @@ export async function GET() {
   let libraryAssets: MediaAsset[] = [];
   let libraryStatus: "included" | "unavailable" = "included";
   try {
-    libraryAssets = await listSanityAssets(tenant);
+    libraryAssets = await listTenantMedia(tenant);
   } catch {
     libraryStatus = "unavailable";
   }
