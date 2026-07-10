@@ -1,11 +1,10 @@
 /**
- * Platform dependency health — Redis, Sanity, Clerk, Stripe, Gemini. Extracted
+ * Platform dependency health — Redis, Supabase, Clerk, Stripe, Gemini. Extracted
  * from the /api/health route so the ops board (and anything else) can read the
  * same checks server-side without an HTTP round-trip.
  */
 
 import { getRedis } from "./redis";
-import { getSanityClient } from "./sanity";
 import { getSupabase } from "./db/client";
 
 const APP_VERSION = process.env.APP_VERSION || "0.1.0";
@@ -25,7 +24,6 @@ export interface HealthReport {
   checks: {
     redis: ServiceCheck;
     supabase: ServiceCheck;
-    sanity: ServiceCheck;
     clerk: ServiceCheck;
     stripe: ServiceCheck;
     gemini: ServiceCheck;
@@ -45,22 +43,6 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; ms: number }
   const start = performance.now();
   const result = await fn();
   return { result, ms: Math.round(performance.now() - start) };
-}
-
-async function checkSanity(): Promise<ServiceCheck> {
-  if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.SANITY_API_TOKEN) {
-    return { status: "not configured", responseMs: 0 };
-  }
-  try {
-    const { ms } = await timed(async () => {
-      const client = getSanityClient();
-      await withTimeout(client.fetch<number>(`count(*[_type == "siteSettings"])`), TIMEOUT_MS, "Sanity");
-    });
-    return { status: "ok", responseMs: ms };
-  } catch (err) {
-    console.error("[health] Sanity check failed:", err instanceof Error ? err.message : err);
-    return { status: "error", responseMs: TIMEOUT_MS };
-  }
 }
 
 async function checkSupabase(): Promise<ServiceCheck> {
@@ -158,8 +140,7 @@ async function checkGemini(): Promise<ServiceCheck> {
 
 /** Run all dependency checks and roll up an overall status. */
 export async function getServiceHealth(): Promise<HealthReport> {
-  const [sanity, supabase, redis, clerk, stripe, gemini] = await Promise.all([
-    checkSanity(),
+  const [supabase, redis, clerk, stripe, gemini] = await Promise.all([
     checkSupabase(),
     checkRedis(),
     checkClerk(),
@@ -167,11 +148,11 @@ export async function getServiceHealth(): Promise<HealthReport> {
     checkGemini(),
   ]);
 
-  const checks = { redis, supabase, sanity, clerk, stripe, gemini };
-  // Core = the live backbone (Redis + Supabase/Postgres). Sanity and Clerk are
-  // being decommissioned, so their errors are "degraded", not "down" — otherwise
-  // pulling those keys would falsely page the platform as down. not-configured
-  // counts as healthy.
+  const checks = { redis, supabase, clerk, stripe, gemini };
+  // Core = the live backbone (Redis + Supabase/Postgres). Clerk is being
+  // decommissioned, so its errors are "degraded", not "down" — otherwise pulling
+  // those keys would falsely page the platform as down. not-configured counts as
+  // healthy.
   const coreDown = redis.status === "error" || supabase.status === "error";
   const anyError = Object.values(checks).some((c) => c.status === "error");
   const status: HealthReport["status"] = coreDown ? "down" : anyError ? "degraded" : "healthy";

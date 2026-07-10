@@ -1,16 +1,12 @@
 /**
  * Newsletter subscriber storage.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres
- * `newsletter_subscribers` table (Sanity fallback on read). Writes go to
- * Postgres AND Sanity while both are configured so the transition is reversible;
- * once Sanity is removed, `hasSanity` is false and only Postgres is written.
- * Default off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `newsletter_subscribers`
+ * table; otherwise uses the local dev-file store.
  */
 
 import path from "path";
-import { getSanityClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevFile, writeDevFile } from "./core";
+import { DEFAULT_TENANT, readDevFile, writeDevFile } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -133,48 +129,7 @@ export async function addSubscriber(
         };
     await pgUpsertSubscriber(subscriber, tenant);
 
-    // Dual-write to Sanity while it is still configured (reversibility).
-    if (hasSanity) {
-      const existingId = await getSanityClient().fetch(
-        `*[_type == "newsletterSubscriber" && tenant == $tenant && email == $email][0]._id`,
-        { tenant, email }
-      );
-      if (existingId) {
-        await getSanityClient().patch(existingId).set({ status: "active" }).commit();
-      } else {
-        await getSanityClient().create({
-          _type: "newsletterSubscriber",
-          tenant,
-          email,
-          name: name || undefined,
-          subscribedAt: subscriber.subscribedAt,
-          status: "active",
-        });
-      }
-    }
-
     return { duplicate: Boolean(existing) };
-  }
-
-  if (hasSanity) {
-    const existing = await getSanityClient().fetch(
-      `*[_type == "newsletterSubscriber" && tenant == $tenant && email == $email][0]._id`,
-      { tenant, email }
-    );
-    if (existing) {
-      // Re-activate if previously unsubscribed
-      await getSanityClient().patch(existing).set({ status: "active" }).commit();
-      return { duplicate: true };
-    }
-    await getSanityClient().create({
-      _type: "newsletterSubscriber",
-      tenant,
-      email,
-      name: name || undefined,
-      subscribedAt: new Date().toISOString(),
-      status: "active",
-    });
-    return { duplicate: false };
   }
 
   const store = await readDevNewsletter();
@@ -202,15 +157,7 @@ export async function getSubscribers(
 ): Promise<NewsletterSubscriber[]> {
   if (dataSourceIsPostgres()) {
     const rows = await pgListSubscribers(tenant);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    return getSanityClient().fetch(
-      `*[_type == "newsletterSubscriber" && tenant == $tenant] | order(subscribedAt desc) { email, name, subscribedAt, status }`,
-      { tenant }
-    );
+    return rows;
   }
 
   const store = await readDevNewsletter();

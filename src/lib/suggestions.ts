@@ -12,8 +12,6 @@ import type { ContentSection } from "./types";
 import { dataSourceIsPostgres } from "./db/source-flags";
 import { getSupabase, type Row, type Insert } from "./db/client";
 
-const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
-
 export interface Suggestion {
   id: string;
   tenantId: string;
@@ -31,8 +29,8 @@ export interface Suggestion {
 // The `suggestions` table maps 1:1 to the Suggestion interface (camelCase ->
 // snake_case). `tenant_id` FKs tenants(id) (uuid) and is passed straight through
 // — tenant ids in this codebase are real uuids, unlike the Clerk-era user ids.
-// Every query is wrapped so it never throws; a failure degrades to the Sanity /
-// dev path the caller already falls through to.
+// Every query is wrapped so it never throws; a failure degrades to the dev path
+// the caller already falls through to.
 
 function suggestionToInsert(s: Suggestion): Insert<"suggestions"> {
   return {
@@ -108,7 +106,7 @@ async function pgInsertSuggestion(suggestion: Suggestion): Promise<void> {
     if (!db) return;
     await db.from("suggestions").insert(suggestionToInsert(suggestion));
   } catch {
-    // swallow — Sanity/dev write still happens for reversibility
+    // swallow — the dev-file write still happens for reversibility
   }
 }
 
@@ -156,17 +154,7 @@ async function writeSuggestions(data: Record<string, Suggestion[]>): Promise<voi
 export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
   if (dataSourceIsPostgres()) {
     const rows = await pgListPendingSuggestions(tenantId);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    const docs = await getSanityClient().fetch(
-      `*[_type == "suggestion" && tenantId == $tenantId && status == "pending"] | order(createdAt desc)`,
-      { tenantId },
-    );
-    return (docs || []).map(sanityToSuggestion);
+    return rows;
   }
 
   const store = await readSuggestions();
@@ -192,34 +180,6 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
 
     await pgInsertSuggestion(entry);
 
-    // Keep the Sanity write alive while configured (dual-write for reversibility).
-    if (hasSanity) {
-      const { getSanityClient } = await import("./sanity");
-      await getSanityClient().create({
-        _type: "suggestion",
-        ...entry,
-        suggestionType: entry.type,
-      });
-    }
-
-    await addSuggestionEvent(entry);
-    return entry;
-  }
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    // Dedupe check
-    const existing = await getSanityClient().fetch(
-      `*[_type == "suggestion" && tenantId == $tenantId && status == "pending" && suggestionType == $type && section == $section][0]`,
-      { tenantId: suggestion.tenantId, type: suggestion.type, section: suggestion.section || "" },
-    );
-    if (existing) return sanityToSuggestion(existing);
-
-    await getSanityClient().create({
-      _type: "suggestion",
-      ...entry,
-      suggestionType: entry.type,
-    });
     await addSuggestionEvent(entry);
     return entry;
   }
@@ -303,33 +263,7 @@ export async function updateSuggestion(
 ): Promise<Suggestion | null> {
   if (dataSourceIsPostgres()) {
     const pgUpdated = await pgUpdateSuggestionStatus(tenantId, suggestionId, status);
-
-    // Mirror the status change to Sanity while it's still configured (dual-write).
-    if (hasSanity) {
-      const { getSanityClient } = await import("./sanity");
-      const doc = await getSanityClient().fetch(
-        `*[_type == "suggestion" && tenantId == $tenantId && id == $id][0]._id`,
-        { tenantId, id: suggestionId },
-      );
-      if (doc) await getSanityClient().patch(doc).set({ status }).commit();
-    }
-
     return pgUpdated;
-  }
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    const doc = await getSanityClient().fetch(
-      `*[_type == "suggestion" && tenantId == $tenantId && id == $id][0]._id`,
-      { tenantId, id: suggestionId },
-    );
-    if (!doc) return null;
-    await getSanityClient().patch(doc).set({ status }).commit();
-    const updated = await getSanityClient().fetch(
-      `*[_type == "suggestion" && tenantId == $tenantId && id == $id][0]`,
-      { tenantId, id: suggestionId },
-    );
-    return updated ? sanityToSuggestion(updated) : null;
   }
 
   const store = await readSuggestions();
@@ -341,12 +275,6 @@ export async function updateSuggestion(
   store[tenantId] = suggestions;
   await writeSuggestions(store);
   return suggestions[idx];
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function sanityToSuggestion(doc: any): Suggestion {
-  const { _id, _rev, _type, _createdAt, _updatedAt, suggestionType, ...rest } = doc;
-  return { ...rest, type: suggestionType || rest.type } as Suggestion;
 }
 
 // --- Generation ---

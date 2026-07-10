@@ -7,7 +7,6 @@
  * Validates all external dependencies, env vars, and webhook configurations.
  */
 
-import { createClient } from "@sanity/client";
 import { Redis } from "@upstash/redis";
 import Stripe from "stripe";
 import { execFileSync } from "node:child_process";
@@ -20,6 +19,7 @@ import {
   type ReadinessStatus,
 } from "../src/lib/production-readiness-rules";
 import { DEFAULT_MARKETING_HOSTS, parseMarketingDomains } from "../src/lib/marketing-hosts";
+import { getAllTenants } from "../src/lib/tenants";
 
 for (const path of [".env.production.local", ".env.local", ".env"]) {
   if (!existsSync(path)) continue;
@@ -71,7 +71,6 @@ const envSourceHints: Record<string, string> = {
   INSTAGRAM_CLIENT_ID: "Meta app Instagram OAuth client ID",
   INSTAGRAM_CLIENT_SECRET: "Meta app Instagram OAuth client secret",
   NEXT_PUBLIC_APP_URL: "https://strelva.com or the deployed control-plane URL used for OAuth callbacks",
-  NEXT_PUBLIC_SANITY_PROJECT_ID: "Sanity production project ID",
   NEXT_PUBLIC_SITE_URL: "https://strelva.com",
   NEXT_PUBLIC_SUPABASE_URL: "Supabase project URL (Project Settings → API)",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "Supabase anon/publishable key (Project Settings → API)",
@@ -80,8 +79,6 @@ const envSourceHints: Record<string, string> = {
   REB_CUSTOM_REQUEST_SECRET: "Legacy alias for SCAFFOLD_CUSTOM_REQUEST_SECRET. Kept readable so deployed custom repos that still set the REB_ name keep working.",
   RESEND_API_KEY: "Resend production API key",
   RESEND_DOMAIN: "Verified Resend sending domain",
-  SANITY_API_TOKEN: "Sanity production API token with content read/write permissions",
-  SANITY_WEBHOOK_SECRET: "Sanity webhook secret you configure for /api/sanity/webhook",
   SENTRY_DSN: "Sentry project DSN",
   NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
   STRIPE_SCAFFOLD_PRICE_ID: "Optional. Stripe live recurring monthly USD price id when admin-side billing is turned on. Leave unset while client sites are free.",
@@ -339,14 +336,12 @@ function checkLaunchBlockerActionability(path: string) {
     "Minimum production values to confirm in Vercel",
     "Copyable Vercel env commands",
     "vercel env add CLERK_WEBHOOK_SECRET production",
-    "vercel env add SANITY_WEBHOOK_SECRET production",
     "vercel env add UPSTASH_REDIS_REST_URL production",
     "vercel env add UPSTASH_REDIS_REST_TOKEN production",
     "vercel env add SENTRY_DSN production",
     "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
     "Provider value sources",
     "Clerk Dashboard -> Webhooks",
-    "Sanity project webhook settings",
     "Upstash Redis database -> REST API section",
     "Sentry project settings -> Client Keys / DSN",
     "Stripe live-mode Products",
@@ -366,7 +361,7 @@ function checkLaunchBlockerActionability(path: string) {
     "PLAYWRIGHT_BASE_URL=https://strelva.com",
     "https://strelva.com/api/cron/maintenance",
     "https://strelva.com/api/health",
-    "Clerk/Sanity/Stripe webhook deliveries",
+    "Clerk/Stripe webhook deliveries",
     "curl -i https://strelva.com/api/cron/maintenance",
     'curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance',
     "cron 401",
@@ -1003,7 +998,7 @@ checkEnvVar("GOOGLE_GENERATIVE_AI_API_KEY", true);
 console.log("\n─── Data backbone (Supabase Postgres + Auth) ────────────────────");
 // Supabase is the live source of truth (auth + tenant + content + ops data).
 // A deploy missing these — or with the source flags not set to "postgres" —
-// silently falls back to reading stale Sanity, which is the worst kind of bug
+// silently falls back to the dev-file/defaults, which is the worst kind of bug
 // (looks fine, serves old data). So these are hard prod requirements now.
 checkEnvVar("NEXT_PUBLIC_SUPABASE_URL", true, false);
 const hasSupabaseKey = !!(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
@@ -1018,15 +1013,9 @@ for (const flag of ["CONTENT_SOURCE", "TENANTS_SOURCE", "DATA_SOURCE"]) {
   log({
     name: `ENV: ${flag}`,
     status: v === "postgres" ? "ok" : "fail",
-    message: v === "postgres" ? "postgres" : `must be "postgres" in prod (is "${v ?? "unset"}" → falls back to stale Sanity)`,
+    message: v === "postgres" ? "postgres" : `must be "postgres" in prod (is "${v ?? "unset"}")`,
   });
 }
-
-console.log("\n─── Content Storage (Sanity — legacy, teardown pending) ─────────");
-const hasSanityProject = checkEnvVar("NEXT_PUBLIC_SANITY_PROJECT_ID", true, false);
-checkEnvVar("NEXT_PUBLIC_SANITY_DATASET", false, false);
-const hasSanityToken = checkEnvVar("SANITY_API_TOKEN", true);
-checkEnvVar("SANITY_WEBHOOK_SECRET", true);
 
 console.log("\n─── Redis (Upstash) ─────────────────────────────────────────────");
 const hasRedisUrl = checkEnvVar("UPSTASH_REDIS_REST_URL", true, false);
@@ -1132,35 +1121,6 @@ console.log("\n═════════════════════�
 console.log("  Connectivity Checks");
 console.log("═══════════════════════════════════════════════════════════════\n");
 
-async function checkSanity() {
-  if (!hasSanityProject || !hasSanityToken) {
-    log({ name: "Sanity connectivity", status: "skip", message: "Missing credentials" });
-    return;
-  }
-
-  try {
-    const client = createClient({
-      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
-      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-      apiVersion: "2024-01-01",
-      useCdn: false,
-      token: process.env.SANITY_API_TOKEN,
-    });
-
-    const count = await client.fetch<number>(`count(*[_type == "tenant"])`);
-    log({ name: "Sanity connectivity", status: "ok", message: `Connected (${count} tenants)` });
-
-    // Check if dataset exists and has tenant data
-    if (count === 0) {
-      log({ name: "Sanity dataset health", status: "warn", message: "No tenants in dataset" });
-    } else {
-      log({ name: "Sanity dataset health", status: "ok", message: `${count} tenant(s) configured` });
-    }
-  } catch (err) {
-    log({ name: "Sanity connectivity", status: "fail", message: `Error: ${(err as Error).message}` });
-  }
-}
-
 async function checkRedis() {
   if (!hasRedisUrl || !hasRedisToken) {
     log({ name: "Redis connectivity", status: "skip", message: "Missing credentials" });
@@ -1255,7 +1215,7 @@ async function checkStripe() {
  * the instant this env var ships.
  *
  * So: if the price id is set, require that either the grandfather list is
- * non-empty, OR every active Sanity tenant already has planOverride==="founder_comp"
+ * non-empty, OR every active tenant already has planOverride==="founder_comp"
  * or an active/trialing subscriptionStatus. Otherwise fail with a remediation that
  * names the cliff.
  */
@@ -1271,46 +1231,19 @@ async function checkBillingGrandfathering() {
     .map((t) => t.trim())
     .filter(Boolean);
 
-  // Coverage MUST be verified against the live tenant list — a non-empty
-  // grandfather env var is NOT proof of safety (it can be incomplete or have a
-  // typo'd id, leaving a real active tenant to get 402'd the moment billing
-  // flips). So always cross-check Sanity: a tenant is "covered" if it is in the
-  // grandfather set OR has planOverride=founder_comp OR an active/trialing sub.
-  if (!hasSanityProject || !hasSanityToken) {
-    // Can't verify against the source of truth.
-    if (grandfathered.length > 0) {
-      log({
-        name: "Billing grandfathering",
-        status: "warn",
-        message: `STRIPE_BILLING_GRANDFATHER_TENANTS lists ${grandfathered.length} tenant(s), but Sanity is not configured to verify the list covers EVERY active tenant. Double-check the list is complete (no missing/typo'd ids) before flipping billing on.`,
-      });
-      return;
-    }
-    failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
-    log({
-      name: "Billing grandfathering",
-      status: "fail",
-      message:
-        "STRIPE_SCAFFOLD_PRICE_ID is set but STRIPE_BILLING_GRANDFATHER_TENANTS is empty and Sanity is not configured to verify tenant coverage. Every existing tenant gets a 402 the moment billing turns on — set STRIPE_BILLING_GRANDFATHER_TENANTS to a comma-separated list of all existing tenant ids in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID.",
-    });
-    return;
-  }
-
+  // Coverage MUST be verified against the live tenant list (Postgres) — a
+  // non-empty grandfather env var is NOT proof of safety (it can be incomplete
+  // or have a typo'd id, leaving a real active tenant to get 402'd the moment
+  // billing flips). So always cross-check the source of truth: a tenant is
+  // "covered" if it is in the grandfather set OR has planOverride=founder_comp
+  // OR an active/trialing sub.
   try {
-    const client = createClient({
-      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
-      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-      apiVersion: "2024-01-01",
-      useCdn: false,
-      token: process.env.SANITY_API_TOKEN,
-    });
-
-    const tenants = await client.fetch<Array<{
-      id: string;
-      active?: boolean;
-      planOverride?: string;
-      subscriptionStatus?: string;
-    }>>(`*[_type == "tenant"]{ id, active, planOverride, subscriptionStatus }`);
+    const tenants = (await getAllTenants()).map((t) => ({
+      id: t.id,
+      active: t.active,
+      planOverride: t.planOverride,
+      subscriptionStatus: t.subscriptionStatus,
+    }));
 
     const grandfatheredSet = new Set(grandfathered);
     const activeTenants = tenants.filter((t) => t.active !== false);
@@ -1329,7 +1262,7 @@ async function checkBillingGrandfathering() {
         status: "fail",
         message: `STRIPE_SCAFFOLD_PRICE_ID is set but ${uncovered.length} active tenant(s) (${uncovered
           .map((t) => t.id)
-          .join(", ")}) are not in STRIPE_BILLING_GRANDFATHER_TENANTS and have neither planOverride nor an active/trialing subscription. They would get a 402 the moment billing turns on — add them to STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated) in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID, or set their planOverride/subscriptionStatus in Sanity first.`,
+          .join(", ")}) are not in STRIPE_BILLING_GRANDFATHER_TENANTS and have neither planOverride nor an active/trialing subscription. They would get a 402 the moment billing turns on — add them to STRIPE_BILLING_GRANDFATHER_TENANTS (comma-separated) in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID, or set their planOverride/subscriptionStatus first.`,
       });
       return;
     }
@@ -1340,11 +1273,22 @@ async function checkBillingGrandfathering() {
       message: `All ${activeTenants.length} active tenant(s) are covered (grandfather list + planOverride/subscriptionStatus) — no 402 cliff`,
     });
   } catch (err) {
+    // Couldn't verify against the live tenant list (Postgres). A non-empty
+    // grandfather list is a soft pass (warn); an empty list with the price id
+    // set stays a hard fail so billing can't flip on unguarded.
+    if (grandfathered.length > 0) {
+      log({
+        name: "Billing grandfathering",
+        status: "warn",
+        message: `STRIPE_BILLING_GRANDFATHER_TENANTS lists ${grandfathered.length} tenant(s), but the live tenant list (Postgres) could not be read to verify it covers EVERY active tenant (${(err as Error).message}). Double-check the list is complete (no missing/typo'd ids) before flipping billing on.`,
+      });
+      return;
+    }
     failedEnvVars.add("STRIPE_BILLING_GRANDFATHER_TENANTS");
     log({
       name: "Billing grandfathering",
       status: "fail",
-      message: `STRIPE_SCAFFOLD_PRICE_ID is set but could not verify tenant billing coverage (${(err as Error).message}). Set STRIPE_BILLING_GRANDFATHER_TENANTS to avoid 402'ing existing tenants when billing turns on.`,
+      message: `STRIPE_SCAFFOLD_PRICE_ID is set but STRIPE_BILLING_GRANDFATHER_TENANTS is empty and the live tenant list (Postgres) could not be verified (${(err as Error).message}). Every existing tenant gets a 402 the moment billing turns on — set STRIPE_BILLING_GRANDFATHER_TENANTS to a comma-separated list of all existing tenant ids in the SAME deploy as STRIPE_SCAFFOLD_PRICE_ID.`,
     });
   }
 }
@@ -1452,12 +1396,6 @@ function printWebhookUrls() {
   console.log("  Events: checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.deleted");
   console.log("  Secret: Set STRIPE_WEBHOOK_SECRET to match\n");
 
-  console.log("Sanity Webhook:");
-  console.log(`  URL: ${baseUrl}/api/sanity/webhook`);
-  console.log("  Trigger: on create/update/delete");
-  console.log("  Filter: _type in ['tenant', 'hero', 'services', 'story', ...] && defined(tenant)");
-  console.log("  Secret: Set SANITY_WEBHOOK_SECRET to match\n");
-
   console.log("Calendly Webhook (if using):");
   console.log(`  URL: ${baseUrl}/api/webhooks/calendly`);
   console.log("  Secret: Set CALENDLY_WEBHOOK_SECRET to match\n");
@@ -1508,32 +1446,8 @@ async function checkTenantRevalidation() {
   console.log("  Per-Tenant Revalidation Secrets");
   console.log("═══════════════════════════════════════════════════════════════\n");
 
-  if (!hasSanityProject || !hasSanityToken) {
-    console.log("  (Skipped - Sanity not configured)\n");
-    return;
-  }
-
   try {
-    const client = createClient({
-      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
-      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-      apiVersion: "2024-01-01",
-      useCdn: false,
-      token: process.env.SANITY_API_TOKEN,
-    });
-
-    const tenants = await client.fetch<Array<{
-      _id?: string;
-      id: string;
-      name: string;
-      active?: boolean;
-      productionDomain?: string;
-      adminDomain?: string;
-      siteUrl?: string;
-      customDomains?: string[];
-      revalidateUrl?: string;
-      revalidationSecret?: string;
-    }>>(`*[_type == "tenant"] { _id, id, name, active, productionDomain, adminDomain, siteUrl, customDomains, revalidateUrl, revalidationSecret }`);
+    const tenants = await getAllTenants();
 
     for (const tenant of tenants) {
       for (const result of getTenantLaunchReadinessResults(tenant)) log(result);
@@ -1695,9 +1609,6 @@ function printReleaseActions() {
   if (supabaseAuthFailed || failedEnvs.includes("RESEND_API_KEY") || failedEnvs.includes("RESEND_DOMAIN")) {
     console.log("- Customer access: after Supabase Auth and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email (magic link or Google OAuth), the email stays prefilled when switching between sign-up and sign-in, strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
   }
-  if (failedEnvs.includes("SANITY_WEBHOOK_SECRET")) {
-    console.log("- Sanity webhook: configure https://strelva.com/api/sanity/webhook for content create/update/delete events with the matching SANITY_WEBHOOK_SECRET.");
-  }
   if (failedEnvs.includes("STRIPE_WEBHOOK_SECRET")) {
     console.log("- Stripe webhook: configure https://strelva.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
   }
@@ -1713,7 +1624,7 @@ function printReleaseActions() {
       console.log("  PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     }
     if (launchBlockers.includes("Production Live Verification")) {
-      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Sanity/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
+      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
       console.log("  Cron auth commands:");
       console.log("    curl -i https://strelva.com/api/cron/maintenance");
       console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance');
@@ -1725,7 +1636,7 @@ function printReleaseActions() {
     (result) => result.status === "fail" && /^Tenant .+ (client domain|admin domain|revalidation)$/.test(result.name),
   );
   if (tenantConfigurationFailures.length) {
-    console.log("- Tenant configuration: update active Sanity tenants before release, or deactivate test tenants that should not be customer-facing:");
+    console.log("- Tenant configuration: update active tenants before release, or deactivate test tenants that should not be customer-facing:");
     for (const result of tenantConfigurationFailures) {
       console.log(`  ${result.name}: ${result.message}`);
     }
@@ -1754,7 +1665,6 @@ function printReleaseActions() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function run() {
-  await checkSanity();
   await checkRedis();
   await checkStripe();
   await checkBillingGrandfathering();

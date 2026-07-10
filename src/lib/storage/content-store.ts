@@ -5,8 +5,8 @@
 
 import type { ContentSection, ContentMap } from "../types";
 import { defaults } from "../defaults";
-import { getSanityClient, getSanityReadClient, sanityImageUrl } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { sanityImageUrl } from "../sanity";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getDraftContent } from "./draft-store";
 import {
   getCachedContent,
@@ -125,24 +125,15 @@ export async function getContent<K extends ContentSection>(
   }
 
   let data: ContentMap[K];
-  // Phase 3: Postgres is the source of truth when CONTENT_SOURCE=postgres. The
-  // stored row's data mirrors the Sanity doc shape, so transformSanityImages keeps
-  // image-field parity. A miss falls through to Sanity/dev so the cutover is safe.
+  // Postgres is the source of truth when CONTENT_SOURCE=postgres. A stored row's
+  // data mirrors the legacy Sanity doc shape (image fields may still be Sanity
+  // asset refs until the content-URL rewrite ops step runs), so transformSanityImages
+  // keeps image-field parity. A miss falls through to the dev file (local only).
   const pgRaw = contentSourceIsPostgres()
     ? await getContentData(tenant, SECTION_TO_TYPE[section])
     : null;
   if (pgRaw) {
     data = transformSanityImages(section, pgRaw);
-  } else if (hasSanity) {
-    const type = SECTION_TO_TYPE[section];
-    const query = `*[_type == $type && tenant == $tenant][0]`;
-    const doc = await getSanityReadClient().fetch(query, { type, tenant });
-    if (doc) {
-      data = transformSanityImages(section, doc);
-    } else {
-      const store = await readDevContent(tenant);
-      data = (store[section] as ContentMap[K]) ?? defaults[section];
-    }
   } else {
     const store = await readDevContent(tenant);
     data = (store[section] as ContentMap[K]) ?? defaults[section];
@@ -164,30 +155,13 @@ export async function setContent<K extends ContentSection>(
   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
   try {
     if (contentSourceIsPostgres()) {
-      // Phase 3: Postgres is the source of truth. Store the frontend data shape as-is;
+      // Postgres is the source of truth. Store the frontend data shape as-is;
       // transformSanityImages on read is a no-op for already-URL'd image fields.
       await upsertContentData(
         tenant,
         SECTION_TO_TYPE[section],
         data as unknown as Record<string, unknown>
       );
-    } else if (hasSanity) {
-      const type = SECTION_TO_TYPE[section];
-      const query = `*[_type == $type && tenant == $tenant][0]._id`;
-      const existingId = await getSanityClient().fetch(query, { type, tenant });
-
-      const doc = {
-        _type: type,
-        tenant,
-        ...(data as unknown as Record<string, unknown>),
-      };
-
-      if (existingId) {
-        await getSanityClient().patch(existingId).set(doc).commit();
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await getSanityClient().create(doc as any);
-      }
     } else {
       const store = await readDevContent(tenant);
       store[section] = data;
@@ -195,7 +169,7 @@ export async function setContent<K extends ContentSection>(
     }
   } catch (err) {
     // Source-of-truth write failed — drop any stale cache entry so the next
-    // read repopulates from whatever wins (Sanity, dev file, or defaults).
+    // read repopulates from whatever wins (dev file or defaults).
     await invalidateCachedContent(section, tenant);
     throw err;
   }

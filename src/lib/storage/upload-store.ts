@@ -1,11 +1,9 @@
 /**
- * File upload storage - Sanity assets, Vercel Blob, or local fallback.
+ * File upload storage - Vercel Blob, or local disk in dev.
  */
 
 import { promises as fs } from "fs";
 import path from "path";
-import { getSanityClient, sanityImageUrl } from "../sanity";
-import { hasSanity } from "./core";
 import { verifyRasterImage } from "../image-signature";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -38,8 +36,7 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
 
   const safeName = sanitizeFilename(file.name);
 
-  // Blob-first (the Sanity library is being decommissioned); Sanity is a
-  // transitional fallback until its dataset is locked; local disk for dev.
+  // Vercel Blob in prod; local disk for dev (no Blob token).
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (hasBlob) {
     const { put } = await import("@vercel/blob");
@@ -51,14 +48,6 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
       addRandomSuffix: true,
     });
     return { url: blob.url };
-  }
-
-  if (hasSanity) {
-    const asset = await getSanityClient().assets.upload("image", buffer, {
-      filename: safeName,
-      contentType: file.type,
-    });
-    return { url: sanityImageUrl(asset) };
   }
 
   const uploadsDir = path.join(process.cwd(), "public", "uploads");

@@ -1,17 +1,14 @@
 /**
  * Full-site snapshots - capture all owner-editable content sections for backup and restore.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `site_snapshots`
- * table (Sanity fallback on read when Postgres is empty). Writes go to Postgres AND
- * Sanity while both are configured so the transition is reversible; once Sanity is
- * removed, `hasSanity` is false and only Postgres is written. Default off (Sanity
- * path). The Postgres repo helpers are self-contained in this file and never throw.
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `site_snapshots` table;
+ * otherwise the dev-file store is the source of truth. The Postgres repo helpers
+ * are self-contained in this file and never throw.
  */
 
 import type { ActorContext } from "../auth";
 import type { ContentMap, ContentSection } from "../types";
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { DEFAULT_TENANT, hasSanity, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent, setContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
@@ -286,26 +283,6 @@ export async function createSiteSnapshot(
     await pgInsertSnapshot(snapshot);
   }
 
-  if (hasSanity) {
-    await getSanityClient().create({
-      _type: "siteSnapshot",
-      tenant: tenantId,
-      snapshotId: snapshot.id,
-      label: snapshot.label,
-      reason: snapshot.reason,
-      author: snapshot.author,
-      createdAt: snapshot.createdAt,
-      sections: snapshot.sections,
-      data: JSON.stringify(snapshot.data),
-      status: snapshot.status,
-      actorUserId: snapshot.actor?.userId,
-      actorEmail: snapshot.actor?.email,
-      actorType: snapshot.actor?.type,
-      actorIsSuperAdmin: snapshot.actor?.isSuperAdmin,
-    });
-    return snapshot;
-  }
-
   if (!dataSourceIsPostgres()) {
     await writeDevSnapshot(snapshot);
   }
@@ -320,40 +297,7 @@ export async function getSiteSnapshots(
 
   if (dataSourceIsPostgres()) {
     const rows = await pgListSnapshotSummaries(tenantId, safeLimit);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    const raw = await getSanityReadClient().fetch<
-      Array<{
-        snapshotId: string;
-        label: string;
-        reason: SiteSnapshotReason;
-        author: SiteSnapshotAuthor;
-        createdAt: string;
-        sections: ContentSection[];
-        status: SiteSnapshot["status"];
-        restoredAt?: string;
-      }>
-    >(
-      `*[_type == "siteSnapshot" && tenant == $tenant] | order(createdAt desc)[0...${safeLimit}]{
-        snapshotId, label, reason, author, createdAt, sections, status, restoredAt
-      }`,
-      { tenant: tenantId },
-    );
-
-    return raw.map((snapshot) => ({
-      id: snapshot.snapshotId,
-      tenantId,
-      label: snapshot.label,
-      reason: snapshot.reason,
-      author: snapshot.author,
-      createdAt: snapshot.createdAt,
-      sections: snapshot.sections || SITE_SNAPSHOT_SECTIONS,
-      status: snapshot.status || "available",
-      restoredAt: snapshot.restoredAt,
-    }));
+    return rows;
   }
 
   const store = await readDevContent(tenantId);
@@ -371,39 +315,7 @@ async function getSnapshotForRestore(
   if (dataSourceIsPostgres()) {
     const pg = await pgGetSnapshot(tenantId, snapshotId);
     if (pg) return pg;
-    // fall through to Sanity for a snapshot not yet in Postgres
-  }
-
-  if (hasSanity) {
-    const raw = await getSanityReadClient().fetch<{
-      snapshotId: string;
-      label: string;
-      reason: SiteSnapshotReason;
-      author: SiteSnapshotAuthor;
-      createdAt: string;
-      sections: ContentSection[];
-      data?: string;
-      status: SiteSnapshot["status"];
-      restoredAt?: string;
-    } | null>(
-      `*[_type == "siteSnapshot" && tenant == $tenant && snapshotId == $snapshotId][0]{
-        snapshotId, label, reason, author, createdAt, sections, data, status, restoredAt
-      }`,
-      { tenant: tenantId, snapshotId },
-    );
-    if (!raw?.data) return null;
-    return {
-      id: raw.snapshotId,
-      tenantId,
-      label: raw.label,
-      reason: raw.reason,
-      author: raw.author,
-      createdAt: raw.createdAt,
-      sections: raw.sections || SITE_SNAPSHOT_SECTIONS,
-      data: JSON.parse(raw.data) as Partial<ContentMap>,
-      status: raw.status || "available",
-      restoredAt: raw.restoredAt,
-    };
+    // fall through to the dev store for a snapshot not yet in Postgres
   }
 
   const store = await readDevContent(tenantId);
@@ -499,15 +411,7 @@ export async function restoreSiteSnapshot(
     await pgUpdateSnapshotStatus(tenantId, snapshotId, { status: "restored", restoredAt });
   }
 
-  if (hasSanity) {
-    const docId = await getSanityReadClient().fetch<string | null>(
-      `*[_type == "siteSnapshot" && tenant == $tenant && snapshotId == $snapshotId][0]._id`,
-      { tenant: tenantId, snapshotId },
-    );
-    if (docId) {
-      await getSanityClient().patch(docId).set({ status: "restored", restoredAt }).commit();
-    }
-  } else if (!dataSourceIsPostgres()) {
+  if (!dataSourceIsPostgres()) {
     await updateDevSnapshotStatus(tenantId, snapshotId, { status: "restored", restoredAt });
   }
 

@@ -12,19 +12,16 @@
  * same-name re-upload gets a unique path WITHOUT mangling the display filename
  * (the last path segment stays the clean name).
  *
- * TRANSITION: images already uploaded to Sanity keep rendering wherever they're
- * referenced (the Sanity CDN stays read-only until the dataset is locked), and
- * are still surfaced here via a fail-soft legacy read so an owner's picker
- * doesn't lose them. NEW uploads go to Blob only. When the Sanity dataset is
- * locked (the deliberate end-step), the legacy read + Sanity-delete branch drop
- * out and this becomes Blob-only.
+ * Images uploaded to the old Sanity library before the migration keep rendering
+ * wherever they're already referenced in content (served by the read-only Sanity
+ * CDN until the dataset is locked), but are no longer LISTED here — the library
+ * is Blob-only.
  */
 
 import { randomUUID } from "crypto";
 import type { MediaAsset } from "./media";
-import { hasSanity } from "./storage/core";
 
-/** Vercel Blob public-store host — used to tell a Blob id from a legacy Sanity _id. */
+/** Vercel Blob public-store host — used to gate the id passed to DELETE. */
 const BLOB_HOST = "blob.vercel-storage.com";
 
 const mediaPrefix = (tenant: string): string => `media/${tenant}/`;
@@ -55,17 +52,16 @@ function filenameFromPathname(pathname: string): string {
 
 export interface TenantMedia {
   assets: MediaAsset[];
-  /** True if an enabled source (Blob and/or Sanity) FAILED — the list is partial.
-   *  Callers that need completeness (owner export) must treat this as an error. */
+  /** True if the Blob list FAILED — the list is partial. Callers that need
+   *  completeness (owner export) must treat this as an error. */
   degraded: boolean;
 }
 
 /**
- * Collect a tenant's media — Blob (new) + a fail-soft Sanity legacy read
- * (existing), newest first — WITH a `degraded` flag. Never throws for a source
- * failure; instead reports it so completeness-sensitive callers (export) can tell
- * "genuinely empty" from "a source was down". `opts.limit` caps the read (a
- * single Blob page + capped Sanity fetch) for surfaces that only need a preview.
+ * Collect a tenant's media from Blob, newest first, WITH a `degraded` flag. Never
+ * throws for a source failure; instead reports it so completeness-sensitive callers
+ * (export) can tell "genuinely empty" from "a source was down". `opts.limit` caps
+ * the read (a single Blob page) for surfaces that only need a preview.
  */
 export async function collectTenantMedia(
   tenant: string,
@@ -103,43 +99,6 @@ export async function collectTenantMedia(
       } while (cursor);
     } catch (err) {
       console.warn("[media] blob list failed", tenant, err);
-      degraded = true;
-    }
-  }
-
-  // Transitional: existing Sanity-hosted images. Fail-soft.
-  if (hasSanity) {
-    try {
-      const { getSanityReadClient } = await import("./sanity");
-      const slice = limit ? `[0...${limit}]` : "";
-      const raw = await getSanityReadClient().fetch(
-        `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) ${slice} {
-          _id, _createdAt, url, originalFilename,
-          metadata { dimensions { width, height }, lqip }, size
-        }`,
-        { tenant },
-      );
-      for (const d of (raw || []) as Array<{
-        _id: string;
-        _createdAt: string;
-        url: string;
-        originalFilename?: string;
-        metadata?: { dimensions?: { width: number; height: number }; lqip?: string };
-        size?: number;
-      }>) {
-        assets.push({
-          id: d._id,
-          url: d.url,
-          filename: d.originalFilename || "untitled",
-          width: d.metadata?.dimensions?.width || 0,
-          height: d.metadata?.dimensions?.height || 0,
-          size: d.size || 0,
-          lqip: d.metadata?.lqip || undefined,
-          createdAt: d._createdAt,
-        });
-      }
-    } catch (err) {
-      console.warn("[media] sanity legacy list failed", tenant, err);
       degraded = true;
     }
   }
@@ -193,10 +152,10 @@ export interface MediaDeleteResult {
 }
 
 /**
- * Delete a tenant-owned asset. `id` is the blob URL for Blob-hosted assets
- * (tenant enforced by the `media/{tenant}/` pathname prefix) or a legacy Sanity
- * `_id` (tenant enforced by a `label == tenant` ownership query). Never deletes
- * cross-tenant.
+ * Delete a tenant-owned asset. `id` is the blob URL; the tenant is enforced by
+ * the `media/{tenant}/` pathname prefix, so this never deletes cross-tenant. A
+ * non-Blob id (e.g. a stale legacy Sanity `_id`) is a 404 — the library is
+ * Blob-only.
  */
 export async function deleteTenantMedia(tenant: string, id: string): Promise<MediaDeleteResult> {
   assertTenant(tenant);
@@ -213,18 +172,6 @@ export async function deleteTenantMedia(tenant: string, id: string): Promise<Med
     }
     const { del } = await import("@vercel/blob");
     await del(id);
-    return { ok: true, status: 200 };
-  }
-
-  // Transitional: legacy Sanity asset. Ownership-checked (label == tenant).
-  if (hasSanity) {
-    const { getSanityReadClient, getSanityClient } = await import("./sanity");
-    const owned = await getSanityReadClient().fetch<string | null>(
-      `*[_type == "sanity.imageAsset" && _id == $id && label == $tenant][0]._id`,
-      { id, tenant },
-    );
-    if (!owned) return { ok: false, status: 404, error: "Asset not found" };
-    await getSanityClient().delete(id);
     return { ok: true, status: 200 };
   }
 

@@ -91,8 +91,7 @@ function rampDaily(thisWeekTotal: number, priorWeeksTotal: number): {
  * Write a click event's daily history directly in the store shape `trackClick`
  * uses, for the active backend. `trackClick` only ever writes "today", so there
  * is no public API to backfill a trend — this mirrors its key shapes:
- *   - Sanity: doc `clicks-{tenant}`, field `clicks`, keys `{event}_{date}` + `{event}_total`
- *   - dev:    store.__clicks, keys `{event}:{date}` + `{event}:total`
+ *   - dev: store.__clicks, keys `{event}:{date}` + `{event}:total`
  */
 async function setClickHistory(
   tenant: string,
@@ -100,32 +99,6 @@ async function setClickHistory(
   daily: Record<string, number>,
   total: number,
 ): Promise<void> {
-  const { hasSanity } = await import("../src/lib/storage/core");
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("../src/lib/sanity");
-    const client = getSanityClient();
-    const docId = `clicks-${tenant}`;
-    await client.createIfNotExists({
-      _id: docId,
-      _type: "activityLog",
-      tenant,
-      text: "click-tracking",
-      activityType: "system",
-      time: new Date().toISOString(),
-      clicks: {},
-    });
-    // Read existing clicks map so we merge instead of clobbering other events.
-    const existing = (await client.fetch(`*[_id == $docId][0].clicks`, { docId })) as
-      | Record<string, number>
-      | null;
-    const clicks: Record<string, number> = { ...(existing || {}) };
-    for (const [date, n] of Object.entries(daily)) clicks[`${event}_${date}`] = n;
-    clicks[`${event}_total`] = total;
-    await client.patch(docId).set({ clicks }).commit();
-    return;
-  }
-
   const { readDevContent, writeDevContent } = await import("../src/lib/storage/core");
   const store = await readDevContent(tenant);
   const clicks = (store.__clicks as Record<string, number>) ?? {};

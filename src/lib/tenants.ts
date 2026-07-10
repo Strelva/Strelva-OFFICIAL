@@ -129,7 +129,6 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   return row;
 }
 
-const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 const DEV_TENANTS_PATH = path.join(process.cwd(), "dev-tenants.json");
 
 const REDIS_KEY = "reb:tenants:all";
@@ -158,56 +157,41 @@ async function loadTenants(): Promise<TenantConfig[]> {
 
   let tenants: TenantConfig[] | undefined;
 
-  // Postgres is the source of truth when TENANTS_SOURCE=postgres. Fall through to
-  // Sanity only if Postgres has no rows (so a misconfig can't blank the platform).
+  // Postgres is the source of truth when TENANTS_SOURCE=postgres; the dev-file
+  // path is local-only.
   if (tenantsSourceIsPostgres()) {
     const rows = await listAllTenants();
-    if (rows.length > 0) tenants = rows.map(rowToTenant);
+    tenants = rows.map(rowToTenant);
   }
 
   if (!tenants) {
-    if (hasSanity) {
-      const { getSanityClient } = await import("./sanity");
-      const docs = await getSanityClient().fetch(
-        `*[_type == "tenant"] | order(createdAt desc)`
-      );
-      const fromSanity = (docs || []).map(sanityToTenant);
-      if (fromSanity.length > 0) {
-        tenants = fromSanity;
-        if (!isProductionEnv()) {
-          const devTenants = await loadFromDevFile();
-          const existingIds = new Set(fromSanity.map((tenant: TenantConfig) => tenant.id));
-          tenants = [
-            ...fromSanity,
-            ...devTenants.filter((tenant) => !existingIds.has(tenant.id)),
-          ];
-        }
-      } else if (isProductionEnv() && !tenantsSourceIsPostgres()) {
-        throw new Error("[PRODUCTION] Sanity returned no tenants — cannot fall back to dev file");
-      } else {
-        tenants = await loadFromDevFile();
-      }
-    } else if (isProductionEnv() && !tenantsSourceIsPostgres()) {
-      throw new Error("[PRODUCTION] Sanity not configured — cannot fall back to dev file");
-    } else {
-      tenants = await loadFromDevFile();
+    // No Postgres source: prod must never silently serve the dev file.
+    if (isProductionEnv()) {
+      throw new Error("[PRODUCTION] TENANTS_SOURCE must be postgres — refusing dev-file fallback");
     }
+    tenants = await loadFromDevFile();
   }
 
   tenants ??= [];
 
-  // Write to Redis cache (fire-and-forget)
-  if (redis) {
-    try {
-      await redis.set(REDIS_KEY, tenants, { ex: CACHE_TTL_SECONDS });
-    } catch {
-      // Redis write failed — not fatal
+  // Cache ONLY a non-empty result. `listAllTenants` swallows a transient Postgres
+  // error to `[]` (indistinguishable from a genuinely-empty platform), so caching
+  // `[]` would turn a momentary DB blip into a full CACHE_TTL platform-wide outage
+  // that persists even after Postgres recovers. Skipping the cache on empty means
+  // the next request re-queries and self-heals; a truly-empty prod DB (never the
+  // case with live tenants) just costs one extra query per request.
+  if (tenants.length > 0) {
+    if (redis) {
+      try {
+        await redis.set(REDIS_KEY, tenants, { ex: CACHE_TTL_SECONDS });
+      } catch {
+        // Redis write failed — not fatal
+      }
     }
+    _memCache = tenants;
+    _memCacheTime = Date.now();
   }
 
-  // Always update in-memory fallback
-  _memCache = tenants;
-  _memCacheTime = Date.now();
   return tenants;
 }
 
@@ -232,11 +216,6 @@ function invalidateCache() {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function sanityToTenant(doc: any): TenantConfig {
-  const { _id, _rev, _type, _createdAt, _updatedAt, ...rest } = doc;
-  return rest as TenantConfig;
-}
 
 export async function getTenantConfig(
   tenantId: string
@@ -467,19 +446,7 @@ export async function createTenant(
     if (existing) throw new Error(`Tenant "${tenant.id}" already exists`);
     await upsertTenant(tenantToRow(tenant));
     invalidateCache();
-  }
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    const existing = await getSanityClient().fetch(
-      `*[_type == "tenant" && id == $id][0]._id`,
-      { id: tenant.id }
-    );
-    if (existing && !tenantsSourceIsPostgres()) throw new Error(`Tenant "${tenant.id}" already exists`);
-
-    await getSanityClient().create({ _type: "tenant", ...tenant });
-    invalidateCache();
-  } else if (!tenantsSourceIsPostgres()) {
+  } else {
     const tenants = await loadTenants();
     if (tenants.find((t) => t.id === tenant.id)) {
       throw new Error(`Tenant "${tenant.id}" already exists`);
@@ -527,35 +494,8 @@ export async function updateTenant(
       }),
     );
     invalidateCache();
-    // Dual-write to Sanity during the transition so a rollback stays current.
-    if (hasSanity) {
-      try {
-        const { getSanityClient } = await import("./sanity");
-        const docId = await getSanityClient().fetch(`*[_type == "tenant" && id == $id][0]._id`, { id });
-        if (docId) await getSanityClient().patch(docId).set(updates).commit();
-      } catch {
-        // Sanity mirror is best-effort during the transition.
-      }
-    }
     const merged = await getTenantRow(id);
     return merged ? rowToTenant(merged) : null;
-  }
-
-  if (hasSanity) {
-    const { getSanityClient } = await import("./sanity");
-    const docId = await getSanityClient().fetch(
-      `*[_type == "tenant" && id == $id][0]._id`,
-      { id }
-    );
-    if (!docId) return null;
-
-    await getSanityClient().patch(docId).set(updates).commit();
-    invalidateCache();
-    const updated = await getSanityClient().fetch(
-      `*[_type == "tenant" && id == $id][0]`,
-      { id }
-    );
-    return updated ? sanityToTenant(updated) : null;
   }
 
   const tenants = await loadTenants();
