@@ -109,7 +109,7 @@ export function buildReportSubject(report: WeeklyReportData): string {
   }
 
   if (hasTrackingHistory(report)) {
-    return "A steady week — here's where your site stands";
+    return "A steady week. Here's where your site stands";
   }
   return "Your weekly report from Strelva";
 }
@@ -122,7 +122,7 @@ export function buildReportSubject(report: WeeklyReportData): string {
  */
 export function buildReportHeading(report: WeeklyReportData): string {
   if (report.pageViews.thisWeek > 0) return "Here's your proof this week";
-  if (hasTrackingHistory(report)) return "A steady week — here's where you stand";
+  if (hasTrackingHistory(report)) return "A steady week. Here's where you stand";
   return "Your site is live and tracking";
 }
 
@@ -258,9 +258,9 @@ export function formatVisibilityLines(diff: VisibilityDiff | null): string {
       }
     } else if (surface === "ai_answer") {
       if (direction === "appeared") {
-        lines.push(`AI started recommending you for "${query}" — a win worth keeping.`);
+        lines.push(`AI started recommending you for "${query}". A win worth keeping.`);
       } else if (direction === "disappeared") {
-        lines.push(`AI stopped mentioning you for "${query}" — checked via one model, directional only.`);
+        lines.push(`AI stopped mentioning you for "${query}" (checked via one model, directional only).`);
       }
     }
   }
@@ -460,7 +460,7 @@ ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary
 ${workBlock}${visibilityBlock}${anomalyBlock}
 Rules:
 - 3-5 short paragraphs max
-- Open with ONE plain-English verdict sentence on how the week went, backed by the strongest real number (e.g. "Your site brought in 47 visitors and 3 booking clicks this week — here's the proof."). Lead with the verdict, not a stat dump.
+- Open with ONE plain-English verdict sentence on how the week went, backed by the strongest real number (e.g. "Your site brought in 47 visitors and 3 booking clicks this week. Here's the proof."). Lead with the verdict, not a stat dump.
 - This goes to a non-technical business owner. NEVER mention internal settings, admin actions, dashboards, verification checks, timestamps, or whether a change was "confirmed live" — those are our concern, not theirs.
 - If there is real traffic or click data, the opening verdict leads with the most interesting number. If there was traffic before but this was a flat/quiet week, frame it as steady and point to the single best next lever (share the site, or ask Strelva to refresh a section) — an opportunity, never a failure. If there is NO visit data yet, do NOT lead with or dwell on zero and do NOT imply the site is failing — open with what we did on the site and one concrete next step.
 - If search query data is available, mention what people are searching to find the site — use their exact words

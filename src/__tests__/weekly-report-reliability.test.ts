@@ -118,7 +118,7 @@ describe("buildReportSubject (verdict-first)", () => {
 
   it("frames an established-but-flat week as steady, never empty", () => {
     const s = buildReportSubject(reportData({ pageViews: { total: 120, thisWeek: 0 } }));
-    expect(s).toBe("A steady week — here's where your site stands");
+    expect(s).toBe("A steady week. Here's where your site stands");
     expect(s.toLowerCase()).not.toContain("update");
   });
 
@@ -138,7 +138,7 @@ describe("buildReportHeading (verdict-first h1)", () => {
 
   it("reads as steady on an established-but-flat week", () => {
     expect(buildReportHeading(reportData({ pageViews: { total: 120, thisWeek: 0 } }))).toBe(
-      "A steady week — here's where you stand",
+      "A steady week. Here's where you stand",
     );
   });
 
