@@ -8,7 +8,7 @@
  * them (the earlier bug — exchange succeeded but the session cookie never stuck, so
  * the proxy gate bounced the user back to sign-in).
  *
- * Inert until the Supabase auth env is set, so safe to ship while the app runs on Clerk.
+ * Inert when the Supabase auth env is unset (local dev without Supabase).
  */
 
 import { NextResponse, type NextRequest } from "next/server";

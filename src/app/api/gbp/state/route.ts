@@ -4,7 +4,7 @@
  * Returns the live GBP state (hours + last 3 posts) for the authenticated
  * tenant. Always fetched fresh from the GBP API — never returns cached claims.
  *
- * Auth: Clerk session required; tenant must be accessible to the caller.
+ * Auth: authenticated session required; tenant must be accessible to the caller.
  *
  * 200 { state: GbpState }
  * 204 when GBP is not connected or data is unavailable (no error — the

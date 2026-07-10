@@ -1,4 +1,3 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { createMiddlewareSupabase } from "@/lib/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { NextResponse } from "next/server";
@@ -20,51 +19,81 @@ const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
 
 const cspBaseDirectives = [
   "default-src 'self'",
-  // Clerk's live frontend API is still served from clerk.scaffoldweb.com (CLERK_DOMAIN=scaffoldweb.com);
-  // clerk.strelva.com is kept for when the rebrand cutover completes. Allow both so clerk.browser.js loads.
   // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
-  // that's a Turbopack/HMR dev artifact; Clerk's remote SDK, Sentry, and Vercel Analytics contain no
-  // eval/new Function). The looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now
-  // (Next bootstrap + JSON-LD + Clerk inline); removing it needs a nonce rollout.
-  "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://va.vercel-scripts.com",
+  // that's a Turbopack/HMR dev artifact; Sentry and Vercel Analytics contain no eval/new Function). The
+  // looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now (Next bootstrap +
+  // JSON-LD inline); removing it needs a nonce rollout.
+  "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://img.clerk.com https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://www.google.com https://*.gstatic.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com",
   "font-src 'self' data:",
   // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
   // kept in the looser variant below).
   "frame-src 'self' https:",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.scaffoldweb.com https://clerk.strelva.com https://clerk-telemetry.com https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
+  "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
   "worker-src 'self' blob:",
   "base-uri 'self'",
   "form-action 'self'",
 ];
 
-const isPublicRoute = createRouteMatcher([
+// Route matching (replaces Clerk's createRouteMatcher). SECURITY: normalize the
+// path first — decodeURI + collapse duplicate slashes — so an encoded path or a
+// `//dashboard` can't slip past the auth catch-all below (mirrors Clerk's
+// normalizePath). A malformed path fails closed (treated as NOT public).
+function normalizePathForMatch(pathname: string): string | null {
+  let p: string;
+  try {
+    p = decodeURI(pathname);
+  } catch {
+    return null;
+  }
+  return p.replace(/\/\/+/g, "/");
+}
+
+// Exact-match public paths.
+const PUBLIC_EXACT = new Set([
   "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
   "/no-access",
-  "/access-request(.*)",
-  "/ai-visibility(.*)",
-  "/onboard(.*)",
-  "/api/access-request/(.*)",
   "/api/ai-visibility",
-  "/api/audit/(.*)",
-  "/api/onboard/(.*)",
-  "/api/pay/(.*)",
-  "/api/approve(.*)",
   "/api/health",
-  "/api/v1/(.*)",
   "/api/newsletter/subscribe",
   "/api/track",
-  "/api/cron/(.*)",
   "/api/billing/webhook",
-  "/api/clerk/webhook",
-  "/api/internal/(.*)",
-  "/((?!api|dashboard|admin|studio).*)",
 ]);
+// Prefix public paths (the old `/foo(.*)` patterns — literal-prefix match, so
+// `/sign-in`, `/sign-in/x`, `/sign-integration` are all public, matching Clerk).
+const PUBLIC_PREFIXES = [
+  "/sign-in",
+  "/sign-up",
+  "/access-request",
+  "/ai-visibility",
+  "/onboard",
+  "/api/access-request/",
+  "/api/audit/",
+  "/api/onboard/",
+  "/api/pay/",
+  "/api/approve",
+  "/api/v1/",
+  "/api/cron/",
+  "/api/internal/",
+];
+// Control-plane areas that are NEVER public (the old `(?!api|dashboard|admin|studio)`
+// negative lookahead — literal prefix, so `/apixyz`/`/administrator` are protected too).
+const PROTECTED_AREA = /^\/(?:api|dashboard|admin|studio)/;
 
-const isCronRoute = createRouteMatcher(["/api/cron/(.*)"]);
+export function isPublicRoute(req: NextRequest): boolean {
+  const path = normalizePathForMatch(req.nextUrl.pathname);
+  if (path === null) return false;
+  if (PUBLIC_EXACT.has(path)) return true;
+  if (PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix))) return true;
+  // Marketing/public catch-all: anything not under a control-plane area.
+  return !PROTECTED_AREA.test(path);
+}
+
+export function isCronRoute(req: NextRequest): boolean {
+  const path = normalizePathForMatch(req.nextUrl.pathname);
+  return path !== null && path.startsWith("/api/cron/");
+}
 
 export function shouldResolveCustomDomain(host: string): boolean {
   const hostWithoutPort = host.toLowerCase().split(":")[0];
@@ -412,28 +441,29 @@ export async function resolveTenantFromCustomDomain(
 }
 
 /**
- * Auth gate (migration Phase 4). When Supabase Auth is configured, gate on the
- * Supabase session; otherwise use Clerk's auth.protect(). Returns a redirect
- * Response when the request is unauthenticated, or null when allowed. Keeping the
- * clerkMiddleware wrapper means `auth` is always available for the Clerk path; the
- * Supabase branch ignores it. (Single-host simplification is a separate follow-up.)
+ * Auth gate. Gates the request on the Supabase session: returns a redirect
+ * Response when the request is unauthenticated, or null when allowed. When
+ * Supabase Auth isn't configured (local dev without env), the middleware client
+ * is null and the gate is open — prod always has Supabase configured, and local
+ * dev uses the dev-access bypass, so this is never an open gate in practice.
  */
 async function gateRequest(
-  auth: { protect: (opts: { unauthenticatedUrl: string }) => Promise<unknown> },
   req: NextRequest,
   signInUrl: string
 ): Promise<NextResponse | null> {
-  if (isSupabaseAuthConfigured()) {
-    const supabase = createMiddlewareSupabase(req);
-    if (supabase) {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
-      }
-    }
-    return null;
+  const supabase = createMiddlewareSupabase(req);
+  // Fail CLOSED: with no Supabase client (auth env unset, or client init failed)
+  // we can't verify the session, so DENY rather than allow — there's no Clerk
+  // fallback anymore. Legitimate local dev short-circuits via the dev-access
+  // bypass before this gate is ever reached, and /sign-in is a public route so
+  // this can't loop.
+  if (!supabase) {
+    return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
   }
-  await auth.protect({ unauthenticatedUrl: signInUrl });
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
+  }
   return null;
 }
 
@@ -466,7 +496,7 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
   }
 }
 
-export default clerkMiddleware(async (auth, req: NextRequest) => {
+export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
@@ -639,7 +669,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     }
 
     // Require auth for protected admin subdomain routes, while still allowing
-    // Clerk's sign-in/sign-up routes to render on admin.<tenant-domain>.
+    // the sign-in/sign-up routes to render on admin.<tenant-domain>.
     const routeIsPublic = isPublicRoute(req);
     const clientPathIsAuthPage =
       tenantFromClientPath &&
@@ -660,7 +690,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       const signInUrl = tenantFromClientPath || customAdminHostUsesFallbackAuth
         ? buildTenantFallbackUrl(req, tenantId, "/sign-in")
         : new URL("/sign-in", req.url);
-      const denied = await gateRequest(auth, req, signInUrl.toString());
+      const denied = await gateRequest(req, signInUrl.toString());
       if (denied) return denied;
     }
 
@@ -681,7 +711,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   if (!devAccessBypass && !isPublicRoute(req)) {
     const signInUrl = new URL("/sign-in", req.url);
-    const denied = await gateRequest(auth, req, signInUrl.toString());
+    const denied = await gateRequest(req, signInUrl.toString());
     if (denied) return denied;
   }
 
@@ -696,7 +726,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     NextResponse.next({ request: { headers: fallbackHeaders } }),
     req
   );
-});
+}
 
 export const config = {
   matcher: [

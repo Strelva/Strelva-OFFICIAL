@@ -18,23 +18,13 @@ import { useDashboardSurfaces } from "./DashboardSurfacesContext";
 import { SURFACE_ICONS, GROUP_LABELS, SURFACE_MATCH } from "./surface-nav";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
 
-/** Ends the active session (Supabase first, Clerk fallback) then returns to sign-in. */
+/** Ends the active Supabase session then returns to sign-in. */
 async function signOutEverywhere() {
   try {
     const supabase = createBrowserSupabase();
     if (supabase) await supabase.auth.signOut();
   } catch {
     // ignore — fall through to redirect so the user always leaves
-  }
-  const clerk = (window as typeof window & {
-    Clerk?: { signOut?: (options?: { redirectUrl?: string }) => Promise<void> };
-  }).Clerk;
-  if (clerk?.signOut) {
-    try {
-      await clerk.signOut();
-    } catch {
-      // ignore
-    }
   }
   window.location.href = "/sign-in";
 }

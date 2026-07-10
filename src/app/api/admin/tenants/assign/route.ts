@@ -17,7 +17,7 @@ function normalizeEmail(value: unknown): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
-/** Assign a Clerk user (by email) to a tenant */
+/** Assign a user (by email) to a tenant */
 export async function POST(req: Request) {
   let body: unknown;
   try {

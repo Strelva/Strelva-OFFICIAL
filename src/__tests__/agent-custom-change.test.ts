@@ -71,10 +71,6 @@ vi.mock("@/lib/auth", () => ({
   isSuperAdmin: () => Promise.resolve(false),
 }));
 
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => Promise.resolve({ userId: "user_1" }),
-}));
-
 vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedAsync: () => Promise.resolve(false),
 }));

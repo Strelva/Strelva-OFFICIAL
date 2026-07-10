@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Supabase-auth path coverage for src/lib/auth.ts (migration Phase 4). The Clerk
-// path is covered by auth-permissions.test.ts; here the backend switch is forced
-// ON by mocking isSupabaseAuthConfigured() → true, and we assert the two
-// invariants survive: the verified-email gate and the last-owner guard.
+// Supabase-auth coverage for src/lib/auth.ts. Asserts the two security
+// invariants: the verified-email gate and the last-owner guard.
 
 const mockGetSessionUser = vi.fn();
 const mockGetMembershipRole = vi.fn();
@@ -29,12 +27,7 @@ vi.mock("../lib/db/repositories", () => ({
   markInviteClaimed: (...a: unknown[]) => mockMarkInviteClaimed(...a),
 }));
 
-// Keep Clerk + tenant + redis imports inert/controlled.
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
-  clerkClient: vi.fn(),
-}));
+// Keep tenant + redis imports controlled.
 vi.mock("../lib/tenants", () => ({
   getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a),
 }));

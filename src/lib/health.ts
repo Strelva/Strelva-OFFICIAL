@@ -1,5 +1,5 @@
 /**
- * Platform dependency health — Redis, Supabase, Clerk, Stripe, Gemini. Extracted
+ * Platform dependency health — Redis, Supabase, Stripe, Gemini. Extracted
  * from the /api/health route so the ops board (and anything else) can read the
  * same checks server-side without an HTTP round-trip.
  */
@@ -24,7 +24,6 @@ export interface HealthReport {
   checks: {
     redis: ServiceCheck;
     supabase: ServiceCheck;
-    clerk: ServiceCheck;
     stripe: ServiceCheck;
     gemini: ServiceCheck;
   };
@@ -78,26 +77,6 @@ async function checkRedis(): Promise<ServiceCheck> {
   }
 }
 
-async function checkClerk(): Promise<ServiceCheck> {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-  if (!secretKey || !publishableKey) return { status: "not configured", responseMs: 0 };
-  const domain = publishableKey.startsWith("pk_")
-    ? `https://${Buffer.from(publishableKey.replace(/^pk_(test|live)_/, ""), "base64").toString("utf-8").replace(/\$$/, "")}`
-    : null;
-  if (!domain) return { status: "not configured", responseMs: 0 };
-  try {
-    const { ms } = await timed(async () => {
-      const res = await withTimeout(fetch(`${domain}/.well-known/jwks.json`, { method: "GET" }), TIMEOUT_MS, "Clerk");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "ok", responseMs: ms };
-  } catch (err) {
-    console.error("[health] Clerk check failed:", err instanceof Error ? err.message : err);
-    return { status: "error", responseMs: TIMEOUT_MS };
-  }
-}
-
 async function checkStripe(): Promise<ServiceCheck> {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return { status: "not configured", responseMs: 0 };
@@ -140,19 +119,16 @@ async function checkGemini(): Promise<ServiceCheck> {
 
 /** Run all dependency checks and roll up an overall status. */
 export async function getServiceHealth(): Promise<HealthReport> {
-  const [supabase, redis, clerk, stripe, gemini] = await Promise.all([
+  const [supabase, redis, stripe, gemini] = await Promise.all([
     checkSupabase(),
     checkRedis(),
-    checkClerk(),
     checkStripe(),
     checkGemini(),
   ]);
 
-  const checks = { redis, supabase, clerk, stripe, gemini };
-  // Core = the live backbone (Redis + Supabase/Postgres). Clerk is being
-  // decommissioned, so its errors are "degraded", not "down" — otherwise pulling
-  // those keys would falsely page the platform as down. not-configured counts as
-  // healthy.
+  const checks = { redis, supabase, stripe, gemini };
+  // Core = the live backbone (Redis + Supabase/Postgres). A non-core error is
+  // "degraded", not "down". not-configured counts as healthy.
   const coreDown = redis.status === "error" || supabase.status === "error";
   const anyError = Object.values(checks).some((c) => c.status === "error");
   const status: HealthReport["status"] = coreDown ? "down" : anyError ? "degraded" : "healthy";
