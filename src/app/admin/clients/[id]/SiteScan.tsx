@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ScanSummary } from "@/lib/scan-store";
+import type { ScanSummary, ScanPrioritizedIssue } from "@/lib/scan-store";
 import type { PrioritizedActionList, PrioritizedIssue } from "@/lib/audit/prioritize";
 import { TONE_PILL, TONE_DOT, gradeTone, scoreTone } from "@/lib/status-colors";
 import { Sparkline } from "../../Sparkline";
@@ -83,6 +83,32 @@ export function SiteScan({
     return cat.checks.filter((ch) => ch.status === "fail").map((ch) => ch.name);
   }
 
+  // The ranked "fix first" verdict. A live re-scan yields the fuller
+  // PrioritizedActionList (true portfolio-wide counts); on initial load we
+  // render the compact verdict the scan persisted, so the operator sees it
+  // WITHOUT clicking Re-scan. Live detail wins when present; both normalize to
+  // one row shape so the list renders identically.
+  const fixList: ScanPrioritizedIssue[] | null = issues
+    ? issues.issues.map((i) => ({
+        message: i.message,
+        category: i.category,
+        priority: i.priority,
+        impact: i.impact,
+        quantified: i.quantified,
+      }))
+    : scan?.prioritizedIssues && scan.prioritizedIssues.length > 0
+      ? scan.prioritizedIssues
+      : null;
+  const fixCounts = issues
+    ? { high: issues.highCount, medium: issues.mediumCount, low: issues.lowCount }
+    : fixList
+      ? {
+          high: fixList.filter((f) => f.priority === "high").length,
+          medium: fixList.filter((f) => f.priority === "medium").length,
+          low: fixList.filter((f) => f.priority === "low").length,
+        }
+      : null;
+
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-5">
       <div className="flex items-center justify-between gap-4">
@@ -153,18 +179,18 @@ export function SiteScan({
             })}
           </div>
 
-          {issues && issues.total > 0 && (
+          {fixList && fixCounts && (
             <div className="mt-6 border-t border-glass-border pt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-warm-white">Fix first</h3>
                 <span className="text-[11px] text-gray-faint">
-                  {issues.highCount} high · {issues.mediumCount} medium · {issues.lowCount} low
+                  {fixCounts.high} high · {fixCounts.medium} medium · {fixCounts.low} low
                 </span>
               </div>
               <ol className="mt-2 space-y-1.5">
-                {issues.issues.slice(0, 6).map((issue, i) => (
+                {fixList.slice(0, 8).map((issue, i) => (
                   <li
-                    key={`${issue.categorySlug}-${issue.check}-${i}`}
+                    key={`${issue.category}-${issue.message}-${i}`}
                     className="flex items-start gap-2.5 text-xs"
                   >
                     <span className="mt-0.5 w-4 shrink-0 text-right tabular-nums text-gray-faint">
@@ -175,13 +201,18 @@ export function SiteScan({
                     >
                       {issue.priority}
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="text-warm-white">{issue.message}</span>
                       <span className="text-gray-faint"> · {issue.category}</span>
                       {issue.impact && (
                         <span className="block text-[11px] text-gray-muted">{issue.impact}</span>
                       )}
                     </span>
+                    {issue.quantified && (
+                      <span className="mt-px shrink-0 text-[11px] font-semibold tabular-nums text-warm-white">
+                        {issue.quantified}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>

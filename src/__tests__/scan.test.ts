@@ -57,6 +57,29 @@ const detail: CategoryResult[] = [
   } as unknown as CategoryResult,
 ];
 
+// A detail with a real failing check, so prioritizeIssues (real, unmocked)
+// produces a non-empty verdict that scanTenant must persist.
+const failingDetail: CategoryResult[] = [
+  {
+    name: "Basic SEO",
+    slug: "seo",
+    weight: 1,
+    score: 40,
+    checks: [
+      {
+        name: "Meta description",
+        status: "fail",
+        score: 0,
+        message: "Missing meta description",
+        impact: "Google writes its own, often poorly.",
+        quantified: "~$120/mo in conversions (estimated)",
+        priority: "high",
+      },
+      { name: "Title tag", status: "pass", score: 100, message: "Present" },
+    ],
+  } as unknown as CategoryResult,
+];
+
 function tenant(id: string, active = true): TenantConfig {
   return { id, active } as unknown as TenantConfig;
 }
@@ -117,6 +140,39 @@ describe("scanTenant", () => {
     // Return value = persisted summary PLUS the full category detail for the UI.
     expect(result).toEqual({ ...savedSummary, detail });
     expect(result.detail).toBe(detail);
+  });
+
+  it("persists the ranked fix-first verdict (compact) for a tenant with failing checks", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(failingDetail);
+
+    await scanTenant("gldf");
+
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    expect(savedSummary.prioritizedIssues).toBeTruthy();
+    expect(savedSummary.prioritizedIssues.length).toBeGreaterThan(0);
+    expect(savedSummary.prioritizedIssues[0]).toMatchObject({
+      message: "Missing meta description",
+      category: "Basic SEO",
+      priority: "high",
+      quantified: "~$120/mo in conversions (estimated)",
+    });
+    // Compact: the heavy live-only fields never leak into the persisted verdict.
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("score");
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("status");
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("categorySlug");
+  });
+
+  it("omits prioritizedIssues entirely when the audit has no failing checks", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail); // empty checks → no issues
+
+    await scanTenant("gldf");
+
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    expect(savedSummary).not.toHaveProperty("prioritizedIssues");
   });
 
   it("threads a paying client's real GA4 + leads traffic into the audit (B5.3)", async () => {
