@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, CircleAlert, Loader2 } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, Loader2 } from "lucide-react";
+import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
 import { resolvePortfolioActions } from "./actions";
 import type {
   PortfolioActionGroup,
@@ -48,7 +49,17 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
   const [groups, setGroups] = useState<PortfolioActionGroup[]>(snapshot.groups);
   const [itemState, setItemState] = useState<Record<string, ItemState>>({});
   const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const totalItems = useMemo(
     () => groups.reduce((sum, g) => sum + g.items.length, 0),
@@ -197,42 +208,71 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
                   {group.items.map((item) => {
                     const state = itemState[item.id];
                     const busy = processing.has(item.id);
+                    const hasDetail = hasQueueEventDetail(item);
+                    const isOpen = expanded.has(item.id);
                     return (
-                      <li
-                        key={item.id}
-                        className="flex items-center justify-between gap-3 px-5 py-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="shrink-0 rounded bg-gray-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-muted">
-                              {item.label}
-                            </span>
-                            <span className="truncate text-sm text-warm-white">{item.title}</span>
+                      <li key={item.id} className="px-5 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="shrink-0 rounded bg-gray-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-muted">
+                                {item.label}
+                              </span>
+                              <span className="truncate text-sm text-warm-white">{item.title}</span>
+                            </div>
+                            {state?.failed && (
+                              <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-300">
+                                <CircleAlert className="h-3 w-3" strokeWidth={2} />
+                                {state.message}
+                              </p>
+                            )}
                           </div>
-                          {state?.failed && (
-                            <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-300">
-                              <CircleAlert className="h-3 w-3" strokeWidth={2} />
-                              {state.message}
-                            </p>
-                          )}
+                          <div className="flex shrink-0 items-center gap-2">
+                            {hasDetail && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(item.id)}
+                                aria-expanded={isOpen}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:text-warm-white"
+                              >
+                                <ChevronDown
+                                  className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                                  strokeWidth={2}
+                                />
+                                {isOpen ? "Hide" : "Review"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => resolve([item])}
+                              disabled={anyProcessing}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-bg px-2.5 py-1.5 text-[12px] font-medium text-gray-fg transition-colors hover:bg-success hover:text-white disabled:opacity-50"
+                            >
+                              {busy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                              )}
+                              Approve
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => resolve([item])}
-                          disabled={anyProcessing}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-bg px-2.5 py-1.5 text-[12px] font-medium text-gray-fg transition-colors hover:bg-success hover:text-white disabled:opacity-50"
-                        >
-                          {busy ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-                          ) : (
-                            <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                          )}
-                          Approve
-                        </button>
+                        {hasDetail && isOpen && (
+                          <QueueEventDetail
+                            event={{ type: item.type, metadata: item.metadata }}
+                            className="mt-2.5"
+                          />
+                        )}
                       </li>
                     );
                   })}
                 </ul>
+                {group.capped && (
+                  <p className="border-t border-glass-border px-5 py-2 text-[11px] text-gray-muted">
+                    Showing the first {group.items.length}. More may be waiting — approve these,
+                    then refresh.
+                  </p>
+                )}
               </section>
             );
           })}
