@@ -85,13 +85,13 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
     velocityDetail = "Let's get more — share your review link";
     velocityIcon = <TrendingUp className="h-4 w-4" strokeWidth={1.5} />;
   } else if (velocity.trend === "up") {
-    velocityDetail = `Up from ${velocity.prior} the month before`;
+    velocityDetail = `Up from ${velocity.prior} the 30 days before`;
     velocityIcon = <TrendingUp className="h-4 w-4 text-positive" strokeWidth={1.5} />;
   } else if (velocity.trend === "down") {
-    velocityDetail = `${velocity.prior} came in the month before`;
+    velocityDetail = `${velocity.prior} came in the 30 days before — the share link brings them back`;
     velocityIcon = <TrendingDown className="h-4 w-4" strokeWidth={1.5} />;
   } else {
-    velocityDetail = "Holding steady month to month";
+    velocityDetail = "Steady with the 30 days before";
     velocityIcon = <Minus className="h-4 w-4" strokeWidth={1.5} />;
   }
 
@@ -113,7 +113,7 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
           icon={<MessageSquare className="h-4 w-4" strokeWidth={1.5} />}
         />
         <MetricTile
-          label="New this month"
+          label="Last 30 days"
           value={velocityValue}
           detail={velocityDetail}
           icon={velocityIcon}
