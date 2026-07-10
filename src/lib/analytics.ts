@@ -76,6 +76,47 @@ interface StoredConfig {
 
 const cfgKey = (tenantId: string) => `analytics:cfg:${tenantId}`;
 
+/**
+ * Read-through cache for the Google perf reads. GSC/GA4 numbers move slowly
+ * (Google itself lags ~1-2 days), yet the dashboard, admin view, and the
+ * weekly-report cron each call getSearchConsolePerf/getGa4Perf independently —
+ * a single dashboard load would otherwise mint a token + hit Google 2-4× live.
+ * Only successful ("ok") reads are cached, so an "unavailable" blip self-heals
+ * on the next call rather than being pinned for the TTL.
+ */
+const PERF_TTL_SECONDS = 900; // 15 min
+const perfKey = (surface: "gsc" | "ga4", tenantId: string, days: number) =>
+  `analytics:${surface}:${tenantId}:${days}`;
+
+async function readCachedPerf<T>(
+  surface: "gsc" | "ga4",
+  tenantId: string,
+  days: number
+): Promise<T | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    return (await redis.get<T>(perfKey(surface, tenantId, days))) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedPerf<T>(
+  surface: "gsc" | "ga4",
+  tenantId: string,
+  days: number,
+  value: T
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(perfKey(surface, tenantId, days), value, { ex: PERF_TTL_SECONDS });
+  } catch {
+    // Best-effort: a failed cache write just means the next read re-fetches.
+  }
+}
+
 /** Derive a GSC domain property (`sc-domain:example.com`) from a site URL.
  *  Exported so the provisioning path can persist the same default it would read. */
 export function deriveScDomain(siteUrl?: string | null): string | null {
@@ -144,6 +185,12 @@ export async function setAnalyticsConfig(
     }
   }
 
+  // No explicit perf-cache bust: the read-through perf cache has a short TTL
+  // (PERF_TTL_SECONDS), so after a property repoint the numbers self-heal within
+  // that window. A fixed per-window invalidation list drifted from its callers
+  // (a days=30 caller was silently missed), so it was removed rather than
+  // maintained — the TTL is the single, correct staleness bound.
+
   return resolveConfig(tenantId, next);
 }
 
@@ -209,41 +256,70 @@ export async function getSearchConsolePerf(tenantId: string, days = 28): Promise
   const cfg = await getAnalyticsConfig(tenantId);
   if (!cfg.gscProperty) return { status: "unconfigured", ...EMPTY_SEARCH };
 
+  const cached = await readCachedPerf<SearchPerf>("gsc", tenantId, days);
+  if (cached) return cached;
+
   try {
     const token = await resolveGoogleToken(tenantId, "gsc");
     if (!token) return { status: "unavailable", ...EMPTY_SEARCH };
 
     const { startDate, endDate } = dateRange(days);
-    const res = await fetch(
-      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
-        cfg.gscProperty
-      )}/searchAnalytics/query`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 20 }),
-      }
-    );
-    if (!res.ok) return { status: "unavailable", ...EMPTY_SEARCH };
+    const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
+      cfg.gscProperty
+    )}/searchAnalytics/query`;
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-    const data = await res.json();
-    const rows: GscRow[] = data.rows || [];
-    const topQueries = rows.map((r) => ({
+    // Two reads, in parallel:
+    //  - totalsRes: NO dimensions → one row of TRUE property totals (clicks,
+    //    impressions, ctr, position). Summing the top-20 query rows understates
+    //    the long tail and skews CTR/position; the un-dimensioned row is the fix.
+    //  - queriesRes: the top-20 query list, for the `topQueries` display only.
+    const [totalsRes, queriesRes] = await Promise.all([
+      fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ startDate, endDate }),
+      }),
+      fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ startDate, endDate, dimensions: ["query"], rowLimit: 20 }),
+      }),
+    ]);
+    if (!totalsRes.ok || !queriesRes.ok) return { status: "unavailable", ...EMPTY_SEARCH };
+
+    const totalsData = await totalsRes.json();
+    const queriesData = await queriesRes.json();
+    const queryRows: GscRow[] = queriesData.rows || [];
+    const topQueries = queryRows.map((r) => ({
       query: r.keys[0],
       clicks: r.clicks,
       impressions: r.impressions,
       position: round1(r.position),
     }));
-    const clicks = rows.reduce((s, r) => s + r.clicks, 0);
-    const impressions = rows.reduce((s, r) => s + r.impressions, 0);
-    const ctr = impressions > 0 ? Math.round((clicks / impressions) * 10000) / 10000 : 0;
-    // Impression-weighted average position across the returned queries.
-    const position =
-      impressions > 0
-        ? round1(rows.reduce((s, r) => s + r.position * r.impressions, 0) / impressions)
+
+    // Property total from the un-dimensioned row. Fall back to the query-row sum
+    // only if that read came back empty, so an odd response still yields a value.
+    const totalRow: { clicks?: number; impressions?: number; ctr?: number; position?: number } | undefined =
+      totalsData.rows?.[0];
+    const clicks = totalRow ? num(totalRow.clicks) : queryRows.reduce((s, r) => s + r.clicks, 0);
+    const impressions = totalRow
+      ? num(totalRow.impressions)
+      : queryRows.reduce((s, r) => s + r.impressions, 0);
+    const ctr = totalRow
+      ? Math.round(num(totalRow.ctr) * 10000) / 10000
+      : impressions > 0
+        ? Math.round((clicks / impressions) * 10000) / 10000
+        : 0;
+    const position = totalRow
+      ? round1(num(totalRow.position))
+      : impressions > 0
+        ? round1(queryRows.reduce((s, r) => s + r.position * r.impressions, 0) / impressions)
         : 0;
 
-    return { status: "ok", clicks, impressions, ctr, position, topQueries };
+    const result: SearchPerf = { status: "ok", clicks, impressions, ctr, position, topQueries };
+    await writeCachedPerf("gsc", tenantId, days, result);
+    return result;
   } catch {
     return { status: "unavailable", ...EMPTY_SEARCH };
   }
@@ -252,6 +328,9 @@ export async function getSearchConsolePerf(tenantId: string, days = 28): Promise
 export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
   const cfg = await getAnalyticsConfig(tenantId);
   if (!cfg.ga4PropertyId) return { status: "unconfigured", ...EMPTY_GA };
+
+  const cached = await readCachedPerf<GaPerf>("ga4", tenantId, days);
+  if (cached) return cached;
 
   try {
     const token = await resolveGoogleToken(tenantId, "ga4");
@@ -313,7 +392,7 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
       })
     );
 
-    return {
+    const result: GaPerf = {
       status: "ok",
       users: num(totals[0]?.value),
       sessions: num(totals[1]?.value),
@@ -321,6 +400,8 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
       topPages,
       topSources,
     };
+    await writeCachedPerf("ga4", tenantId, days, result);
+    return result;
   } catch {
     return { status: "unavailable", ...EMPTY_GA };
   }

@@ -9,13 +9,54 @@ import { getTenantConfig, getAllTenants } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { runAudit } from "@/lib/audit/checks";
 import type { CategoryResult } from "@/lib/audit/types";
+import { type TrafficProfile, GENERIC_METRICS } from "@/lib/audit/impact";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
-import { saveScanSummary, pushScanHistory, type ScanSummary } from "@/lib/scan-store";
+import {
+  saveScanSummary,
+  pushScanHistory,
+  saveScanBaseline,
+  getScanBaseline,
+  getScanHistory,
+  type ScanSummary,
+} from "@/lib/scan-store";
 import { selectRunWindow } from "@/lib/visibility/schedule";
+import { getGa4Perf } from "@/lib/analytics";
+import { getLeadSummary } from "@/lib/leads";
 
 export interface ScanResult extends ScanSummary {
   /** Full per-category detail (not persisted; returned for the live UI). */
   detail: CategoryResult[];
+}
+
+/**
+ * A paying client's REAL monthly traffic, for the dollar-impact estimates —
+ * or `undefined` when GA4 isn't lit up yet (so the audit stays on the generic
+ * prior). Visitors come from GA4 (the canonical traffic source); the conversion
+ * rate is derived from real 30-day leads when we have them, else the
+ * conservative default. Order value stays a documented prior — the audit path
+ * has no per-tenant AOV. All reads are best-effort: any failure → generic.
+ */
+async function measuredTraffic(tenantId: string): Promise<TrafficProfile | undefined> {
+  const ga = await getGa4Perf(tenantId, 30).catch(() => null);
+  if (!ga || ga.status !== "ok" || ga.users <= 0) return undefined;
+
+  const visitors = ga.users;
+  const leads = await getLeadSummary(tenantId, 30).catch(() => ({ count: 0 }));
+  // Leads are real "who reached out" conversions over the same 30-day window.
+  // Fall back to the shared generic prior (single source of truth in impact.ts)
+  // when there's no conversion signal yet; order value has no per-tenant source
+  // in the audit path, so it always uses that prior.
+  const conversionRate =
+    leads.count > 0
+      ? Math.min(0.5, Math.max(0.005, leads.count / visitors))
+      : GENERIC_METRICS.conversionRate;
+
+  return {
+    monthlyVisitors: visitors,
+    conversionRate,
+    orderValue: GENERIC_METRICS.orderValue,
+    source: "measured",
+  };
 }
 
 /**
@@ -30,7 +71,8 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
   // Always scan the client's real live site, not the localhost dev URL.
   const url = getTenantPublicUrl(config, "production");
 
-  const detail = await runAudit(url);
+  const traffic = await measuredTraffic(tenantId);
+  const detail = await runAudit(url, { traffic });
   const overallScore = computeOverallScore(detail);
   const grade = scoreToGrade(overallScore);
   const scannedAt = new Date().toISOString();
@@ -42,8 +84,17 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
     grade,
     categories: detail.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
   };
+  const point = { scannedAt, overallScore, grade };
   await saveScanSummary(tenantId, summary);
-  await pushScanHistory(tenantId, { scannedAt, overallScore, grade });
+  await pushScanHistory(tenantId, point);
+
+  // Capture the durable day-0 anchor once. Seed it from the earliest point we
+  // already retain so an existing tenant gets its best available baseline now,
+  // rather than resetting the 90-day clock to today.
+  if (!(await getScanBaseline(tenantId))) {
+    const history = await getScanHistory(tenantId); // oldest -> newest (incl. this scan)
+    await saveScanBaseline(tenantId, history[0] ?? point);
+  }
 
   return { ...summary, detail };
 }

@@ -28,10 +28,44 @@ do not get direct repo or code-editor access by default.
 - Consume `GET /api/v1/page-config/{tenant}` where the site supports page-level sections.
 - Consume `GET /api/v1/site-capabilities/{tenant}` or keep an equivalent local
   manifest in sync with Strelva tenant metadata.
+- Publish a capability manifest declaring the sections the LIVE site actually
+  renders (see "Capability Manifest Publish Contract" below).
 - Expose a signed `POST /api/revalidate` endpoint.
 - Keep local defaults for Strelva outages.
 - Document supported sections, variants, design tokens, custom features, env vars,
   build/test commands, deploy target, and rollback path.
+
+## Capability Manifest Publish Contract
+
+By default the AI edits the template's built-in section list. A custom repo whose
+LIVE site renders sections beyond that template should PUBLISH its own capability
+manifest so the AI edits what the site actually shows.
+
+**How a repo publishes its manifest**
+
+- Drop `custom-repo-starter/site-capabilities-route.ts` in at
+  `app/api/capabilities/route.ts`. It builds the manifest from the repo's own
+  `content-defaults` (so the section list stays honest to what the repo ships)
+  via the new `buildSiteCapabilityManifest()` helper in
+  `custom-repo-starter/scaffold-client.ts`, and serves it as static JSON.
+- Declare commerce (cart/checkout), rewards, and any other repo-managed behavior
+  in `customOnlyFeatures`. The AI **requests** changes to those (custom-request
+  path) rather than editing them directly — they are not AI-editable content.
+
+**How an operator points the tenant at it**
+
+- Set the tenant's `customRepo.capabilityManifestUrl` to the manifest's public
+  URL via `POST /api/admin/tenants/[id]/capability-manifest` (super-admin). This
+  is now settable/updatable/clearable on EXISTING tenants — previously it could
+  only be set at tenant-create, so pre-existing tenants (gldf, rohlax) predate
+  the field. The URL must be a public https target that passes the same SSRF
+  guard as the fetch path; the change merges into the `customRepo` blob (other
+  fields untouched) and is audit-logged.
+- The control plane then fetches + merges the manifest (`getSiteCapabilityManifest`
+  in `src/lib/site-capabilities.ts`, SSRF-guarded + Zod-validated) and
+  `resolveEditableSections` (`src/lib/agent-shared.ts`) ADDS the sections the
+  remote manifest declares beyond the template. It is a no-op for tenants without
+  a remote manifest.
 
 ## Current Precedents
 
@@ -62,7 +96,8 @@ Each custom-repo tenant in Strelva should have:
 - `customRepo.repoName`
 - `customRepo.localPath`
 - `customRepo.productionUrl`
-- `customRepo.capabilityManifestUrl`
+- `customRepo.capabilityManifestUrl` (settable on existing tenants via
+  `POST /api/admin/tenants/[id]/capability-manifest`; see the publish contract above)
 - `customRepo.supportsPageConfig: true`
 - `customRepo.supportsDraftPreview: true`
 - `customRepo.supportsInlineEditing: true`

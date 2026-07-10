@@ -107,30 +107,44 @@ export async function fetchSearchData(
     startDate.setDate(startDate.getDate() - days);
 
     const encodedUrl = encodeURIComponent(siteUrl);
-    const res = await fetch(
-      `https://www.googleapis.com/webmasters/v3/sites/${encodedUrl}/searchAnalytics/query`,
-      {
+    const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodedUrl}/searchAnalytics/query`;
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    const startStr = startDate.toISOString().slice(0, 10);
+    const endStr = endDate.toISOString().slice(0, 10);
+
+    // Property totals come from an un-dimensioned request (one aggregate row);
+    // the dimensioned request only supplies the top-20 query list. Summing the
+    // top-20 rows for totals understates any site with a long tail.
+    const [totalsRes, queriesRes] = await Promise.all([
+      fetch(endpoint, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
+        body: JSON.stringify({ startDate: startStr, endDate: endStr }),
+      }),
+      fetch(endpoint, {
+        method: "POST",
+        headers,
         body: JSON.stringify({
-          startDate: startDate.toISOString().slice(0, 10),
-          endDate: endDate.toISOString().slice(0, 10),
+          startDate: startStr,
+          endDate: endStr,
           dimensions: ["query"],
           rowLimit: 20,
         }),
-      },
-    );
+      }),
+    ]);
 
-    if (!res.ok) {
-      console.error(`Search Console API error: ${res.status} ${await res.text()}`);
+    if (!totalsRes.ok || !queriesRes.ok) {
+      const failed = !totalsRes.ok ? totalsRes : queriesRes;
+      console.error(`Search Console API error: ${failed.status} ${await failed.text()}`);
       return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
     }
 
-    const data = await res.json();
-    const rows = data.rows || [];
+    const totalsData = await totalsRes.json();
+    const queriesData = await queriesRes.json();
+    const rows = queriesData.rows || [];
 
     const queries = rows.map((row: { keys: string[]; clicks: number; impressions: number; position: number }) => ({
       query: row.keys[0],
@@ -139,8 +153,15 @@ export async function fetchSearchData(
       position: Math.round(row.position * 10) / 10,
     }));
 
-    const totalClicks = queries.reduce((sum: number, q: { clicks: number }) => sum + q.clicks, 0);
-    const totalImpressions = queries.reduce((sum: number, q: { impressions: number }) => sum + q.impressions, 0);
+    // True property totals from the un-dimensioned row; fall back to the query
+    // sum only if that read came back empty.
+    const totalRow: { clicks?: number; impressions?: number } | undefined = totalsData.rows?.[0];
+    const totalClicks = totalRow
+      ? Number(totalRow.clicks) || 0
+      : queries.reduce((sum: number, q: { clicks: number }) => sum + q.clicks, 0);
+    const totalImpressions = totalRow
+      ? Number(totalRow.impressions) || 0
+      : queries.reduce((sum: number, q: { impressions: number }) => sum + q.impressions, 0);
 
     return {
       queries,

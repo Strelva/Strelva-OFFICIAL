@@ -279,5 +279,68 @@ export async function fetchScaffoldSiteCapabilities(
   }
 }
 
+const DEFAULT_DESIGN_TOKENS: DesignTokenScope[] = [
+  "colors",
+  "fonts",
+  "buttons",
+  "spacing",
+  "radius",
+  "motion",
+  "imagery",
+];
+
+const DEFAULT_SECTION_CAPABILITY: SectionCapability = {
+  variants: ["default"],
+  editableFields: ["content", "props", "variant", "layout"],
+  styleProps: ["variant", "layout.gap", "layout.padding"],
+  allowedActions: ["read", "draft", "publish", "request_custom"],
+};
+
+/**
+ * Build the capability manifest THIS repo publishes (B4). The control plane
+ * fetches it (see `getSiteCapabilityManifest` there) and merges it over the
+ * template default, so the AI edits the sections the LIVE site actually renders
+ * — not just the template's built-in list.
+ *
+ * Pass the section keys the repo really mounts (e.g. `Object.keys(defaults)`),
+ * and override any per-section capability or add `customOnlyFeatures` (commerce,
+ * rewards) that the AI must route through a custom request rather than edit.
+ */
+export function buildSiteCapabilityManifest(
+  sections: string[],
+  opts?: {
+    contractVersion?: string;
+    designTokens?: DesignTokenScope[];
+    sectionOverrides?: Record<string, Partial<SectionCapability>>;
+    customOnlyFeatures?: string[];
+    customComponents?: SiteCapabilityManifest["customComponents"];
+    customRequestEndpoint?: string;
+    supportsPageConfig?: boolean;
+    supportsNavigationConfig?: boolean;
+    supportsFooterConfig?: boolean;
+    supportsDraftPreview?: boolean;
+    supportsInlineEditing?: boolean;
+  }
+): SiteCapabilityManifest {
+  const sectionEntries = sections.map((section): [string, SectionCapability] => [
+    section,
+    { ...DEFAULT_SECTION_CAPABILITY, ...opts?.sectionOverrides?.[section] },
+  ]);
+
+  return {
+    contractVersion: opts?.contractVersion ?? SCAFFOLD_CONTRACT_VERSION,
+    sections: Object.fromEntries(sectionEntries),
+    designTokens: opts?.designTokens ?? DEFAULT_DESIGN_TOKENS,
+    supportsPageConfig: opts?.supportsPageConfig ?? true,
+    supportsNavigationConfig: opts?.supportsNavigationConfig ?? true,
+    supportsFooterConfig: opts?.supportsFooterConfig ?? true,
+    supportsDraftPreview: opts?.supportsDraftPreview ?? true,
+    supportsInlineEditing: opts?.supportsInlineEditing ?? true,
+    customOnlyFeatures: opts?.customOnlyFeatures ?? [],
+    customComponents: opts?.customComponents ?? [],
+    customRequestEndpoint: opts?.customRequestEndpoint,
+  };
+}
+
 /** @deprecated Use fetchScaffoldSiteCapabilities. */
 export const fetchRebSiteCapabilities = fetchScaffoldSiteCapabilities;

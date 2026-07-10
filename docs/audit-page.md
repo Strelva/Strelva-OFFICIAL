@@ -29,10 +29,10 @@ The product framing: free scan = top of funnel (zero marginal cost, never a "fre
 3. Builds one shared `AuditContext` via `buildAuditContext`: a single homepage fetch (15s timeout, falls back HTTPS to HTTP) plus three well-known files fetched in parallel (`/robots.txt`, `/sitemap.xml`, `/llms.txt`). Any that miss come through as `null` so a module degrades a finding instead of throwing. After redirects it re-validates the final host against private IPs (DNS-rebinding guard).
 4. Makes one optional Google PageSpeed Insights call (`fetchPageSpeedData`, 30s, mobile strategy, PERFORMANCE category only). The single response feeds both `checkWebVitals` and `checkMobile`.
 5. Runs the six ported modules synchronously off the shared context, then assigns each category its weight from the central `WEIGHTS` map.
-6. Calls `attachImpact` on every category to attach the impact narrative + fix priority.
+6. Calls `attachImpact` on every category to attach the impact narrative + fix priority, threading through the caller's `TrafficProfile` (`runAudit(url, { traffic })` → `attachImpact(cat, traffic)`) so the dollar/customer figures reflect real traffic when it's supplied.
 7. Returns `CategoryResult[]`.
 
-`runAudit` does not compute the overall score or persist anything; callers do. Types live in `src/lib/audit/types.ts` (`CheckResult`, `CategoryResult`, `AuditResult`, `LetterGrade`, `PageSpeedResult`).
+`runAudit(url, opts?)` does not compute the overall score or persist anything; callers do. Types live in `src/lib/audit/types.ts` (`CheckResult`, `CategoryResult`, `AuditResult`, `LetterGrade`, `PageSpeedResult`).
 
 ### The AuditContext (`src/lib/audit/context.ts`)
 
@@ -53,7 +53,7 @@ The runner gathers everything once so each module stays pure (no module makes it
 
 Nothing writes the store directly. Everything goes through `src/lib/scan.ts`:
 
-- `scanTenant(tenantId)` resolves the tenant's live public URL, runs `runAudit`, computes the overall score + grade, persists the summary and a history point, and returns the full per-category detail (`ScanResult`) for the live UI.
+- `scanTenant(tenantId)` resolves the tenant's live public URL, builds a real `TrafficProfile` for the tenant (see the impact section) and passes it into `runAudit(url, { traffic })`, computes the overall score + grade, persists the summary and a history point, and returns the full per-category detail (`ScanResult`) for the live UI.
 - `scanAllTenants(concurrency = 6)` the portfolio version: scans every active tenant with a bounded worker pool (each scan is a ~35s external fetch + PageSpeed call, so a sequential loop would exhaust the cron budget), isolating per-tenant failures.
 
 ### The surfaces (one engine + store behind all of them)
@@ -108,11 +108,13 @@ Because it divides by the sum of the weights actually present, a category emitte
 
 ### Impact narrative + quantified loss (`src/lib/audit/impact.ts`)
 
-`attachImpact(category)` walks every non-passing check (informational "not measured / coming soon" placeholders are skipped) and attaches:
+`attachImpact(category, metrics?)` walks every non-passing check (informational "not measured / coming soon" placeholders are skipped) and attaches:
 
 - `impact` a plain-English "what this costs you" line, matched by a keyword regex against the check name (`CHECK_IMPACT`), falling back to a per-category line (`CATEGORY_IMPACT`).
-- `quantified` a conservative dollar/customer estimate (e.g. "~12 customers/mo" / "~$45/mo in conversions"), only for issue types where a figure is genuinely credible (`CHECK_QUANTIFIED`); otherwise omitted. Estimates use one generic, deliberately conservative single-profile metric set (`GENERIC_METRICS` = 500 monthly visitors, 3% conversion, $75 order value) ported from OWSH and collapsed to a single profile because Strelva's free audit has no vertical and no client analytics. Every line is prefixed "~".
+- `quantified` a conservative dollar/customer estimate (e.g. "~12 customers/mo" / "~$45/mo in conversions"), only for issue types where a figure is genuinely credible (`CHECK_QUANTIFIED`); otherwise omitted. Estimates multiply against a `TrafficProfile` (`{ monthlyVisitors, conversionRate, orderValue, source: "generic" | "measured" }`) passed by the caller, defaulting to `GENERIC_METRICS` (500 monthly visitors, 3% conversion, $75 order value) — the deliberately conservative single-profile prior ported from OWSH, used whenever no real traffic is supplied (Strelva's free audit has no vertical and no client analytics). Honest labeling comes from `source`: a `measured` profile reads "(based on your traffic)", a `generic` one reads "(estimated)", so a figure never claims a precision it lacks. Every line is prefixed "~".
 - `priority` (`high` / `medium` / `low`) derived from status + how heavily the category counts.
+
+**Real traffic for paying clients.** `scanTenant` (`src/lib/scan.ts`) builds a `measured` `TrafficProfile` per tenant: monthly visitors from GA4 (`getGa4Perf`), a conversion rate derived from real 30-day leads (`getLeadSummary`) over the same window, and order value kept as a documented `$75` prior. It threads through `runAudit(url, { traffic })` → `attachImpact`, so a paying client sees dollar/customer figures computed from their own numbers. The anonymous `/audit` tool passes nothing, so it keeps the generic 500-visitor prior. **Fail-safe:** any GA4 read that isn't `ok` (or reports 0 users) falls back to the generic prior, so pre-activation tenants are unaffected.
 
 `topFixes(categories, limit)` flattens all non-passing checks into a prioritized list (high to low, worst score first). It powers the "Fix these first" block on the public results page, the client health card, and the PDF one-pager.
 

@@ -23,7 +23,7 @@
 import type { ReviewItem } from "./types";
 import type { ScanHistoryPoint } from "./scan-store";
 import type { DailyMetric } from "./storage/analytics-store";
-import { getScanHistory } from "./scan-store";
+import { getScanHistory, getScanBaseline } from "./scan-store";
 import { getReviews } from "./reviews";
 import { getDailyMetrics } from "./storage";
 import { getTenantConfig } from "./tenants";
@@ -71,6 +71,8 @@ export interface MilestoneInput {
   startDate: string | null;
   now: number;
   scanHistory: ScanHistoryPoint[];
+  /** Durable day-0 health anchor. When present, the "then" health for the recap. */
+  scanBaseline: ScanHistoryPoint | null;
   reviews: ReviewItem[];
   dailyMetrics: DailyMetric[];
 }
@@ -113,6 +115,8 @@ function resolveStart(input: MilestoneInput): number {
   if (Number.isFinite(explicit)) return explicit;
 
   const candidates: number[] = [];
+  const baselineTime = toTime(input.scanBaseline?.scannedAt);
+  if (Number.isFinite(baselineTime)) candidates.push(baselineTime);
   for (const p of input.scanHistory) {
     const t = toTime(p.scannedAt);
     if (Number.isFinite(t)) candidates.push(t);
@@ -243,16 +247,24 @@ function buildRating(
   };
 }
 
-function buildHealth(scanHistory: ScanHistoryPoint[]): MilestoneMetric | null {
+function buildHealth(
+  scanHistory: ScanHistoryPoint[],
+  baseline: ScanHistoryPoint | null
+): MilestoneMetric | null {
   if (scanHistory.length === 0) return null;
 
   // getScanHistory returns oldest -> newest.
   const latest = scanHistory[scanHistory.length - 1];
   const latestValue = `${latest.grade} · ${latest.overallScore}`;
 
-  // One point = we know where you are now, but there's no earlier baseline to
-  // compare against yet. Honest "tracking since", not a fabricated move.
-  if (scanHistory.length === 1) {
+  // Prefer the durable day-0 anchor as "then"; fall back to the earliest scan
+  // still in the ring buffer. The anchor gives a true 90-day baseline where the
+  // ring buffer (12 points / 30-day TTL) only ever reaches back ~12 days.
+  const then = baseline ?? scanHistory[0];
+
+  // "Then" and "now" are the same measurement = no real earlier baseline yet.
+  // Honest "tracking since", not a fabricated move.
+  if (then.scannedAt === latest.scannedAt) {
     return {
       key: "health",
       label: "Site health",
@@ -260,13 +272,12 @@ function buildHealth(scanHistory: ScanHistoryPoint[]): MilestoneMetric | null {
       then: null,
       now: latestValue,
       direction: "new",
-      trackingSince: fmtDate(latest.scannedAt),
+      trackingSince: fmtDate(then.scannedAt),
       caption: "site speed, security, SEO, accessibility",
     };
   }
 
-  const earliest = scanHistory[0];
-  const diff = latest.overallScore - earliest.overallScore;
+  const diff = latest.overallScore - then.overallScore;
   const direction = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
   const caption =
     direction === "up"
@@ -279,7 +290,7 @@ function buildHealth(scanHistory: ScanHistoryPoint[]): MilestoneMetric | null {
     key: "health",
     label: "Site health",
     kind: "change",
-    then: `${earliest.grade} · ${earliest.overallScore}`,
+    then: `${then.grade} · ${then.overallScore}`,
     now: latestValue,
     direction,
     trackingSince: null,
@@ -358,7 +369,7 @@ export function computeMilestone(input: MilestoneInput): Milestone {
     buildVisitors(input, startTime),
     buildRating(input.reviews, baselineReviews),
     buildReviewsCount(input.reviews, baselineReviews.length),
-    buildHealth(input.scanHistory),
+    buildHealth(input.scanHistory, input.scanBaseline),
   ].filter((m): m is MilestoneMetric => m !== null);
 
   const state: Milestone["state"] =
@@ -381,9 +392,10 @@ export function computeMilestone(input: MilestoneInput): Milestone {
  * is guarded so one blip degrades to a partial recap rather than throwing it away.
  */
 export async function buildMilestone(tenantId: string): Promise<Milestone> {
-  const [tenant, scanHistory, reviews, dailyMetrics] = await Promise.all([
+  const [tenant, scanHistory, scanBaseline, reviews, dailyMetrics] = await Promise.all([
     getTenantConfig(tenantId).catch(() => undefined),
     getScanHistory(tenantId).catch(() => []),
+    getScanBaseline(tenantId).catch(() => null),
     getReviews(tenantId).catch(() => []),
     getDailyMetrics(tenantId, MILESTONE_WINDOW_DAYS + 31).catch(() => []),
   ]);
@@ -392,6 +404,7 @@ export async function buildMilestone(tenantId: string): Promise<Milestone> {
     startDate: tenant?.createdAt ?? null,
     now: Date.now(),
     scanHistory,
+    scanBaseline,
     reviews,
     dailyMetrics,
   });

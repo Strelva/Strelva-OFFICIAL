@@ -45,6 +45,7 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 - Host → tenant resolution in `src/proxy.ts`: subdomain (`gldf.strelva.com`, `admin.gldf.strelva.com`), then `/client/{tenant}/...` path fallback, then custom-domain map (Redis/Sanity-backed via `/api/internal/domain-map`), then `?tenant=` query.
 - The public storefront contract is **`/api/v1/*`** — owned directly (no `@/app/api/public/*` re-export layer). The v1 routes are the canonical wire shape consumed by client repos. Change them only by versioning (add a v2 sibling).
 - Custom-repo wiring: `src/lib/custom-repos.ts`, `src/lib/revalidate-client.ts` (signed HMAC revalidation), `custom-repo-starter/` (drop-in scaffold), `scripts/custom-repo-workspace-check.ts`, `release-manifest.json`.
+- **Capability manifest (which sections the AI may edit):** a custom repo can PUBLISH a manifest declaring the sections its live site actually renders — drop `custom-repo-starter/site-capabilities-route.ts` in at `app/api/capabilities/route.ts` (built from `content-defaults` via `buildSiteCapabilityManifest`), then set the tenant's `customRepo.capabilityManifestUrl` via `POST /api/admin/tenants/[id]/capability-manifest` (super-admin). The control plane fetches + merges it (`src/lib/site-capabilities.ts`, SSRF-guarded, Zod-validated) so the agent edits what the live site renders, not just the template default. Commerce/rewards go in the manifest's `customOnlyFeatures` (AI requests, doesn't edit).
 - `DEFAULT_DELIVERY_MODEL` is `"custom_repo"`. Every paid client is a separate hand-built repo. The `platform_template` value still exists in the type for legacy tenant records but should not be used for new tenants. The self-serve backend was **deleted** (2026-06-10; `/onboard` redirects to `/access-request` preserving `?ref=`) — the only lead path is `/access-request`, Jacob builds the repo.
 - **Client-site traffic tracking**: custom repos send page-view/booking-click beacons to `POST /api/v1/track/[tenant]` (additive v1 route; rate-limited, fail-silent tracker in `custom-repo-starter/ScaffoldTracker.tsx`, needs `NEXT_PUBLIC_SCAFFOLD_API_URL` + `NEXT_PUBLIC_TENANT_ID`). This feeds the weekly report's numbers — rollout steps for live repos in `docs/tracking-rollout.md`.
 - **Conversion capture (additive v1)**: the same beacon carries an `order` event (validated, idempotent on `externalId`) into `src/lib/orders.ts` — powers the Store pillar's revenue/orders/best-sellers. Native form submissions POST to `/api/v1/leads/[tenant]` (validated, deduped, rate-limited) into `src/lib/leads.ts` — surfaced as "Who reached out" on Today. Both stores set a dedup lock that is **released on a write failure** so a retried beacon is never silently swallowed. v1 stays additive-only; change by versioning.
@@ -66,17 +67,29 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
   `create_suggestion`, `create_blog_post`, `list_blog_posts`, `draft_newsletter`.
   Inline-display tools return `{ __inlineTool, ... }` → streamed as `__CARD__`
   (e.g. `show_report`, `show_content`).
-- `undo_last_change` (`src/app/api/agent/route.ts`) is the **governed revert** — "undo
-  that" / "put it back" restores the previous section version (or a named `versionId` from
-  history) through the SAME `applySectionUpdate` path as any edit, but with the additive
-  `forceReview: true` knob so a revert **always drafts into the approval queue and never
-  auto-publishes**, even a low-risk one. It no-ops honestly when there's no earlier version.
-- Google Business tools (`create_gbp_post`, `update_business_hours`) NEVER write to Google
-  directly — they queue a `status:"pending"` event (`metadata.kind` of `gbp_post_draft` /
-  `gbp_hours_draft`); the real write happens on owner approval in `src/lib/event-actions.ts`,
-  which leaves the event pending if the write fails. Review replies follow the same governed
-  path (`review_reply_draft` → `publishReviewReply`). This is the safety invariant — do not
-  add a tool that publishes to an external surface without queuing for approval first.
+- **Two agent paths, one set of tool definitions.** The streaming chat route
+  (`src/app/api/agent/route.ts`) and the background executor (`src/lib/agent-executor.ts`,
+  run when an owner approves a suggestion in `event-actions.ts`) MUST behave identically.
+  The shared gates + tool factories live in **`src/lib/agent-shared.ts`**:
+  `resolveGbpWriteAllowed`, `resolveEditableSections`, **`buildGbpTools`**, **`buildUndoTool`**.
+  Each path passes its own post-queue side-effect hooks (route → streamed result card via
+  `recordActionResult`; executor → Slack ping) but the tool schema/metadata/return shape are
+  shared, so the two can't drift. Do NOT hand-roll a second copy of a GBP tool or undo in the
+  executor — extend the factory. (The executor previously LACKED `upload_gbp_photo` and undo,
+  and its `create_gbp_post` schema had drifted; the factories closed that gap.)
+- `undo_last_change` (`buildUndoTool` in `src/lib/agent-shared.ts`, used by both paths) is the
+  **governed revert** — "undo that" / "put it back" restores the previous section version (or a
+  named `versionId` from history) through the SAME `applySectionUpdate` path as any edit, but
+  with the additive `forceReview: true` knob so a revert **always drafts into the approval queue
+  and never auto-publishes**, even a low-risk one. It no-ops honestly when there's no earlier version.
+- Google Business tools (`create_gbp_post`, `update_business_hours`, `upload_gbp_photo` — all
+  three from `buildGbpTools`) NEVER write to Google directly — they queue a `status:"pending"`
+  event (`metadata.kind` of `gbp_post_draft` / `gbp_hours_draft` / `gbp_photo_draft`); the real
+  write happens on owner approval in `src/lib/event-actions.ts`, which leaves the event pending
+  if the write fails and, on a SUCCESSFUL write, logs a `gbp-*` activity entry to the owner's
+  "What Strelva did" feed. Review replies follow the same governed path (`review_reply_draft` →
+  `publishReviewReply`). This is the safety invariant — do not add a tool that publishes to an
+  external surface without queuing for approval first.
   - **Resolve on `success`, NOT on `verified`.** These external writes are NON-idempotent
     (a re-posted GBP update / review reply duplicates), so approval resolution gates on the
     write being *accepted* (`success`/`published`), not on the read-back confirmation
@@ -115,19 +128,23 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 - Report cadence: `src/lib/report-cadence.ts` — decides WHEN the weekly-report cron emails a tenant (not what's in it). Per-tenant override in Redis (`reb:report-cadence:{tenant}`, default `monthly`; last-sent throttle at `reb:report-sent:{tenant}`); tiers aren't a code signal, so an operator flips a high-touch client to `weekly`. The `weekly-report` cron gates each send on `isReportDue`.
 - Client lifecycle emails: `sendWelcomeEmail`/`sendSiteLiveEmail`/`sendReviewRequestEmail` in `src/lib/delivery-email.ts` (all behind the client `emailSendingPaused()` gate, fail-soft). Wired to an operator "send" surface: `POST /api/admin/tenants/[id]/lifecycle-email` (`type: "welcome" | "site-live" | "review-request"`; super-admin, audit-logged) resolves the tenant's contact + URLs from trusted tenant config (never request input) and calls the matching sender. Because a `false` return means either "paused" or "send failed", when a send returns false AND client email is paused the route returns `200 { sent: false, paused: true }` so the UI reads it as an off-switch, not an error. Each sender also passes its `tenantId` so a real send auto-logs to the operator CRM timeline (see CRM comms auto-log above).
 - Search Console + GA4 analytics: `src/lib/analytics.ts` — per-tenant analytics config (which GSC property + GA4 property to read) in Redis at `analytics:cfg:{tenantId}` (GSC default derived from the tenant's siteUrl); fail-soft reads that always return a status (`ok`/`unconfigured`/`unavailable`) and never throw. **Auth is OAuth-first, service-account-fallback** — each read tries the tenant's own Google connection when they granted the matching scope (`getGoogleScopeGrants`/`getGoogleAccessToken` in `src/lib/google-token.ts`), else falls back to the shared Strelva reporting service account (JWT signer reused from `search-console.ts`). Admin view at `src/app/admin/analytics/`; config write via `POST /api/admin/tenants/[id]/analytics-config` (super-admin, audit-logged).
+  - **GSC property totals** are the TRUE property aggregate: `getSearchConsolePerf` fires TWO reads — an un-dimensioned request for the real totals (clicks/impressions/ctr/position) and the `dimensions:["query"], rowLimit:20` request for the `topQueries` list only. (It previously summed the top-20 rows, which understated any long tail.) The cron twin `search-console.ts` `fetchSearchData` does the same. **Do NOT go back to summing the query rows for totals.**
+  - **Reads are cached read-through in Redis** (`analytics:gsc:{tenant}:{days}` / `analytics:ga4:{tenant}:{days}`, ~15-min TTL, only `status:"ok"` results cached) — the dashboard, admin view, and weekly-report cron each call the reads independently, so without the cache a single dashboard load minted a token + hit Google 2-4× live. There is no explicit cache bust on a property repoint: the short TTL is the single staleness bound (numbers self-heal within it). A per-window invalidation list was tried and removed — it drifted from its callers (a `days=30` caller was silently missed). Fail-open when Redis is null.
   - **Auto-setup because we host** (the "analytics wires itself up" promise): (1) GA4 pageview tag `custom-repo-starter/ScaffoldGA4.tsx` — a self-contained, fail-silent, CSP-friendly drop-in (mirrors `ScaffoldTracker`) that loads gtag.js only when `NEXT_PUBLIC_GA4_MEASUREMENT_ID` is set and is a complete no-op when unset; the operator just sets the one env var. (2) Provision-time analytics config: `src/lib/provisioning.ts` best-effort `setAnalyticsConfig` writes `analytics:cfg` with the siteUrl-derived GSC property (`deriveScDomain`) so a tenant has stored config from day one. (3) `registerHostedSiteWithSearchConsole` in `analytics.ts` is **GATED-OFF groundwork** — never auto-invoked, no-ops unless `opts.allow === true`, writes no verification token so it **cannot fabricate a verified state** (the Sites:add call only succeeds if the reporting service account is already a verified owner). The supported grant path is still the manual "add the reporting service account as a GSC/GA4 user" step provisioning surfaces.
 - Visibility cron gating (`src/app/api/cron/visibility/route.ts`): derives the probe `trade` from the tenant's `industry` field when no `visibility.trade` is hand-set (a real field, not a guess) so a tenant that never had a `visibility` block still collects wedge data — instead of silently skipping. `towns` are never invented; a tenant missing a real trade/town is recorded as `missing_*` and surfaced to an operator (deduped `alertOnce`), never a silent no-op.
 - Site health / audit: `src/lib/scan.ts` (`scanTenant`/`scanAllTenants`) wraps the audit engine (`src/lib/audit/checks.ts` `runAudit`) and is the ONLY writer to `scan-store` (`src/lib/scan-store.ts`, Redis) — the single source of truth for per-tenant health + history. The daily `portfolio-scan` cron (`0 5 * * *`) populates every tenant; the client `/dashboard/health` and the admin overview grade/score/sparkline read the SAME store. **Do NOT add a parallel audit-history store or cron** — a duplicate was built and removed; all health work goes through `scan.ts`/`scan-store`. Public free tool at `/audit` (rate-limited); sendable one-pager via `src/lib/audit/html.ts` + `/api/audit/report`. The admin scan (`POST /api/admin/scan`) also returns `prioritizedIssues` (via `src/lib/audit/prioritize.ts`) — the ranked "fix first" list rendered admin-side in the tenant `SiteScan` view; the client only ever sees grade/score. Full: `docs/audit-page.md`.
+  - **Real GA4 in the dollar-impact:** `scanTenant` sources a `TrafficProfile` (real GA4 monthly visitors + a leads-based conversion rate over the same 30-day window) and threads it into `runAudit(url, { traffic })` → `attachImpact`. Paying clients get dollar/customer estimates computed from their real traffic (labeled "based on your traffic"); the anonymous `/audit` tool passes nothing and keeps the generic 500-visitor prior (labeled "estimated"). Any GA4 read that isn't `ok`/has 0 users → generic prior, so pre-activation tenants are unaffected.
+  - **90-day baseline anchor:** `scanTenant` captures a durable, set-once, NO-TTL day-0 health snapshot (`saveScanBaseline`/`getScanBaseline` in `scan-store`, `reb:scan:baseline:{tenant}`) seeded from the earliest retained point. `milestone.ts` compares "then" health against this anchor instead of the 12-point / 30-day ring buffer (which only ever reached back ~12 days). Honest "tracking since" still shows when there's no real earlier baseline.
 
 ## Key lib files
 
-- `src/lib/tenants.ts` — tenant config lookup (Postgres `tenants` via `TENANTS_SOURCE`, Sanity fallback, Redis 60s cache); the `rowToTenant`/`tenantToRow` mapper is the 45-column spine
+- `src/lib/tenants.ts` — tenant config lookup (Postgres `tenants` via `TENANTS_SOURCE`, Sanity fallback, Redis 60s cache); the `rowToTenant`/`tenantToRow` mapper is the 45-column spine. **`tenantToRow` always emits `site_name` + `created_at`** (the generated Insert type requires `site_name`), so `updateTenant` backfills both from the existing row before upserting — a partial update (e.g. an admin setting `customRepo`) must NOT blank the name or reset `created_at`, which feeds `milestone.ts`'s 90-day baseline. Don't "simplify" that backfill away.
 - `src/lib/storage/content-cache.ts` — Redis read-through/write-through cache for the public content path
 - `src/lib/storage/content-store.ts` — Postgres `content` (via `CONTENT_SOURCE`) with Sanity/dev-file fallback; `src/lib/db/repositories.ts` + `src/lib/db/source-flags.ts` back the whole dual-path
 - `src/lib/auth.ts` — Supabase Auth (`auth.uid()`) + per-tenant roles via the `memberships` table + super-admin via `super_admins`; Clerk path dead-pathed behind the flag
-- `src/lib/site-capabilities.ts` — capability manifest builder (merged with optional remote manifest from the custom repo)
+- `src/lib/site-capabilities.ts` — capability manifest builder (merged with the optional remote manifest a custom repo publishes at `customRepo.capabilityManifestUrl`, SSRF-guarded + Zod-validated). The manifest URL is settable on EXISTING tenants via `POST /api/admin/tenants/[id]/capability-manifest` (super-admin) — not just at create. The agent's editable-section set (`resolveEditableSections` in `agent-shared.ts`) adds sections the remote manifest declares beyond the template (excluding component render-keys), so the AI edits what the LIVE custom site renders. A custom repo publishes its manifest via `custom-repo-starter/site-capabilities-route.ts` + `buildSiteCapabilityManifest` (`scaffold-client.ts`).
 - `src/lib/scaffold-contracts.ts` — versioned route helpers + HMAC revalidation signing/verification (legacy `REB_*` symbol aliases are still exported for back-compat)
-- `src/lib/audit/*` — the site-health audit engine: `checks.ts` (`runAudit`), `context.ts` (one-fetch `AuditContext`), `modules/*` (6 checks ported + fidelity-reviewed from the archived OWSH Systems product: ai-readability/seo-foundations/security/accessibility/trust/content), `impact.ts` ("what this costs you" + dollar-quantified narrative + `topFixes`), `prioritize.ts` (`prioritizeIssues` — ranks an `AuditResult`'s failing/warning checks into one admin-only "fix first" list; **pure transform, no store/cron**; ported/de-scoped from OWSH, revenue modeling intentionally omitted), `scoring.ts`. Always consumed via `src/lib/scan.ts` -> `src/lib/scan-store.ts` (see Operational systems).
+- `src/lib/audit/*` — the site-health audit engine: `checks.ts` (`runAudit`), `context.ts` (one-fetch `AuditContext`), `modules/*` (6 checks ported + fidelity-reviewed from the archived OWSH Systems product: ai-readability/seo-foundations/security/accessibility/trust/content), `impact.ts` ("what this costs you" + dollar-quantified narrative + `topFixes`; the quantified estimates multiply against a `TrafficProfile` — a paying client's real GA4/leads numbers threaded from `scan.ts`, or the generic prior for the anonymous audit), `prioritize.ts` (`prioritizeIssues` — ranks an `AuditResult`'s failing/warning checks into one admin-only "fix first" list; **pure transform, no store/cron**; ported/de-scoped from OWSH, revenue modeling intentionally omitted), `scoring.ts`. Always consumed via `src/lib/scan.ts` -> `src/lib/scan-store.ts` (see Operational systems).
 - `src/lib/reviews/*` — dependency-free review intelligence (ported from the OWSH `sentiment-analyzer`): `sentiment.ts` (negation/intensifier-aware lexicon scoring + topic/keyword/urgency/emotion), `intelligence.ts` (the **admin-vs-client split** — `getClientReviewSummary` = positive owner-facing numbers only; `getAdminReviewIntelligence` = sentiment breakdown + urgent-first needs-a-reply queue + concerns + at-risk). Synchronous, no model call. Surfaces: client → `weekly-brief.ts` + `ReviewsPanel`; admin → the tenant page `ReviewIntelPanel` + `GET /api/admin/tenants/[id]/reviews-intel`. Product rule: issues are admin-side, the client sees good numbers as good numbers. Full: `docs/features/review-engine.md`.
 - `src/lib/review-replies.ts` — filter-safe review-reply drafting (anti-boilerplate lint from the 12,752-reply rejection dataset, near-duplicate check, deterministic fallback, always queued for approval). Enriched with a sentiment/topic hint from `reviews/sentiment` so drafts name the reviewer's actual concern/praise.
 - `src/lib/guides.ts` + `src/content/guides/batch-*.ts` — the `/guides` SEO blog (articles repurposed from the OWSH fix guides; each `fixesSlug` links an article to the audit category it addresses)
@@ -190,10 +207,12 @@ Local-business owners will pay for a dashboard that proves their website is work
      (`ActivityFeed.tsx` + `src/lib/activity-feed.ts`) — an owner-facing, past-tense timeline
      of the managed done-for-you work, the anti-churn proof surface. `selectStrelvaWork`
      scopes it to `actor:"ai"` + `actor:"admin"` + posted review replies (`type:"review-reply"`)
-     and **excludes the owner's own manual edits**; only genuinely-live work is shown
+     + published Google Business actions (`type` `gbp-post`/`gbp-hours`/`gbp-photo`) and
+     **excludes the owner's own manual edits**; only genuinely-live work is shown
      (pending drafts / "dashboard only" reply drafts are skipped), with an honest empty state.
-     Known gap: GBP posts aren't in the feed yet), **Ask Strelva** (`/dashboard/chat`, the
-     agent chat).
+     GBP posts/hours/photos now appear once published — `event-actions.ts` logs a
+     `gbp-*` activity entry (actor `admin`) on a SUCCESSFUL approval-write only), **Ask
+     Strelva** (`/dashboard/chat`, the agent chat).
    - **Your presence** — **Website** (spine; Site + Content/Assets/**History**/Store as
      sub-tabs — History holds the change log + revert-to-last-good; **Store folds in** as a
      sub-tab only when the tenant runs a storefront, never a top-level tab), **Google
@@ -201,7 +220,9 @@ Local-business owners will pay for a dashboard that proves their website is work
      `WeeklyBriefClient` + `SiteHealthCard`; the old separate Health tab is gone. Also carries
      the **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`) — a
      real then→now recap (traffic, review count + rating, health grade) built only from stored
-     history; "tracking since {date}" when a metric has no baseline, a forward-looking
+     history; the "then" health compares against a durable set-once day-0 anchor
+     (`getScanBaseline`), not the 12-point/30-day ring buffer, so an aging client gets a true
+     90-day delta; "tracking since {date}" when a metric has no baseline, a forward-looking
      "building" state until enough history — and the **AI-visibility scorecard** "You in AI
      answers" (`AiVisibilityScorecard.tsx` + `src/lib/ai-visibility-scorecard.ts`) which reuses
      the weekly visibility snapshot, counts only probed answers, and never shames a gap; plus

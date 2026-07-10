@@ -3,7 +3,7 @@ import * as cheerio from "cheerio";
 import type { AuditContext } from "./context";
 import type { CategoryResult, CheckResult, PageSpeedResult } from "./types";
 import { averageCheckScores } from "./scoring";
-import { attachImpact } from "./impact";
+import { attachImpact, type TrafficProfile } from "./impact";
 import { guideRefsForCategory } from "@/lib/guides";
 import { checkAiReadability } from "./modules/ai-readability";
 import { checkSeoFoundations } from "./modules/seo-foundations";
@@ -352,7 +352,10 @@ async function buildAuditContext(
 // ---------------------------------------------------------------------------
 // Run all checks
 // ---------------------------------------------------------------------------
-export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
+export async function runAudit(
+  inputUrl: string,
+  opts?: { traffic?: TrafficProfile }
+): Promise<CategoryResult[]> {
   let url = inputUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
@@ -383,7 +386,10 @@ export async function runAudit(inputUrl: string): Promise<CategoryResult[]> {
   const categories = [webVitals, mobile, ...moduleResults];
 
   // Attach the "what this costs you" narrative + fix priority to every finding.
-  for (const cat of categories) attachImpact(cat);
+  // `opts.traffic` (a paying client's real GA4/leads numbers) makes the dollar
+  // estimates real; the anonymous audit passes nothing and stays on the generic
+  // prior.
+  for (const cat of categories) attachImpact(cat, opts?.traffic);
 
   // Cross-link weak categories (needs improvement) to the `/guides` articles
   // that fix them. Server-only: guideRefsForCategory returns a light

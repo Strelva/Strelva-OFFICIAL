@@ -468,6 +468,13 @@ unit-tested.
 - Mount `<ScaffoldTracker />` and wire `trackBookingClick` so the weekly report has real numbers.
 - Expose `POST /api/v1/revalidate` and verify `x-reb-timestamp` + `x-reb-signature` headers.
 - Keep local defaults (via `content-defaults.ts`) so the site renders when Scaffold Web is unavailable.
+- **Publish your capability manifest.** Drop `site-capabilities-route.ts` in at
+  `app/api/capabilities/route.ts` (it builds the manifest from `content-defaults`
+  via `buildSiteCapabilityManifest`), then have the operator point the tenant's
+  `customRepo.capabilityManifestUrl` at its public URL (super-admin →
+  `POST /api/admin/tenants/{id}/capability-manifest`). The control plane fetches +
+  merges it, so the AI edits the sections THIS site actually renders — declare
+  only the sections you mount, and list commerce/rewards in `customOnlyFeatures`.
 
 ## Content Sections
 
