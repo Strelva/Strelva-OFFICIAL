@@ -1,14 +1,11 @@
 /**
  * Inbox storage - notifications and action items for dashboard.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `inbox_items`
- * table (Sanity fallback on read). Writes go to Postgres AND Sanity while both
- * are configured so the transition is reversible; once Sanity is removed,
- * `hasSanity` is false and only Postgres is written. Default off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `inbox_items` table;
+ * otherwise uses the local dev-file store.
  */
 
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -134,22 +131,6 @@ export async function addInboxItem(
     await insertInboxItem(full, tenant);
   }
 
-  if (hasSanity) {
-    await getSanityClient().create({
-      _type: "inboxItem",
-      tenant,
-      itemId: full.id,
-      itemType: full.type,
-      title: full.title,
-      detail: full.detail,
-      time: full.timestamp,
-      read: false,
-      section: full.section,
-      actions: full.actions,
-    });
-    return full;
-  }
-
   if (!dataSourceIsPostgres()) {
     const store = await readDevContent(tenant);
     const items = (store.__inbox as InboxItem[]) ?? [];
@@ -166,24 +147,7 @@ export async function getInboxItems(
 ): Promise<InboxItem[]> {
   if (dataSourceIsPostgres()) {
     const rows = await listInboxItems(tenant, filters);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    let query = `*[_type == "inboxItem" && tenant == $tenant`;
-    const params: Record<string, string | boolean> = { tenant };
-    if (filters?.type) {
-      query += ` && itemType == $itemType`;
-      params.itemType = filters.type;
-    }
-    if (filters?.unreadOnly) {
-      query += ` && read == false`;
-    }
-    query += `] | order(time desc)[0...50]{
-      "id": itemId, "type": itemType, title, detail, "timestamp": time, read, section, actions
-    }`;
-    return getSanityReadClient().fetch(query, params);
+    return rows;
   }
 
   const store = await readDevContent(tenant);
@@ -206,16 +170,6 @@ export async function markInboxRead(
     pgUpdated = await markInboxItemRead(itemId, tenant);
   }
 
-  if (hasSanity) {
-    const docId = await getSanityClient().fetch(
-      `*[_type == "inboxItem" && tenant == $tenant && itemId == $itemId][0]._id`,
-      { tenant, itemId }
-    );
-    if (!docId) return pgUpdated;
-    await getSanityClient().patch(docId).set({ read: true }).commit();
-    return true;
-  }
-
   if (dataSourceIsPostgres()) {
     return pgUpdated;
   }
@@ -235,19 +189,6 @@ export async function markAllInboxRead(
 ): Promise<void> {
   if (dataSourceIsPostgres()) {
     await markAllInboxItemsRead(tenant);
-  }
-
-  if (hasSanity) {
-    const docs = await getSanityClient().fetch<Array<{ _id: string }>>(
-      `*[_type == "inboxItem" && tenant == $tenant && read == false]{_id}`,
-      { tenant }
-    );
-    const tx = getSanityClient().transaction();
-    for (const doc of docs) {
-      tx.patch(doc._id, (p) => p.set({ read: true }));
-    }
-    await tx.commit();
-    return;
   }
 
   if (!dataSourceIsPostgres()) {

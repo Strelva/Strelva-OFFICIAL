@@ -1,23 +1,22 @@
 /**
  * Booking storage - appointments, availability, and config.
  *
- * Migration: when DATA_SOURCE=postgres, the individual-booking functions
- * (getBookings, createBooking, updateBooking) read/write the Postgres `bookings`
- * table (Sanity fallback on read). Writes go to Postgres AND Sanity while both
- * are configured so the transition is reversible. Default off (Sanity path).
+ * When DATA_SOURCE=postgres, the individual-booking functions (getBookings,
+ * createBooking, updateBooking) read/write the Postgres `bookings` table;
+ * otherwise they use the dev-file store.
  *
  * NOTE: only the `bookings` table exists in Postgres. There is no table for
- * BookingConfig or DateOverride, so getBookingConfig/setBookingConfig/
- * getDateOverrides stay on Sanity/dev unchanged (see columnMismatch note in the
- * migration tracker). The Redis slot-lock layer is orthogonal to the data source
- * and is preserved as-is.
+ * BookingConfig or DateOverride — those are tableless per-tenant config, stored
+ * as a Redis blob (`reb:booking:config:*` / `reb:booking:overrides:*`, the same
+ * pattern as report-cadence/CRM) with the dev-file store as the local fallback
+ * when Redis is absent. The Redis slot-lock layer is a separate concern and is
+ * preserved as-is.
  */
 
 import type { BookingConfig, DateOverride, Booking } from "../types";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "../booking";
-import { getSanityClient } from "../sanity";
 import { getRedis } from "../redis";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert, type Update } from "../db/client";
@@ -127,27 +126,22 @@ async function pgUpdateBooking(
   }
 }
 
+const bookingConfigKey = (tenant: string) => `reb:booking:config:${tenant}`;
+const dateOverridesKey = (tenant: string) => `reb:booking:overrides:${tenant}`;
+
 export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<BookingConfig> {
-  if (hasSanity) {
-    const doc = await getSanityClient().fetch(
-      `*[_type == "bookingConfig" && tenant == $tenant][0]`,
-      { tenant }
-    );
-    if (doc) {
-      const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...config } = doc;
-      // Clean _key from weeklySchedule items
-      if (config.weeklySchedule) {
-        config.weeklySchedule = config.weeklySchedule.map(
-          ({ _key, ...rest }: { _key?: string } & Record<string, unknown>) => rest
-        );
-      }
-      return config as BookingConfig;
-    }
-    return DEFAULT_BOOKING_CONFIG;
+  const redis = getRedis();
+  if (redis) {
+    // Fail CLOSED: let a Redis error propagate (the caller fails the request)
+    // rather than swallow it and serve DEFAULT_BOOKING_CONFIG — default hours
+    // could offer slots on a day the tenant is actually closed, or hide a day
+    // it's open, on a live booking surface. A genuine miss (null) means "no
+    // custom config yet" → DEFAULT is the correct answer.
+    const raw = await redis.get<BookingConfig>(bookingConfigKey(tenant));
+    return raw ?? DEFAULT_BOOKING_CONFIG;
   }
-
   const store = await readDevContent(tenant);
   return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
 }
@@ -156,20 +150,13 @@ export async function setBookingConfig(
   config: BookingConfig,
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
-  if (hasSanity) {
-    const existingId = await getSanityClient().fetch(
-      `*[_type == "bookingConfig" && tenant == $tenant][0]._id`,
-      { tenant }
-    );
-    const doc = { _type: "bookingConfig" as const, tenant, ...config };
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
-    } else {
-      await getSanityClient().create(doc);
-    }
+  const redis = getRedis();
+  if (redis) {
+    // Let a real Redis write failure surface (route → 500) rather than pretend
+    // the save succeeded.
+    await redis.set(bookingConfigKey(tenant), config);
     return;
   }
-
   const store = await readDevContent(tenant);
   store[`__bookingConfig_${tenant}`] = config;
   await writeDevContent(store, tenant);
@@ -178,15 +165,20 @@ export async function setBookingConfig(
 export async function getDateOverrides(
   tenant: string = DEFAULT_TENANT
 ): Promise<DateOverride[]> {
-  if (hasSanity) {
-    // Store date overrides as part of booking config
-    const doc = await getSanityClient().fetch(
-      `*[_type == "bookingConfig" && tenant == $tenant][0].dateOverrides`,
-      { tenant }
-    );
-    return doc || [];
+  // NOTE: there is currently NO app writer for date overrides — they were
+  // authored in Sanity Studio, which is decommissioned — so this returns [] in
+  // prod today. The getter + the availability path's override handling are kept
+  // intact for a future Redis-backed writer (config already lives here). If a
+  // client relied on Studio-authored holiday closures, those are no longer
+  // honored (see the Sanity teardown ops notes).
+  const redis = getRedis();
+  if (redis) {
+    // Fail CLOSED like getBookingConfig: propagate a Redis error rather than
+    // silently dropping a "closed" override and accepting a booking on a day the
+    // owner blocked off.
+    const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
+    return Array.isArray(raw) ? raw : [];
   }
-
   const store = await readDevContent(tenant);
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
 }
@@ -196,23 +188,7 @@ export async function getBookings(
   dateRange?: { from: string; to: string }
 ): Promise<Booking[]> {
   if (dataSourceIsPostgres()) {
-    const pg = await pgListBookings(tenant, dateRange);
-    if (pg.length > 0 || !hasSanity) return pg;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    let query = `*[_type == "booking" && tenant == $tenant`;
-    const params: Record<string, string> = { tenant };
-
-    if (dateRange) {
-      query += ` && date >= $from && date <= $to`;
-      params.from = dateRange.from;
-      params.to = dateRange.to;
-    }
-    query += `] | order(date asc){ "id": bookingId, serviceId, serviceName, date, startTime, endTime, clientName, clientEmail, clientPhone, notes, status, "createdAt": _createdAt, cancelledAt }`;
-
-    return getSanityClient().fetch(query, params);
+    return pgListBookings(tenant, dateRange);
   }
 
   const store = await readDevContent(tenant);
@@ -370,40 +346,6 @@ export async function createBooking(
   const bookingId = generateBookingId();
   const { bufferTime } = await getBookingConfig(tenant);
 
-  if (hasSanity) {
-    const doc = await getSanityClient().create({
-      _type: "booking",
-      tenant,
-      bookingId,
-      ...booking,
-      status: "confirmed",
-    });
-
-    const created: Booking = {
-      ...booking,
-      id: bookingId,
-      status: "confirmed",
-      createdAt: doc._createdAt!,
-    };
-
-    // Dual-write to Postgres while migrating (using Sanity's createdAt so the two
-    // stores agree). Best-effort; Sanity remains the durable store of record.
-    if (dataSourceIsPostgres()) {
-      await pgInsertBooking(created, tenant);
-    }
-
-    // Mark the full booked span as confirmed in Redis after successful DB write
-    await confirmBookingSlot(
-      tenant,
-      booking.date,
-      booking.startTime,
-      booking.endTime,
-      bufferTime
-    );
-
-    return created;
-  }
-
   const newBooking: Booking = {
     ...booking,
     id: bookingId,
@@ -484,47 +426,10 @@ export async function updateBooking(
     const existing = await pgGetBooking(id, tenant);
     if (existing) {
       await pgUpdateBooking(id, tenant, updates);
-      // Keep Sanity in sync while dual-writing for reversibility.
-      if (hasSanity) {
-        const doc = await getSanityClient().fetch(
-          `*[_type == "booking" && tenant == $tenant && bookingId == $id][0]._id`,
-          { tenant, id }
-        );
-        if (doc) await getSanityClient().patch(doc).set(updates).commit();
-      }
       return { ...existing, ...updates };
     }
-    // Postgres miss: fall through to Sanity only if it's still configured.
-    if (!hasSanity) return null;
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "booking" && tenant == $tenant && bookingId == $id][0]`;
-    const doc = await getSanityClient().fetch(query, { tenant, id });
-    if (!doc) return null;
-
-    await getSanityClient().patch(doc._id).set(updates).commit();
-    const updated: Booking = {
-      id,
-      serviceId: doc.serviceId,
-      serviceName: doc.serviceName,
-      date: doc.date,
-      startTime: doc.startTime,
-      endTime: doc.endTime,
-      clientName: doc.clientName,
-      clientEmail: doc.clientEmail,
-      clientPhone: doc.clientPhone,
-      notes: doc.notes,
-      status: doc.status,
-      createdAt: doc._createdAt,
-      cancelledAt: doc.cancelledAt,
-      ...updates,
-    };
-    // Dual-write the patch to Postgres if it has the row.
-    if (dataSourceIsPostgres()) {
-      await pgUpdateBooking(id, tenant, updates);
-    }
-    return updated;
+    // Postgres miss: no Sanity fallback remains.
+    return null;
   }
 
   const store = await readDevContent(tenant);

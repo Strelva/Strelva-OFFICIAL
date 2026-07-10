@@ -2,15 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetRedis = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
-vi.mock("@/lib/sanity", () => ({ getSanityClient: vi.fn() }));
 
 import { getServiceHealth } from "@/lib/health";
 
 // Env vars that drive the external checks — cleared so they read "not configured"
 // (and never make a real network call) in tests.
 const ENV_KEYS = [
-  "NEXT_PUBLIC_SANITY_PROJECT_ID",
-  "SANITY_API_TOKEN",
   "CLERK_SECRET_KEY",
   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
   "STRIPE_SECRET_KEY",
@@ -39,7 +36,7 @@ describe("getServiceHealth", () => {
     const report = await getServiceHealth();
     expect(report.status).toBe("healthy");
     expect(report.checks.redis.status).toBe("not configured");
-    expect(report.checks.sanity.status).toBe("not configured");
+    expect(report.checks.supabase.status).toBe("not configured");
   });
 
   it("marks redis ok when ping succeeds", async () => {

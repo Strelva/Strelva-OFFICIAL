@@ -2,8 +2,7 @@
  * Activity logging - audit trail of all content changes.
  */
 
-import { getSanityClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { addInboxItem } from "./inbox-store";
 import { emitEventFromActivity } from "../events";
 import { dataSourceIsPostgres } from "../db/source-flags";
@@ -66,21 +65,7 @@ export async function logActivity(
 ): Promise<void> {
   if (dataSourceIsPostgres()) {
     await insertActivity(activityToInsert(entry, tenant));
-  }
-  if (hasSanity) {
-    await getSanityClient().create({
-      _type: "activityLog",
-      tenant,
-      text: entry.text,
-      activityType: entry.type,
-      time: entry.time,
-      section: entry.section,
-      actor: entry.actor,
-      changes: entry.changes,
-      snapshot:
-        entry.snapshot === undefined ? undefined : JSON.stringify(entry.snapshot),
-    });
-  } else if (!dataSourceIsPostgres()) {
+  } else {
     const store = await readDevContent(tenant);
     const activity = (store.__activity as unknown[]) ?? [];
     activity.unshift(entry);
@@ -122,33 +107,7 @@ export async function getActivity(
 ): Promise<ActivityEntry[]> {
   if (dataSourceIsPostgres()) {
     const rows = await listActivity(tenant, { section: filters?.section, actor: filters?.actor, limit: 50 });
-    if (rows.length > 0 || !hasSanity) return rows.map(mapPgActivityRow);
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    let query = `*[_type == "activityLog" && tenant == $tenant`;
-    const params: Record<string, string> = { tenant };
-    if (filters?.section) {
-      query += ` && section == $section`;
-      params.section = filters.section;
-    }
-    if (filters?.actor) {
-      query += ` && actor == $actor`;
-      params.actor = filters.actor;
-    }
-    query += `] | order(time desc)[0...50]{ text, "type": activityType, time, section, actor, changes, snapshot }`;
-    const raw = await getSanityClient().fetch<Array<ActivityEntry & { snapshot?: string | unknown }>>(query, params);
-    return raw.map((entry) => {
-      if (typeof entry.snapshot === "string") {
-        try {
-          return { ...entry, snapshot: JSON.parse(entry.snapshot) };
-        } catch {
-          return { ...entry, snapshot: undefined };
-        }
-      }
-      return entry;
-    });
+    return rows.map(mapPgActivityRow);
   }
 
   const store = await readDevContent(tenant);

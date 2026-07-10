@@ -1,6 +1,6 @@
 # Strelva Production Readiness
 
-> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (auth, content, tenants, and operational data all on Postgres; `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live). This doc is retained for historical/runbook reference. The only remaining work is the deliberate destructive Sanity/Clerk teardown (remove Sanity reads, lock the dataset, unwrap `clerkMiddleware` in `src/proxy.ts`).
+> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (auth, content, tenants, and operational data all on Postgres; `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live). This doc is retained for historical/runbook reference. The Sanity code teardown is done (Sanity reads removed); the only remaining work is locking the Sanity dataset (an ops step) and the Clerk teardown (unwrap `clerkMiddleware` in `src/proxy.ts`).
 
 ## Branch And Release Model
 
@@ -29,8 +29,7 @@
   `SUPER_ADMIN_EMAILS`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   `CONTENT_SOURCE=postgres`, `TENANTS_SOURCE=postgres`, `DATA_SOURCE=postgres` (the live data backbone),
-  `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`,
-  `SANITY_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
+  `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
   `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `SCAFFOLD_CUSTOM_REQUEST_SECRET` (legacy alias `REB_CUSTOM_REQUEST_SECRET`), `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
   `NEXT_PUBLIC_SITE_URL`, and tenant-specific revalidation secrets. Set `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth connections are enabled.
@@ -56,7 +55,6 @@
 - Configure DNS and wait for Vercel domain verification before sending traffic.
 - For Cloudflare-managed tenant domains, keep the Vercel project domain entries and add the records Vercel recommends in Cloudflare. Current Rohlax evidence: `admin.rohlaxwellness.com` is attached to `scaffold-web`, `rohlaxwellness.com` is attached to `rohlax-wellness`, and `www` plus `admin` currently expose a Vercel CNAME alias but still fail `dns.resolve4(...)`/`curl`; Cloudflare still needs `A www.rohlaxwellness.com 76.76.21.21` plus `A admin.rohlaxwellness.com 76.76.21.21`.
 - Confirm `https://strelva.com/api/health` resolves to the Vercel Next.js app, not a domain-forwarding or link-shortener service. For Porkbun-managed DNS, Vercel currently recommends `A strelva.com 76.76.21.21` or changing nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`. `pnpm check:prod` fails this check when the public production host redirects away from `strelva.com` or does not return Vercel health JSON.
-- Configure Sanity webhook `https://strelva.com/api/sanity/webhook` for content create/update/delete events with `SANITY_WEBHOOK_SECRET` set to the matching webhook secret.
 - Configure Stripe webhook `https://strelva.com/api/billing/webhook` for `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, and `customer.subscription.deleted`, with `STRIPE_WEBHOOK_SECRET` set to the matching signing secret.
 - Configure Clerk webhook `https://strelva.com/api/clerk/webhook` for the `user.created` event and set `CLERK_WEBHOOK_SECRET` to the matching endpoint signing secret.
 - Run `pnpm lint`.
@@ -79,7 +77,7 @@
 - Verify public tenant pages cannot be framed without `?preview=true`.
 - Verify `admin.greatlakesdriedfruit.com` redirects root traffic to `/dashboard`, then signed-out users reach `/sign-in` with invited-email guidance.
 - Verify cron auth with `curl -i https://strelva.com/api/cron/maintenance` and `curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance`; the first request must return 401 and the second must return a non-401 response.
-- Production Live Verification is not complete until an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Sanity/Stripe webhook deliveries are confirmed in provider dashboards, and cron 401/success behavior is verified with `CRON_SECRET`.
+- Production Live Verification is not complete until an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Stripe webhook deliveries are confirmed in provider dashboards, and cron 401/success behavior is verified with `CRON_SECRET`.
 
 ## Customer Access Handoff
 
@@ -110,7 +108,6 @@
 - Dashboard preview fails: inspect the preview response CSP; preview pages should include dashboard frame ancestors and should not emit `X-Frame-Options: DENY`.
 - Revalidation fails: confirm tenant `revalidateUrl`, matching `REVALIDATE_SECRET`, `INTERNAL_API_SECRET`, and webhook delivery status.
 - Stripe webhook fails: check webhook signing secret, endpoint URL, Stripe event delivery, and tenant subscription status.
-- Sanity webhook fails: confirm webhook URL, secret, and that content publish events include the changed tenant.
 - AI content published unexpectedly: set `AI_AUTO_PUBLISH=false`, audit recent generated changes, restore prior content version if needed, and re-run revalidation.
 
 ## Content Schema Rollback Plan

@@ -1,11 +1,8 @@
 /**
  * Page configuration storage - per-page section ordering.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `page_config`
- * and `draft_page_config` tables (Sanity fallback on read). Writes go to Postgres
- * AND Sanity while both are configured so the transition is reversible; once
- * Sanity is removed, `hasSanity` is false and only Postgres is written. Default
- * off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `page_config` and
+ * `draft_page_config` tables; otherwise the dev-file store is the source of truth.
  *
  * Shape note: the store models one `SitePageConfig` blob per tenant
  * (`Record<pageName, { sections, seo }>`). The Postgres tables model ONE ROW PER
@@ -16,8 +13,7 @@
  */
 
 import type { SitePageConfig, PageConfig } from "../types";
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase } from "../db/client";
 import type { Row, Insert } from "../db/client";
@@ -93,7 +89,7 @@ async function setPgPageConfig(
       await db.from(table).insert(rows);
     }
   } catch {
-    // never throw — Sanity/dev path remains the durable fallback
+    // never throw — the dev-file path remains the durable fallback
   }
 }
 
@@ -121,23 +117,12 @@ export async function getPageConfig(
 
   if (dataSourceIsPostgres()) {
     config = await getPgPageConfig("page_config", tenant);
-    // fall through to Sanity/dev for a tenant not yet in Postgres
+    // fall through to the dev store for a tenant not yet in Postgres
   }
 
   if (config === null) {
-    if (hasSanity) {
-      const doc = await getSanityReadClient().fetch(
-        `*[_type == "pageConfig" && tenant == $tenant][0]`,
-        { tenant }
-      );
-      if (doc) {
-        const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...rest } = doc;
-        config = rest.pages as SitePageConfig;
-      }
-    } else {
-      const store = await readDevContent(tenant);
-      config = (store.__pageConfig as SitePageConfig) ?? null;
-    }
+    const store = await readDevContent(tenant);
+    config = (store.__pageConfig as SitePageConfig) ?? null;
   }
 
   if (config) await setCachedPageConfig(tenant, config);
@@ -150,15 +135,7 @@ export async function getDraftPageConfig(
   if (dataSourceIsPostgres()) {
     const pg = await getPgPageConfig("draft_page_config", tenant);
     if (pg) return pg;
-    // fall through to Sanity/dev for a draft not yet in Postgres
-  }
-
-  if (hasSanity) {
-    const doc = await getSanityReadClient().fetch(
-      `*[_type == "draftPageConfig" && tenant == $tenant][0]`,
-      { tenant }
-    );
-    return (doc?.pages as SitePageConfig) ?? null;
+    // fall through to dev for a draft not yet in Postgres
   }
 
   const store = await readDevContent(tenant);
@@ -174,16 +151,7 @@ export async function setPageConfig(
       await setPgPageConfig("page_config", tenant, config);
     }
 
-    if (hasSanity) {
-      const query = `*[_type == "pageConfig" && tenant == $tenant][0]._id`;
-      const existingId = await getSanityClient().fetch(query, { tenant });
-      const doc = { _type: "pageConfig" as const, tenant, pages: config };
-      if (existingId) {
-        await getSanityClient().patch(existingId).set(doc).commit();
-      } else {
-        await getSanityClient().create(doc);
-      }
-    } else if (!dataSourceIsPostgres()) {
+    if (!dataSourceIsPostgres()) {
       const store = await readDevContent(tenant);
       store.__pageConfig = config;
       await writeDevContent(store, tenant);
@@ -204,18 +172,6 @@ export async function setDraftPageConfig(
     await setPgPageConfig("draft_page_config", tenant, config);
   }
 
-  if (hasSanity) {
-    const query = `*[_type == "draftPageConfig" && tenant == $tenant][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant });
-    const doc = { _type: "draftPageConfig" as const, tenant, pages: config };
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
-    } else {
-      await getSanityClient().create(doc);
-    }
-    return;
-  }
-
   if (!dataSourceIsPostgres()) {
     const store = await readDevContent(tenant);
     store.__draftPageConfig = config;
@@ -228,15 +184,6 @@ export async function clearDraftPageConfig(
 ): Promise<void> {
   if (dataSourceIsPostgres()) {
     await clearPgPageConfig("draft_page_config", tenant);
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "draftPageConfig" && tenant == $tenant][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant });
-    if (existingId) {
-      await getSanityClient().delete(existingId);
-    }
-    return;
   }
 
   if (!dataSourceIsPostgres()) {

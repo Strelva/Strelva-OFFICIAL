@@ -6,7 +6,7 @@
  * This file re-exports all storage functions from modular domain files.
  * See src/lib/storage/ for the implementation:
  *
- * - core.ts: shared utilities (hasSanity, dev file helpers)
+ * - core.ts: shared utilities (dev file helpers)
  * - content-store.ts: content sections CRUD
  * - version-store.ts: content versioning and rollback
  * - draft-store.ts: preview drafts

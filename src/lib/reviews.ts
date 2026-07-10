@@ -1,12 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { ReviewItem } from "./types";
-import { getSanityClient, getSanityReadClient } from "./sanity";
 import { dataSourceIsPostgres } from "./db/source-flags";
 import { getSupabase } from "./db/client";
 import type { Row, Insert } from "./db/client";
-
-const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
 function devReviewsPath(tenant: string): string {
   return path.join(process.cwd(), `dev-reviews-${tenant}.json`);
@@ -117,17 +114,7 @@ async function pgReplyToReview(tenant: string, id: string, reply: string, replie
 export async function getReviews(tenant: string): Promise<ReviewItem[]> {
   if (dataSourceIsPostgres()) {
     const pg = await pgListReviews(tenant);
-    if (pg.length > 0 || !hasSanity) return pg;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    return getSanityReadClient().fetch(
-      `*[_type == "review" && tenant == $tenant] | order(date desc) {
-        "id": _id, source, author, rating, text, date, reply, repliedAt
-      }`,
-      { tenant },
-    );
+    return pg;
   }
 
   const reviews = await readDevReviews(tenant);
@@ -146,19 +133,7 @@ export async function addReview(
     result = await pgInsertReview(tenant, review);
   }
 
-  if (hasSanity) {
-    await getSanityClient().create({
-      _type: "review",
-      tenant,
-      source: review.source,
-      author: review.author,
-      rating: review.rating,
-      text: review.text,
-      date: review.date,
-      reply: review.reply,
-      repliedAt: review.repliedAt,
-    });
-  } else if (!dataSourceIsPostgres()) {
+  if (!dataSourceIsPostgres()) {
     const id = generateId();
     const newReview: ReviewItem = { ...review, id };
     const reviews = await readDevReviews(tenant);
@@ -180,24 +155,7 @@ export async function replyToReview(
   if (dataSourceIsPostgres()) {
     const updated = await pgReplyToReview(tenant, reviewId, replyText, repliedAt);
     if (updated) return updated;
-    if (!hasSanity) return null;
-    // a uuid not in Postgres -> fall through to Sanity (legacy _id during transition)
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "review" && tenant == $tenant && _id == $reviewId][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant, reviewId });
-    if (!existingId) return null;
-
-    await getSanityClient().patch(existingId).set({ reply: replyText, repliedAt }).commit();
-
-    const updated = await getSanityReadClient().fetch(
-      `*[_type == "review" && _id == $reviewId][0]{
-        "id": _id, source, author, rating, text, date, reply, repliedAt
-      }`,
-      { reviewId },
-    );
-    return updated || null;
+    return null;
   }
 
   const reviews = await readDevReviews(tenant);

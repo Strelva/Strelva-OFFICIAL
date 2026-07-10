@@ -1,18 +1,14 @@
 /**
  * Search Console data storage.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres
- * `search_console_data` table (one row per tenant, keyed on tenant_id;
- * Sanity fallback on read). Writes go to Postgres AND Sanity while both are
- * configured so the transition is reversible; once Sanity is removed,
- * `hasSanity` is false and only Postgres is written. Default off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `search_console_data`
+ * table (one row per tenant, keyed on tenant_id); otherwise the dev-file store
+ * is the source of truth.
  */
 
 import { promises as fs } from "fs";
 import path from "path";
 import type { SearchData } from "../types";
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { hasSanity } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -61,7 +57,7 @@ async function setSearchDataPg(tenant: string, data: SearchData): Promise<void> 
       .from("search_console_data")
       .upsert(searchToInsert(tenant, data), { onConflict: "tenant_id" });
   } catch {
-    // never throw: dual-write must not break the Sanity/dev path
+    // never throw: a Postgres write must not break the dev-file path
   }
 }
 
@@ -69,17 +65,7 @@ export async function getSearchData(tenant: string): Promise<SearchData | null> 
   if (dataSourceIsPostgres()) {
     const pg = await getSearchDataPg(tenant);
     if (pg) return pg;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    const doc = await getSanityReadClient().fetch(
-      `*[_type == "searchData" && tenant == $tenant][0]`,
-      { tenant },
-    );
-    if (!doc) return null;
-    const { _id, _rev, _type, _createdAt, _updatedAt, tenant: _, ...data } = doc;
-    return data as SearchData;
+    // fall through to the dev file only if Postgres is empty
   }
 
   try {
@@ -93,18 +79,6 @@ export async function getSearchData(tenant: string): Promise<SearchData | null> 
 export async function setSearchData(tenant: string, data: SearchData): Promise<void> {
   if (dataSourceIsPostgres()) {
     await setSearchDataPg(tenant, data);
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "searchData" && tenant == $tenant][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant });
-    const doc = { _type: "searchData" as const, tenant, ...data };
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
-    } else {
-      await getSanityClient().create(doc);
-    }
-    return;
   }
 
   if (!dataSourceIsPostgres()) {

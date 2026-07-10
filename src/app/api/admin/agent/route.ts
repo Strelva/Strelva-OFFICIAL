@@ -155,7 +155,7 @@ export async function POST(req: Request) {
     }),
     read_health: tool({
       description:
-        "Check platform dependency health (Redis, Supabase, Stripe, Gemini; Sanity/Clerk are legacy paths being decommissioned) — overall status + per-service. Use for 'is the platform up / are services healthy'.",
+        "Check platform dependency health (Redis, Supabase, Stripe, Gemini; Clerk is a legacy path being decommissioned) — overall status + per-service. Use for 'is the platform up / are services healthy'.",
       inputSchema: z.object({}),
       execute: async () => await getServiceHealth(),
     }),

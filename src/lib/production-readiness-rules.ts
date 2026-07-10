@@ -1,7 +1,6 @@
 export type ReadinessStatus = "ok" | "warn" | "fail" | "skip";
 
 export interface TenantReadinessInput {
-  _id?: string;
   id: string;
   active?: boolean;
   productionDomain?: string;
@@ -75,10 +74,6 @@ function mustBeAtLeastLength(length: number) {
   return (value: string) => value.length >= length ? null : `Must be at least ${length} characters for production launch`;
 }
 
-function mustMatch(pattern: RegExp, message: string) {
-  return (value: string) => pattern.test(value) ? null : message;
-}
-
 function mustBeEmailList(value: string) {
   const emails = value.split(",").map((email) => email.trim()).filter(Boolean);
   const valid = emails.length > 0 && emails.every((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
@@ -140,9 +135,6 @@ const productionEnvValidators: Record<string, (value: string) => string | null> 
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: mustBeAtLeastLength(20),
   CONTENT_SOURCE: mustEqual("postgres"),
   GOOGLE_GENERATIVE_AI_API_KEY: mustStartWith("AIza"),
-  NEXT_PUBLIC_SANITY_PROJECT_ID: mustMatch(/^[a-z0-9]+$/, "Must be a Sanity project id for production launch"),
-  SANITY_API_TOKEN: mustBeAtLeastLength(20),
-  SANITY_WEBHOOK_SECRET: mustBeAtLeastLength(16),
   OAUTH_STATE_SECRET: mustBeAtLeastLength(32),
   UPSTASH_REDIS_REST_URL: mustBeHttps,
   STRIPE_SECRET_KEY: mustStartWith("sk_live_"),
@@ -176,7 +168,6 @@ export function validateProductionEnvValue(name: string, value: string): string 
 
 export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): TenantReadinessResult[] {
   const tenantIsActive = tenant.active !== false;
-  const activeTenantContext = tenantIsActive && tenant._id ? ` (Sanity document ${tenant._id})` : "";
   const productionDomain = normalizeReadinessDomain(tenant.productionDomain);
   const adminDomain = normalizeReadinessDomain(tenant.adminDomain);
   const clientCustomDomains = tenant.customDomains?.map(normalizeReadinessDomain).filter((domain) =>
@@ -193,7 +184,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
     name: `Tenant ${tenant.id} client domain`,
     status: tenantIsActive ? "fail" : "warn",
     message: tenantIsActive
-      ? `Active tenant has no customer-facing productionDomain/customDomains entry configured${activeTenantContext}`
+      ? `Active tenant has no customer-facing productionDomain/customDomains entry configured`
       : "Inactive tenant has no customer-facing productionDomain/customDomains entry configured",
   });
 
@@ -206,7 +197,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
     name: `Tenant ${tenant.id} admin domain`,
     status: tenantIsActive ? "fail" : "warn",
     message: tenantIsActive
-      ? `Active tenant has no admin domain and none can be derived${activeTenantContext}`
+      ? `Active tenant has no admin domain and none can be derived`
       : "Inactive tenant has no admin domain and none can be derived",
   });
 
@@ -219,7 +210,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
       name: `Tenant ${tenant.id} revalidation`,
       status: tenantIsActive ? "fail" : "warn",
       message: tenantIsActive
-        ? `Active tenant URL set but NO SECRET (generate with: openssl rand -hex 32)${activeTenantContext}`
+        ? `Active tenant URL set but NO SECRET (generate with: openssl rand -hex 32)`
         : "Inactive tenant URL set but NO SECRET (generate with: openssl rand -hex 32)",
     });
   } else {
@@ -227,7 +218,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
       name: `Tenant ${tenant.id} revalidation`,
       status: tenantIsActive ? "fail" : "skip",
       message: tenantIsActive
-        ? `Active tenant has no revalidateUrl configured${activeTenantContext}`
+        ? `Active tenant has no revalidateUrl configured`
         : "Inactive tenant has no revalidateUrl configured",
     });
   }

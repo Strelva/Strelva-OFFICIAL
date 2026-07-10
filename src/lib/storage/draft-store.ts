@@ -1,15 +1,12 @@
 /**
  * Draft content storage - preview versions before publishing.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `draft_content`
- * table (Sanity fallback on read). Writes go to Postgres AND Sanity while both
- * are configured so the transition is reversible; once Sanity is removed,
- * `hasSanity` is false and only Postgres is written. Default off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `draft_content` table;
+ * otherwise uses the local dev-file store.
  */
 
 import type { ContentSection, ContentMap } from "../types";
-import { getSanityClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import {
   getDraftContentData,
@@ -25,13 +22,7 @@ export async function getDraftContent<K extends ContentSection>(
   if (dataSourceIsPostgres()) {
     const pg = await getDraftContentData(tenant, section);
     if (pg) return pg as unknown as ContentMap[K];
-    // fall through to Sanity for a draft not yet in Postgres
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0].data`;
-    const data = await getSanityClient().fetch(query, { tenant, section });
-    return data || null;
+    // fall through to the dev store for a draft not yet in Postgres
   }
 
   const store = await readDevContent(tenant);
@@ -48,18 +39,6 @@ export async function setDraftContent<K extends ContentSection>(
     await upsertDraftContentData(tenant, section, data as unknown as Record<string, unknown>);
   }
 
-  if (hasSanity) {
-    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant, section });
-    const doc = { _type: "draftContent" as const, tenant, section, data };
-    if (existingId) {
-      await getSanityClient().patch(existingId).set(doc).commit();
-    } else {
-      await getSanityClient().create(doc);
-    }
-    return;
-  }
-
   if (!dataSourceIsPostgres()) {
     const store = await readDevContent(tenant);
     store[`__draft:${section}`] = data;
@@ -73,15 +52,6 @@ export async function clearDraft(
 ): Promise<void> {
   if (dataSourceIsPostgres()) {
     await deleteDraftContentData(tenant, section);
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "draftContent" && tenant == $tenant && section == $section][0]._id`;
-    const existingId = await getSanityClient().fetch(query, { tenant, section });
-    if (existingId) {
-      await getSanityClient().delete(existingId);
-    }
-    return;
   }
 
   if (!dataSourceIsPostgres()) {
@@ -101,15 +71,7 @@ export async function listDrafts(
       for (const s of sections) result[s] = true;
       return result;
     }
-    // fall through to Sanity if Postgres has none yet
-  }
-
-  if (hasSanity) {
-    const query = `*[_type == "draftContent" && tenant == $tenant].section`;
-    const sections: string[] = await getSanityClient().fetch(query, { tenant });
-    const result: Record<string, boolean> = {};
-    for (const s of sections) result[s] = true;
-    return result;
+    // fall through to the dev store if Postgres has none yet
   }
 
   const store = await readDevContent(tenant);

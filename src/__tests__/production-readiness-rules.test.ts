@@ -52,9 +52,6 @@ describe("production readiness rules", () => {
     expect(validateProductionEnvValue("CLERK_WEBHOOK_SECRET", "whsec_example")).toBeNull();
     expect(validateProductionEnvValue("SUPER_ADMIN_EMAILS", "owner@example.com,admin@example.com")).toBeNull();
     expect(validateProductionEnvValue("GOOGLE_GENERATIVE_AI_API_KEY", "AIzaSyExample")).toBeNull();
-    expect(validateProductionEnvValue("NEXT_PUBLIC_SANITY_PROJECT_ID", "abc123")).toBeNull();
-    expect(validateProductionEnvValue("SANITY_API_TOKEN", "s".repeat(20))).toBeNull();
-    expect(validateProductionEnvValue("SANITY_WEBHOOK_SECRET", "s".repeat(16))).toBeNull();
     expect(validateProductionEnvValue("STRIPE_SECRET_KEY", "sk_live_example")).toBeNull();
     expect(validateProductionEnvValue("STRIPE_SCAFFOLD_PRICE_ID", "price_example")).toBeNull();
     expect(validateProductionEnvValue("RESEND_API_KEY", "re_example")).toBeNull();
@@ -68,12 +65,6 @@ describe("production readiness rules", () => {
       .toBe("Must be a comma-separated list of valid emails for production launch");
     expect(validateProductionEnvValue("GOOGLE_GENERATIVE_AI_API_KEY", "not-google"))
       .toBe("Must start with AIza for production launch");
-    expect(validateProductionEnvValue("NEXT_PUBLIC_SANITY_PROJECT_ID", "abc-123"))
-      .toBe("Must be a Sanity project id for production launch");
-    expect(validateProductionEnvValue("SANITY_API_TOKEN", "short"))
-      .toBe("Must be at least 20 characters for production launch");
-    expect(validateProductionEnvValue("SANITY_WEBHOOK_SECRET", "short"))
-      .toBe("Must be at least 16 characters for production launch");
     expect(validateProductionEnvValue("RESEND_DOMAIN", "https://updates.strelva.com"))
       .toBe("Must be a bare domain like updates.strelva.com for production launch");
     expect(validateProductionEnvValue("RESEND_DOMAIN", "updates.example.com"))
@@ -181,17 +172,16 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     ]);
   });
 
-  it("includes Sanity document ids in active tenant launch failures", () => {
+  it("reports active tenant launch failures for missing domains + revalidation", () => {
     const results = getTenantLaunchReadinessResults({
-      _id: "THl7mfItZYUmELpcZNa2Zr",
       id: "jacobtest",
       active: true,
     });
 
     expect(results.map((result) => result.message)).toEqual([
-      "Active tenant has no customer-facing productionDomain/customDomains entry configured (Sanity document THl7mfItZYUmELpcZNa2Zr)",
-      "Active tenant has no admin domain and none can be derived (Sanity document THl7mfItZYUmELpcZNa2Zr)",
-      "Active tenant has no revalidateUrl configured (Sanity document THl7mfItZYUmELpcZNa2Zr)",
+      "Active tenant has no customer-facing productionDomain/customDomains entry configured",
+      "Active tenant has no admin domain and none can be derived",
+      "Active tenant has no revalidateUrl configured",
     ]);
   });
 
@@ -490,7 +480,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Vercel app freshness");
     expect(source).toContain("app-host smoke probe");
     expect(source).toContain("Tenant DNS: add the missing Vercel/Cloudflare DNS records");
-    expect(source).toContain("Tenant configuration: update active Sanity tenants before release");
+    expect(source).toContain("Tenant configuration: update active tenants before release");
     expect(source).toContain("deactivate test tenants that should not be customer-facing");
     expect(source).toContain("Active launch tenants need a customer-facing productionDomain/customDomains entry");
     expect(source).toContain("Sign in to Strelva | Strelva");
@@ -731,7 +721,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("dirty local working tree");
     expect(source).toContain("Production Live Verification");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(source).toContain("Clerk/Sanity/Stripe webhook deliveries");
+    expect(source).toContain("Clerk/Stripe webhook deliveries");
     expect(source).toContain("cron 401");
     expect(source).toContain("production live-verification steps");
     expect(source).toContain('[".env.production.local", ".env.local", ".env"]');
@@ -750,7 +740,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("email stays prefilled when switching between sign-up and sign-in");
     expect(source).toContain("strelva.com auth reaches /account");
     expect(source).toContain("admin.greatlakesdriedfruit.com auth reaches /dashboard/site");
-    expect(source).toContain("content create/update/delete events");
     expect(source).toContain("checkout.session.completed");
     expect(source).toContain("invoice.paid");
     expect(source).toContain("invoice.payment_failed");
@@ -764,7 +753,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
     expect(source).toContain("root marketing auth reaches /account");
     expect(source).toContain("invited-owner /dashboard/site access");
-    expect(source).toContain("Clerk/Sanity/Stripe webhook deliveries are successful");
+    expect(source).toContain("Clerk/Stripe webhook deliveries are successful");
     expect(source).toContain("cron 401/success behavior works with CRON_SECRET");
     expect(source).toContain("clear docs/launch-blockers.md Current Blockers");
     expect(source).toContain("DNS verification commands:");
@@ -782,10 +771,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("Vercel app-host freshness check");
     expect(launchBlockers).toContain("after production env, redeploy, and DNS are resolved");
     expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(launchBlockers).toContain("Clerk/Sanity/Stripe webhook deliveries");
+    expect(launchBlockers).toContain("Clerk/Stripe webhook deliveries");
     expect(launchBlockers).toContain("Copyable Vercel env commands");
     expect(launchBlockers).toContain("vercel env add CLERK_WEBHOOK_SECRET production");
-    expect(launchBlockers).toContain("vercel env add SANITY_WEBHOOK_SECRET production");
     expect(launchBlockers).toContain("vercel env add UPSTASH_REDIS_REST_URL production");
     expect(launchBlockers).toContain("vercel env add UPSTASH_REDIS_REST_TOKEN production");
     expect(launchBlockers).toContain("vercel env add SENTRY_DSN production");
@@ -794,7 +782,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("vercel env add NEXT_PUBLIC_APP_URL production");
     expect(launchBlockers).toContain("Provider value sources");
     expect(launchBlockers).toContain("Clerk Dashboard -> Webhooks");
-    expect(launchBlockers).toContain("Sanity project webhook settings");
     expect(launchBlockers).toContain("Upstash Redis database -> REST API section");
     expect(launchBlockers).toContain("Sentry project settings -> Client Keys / DSN");
     expect(launchBlockers).toContain("Stripe live-mode Products");
@@ -820,7 +807,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("Jacob Test Tenant Launch Configuration");
     expect(launchBlockers).toContain("Tenant jacobtest client domain");
     expect(launchBlockers).toContain("THl7mfItZYUmELpcZNa2Zr");
-    expect(launchBlockers).toContain("deactivate `jacobtest` in Sanity");
+    expect(launchBlockers).toContain("deactivate `jacobtest` if it is an internal test tenant");
     expect(launchBlockers).toContain("dax.ns.cloudflare.com");
     expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `scaffold-web");
     expect(launchBlockers).toContain("A admin.rohlaxwellness.com 76.76.21.21");
@@ -936,8 +923,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("https://strelva.com/api/clerk/webhook");
     expect(productionReadiness).toContain("user.created");
     expect(productionReadiness).toContain("CLERK_WEBHOOK_SECRET");
-    expect(productionReadiness).toContain("https://strelva.com/api/sanity/webhook");
-    expect(productionReadiness).toContain("SANITY_WEBHOOK_SECRET");
     expect(productionReadiness).toContain("https://strelva.com/api/billing/webhook");
     expect(productionReadiness).toContain("checkout.session.completed");
     expect(productionReadiness).toContain("invoice.paid");
@@ -952,7 +937,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Production Live Verification");
     expect(productionReadiness).toContain("invited owner reaches `/dashboard/site`");
     expect(productionReadiness).toContain("content edit saves and refreshes preview");
-    expect(productionReadiness).toContain("Clerk/Sanity/Stripe webhook deliveries");
+    expect(productionReadiness).toContain("Clerk/Stripe webhook deliveries");
     expect(productionReadiness).toContain("cron 401/success behavior");
     expect(productionReadiness).toContain("Placeholder references");
     expect(launchBlockers).toContain("Placeholder references");
@@ -1063,17 +1048,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("claimStripeEvent");
     expect(source).not.toContain("if (webhookSecret && signature)");
     expect(source).not.toContain("return true; // Skip if not configured");
-  });
-
-  it("fails closed on Sanity webhooks without a configured secret", () => {
-    const source = readFileSync(path.join(process.cwd(), "src/app/api/sanity/webhook/route.ts"), "utf8");
-
-    expect(source).toContain("SANITY_WEBHOOK_SECRET is not configured");
-    expect(source).toContain('parseBody<SanityWebhookPayload>');
-    expect(source).toContain('from "next-sanity/webhook"');
-    expect(source).not.toContain("skipping signature verification");
-    expect(source).not.toContain("x-sanity-signature");
-    expect(source).not.toContain("return true;");
   });
 
   it("does not trust client-submitted checkout prices", () => {

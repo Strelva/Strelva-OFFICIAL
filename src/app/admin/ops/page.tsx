@@ -9,10 +9,10 @@ const SERVICE_DOT: Record<ServiceStatus, string> = {
   error: "bg-red-400",
 };
 
-// Sanity and Clerk are the decommissioning legacy paths (Supabase + Redis are
-// the live backbone). Their dots are muted so an operator doesn't read a dead
-// path's error/degraded state as a real outage.
-const LEGACY_SERVICES = new Set(["sanity", "clerk"]);
+// Clerk is a decommissioning legacy path (Supabase + Redis are the live
+// backbone). Its dot is muted so an operator doesn't read a dead path's
+// error/degraded state as a real outage.
+const LEGACY_SERVICES = new Set(["clerk"]);
 const LEGACY_DOT = "bg-gray-faint";
 
 function MetricCard({

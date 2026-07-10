@@ -1,11 +1,8 @@
 import { randomBytes } from "crypto";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { getRedis } from "@/lib/redis";
-import { getSanityClient } from "@/lib/sanity";
 import { upsertLead } from "@/lib/db/repositories";
 import { dualWritePgEnabled } from "@/lib/db/dual-write";
-
-export const hasLeadSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
 export type DeliveryStatus =
   | "received"
@@ -195,27 +192,6 @@ async function readRedisLeadByEmail(email: string): Promise<DeliveryLead | null>
 export async function getDeliveryLeadByToken(token: string): Promise<DeliveryLead | null> {
   if (!validToken(token)) return null;
 
-  if (hasLeadSanity) {
-    const query: string = `*[_type == "onboardLead" && statusToken == $token][0]{
-        businessName,
-        description,
-        location,
-        email,
-        phone,
-        currentWebsite,
-        plan,
-        referredBy,
-        status,
-        deliveryStatus,
-        statusToken,
-        submittedAt,
-        statusUpdatedAt
-      }`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const doc = await (getSanityClient() as any).fetch(query, { token });
-    return coerceLead(doc);
-  }
-
   const redis = getRedis();
   if (!redis) return null;
   const raw = await redis.get<unknown>(`lead-status:${token}`);
@@ -261,39 +237,12 @@ export async function getDeliveryLeads(limit = 100): Promise<DeliveryLead[]> {
 }
 
 export async function getExistingLeadToken(email: string): Promise<string | null> {
-  if (hasLeadSanity) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const doc = await (getSanityClient() as any).fetch(
-      `*[_type == "onboardLead" && email == $email][0]{statusToken}`,
-      { email },
-    );
-    return typeof doc?.statusToken === "string" ? doc.statusToken : null;
-  }
-
   const lead = await readRedisLeadByEmail(email);
   return lead?.statusToken ?? null;
 }
 
 export async function saveDeliveryLead(lead: DeliveryLead): Promise<boolean> {
   let persisted = false;
-
-  if (hasLeadSanity) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existing = await (getSanityClient() as any).fetch(
-      `*[_type == "onboardLead" && email == $email][0]._id`,
-      { email: lead.email },
-    );
-    if (existing) {
-      await getSanityClient().patch(existing).set(lead).commit();
-    } else {
-      await getSanityClient().create({
-        _type: "onboardLead",
-        ...lead,
-        status: "new",
-      });
-    }
-    persisted = true;
-  }
 
   const redis = getRedis();
   if (redis) {
@@ -306,7 +255,7 @@ export async function saveDeliveryLead(lead: DeliveryLead): Promise<boolean> {
   }
 
   // Postgres shadow-write (Phase-2 dual-write). NULL-SAFE: a no-op when Supabase
-  // env is unset. Redis/Sanity stay the source of truth; this builds the Postgres
+  // env is unset. Redis stays the source of truth; this builds the Postgres
   // copy so we can validate parity before cutting reads over. Best-effort — never
   // fails the lead save. Gated by DUAL_WRITE_PG (kill-switch without redeploy).
   if (dualWritePgEnabled()) {

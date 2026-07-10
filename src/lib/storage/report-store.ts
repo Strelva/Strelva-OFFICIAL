@@ -1,10 +1,8 @@
 /**
  * Weekly report storage.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres `weekly_briefs`
- * table (Sanity fallback on read). Writes go to Postgres AND Sanity while both
- * are configured so the transition is reversible; once Sanity is removed,
- * `hasSanity` is false and only Postgres is written. Default off (Sanity path).
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `weekly_briefs` table;
+ * otherwise the dev-file store is the source of truth.
  *
  * Postgres repo helpers are kept self-contained in this file (not in
  * repositories.ts) to avoid colliding with parallel edits there.
@@ -12,8 +10,7 @@
 
 import path from "path";
 import type { WeeklyReportData } from "../reports";
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { hasSanity, readDevFile, writeDevFile } from "./core";
+import { readDevFile, writeDevFile } from "./core";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -173,38 +170,6 @@ export async function saveWeeklyReport(
     await upsertReportPg(stored, tenant);
   }
 
-  if (hasSanity) {
-    // Upsert: check if report for this week exists
-    const existing = await getSanityClient().fetch(
-      `*[_type == "weeklyReport" && tenant == $tenant && weekStart == $weekStart][0]._id`,
-      { tenant, weekStart }
-    );
-    if (existing) {
-      await getSanityClient().patch(existing).set({
-        pageViews: stored.pageViews,
-        bookingClicks: stored.bookingClicks,
-        topServices: stored.topServices,
-        staleSections: stored.staleSections,
-        summary: stored.summary,
-        createdAt: stored.createdAt,
-      }).commit();
-    } else {
-      await getSanityClient().create({
-        _type: "weeklyReport",
-        tenant,
-        reportId: stored.id,
-        weekStart: stored.weekStart,
-        createdAt: stored.createdAt,
-        pageViews: stored.pageViews,
-        bookingClicks: stored.bookingClicks,
-        topServices: stored.topServices,
-        staleSections: stored.staleSections,
-        summary: stored.summary,
-      });
-    }
-    return stored;
-  }
-
   if (!dataSourceIsPostgres()) {
     // Dev file: upsert by weekStart
     const reports = await readDevReports(tenant);
@@ -226,18 +191,7 @@ export async function getWeeklyReports(
 ): Promise<StoredWeeklyReport[]> {
   if (dataSourceIsPostgres()) {
     const rows = await listReportsPg(tenant, limit);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    const results = await getSanityReadClient().fetch(
-      `*[_type == "weeklyReport" && tenant == $tenant] | order(weekStart desc)[0...$limit] {
-        "id": reportId, weekStart, createdAt, pageViews, bookingClicks, topServices, staleSections, summary
-      }`,
-      { tenant, limit }
-    );
-    return results || [];
+    return rows;
   }
 
   const reports = await readDevReports(tenant);

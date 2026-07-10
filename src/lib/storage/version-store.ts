@@ -1,18 +1,14 @@
 /**
  * Content versioning - track changes and enable rollback.
  *
- * Migration: when DATA_SOURCE=postgres, reads/writes the Postgres
- * `content_versions` table (Sanity fallback on read). Writes go to Postgres AND
- * Sanity while both are configured so the transition is reversible; once Sanity
- * is removed, `hasSanity` is false and only Postgres is written. Default off
- * (Sanity path). The Postgres repo helpers are kept self-contained in this file
- * (never throw — safe fallback) to avoid colliding with parallel edits to
- * repositories.ts.
+ * When DATA_SOURCE=postgres, reads/writes the Postgres `content_versions` table;
+ * otherwise the dev-file store is the source of truth. The Postgres repo helpers
+ * are kept self-contained in this file (never throw — safe fallback) to avoid
+ * colliding with parallel edits to repositories.ts.
  */
 
 import type { ContentSection, ContentMap } from "../types";
-import { getSanityClient, getSanityReadClient } from "../sanity";
-import { hasSanity, DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
+import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { setContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
@@ -109,21 +105,6 @@ export async function appendVersion(
     await pgInsertVersion(version, tenant);
   }
 
-  if (hasSanity) {
-    await getSanityClient().create({
-      _type: "contentVersion",
-      tenant,
-      versionId: version.id,
-      section: version.section,
-      data: JSON.stringify(version.data),
-      author: version.author,
-      time: version.timestamp,
-      status: version.status,
-      changes: version.changes,
-    });
-    return version;
-  }
-
   if (!dataSourceIsPostgres()) {
     const store = await readDevContent(tenant);
     const key = `__versions:${section}`;
@@ -145,36 +126,7 @@ export async function getVersions(
 ): Promise<ContentVersion[]> {
   if (dataSourceIsPostgres()) {
     const rows = await pgListVersions(section, tenant, 50);
-    if (rows.length > 0 || !hasSanity) return rows;
-    // fall through to Sanity only if Postgres is empty and Sanity still configured
-  }
-
-  if (hasSanity) {
-    const raw = await getSanityReadClient().fetch<
-      Array<{
-        versionId: string;
-        section: string;
-        data: string;
-        author: string;
-        time: string;
-        status: string;
-        changes?: ContentVersion["changes"];
-      }>
-    >(
-      `*[_type == "contentVersion" && tenant == $tenant && section == $section] | order(time desc)[0...50]{
-        versionId, section, data, author, time, status, changes
-      }`,
-      { tenant, section }
-    );
-    return raw.map((v) => ({
-      id: v.versionId,
-      section: v.section,
-      data: typeof v.data === "string" ? JSON.parse(v.data) : v.data,
-      author: v.author as "user" | "ai" | "admin",
-      timestamp: v.time,
-      status: v.status as "live" | "rolled-back",
-      changes: v.changes,
-    }));
+    return rows;
   }
 
   const store = await readDevContent(tenant);

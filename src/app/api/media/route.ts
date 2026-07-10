@@ -8,7 +8,7 @@ import { verifyRasterImage } from "@/lib/image-signature";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
-// --- GET: List image assets for this tenant (Blob + legacy Sanity, transitional) ---
+// --- GET: List image assets for this tenant (Vercel Blob) ---
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -101,8 +101,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Missing asset id" }, { status: 400 });
   }
 
-  // Tenant-scoped delete: Blob assets by pathname prefix, legacy Sanity by
-  // label == tenant. Prevents deleting another tenant's media by guessing an id.
+  // Tenant-scoped delete: Blob assets by pathname prefix. Prevents deleting
+  // another tenant's media by guessing an id.
   const result = await deleteTenantMedia(tenant, id);
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? "Delete failed" }, { status: result.status });

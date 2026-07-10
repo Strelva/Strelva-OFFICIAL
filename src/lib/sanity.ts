@@ -1,48 +1,24 @@
-import { createClient, type SanityClient } from "@sanity/client";
+/**
+ * Residual Sanity image-URL resolver — the last live tie to Sanity.
+ *
+ * Sanity is decommissioned as a data source; the only thing left is rendering
+ * legacy content images whose stored value is still a Sanity asset ref. Those
+ * are served read-only from the Sanity CDN (kept in the CSP + next.config
+ * remotePatterns) until the content-URL rewrite ops step runs, after which this
+ * file and the `@sanity/image-url` dep can be deleted.
+ *
+ * Built from project config directly — no `@sanity/client`.
+ */
 import imageUrlBuilder from "@sanity/image-url";
 
-let _client: SanityClient | null = null;
-let _readClient: SanityClient | null = null;
 let _builder: ReturnType<typeof imageUrlBuilder> | null = null;
-
-function getProjectId(): string {
-  return process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "";
-}
-
-function getDataset(): string {
-  return process.env.NEXT_PUBLIC_SANITY_DATASET || "production";
-}
-
-/** Write client (requires SANITY_API_TOKEN) */
-export function getSanityClient(): SanityClient {
-  if (!_client) {
-    _client = createClient({
-      projectId: getProjectId(),
-      dataset: getDataset(),
-      apiVersion: "2024-01-01",
-      useCdn: false,
-      token: process.env.SANITY_API_TOKEN,
-    });
-  }
-  return _client;
-}
-
-/** Read-only client (uses CDN in production) */
-export function getSanityReadClient(): SanityClient {
-  if (!_readClient) {
-    _readClient = createClient({
-      projectId: getProjectId(),
-      dataset: getDataset(),
-      apiVersion: "2024-01-01",
-      useCdn: process.env.NODE_ENV === "production",
-    });
-  }
-  return _readClient;
-}
 
 function getBuilder(): ReturnType<typeof imageUrlBuilder> {
   if (!_builder) {
-    _builder = imageUrlBuilder(getSanityClient());
+    _builder = imageUrlBuilder({
+      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "",
+      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
+    });
   }
   return _builder;
 }

@@ -59,7 +59,6 @@ const isPublicRoute = createRouteMatcher([
   "/api/track",
   "/api/cron/(.*)",
   "/api/billing/webhook",
-  "/api/sanity/webhook",
   "/api/clerk/webhook",
   "/api/internal/(.*)",
   "/((?!api|dashboard|admin|studio).*)",

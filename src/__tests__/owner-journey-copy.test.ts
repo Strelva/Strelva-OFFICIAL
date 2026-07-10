@@ -131,9 +131,8 @@ describe("owner journey copy and links", () => {
     expect(retention).toContain("queueRetentionReengagement");
     expect(retention).toContain("retention_reengagement");
     expect(retention).toContain("No AI changes in");
-    expect(analyticsStore).toContain("sanityClickPath");
-    expect(analyticsStore).toContain(".setIfMissing({ clicks: {}, [dailyPath]: 0, [totalPath]: 0 })");
-    expect(analyticsStore).toContain(".inc({ [dailyPath]: 1, [totalPath]: 1 })");
+    expect(analyticsStore).toContain('.from("site_metrics")');
+    expect(analyticsStore).toContain("pgIncrementMetric(tenant, event)");
     expect(trackRoute).toContain('"dashboard-open"');
     expect(trackRoute).toContain('"ai-chat-open"');
     expect(trackRoute).toContain('"report-view"');

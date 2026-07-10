@@ -1,12 +1,10 @@
 /**
  * Core storage utilities shared across domain modules.
- * Handles Sanity detection, dev file I/O, and tenant defaults.
+ * Handles dev file I/O and tenant defaults.
  */
 
 import { promises as fs } from "fs";
 import path from "path";
-
-export const hasSanity = !!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID && !!process.env.SANITY_API_TOKEN;
 
 /** Default tenant - used only when no tenant is in scope. Real tenants always pass an explicit tenant ID. */
 export const DEFAULT_TENANT = "demo";

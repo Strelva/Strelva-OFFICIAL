@@ -3,16 +3,14 @@
  * Tenant deprovision / teardown — the inverse of src/lib/provisioning.ts.
  *
  * provisionTenant() is forward-recovery only (it never rolls back), so an
- * aborted or test onboard leaves orphan rows across Postgres + Redis + Vercel
- * (+ a Sanity tenant doc while dual-write is still on). This script cleans up
- * everything a tenant owns so a throwaway onboard can be wiped back to zero.
+ * aborted or test onboard leaves orphan rows across Postgres + Redis + Vercel.
+ * This script cleans up everything a tenant owns so a throwaway onboard can be
+ * wiped back to zero.
  *
  * Postgres is the source of truth, so it is the primary target: every
  * tenant-scoped table is purged by tenant_id, then the `tenants` row itself.
- * Redis cache keys and the per-tenant Vercel project are torn down too, the
- * tenant's domain-claims are cleared from the shared claim map, and the Sanity
- * `tenant` doc is best-effort deleted (resolved by its `id` field) to remove the
- * active:true mirror that getTenantConfig() can otherwise fall back to.
+ * Redis cache keys and the per-tenant Vercel project are torn down too, and the
+ * tenant's domain-claims are cleared from the shared claim map.
  *
  * SAFETY (this deletes PRODUCTION data — .env.local points at prod):
  *   - DRY RUN BY DEFAULT. Nothing is deleted without --confirm.
@@ -29,7 +27,6 @@
  *   --confirm       Actually delete (default is a no-write dry run).
  *   --force         Override the real-client guards (denylist + has-paid).
  *   --keep-vercel   Leave the {tenantId}-site Vercel project in place.
- *   --no-sanity     Skip the Sanity tenant-doc delete.
  *   --json          Emit a machine-readable summary instead of the human report.
  */
 
@@ -68,7 +65,6 @@ interface Flags {
   confirm: boolean;
   force: boolean;
   keepVercel: boolean;
-  sanity: boolean;
   json: boolean;
 }
 
@@ -81,7 +77,6 @@ function parseFlags(): { tenantId: string | undefined; flags: Flags } {
       confirm: args.includes("--confirm"),
       force: args.includes("--force"),
       keepVercel: args.includes("--keep-vercel"),
-      sanity: !args.includes("--no-sanity"),
       json: args.includes("--json"),
     },
   };
@@ -166,7 +161,7 @@ async function findTenantRedisKeys(patterns: string[]): Promise<string[]> {
 async function main() {
   const { tenantId, flags } = parseFlags();
   if (!tenantId) {
-    console.error("Usage: npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> [--confirm] [--force] [--keep-vercel] [--no-sanity]");
+    console.error("Usage: npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> [--confirm] [--force] [--keep-vercel]");
     process.exit(1);
   }
   if (!getSupabase()) {
@@ -219,7 +214,7 @@ async function main() {
     }
   }
 
-  const summary: Record<string, StoreAction[]> = { postgres: [], redis: [], vercel: [], sanity: [] };
+  const summary: Record<string, StoreAction[]> = { postgres: [], redis: [], vercel: [] };
 
   // --- Postgres (primary): count, then optionally delete, children first ---
   let pgTotal = 0;
@@ -254,27 +249,6 @@ async function main() {
     summary.vercel.push({ target: `${tenantId}-site`, found: "?", deleted: r.ok, detail: r.ok ? "deleted (or already absent)" : r.error });
   } else {
     summary.vercel.push({ target: `${tenantId}-site`, found: "?", deleted: false, detail: "would delete (dry run)" });
-  }
-
-  // --- Sanity: delete the tenant doc, resolved by its `id` FIELD (not _id, which
-  //     is auto-generated). Kills the active:true mirror that can resurrect the
-  //     tenant via getTenantConfig's zero-row Sanity fallback. ---
-  if (flags.sanity) {
-    try {
-      const { getSanityClient } = await import("../src/lib/sanity");
-      const client = getSanityClient();
-      const docId = await client.fetch<string | null>('*[_type=="tenant" && id==$id][0]._id', { id: tenantId });
-      if (!docId) {
-        summary.sanity.push({ target: `tenant doc (id==${tenantId})`, found: 0, deleted: false, detail: "no Sanity tenant doc (dual-write off, or already gone)" });
-      } else if (flags.confirm) {
-        await client.delete(docId);
-        summary.sanity.push({ target: `tenant doc ${docId}`, found: 1, deleted: true });
-      } else {
-        summary.sanity.push({ target: `tenant doc ${docId}`, found: 1, deleted: false, detail: "would delete (dry run)" });
-      }
-    } catch (err) {
-      summary.sanity.push({ target: `tenant doc (id==${tenantId})`, found: "?", deleted: false, detail: `skipped: ${err instanceof Error ? err.message : String(err)}` });
-    }
   }
 
   if (flags.json) {
