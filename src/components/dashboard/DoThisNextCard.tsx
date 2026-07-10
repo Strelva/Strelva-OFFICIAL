@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 
 /**
- * "Do this next" — surfaces the single highest-value pending suggestion on Today
+ * "Do this next" — surfaces your latest pending suggestion on Today
  * with a one-tap hand-off into chat. Tapping prefills Ask Strelva with the exact
  * ask (same setChatPrompt + navigate path the rest of the dashboard uses), so the
  * owner never has to retype it. Only rendered when there's a real pending

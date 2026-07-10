@@ -76,7 +76,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
   // Lead with a plain-English health verdict, not a data dump. Opportunity-framed
   // when something's missing — never shaming.
   const verdict = hours.length
-    ? "Your listing is live on Google and showing up on Maps."
+    ? "Your listing is connected and your hours are set — Strelva keeps it in sync."
     : "Your listing is connected. Add your hours so customers know when you're open.";
 
   return (

@@ -184,7 +184,7 @@ async function DashboardHome() {
               weekly-proof / retention panel. */}
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
 
-          {/* Do this next — the highest-value pending suggestion, one tap into
+          {/* Do this next — your latest pending suggestion, one tap into
               chat. Only when there's a real pending suggestion. */}
           {topSuggestion ? (
             <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
