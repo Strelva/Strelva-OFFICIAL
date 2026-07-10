@@ -73,6 +73,12 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
   const hours = state?.regularHours?.periods ?? [];
   const posts = state?.recentPosts ?? [];
 
+  // Lead with a plain-English health verdict, not a data dump. Opportunity-framed
+  // when something's missing — never shaming.
+  const verdict = hours.length
+    ? "Your listing is live on Google and showing up on Maps."
+    : "Your listing is connected. Add your hours so customers know when you're open.";
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="flex items-center justify-between gap-3">
@@ -91,7 +97,10 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
         </span>
       </div>
 
-      <p className="mt-3 max-w-[560px] text-[13px] leading-relaxed text-gray-muted">
+      <p className="mt-4 text-[15px] font-medium leading-snug text-warm-black">
+        {verdict}
+      </p>
+      <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-gray-muted">
         Changes to your listing run through your approval queue before they publish to Google —
         nothing goes live without your sign-off.
       </p>
