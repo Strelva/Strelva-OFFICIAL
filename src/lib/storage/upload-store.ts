@@ -38,22 +38,27 @@ export async function uploadFile(file: File): Promise<{ url: string }> {
 
   const safeName = sanitizeFilename(file.name);
 
+  // Blob-first (the Sanity library is being decommissioned); Sanity is a
+  // transitional fallback until its dataset is locked; local disk for dev.
+  const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+  if (hasBlob) {
+    const { put } = await import("@vercel/blob");
+    // addRandomSuffix: a same-name re-upload gets a unique path instead of
+    // throwing (v2 Blob rejects a duplicate pathname by default).
+    const blob = await put(safeName, buffer, {
+      access: "public",
+      contentType: file.type,
+      addRandomSuffix: true,
+    });
+    return { url: blob.url };
+  }
+
   if (hasSanity) {
     const asset = await getSanityClient().assets.upload("image", buffer, {
       filename: safeName,
       contentType: file.type,
     });
     return { url: sanityImageUrl(asset) };
-  }
-
-  const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
-  if (hasBlob) {
-    const { put } = await import("@vercel/blob");
-    const blob = await put(safeName, buffer, {
-      access: "public",
-      contentType: file.type,
-    });
-    return { url: blob.url };
   }
 
   const uploadsDir = path.join(process.cwd(), "public", "uploads");

@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
-import { getSanityReadClient } from "@/lib/sanity";
+import { collectTenantMedia } from "@/lib/media-store";
 import type { ContentSection } from "@/lib/types";
-import type { MediaAsset } from "@/lib/media";
 
 const CONTENT_SECTIONS = Object.keys(SECTION_TO_TYPE) as ContentSection[];
 const URL_KEY_PATTERN = /(url|image|logo|photo|media|asset)/i;
@@ -29,38 +28,6 @@ function collectUrls(value: unknown, urls = new Set<string>()): Set<string> {
     });
   }
   return urls;
-}
-
-async function listSanityAssets(tenant: string): Promise<MediaAsset[]> {
-  const query = `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) {
-    _id,
-    _createdAt,
-    url,
-    originalFilename,
-    metadata { dimensions { width, height }, lqip },
-    size
-  }`;
-
-  const raw = await getSanityReadClient().fetch(query, { tenant });
-  return (raw || []).map(
-    (doc: {
-      _id: string;
-      _createdAt: string;
-      url: string;
-      originalFilename?: string;
-      metadata?: { dimensions?: { width: number; height: number }; lqip?: string };
-      size?: number;
-    }) => ({
-      id: doc._id,
-      url: doc.url,
-      filename: doc.originalFilename || "untitled",
-      width: doc.metadata?.dimensions?.width || 0,
-      height: doc.metadata?.dimensions?.height || 0,
-      size: doc.size || 0,
-      lqip: doc.metadata?.lqip || undefined,
-      createdAt: doc._createdAt,
-    }),
-  );
 }
 
 function jsonAttachment(body: unknown, filename: string) {
@@ -93,13 +60,10 @@ export async function GET() {
     }),
   );
 
-  let libraryAssets: MediaAsset[] = [];
-  let libraryStatus: "included" | "unavailable" = "included";
-  try {
-    libraryAssets = await listSanityAssets(tenant);
-  } catch {
-    libraryStatus = "unavailable";
-  }
+  // Completeness matters for a departing client's export — if a media source was
+  // down, report "unavailable" so they retry rather than trust an empty library.
+  const { assets: libraryAssets, degraded } = await collectTenantMedia(tenant);
+  const libraryStatus: "included" | "unavailable" = degraded ? "unavailable" : "included";
 
   const payload = {
     exportedAt: new Date().toISOString(),
