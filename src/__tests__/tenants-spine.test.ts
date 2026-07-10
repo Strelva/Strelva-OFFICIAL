@@ -105,4 +105,13 @@ describe("tenants spine round-trip (tenantToRow . rowToTenant)", () => {
     expect(row).not.toHaveProperty("production_domain");
     expect(row).not.toHaveProperty("revalidation_secret");
   });
+
+  it("round-trips created_at (the value updateTenant backfills to avoid clobber)", () => {
+    // tenantToRow always emits site_name + created_at (Insert requires site_name),
+    // so a partial update must pass them through from the existing row. That
+    // relies on rowToTenant -> tenantToRow preserving both faithfully.
+    const row = tenantToRow(rowToTenant(gldfRow));
+    expect(row.site_name).toBe("Great Lakes Dried Fruit");
+    expect(row.created_at).toBe("2026-03-30");
+  });
 });

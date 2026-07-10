@@ -9,7 +9,7 @@ import { getTenantConfig, getAllTenants } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { runAudit } from "@/lib/audit/checks";
 import type { CategoryResult } from "@/lib/audit/types";
-import type { TrafficProfile } from "@/lib/audit/impact";
+import { type TrafficProfile, GENERIC_METRICS } from "@/lib/audit/impact";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import {
   saveScanSummary,
@@ -43,12 +43,20 @@ async function measuredTraffic(tenantId: string): Promise<TrafficProfile | undef
   const visitors = ga.users;
   const leads = await getLeadSummary(tenantId, 30).catch(() => ({ count: 0 }));
   // Leads are real "who reached out" conversions over the same 30-day window.
+  // Fall back to the shared generic prior (single source of truth in impact.ts)
+  // when there's no conversion signal yet; order value has no per-tenant source
+  // in the audit path, so it always uses that prior.
   const conversionRate =
     leads.count > 0
       ? Math.min(0.5, Math.max(0.005, leads.count / visitors))
-      : 0.03; // conservative default when no conversion signal exists yet
+      : GENERIC_METRICS.conversionRate;
 
-  return { monthlyVisitors: visitors, conversionRate, orderValue: 75, source: "measured" };
+  return {
+    monthlyVisitors: visitors,
+    conversionRate,
+    orderValue: GENERIC_METRICS.orderValue,
+    source: "measured",
+  };
 }
 
 /**

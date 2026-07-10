@@ -132,6 +132,20 @@ const GBP_PHOTO_CATEGORY = z.enum([
   "ADDITIONAL",
 ]);
 
+/**
+ * An optional URL tool-input that validates a real value as a URL but treats
+ * "" / whitespace — a common thing the model emits for "no value" — as absent
+ * instead of a validation error that would reject the ENTIRE tool call (and
+ * silently queue no draft). Strictly safer than a bare `.url().optional()`.
+ */
+const optionalUrl = (description: string) =>
+  z
+    .preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.string().url().optional(),
+    )
+    .describe(description);
+
 export function buildGbpTools(hooks: GbpToolHooks) {
   const { tenantId } = hooks;
 
@@ -175,8 +189,8 @@ export function buildGbpTools(hooks: GbpToolHooks) {
         "Google — never posts directly. Keep the summary under 1500 characters.",
       inputSchema: z.object({
         summary: z.string().max(1500).describe("The post text (up to 1500 characters)"),
-        ctaUrl: z.string().url().optional().describe("Optional call-to-action link"),
-        photoUrl: z.string().url().optional().describe("Optional public photo URL to include"),
+        ctaUrl: optionalUrl("Optional call-to-action link"),
+        photoUrl: optionalUrl("Optional public photo URL to include"),
       }),
       execute: ({ summary, ctaUrl, photoUrl }) =>
         queueDraft("create_gbp_post", {

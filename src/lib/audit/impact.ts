@@ -115,7 +115,10 @@ export interface TrafficProfile {
   source: "generic" | "measured";
 }
 
-const GENERIC_METRICS: TrafficProfile = {
+/** The generic prior for the anonymous audit. Exported so the single source of
+ *  truth for the conversion/order-value priors is here (scanTenant reuses them
+ *  for a paying client's real-traffic profile rather than re-hardcoding them). */
+export const GENERIC_METRICS: TrafficProfile = {
   monthlyVisitors: 500,
   conversionRate: 0.03,
   orderValue: 75,

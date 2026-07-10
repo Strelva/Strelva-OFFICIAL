@@ -117,23 +117,6 @@ async function writeCachedPerf<T>(
   }
 }
 
-/** Windows the callers actually request; cleared when the operator repoints a property. */
-const CACHED_PERF_WINDOWS = [7, 28, 90];
-
-async function invalidatePerfCache(tenantId: string): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-  try {
-    await Promise.all(
-      (["gsc", "ga4"] as const).flatMap((surface) =>
-        CACHED_PERF_WINDOWS.map((days) => redis.del(perfKey(surface, tenantId, days)))
-      )
-    );
-  } catch {
-    // Best-effort — stale perf self-heals within PERF_TTL_SECONDS.
-  }
-}
-
 /** Derive a GSC domain property (`sc-domain:example.com`) from a site URL.
  *  Exported so the provisioning path can persist the same default it would read. */
 export function deriveScDomain(siteUrl?: string | null): string | null {
@@ -202,8 +185,11 @@ export async function setAnalyticsConfig(
     }
   }
 
-  // A property repoint must not keep serving the old property's cached perf.
-  await invalidatePerfCache(tenantId);
+  // No explicit perf-cache bust: the read-through perf cache has a short TTL
+  // (PERF_TTL_SECONDS), so after a property repoint the numbers self-heal within
+  // that window. A fixed per-window invalidation list drifted from its callers
+  // (a days=30 caller was silently missed), so it was removed rather than
+  // maintained — the TTL is the single, correct staleness bound.
 
   return resolveConfig(tenantId, next);
 }

@@ -188,6 +188,23 @@ describe("buildGbpTools", () => {
     expect(queued).toEqual(["create_gbp_post:evt1"]);
   });
 
+  it("create_gbp_post accepts an empty-string ctaUrl (no CTA) but rejects a non-URL", () => {
+    // Regression guard: the model commonly emits ctaUrl:"" for 'no CTA'. A bare
+    // .url() would reject the whole tool call and queue nothing; optionalUrl
+    // treats "" as absent while still validating a real value.
+    const tools = buildGbpTools({ tenantId: "t", onQueued: () => {} });
+    const schema = (tools.create_gbp_post as unknown as { inputSchema: {
+      safeParse: (v: unknown) => { success: boolean; data?: { ctaUrl?: string } };
+    } }).inputSchema;
+
+    const empty = schema.safeParse({ summary: "hi", ctaUrl: "" });
+    expect(empty.success).toBe(true);
+    expect(empty.data?.ctaUrl).toBeUndefined();
+
+    expect(schema.safeParse({ summary: "hi", ctaUrl: "https://x.com/book" }).success).toBe(true);
+    expect(schema.safeParse({ summary: "hi", ctaUrl: "not a url" }).success).toBe(false);
+  });
+
   it("defaults the photo category to ADDITIONAL", async () => {
     const tools = buildGbpTools({ tenantId: "t", onQueued: () => {} });
     const def = tools.upload_gbp_photo as unknown as { execute: (a: unknown) => Promise<unknown> };

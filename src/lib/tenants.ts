@@ -71,6 +71,11 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
  *  defined fields are set so a partial update doesn't clobber columns. */
 export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"tenants"> {
   const j = (v: unknown) => (v ?? null) as Insert<"tenants">["custom_repo"];
+  // NOTE: site_name + created_at are set unconditionally because the generated
+  // Insert type requires site_name (NOT NULL, no default). A PARTIAL update must
+  // therefore backfill these from the existing row before calling this (see
+  // updateTenant) so an unrelated edit doesn't blank the name / reset created_at
+  // (which feeds milestone.ts's 90-day baseline). createTenant always passes both.
   const row: Insert<"tenants"> = {
     id: t.id,
     site_name: t.siteName ?? "",
@@ -507,7 +512,20 @@ export async function updateTenant(
   if (tenantsSourceIsPostgres()) {
     const existing = await getTenantRow(id);
     if (!existing) return null;
-    await upsertTenant(tenantToRow({ ...updates, id }));
+    // The Postgres upsert overwrites exactly the columns tenantToRow emits, and
+    // tenantToRow ALWAYS emits site_name + created_at (the Insert type requires
+    // site_name). So a partial update that doesn't touch them would blank the
+    // business name / reset created_at (which feeds milestone.ts's 90-day
+    // baseline). Backfill both from the existing row unless the update changes them.
+    const existingConfig = rowToTenant(existing);
+    await upsertTenant(
+      tenantToRow({
+        ...updates,
+        id,
+        siteName: updates.siteName ?? existingConfig.siteName,
+        createdAt: updates.createdAt ?? existingConfig.createdAt,
+      }),
+    );
     invalidateCache();
     // Dual-write to Sanity during the transition so a rollback stays current.
     if (hasSanity) {
