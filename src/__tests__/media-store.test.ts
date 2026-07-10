@@ -8,7 +8,7 @@ vi.mock("@vercel/blob", () => ({ list: mockList, put: mockPut, del: mockDel }));
 // Blob-only (post-transition) behavior: no Sanity legacy read/delete.
 vi.mock("@/lib/storage/core", () => ({ hasSanity: false }));
 
-import { listTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
+import { listTenantMedia, collectTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
 
 const BLOB = "https://abc123.public.blob.vercel-storage.com";
 
@@ -58,19 +58,18 @@ describe("listTenantMedia", () => {
 });
 
 describe("uploadTenantMedia", () => {
-  it("puts under the tenant prefix as a public blob and returns the MediaAsset", async () => {
-    mockPut.mockResolvedValue({ url: `${BLOB}/media/gldf/photo-x1.jpg`, pathname: "media/gldf/photo-x1.jpg" });
+  it("puts in a per-upload subfolder under the tenant prefix (unique path, clean filename)", async () => {
+    mockPut.mockResolvedValue({ url: `${BLOB}/media/gldf/uuid/photo.jpg`, pathname: "media/gldf/uuid/photo.jpg" });
 
     const asset = await uploadTenantMedia("gldf", Buffer.from("bytes"), "photo.jpg", "image/jpeg");
 
-    expect(mockPut).toHaveBeenCalledWith(
-      "media/gldf/photo.jpg",
-      expect.any(Buffer),
-      // addRandomSuffix so a same-name re-upload gets a unique path (v2 Blob
-      // throws on a duplicate pathname otherwise).
-      expect.objectContaining({ access: "public", contentType: "image/jpeg", addRandomSuffix: true }),
-    );
-    expect(asset).toMatchObject({ url: `${BLOB}/media/gldf/photo-x1.jpg`, filename: "photo.jpg", size: 5 });
+    const [pathname, body, opts] = mockPut.mock.calls[0];
+    // media/{tenant}/{uuid}/{cleanname} — the uuid subfolder makes the path unique
+    // without mangling the display filename (no addRandomSuffix drift on reload).
+    expect(pathname).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/photo\.jpg$/);
+    expect(body).toBeInstanceOf(Buffer);
+    expect(opts).toMatchObject({ access: "public", contentType: "image/jpeg" });
+    expect(asset).toMatchObject({ url: `${BLOB}/media/gldf/uuid/photo.jpg`, filename: "photo.jpg", size: 5 });
   });
 
   it("throws a clear error (not a cryptic BlobError) when the Blob token is missing", async () => {
@@ -81,10 +80,11 @@ describe("uploadTenantMedia", () => {
     expect(mockPut).not.toHaveBeenCalled();
   });
 
-  it("sanitizes the filename before using it as the blob path", async () => {
+  it("sanitizes the filename (path traversal can't escape the tenant subfolder)", async () => {
     mockPut.mockResolvedValue({ url: `${BLOB}/x`, pathname: "x" });
     await uploadTenantMedia("gldf", Buffer.from("b"), "../../evil name!.png", "image/png");
-    expect(mockPut.mock.calls[0][0]).toBe("media/gldf/.._.._evil_name_.png");
+    // The `/` in the input became `_`, so the sanitized name is the last segment.
+    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[^/]+\/\.\._\.\._evil_name_\.png$/);
   });
 });
 
@@ -106,5 +106,31 @@ describe("deleteTenantMedia — tenant isolation", () => {
     const res = await deleteTenantMedia("gldf", "image-abc123-legacy");
     expect(res).toMatchObject({ ok: false, status: 404 });
     expect(mockDel).not.toHaveBeenCalled();
+  });
+});
+
+describe("collectTenantMedia — degraded flag (export completeness)", () => {
+  it("reports degraded=true when a media source read fails (list is partial)", async () => {
+    mockList.mockRejectedValue(new Error("blob down"));
+    const { assets, degraded } = await collectTenantMedia("gldf");
+    // A failed source must NOT look like 'genuinely empty' to a departing client.
+    expect(degraded).toBe(true);
+    expect(assets).toEqual([]);
+  });
+
+  it("reports degraded=false on a clean read", async () => {
+    mockList.mockResolvedValue({ blobs: [], hasMore: false });
+    const { degraded } = await collectTenantMedia("gldf");
+    expect(degraded).toBe(false);
+  });
+});
+
+describe("tenant-id isolation guard", () => {
+  it("rejects a tenant id containing a slash (the isolation boundary is a path prefix)", async () => {
+    await expect(listTenantMedia("a/b")).rejects.toThrow(/Invalid tenant/);
+    await expect(deleteTenantMedia("a/b", `${BLOB}/media/a/x.jpg`)).rejects.toThrow(/Invalid tenant/);
+    await expect(uploadTenantMedia("a/b", Buffer.from("x"), "x.jpg", "image/jpeg")).rejects.toThrow(/Invalid tenant/);
+    expect(mockDel).not.toHaveBeenCalled();
+    expect(mockPut).not.toHaveBeenCalled();
   });
 });

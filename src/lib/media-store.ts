@@ -8,6 +8,10 @@
  * unused and the UI's Dimensions row already degrades to "Unknown" — so no index
  * is needed and there's no dual-write to drift.
  *
+ * Each upload lands in a per-upload subfolder (`media/{tenant}/{id}/{name}`) so a
+ * same-name re-upload gets a unique path WITHOUT mangling the display filename
+ * (the last path segment stays the clean name).
+ *
  * TRANSITION: images already uploaded to Sanity keep rendering wherever they're
  * referenced (the Sanity CDN stays read-only until the dataset is locked), and
  * are still surfaced here via a fail-soft legacy read so an owner's picker
@@ -16,6 +20,7 @@
  * out and this becomes Blob-only.
  */
 
+import { randomUUID } from "crypto";
 import type { MediaAsset } from "./media";
 import { hasSanity } from "./storage/core";
 
@@ -26,30 +31,61 @@ const mediaPrefix = (tenant: string): string => `media/${tenant}/`;
 
 const blobEnabled = (): boolean => !!process.env.BLOB_READ_WRITE_TOKEN;
 
+/**
+ * The `media/{tenant}/` prefix IS the tenant-isolation boundary, so a tenant id
+ * must never contain a `/` (which would let `a` prefix-match `a/b`'s blobs) or be
+ * empty. Tenant ids come from validated auth/headers today, so this is
+ * defense-in-depth — fail closed rather than silently mis-scope.
+ */
+function assertTenant(tenant: string): void {
+  if (!tenant || tenant.includes("/")) {
+    throw new Error(`Invalid tenant id for media store: ${JSON.stringify(tenant)}`);
+  }
+}
+
 /** Sanitize an upload filename to the same charset the old path used. */
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100) || "image";
 }
 
-/** Display filename from a blob pathname (`media/{tenant}/{name}`). */
+/** Display filename from a blob pathname (`media/{tenant}/{id}/{name}`). */
 function filenameFromPathname(pathname: string): string {
   return pathname.split("/").pop() || pathname;
 }
 
+export interface TenantMedia {
+  assets: MediaAsset[];
+  /** True if an enabled source (Blob and/or Sanity) FAILED — the list is partial.
+   *  Callers that need completeness (owner export) must treat this as an error. */
+  degraded: boolean;
+}
+
 /**
- * List a tenant's media library — Blob (new) merged with a fail-soft Sanity
- * legacy read (existing), newest first. Never throws: a failing source is
- * skipped so the library still renders what the other source has.
+ * Collect a tenant's media — Blob (new) + a fail-soft Sanity legacy read
+ * (existing), newest first — WITH a `degraded` flag. Never throws for a source
+ * failure; instead reports it so completeness-sensitive callers (export) can tell
+ * "genuinely empty" from "a source was down". `opts.limit` caps the read (a
+ * single Blob page + capped Sanity fetch) for surfaces that only need a preview.
  */
-export async function listTenantMedia(tenant: string): Promise<MediaAsset[]> {
+export async function collectTenantMedia(
+  tenant: string,
+  opts: { limit?: number } = {},
+): Promise<TenantMedia> {
+  assertTenant(tenant);
+  const { limit } = opts;
   const assets: MediaAsset[] = [];
+  let degraded = false;
 
   if (blobEnabled()) {
     try {
       const { list } = await import("@vercel/blob");
       let cursor: string | undefined;
       do {
-        const res = await list({ prefix: mediaPrefix(tenant), cursor, limit: 1000 });
+        const res = await list({
+          prefix: mediaPrefix(tenant),
+          cursor,
+          limit: limit ? Math.min(limit, 1000) : 1000,
+        });
         for (const b of res.blobs) {
           const uploadedAt = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt);
           assets.push({
@@ -62,10 +98,12 @@ export async function listTenantMedia(tenant: string): Promise<MediaAsset[]> {
             createdAt: uploadedAt.toISOString(),
           });
         }
-        cursor = res.hasMore ? res.cursor : undefined;
+        // Stop after one page when a limit was requested (preview surfaces).
+        cursor = !limit && res.hasMore ? res.cursor : undefined;
       } while (cursor);
     } catch (err) {
       console.warn("[media] blob list failed", tenant, err);
+      degraded = true;
     }
   }
 
@@ -73,8 +111,9 @@ export async function listTenantMedia(tenant: string): Promise<MediaAsset[]> {
   if (hasSanity) {
     try {
       const { getSanityReadClient } = await import("./sanity");
+      const slice = limit ? `[0...${limit}]` : "";
       const raw = await getSanityReadClient().fetch(
-        `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) {
+        `*[_type == "sanity.imageAsset" && label == $tenant] | order(_createdAt desc) ${slice} {
           _id, _createdAt, url, originalFilename,
           metadata { dimensions { width, height }, lqip }, size
         }`,
@@ -101,19 +140,24 @@ export async function listTenantMedia(tenant: string): Promise<MediaAsset[]> {
       }
     } catch (err) {
       console.warn("[media] sanity legacy list failed", tenant, err);
+      degraded = true;
     }
   }
 
   assets.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-  return assets;
+  return { assets: limit ? assets.slice(0, limit) : assets, degraded };
+}
+
+/** List a tenant's media (fail-soft; drops the degraded flag). Use `collectTenantMedia` when completeness matters. */
+export async function listTenantMedia(tenant: string, opts: { limit?: number } = {}): Promise<MediaAsset[]> {
+  return (await collectTenantMedia(tenant, opts)).assets;
 }
 
 /**
- * Upload a verified image buffer to the tenant's Blob library. The caller does
- * size/type/raster-byte verification; this just stores it under the tenant
- * prefix. `addRandomSuffix` makes the pathname unique so a same-name re-upload
- * gets its own URL instead of throwing (v2 Blob rejects a duplicate pathname by
- * default). Requires BLOB_READ_WRITE_TOKEN — the media library is Blob-only now.
+ * Upload a verified image buffer to the tenant's Blob library, in a per-upload
+ * subfolder so the display filename stays clean and same-name re-uploads don't
+ * collide. The caller does size/type/raster-byte verification. Requires
+ * BLOB_READ_WRITE_TOKEN — the media library is Blob-only now.
  */
 export async function uploadTenantMedia(
   tenant: string,
@@ -121,15 +165,15 @@ export async function uploadTenantMedia(
   filename: string,
   contentType: string,
 ): Promise<MediaAsset> {
+  assertTenant(tenant);
   if (!blobEnabled()) {
     throw new Error("Media uploads require BLOB_READ_WRITE_TOKEN (Vercel Blob) to be configured.");
   }
   const { put } = await import("@vercel/blob");
   const safe = sanitizeFilename(filename);
-  const blob = await put(`${mediaPrefix(tenant)}${safe}`, buffer, {
+  const blob = await put(`${mediaPrefix(tenant)}${randomUUID()}/${safe}`, buffer, {
     access: "public",
     contentType,
-    addRandomSuffix: true,
   });
   return {
     id: blob.url,
@@ -155,6 +199,8 @@ export interface MediaDeleteResult {
  * cross-tenant.
  */
 export async function deleteTenantMedia(tenant: string, id: string): Promise<MediaDeleteResult> {
+  assertTenant(tenant);
+
   if (id.includes(BLOB_HOST)) {
     let pathname: string;
     try {

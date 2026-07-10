@@ -1401,7 +1401,9 @@ Only use tools for manifest-supported sections and actions. If the user requests
         execute: async () => {
           try {
             const { listTenantMedia } = await import("@/lib/media-store");
-            const assets = await listTenantMedia(tenant);
+            // Preview card: 6 photos + a count — cap the read instead of
+            // enumerating the whole library (old path capped at 20).
+            const assets = await listTenantMedia(tenant, { limit: 24 });
 
             return {
               __inlineTool: "show_photos",
