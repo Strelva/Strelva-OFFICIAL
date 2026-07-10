@@ -17,13 +17,12 @@ function formatTime(hhmm: string): string {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Group header label: "Today", "Tomorrow", else "Mon, Jul 14". */
-function dayHeading(iso: string): string {
-  const today = todayIso();
+/**
+ * Group header label: "Today", "Tomorrow", else "Mon, Jul 14". Anchored to the
+ * tenant-local `today` (YYYY-MM-DD) passed from the server — never a UTC date,
+ * which would mislabel tonight's appointments as "Tomorrow" after ~8pm ET.
+ */
+function dayHeading(iso: string, today: string): string {
   if (iso === today) return "Today";
   const d = new Date(`${iso}T00:00:00`);
   const tomorrow = new Date(`${today}T00:00:00`);
@@ -44,10 +43,12 @@ export function SchedulePanel({
   bookings,
   config,
   overrides,
+  today,
 }: {
   bookings: Booking[];
   config: BookingConfig;
   overrides: DateOverride[];
+  today: string;
 }) {
   const [tab, setTab] = useState<"appointments" | "availability">("appointments");
 
@@ -69,9 +70,9 @@ export function SchedulePanel({
         </div>
 
         {tab === "appointments" ? (
-          <Appointments bookings={bookings} />
+          <Appointments bookings={bookings} today={today} />
         ) : (
-          <Availability config={config} overrides={overrides} />
+          <Availability config={config} overrides={overrides} today={today} />
         )}
       </div>
     </div>
@@ -102,13 +103,11 @@ function TabButton({
 
 // --- Appointments --------------------------------------------------------------
 
-function Appointments({ bookings }: { bookings: Booking[] }) {
+function Appointments({ bookings, today }: { bookings: Booking[]; today: string }) {
   const [cancelled, setCancelled] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const today = todayIso();
 
   const upcoming = useMemo(
     () =>
@@ -192,7 +191,7 @@ function Appointments({ bookings }: { bookings: Booking[] }) {
         {groups.map(([date, dayBookings]) => (
           <div key={date}>
             <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-gray-muted">
-              {dayHeading(date)}
+              {dayHeading(date, today)}
             </p>
             <div className="space-y-2">
               {dayBookings.map((b) => (
@@ -247,9 +246,11 @@ function Appointments({ bookings }: { bookings: Booking[] }) {
 function Availability({
   config,
   overrides,
+  today,
 }: {
   config: BookingConfig;
   overrides: DateOverride[];
+  today: string;
 }) {
   const [schedule, setSchedule] = useState<WeeklySlot[]>(() => normalizeSchedule(config.weeklySchedule));
   const [slotDuration, setSlotDuration] = useState(config.slotDuration);
@@ -294,7 +295,7 @@ function Availability({
   }
 
   function addOverride() {
-    setRows((prev) => [...prev, { date: todayIso(), available: false, reason: "" }]);
+    setRows((prev) => [...prev, { date: today, available: false, reason: "" }]);
     setOverridesSaved(false);
   }
 
@@ -309,6 +310,15 @@ function Availability({
   }
 
   async function saveOverrides() {
+    // A "Special hours" (available) day MUST carry both a start and an end. If
+    // the times are dropped, generateSlots silently falls back to the (disabled)
+    // weekly schedule and the day the owner meant to OPEN stays closed — so
+    // block the save with an inline error rather than saving nothing.
+    if (rows.some((r) => r.available && (!r.start || !r.end))) {
+      setOverridesError("Set both a start and end time for special hours.");
+      setOverridesSaved(false);
+      return;
+    }
     setSavingOverrides(true);
     setOverridesError(null);
     setOverridesSaved(false);

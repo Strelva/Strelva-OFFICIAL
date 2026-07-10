@@ -30,23 +30,30 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function checkIn(id: string) {
+  async function setStatus(id: string, status: Booking["status"], failMsg: string) {
     setPendingId(id);
     setError(null);
     try {
       const res = await fetch(`/api/booking/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "completed" }),
+        body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error();
-      setStatuses((prev) => ({ ...prev, [id]: "completed" }));
+      setStatuses((prev) => ({ ...prev, [id]: status }));
     } catch {
-      setError("Couldn't check that one in — please try again.");
+      setError(failMsg);
     } finally {
       setPendingId(null);
     }
   }
+
+  // Check-in marks the booking done; Undo puts it back to confirmed so a
+  // mis-tap is always recoverable (there's no separate "arrived" status).
+  const checkIn = (id: string) =>
+    setStatus(id, "completed", "Couldn't check that one in — please try again.");
+  const undoCheckIn = (id: string) =>
+    setStatus(id, "confirmed", "Couldn't undo that — please try again.");
 
   const remaining = active.filter((b) => statuses[b.id] !== "completed").length;
 
@@ -122,10 +129,20 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
                     </div>
 
                     {checkedIn ? (
-                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-dim px-3 py-2 text-[12px] font-medium text-accent">
-                        <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                        Checked in
-                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-dim px-3 py-2 text-[12px] font-medium text-accent">
+                          <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                          Checked in
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => undoCheckIn(b.id)}
+                          disabled={pendingId === b.id}
+                          className="text-[12px] text-gray-muted underline-offset-2 transition-colors hover:text-warm-black hover:underline disabled:opacity-60"
+                        >
+                          {pendingId === b.id ? "…" : "Undo"}
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"
