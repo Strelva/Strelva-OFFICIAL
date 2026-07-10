@@ -252,4 +252,29 @@ describe("owner journey copy and links", () => {
     expect(ownershipPage).toContain("Billing cancellation");
     expect(ownershipPage).toContain("Admin revocation");
   });
+
+  it("leads ownership with a plain verdict and a one-click site-files request", () => {
+    const ownershipPage = readRepoFile("src/components/dashboard/OwnershipSection.tsx");
+    const settingsPage = readRepoFile("src/app/dashboard/settings/page.tsx");
+
+    // Verdict framing: what they own, in plain words.
+    expect(ownershipPage).toContain(
+      "Your domain, your content, your customers — leave anytime, with everything.",
+    );
+
+    // One-click repo/domain handoff request reusing the offboarding path,
+    // with an honest success message and confirm-before-send.
+    expect(ownershipPage).toContain("Request your site files");
+    expect(ownershipPage).toContain("/api/offboarding/request");
+    expect(ownershipPage).toContain(
+      "We've got your request — we'll reach out to hand over your files.",
+    );
+    // The fixed-string request is gone — the owner adds their own context.
+    expect(ownershipPage).not.toContain("Client opened ownership settings handoff request.");
+
+    // Single canonical export home: the settings shortcut points at Ownership,
+    // it is not a second export implementation.
+    expect(settingsPage).not.toContain("/api/tenant-export/");
+    expect(settingsPage).toContain("/dashboard/settings#ownership");
+  });
 });
