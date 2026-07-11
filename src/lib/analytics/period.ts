@@ -45,20 +45,29 @@ export function resolveRange(key?: string, fromStr?: string, toStr?: string): Re
   const today = startOfToday();
 
   if (key === "week") {
-    // Current calendar week, Monday-anchored, through today.
+    // Current calendar week, Monday-anchored, through today (a partial week until
+    // Sunday). The prior window is the SAME days-so-far a week earlier (last
+    // Monday through the same weekday as today) — an equal-length comparison, so
+    // an in-progress week isn't dragged "down" against a full 7-day prior week.
     const day = today.getDay(); // 0 = Sun
     const back = day === 0 ? 6 : day - 1;
     const from = new Date(today.getTime() - back * DAY_MS);
-    const priorTo = new Date(from.getTime() - DAY_MS);
-    const priorFrom = new Date(priorTo.getTime() - 6 * DAY_MS);
+    const priorFrom = new Date(from.getTime() - 7 * DAY_MS);
+    const priorTo = new Date(today.getTime() - 7 * DAY_MS);
     return { key: "week", label: `This week (${fmt(from)} – ${fmt(today)})`, priorLabel: "vs last week", from, to: today, priorFrom, priorTo };
   }
 
   if (key === "month") {
-    // Current calendar month, 1st through today.
+    // Current calendar month, 1st through today (a partial month until the last
+    // day). The prior window is the SAME days-so-far in the previous month (its
+    // 1st through the same day-of-month, clamped to that month's length) — an
+    // equal-length comparison, so a young month isn't dragged "down" against a
+    // full prior month.
     const from = new Date(today.getFullYear(), today.getMonth(), 1);
-    const priorTo = new Date(from.getTime() - DAY_MS);
-    const priorFrom = new Date(priorTo.getFullYear(), priorTo.getMonth(), 1);
+    const priorLastDay = new Date(today.getFullYear(), today.getMonth(), 0); // last day of prior month
+    const priorFrom = new Date(priorLastDay.getFullYear(), priorLastDay.getMonth(), 1);
+    const elapsedDay = Math.min(today.getDate(), priorLastDay.getDate());
+    const priorTo = new Date(priorLastDay.getFullYear(), priorLastDay.getMonth(), elapsedDay);
     return { key: "month", label: `This month (${fmt(from)} – ${fmt(today)})`, priorLabel: "vs last month", from, to: today, priorFrom, priorTo };
   }
 
@@ -110,8 +119,8 @@ export function periodHeadline(stats: PeriodStats): string {
       : "No visitors in this window yet. Let's change that.";
   }
   const people = `${pageViews.toLocaleString()} ${pageViews === 1 ? "person" : "people"} found you`;
-  if (pageViewsDelta > 0) return `It's working. ${people}, up ${range.priorLabel.replace(/^vs /, "vs ")}.`;
-  if (pageViewsDelta < 0) return `${people}, down ${range.priorLabel.replace(/^vs /, "vs ")}.`;
+  if (pageViewsDelta > 0) return `It's working. ${people}, up ${range.priorLabel}.`;
+  if (pageViewsDelta < 0) return `${people}, down ${range.priorLabel}.`;
   return `${people}.`;
 }
 
