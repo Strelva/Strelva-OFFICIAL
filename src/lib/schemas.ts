@@ -272,6 +272,19 @@ export const bookingConfigSchema = z.object({
   requirePayment: z.boolean(),
 });
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+export const dateOverridesSchema = z
+  .array(
+    z.object({
+      date: z.string().regex(ISO_DATE, "Invalid date"),
+      available: z.boolean(),
+      start: z.string().regex(HHMM, "Invalid time").optional(),
+      end: z.string().regex(HHMM, "Invalid time").optional(),
+      reason: z.string().max(200).optional(),
+    })
+  )
+  .max(366);
+
 export const rewardsConfigSchema = z.object({
   starsPerBag: z.number(),
   starsToRedeem: z.number(),
