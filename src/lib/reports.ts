@@ -336,7 +336,7 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
     );
   } else if (hasTrafficData) {
     paragraphs.push(
-      `${greeting} a steady week — no new visits landed this week, but here's where you stand (${data.pageViews.total} total so far). The quickest way to bring the next few in is to share your site or ask Strelva to refresh a section.`,
+      `${greeting} a steady week: no new visits landed this week, but here's where you stand (${data.pageViews.total} total so far). The quickest way to bring the next few in is to share your site or ask Strelva to refresh a section.`,
     );
   } else {
     // No data ever recorded — visitor tracking is still coming online. Don't
