@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isSuperAdmin } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
-import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
+import { getClickCounts, getActivity, listDrafts, getDailyMetrics } from "@/lib/storage";
+import { Sparkline } from "@/components/dashboard/Sparkline";
 import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { listTenantDomainClaims, serializeDomainClaim } from "@/lib/domains";
 import { getLatestSnapshots, diffSnapshots } from "@/lib/visibility/snapshots";
@@ -26,12 +27,17 @@ import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-function Pulse({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function Pulse({ label, value, sub, series }: { label: string; value: string | number; sub?: string; series?: number[] }) {
   return (
-    <div className="rounded-2xl border border-glass-border bg-glass p-4">
+    <div className="flex flex-col rounded-2xl border border-glass-border bg-glass p-4">
       <p className="text-[11px] text-gray-muted">{label}</p>
       <p className="mt-1.5 font-[family-name:var(--font-display)] text-[23px] font-medium tracking-[-0.02em] text-warm-white">{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-gray-faint">{sub}</p>}
+      {series && series.length > 1 && (
+        <div className="mt-2.5">
+          <Sparkline series={series} />
+        </div>
+      )}
     </div>
   );
 }
@@ -65,7 +71,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -78,6 +84,7 @@ export default async function ClientDetailPage({
       getReviews(id).catch(() => []),
       getTenantCrm(id).catch(() => null),
       getTenantAtRisk(id).catch(() => noRisk),
+      getDailyMetrics(id, 14).catch(() => []),
     ]);
 
   const latestVis = visSnapshots[0] ?? null;
@@ -178,8 +185,8 @@ export default async function ClientDetailPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} />
-        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} />
+        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
+        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
         <Pulse label="Content drafts" value={Object.keys(drafts).length} sub="awaiting review" />
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
