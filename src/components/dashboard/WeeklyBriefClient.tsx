@@ -242,6 +242,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               label={`People found you ${periodLabel}`}
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
+              deltaLabel={periodLabel === "this month" ? "vs last month" : "vs last week"}
               icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
@@ -249,6 +250,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               label="Customer actions"
               value={brief.stats.bookingClicks + (brief.stats.phoneClicks ?? 0)}
               delta={(brief.stats.bookingClicksDelta ?? 0) + (brief.stats.phoneClicksDelta ?? 0)}
+              deltaLabel={periodLabel === "this month" ? "vs last month" : "vs last week"}
               detail={(brief.stats.phoneClicks ?? 0) > 0 ? "Booked or called you" : undefined}
               icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
