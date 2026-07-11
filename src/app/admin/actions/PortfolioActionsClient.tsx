@@ -134,7 +134,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
     <div className="max-w-3xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
+          <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
             Portfolio actions
           </h1>
           <p className="mt-1 text-sm text-gray-muted">

@@ -3,6 +3,7 @@ import { getSectionTimestamps } from "./storage";
 import { detectStaleSections } from "./reports";
 import { getScanSummary } from "./scan-store";
 import { addSuggestion } from "./suggestions";
+import { getTenantSiteName } from "./tenant-display";
 
 /**
  * Autonomous maintenance digest — the "done-with-you management" loop.
@@ -123,6 +124,9 @@ export async function listPendingDigests(): Promise<MaintenanceDigest[]> {
   const digests = await Promise.all(tenants.map((t) => getMaintenanceDigest(t)));
   return digests
     .filter((d): d is MaintenanceDigest => d !== null && d.status === "pending")
+    // Heal a digest saved before its site_name was set — show the real business
+    // name (from the fallback map / title-cased id) instead of a raw tenant id.
+    .map((d) => (d.siteName ? d : { ...d, siteName: getTenantSiteName(d.tenant, undefined) }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

@@ -11,7 +11,7 @@ export default async function AdminLeadsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
+        <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
           Leads
         </h1>
         <p className="text-sm text-gray-muted mt-1">
