@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Sparkline } from "./Sparkline";
 
 /** The ONE metric primitive. Both Today's stat grid and the weekly brief render
  *  through this — one padding, one 28px number, one eyebrow. Pass `countUp` to
@@ -46,6 +47,7 @@ export function StatTile({
   deltaLabel = "vs last week",
   icon,
   countUp = false,
+  series,
 }: {
   label: string;
   value: string | number;
@@ -58,11 +60,14 @@ export function StatTile({
    *  functions can't cross the server→client boundary; elements can. */
   icon: ReactNode;
   countUp?: boolean;
+  /** Daily series for the trailing sparkline. Omit (or pass a flat/empty one)
+   *  and the tile stays a plain number — the Sparkline self-suppresses. */
+  series?: number[];
 }) {
   const showDelta = typeof delta === "number" && delta !== 0;
 
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4">
+    <div className="flex flex-col rounded-xl border border-glass-border bg-glass p-4">
       <div className="mb-3 flex items-center gap-2 text-gray-muted">
         {icon}
         <span className="text-[11px] font-medium uppercase tracking-[0.14em]">{label}</span>
@@ -76,6 +81,11 @@ export function StatTile({
           {delta > 0 ? "+" : ""}
           {delta} {deltaLabel}
         </p>
+      )}
+      {series && series.length > 1 && (
+        <div className="mt-3 pt-0.5">
+          <Sparkline series={series} />
+        </div>
       )}
     </div>
   );
