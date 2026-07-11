@@ -212,7 +212,7 @@ export default async function AdminPage() {
         <Link href="/admin/drafts">
           <StatTile
             icon={<FileText className="h-4 w-4" strokeWidth={1.5} />}
-            label="Drafts"
+            label="Content drafts"
             value={totalDrafts}
             detail={totalDrafts > 0 ? "review needed" : "all clear"}
           />

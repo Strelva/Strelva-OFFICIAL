@@ -102,7 +102,7 @@ export default async function OpsPage() {
     {
       key: "pending",
       count: m.totalPendingEvents,
-      label: `${m.totalPendingEvents} pending in the review queue`,
+      label: `${m.totalPendingEvents} open in the review queue`,
       href: "/admin/actions",
     },
     {
@@ -214,7 +214,7 @@ export default async function OpsPage() {
         />
         <MetricCard label="Failed AI writes" value={m.failedAiWrites} bad />
         <MetricCard label="Stale SMS approvals" value={m.staleSmsApprovals} bad />
-        <MetricCard label="Pending queue" value={m.totalPendingEvents} href="/admin/actions" />
+        <MetricCard label="Open items" value={m.totalPendingEvents} href="/admin/actions" />
         <MetricCard label="Domain drift" value={m.tenantDomainDrift.length} bad href="#domain-drift" />
       </div>
 

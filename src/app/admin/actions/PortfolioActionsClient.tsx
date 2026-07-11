@@ -139,9 +139,9 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
           </h1>
           <p className="mt-1 text-sm text-gray-muted">
             {totalItems > 0
-              ? `${totalItems} item${totalItems === 1 ? "" : "s"} across ${groups.length} client${
+              ? `${totalItems} ready to approve across ${groups.length} client${
                   groups.length === 1 ? "" : "s"
-                } waiting for you`
+                }`
               : "Nothing waiting across the portfolio. New drafts and approvals land here."}
           </p>
         </div>

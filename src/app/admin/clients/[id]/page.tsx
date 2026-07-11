@@ -188,7 +188,7 @@ export default async function ClientDetailPage({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} />
         <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} />
-        <Pulse label="Drafts waiting" value={Object.keys(drafts).length} />
+        <Pulse label="Content drafts" value={Object.keys(drafts).length} />
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
