@@ -123,9 +123,13 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
         // Auto-select the newly uploaded photo
         handlePick(asset);
       } else {
-        // Don't swallow the failure — the spinner used to just stop and users
-        // retried endlessly with no idea why.
-        setUploadError("Upload failed. Try a smaller image, or check your connection.");
+        // Don't swallow the failure — surface the server's real reason (e.g.
+        // "File too large (max 5MB)") instead of a vague catch-all.
+        const reason = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => null);
+        setUploadError(reason || "Upload failed. Try a smaller image, or check your connection.");
       }
     } catch {
       setUploadError("Upload failed. Check your connection and try again.");
