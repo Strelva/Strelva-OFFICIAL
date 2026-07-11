@@ -75,6 +75,15 @@ describe("buildAiVisibilityScorecard", () => {
     expect(card!.service).toBe("plumber");
   });
 
+  it("threads the snapshot's checkedAt through for the subtle as-of note", () => {
+    const when = "2026-06-28T09:00:00.000Z";
+    const card = buildAiVisibilityScorecard(
+      snap([aiResult("emergency plumber Buffalo, NY", true)], { checkedAt: when }),
+      null
+    );
+    expect(card!.checkedAt).toBe(when);
+  });
+
   it("never claims a trend on the first snapshot (no previous → no newlyAppeared)", () => {
     const card = buildAiVisibilityScorecard(
       snap([aiResult("emergency plumber Buffalo, NY", true)]),
