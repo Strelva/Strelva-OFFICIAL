@@ -14,6 +14,11 @@ import { isInspecting } from "./inspect-mode";
  * super-admin inspecting (cookie + isSuperAdmin re-verified in isInspecting()), the
  * page renders as a read-only PREVIEW (`preview: true`) instead of 404. A real client
  * (non-super-admin) still 404s exactly as before — the cookie alone grants nothing.
+ *
+ * `preview` is DISPLAY INTENT only — it flags the page to render a preview banner and
+ * (today) static placeholders. It does NOT enforce read-only. If a future surface adds
+ * writes, gate those writes explicitly; a super-admin already has full write access to
+ * any tenant, so `preview: true` must not be mistaken for a read-only sandbox.
  */
 export async function requireDashboardFeature(
   featureId: string

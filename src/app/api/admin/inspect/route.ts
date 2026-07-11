@@ -30,18 +30,24 @@ export async function GET(request: NextRequest) {
   const on = searchParams.get("on") === "1";
   const to = safeRelativePath(searchParams.get("to"));
 
+  // The cookie is inspect INTENT only. It authorizes nothing: every enforcement
+  // point re-checks isSuperAdmin() via isInspecting(). secure in prod is
+  // defense-in-depth so the intent flag never rides an http request.
+  const secure = process.env.NODE_ENV === "production";
   const response = NextResponse.redirect(new URL(to, request.url));
   if (on) {
     // Session cookie (no maxAge) — inspect intent ends when the browser closes.
     response.cookies.set(INSPECT_COOKIE, "1", {
       httpOnly: true,
       sameSite: "lax",
+      secure,
       path: "/",
     });
   } else {
     response.cookies.set(INSPECT_COOKIE, "", {
       httpOnly: true,
       sameSite: "lax",
+      secure,
       path: "/",
       maxAge: 0,
     });
