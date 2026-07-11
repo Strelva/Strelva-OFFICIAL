@@ -143,17 +143,19 @@ describe("owner journey copy and links", () => {
   });
 
   it("keeps weekly reports reachable as the proof surface", () => {
-    // Reports folded into the merged Analytics surface; /dashboard/reports aliases to it.
-    const analyticsPage = readRepoFile("src/app/dashboard/analytics/page.tsx");
+    // Analytics split into LIVE (rolling range view) + Reports (the written recap).
+    // The weekly brief now lives on /dashboard/reports; analytics is the live view.
+    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
     const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");
+    const trendChart = readRepoFile("src/components/dashboard/TrendChart.tsx");
 
-    expect(analyticsPage).toContain("getWeeklyBrief(tenant)");
-    expect(analyticsPage).toContain("getWeeklyBriefs(tenant)");
-    expect(analyticsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
-    expect(analyticsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
+    expect(reportsPage).toContain("getWeeklyBrief(tenant)");
+    expect(reportsPage).toContain("getWeeklyBriefs(tenant)");
+    expect(reportsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
+    expect(reportsPage).not.toContain("redirect(");
     // Verdict-first: lead with a plain-English verdict + the 30-day trend.
     expect(weeklyBrief).toContain("buildVerdict");
-    expect(weeklyBrief).toContain("Last 30 days");
+    expect(trendChart).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
     expect(weeklyBrief).toContain("Open dashboard");
   });

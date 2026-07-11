@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
 import { buildVerdict } from "@/lib/weekly-verdict";
+import { TrendChart } from "@/components/dashboard/TrendChart";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
@@ -46,60 +47,6 @@ function rankLabel(rank: number | null, inPack: boolean): string {
   if (rank !== null) return `#${rank}`;
   if (inPack) return "map pack";
   return "not ranked";
-}
-
-/** A lightweight 30-day traffic sparkline (no chart dependency). */
-function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
-  if (metrics.length < 2) return null;
-  const values = metrics.map((m) => m.pageViews);
-  const total = values.reduce((a, b) => a + b, 0);
-  const max = Math.max(1, ...values);
-  const w = 300;
-  const h = 56;
-
-  // Below a handful of visitors, a real chart is a single spike on a flat line —
-  // it reads as a rendering glitch, not data. Show a calm baseline + a plain note
-  // so an early, low-traffic week looks deliberate.
-  if (total < 5) {
-    return (
-      <div className="rounded-xl border border-glass-border bg-glass p-4">
-        <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
-          <p className="text-[12px] text-gray-muted">
-            <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> {total === 1 ? "visitor" : "visitors"}
-          </p>
-        </div>
-        <div className="flex h-14 items-center justify-center">
-          <div className="w-full border-t border-dashed border-glass-border" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-gray-muted">
-          Not enough traffic yet to chart. This fills in as more people find you.
-        </p>
-      </div>
-    );
-  }
-
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - (v / max) * (h - 4) - 2;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const line = `M ${pts.join(" L ")}`;
-  const area = `M 0,${h} L ${pts.join(" L ")} L ${w},${h} Z`;
-  return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
-        <p className="text-[12px] text-gray-muted">
-          <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> visitors
-        </p>
-      </div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-14 w-full" aria-hidden="true">
-        <path d={area} fill="var(--accent-dim)" opacity={0.5} />
-        <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      </svg>
-    </div>
-  );
 }
 
 function formatWeekRange(start: string, end: string): string {

@@ -43,6 +43,7 @@ export function StatTile({
   value,
   detail,
   delta,
+  deltaLabel = "vs last week",
   icon,
   countUp = false,
 }: {
@@ -50,6 +51,8 @@ export function StatTile({
   value: string | number;
   detail?: string;
   delta?: number;
+  /** The comparison phrase after the delta, e.g. "vs last month". */
+  deltaLabel?: string;
   /** A rendered icon element (e.g. `<Users className="h-4 w-4" />`), NOT a
    *  component reference — server pages render this tile, and component
    *  functions can't cross the server→client boundary; elements can. */
@@ -71,7 +74,7 @@ export function StatTile({
       {showDelta && (
         <p className={`mt-2 text-[12px] ${delta > 0 ? "text-positive" : "text-gray-muted"}`}>
           {delta > 0 ? "+" : ""}
-          {delta} vs last week
+          {delta} {deltaLabel}
         </p>
       )}
     </div>

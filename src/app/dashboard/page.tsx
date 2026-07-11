@@ -146,7 +146,7 @@ async function DashboardHome() {
             </p>
             {brief ? (
               <Link
-                href={dashboardHref("/dashboard/analytics")}
+                href={dashboardHref("/dashboard/reports")}
                 className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-colors hover:text-warm-black"
               >
                 <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
