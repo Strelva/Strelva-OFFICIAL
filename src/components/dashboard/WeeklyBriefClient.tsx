@@ -532,7 +532,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             </div>
           )}
 
-          {footerSlot}
+          {footerSlot && <div>{footerSlot}</div>}
         </div>
       </div>
     </div>
