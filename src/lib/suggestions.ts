@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
 import { sanitizePromptValue } from "./capabilities";
-import { addEvent, getEvents, resolveEvent } from "./events";
+import { addEvent, getEvents, resolveEvent, updateEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getProducts } from "./products";
 import { getAllTenants, getTenantConfig } from "./tenants";
@@ -165,6 +165,50 @@ export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+/** True when a regenerated suggestion carries fresher copy than the stored one. */
+function suggestionCopyDiffers(existing: Suggestion, entry: Suggestion): boolean {
+  return (
+    existing.title !== entry.title ||
+    existing.description !== entry.description ||
+    existing.action !== entry.action
+  );
+}
+
+/** Update the stored suggestion row's copy (Postgres). Best-effort. */
+async function pgUpdateSuggestionCopy(tenantId: string, id: string, entry: Suggestion): Promise<void> {
+  try {
+    const db = getSupabase();
+    if (!db) return;
+    await db
+      .from("suggestions")
+      .update({ title: entry.title, description: entry.description, action: entry.action })
+      .eq("tenant_id", tenantId)
+      .eq("id", id);
+  } catch {
+    // swallow — the dev-file path still keeps read-side consistent
+  }
+}
+
+/** Sync the "Needs you" queue card (its event) when a stored suggestion's copy is
+ *  refreshed, so a stale-worded card (e.g. a baked-in traffic number) doesn't
+ *  linger after the generation code was fixed. Matches the event by the stable
+ *  suggestionId, not the title, so a changed title still finds its card. */
+async function refreshSuggestionEventBody(tenantId: string, suggestionId: string, entry: Suggestion): Promise<void> {
+  const pending = await getEvents(tenantId, { status: "pending", limit: 100 }).catch(() => []);
+  const ev = pending.find((e) => e.type === "suggestion" && e.metadata?.suggestionId === suggestionId);
+  if (!ev) return;
+  await updateEvent(ev.id, (e) => ({
+    ...e,
+    title: entry.title,
+    body: entry.description,
+    metadata: {
+      ...e.metadata,
+      action: entry.action,
+      actionPrompt: entry.action.startsWith("prompt:") ? entry.action.slice("prompt:".length) : entry.action,
+    },
+  })).catch(() => {});
+}
+
 export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "createdAt" | "status">): Promise<Suggestion> {
   const entry: Suggestion = {
     ...suggestion,
@@ -180,7 +224,17 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
       suggestion.type,
       suggestion.section ?? null,
     );
-    if (existing) return existing;
+    if (existing) {
+      // Refresh in place when the regenerated copy is fresher (e.g. a now-
+      // numberless traffic nudge) so a stored artifact never keeps stale wording;
+      // stay a no-op when the copy is unchanged (idempotent re-run).
+      if (suggestionCopyDiffers(existing, entry)) {
+        await pgUpdateSuggestionCopy(suggestion.tenantId, existing.id, entry);
+        await refreshSuggestionEventBody(suggestion.tenantId, existing.id, entry);
+        return { ...existing, title: entry.title, description: entry.description, action: entry.action };
+      }
+      return existing;
+    }
 
     await pgInsertSuggestion(entry);
 
@@ -195,7 +249,17 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
   const existing = tenantSuggestions.find(
     (s) => s.status === "pending" && s.type === suggestion.type && s.section === suggestion.section,
   );
-  if (existing) return existing;
+  if (existing) {
+    if (suggestionCopyDiffers(existing, entry)) {
+      existing.title = entry.title;
+      existing.description = entry.description;
+      existing.action = entry.action;
+      store[suggestion.tenantId] = tenantSuggestions;
+      await writeSuggestions(store);
+      await refreshSuggestionEventBody(suggestion.tenantId, existing.id, entry);
+    }
+    return existing;
+  }
 
   tenantSuggestions.push(entry);
   store[suggestion.tenantId] = tenantSuggestions;
