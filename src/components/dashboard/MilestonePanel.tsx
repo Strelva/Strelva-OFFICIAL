@@ -1,6 +1,7 @@
 import { ArrowRight, Flag, Gauge, MessageSquareText, Star, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import type { Milestone, MilestoneMetric } from "@/lib/milestone";
+import { Sparkline } from "./Sparkline";
 
 const METRIC_ICON: Record<MilestoneMetric["key"], ComponentType<{ className?: string; strokeWidth?: number }>> = {
   visitors: Users,
@@ -15,11 +16,11 @@ function valueClass(direction: MilestoneMetric["direction"]): string {
   return direction === "up" ? "text-positive" : "text-warm-black";
 }
 
-function MetricTile({ metric }: { metric: MilestoneMetric }) {
+function MetricTile({ metric, series }: { metric: MilestoneMetric; series?: number[] }) {
   const Icon = METRIC_ICON[metric.key];
 
   return (
-    <div className="rounded-xl border border-gray-border/70 bg-surface-raised p-4">
+    <div className="flex flex-col rounded-xl border border-gray-border/70 bg-surface-raised p-4">
       <div className="mb-3 flex items-center gap-2 text-gray-muted">
         <Icon className="h-4 w-4" strokeWidth={1.5} />
         <span className="text-[11px] font-medium uppercase tracking-[0.12em]">{metric.label}</span>
@@ -54,6 +55,11 @@ function MetricTile({ metric }: { metric: MilestoneMetric }) {
       )}
 
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{metric.caption}</p>
+      {series && series.length > 1 && (
+        <div className="mt-3 pt-0.5">
+          <Sparkline series={series} />
+        </div>
+      )}
     </div>
   );
 }
@@ -64,7 +70,7 @@ function MetricTile({ metric }: { metric: MilestoneMetric }) {
  * a forward-looking "building" state for young/quiet tenants, and the full
  * then -> now recap once there's enough measured history.
  */
-export function MilestonePanel({ milestone }: { milestone: Milestone }) {
+export function MilestonePanel({ milestone, visitorSeries }: { milestone: Milestone; visitorSeries?: number[] }) {
   if (milestone.state === "building") {
     return (
       <section className="rounded-2xl border border-glass-border bg-glass p-5">
@@ -100,7 +106,11 @@ export function MilestonePanel({ milestone }: { milestone: Milestone }) {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {milestone.metrics.map((metric) => (
-          <MetricTile key={metric.key} metric={metric} />
+          <MetricTile
+            key={metric.key}
+            metric={metric}
+            series={metric.key === "visitors" ? visitorSeries : undefined}
+          />
         ))}
       </div>
     </section>

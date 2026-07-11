@@ -34,6 +34,7 @@ export function AnalyticsLiveView({
   searchPerf,
   gaPerf,
   milestone,
+  visitorSeries,
   aiVisibility,
 }: {
   stats: PeriodStats;
@@ -43,6 +44,10 @@ export function AnalyticsLiveView({
   searchPerf: SearchPerf;
   gaPerf: GaPerf;
   milestone: Milestone | null;
+  /** Stable daily-visitor series for the milestone growth sparkline — kept
+   *  separate from the range-driven `stats.series` so it doesn't shift with the
+   *  range selector (the "since you started" story is fixed). */
+  visitorSeries?: number[];
   aiVisibility: AiViz | null;
 }) {
   const headline = periodHeadline(stats);
@@ -128,7 +133,7 @@ export function AnalyticsLiveView({
           <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
           {aiVisibility && <AiVisibilityScorecard data={aiVisibility} />}
-          {milestone && <MilestonePanel milestone={milestone} />}
+          {milestone && <MilestonePanel milestone={milestone} visitorSeries={visitorSeries} />}
 
           <details className="group rounded-2xl border border-glass-border bg-glass">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
