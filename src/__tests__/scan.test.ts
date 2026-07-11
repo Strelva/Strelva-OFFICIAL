@@ -190,6 +190,56 @@ describe("scanTenant", () => {
     });
   });
 
+  // The conversion rate is clamped to [0.005, 0.5]. Without the ceiling a tenant
+  // whose leads momentarily exceed GA4 users (bot-inflated leads, a GA4 undercount,
+  // a tiny sample) would multiply the dollar-impact into an absurd figure on their
+  // dashboard. These lock the bounds so a refactor can't silently drop them.
+  it("clamps the conversion rate to the 0.5 ceiling when leads exceed visitors (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // 50 leads over just 10 GA4 users → raw 5.0, must clamp to 0.5 (not 5.0).
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 10 });
+    mockGetLeadSummary.mockResolvedValue({ count: 50 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 10, conversionRate: 0.5, orderValue: 75, source: "measured" },
+    });
+  });
+
+  it("clamps the conversion rate to the 0.005 floor for high-traffic, low-lead tenants (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // 1 lead over 100k users → raw 0.00001, must clamp up to the 0.005 floor.
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 100000 });
+    mockGetLeadSummary.mockResolvedValue({ count: 1 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 100000, conversionRate: 0.005, orderValue: 75, source: "measured" },
+    });
+  });
+
+  it("falls back to the generic conversion prior when a tenant has real traffic but no leads (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // Real GA4 visitors but zero leads → no conversion signal → generic 0.03,
+    // while monthlyVisitors stays the tenant's real number.
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 2000 });
+    mockGetLeadSummary.mockResolvedValue({ count: 0 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 2000, conversionRate: 0.03, orderValue: 75, source: "measured" },
+    });
+  });
+
   it("seeds the durable day-0 baseline once, from the earliest retained point (B5.4)", async () => {
     mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
     mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
