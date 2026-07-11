@@ -84,13 +84,14 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
   // renders the verdict on load instead of null-until-rescan. Pure transform
   // over the AuditResult we already have; the store deliberately stays small,
   // so only the top few and only the fields the UI renders are kept.
-  const prioritizedIssues: ScanPrioritizedIssue[] = prioritizeIssues({
+  const prioritized = prioritizeIssues({
     url,
     scannedAt,
     overallScore,
     grade,
     categories: detail,
-  }).issues
+  });
+  const prioritizedIssues: ScanPrioritizedIssue[] = prioritized.issues
     .slice(0, 8)
     .map((i) => ({
       message: i.message,
@@ -99,6 +100,13 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
       impact: i.impact,
       quantified: i.quantified,
     }));
+  // Persist the TRUE severity counts (not derived from the capped list) so the
+  // on-load badge never understates when a site has more than 8 open issues.
+  const prioritizedCounts = {
+    high: prioritized.highCount,
+    medium: prioritized.mediumCount,
+    low: prioritized.lowCount,
+  };
 
   const summary: ScanSummary = {
     url,
@@ -108,7 +116,7 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
     categories: detail.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
     // Omit the field entirely on a spotless site so an empty list never bloats
     // the record and legacy/empty reads stay identical.
-    ...(prioritizedIssues.length > 0 ? { prioritizedIssues } : {}),
+    ...(prioritizedIssues.length > 0 ? { prioritizedIssues, prioritizedCounts } : {}),
   };
   const point = { scannedAt, overallScore, grade };
   await saveScanSummary(tenantId, summary);

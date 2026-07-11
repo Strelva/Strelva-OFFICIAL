@@ -55,6 +55,13 @@ export interface ScanSummary {
    * must never break deserialization.
    */
   prioritizedIssues?: ScanPrioritizedIssue[];
+  /**
+   * TRUE severity counts across ALL open issues (not just the capped
+   * `prioritizedIssues` list), so the on-load badge is accurate even when a
+   * site has more than 8 issues. Absent on legacy records — the consumer falls
+   * back to counting the capped list.
+   */
+  prioritizedCounts?: { high: number; medium: number; low: number };
 }
 
 /** Trailing scan history (a small ring buffer) for trend lines. */

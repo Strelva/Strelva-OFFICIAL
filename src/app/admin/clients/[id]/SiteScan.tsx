@@ -101,13 +101,17 @@ export function SiteScan({
       : null;
   const fixCounts = issues
     ? { high: issues.highCount, medium: issues.mediumCount, low: issues.lowCount }
-    : fixList
-      ? {
-          high: fixList.filter((f) => f.priority === "high").length,
-          medium: fixList.filter((f) => f.priority === "medium").length,
-          low: fixList.filter((f) => f.priority === "low").length,
-        }
-      : null;
+    : scan?.prioritizedCounts
+      ? scan.prioritizedCounts
+      : fixList
+        ? {
+            // Legacy records without persisted counts: count the capped list
+            // (may understate when >8 issues, but never overstates).
+            high: fixList.filter((f) => f.priority === "high").length,
+            medium: fixList.filter((f) => f.priority === "medium").length,
+            low: fixList.filter((f) => f.priority === "low").length,
+          }
+        : null;
 
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-5">
