@@ -165,12 +165,10 @@ export async function setBookingConfig(
 export async function getDateOverrides(
   tenant: string = DEFAULT_TENANT
 ): Promise<DateOverride[]> {
-  // NOTE: there is currently NO app writer for date overrides — they were
-  // authored in Sanity Studio, which is decommissioned — so this returns [] in
-  // prod today. The getter + the availability path's override handling are kept
-  // intact for a future Redis-backed writer (config already lives here). If a
-  // client relied on Studio-authored holiday closures, those are no longer
-  // honored (see the Sanity teardown ops notes).
+  // Closed-dates / special-hours overrides persist as a Redis blob (mirrors
+  // getBookingConfig), written by setDateOverrides from the owner's Schedule
+  // availability editor. The dev-file store is the local fallback when Redis is
+  // absent. (These were previously authored in Sanity Studio, now decommissioned.)
   const redis = getRedis();
   if (redis) {
     // Fail CLOSED like getBookingConfig: propagate a Redis error rather than
@@ -181,6 +179,22 @@ export async function getDateOverrides(
   }
   const store = await readDevContent(tenant);
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
+}
+
+export async function setDateOverrides(
+  overrides: DateOverride[],
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    // Let a real Redis write failure surface (route → 500) rather than pretend
+    // the save succeeded — same contract as setBookingConfig.
+    await redis.set(dateOverridesKey(tenant), overrides);
+    return;
+  }
+  const store = await readDevContent(tenant);
+  store[`__dateOverrides_${tenant}`] = overrides;
+  await writeDevContent(store, tenant);
 }
 
 export async function getBookings(
