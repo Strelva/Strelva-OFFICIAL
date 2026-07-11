@@ -778,7 +778,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
         ) : messages.length === 0 && isLoading ? (
           <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
             <div className="ai-thinking-pop rounded-2xl border border-glass-border bg-glass px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-              <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
+              <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
             </div>
           </div>
         ) : (
@@ -857,7 +857,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                       <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
                         <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
                       </div>
-                      <span className="text-[11px] text-gray-muted">AI</span>
+                      <span className="text-[11px] text-gray-muted">Strelva</span>
                     </div>
                   )}
                   <div
@@ -877,7 +877,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                       )
                     ) : (
                       <span className="flex items-center py-1">
-                        <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
+                        <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
                       </span>
                     )}
                   </div>
@@ -895,10 +895,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                     <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
                       <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
                     </div>
-                    <span className="text-[11px] text-gray-muted">AI</span>
+                    <span className="text-[11px] text-gray-muted">Strelva</span>
                   </div>
                   <div className="ai-thinking-pop px-4 py-3 rounded-2xl bg-glass border border-glass-border shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-                    <ShiningText text={toolStatus || "AI is thinking..."} className="text-[12px] font-medium" />
+                    <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
                   </div>
                 </div>
               </div>
