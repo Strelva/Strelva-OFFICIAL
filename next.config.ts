@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  // The dev-tools badge defaults to bottom-left, where it sits on top of the
+  // dashboard sidebar's account footer during local walks. Move it out of the
+  // way. Dev-only — has no effect on a production build.
+  devIndicators: { position: "bottom-right" },
   allowedDevOrigins: [
     "127.0.0.1",
     "gldf.localhost",
