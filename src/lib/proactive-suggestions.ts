@@ -31,24 +31,36 @@ export async function tenantHasContentEngine(tenant: string): Promise<boolean> {
  * The "fresh update" / "add a post" nudges only fire for sites with a content
  * engine (a blog) — a static one-pager has nothing to keep fresh, so nagging it
  * just floods the approval queue.
+ *
+ * Returns how many suggestions were actually queued for this tenant (0 when no
+ * signal applied). Callers that route a client through here for a "draft these"
+ * pass rely on this count to report the HONEST outcome — a stale one-pager with
+ * no content engine and no unreplied review produces 0, and must not be reported
+ * as "drafted". The dedupe-cleanup pass is not a draft, so it never counts.
  */
-export async function generateProactiveSuggestions(tenant: string): Promise<void> {
+export async function generateProactiveSuggestions(tenant: string): Promise<number> {
   const hasContent = await tenantHasContentEngine(tenant);
-  await Promise.allSettled([
+  const tasks: Promise<number>[] = [
     suggestUnrepliedReview(tenant),
     // Sites without a content engine: don't add blog nudges, AND dismiss any that
     // were queued before this gating existed (or while the site still had a blog).
     ...(hasContent
       ? [suggestStaleSite(tenant), suggestFirstPost(tenant)]
-      : [dedupePendingSuggestionEvents(tenant, { invalidTitles: CONTENT_SUGGESTION_TITLES })]),
-  ]);
+      : [
+          dedupePendingSuggestionEvents(tenant, {
+            invalidTitles: CONTENT_SUGGESTION_TITLES,
+          }).then(() => 0),
+        ]),
+  ];
+  const results = await Promise.allSettled(tasks);
+  return results.reduce((sum, r) => (r.status === "fulfilled" ? sum + r.value : sum), 0);
 }
 
-async function suggestUnrepliedReview(tenant: string): Promise<void> {
+async function suggestUnrepliedReview(tenant: string): Promise<number> {
   // getReviews returns newest-first, so the first unreplied one is the most recent.
   const reviews = await getReviews(tenant);
   const unreplied = reviews.find((review) => !hasReply(review.reply));
-  if (!unreplied) return;
+  if (!unreplied) return 0;
 
   const author = unreplied.author?.trim() || "a customer";
   await addSuggestion({
@@ -58,11 +70,12 @@ async function suggestUnrepliedReview(tenant: string): Promise<void> {
     description: `You have an unreplied review from ${author}. Want me to draft a reply that thanks them and sounds like you?`,
     action: "prompt:Draft a reply to my most recent unreplied review.",
   });
+  return 1;
 }
 
-async function suggestStaleSite(tenant: string): Promise<void> {
+async function suggestStaleSite(tenant: string): Promise<number> {
   const signals = await getOwnerRetentionSignals(tenant);
-  if (signals.noAiUsageDays === null || signals.noAiUsageDays < STALE_SITE_DAYS) return;
+  if (signals.noAiUsageDays === null || signals.noAiUsageDays < STALE_SITE_DAYS) return 0;
 
   await addSuggestion({
     tenantId: tenant,
@@ -72,11 +85,12 @@ async function suggestStaleSite(tenant: string): Promise<void> {
       "Your site hasn't changed in a few weeks. Want a fresh update or a quick post? A small change keeps it current for customers and search.",
     action: "prompt:Suggest one small, useful update for my site and make it after I approve.",
   });
+  return 1;
 }
 
-async function suggestFirstPost(tenant: string): Promise<void> {
+async function suggestFirstPost(tenant: string): Promise<number> {
   const posts = await getBlogPostsForSite(tenant, { limit: 1 });
-  if (posts.length > 0) return;
+  if (posts.length > 0) return 0;
 
   await addSuggestion({
     tenantId: tenant,
@@ -86,4 +100,5 @@ async function suggestFirstPost(tenant: string): Promise<void> {
       "A short update post helps customers and search find you. Want me to draft one about what's new with your business?",
     action: "prompt:Draft a short update post for my site about what's new with my business.",
   });
+  return 1;
 }
