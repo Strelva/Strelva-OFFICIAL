@@ -169,8 +169,8 @@ export function SearchAnalyticsPanel({ search, ga, connectHref }: SearchAnalytic
                 </tr>
               </thead>
               <tbody>
-                {topQueries.map((q) => (
-                  <tr key={q.query} className="border-t border-glass-border first:border-t-0">
+                {topQueries.map((q, i) => (
+                  <tr key={`${q.query}-${i}`} className="border-t border-glass-border first:border-t-0">
                     <td className="px-4 py-2.5 text-warm-black">{q.query}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.clicks.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.impressions.toLocaleString()}</td>
@@ -196,8 +196,8 @@ export function SearchAnalyticsPanel({ search, ga, connectHref }: SearchAnalytic
                 </tr>
               </thead>
               <tbody>
-                {topPages.map((p) => (
-                  <tr key={p.path} className="border-t border-glass-border first:border-t-0">
+                {topPages.map((p, i) => (
+                  <tr key={`${p.path}-${i}`} className="border-t border-glass-border first:border-t-0">
                     <td className="px-4 py-2.5 text-warm-black">{p.path}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{p.views.toLocaleString()}</td>
                   </tr>

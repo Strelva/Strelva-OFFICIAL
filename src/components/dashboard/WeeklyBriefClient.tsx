@@ -319,8 +319,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               What this means
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
-              {verdicts.map((v) => (
-                <div key={v.key} className="rounded-xl border border-glass-border bg-glass p-4">
+              {verdicts.map((v, i) => (
+                <div key={`${v.key}-${i}`} className="rounded-xl border border-glass-border bg-glass p-4">
                   <div className="flex items-center gap-2">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
@@ -353,8 +353,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                 Proof it&apos;s working
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {proofCards.map((c) => (
-                  <div key={c.changedAt} className="rounded-xl border border-success/25 bg-success-dim/40 p-4">
+                {proofCards.map((c, i) => (
+                  <div key={`${c.changedAt}-${i}`} className="rounded-xl border border-success/25 bg-success-dim/40 p-4">
                     <div className="flex items-center gap-2">
                       <ArrowUpRight className="h-4 w-4 shrink-0 text-success" strokeWidth={2} />
                       <p className="text-[14px] font-semibold text-warm-black">{c.headline}</p>
@@ -384,8 +384,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               <div className="rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
                 <p className="text-[14px] font-medium text-warm-black">{benchmark.headline}</p>
                 <div className="mt-4 space-y-3.5">
-                  {benchmark.rows.map((row) => (
-                    <div key={row.query} className="border-t border-glass-border pt-3 first:border-t-0 first:pt-0">
+                  {benchmark.rows.map((row, i) => (
+                    <div key={`${row.query}-${i}`} className="border-t border-glass-border pt-3 first:border-t-0 first:pt-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-[13px] font-medium text-warm-black">&ldquo;{row.query}&rdquo;</p>
                         <span
@@ -400,9 +400,9 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-dim px-2.5 py-1 text-[11px] font-medium text-warm-black">
                           You <span className="text-accent">{rankLabel(row.yourRank, row.yourInPack)}</span>
                         </span>
-                        {row.competitors.map((c) => (
+                        {row.competitors.map((c, i) => (
                           <span
-                            key={c.name}
+                            key={`${c.name}-${i}`}
                             className="inline-flex items-center gap-1.5 rounded-full border border-gray-border px-2.5 py-1 text-[11px] text-gray-muted"
                           >
                             <span className="max-w-[120px] truncate text-warm-black">{c.name}</span>
@@ -443,8 +443,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     </tr>
                   </thead>
                   <tbody>
-                    {searchRows.map((q) => (
-                      <tr key={q.query} className="border-t border-glass-border first:border-t-0">
+                    {searchRows.map((q, i) => (
+                      <tr key={`${q.query}-${i}`} className="border-t border-glass-border first:border-t-0">
                         <td className="px-4 py-2.5 text-warm-black">{q.query}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.clicks.toLocaleString()}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.impressions.toLocaleString()}</td>
@@ -557,9 +557,9 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                 Brief History
               </h2>
               <div className="space-y-2">
-                {history.slice(1).map((item) => (
+                {history.slice(1).map((item, i) => (
                   <details
-                    key={item.id}
+                    key={`${item.id}-${i}`}
                     className="rounded-xl border border-glass-border bg-surface-raised px-4 py-3"
                   >
                     <summary className="cursor-pointer text-[13px] font-medium text-warm-black">

@@ -121,10 +121,10 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
 
       {sources.length > 0 && (
         <div className="space-y-2.5">
-          {sources.map((s) => {
+          {sources.map((s, i) => {
             const pct = Math.round((s.sessions / maxSessions) * 100);
             return (
-              <div key={s.source} className="rounded-xl border border-glass-border bg-glass p-3.5">
+              <div key={`${s.source}-${i}`} className="rounded-xl border border-glass-border bg-glass p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="truncate text-[13px] font-medium text-warm-black">
                     {sourceLabel(s.source)}
@@ -160,8 +160,8 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
                 </tr>
               </thead>
               <tbody>
-                {pages.map((p) => (
-                  <tr key={p.path} className="border-t border-glass-border first:border-t-0">
+                {pages.map((p, i) => (
+                  <tr key={`${p.path}-${i}`} className="border-t border-glass-border first:border-t-0">
                     <td className="px-4 py-2.5 text-warm-black">{p.path}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">
                       {p.views.toLocaleString()}
