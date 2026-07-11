@@ -3,7 +3,6 @@ import { getWeeklyBrief, getWeeklyBriefs, getMonthlyRecap, getMonthlyRecaps } fr
 import { getDailyMetrics, getActivity, getSearchData } from "@/lib/storage";
 import { getGoal } from "@/lib/goals";
 import { buildProofCards } from "@/lib/proof";
-import { detectTrafficAnomaly } from "@/lib/anomaly";
 import { getLatestSnapshots } from "@/lib/visibility/snapshots";
 import { buildCompetitorBenchmark } from "@/lib/competitor-benchmark";
 import { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
@@ -53,7 +52,8 @@ export default async function ReportsPage({
   const periodLabel = view === "monthly" ? "this month" : "this week";
 
   const proofCards = buildProofCards(activity, dailyMetrics);
-  const anomaly = detectTrafficAnomaly(dailyMetrics);
+  // The live traffic anomaly is a "right now" signal — it lives on Analytics.
+  // Reports is the dated recap, so it doesn't carry a current-week alert.
   const benchmark = buildCompetitorBenchmark(snapshots[0] ?? null);
   const aiVisibility = buildAiVisibilityScorecard(snapshots[0] ?? null, snapshots[1] ?? null);
   const connectHref = withClientFallbackRoot(clientFallbackRoot, "/dashboard/integrations");
@@ -83,7 +83,6 @@ export default async function ReportsPage({
             dailyMetrics={dailyMetrics}
             proofCards={proofCards}
             goal={goal}
-            anomaly={anomaly}
             benchmark={benchmark}
             aiVisibility={aiVisibility}
             searchData={searchData}

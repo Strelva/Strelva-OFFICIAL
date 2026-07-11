@@ -174,7 +174,10 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug text-warm-black tracking-[-0.01em] sm:text-[32px]">
-                {buildVerdict(brief.stats)}
+                {buildVerdict(
+                  brief.stats,
+                  periodLabel === "this month" ? { periodNoun: "month", priorPhrase: "from last month" } : undefined
+                )}
               </h1>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">

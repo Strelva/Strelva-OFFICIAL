@@ -6,12 +6,17 @@
  * caller can pass LIVE page-view counts (not just a frozen brief) — the Today
  * headline computes this from live counts so it agrees with the live anomaly.
  */
-export function buildVerdict(stats: { pageViews: number; pageViewsDelta?: number }): string {
+export function buildVerdict(
+  stats: { pageViews: number; pageViewsDelta?: number },
+  opts: { periodNoun?: string; priorPhrase?: string } = {}
+): string {
+  const periodNoun = opts.periodNoun ?? "week";
+  const priorPhrase = opts.priorPhrase ?? "from last week";
   const views = stats.pageViews;
   const delta = stats.pageViewsDelta ?? 0;
-  if (views === 0) return "A quiet week. No visitors yet. Let's change that.";
+  if (views === 0) return `A quiet ${periodNoun}. No visitors yet. Let's change that.`;
   const people = `${views.toLocaleString()} ${views === 1 ? "person" : "people"} found you`;
-  if (delta > 0) return `It's working. ${people}, up from last week.`;
-  if (delta < 0) return `${people} this week, down from last week.`;
-  return `${people} this week.`;
+  if (delta > 0) return `It's working. ${people}, up ${priorPhrase}.`;
+  if (delta < 0) return `${people} this ${periodNoun}, down ${priorPhrase}.`;
+  return `${people} this ${periodNoun}.`;
 }
