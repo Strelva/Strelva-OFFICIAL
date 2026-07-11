@@ -1,10 +1,21 @@
 # Clerk + Sanity teardown — execution checklist (Phase A)
 
+> **✅ CLERK TEARDOWN DONE (2026-07-11, #146).** Steps 1–4 for Clerk are executed and
+> shipped to prod (deploy `dpl_6RxJPpBckUJNwroaAy3NJQ3hCeMQ`): `auth.ts` is Supabase-only,
+> `proxy.ts` uses a hand-rolled fail-closed auth gate + `isPublicRoute`/`isCronRoute`
+> matcher, `@clerk/nextjs` (+ `svix`, if unused) and the Clerk CSP entries are removed, and
+> the auth test suite was migrated off Clerk mocks. Post-deploy headless smoke confirmed the
+> route matcher behaves identically to Clerk's (public 200, protected 307→/sign-in, no leak).
+> **Still worth a human click:** an interactive Google OAuth sign-in + sign-out on prod (curl
+> can't drive OAuth; that Supabase path is unchanged by #146). The **Sanity** steps below
+> remain OPS-only (rewrite legacy content-image URLs, lock the dataset, unset `SANITY_*`).
+> The Clerk steps are retained below as the historical record of what was executed.
+
 Companion to `docs/post-cutover-runbook.md`. This is the precise, file:line step
 list for the HELD destructive end-step of the Clerk+Sanity → Supabase+Postgres
 migration. It was compiled from a full-platform audit on 2026-06-26.
 
-## THE GATE
+## THE GATE (Clerk portion satisfied — see banner above)
 Do not start until Noah has done a **real prod Google sign-in smoke test** on
 scaffoldweb.com (sign in, land on the dashboard, confirm it works). After Steps 1
 and 4 there is **no flag-flip rollback** — only a code revert + redeploy. One PR

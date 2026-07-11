@@ -4,16 +4,18 @@
 migration plan (`docs/supabase-migration-plan.md`, Phase 4) executes against. Goal: get the
 foundation right once so nothing here forces a rewrite as we grow from 3 → 50+ clients.
 
-> **2026-06-22 — much of this is now SHIPPED.** The Clerk → Supabase Auth +
-> Postgres swap **cut over in production on 2026-06-20**: Supabase Auth is live
-> (`auth.uid()`, Google OAuth + magic link), `memberships`/`super_admins` back
+> **2026-06-22 — SHIPPED; Clerk teardown COMPLETE 2026-07-11 (#146).** The Clerk →
+> Supabase Auth + Postgres swap **cut over in production on 2026-06-20**: Supabase Auth
+> is live (`auth.uid()`, Google OAuth + magic link), `memberships`/`super_admins` back
 > authorization, **RLS is enabled and enforcing tenant isolation**, and the
 > `handle_new_user` trigger provisions users on first sign-in (replacing the
-> Clerk webhook). What remains from "Phase 4 scope" below is the **destructive
-> teardown** — the `src/proxy.ts` net-removal (`clerkMiddleware` unwrap,
-> dropping `admin.*`/custom-domain auth fallback) and locking the Sanity dataset
-> — held deliberately as the end-step. The three-plane model and the
-> service-role discipline below remain the live operating rules.
+> Clerk webhook). **The destructive Clerk teardown is now done (#146, deployed to prod):**
+> `src/proxy.ts` unwrapped `clerkMiddleware` for a plain `proxy()` export with a hand-rolled
+> **fail-closed** auth gate + `isPublicRoute`/`isCronRoute` matcher (path-normalized),
+> `src/lib/auth.ts` is Supabase-only (dual-path branches collapsed, signatures + invariants
+> preserved), and the `@clerk/nextjs` dep + Clerk CSP entries are removed. Only the **Sanity
+> dataset lock** remains (OPS). The three-plane model and the service-role discipline below
+> remain the live operating rules.
 
 Grounded in current Supabase guidance (RLS performance lint `0003_auth_rls_initplan`,
 Custom Access Token Hook, `@supabase/ssr`, multi-SSO) — verified against live docs, not memory.
@@ -162,15 +164,16 @@ repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* 
 
 ## What this changes in code (Phase 4 scope) — status as of 2026-06-22
 
-- `src/proxy.ts` — **net removal (STILL PENDING — the teardown end-step):** drop
-  `admin.*` subdomain detection and the custom-domain auth fallback
-  (`shouldUseFallbackAuthForAdminHost`, `buildTenantFallbackUrl`), and unwrap
-  `clerkMiddleware`. The auth gate runs only on `app.strelva.com`; public hosts
-  (`{tenant}.strelva.com`, custom client domains) are unauthenticated read paths.
-- `src/lib/auth.ts` — **DONE (live 2026-06-20):** rewritten against the Supabase
-  server client + `memberships`/`super_admins`, signatures preserved. (Clerk path
-  dead-pathed behind `isSupabaseAuthConfigured()`; `getTenantOwnerUserIds`
-  collapses to a single indexed query.)
+- `src/proxy.ts` — **DONE (#146, 2026-07-11):** `clerkMiddleware` unwrapped to a plain
+  `proxy()` export; `clerkMiddleware`/`createRouteMatcher` replaced with a hand-rolled
+  **fail-closed** `gateRequest` + `isPublicRoute`/`isCronRoute` matcher (path-normalized
+  against encoded/`//` bypass). The auth gate runs only on `app.strelva.com`; public hosts
+  (`{tenant}.strelva.com`, custom client domains) are unauthenticated read paths. (The
+  `admin.*`/custom-domain fallback-auth helpers were kept where still load-bearing.)
+- `src/lib/auth.ts` — **DONE (live 2026-06-20; Clerk path removed #146):** Supabase-only
+  against the server client + `memberships`/`super_admins`, signatures + invariants
+  preserved. The `isSupabaseAuthConfigured()` dual-path branches are collapsed;
+  `getTenantOwnerUserIds` is a single indexed query.
 - Dashboard routing moves to `app.strelva.com/{tenant}` (pending the rebrand /
   single-host work); any existing `admin.{client-domain}` dashboard URL becomes a
   301 to it.

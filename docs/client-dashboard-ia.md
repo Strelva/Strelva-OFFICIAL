@@ -7,10 +7,10 @@ surface — see [`operator-command-center.md`](./operator-command-center.md).
 The IA cleanup is scoped in `dashboard-ia-scope-2026-06-28.md`; this doc is the current,
 verified shape.
 
-## The seven surfaces
+## The eight surfaces
 
-The nav is a **conditional** surface set, not a fixed list. Six surfaces are resolved by
-`getDashboardSurfaces(tenant)` in `src/lib/dashboard-surfaces.ts`; the seventh, **Settings**,
+The nav is a **conditional** surface set, not a fixed list. Seven surfaces are resolved by
+`getDashboardSurfaces(tenant)` in `src/lib/dashboard-surfaces.ts`; the eighth, **Settings**,
 is the always-present gear in the identity footer (not part of the resolver list).
 
 | Surface | Route | Group | Shown when |
@@ -19,7 +19,8 @@ is the always-present gear in the identity footer (not part of the resolver list
 | **Ask Strelva** | `/dashboard/chat` | manage | always |
 | **Website** | `/dashboard/site` | presence | always (Store folds in as a sub-tab) |
 | **Google Business** | `/dashboard/google` | presence | local/hybrid business type |
-| **Analytics** | `/dashboard/analytics` | presence | always (merged Reports + Health) |
+| **Analytics** | `/dashboard/analytics` | presence | always (LIVE/rolling; range selector + Health) |
+| **Reports** | `/dashboard/reports` | presence | always (the written weekly + monthly recaps) |
 | **Reviews** | `/dashboard/reviews` | presence | has a review source, or local (as a connect tab) |
 | **Settings** | `/dashboard/settings` | footer | always |
 
@@ -28,10 +29,17 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
 
 ### Consolidations (what merged into what)
 
-- **Analytics = Reports + Health.** The old separate Reports and Health tabs are gone. One
-  verdict-first surface: `WeeklyBriefClient` (the weekly report) + `SiteHealthCard` (the
-  audit grade/score/detail) in one scroll. `SURFACE_MATCH["analytics"]` lights the tab for
-  `/dashboard/analytics`, `/dashboard/reports`, and `/dashboard/health`. It also carries the
+- **Analytics = LIVE/rolling + Health; Reports = the written recaps (split out 2026-07-11).**
+  Analytics is now the live surface: a range selector (`Live · This week · This month · Custom`
+  → `AnalyticsRangeSelector` → `?range=`) drives the headline verdict, tiles, and trend chart,
+  all recomputed for the window from the daily metric series via `src/lib/analytics/period.ts`
+  (`resolveRange` + `computePeriodStats` + `periodHeadline`), so the headline can never
+  contradict the chart or anomaly. `AnalyticsLiveView` + `SiteHealthCard` in one scroll. The
+  **written recaps moved to their own Reports surface** (`/dashboard/reports`, `WeeklyBriefClient`
+  with a Weekly/Monthly toggle): the weekly brief + a monthly recap (`generateMonthlyRecap` +
+  the `monthly-report` cron, stored period-tagged in the same recap store). `SURFACE_MATCH`
+  lights **Analytics** for `/dashboard/analytics` + `/dashboard/health`, and **Reports** for
+  `/dashboard/reports`. Analytics also carries the
   **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`, a stored-
   history then→now recap of traffic / reviews / rating / health, with a "building" state until
   there's enough history — the "then" site-health value compares against a durable, set-once,
@@ -118,7 +126,7 @@ State rules per surface:
 
 | Surface | shown | connect | hidden |
 |---------|-------|---------|--------|
-| Today, Ask Strelva, Website, Analytics | always | — | — |
+| Today, Ask Strelva, Website, Analytics, Reports | always | — | — |
 | Google Business | local + Google connected | local, not connected | not local |
 | Reviews | has review source | local, no review source | not local, no review source |
 
