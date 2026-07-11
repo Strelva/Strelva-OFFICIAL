@@ -161,8 +161,8 @@ export default function PayLinksPage() {
         </p>
       </div>
 
-      <div className="rounded-xl bg-glass border border-glass-border p-5">
-        <h2 className="text-[15px] font-medium text-warm-white mb-4">New payment link</h2>
+      <div className="rounded-2xl border border-glass-border bg-glass p-5">
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-4">New payment link</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="acme-coffee" />
           <Field label="Client name" value={form.clientName} onChange={(v) => setForm({ ...form, clientName: v })} placeholder="Acme Coffee" />
@@ -201,9 +201,9 @@ export default function PayLinksPage() {
         </button>
       </div>
 
-      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         <div className="px-5 py-4 border-b border-glass-border flex items-center justify-between gap-4">
-          <h2 className="text-[15px] font-medium text-warm-white">
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">
             Outstanding links {links.length > 0 && <span className="text-gray-muted">({links.length})</span>}
           </h2>
           {(rollup.collected > 0 || rollup.outstanding > 0) && (

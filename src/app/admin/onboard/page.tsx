@@ -114,7 +114,7 @@ function OnboardForm() {
       </div>
 
       {!result && (
-        <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+        <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Subdomain *" value={form.subdomain} onChange={(v) => setForm({ ...form, subdomain: v })} placeholder="acme-hvac" />
             <Field label="Site name *" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} placeholder="Acme HVAC" />
@@ -147,8 +147,8 @@ function OnboardForm() {
 
       {result && (
         <div className="space-y-5">
-          <div className="rounded-xl bg-glass border border-glass-border p-5">
-            <h2 className="text-[15px] font-medium text-warm-white mb-3">
+          <div className="rounded-2xl border border-glass-border bg-glass p-5">
+            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-3">
               {result.tenantId} · {result.siteUrl}
             </h2>
             <ul className="space-y-2">
@@ -172,9 +172,9 @@ function OnboardForm() {
           </div>
 
           {Object.keys(result.clientEnv).length > 0 && (
-            <div className="rounded-xl bg-glass border border-glass-border p-5">
+            <div className="rounded-2xl border border-glass-border bg-glass p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-medium text-warm-white">Client repo env</h2>
+                <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Client repo env</h2>
                 <button
                   onClick={copyEnv}
                   className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"

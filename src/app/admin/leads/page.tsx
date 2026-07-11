@@ -21,7 +21,7 @@ export default async function AdminLeadsPage() {
       </div>
 
       {leads.length === 0 ? (
-        <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
           <p className="text-sm font-medium text-warm-white">No leads yet</p>
           <p className="mt-1 text-xs text-gray-muted">
             Contact, discovery, and get-started form submissions land here the moment they come in.

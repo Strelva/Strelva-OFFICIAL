@@ -68,8 +68,8 @@ export function DomainManager({
   }
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-5">
-      <h2 className="text-[15px] font-medium text-warm-white">Domains</h2>
+    <div className="rounded-2xl border border-glass-border bg-glass p-5">
+      <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Domains</h2>
       <p className="mt-0.5 text-xs text-gray-muted">
         DNS + SSL status per claimed domain. Refresh re-checks verification.
       </p>

@@ -324,7 +324,7 @@ export function OwnershipSection() {
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
             Offboarding checklist
           </p>
-          <h4 className="mt-1 text-[15px] font-medium text-warm-white">Move cleanly, in order</h4>
+          <h4 className="mt-1 text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Move cleanly, in order</h4>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {HANDOFF_STEPS.map((step, index) => (

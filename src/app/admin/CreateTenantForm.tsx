@@ -84,7 +84,7 @@ export function CreateTenantForm() {
   }
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-6">
+    <div className="rounded-2xl border border-glass-border bg-glass p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-medium text-warm-white">New Client</h2>
         <button

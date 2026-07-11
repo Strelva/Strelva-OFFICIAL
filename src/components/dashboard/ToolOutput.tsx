@@ -175,7 +175,7 @@ function ReportOutput({ data }: { data: ReportData }) {
       {expanded && (
         <div className="p-4 animate-fade-in-up">
           {/* Headline */}
-          <p className="text-[15px] font-medium text-warm-black mb-4">
+          <p className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black mb-4">
             {data.pageViews.thisWeek > 0
               ? `${data.pageViews.thisWeek} people found you this week`
               : "No visitors yet this week"}

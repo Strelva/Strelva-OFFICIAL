@@ -185,7 +185,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
           </div>
         )}
       </div>
-      <p className="mt-2 text-[15px] font-medium text-warm-black">
+      <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-black">
         {current.toLocaleString()} of {goal!.target.toLocaleString()} {GOAL_METRIC_LABELS[goal!.metric]}
       </p>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-raised">

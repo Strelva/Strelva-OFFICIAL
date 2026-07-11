@@ -454,7 +454,7 @@ export function OperatorConsole() {
   }
 
   return (
-    <div ref={rootRef} id="mission-control" className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+    <div ref={rootRef} id="mission-control" className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
       <div className="px-5 py-4 border-b border-glass-border flex items-center gap-2">
         <span className="text-sm font-semibold text-warm-white">Mission Control</span>
         <span className="text-xs text-gray-muted">

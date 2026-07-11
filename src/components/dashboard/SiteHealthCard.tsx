@@ -211,7 +211,7 @@ export function SiteHealthCard() {
             </div>
           </div>
           <div>
-            <h2 className="text-[15px] font-medium text-warm-black">Site Health</h2>
+            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black">Site Health</h2>
             <p className="text-[12px] text-gray-muted">
               Scanned {new Date(audit.scannedAt).toLocaleDateString()}
             </p>

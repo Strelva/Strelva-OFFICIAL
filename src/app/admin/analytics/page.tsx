@@ -39,7 +39,7 @@ export default async function AdminAnalyticsPage({
             Search Console + GA4 performance, per client.
           </p>
         </div>
-        <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
           <p className="text-sm font-medium text-warm-white">No active clients yet</p>
           <p className="mt-1 text-xs text-gray-muted">
             Clients appear here once tenants exist.

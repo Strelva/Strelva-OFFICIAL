@@ -762,7 +762,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                   onClick={() => sendChat(chip.label)}
                   className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} ${
                     chip.hideOnMobile ? "hidden sm:block" : ""
-                  } rounded-xl bg-glass border border-glass-border hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
+                  } rounded-2xl border border-glass-border bg-glass hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />

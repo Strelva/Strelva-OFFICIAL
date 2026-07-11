@@ -88,10 +88,10 @@ export function ReviewIntelPanel({
   const { totalReviews, sentimentBreakdown, needsResponse, unansweredNegative, concerns, atRisk, atRiskReason } = intel;
 
   return (
-    <div id="reviews-operator" className="rounded-xl bg-glass border border-glass-border p-5 scroll-mt-24">
+    <div id="reviews-operator" className="rounded-2xl border border-glass-border bg-glass p-5 scroll-mt-24">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-[15px] font-medium text-warm-white">Reviews: operator view</h2>
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Reviews: operator view</h2>
           <p className="mt-0.5 text-xs text-gray-muted">
             {totalReviews === 0
               ? "No reviews pulled in yet."

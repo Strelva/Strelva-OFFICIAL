@@ -113,7 +113,7 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
                         <span className="text-gray-muted">–</span>
                         <span className="text-gray-muted">{formatTime(b.endTime)}</span>
                       </div>
-                      <p className="mt-1.5 truncate text-[15px] font-medium text-warm-black">
+                      <p className="mt-1.5 truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-black">
                         {b.clientName}
                       </p>
                       <p className="mt-0.5 truncate text-[13px] text-gray-muted">{b.serviceName}</p>

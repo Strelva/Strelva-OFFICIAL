@@ -100,7 +100,7 @@ export function LeadRows({
 
   function renderTable(rows: DeliveryLead[], receded: boolean) {
     return (
-      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -225,7 +225,7 @@ export function LeadRows({
   return (
     <div className="space-y-6">
       {active.length === 0 ? (
-        <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
           <p className="text-sm font-medium text-warm-white">No leads to work</p>
           <p className="mt-1 text-xs text-gray-muted">
             {dismissed.length > 0

@@ -388,7 +388,7 @@ function AccountSection() {
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
+            <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{name}</p>
             {isAdmin && (
               <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
                 Strelva Admin

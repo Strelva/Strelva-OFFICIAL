@@ -60,7 +60,7 @@ export default async function AdminDraftsPage() {
       </div>
 
       {allDrafts.length === 0 ? (
-        <div className="rounded-xl bg-glass border border-glass-border p-12 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-12 text-center">
           <p className="text-gray-muted">No pending drafts across any clients.</p>
           <p className="text-xs text-gray-faint mt-2">
             Drafts appear here when the AI agent proposes content changes.
@@ -71,7 +71,7 @@ export default async function AdminDraftsPage() {
           {allDrafts.map((draft) => (
             <div
               key={`${draft.tenantId}-${draft.section}`}
-              className="rounded-xl bg-glass border border-glass-border p-6"
+              className="rounded-2xl border border-glass-border bg-glass p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">

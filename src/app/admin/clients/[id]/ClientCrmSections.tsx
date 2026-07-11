@@ -213,7 +213,7 @@ export function ClientCrmSections({
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-[15px] font-medium text-warm-white">Client relationship</h2>
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Client relationship</h2>
         <span className="text-[11px] text-gray-faint">updated {formatUpdated(crm.updatedAt)}</span>
       </div>
 
@@ -224,7 +224,7 @@ export function ClientCrmSections({
       )}
 
       {/* Stage + tags */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-4">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-gray-muted">Stage</span>
           <select
@@ -276,7 +276,7 @@ export function ClientCrmSections({
       </section>
 
       {/* Contacts */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">Contacts</h3>
         {crm.contacts.length === 0 ? (
           <p className="text-xs text-gray-faint">No contacts yet.</p>
@@ -349,7 +349,7 @@ export function ClientCrmSections({
       </section>
 
       {/* Activity */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">Activity</h3>
         <div className="flex items-start gap-2">
           <select
@@ -410,7 +410,7 @@ export function ClientCrmSections({
       </section>
 
       {/* Notes */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">Notes</h3>
         <div className="flex items-start gap-2">
           <textarea
@@ -451,7 +451,7 @@ export function ClientCrmSections({
       </section>
 
       {/* Client emails */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">Client emails</h3>
         {!ownerEmail && (
           <p className="text-xs text-gray-faint">No owner email on file. Add one to send.</p>

@@ -103,7 +103,7 @@ export function AuditList({ events }: { events: AuditEventView[] }) {
         </span>
       </div>
 
-      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         {filtered.length === 0 ? (
           <p className="px-5 py-6 text-sm text-gray-muted">
             {events.length === 0 ? "No audited actions yet." : "No actions match these filters."}

@@ -212,8 +212,8 @@ export default async function ClientDetailPage({
       <ClientCrmSections tenantId={tenant.id} ownerEmail={tenant.ownerEmail ?? null} initialCrm={crm} />
 
       {activity.length > 0 && (
-        <div className="rounded-xl bg-glass border border-glass-border p-5">
-          <h2 className="text-[15px] font-medium text-warm-white mb-3">Recent activity</h2>
+        <div className="rounded-2xl border border-glass-border bg-glass p-5">
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-3">Recent activity</h2>
           <ul className="space-y-2">
             {activity.slice(0, 8).map((a, i) => (
               <li key={i} className="flex items-start justify-between gap-4 text-sm">
