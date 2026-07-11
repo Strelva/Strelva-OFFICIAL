@@ -2,9 +2,10 @@ import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { listMembers } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
 import { MembersPanel } from "@/components/dashboard/MembersPanel";
+import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 export default async function MembersPage() {
-  const { tenant } = await requireDashboardFeature("members");
+  const { tenant, preview } = await requireDashboardFeature("members");
 
   // The members/points backend is KV-gated: listMembers throws
   // KvNotConfiguredError when membership isn't wired for this site. Treat that —
@@ -18,8 +19,18 @@ export default async function MembersPage() {
     if (!(err instanceof KvNotConfiguredError)) {
       console.error("[dashboard members]", err);
     }
-    return <MembersPanel configured={false} />;
+    return (
+      <>
+        {preview && <InspectPreviewBanner tenant={tenant} featureId="members" />}
+        <MembersPanel configured={false} />
+      </>
+    );
   }
 
-  return <MembersPanel configured members={members} />;
+  return (
+    <>
+      {preview && <InspectPreviewBanner tenant={tenant} featureId="members" />}
+      <MembersPanel configured members={members} />
+    </>
+  );
 }

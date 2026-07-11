@@ -2,9 +2,10 @@ import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { getBookings, getBookingConfig } from "@/lib/storage";
 import { DEFAULT_BOOKING_CONFIG, zonedTodayIso } from "@/lib/booking";
 import { RosterPanel } from "@/components/dashboard/RosterPanel";
+import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 export default async function RosterPage() {
-  const { tenant } = await requireDashboardFeature("roster");
+  const { tenant, preview } = await requireDashboardFeature("roster");
 
   // Today's appointments only, anchored to the tenant's LOCAL calendar day.
   // Bookings store their date as the tenant-local YYYY-MM-DD, so "today" must
@@ -14,5 +15,10 @@ export default async function RosterPage() {
   const today = zonedTodayIso(config.timezone);
   const bookings = await getBookings(tenant, { from: today, to: today }).catch(() => []);
 
-  return <RosterPanel bookings={bookings} today={today} />;
+  return (
+    <>
+      {preview && <InspectPreviewBanner tenant={tenant} featureId="roster" />}
+      <RosterPanel bookings={bookings} today={today} />
+    </>
+  );
 }
