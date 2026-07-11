@@ -1,12 +1,12 @@
-import type { WeeklyBrief } from "@/lib/types";
-
 /**
  * The owner-facing one-line verdict from a week's stats. Pure + server-safe so
  * both Today (a server component) and the weekly brief (a client component) can
  * compute the same headline — it used to live inside the "use client" brief,
- * which made the server call crash.
+ * which made the server call crash. Takes only the two fields it reads so a
+ * caller can pass LIVE page-view counts (not just a frozen brief) — the Today
+ * headline computes this from live counts so it agrees with the live anomaly.
  */
-export function buildVerdict(stats: WeeklyBrief["stats"]): string {
+export function buildVerdict(stats: { pageViews: number; pageViewsDelta?: number }): string {
   const views = stats.pageViews;
   const delta = stats.pageViewsDelta ?? 0;
   if (views === 0) return "A quiet week — no visitors yet. Let's change that.";

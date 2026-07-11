@@ -42,7 +42,12 @@ export async function GET(
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    if (!(await isValidSection(section, tenant))) {
+    // A known section TYPE that this tenant's template doesn't include still has
+    // a valid (empty) read — getContent returns null. Only a genuinely unknown
+    // section name is a bad request. This stops optional-section editors (the
+    // Settings nav/footer editor) from 400ing on every load when the template
+    // omits those sections. Writes (PUT/DELETE) still gate on isValidSection.
+    if (!Object.prototype.hasOwnProperty.call(sectionSchemas, section)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
     const s = section as ContentSection;

@@ -386,7 +386,10 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       tenantId,
       type: "growth",
       title: "Traffic dropped this week",
-      description: `${thisWeekViews} people found you this week, down from ${lastWeekViews} last week. Want me to draft a quick post or email to bring people back?`,
+      // Deliberately numberless: this suggestion is stored and read days later,
+      // so a baked-in "N this week vs M last week" goes stale and contradicts the
+      // live headline/anomaly. The trigger math above still gates on the real dip.
+      description: "Traffic dipped this week. Want me to draft a quick post or email to bring people back?",
       action: "prompt:Help me bring website traffic back after this week's drop.",
     }));
   }

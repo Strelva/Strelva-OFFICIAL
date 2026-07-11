@@ -17,6 +17,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
 import { scanTenant } from "@/lib/scan";
+import { getScanSummary } from "@/lib/scan-store";
 import { topFixes } from "@/lib/audit/impact";
 import type { TenantConfig } from "@/lib/types";
 import { getRedis } from "@/lib/redis";
@@ -101,13 +102,33 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
+    // A live audit commonly fails because the client's site is unreachable
+    // (domain not live yet, DNS/timeout). That is an expected state, not a
+    // server error, and must not 500 the health card on every load. Fall back
+    // to the last stored scan (the same scan-store the admin reads) so the card
+    // shows real last-known health; if nothing is stored yet, return 404 so the
+    // card renders its honest "not checked yet" empty state instead of an error.
+    const stored = await getScanSummary(tenant).catch(() => null);
+    if (stored) {
+      return NextResponse.json({
+        url: stored.url,
+        scannedAt: stored.scannedAt,
+        overallScore: stored.overallScore,
+        grade: stored.grade,
+        // Stored categories carry name/slug/score only; shim weight so the
+        // card's `weight > 0` filter renders the bars, empty per-check detail.
+        categories: stored.categories.map((c) => ({ ...c, weight: 1, checks: [] })),
+        topFixes: [],
+        stale: true,
+      });
+    }
     Sentry.captureException(err, {
       tags: { feature: "site-audit" },
       extra: { tenant, target },
     });
     return NextResponse.json(
-      { error: "Audit failed. Please try again." },
-      { status: 500 }
+      { error: "We couldn't reach your site to check it just now." },
+      { status: 404 }
     );
   }
 }

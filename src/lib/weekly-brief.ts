@@ -64,27 +64,56 @@ export async function getWeeklyBriefs(
   const redis = getRedis();
   if (!redis) return [];
 
-  const raw = await redis.zrange(briefsKey(tenantId), 0, limit - 1, { rev: true });
-  const briefs: WeeklyBrief[] = [];
+  // Fetch a generous window then dedupe by brief id. The zset dedupes by member
+  // string, not by id, so a brief regenerated for the same week (cron retry /
+  // manual re-run) leaves multiple members that share one id — which would
+  // otherwise render duplicate React keys and let different surfaces read
+  // different stats. rev order is newest-first, so the first member seen for an
+  // id is the newest; keep that one.
+  const raw = await redis.zrange(briefsKey(tenantId), 0, Math.max(limit * 4, 48) - 1, {
+    rev: true,
+  });
+  const byId = new Map<string, WeeklyBrief>();
 
   for (const item of raw) {
     try {
-      const parsed = typeof item === "string" ? JSON.parse(item) : item;
-      briefs.push(parsed);
+      const parsed = (typeof item === "string" ? JSON.parse(item) : item) as WeeklyBrief;
+      if (!byId.has(parsed.id)) byId.set(parsed.id, parsed);
     } catch {
       // skip malformed
     }
   }
 
-  return briefs;
+  return Array.from(byId.values()).slice(0, limit);
 }
 
 export async function saveWeeklyBrief(brief: WeeklyBrief): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
 
+  const key = briefsKey(brief.tenantId);
+  // Upsert by brief id: a brief regenerated for the same week reuses its id but
+  // gets a new createdAt/stats, so a plain zadd would append a duplicate member
+  // (the zset dedupes by member string, not by id). Remove any prior member(s)
+  // for this id first so there's exactly one brief per week. Best-effort — the
+  // zadd below always writes the current brief even if the cleanup read fails.
+  try {
+    const existing = await redis.zrange(key, 0, -1);
+    const stale = existing.filter((item) => {
+      try {
+        const p = (typeof item === "string" ? JSON.parse(item) : item) as WeeklyBrief;
+        return p?.id === brief.id;
+      } catch {
+        return false;
+      }
+    });
+    if (stale.length) await redis.zrem(key, ...stale);
+  } catch {
+    // ignore — the write below still lands; read-side dedupe covers any residue
+  }
+
   const score = new Date(brief.createdAt).getTime();
-  await redis.zadd(briefsKey(brief.tenantId), {
+  await redis.zadd(key, {
     score,
     member: JSON.stringify(brief),
   });
