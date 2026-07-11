@@ -43,7 +43,7 @@ export interface FeatureDef {
 }
 
 /** Locked, on-for-everyone. These can never be removed from a tenant (enforced server-side). */
-export const CORE_FEATURES = ["today", "ask-ai", "website", "analytics"] as const;
+export const CORE_FEATURES = ["today", "ask-ai", "website", "analytics", "reports"] as const;
 export type CoreFeatureId = (typeof CORE_FEATURES)[number];
 
 /** Vertical sets: a set id → its member feature ids. Toggling a set flips all members together. */
@@ -60,6 +60,7 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
   { id: "ask-ai", label: "Ask Strelva", tier: "core", locked: true },
   { id: "website", label: "Website", tier: "core", locked: true },
   { id: "analytics", label: "Analytics", tier: "core", locked: true },
+  { id: "reports", label: "Reports", tier: "core", locked: true },
 
   // ── Conditional (by what the business is / has) ────────────────────────────
   { id: "google-business", label: "Google Business", tier: "conditional", requires: { presence: "local", connection: "google" } },

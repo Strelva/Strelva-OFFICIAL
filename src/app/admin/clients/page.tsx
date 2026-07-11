@@ -13,6 +13,7 @@ import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rule
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
 import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
+import { getTenantSiteName } from "@/lib/tenant-display";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,10 @@ export default async function AdminClientsPage() {
     const row = rowById.get(t.id);
     return {
       id: t.id,
-      siteName: t.siteName,
+      // Resolve the display name the SAME way the client dashboard does
+      // (config.siteName → known-tenant map → owner name → id) so the operator
+      // never sees a bare owner name for a business whose site_name column is blank.
+      siteName: getTenantSiteName(t.id, t),
       ownerEmail: t.ownerEmail ?? null,
       ownerName: t.ownerName ?? null,
       active: isActiveTenant(t),
