@@ -44,16 +44,16 @@ function DraftReplyButton({ tenantId, reviewId }: { tenantId: string; reviewId: 
       const res = await draftReviewReplyForReview(tenantId, reviewId).catch(() => null);
       if (res?.ok && res.drafted) {
         setState("drafted");
-        setMessage("Drafted — approve in the queue");
+        setMessage("Drafted. Approve in the queue");
       } else if (res?.ok && res.reason === "already_drafted") {
         setState("drafted");
-        setMessage("Already drafted — in the queue");
+        setMessage("Already drafted, in the queue");
       } else if (res?.ok && res.reason === "already_replied") {
         setState("drafted");
         setMessage("Already replied");
       } else {
         setState("error");
-        setMessage("Draft failed — try again");
+        setMessage("Draft failed. Try again");
       }
     });
   }
@@ -91,7 +91,7 @@ export function ReviewIntelPanel({
     <div id="reviews-operator" className="rounded-xl bg-glass border border-glass-border p-5 scroll-mt-24">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-[15px] font-medium text-warm-white">Reviews — operator view</h2>
+          <h2 className="text-[15px] font-medium text-warm-white">Reviews: operator view</h2>
           <p className="mt-0.5 text-xs text-gray-muted">
             {totalReviews === 0
               ? "No reviews pulled in yet."
@@ -121,7 +121,7 @@ export function ReviewIntelPanel({
             </div>
 
             {needsResponse.length === 0 ? (
-              <p className="mt-2 text-xs text-gray-muted">All caught up — nothing waiting on a reply.</p>
+              <p className="mt-2 text-xs text-gray-muted">All caught up. Nothing waiting on a reply.</p>
             ) : (
               <ul className="mt-2 space-y-2">
                 {needsResponse.slice(0, 5).map((flag) => (

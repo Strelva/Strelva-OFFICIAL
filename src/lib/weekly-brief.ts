@@ -379,7 +379,7 @@ function buildFallbackSummary(stats: WeeklyBriefStats, phoneClicks = 0): string 
   if (stats.pageViews > 0) {
     parts.push(`${stats.pageViews} people found you this week`);
   } else {
-    parts.push("A steady week — no new visits landed yet");
+    parts.push("A steady week: no new visits landed yet");
   }
 
   if (stats.bookingClicks > 0) {

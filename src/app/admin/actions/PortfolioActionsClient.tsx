@@ -18,18 +18,18 @@ import type {
 function failureMessage(reason?: string): string {
   switch (reason) {
     case "gbp_post_failed":
-      return "Google post failed — still pending";
+      return "Google post failed. Still pending";
     case "gbp_hours_failed":
-      return "Hours update failed — still pending";
+      return "Hours update failed. Still pending";
     case "gbp_photo_failed":
-      return "Photo upload failed — still pending";
+      return "Photo upload failed. Still pending";
     case "review_reply_failed":
-      return "Reply publish failed — still pending";
+      return "Reply publish failed. Still pending";
     case "newsletter_failed":
     case "newsletter_invalid":
-      return "Newsletter send failed — still pending";
+      return "Newsletter send failed. Still pending";
     case "draft_not_found":
-      return "Draft missing — still pending";
+      return "Draft missing. Still pending";
     case "stale_superseded":
       return "Superseded by a newer edit";
     case "already_resolved":
@@ -38,7 +38,7 @@ function failureMessage(reason?: string): string {
     case "wrong_tenant":
       return "No longer available";
     default:
-      return "Couldn’t approve — still pending";
+      return "Couldn’t approve. Still pending";
   }
 }
 
@@ -269,7 +269,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
                 </ul>
                 {group.capped && (
                   <p className="border-t border-glass-border px-5 py-2 text-[11px] text-gray-muted">
-                    Showing the first {group.items.length}. More may be waiting — approve these,
+                    Showing the first {group.items.length}. More may be waiting. Approve these,
                     then refresh.
                   </p>
                 )}

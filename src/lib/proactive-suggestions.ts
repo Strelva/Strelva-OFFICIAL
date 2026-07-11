@@ -67,7 +67,7 @@ async function suggestUnrepliedReview(tenant: string): Promise<number> {
     tenantId: tenant,
     type: "growth",
     title: "Reply to a recent review",
-    description: `You have an unreplied review from ${author}. Want me to draft a reply that thanks them and sounds like you?`,
+    description: `You have an unreplied review from ${author.replace(/\.+$/, "")}. Want me to draft a reply that thanks them and sounds like you?`,
     action: "prompt:Draft a reply to my most recent unreplied review.",
   });
   return 1;

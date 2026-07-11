@@ -159,7 +159,7 @@ function ScanCard({ data }: { data: Record<string, unknown> }) {
   if (scanned) {
     if (scanned.length === 0) return null;
     return (
-      <CardShell title="Site health — ranked (worst first)">
+      <CardShell title="Site health: ranked (worst first)">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="text-gray-faint">

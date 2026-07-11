@@ -156,7 +156,7 @@ export default function PayLinksPage() {
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Pay Links</h1>
         <p className="text-sm text-gray-muted mt-1">
-          Mint a payment link for a one-off charge — an occasional paid build or a one-time
+          Mint a payment link for a one-off charge: an occasional paid build or a one-time
           invoice. Monthly plans bill separately through Stripe.
         </p>
       </div>

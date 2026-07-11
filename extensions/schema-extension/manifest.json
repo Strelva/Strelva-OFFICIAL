@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Schema & Sitemap Checker - OWSH Snapshot",
+  "version": "1.0.0",
+  "description": "Quick schema and sitemap analysis for any webpage. Check JSON-LD, Microdata, robots.txt, and sitemap.xml instantly.",
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "32": "src/icons/icon32.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "32": "src/icons/icon32.png",
+      "48": "src/icons/icon48.png",
+      "128": "src/icons/icon128.png"
+    },
+    "default_title": "Schema & Sitemap Snapshot"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ]
+}

@@ -188,7 +188,7 @@ function checkSecurityHeaders(ctx: AuditContext): CheckResult {
     details:
       missing.length === 0
         ? undefined
-        : `Missing headers: ${missing.join(", ")}. Ask Strelva to add these — they harden the site behind the scenes with no visible change.`,
+        : `Missing headers: ${missing.join(", ")}. Ask Strelva to add these. They harden the site behind the scenes with no visible change.`,
   };
 }
 

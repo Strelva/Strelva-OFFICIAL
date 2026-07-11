@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schema & Sitemap Snapshot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+        </div>
+        <span class="logo-text">Schema & Sitemap</span>
+      </div>
+      <button class="full-report-btn" id="fullReportBtn" title="Open full report">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        Full Report
+      </button>
+    </header>
+
+    <!-- Current URL -->
+    <div class="url-bar" id="urlBar">
+      <span class="url-text" id="currentUrl">Loading...</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="schema">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        Schema
+      </button>
+      <button class="tab" data-tab="sitemap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="10" r="3"></circle>
+          <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"></path>
+        </svg>
+        Sitemap
+      </button>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content">
+      <!-- Loading State -->
+      <div class="loading-state" id="loadingState">
+        <div class="spinner"></div>
+        <p>Analyzing page...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state hidden" id="errorState">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p id="errorMessage">Unable to analyze this page</p>
+      </div>
+
+      <!-- Schema Tab Content -->
+      <div class="tab-content" id="schemaContent">
+        <div class="status-card" id="schemaStatusCard">
+          <div class="status-icon" id="schemaStatusIcon"></div>
+          <div class="status-info">
+            <span class="status-label" id="schemaStatusLabel">Checking...</span>
+            <span class="status-text">Schema Status</span>
+          </div>
+        </div>
+
+        <div class="section" id="schemaTypesSection">
+          <h3 class="section-title">Detected Schema Types</h3>
+          <div class="schema-types" id="schemaTypes"></div>
+        </div>
+
+        <div class="section hidden" id="schemaRawSection">
+          <h3 class="section-title">Raw Schema Markup</h3>
+          <div class="schema-raw" id="schemaRawContent"></div>
+        </div>
+
+        <div class="section hidden" id="schemaIssuesSection">
+          <h3 class="section-title">Issues</h3>
+          <div class="issues-list" id="schemaIssues"></div>
+        </div>
+      </div>
+
+      <!-- Sitemap Tab Content -->
+      <div class="tab-content hidden" id="sitemapContent">
+        <div class="status-card" id="sitemapStatusCard">
+          <div class="status-icon" id="sitemapStatusIcon"></div>
+          <div class="status-info">
+            <span class="status-label" id="sitemapStatusLabel">Checking...</span>
+            <span class="status-text">Sitemap Status</span>
+          </div>
+        </div>
+
+        <div class="section" id="sitemapChecksSection">
+          <h3 class="section-title">Discovery Results</h3>
+          <div class="checks-list" id="sitemapChecks"></div>
+        </div>
+
+        <div class="section hidden" id="sitemapDetailsSection">
+          <h3 class="section-title">Sitemap Details</h3>
+          <div class="details-grid" id="sitemapDetails"></div>
+        </div>
+
+        <div class="section hidden" id="robotsContentSection">
+          <h3 class="section-title">robots.txt Content</h3>
+          <div class="raw-content" id="robotsContent"></div>
+        </div>
+
+        <div class="section hidden" id="sitemapUrlsSection">
+          <h3 class="section-title">Sample URLs from Sitemap</h3>
+          <div class="sitemap-urls" id="sitemapUrls"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>by <a href="https://owshsystems.com" target="_blank">OWSH Systems</a></span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

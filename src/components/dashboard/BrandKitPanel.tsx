@@ -138,7 +138,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
         />
         <Field
           label="How should Strelva sound?"
-          hint="Your voice and tone — Strelva writes everything this way."
+          hint="Your voice and tone. Strelva writes everything this way."
           value={settings.brandVoice ?? ""}
           onChange={(v) => onChange("brandVoice", v)}
           onBlur={save}

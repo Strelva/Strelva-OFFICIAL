@@ -100,17 +100,17 @@ export default async function ClientDetailPage({
     const reason = atRisk.reasons[0];
     verdict = {
       tone: "red",
-      message: `At risk — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}. Reach out.`,
+      message: `At risk: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}. Reach out.`,
     };
   } else if (launchFails > 0) {
     verdict = {
       tone: "amber",
-      message: `Launch blocked — ${launchFails} infrastructure ${launchFails === 1 ? "check" : "checks"} to fix before go-live.`,
+      message: `Launch blocked: ${launchFails} infrastructure ${launchFails === 1 ? "check" : "checks"} to fix before go-live.`,
     };
   } else if (grade === "F" || grade === "D") {
     verdict = {
       tone: grade === "F" ? "red" : "amber",
-      message: `${grade}-grade site — fix the issues below.`,
+      message: `${grade}-grade site. Fix the issues below.`,
     };
   } else if (needsReply > 0) {
     verdict = {
@@ -118,7 +118,7 @@ export default async function ClientDetailPage({
       message: `${needsReply} review${needsReply === 1 ? "" : "s"} waiting on a reply.`,
     };
   } else {
-    verdict = { tone: "emerald", message: "Healthy — nothing needs you." };
+    verdict = { tone: "emerald", message: "Healthy. Nothing needs you." };
   }
   const verdictTone = {
     red: "border-red-500/30 bg-red-500/10",

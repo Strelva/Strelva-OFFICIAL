@@ -73,7 +73,7 @@ function ConnectPrompt({ service }: { service: string }) {
 function UnavailableNote() {
   return (
     <p className="rounded-lg border border-glass-border bg-surface-base/30 px-5 py-4 text-xs text-gray-muted">
-      Couldn&apos;t fetch this right now — the connection is set, but the API
+      Couldn&apos;t fetch this right now. The connection is set, but the API
       didn&apos;t answer. Try again shortly.
     </p>
   );

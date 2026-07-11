@@ -89,7 +89,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
         <span>
           <span className="block text-[14px] font-medium text-warm-black">Set a weekly goal</span>
           <span className="block text-[12px] text-gray-muted">
-            Pick a number to chase — we&apos;ll track it on every report.
+            Pick a number to chase. We&apos;ll track it on every report.
           </span>
         </span>
       </button>
@@ -196,7 +196,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
       </div>
       <p className="mt-2 text-[12px] text-gray-muted">
         {hit
-          ? "Goal hit — nice. Raise the bar or ride the momentum."
+          ? "Goal hit. Nice. Raise the bar or ride the momentum."
           : `${goal!.target - current} to go this week.`}
       </p>
     </div>

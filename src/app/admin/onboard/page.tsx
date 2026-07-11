@@ -156,7 +156,7 @@ function OnboardForm() {
                 <li key={s.key} className="text-sm flex items-start gap-2">
                   <span className={STATUS_DOT[s.status]}>{STATUS_MARK[s.status]}</span>
                   <span className="text-warm-white">{s.label}</span>
-                  {s.detail && <span className="text-gray-muted">— {s.detail}</span>}
+                  {s.detail && <span className="text-gray-muted">: {s.detail}</span>}
                 </li>
               ))}
             </ul>
@@ -186,7 +186,7 @@ function OnboardForm() {
                 {envText(result.clientEnv)}
               </pre>
               <p className="text-xs text-gray-faint mt-2">
-                Paste into the hand-built {result.tenantId} repo — REVALIDATION_SECRET is the
+                Paste into the hand-built {result.tenantId} repo. REVALIDATION_SECRET is the
                 load-bearing one. (Already set on the Vercel project too.)
               </p>
             </div>

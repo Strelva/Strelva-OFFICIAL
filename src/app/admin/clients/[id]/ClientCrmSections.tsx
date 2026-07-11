@@ -174,7 +174,7 @@ export function ClientCrmSections({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       if (data.paused) {
-        setEmailResult({ tone: "paused", msg: "Email is paused — turn it on to send." });
+        setEmailResult({ tone: "paused", msg: "Email is paused. Turn it on to send." });
       } else if (data.sent) {
         setEmailResult({ tone: "ok", msg: "Sent ✓" });
         if (type === "review-request") {
@@ -454,7 +454,7 @@ export function ClientCrmSections({
       <section className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-gray-muted">Client emails</h3>
         {!ownerEmail && (
-          <p className="text-xs text-gray-faint">No owner email on file — add one to send.</p>
+          <p className="text-xs text-gray-faint">No owner email on file. Add one to send.</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           {LIFECYCLE_EMAILS.map(({ type, label }) => {

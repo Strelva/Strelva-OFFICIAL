@@ -354,7 +354,7 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
     const total = data.bookingClicks.thisWeek + phone.thisWeek;
     const grandTotal = data.bookingClicks.total + phone.total;
     paragraphs.push(
-      `${total} people took action this week — ${data.bookingClicks.thisWeek} clicked to book and ${phone.thisWeek} called you (${grandTotal} total).`,
+      `${total} people took action this week: ${data.bookingClicks.thisWeek} clicked to book and ${phone.thisWeek} called you (${grandTotal} total).`,
     );
   } else if (data.bookingClicks.thisWeek > 0) {
     const plural = data.bookingClicks.thisWeek === 1 ? "click" : "clicks";
@@ -383,7 +383,7 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
   const stalest = data.staleSections[0];
   if (stalest) {
     paragraphs.push(
-      `Your ${stalest.section} section hasn't changed in ${stalest.daysSinceUpdate} days — a quick update keeps things fresh.`,
+      `Your ${stalest.section} section hasn't changed in ${stalest.daysSinceUpdate} days. A quick update keeps things fresh.`,
     );
   }
 

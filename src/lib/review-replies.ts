@@ -216,13 +216,13 @@ export function buildDeterministicReply(
 ): string {
   const name = reviewerName.trim() || "there";
   if (rating >= 4) {
-    return `${name}, appreciate you leaving this review. Glad your experience was good — it means a lot to us.`;
+    return `${name}, appreciate you leaving this review. Glad your experience was good. It means a lot to us.`;
   }
   if (rating === 3) {
-    return `${name}, appreciate the feedback. We'd like to understand what we can do better — please reach out directly.`;
+    return `${name}, appreciate the feedback. We'd like to understand what we can do better. Please reach out directly.`;
   }
   // 1–2 stars
-  return `${name}, thank you for the honest feedback. We'd like to make this right — please contact us directly so we can address it.`;
+  return `${name}, thank you for the honest feedback. We'd like to make this right. Please contact us directly so we can address it.`;
 }
 
 // ─── Google Review interface (mirrored from cron for portability) ─────────────

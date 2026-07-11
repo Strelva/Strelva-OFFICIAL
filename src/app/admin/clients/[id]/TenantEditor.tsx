@@ -105,7 +105,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      setAssignNote(data.emailSent === false ? `✓ Invite created — email failed, share: ${data.signUpUrl}` : `✓ ${data.message || "Invite sent"}`);
+      setAssignNote(data.emailSent === false ? `✓ Invite created. Email failed, share: ${data.signUpUrl}` : `✓ ${data.message || "Invite sent"}`);
     } catch (err) {
       setAssignNote(err instanceof Error ? err.message : "Invite failed");
     } finally {
@@ -193,7 +193,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           {assigning ? "Assigning…" : "Assign user"}
         </button>
         <p className="text-xs text-gray-faint">
-          The user must already have an account (signed up with this exact email) — use Resend owner invite below if they don&apos;t.
+          The user must already have an account (signed up with this exact email). Use Resend owner invite below if they don&apos;t.
         </p>
 
         <div className="pt-3 mt-1 border-t border-glass-border">

@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded square background matching OWSH brand orange -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#C2410C"/>
+
+  <!-- Speed gauge arc -->
+  <path d="M38 82 A30 30 0 1 1 90 82" stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- Gauge needle pointing to fast (upper-right area) -->
+  <line x1="64" y1="72" x2="80" y2="48" stroke="white" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="64" cy="72" r="6" fill="white"/>
+
+  <!-- Speed tick marks -->
+  <line x1="38" y1="82" x2="38" y2="76" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="42" y1="56" x2="46" y2="60" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="64" y1="44" x2="64" y2="50" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="86" y1="56" x2="82" y2="60" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="90" y1="82" x2="90" y2="76" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- "Speed" lightning bolt accent -->
+  <path d="M56 94 L62 88 L58 88 L64 80 L58 86 L62 86 Z" fill="white" opacity="0.8"/>
+</svg>

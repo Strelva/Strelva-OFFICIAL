@@ -33,12 +33,12 @@ export function metricVerdicts(stats: WeeklyBriefStats): MetricVerdict[] {
     ...(pageViews === 0
       ? {
           verdict:
-            "No one found your site this week. Getting found is job one — connect Google Business and keep the site fresh so you start showing up.",
+            "No one found your site this week. Getting found is job one. Connect Google Business and keep the site fresh so you start showing up.",
           tone: "attention" as const,
         }
       : viewsDelta > 0
         ? {
-            verdict: `${viewsDelta} more people than last week. Whatever changed is working — keep the site active to hold the momentum.`,
+            verdict: `${viewsDelta} more people than last week. Whatever changed is working. Keep the site active to hold the momentum.`,
             tone: "good" as const,
           }
         : viewsDelta < 0
@@ -63,12 +63,12 @@ export function metricVerdicts(stats: WeeklyBriefStats): MetricVerdict[] {
       delta: stats.bookingClicksDelta,
       ...(bookingClicks > 0
         ? {
-            verdict: `About ${rate}% of your visitors clicked to book — that's the action that turns traffic into paying customers.`,
+            verdict: `About ${rate}% of your visitors clicked to book: that's the action that turns traffic into paying customers.`,
             tone: "good" as const,
           }
         : {
             verdict:
-              "People visited but no one clicked to book. Make your booking or call button impossible to miss — that's usually the gap.",
+              "People visited but no one clicked to book. Make your booking or call button impossible to miss: that's usually the gap.",
             tone: "attention" as const,
           }),
     });
@@ -81,12 +81,12 @@ export function metricVerdicts(stats: WeeklyBriefStats): MetricVerdict[] {
     value: reviewsReceived,
     ...(reviewsReceived > 0
       ? {
-          verdict: `${reviewsReceived} new review${reviewsReceived === 1 ? "" : "s"} — fresh reviews are the single biggest trust signal for local customers searching for you.`,
+          verdict: `${reviewsReceived} new review${reviewsReceived === 1 ? "" : "s"}. Fresh reviews are the single biggest trust signal for local customers searching for you.`,
           tone: "good" as const,
         }
       : {
           verdict:
-            "No new reviews this week. A quick ask right after a visit is the easiest way to get more — and they compound.",
+            "No new reviews this week. A quick ask right after a visit is the easiest way to get more, and they compound.",
           tone: "neutral" as const,
         }),
   });

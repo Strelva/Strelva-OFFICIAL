@@ -34,7 +34,7 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
   website: {
     name: "Website Management",
     description:
-      "Read, update, and manage all sections of your website — including undoing the last change (revert to an earlier version), which is drafted for your approval before it goes live",
+      "Read, update, and manage all sections of your website, including undoing the last change (revert to an earlier version), which is drafted for your approval before it goes live",
     tools: ["read_section", "update_section", "undo_last_change", "upload_image"],
   },
   analytics: {
@@ -67,7 +67,7 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
     // Every Google-listing write is drafted and queued for the owner's
     // approval before it publishes — the approve-before-live trust spine.
     description:
-      "Draft Google Business posts, hours updates, and photos — each queued for your approval before it publishes to Google",
+      "Draft Google Business posts, hours updates, and photos, each queued for your approval before it publishes to Google",
     tools: ["create_gbp_post", "update_business_hours", "upload_gbp_photo"],
   },
 };

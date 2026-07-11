@@ -98,7 +98,7 @@ export default async function AnalyticsPage() {
                     Site health
                   </p>
                   <p className="mt-1 text-[13px] text-gray-muted">
-                    The daily check of your live site — speed, security, SEO, accessibility.
+                    The daily check of your live site: speed, security, SEO, accessibility.
                   </p>
                 </div>
                 <span className="shrink-0 text-[12px] font-medium text-accent group-open:hidden">Show</span>

@@ -149,7 +149,7 @@ describe("visibilityHeadline", () => {
       ],
     });
     const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
-    expect(headline).toBe('Cited in 1 of 2 AI answers — the wedge gap is "gluten free bakery buffalo".');
+    expect(headline).toBe('Cited in 1 of 2 AI answers. The wedge gap is "gluten free bakery buffalo".');
   });
 
   it("celebrates full AI citation without shame", () => {
@@ -157,7 +157,7 @@ describe("visibilityHeadline", () => {
       aiResults: [{ query: "q", model: "g", probed: true, tenantMentioned: true, competitors: [], checkedAt: "x", methodologyNote: "" }],
     });
     const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
-    expect(headline).toContain("you're who the assistant names");
+    expect(headline).toContain("You're who the assistant names");
   });
 
   it("falls back to the SERP signal when no AI probe ran", () => {
@@ -167,7 +167,7 @@ describe("visibilityHeadline", () => {
     });
     const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
     expect(headline).toContain("On page 1 for 0 of 1 searches checked");
-    expect(headline).toContain('start with "bakery buffalo"');
+    expect(headline).toContain('Start with "bakery buffalo"');
   });
 
   it("returns null when nothing was measured", () => {

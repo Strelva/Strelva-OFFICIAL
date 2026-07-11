@@ -23,21 +23,21 @@ type Domain = { domain: string; status: "connected" | "pending"; isApex: boolean
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 const OWNED_ITEMS = [
-  "Your domain — registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
-  "All your content — business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
+  "Your domain: registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
+  "All your content: business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
   "On the monthly plan: the full site repo and source files, which transfer to you at month 12 or earlier via buyout. Your domain is already yours either way.",
 ];
 
 const MANAGED_ITEMS = [
-  "Hosting and deployment — the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
-  "The platform — dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
+  "Hosting and deployment: the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
+  "The platform: dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
   "Strelva platform source code and deployment credentials. (The platform itself stays with Strelva; your site repo is what transfers to you.)",
 ];
 
 const HANDOFF_STEPS = [
   {
     title: "Export content",
-    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration — everything Strelva renders from.",
+    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration: everything Strelva renders from.",
   },
   {
     title: "Export assets",
@@ -45,15 +45,15 @@ const HANDOFF_STEPS = [
   },
   {
     title: "Repo + files transfer",
-    body: "On the monthly plan, the site repo and source files transfer to you at month 12 — or earlier via buyout. Strelva bakes your exported content in so the repo runs on its own, then hands you ownership.",
+    body: "On the monthly plan, the site repo and source files transfer to you at month 12, or earlier via buyout. Strelva bakes your exported content in so the repo runs on its own, then hands you ownership.",
   },
   {
     title: "DNS is already yours",
-    body: "Your domain has been in your name since day one. There's nothing to move — Strelva just steps off the DNS-edit access once your deploy is live on your own account.",
+    body: "Your domain has been in your name since day one. There's nothing to move. Strelva just steps off the DNS-edit access once your deploy is live on your own account.",
   },
   {
     title: "Cancel billing",
-    body: "Use the billing portal when handoff timing is confirmed. Canceling billing doesn't move the repo or export files by itself — do the exports and transfer first.",
+    body: "Use the billing portal when handoff timing is confirmed. Canceling billing doesn't move the repo or export files by itself. Do the exports and transfer first.",
   },
   {
     title: "Revoke access",
@@ -148,7 +148,7 @@ export function OwnershipSection() {
       if (!res.ok) throw new Error("Request failed");
       setConfirmingHandoff(false);
       setHandoffNote("");
-      setNotice("We've got your request — we'll reach out to hand over your files.");
+      setNotice("We've got your request. We'll reach out to hand over your files.");
     } catch {
       setError("Could not send that request. You can still download your exports or email Strelva directly.");
     } finally {
@@ -168,7 +168,7 @@ export function OwnershipSection() {
       if (!res.ok || !body?.portalUrl) {
         setBillingError(
           res.status === 404 || !dashboard?.hasStripeCustomer
-            ? "Your plan is managed by Strelva — message us anytime to change or end it."
+            ? "Your plan is managed by Strelva. Message us anytime to change or end it."
             : body?.error || "Could not open the billing portal.",
         );
         return;
@@ -189,7 +189,7 @@ export function OwnershipSection() {
             Handoff clarity
           </p>
           <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-warm-white">
-            Your domain, your content, your customers — leave anytime, with everything.
+            Your domain, your content, your customers. Leave anytime, with everything.
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
             Nothing here is locked in. Export your content and assets whenever you want, request your site files in one click, and see exactly what transfers before any offboarding, DNS, or billing change.
@@ -261,7 +261,7 @@ export function OwnershipSection() {
             </p>
             <h3 className="mt-1 text-[18px] font-medium text-warm-white">Request your site files</h3>
             <p className="mt-1.5 text-[12px] leading-relaxed text-gray-muted">
-              One click tells Strelva you want the site repo and source files handed over. We&apos;ll confirm timing and walk the transfer with you — your domain is already in your name, so there&apos;s nothing to move there.
+              One click tells Strelva you want the site repo and source files handed over. We&apos;ll confirm timing and walk the transfer with you. Your domain is already in your name, so there&apos;s nothing to move there.
             </p>
           </div>
           {!confirmingHandoff && (
@@ -293,7 +293,7 @@ export function OwnershipSection() {
               onChange={(event) => setHandoffNote(event.target.value)}
               rows={3}
               maxLength={1000}
-              placeholder="e.g. Hoping to move in the next month — what do you need from me?"
+              placeholder="e.g. Hoping to move in the next month. What do you need from me?"
               className="mt-3 w-full resize-none rounded-lg border border-gray-border bg-surface-raised px-3 py-2 text-[13px] text-warm-white placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -49,7 +49,7 @@ export async function saveVisibilitySnapshot(snapshot: VisibilitySnapshot): Prom
     tenantId: snapshot.tenantId,
     source: "website",
     type: "visibility_snapshot",
-    title: `Visibility snapshot — ${snapshot.trade} (${snapshot.towns.join(", ")})`,
+    title: `Visibility snapshot: ${snapshot.trade} (${snapshot.towns.join(", ")})`,
     body: `${snapshot.serpResults.length} SERP checks, ${snapshot.aiResults.length} AI answer checks`,
     status: "auto_approved",
     metadata: {
