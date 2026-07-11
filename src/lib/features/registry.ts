@@ -138,13 +138,22 @@ export function applyFeatureChange(current: string[], next: string[]): string[] 
   return cleaned;
 }
 
-/** The dashboard surfaces contributed by a tenant's enabled set-member features, in registry order. */
-export function getSetSurfaces(features: string[]): DashboardSurface[] {
+/**
+ * The dashboard surfaces contributed by a tenant's enabled set-member features, in
+ * registry order. When `inspect` is true (super-admin inspect mode), EVERY
+ * surface-bearing set feature is returned — the ones the tenant hasn't enabled are
+ * marked `preview: true` so the nav can flag them as an operator-only preview. A
+ * normal client call (inspect=false) is unchanged: only enabled features surface.
+ */
+export function getSetSurfaces(features: string[], inspect = false): DashboardSurface[] {
   const enabled = new Set(features);
   const surfaces: DashboardSurface[] = [];
   for (const f of FEATURE_REGISTRY) {
-    if (f.surface && enabled.has(f.id)) {
+    if (!f.surface) continue;
+    if (enabled.has(f.id)) {
       surfaces.push({ id: f.surface.id, label: f.surface.label, href: f.surface.href, state: "shown", group: "set" });
+    } else if (inspect) {
+      surfaces.push({ id: f.surface.id, label: f.surface.label, href: f.surface.href, state: "shown", group: "set", preview: true });
     }
   }
   return surfaces;

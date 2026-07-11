@@ -57,6 +57,29 @@ const detail: CategoryResult[] = [
   } as unknown as CategoryResult,
 ];
 
+// A detail with a real failing check, so prioritizeIssues (real, unmocked)
+// produces a non-empty verdict that scanTenant must persist.
+const failingDetail: CategoryResult[] = [
+  {
+    name: "Basic SEO",
+    slug: "seo",
+    weight: 1,
+    score: 40,
+    checks: [
+      {
+        name: "Meta description",
+        status: "fail",
+        score: 0,
+        message: "Missing meta description",
+        impact: "Google writes its own, often poorly.",
+        quantified: "~$120/mo in conversions (estimated)",
+        priority: "high",
+      },
+      { name: "Title tag", status: "pass", score: 100, message: "Present" },
+    ],
+  } as unknown as CategoryResult,
+];
+
 function tenant(id: string, active = true): TenantConfig {
   return { id, active } as unknown as TenantConfig;
 }
@@ -119,6 +142,39 @@ describe("scanTenant", () => {
     expect(result.detail).toBe(detail);
   });
 
+  it("persists the ranked fix-first verdict (compact) for a tenant with failing checks", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(failingDetail);
+
+    await scanTenant("gldf");
+
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    expect(savedSummary.prioritizedIssues).toBeTruthy();
+    expect(savedSummary.prioritizedIssues.length).toBeGreaterThan(0);
+    expect(savedSummary.prioritizedIssues[0]).toMatchObject({
+      message: "Missing meta description",
+      category: "Basic SEO",
+      priority: "high",
+      quantified: "~$120/mo in conversions (estimated)",
+    });
+    // Compact: the heavy live-only fields never leak into the persisted verdict.
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("score");
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("status");
+    expect(savedSummary.prioritizedIssues[0]).not.toHaveProperty("categorySlug");
+  });
+
+  it("omits prioritizedIssues entirely when the audit has no failing checks", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail); // empty checks → no issues
+
+    await scanTenant("gldf");
+
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    expect(savedSummary).not.toHaveProperty("prioritizedIssues");
+  });
+
   it("threads a paying client's real GA4 + leads traffic into the audit (B5.3)", async () => {
     mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
     mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
@@ -131,6 +187,56 @@ describe("scanTenant", () => {
 
     expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
       traffic: { monthlyVisitors: 2000, conversionRate: 0.02, orderValue: 75, source: "measured" },
+    });
+  });
+
+  // The conversion rate is clamped to [0.005, 0.5]. Without the ceiling a tenant
+  // whose leads momentarily exceed GA4 users (bot-inflated leads, a GA4 undercount,
+  // a tiny sample) would multiply the dollar-impact into an absurd figure on their
+  // dashboard. These lock the bounds so a refactor can't silently drop them.
+  it("clamps the conversion rate to the 0.5 ceiling when leads exceed visitors (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // 50 leads over just 10 GA4 users → raw 5.0, must clamp to 0.5 (not 5.0).
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 10 });
+    mockGetLeadSummary.mockResolvedValue({ count: 50 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 10, conversionRate: 0.5, orderValue: 75, source: "measured" },
+    });
+  });
+
+  it("clamps the conversion rate to the 0.005 floor for high-traffic, low-lead tenants (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // 1 lead over 100k users → raw 0.00001, must clamp up to the 0.005 floor.
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 100000 });
+    mockGetLeadSummary.mockResolvedValue({ count: 1 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 100000, conversionRate: 0.005, orderValue: 75, source: "measured" },
+    });
+  });
+
+  it("falls back to the generic conversion prior when a tenant has real traffic but no leads (B5.3)", async () => {
+    mockGetTenantConfig.mockResolvedValue(tenant("gldf"));
+    mockGetTenantPublicUrl.mockReturnValue("https://greatlakesdriedfruit.com");
+    mockRunAudit.mockResolvedValue(detail);
+    // Real GA4 visitors but zero leads → no conversion signal → generic 0.03,
+    // while monthlyVisitors stays the tenant's real number.
+    mockGetGa4Perf.mockResolvedValue({ status: "ok", users: 2000 });
+    mockGetLeadSummary.mockResolvedValue({ count: 0 });
+
+    await scanTenant("gldf");
+
+    expect(mockRunAudit).toHaveBeenCalledWith("https://greatlakesdriedfruit.com", {
+      traffic: { monthlyVisitors: 2000, conversionRate: 0.03, orderValue: 75, source: "measured" },
     });
   });
 

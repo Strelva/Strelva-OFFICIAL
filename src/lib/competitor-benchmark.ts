@@ -72,8 +72,8 @@ export function buildCompetitorBenchmark(snapshot: VisibilitySnapshot | null): C
     leadCount === total
       ? "You're out-ranking your competitors across the board."
       : leadCount > 0
-        ? `You lead ${leadCount} of ${total} searches — here's where competitors are ahead.`
-        : "Competitors are out-ranking you on these searches — the clearest place to gain ground.";
+        ? `You lead ${leadCount} of ${total} searches. Here's where competitors are ahead.`
+        : "Competitors are out-ranking you on these searches: the clearest place to gain ground.";
 
   return { rows, leadCount, total, headline };
 }

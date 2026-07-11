@@ -56,12 +56,12 @@ function escapeHtml(value: string): string {
 export function probeStatusLine(citation: CitationProbe, business: string): string {
   const name = escapeHtml(business);
   if (!citation.probed) {
-    return `The live AI-citation probe hasn't been run yet for ${name}. This grade reflects AI readiness — how well AI can read and understand the site. Run the Gemini probe to confirm whether AI actually names ${name}.`;
+    return `The live AI-citation probe hasn't been run yet for ${name}. This grade reflects AI readiness: how well AI can read and understand the site. Run the Gemini probe to confirm whether AI actually names ${name}.`;
   }
   if (citation.mentioned) {
     return `Gemini named ${name} when asked to recommend the best option. The site is showing up in a live AI answer today.`;
   }
-  return `Gemini did not name ${name} when asked to recommend the best option — a competitor got the recommendation in the live AI answer.`;
+  return `Gemini did not name ${name} when asked to recommend the best option. A competitor got the recommendation in the live AI answer.`;
 }
 
 /** Short status label used in the probe card heading. */
@@ -106,7 +106,7 @@ export function renderAiVisibilityHtml(result: AiVisibilityResult): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Visibility Score — ${business}</title>
+<title>AI Visibility Score: ${business}</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -254,7 +254,7 @@ ${signalsBlock}
     </div>
 
     <footer>
-      Prepared by Strelva — <a href="https://strelva.com">strelva.com</a>
+      Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>
     </footer>
   </main>
 </body>

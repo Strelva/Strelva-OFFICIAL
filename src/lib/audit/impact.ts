@@ -12,59 +12,59 @@ import type { CategoryResult, CheckResult } from "./types";
 // First match wins, so order most-specific first.
 const CHECK_IMPACT: Array<[RegExp, string]> = [
   // AI readability / schema
-  [/llms\.txt/i, "AI agents increasingly look for an llms.txt to understand a site. Without one you are invisible to that growing channel."],
-  [/structured data|business schema|schema/i, "Without structured data, AI assistants and voice search cannot confidently recommend your business."],
-  [/ai[- ]?answer|faq|howto|how-to/i, "Answer-format content is what AI tools quote directly. Without it, the AI summarizes a competitor instead of you."],
-  [/entity|sameas|authority/i, "Weak entity signals make it hard for AI and search engines to know who you are and trust you."],
-  [/plain[- ]?text|readable|render|javascript|js/i, "If your content only appears after JavaScript runs, AI crawlers often cannot read it at all."],
-  [/business name|ambiguity|ambiguous/i, "An inconsistent business name across your site confuses both customers and the AI deciding who to recommend."],
-  [/ai readiness|ai[- ]?ready|discoverab/i, "AI search is becoming a primary way customers find businesses. Sites that are not AI-ready get left out."],
+  [/llms\.txt/i, "More people now ask ChatGPT and Perplexity for recommendations. An llms.txt points those assistants at your best pages, opening a channel most of your competitors have not touched yet."],
+  [/structured data|business schema|schema/i, "Structured data is the label that tells AI assistants and voice search what you do and where you are. Add it and you become the answer they hand a searcher."],
+  [/ai[- ]?answer|faq|howto|how-to/i, "When someone asks AI a question in your field, it quotes whoever wrote the clearest answer. Publish that answer and the quote points to you instead of a competitor."],
+  [/entity|sameas|authority/i, "Links to your Google, social, and listing profiles let AI confirm you are real. The more it can cross-check, the more confidently it recommends you."],
+  [/plain[- ]?text|readable|render|javascript|js/i, "AI crawlers do not run your site's scripts. If your words only appear after JavaScript loads, they read a blank page. Getting the text into the page puts you back in the conversation."],
+  [/business name|ambiguity|ambiguous/i, "When your name shows up a few different ways across the site, AI can't tell which business is you. One consistent name makes you easy to pick out and recommend."],
+  [/ai readiness|ai[- ]?ready|discoverab/i, "More customers start their search by asking an AI. Getting AI-ready is how you show up in that answer instead of being left out of it."],
 
   // SEO foundations
-  [/robots|crawler|blocked|index/i, "If crawlers are blocked, search engines and AI tools cannot list you at all, no matter how good the site is."],
-  [/sitemap/i, "Without a sitemap, search engines may never discover some of your pages."],
-  [/canonical/i, "Missing canonical tags can split your ranking signals across duplicate URLs."],
-  [/title/i, "Your title tag is the headline in search results. A missing or weak one costs clicks."],
-  [/meta description/i, "The meta description is your ad copy in search results. Without it, Google writes its own, often poorly."],
-  [/h1|heading/i, "Clear headings help search engines and AI understand what your page is about."],
+  [/robots|crawler|blocked|index/i, "Search engines can only show pages they are allowed to read. Opening that gate makes everything you have already built findable."],
+  [/sitemap/i, "A sitemap is the index you hand Google so it finds every page. Add one and pages that were being missed start getting listed."],
+  [/canonical/i, "A canonical tag tells Google which page is the real one, so your ranking strength lands on a single URL instead of being split across duplicates."],
+  [/title/i, "Your title is the headline people see in Google. A clear one is the difference between a click and a scroll-past."],
+  [/meta description/i, "The line under your title in Google is free ad space. Write it yourself and you control the first impression; leave it blank and Google guesses for you."],
+  [/h1|heading/i, "A clear main heading tells Google and AI what the page is about in one line, so it shows your page for the right searches."],
 
   // Performance / mobile
-  [/lcp|contentful paint|performance|load/i, "A slow site loses visitors. Over half of people abandon a page that takes more than three seconds."],
-  [/cls|layout shift/i, "Visual instability frustrates users; roughly 40% leave after a jarring experience."],
-  [/mobile|viewport|tap target|font size/i, "Most local searches happen on a phone. A site that is hard to use on mobile loses those customers."],
+  [/lcp|contentful paint|performance|load/i, "People leave a page that makes them wait; over half abandon after about three seconds. A faster site simply keeps more of the visitors you already earn."],
+  [/cls|layout shift/i, "When the page jumps around as it loads, visitors mis-tap and give up. Steadying it keeps people moving toward booking or buying."],
+  [/mobile|viewport|tap target|font size/i, "Most local searches happen on a phone. A site that is easy to use on mobile keeps the customers who find you there."],
 
   // Security
-  [/https/i, "Browsers flag non-HTTPS sites as Not Secure, and most visitors will not enter their information."],
-  [/mixed content/i, "Insecure resources on a secure page trigger browser warnings that scare customers away."],
-  [/security header/i, "Missing security headers leave the site open to common attacks and erode trust signals search engines read."],
-  [/form/i, "Forms that are not secured put customer data at risk and can fail silently."],
-  [/cookie|consent|gdpr/i, "A missing consent notice is a compliance gap that can carry real penalties."],
+  [/https/i, "Without the padlock, browsers stamp your site 'Not Secure' and almost no one types their name or number into a page that looks unsafe. Adding it removes that hesitation."],
+  [/mixed content/i, "A single insecure file on a secure page trips a browser warning that undoes the padlock's reassurance. Clearing it keeps the page looking trustworthy."],
+  [/security header/i, "Security headers are the quiet signals that tell browsers and search engines your site is well-run. Adding them hardens the site and strengthens trust."],
+  [/form/i, "A form that isn't secured can leak what customers type or fail without telling them. Securing it protects their details and your reputation."],
+  [/cookie|consent|gdpr/i, "A consent notice keeps you on the right side of privacy rules and shows visitors you handle their data carefully."],
 
   // Accessibility
-  [/alt/i, "Missing image alt text hurts accessibility, image search, and how AI understands your visuals."],
-  [/lang|language/i, "A missing language attribute makes the page harder for screen readers and search engines to interpret."],
-  [/label|form field/i, "Unlabeled form fields are unusable for screen readers and frustrate everyone else."],
-  [/link text|click here/i, "Vague link text hurts accessibility and tells search engines nothing about where the link goes."],
-  [/accessib|wcag|contrast|landmark/i, "Accessibility gaps shrink your audience and increasingly carry legal risk."],
+  [/alt/i, "Alt text describes your images to screen readers, image search, and AI. Adding it widens your audience and helps your photos get found."],
+  [/lang|language/i, "Declaring the page language helps screen readers and search engines read it correctly, so more people can use the site as intended."],
+  [/label|form field/i, "Labeled fields let everyone fill out your form, including customers using a screen reader. It's a small fix that removes a real barrier to reaching you."],
+  [/link text|click here/i, "Links that describe where they go help both screen-reader users and Google understand your site, so more people follow them to the right place."],
+  [/accessib|wcag|contrast|landmark/i, "An accessible site works for more people and lowers legal risk. Every fix here widens the audience that can actually use you."],
 
   // Trust / content / conversion
-  [/contact|phone|address|click[- ]?to[- ]?call/i, "If customers cannot quickly find how to reach you, they leave and call a competitor."],
-  [/testimonial|review|trust|badge|credential/i, "Visible proof (reviews, credentials, guarantees) is what converts a visitor into a customer."],
-  [/privacy|terms|legal/i, "Missing privacy and terms pages undercut trust and can block some ad and listing platforms."],
-  [/content|word count|thin/i, "Thin pages rarely rank and give AI little to quote. Substance is what gets recommended."],
-  [/cta|call to action/i, "Without a clear next step, even interested visitors leave without acting."],
+  [/contact|phone|address|click[- ]?to[- ]?call/i, "If customers can't find how to reach you in a second, they leave and call the next business. Making contact obvious captures people already ready to act."],
+  [/testimonial|review|trust|badge|credential/i, "Reviews, credentials, and guarantees are what tip a hesitant visitor into a customer. Showing your proof does the convincing for you."],
+  [/privacy|terms|legal/i, "Privacy and terms pages signal a real, legitimate business, and some ad and listing platforms require them before they'll feature you."],
+  [/content|word count|thin/i, "Pages with real substance are what rank and what AI quotes. Filling out your content gives search and AI a reason to recommend you."],
+  [/cta|call to action/i, "A clear next step turns interest into action. Telling visitors exactly what to do next is often the simplest way to win more customers."],
 ];
 
 // Per-category fallback when no specific check line matches.
 const CATEGORY_IMPACT: Record<string, string> = {
-  "ai-readability": "AI readiness issues will increasingly decide whether AI tools recommend you or a competitor.",
-  seo: "Technical SEO issues stop search engines from properly understanding and ranking your site.",
-  "web-vitals": "A slow site drives customers to faster competitors before they ever see your offer.",
-  mobile: "Most of your visitors are on phones; a poor mobile experience loses them.",
-  security: "Security gaps trigger browser warnings and erode the trust customers need to act.",
-  a11y: "Accessibility gaps shrink your audience and carry growing legal risk.",
-  trust: "Without visible proof, visitors hesitate and never become customers.",
-  content: "Thin content rarely ranks and gives AI nothing to quote about you.",
+  "ai-readability": "As more customers search by asking an AI, being AI-ready is what decides whether it recommends you or a competitor.",
+  seo: "These SEO foundations are how search engines understand and rank your site, so the pages you've built actually get found.",
+  "web-vitals": "A faster site keeps the visitors you already earn instead of losing them to a competitor's quicker page.",
+  mobile: "Most of your visitors are on phones, so a smooth mobile experience is what keeps them from bouncing.",
+  security: "A secure site removes the browser warnings and hesitation that stop customers from acting.",
+  a11y: "An accessible site works for more people and lowers legal risk; every fix widens who can use you.",
+  trust: "Visible proof is what turns a hesitant visitor into a customer, so these signals directly affect conversions.",
+  content: "Substantial content is what ranks and what AI quotes, giving both a reason to point people to you.",
 };
 
 function impactLineFor(categorySlug: string, checkName: string): string | undefined {

@@ -11,7 +11,7 @@
  */
 import { getRedis } from "@/lib/redis";
 
-export type LeadWorkflowStatus = "new" | "contacted" | "converted" | "dismissed";
+export type LeadWorkflowStatus = "new" | "contacted" | "converting" | "converted" | "dismissed";
 
 export interface LeadWorkflow {
   token: string;
@@ -20,9 +20,14 @@ export interface LeadWorkflow {
   updatedAt: string | null;
 }
 
+// `converting` is the intermediate state set when the operator clicks Convert and
+// hands off to the onboard form. It flips to `converted` ONLY when provisioning
+// actually creates the tenant — so an abandoned onboard leaves a visible
+// "Converting…" lead, never a mislabeled "Converted" lead with no tenant.
 export const LEAD_WORKFLOW_STATUSES: LeadWorkflowStatus[] = [
   "new",
   "contacted",
+  "converting",
   "converted",
   "dismissed",
 ];

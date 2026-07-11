@@ -6,16 +6,19 @@ import { useDashboard } from "./DashboardContext";
 
 /**
  * The ONE sub-nav for the Website pillar. Folds every Website sub-section —
- * Preview (the site editor), Content, Media, Store (only when the tenant runs a
- * storefront), and History — behind a single strip, rendered once in the shell
- * and shown only on those routes; null everywhere else. This is the only Website
- * sub-nav (the old per-page WebsiteSubnav was removed), so nothing means
- * "editor" twice. Routes are unchanged — this just groups them.
+ * Preview (the site editor), Content, Media, Brand Kit (the voice/business
+ * context the AI writes from), Store (only when the tenant runs a storefront),
+ * and History — behind a single strip, rendered once in the shell and shown only
+ * on those routes; null everywhere else. This is the only Website sub-nav (the
+ * old per-page WebsiteSubnav was removed), so nothing means "editor" twice.
+ * Brand Kit also keeps its Settings → Shortcuts entry; this is a second entry
+ * point to the same page, not a second home. Routes are unchanged.
  */
 const WEBSITE_ROUTES = [
   "/dashboard/site",
   "/dashboard/collections",
   "/dashboard/assets",
+  "/dashboard/brand-kit",
   "/dashboard/store",
   "/dashboard/history",
 ];
@@ -34,6 +37,7 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
     { href: "/dashboard/site", label: "Preview" },
     { href: "/dashboard/collections", label: "Content" },
     { href: "/dashboard/assets", label: "Media" },
+    { href: "/dashboard/brand-kit", label: "Brand Kit" },
     ...(hasStore ? [{ href: "/dashboard/store", label: "Store" }] : []),
     { href: "/dashboard/history", label: "History" },
   ];

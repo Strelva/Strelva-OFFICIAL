@@ -86,7 +86,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
       : "No robots.txt file was found.",
     details: hasRobots
       ? undefined
-      : "Search engines look for robots.txt to learn which pages they may crawl. Add one at /robots.txt.",
+      : "A robots.txt is the note that tells search engines which pages they may read. Ask Strelva to add one so crawlers get clear guidance.",
   });
 
   // -------------------------------------------------------------------------
@@ -100,10 +100,10 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     status: blocking.blocked ? "fail" : "pass",
     score: blocking.blocked ? 0 : 100,
     message: blocking.blocked
-      ? "Your robots.txt is blocking search engines from your whole site."
-      : "Search engines are allowed to crawl the site.",
+      ? "Your site is currently blocking search engines from reading it at all."
+      : "Search engines are allowed to read the site.",
     details: blocking.blocked
-      ? `These rules block crawling and keep your pages out of search results: ${blocking.patterns.join("; ")}. Remove the blanket "Disallow: /" lines.`
+      ? `A setting is telling search engines to skip your whole site, which keeps you out of results: ${blocking.patterns.join("; ")}. Ask Strelva to remove the blanket block so you can be found.`
       : undefined,
   });
 
@@ -120,7 +120,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
       : "No XML sitemap was found.",
     details: hasSitemap
       ? undefined
-      : "A sitemap helps search engines discover and index all of your pages faster. Add one at /sitemap.xml.",
+      : "A sitemap is the index you hand search engines so they find every page faster. Ask Strelva to add one.",
   });
 
   // -------------------------------------------------------------------------
@@ -143,7 +143,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
         : "No sitemap to validate.",
     details: sitemapValid
       ? undefined
-      : "A sitemap should be XML and list page URLs so search engines can read it.",
+      : "The sitemap needs to list your page addresses in a format search engines can read. Ask Strelva to fix its format.",
   });
 
   // -------------------------------------------------------------------------
@@ -160,7 +160,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
       : "No canonical tag was found.",
     details: hasCanonical
       ? canonical
-      : "A canonical tag tells search engines which version of a page is the main one and prevents duplicate-content problems.",
+      : "A canonical tag tells search engines which version of a page is the main one, so your ranking strength lands on one address instead of being split. Ask Strelva to add it.",
   });
 
   // -------------------------------------------------------------------------
@@ -206,7 +206,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
       : "No meta description was found.",
     details: hasMetaDesc
       ? undefined
-      : "The meta description is the snippet shown under your title in search results. Add one to improve click-through.",
+      : "The description is the sentence shown under your title in search results: free ad space. Ask Strelva to write one so you control that first impression.",
   });
 
   // -------------------------------------------------------------------------
@@ -224,7 +224,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     details:
       h1Count > 0
         ? $("h1").first().text().trim().slice(0, 100)
-        : "The H1 heading tells search engines and AI assistants the main topic of the page.",
+        : "The main heading tells search engines and AI what the page is about in one line. Ask Strelva to add a clear one.",
   });
   checks.push({
     name: "Single H1",
@@ -235,10 +235,10 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
         ? "The page uses a single H1 heading."
         : h1Count === 0
           ? "There is no H1 heading to count."
-          : `The page has ${h1Count} H1 headings. Use one H1 per page.`,
+          : `The page has ${h1Count} main headings. A page reads clearest with one.`,
     details:
       h1Count > 1
-        ? "Multiple H1 tags can confuse search engines about your main topic. Keep one H1 and demote the rest to H2."
+        ? "Several top-level headings can blur what your page is mainly about. Ask Strelva to keep one main heading and make the others sub-headings."
         : undefined,
   });
 
@@ -255,10 +255,10 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     status: jsRisk ? "warn" : "pass",
     score: jsRisk ? 40 : 100,
     message: jsRisk
-      ? "The page may need JavaScript to show its content."
-      : "The page content is readable in the server HTML.",
+      ? "Your page may need JavaScript to run before its content appears."
+      : "Your content is readable right in the page, the way search engines prefer.",
     details: jsRisk
-      ? "A single-page-app shell was found with little text in the HTML. Search engines and AI assistants may not see content that only appears after JavaScript runs. Server-render the key content."
+      ? "There is very little text in the page until scripts run, and search engines and AI may not wait for them. Ask Strelva to serve your key content directly in the page so it is always readable."
       : undefined,
   });
 

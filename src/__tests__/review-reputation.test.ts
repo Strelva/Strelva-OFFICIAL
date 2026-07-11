@@ -190,7 +190,22 @@ describe("ReputationHeader render", () => {
     expect(html).toContain("Your reputation is strong");
     expect(html).toContain("Response rate");
     expect(html).toContain("85%");
-    expect(html).toContain("New this month");
+    expect(html).toContain("Last 30 days");
+  });
+
+  it("reframes a down-trend as an opportunity, never shame", () => {
+    // recent (1) < prior (3): the one spot that used to read negative.
+    const reviews = [
+      review({ rating: 5, date: daysAgo(3) }),
+      review({ rating: 5, date: daysAgo(40) }),
+      review({ rating: 5, date: daysAgo(45) }),
+      review({ rating: 5, date: daysAgo(50) }),
+    ];
+    const html = render({ reviews, gbpConnected: true, copyDest: "Google" });
+    expect(html).toContain("Last 30 days");
+    // Keeps the prior number, points at the action, no shame language.
+    expect(html).toContain("The share link brings them back");
+    expect(html.toLowerCase()).not.toContain("down from");
   });
 
   it("invites more reviews (not a red number) when data is thin", () => {

@@ -1066,7 +1066,6 @@ const hasAnyOAuth = hasGoogleOAuth || hasInstagramOAuth || hasCalendlyOAuth;
 checkRequiredWhen(hasAnyOAuth, "NEXT_PUBLIC_APP_URL", "OAuth redirects need the deployed app URL", false);
 
 console.log("\n─── External Webhook Secrets ────────────────────────────────────");
-checkEnvVar("VEGARO_WEBHOOK_SECRET", false);
 checkRequiredWhen(hasCalendlyOAuth, "CALENDLY_WEBHOOK_SECRET", "Calendly OAuth registers booking webhooks");
 if (!hasCalendlyOAuth) checkEnvVar("CALENDLY_WEBHOOK_SECRET", false);
 
@@ -1399,10 +1398,6 @@ function printWebhookUrls() {
   console.log("Calendly Webhook (if using):");
   console.log(`  URL: ${baseUrl}/api/webhooks/calendly`);
   console.log("  Secret: Set CALENDLY_WEBHOOK_SECRET to match\n");
-
-  console.log("Vegaro Webhook (if using):");
-  console.log(`  URL: ${baseUrl}/api/webhooks/vegaro`);
-  console.log("  Secret: Set VEGARO_WEBHOOK_SECRET to match\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -19,9 +19,9 @@ type BusinessModel = "local" | "online" | "hybrid";
 type Step = "welcome" | "find" | "want" | "voice" | "done";
 
 const VOICE_PRESETS: { label: string; value: string }[] = [
-  { label: "Warm & friendly", value: "Warm, friendly, and welcoming — like a neighbor who knows their stuff." },
+  { label: "Warm & friendly", value: "Warm, friendly, and welcoming, like a neighbor who knows their stuff." },
   { label: "Polished & professional", value: "Polished and professional, clear and confident without being stiff." },
-  { label: "Bold & direct", value: "Bold and direct — short sentences, no fluff, get to the point." },
+  { label: "Bold & direct", value: "Bold and direct: short sentences, no fluff, get to the point." },
 ];
 
 export function OnboardingWizard() {
@@ -190,7 +190,7 @@ export function OnboardingWizard() {
           <div>
             <h2 className="text-[20px] font-semibold text-warm-black">How should Strelva sound?</h2>
             <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">
-              Pick a voice — we&apos;ll use it every time we write or update your site.
+              Pick a voice. We&apos;ll use it every time we write or update your site.
             </p>
             <div className="mt-4 grid gap-2">
               {VOICE_PRESETS.map((v) => (

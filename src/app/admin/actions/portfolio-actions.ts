@@ -24,12 +24,21 @@ export interface PortfolioActionItem {
   label: string;
   title: string;
   createdAt: string;
+  /** Event type + metadata, threaded so the bulk-approve queue can render the
+   *  SAME before→after diff / GBP post / hours detail the client Today queue
+   *  shows (`QueueEventDetail`) — so a bulk-approver reads the real change, not
+   *  just the label, before approving. */
+  type: UnifiedEvent["type"];
+  metadata?: UnifiedEvent["metadata"];
 }
 
 export interface PortfolioActionGroup {
   tenantId: string;
   siteName: string;
   items: PortfolioActionItem[];
+  /** True when the tenant's pending read hit the fetch cap, so more may be
+   *  waiting than shown. Drives an honest "showing first N" marker. */
+  capped: boolean;
 }
 
 export interface PortfolioActionsSnapshot {
@@ -72,14 +81,19 @@ export function describePortfolioAction(event: UnifiedEvent): string {
  * ordered by how much each client is waiting on (busiest first). Per-tenant and
  * per-read failures degrade to empty rather than failing the whole snapshot.
  */
+/** Per-tenant pending fetch cap. When a tenant's pending read returns this many
+ *  raw events, more may be waiting than we surface — flagged as `capped`. */
+export const PORTFOLIO_EVENTS_LIMIT = 100;
+
 export async function getPortfolioActions(): Promise<PortfolioActionsSnapshot> {
   const tenants = (await getAllTenants().catch(() => [])).filter(isActiveTenant);
 
   const groups = await Promise.all(
     tenants.map(async (t): Promise<PortfolioActionGroup> => {
-      const events = await getEvents(t.id, { status: "pending", limit: 100 }).catch(
-        () => [] as UnifiedEvent[],
-      );
+      const events = await getEvents(t.id, {
+        status: "pending",
+        limit: PORTFOLIO_EVENTS_LIMIT,
+      }).catch(() => [] as UnifiedEvent[]);
       const items = events.filter(isPortfolioApprovable).map(
         (e): PortfolioActionItem => ({
           id: e.id,
@@ -87,9 +101,16 @@ export async function getPortfolioActions(): Promise<PortfolioActionsSnapshot> {
           label: describePortfolioAction(e),
           title: e.title,
           createdAt: e.createdAt,
+          type: e.type,
+          metadata: e.metadata,
         }),
       );
-      return { tenantId: t.id, siteName: t.siteName || t.id, items };
+      return {
+        tenantId: t.id,
+        siteName: t.siteName || t.id,
+        items,
+        capped: events.length >= PORTFOLIO_EVENTS_LIMIT,
+      };
     }),
   );
 

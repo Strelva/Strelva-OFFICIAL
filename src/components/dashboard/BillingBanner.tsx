@@ -90,7 +90,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
       if (!res.ok) {
         setError(
           res.status === 404
-            ? "You're on a managed plan — there's no billing portal to open. Message Strelva anytime about your plan."
+            ? "You're on a managed plan. There's no billing portal to open. Message Strelva anytime about your plan."
             : body?.error || "Couldn't open billing. Try again.",
         );
         return;

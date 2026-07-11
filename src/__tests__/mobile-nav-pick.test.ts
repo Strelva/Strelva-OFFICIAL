@@ -9,13 +9,13 @@ function conn(provider: Connection["provider"], status: Connection["status"] = "
 
 describe("pickMobileNavSurfaces — the phone bottom-bar pick", () => {
   it("keeps Reviews for a fully-connected local business (drops Website, not Reviews)", () => {
-    // Local template + Google connected + a review source → all 6 surfaces shown,
-    // one over the 5-tab phone cap.
+    // Local template + Google connected + a review source → all 7 surfaces shown
+    // (Reports is now its own tab), two over the 5-tab phone cap.
     const surfaces = getDashboardSurfaces({
       tenantConfig: { template: "wellness", reviewsConfig: { googlePlaceId: "p" } },
       connections: [conn("google")],
     });
-    expect(surfaces.filter((s) => s.state === "shown")).toHaveLength(6);
+    expect(surfaces.filter((s) => s.state === "shown")).toHaveLength(7);
 
     const bar = pickMobileNavSurfaces(surfaces).map((s) => s.id);
     expect(bar).toHaveLength(5);
@@ -39,13 +39,14 @@ describe("pickMobileNavSurfaces — the phone bottom-bar pick", () => {
   });
 
   it("keeps every tab when 5 or fewer are shown (online brand)", () => {
-    // food-brand → Google Business + Reviews hidden, so only 4 shown.
+    // food-brand → Google Business + Reviews hidden, so only 5 shown (Reports is
+    // its own tab now) — still within the 5-tab cap, so all are kept.
     const surfaces = getDashboardSurfaces({
       tenantConfig: { template: "food-brand" },
       connections: [],
     });
     const bar = pickMobileNavSurfaces(surfaces).map((s) => s.id);
-    expect(bar).toEqual(["today", "ask-ai", "website", "analytics"]);
+    expect(bar).toEqual(["today", "ask-ai", "website", "analytics", "reports"]);
   });
 
   it("never puts a connect-state or hidden surface in the bar", () => {

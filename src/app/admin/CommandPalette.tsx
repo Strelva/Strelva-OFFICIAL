@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface Cmd {
   id: string;
@@ -19,8 +19,19 @@ const NAV: Cmd[] = [
   { id: "nav-audit", label: "Audit trail", hint: "Section", href: "/admin/audit" },
 ];
 
+// Actions, not just jumps. Each routes to a surface that ALREADY performs the
+// work — either the real page (mint a pay link) or Mission Control with the ask
+// prefilled (`?ask=`), where the operator agent's propose_* → confirm flow
+// commits it. No new mutation path is created here; this is navigation only.
+const ACTIONS: Cmd[] = [
+  { id: "act-mc", label: "Open Mission Control", hint: "Action", href: "/admin#mission-control" },
+  { id: "act-ask", label: "Ask the operator agent…", hint: "Action", href: "/admin?ask=" },
+  { id: "act-paylink", label: "Mint a pay link", hint: "Action", href: "/admin/pay-links" },
+];
+
 export function CommandPalette({ tenants }: { tenants: { id: string; siteName: string }[] }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -29,12 +40,21 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
   const commands = useMemo<Cmd[]>(
     () => [
       ...NAV,
-      ...tenants.map((t) => ({
-        id: `tenant-${t.id}`,
-        label: t.siteName,
-        hint: "Client",
-        href: `/admin/clients/${t.id}`,
-      })),
+      ...ACTIONS,
+      ...tenants.flatMap((t) => [
+        {
+          id: `tenant-${t.id}`,
+          label: t.siteName,
+          hint: "Client",
+          href: `/admin/clients/${t.id}`,
+        },
+        {
+          id: `scan-${t.id}`,
+          label: `Run a scan on ${t.siteName}`,
+          hint: "Action",
+          href: `/admin?ask=${encodeURIComponent(`Run a fresh site scan on ${t.id}`)}`,
+        },
+      ]),
     ],
     [tenants]
   );
@@ -84,6 +104,14 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
   function go(cmd: Cmd | undefined) {
     if (!cmd) return;
     setOpen(false);
+    // An `?ask=` action prefills Mission Control. If we're already on /admin the
+    // console is mounted (its `?ask=` mount effect won't re-fire), so hand it the
+    // ask over a live event instead of a no-op navigation.
+    const askMatch = cmd.href.match(/^\/admin\?ask=(.*)$/);
+    if (askMatch && pathname === "/admin") {
+      window.dispatchEvent(new CustomEvent("strelva:ask", { detail: decodeURIComponent(askMatch[1]) }));
+      return;
+    }
     router.push(cmd.href);
   }
 

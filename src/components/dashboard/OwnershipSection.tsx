@@ -11,6 +11,7 @@ import {
   KeyRound,
   Loader2,
   Lock,
+  Package,
   ShieldCheck,
   UserMinus,
 } from "lucide-react";
@@ -22,21 +23,21 @@ type Domain = { domain: string; status: "connected" | "pending"; isApex: boolean
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 const OWNED_ITEMS = [
-  "Your domain — registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
-  "All your content — business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
+  "Your domain: registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
+  "All your content: business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
   "On the monthly plan: the full site repo and source files, which transfer to you at month 12 or earlier via buyout. Your domain is already yours either way.",
 ];
 
 const MANAGED_ITEMS = [
-  "Hosting and deployment — the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
-  "The platform — dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
+  "Hosting and deployment: the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
+  "The platform: dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
   "Strelva platform source code and deployment credentials. (The platform itself stays with Strelva; your site repo is what transfers to you.)",
 ];
 
 const HANDOFF_STEPS = [
   {
     title: "Export content",
-    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration — everything Strelva renders from.",
+    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration: everything Strelva renders from.",
   },
   {
     title: "Export assets",
@@ -44,15 +45,15 @@ const HANDOFF_STEPS = [
   },
   {
     title: "Repo + files transfer",
-    body: "On the monthly plan, the site repo and source files transfer to you at month 12 — or earlier via buyout. Strelva bakes your exported content in so the repo runs on its own, then hands you ownership.",
+    body: "On the monthly plan, the site repo and source files transfer to you at month 12, or earlier via buyout. Strelva bakes your exported content in so the repo runs on its own, then hands you ownership.",
   },
   {
     title: "DNS is already yours",
-    body: "Your domain has been in your name since day one. There's nothing to move — Strelva just steps off the DNS-edit access once your deploy is live on your own account.",
+    body: "Your domain has been in your name since day one. There's nothing to move. Strelva just steps off the DNS-edit access once your deploy is live on your own account.",
   },
   {
     title: "Cancel billing",
-    body: "Use the billing portal when handoff timing is confirmed. Canceling billing doesn't move the repo or export files by itself — do the exports and transfer first.",
+    body: "Use the billing portal when handoff timing is confirmed. Canceling billing doesn't move the repo or export files by itself. Do the exports and transfer first.",
   },
   {
     title: "Revoke access",
@@ -90,6 +91,8 @@ export function OwnershipSection() {
   const [loadingDomains, setLoadingDomains] = useState(true);
   const [downloading, setDownloading] = useState<"content" | "assets" | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const [confirmingHandoff, setConfirmingHandoff] = useState(false);
+  const [handoffNote, setHandoffNote] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [billingError, setBillingError] = useState("");
@@ -129,7 +132,7 @@ export function OwnershipSection() {
     }
   }
 
-  async function requestHandoff() {
+  async function sendFilesRequest() {
     setError("");
     setNotice("");
     setRequesting(true);
@@ -138,12 +141,16 @@ export function OwnershipSection() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ notes: "Client opened ownership settings handoff request." }),
+        body: JSON.stringify({
+          notes: handoffNote.trim() || "Owner requested their site files from the Ownership Center.",
+        }),
       });
       if (!res.ok) throw new Error("Request failed");
-      setNotice("Handoff request recorded. Strelva can coordinate timing from here.");
+      setConfirmingHandoff(false);
+      setHandoffNote("");
+      setNotice("We've got your request. We'll reach out to hand over your files.");
     } catch {
-      setError("Could not record the handoff request. You can still download exports and contact Strelva directly.");
+      setError("Could not send that request. You can still download your exports or email Strelva directly.");
     } finally {
       setRequesting(false);
     }
@@ -161,7 +168,7 @@ export function OwnershipSection() {
       if (!res.ok || !body?.portalUrl) {
         setBillingError(
           res.status === 404 || !dashboard?.hasStripeCustomer
-            ? "Your plan is managed by Strelva — message us anytime to change or end it."
+            ? "Your plan is managed by Strelva. Message us anytime to change or end it."
             : body?.error || "Could not open the billing portal.",
         );
         return;
@@ -182,10 +189,10 @@ export function OwnershipSection() {
             Handoff clarity
           </p>
           <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-warm-white">
-            Ownership
+            Your domain, your content, your customers. Leave anytime, with everything.
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-            See what belongs to your business, what Strelva manages, and what to export before any offboarding, DNS, or billing change.
+            Nothing here is locked in. Export your content and assets whenever you want, request your site files in one click, and see exactly what transfers before any offboarding, DNS, or billing change.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -248,20 +255,76 @@ export function OwnershipSection() {
 
       <section className="rounded-xl border border-glass-border bg-glass p-5">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="max-w-xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-              Offboarding checklist
+              Your site files
             </p>
-            <h3 className="mt-1 text-[18px] font-medium text-warm-white">Move cleanly, in order</h3>
+            <h3 className="mt-1 text-[18px] font-medium text-warm-white">Request your site files</h3>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-gray-muted">
+              One click tells Strelva you want the site repo and source files handed over. We&apos;ll confirm timing and walk the transfer with you. Your domain is already in your name, so there&apos;s nothing to move there.
+            </p>
           </div>
-          <Button
-            variant="secondary"
-            icon={requesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            onClick={requestHandoff}
-            disabled={requesting}
-          >
-            Request handoff
-          </Button>
+          {!confirmingHandoff && (
+            <Button
+              variant="primary"
+              icon={<Package className="h-4 w-4" />}
+              onClick={() => {
+                setError("");
+                setNotice("");
+                setConfirmingHandoff(true);
+              }}
+            >
+              Request your site files
+            </Button>
+          )}
+        </div>
+
+        {confirmingHandoff && (
+          <div className="mb-6 rounded-lg border border-accent/30 bg-accent-dim/40 p-4">
+            <label htmlFor="handoff-note" className="block text-[12px] font-medium text-warm-white">
+              Anything we should know? (optional)
+            </label>
+            <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
+              Add your timing, where you&apos;re taking the site, or a question. We&apos;ll read it before we reach out.
+            </p>
+            <textarea
+              id="handoff-note"
+              value={handoffNote}
+              onChange={(event) => setHandoffNote(event.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="e.g. Hoping to move in the next month. What do you need from me?"
+              className="mt-3 w-full resize-none rounded-lg border border-gray-border bg-surface-raised px-3 py-2 text-[13px] text-warm-white placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                icon={requesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
+                onClick={sendFilesRequest}
+                disabled={requesting}
+              >
+                Send request
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setConfirmingHandoff(false);
+                  setHandoffNote("");
+                }}
+                disabled={requesting}
+              >
+                Cancel
+              </Button>
+              <span className="text-[11px] text-gray-faint">Sending this doesn&apos;t cancel billing or move anything.</span>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-5 border-t border-glass-border pt-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+            Offboarding checklist
+          </p>
+          <h4 className="mt-1 text-[15px] font-medium text-warm-white">Move cleanly, in order</h4>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {HANDOFF_STEPS.map((step, index) => (

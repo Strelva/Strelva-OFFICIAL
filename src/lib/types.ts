@@ -816,6 +816,9 @@ export interface WeeklyBriefStaleSection {
 export interface WeeklyBrief {
   id: string;
   tenantId: string;
+  /** "week" (default) or "month" — weekly + monthly recaps share this store.
+   *  weekStart/weekEnd hold the period bounds either way. */
+  period?: "week" | "month";
   weekStart: string;
   weekEnd: string;
   summary: string;

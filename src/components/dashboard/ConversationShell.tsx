@@ -17,6 +17,12 @@ interface ConversationShellProps {
   pendingCount?: number;
   /** Whether the tenant runs a storefront — adds the Store sub-tab to the Website sub-nav. */
   hasStore?: boolean;
+  /** Super-admin inspect mode is active — show the inspect strip + preview markers. */
+  inspect?: boolean;
+  /** Business name shown in the "Inspecting {name}" strip. */
+  inspectTenantName?: string;
+  /** Exit-inspect link (clears the cookie, returns to the admin client page). */
+  inspectExitHref?: string;
 }
 
 export function ConversationShell({
@@ -28,6 +34,9 @@ export function ConversationShell({
   isSuperAdmin = false,
   pendingCount = 0,
   hasStore = false,
+  inspect = false,
+  inspectTenantName,
+  inspectExitHref,
 }: ConversationShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Admins can preview the dashboard exactly as the client sees it — hides the
@@ -50,6 +59,9 @@ export function ConversationShell({
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pendingCount={pendingCount}
+        inspect={inspect}
+        inspectTenantName={inspectTenantName}
+        inspectExitHref={inspectExitHref}
       />
 
       {/* Main content area */}

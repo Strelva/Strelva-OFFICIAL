@@ -69,7 +69,8 @@ beforeEach(() => {
   mockGetEvents.mockResolvedValue([]);
   mockAddEvent.mockResolvedValue({ id: "evt_new" });
   mockStoreRecentReply.mockResolvedValue(undefined);
-  mockGenerateProactive.mockResolvedValue(undefined);
+  // Default: the governed generator queued one suggestion (a real draft landed).
+  mockGenerateProactive.mockResolvedValue(1);
   mockDraftReviewReply.mockResolvedValue("Sam, sorry the wait was long. We've tightened staffing.");
 });
 
@@ -187,9 +188,24 @@ describe("draftOpportunityForClients — governed, lands PENDING not published",
     expect(mockDraftReviewReply).not.toHaveBeenCalled();
   });
 
+  it("reports a client that produced 0 drafts as skipped, not drafted (no phantom)", async () => {
+    // A stale client with no content engine and no unreplied review: the governed
+    // generator queues nothing, so the pass must report it honestly as
+    // nothing_to_draft — never a phantom "drafted for N clients".
+    mockGenerateProactive.mockImplementation(async (id: string) => (id === "acme" ? 1 : 0));
+
+    const results = await draftOpportunityForClients("stale_sites", ["acme", "bolt"]);
+
+    expect(results).toEqual([
+      { tenantId: "acme", drafted: true },
+      { tenantId: "bolt", drafted: false, reason: "nothing_to_draft" },
+    ]);
+  });
+
   it("reports honest partial failure — one client throwing never aborts the rest", async () => {
     mockGenerateProactive.mockImplementation(async (id: string) => {
       if (id === "bolt") throw new Error("boom");
+      return 1;
     });
 
     const results = await draftOpportunityForClients("low_health", ["acme", "bolt", "cove"]);

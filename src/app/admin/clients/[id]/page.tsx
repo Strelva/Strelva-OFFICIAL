@@ -10,6 +10,8 @@ import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagno
 import { getReviews } from "@/lib/reviews";
 import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";
 import { getTenantCrm } from "@/lib/tenant-crm";
+import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
+import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
@@ -51,7 +53,16 @@ export default async function ClientDetailPage({
   const tenant = await getTenantConfig(id);
   if (!tenant) notFound();
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm] =
+  const noRisk: AtRiskSignal = {
+    tenantId: id,
+    atRisk: false,
+    reasons: [],
+    daysSinceActivity: null,
+    engagement7d: 0,
+    subscriptionStatus: null,
+  };
+
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -63,6 +74,7 @@ export default async function ClientDetailPage({
       getLatestSnapshots(id, 2).catch(() => []),
       getReviews(id).catch(() => []),
       getTenantCrm(id).catch(() => null),
+      getTenantAtRisk(id).catch(() => noRisk),
     ]);
 
   const latestVis = visSnapshots[0] ?? null;
@@ -70,6 +82,54 @@ export default async function ClientDetailPage({
   const visFindings = latestVis ? diagnoseVisibility(latestVis) : [];
   const visDiff = latestVis ? diffSnapshots(visSnapshots[1] ?? null, latestVis) : null;
   const reviewIntel = getAdminReviewIntelligence(reviews);
+
+  // Fuse the panels' self-verdicts into ONE ranked "next action for this client".
+  // Priority: churn > launch-blocked > failing site health > reviews waiting.
+  // Each signal is fail-soft — a missing one just drops out of the ranking.
+  let launchFails = 0;
+  try {
+    launchFails = getTenantLaunchReadinessResults(tenant).filter((r) => r.status === "fail").length;
+  } catch {
+    launchFails = 0;
+  }
+  const grade = lastScan?.grade ?? null;
+  const needsReply = reviewIntel.needsResponse.length;
+
+  let verdict: { tone: "red" | "amber" | "emerald"; message: string };
+  if (atRisk.atRisk && atRisk.reasons.length > 0) {
+    const reason = atRisk.reasons[0];
+    verdict = {
+      tone: "red",
+      message: `At risk: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}. Reach out.`,
+    };
+  } else if (launchFails > 0) {
+    verdict = {
+      tone: "amber",
+      message: `Launch blocked: ${launchFails} infrastructure ${launchFails === 1 ? "check" : "checks"} to fix before go-live.`,
+    };
+  } else if (grade === "F" || grade === "D") {
+    verdict = {
+      tone: grade === "F" ? "red" : "amber",
+      message: `${grade}-grade site. Fix the issues below.`,
+    };
+  } else if (needsReply > 0) {
+    verdict = {
+      tone: "amber",
+      message: `${needsReply} review${needsReply === 1 ? "" : "s"} waiting on a reply.`,
+    };
+  } else {
+    verdict = { tone: "emerald", message: "Healthy. Nothing needs you." };
+  }
+  const verdictTone = {
+    red: "border-red-500/30 bg-red-500/10",
+    amber: "border-amber-500/30 bg-amber-500/10",
+    emerald: "border-emerald-500/30 bg-emerald-500/10",
+  }[verdict.tone];
+  const verdictDot = {
+    red: "bg-red-400",
+    amber: "bg-amber-400",
+    emerald: "bg-emerald-400",
+  }[verdict.tone];
 
   const publicUrl = getTenantPublicUrl(tenant);
   const dashboardUrl = getTenantDashboardFallbackUrl(tenant);
@@ -98,6 +158,13 @@ export default async function ClientDetailPage({
               Dashboard
             </a>
             <a
+              href={`/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`}
+              className="rounded-md px-3 py-2 text-sm text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+              title="Open this client's dashboard as a read-only operator preview"
+            >
+              Inspect
+            </a>
+            <a
               href={publicUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -109,16 +176,25 @@ export default async function ClientDetailPage({
         </div>
       </div>
 
+      {/* Fused verdict — the single next action for this client, above the panels. */}
+      <div className={`rounded-xl border p-5 ${verdictTone}`}>
+        <p className="text-xs uppercase tracking-wide text-gray-muted">Next action</p>
+        <div className="mt-1 flex items-center gap-2.5">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${verdictDot}`} />
+          <p className="text-[15px] font-medium text-warm-white">{verdict.message}</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} />
         <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} />
-        <Pulse label="Drafts waiting" value={Object.keys(drafts).length} />
+        <Pulse label="Content drafts" value={Object.keys(drafts).length} />
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
       <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
 
-      <ReviewIntelPanel intel={reviewIntel} />
+      <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
 
       <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
 

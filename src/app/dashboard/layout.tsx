@@ -6,6 +6,7 @@ import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
 import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfacesContext";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
+import { getTenantSiteName } from "@/lib/tenant-display";
 import { getConnections } from "@/lib/connections";
 import { getVisibleSurfaces, tenantHasStore } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
@@ -16,6 +17,7 @@ import { getQueueCount } from "@/lib/events";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { isInspecting } from "@/lib/inspect-mode";
 import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custom-repos";
 import { getLocalClientPreviewUrl } from "@/lib/preview-target";
 import { ConversationShell } from "@/components/dashboard/ConversationShell";
@@ -83,12 +85,18 @@ export default async function DashboardLayout({
   const previewUrl = shouldUseLocalClientPreviewUrl
     ? localClientPreviewUrl || ""
     : tenantEditablePreviewUrl;
-  let siteName = "Your Business";
+  // Resolve the real business name (config.siteName, known-tenant name, or the
+  // owner name) instead of a generic "Your Business" when the content settings
+  // haven't set a site name yet. The editable content siteName still wins.
+  let siteName = getTenantSiteName(tenant, tenantConfig ?? undefined);
   let settingsBusinessModel = "";
   let businessLogoUrl = "";
   try {
     const settings = await getContent("settings", tenant);
-    siteName = settings.siteName || siteName;
+    // Ignore the "Your Business" default placeholder (defaults.ts) — an unset
+    // content siteName falls back to it, which would otherwise mask the real
+    // resolved business name.
+    if (settings.siteName && settings.siteName !== "Your Business") siteName = settings.siteName;
     settingsBusinessModel = settings.businessModel || "";
     businessLogoUrl = settings.logoUrl || "";
   } catch {}
@@ -122,12 +130,17 @@ export default async function DashboardLayout({
     settingsBusinessModel === "local" || settingsBusinessModel === "online" || settingsBusinessModel === "hybrid"
       ? settingsBusinessModel
       : undefined;
+  // Super-admin inspect mode: re-verified server-side (cookie + isSuperAdmin) — a
+  // real client always resolves false. When on, the nav surfaces every vertical-set
+  // tab (the not-enabled ones marked preview) so the operator can open any surface.
+  const inspect = await isInspecting();
   const surfaces = getVisibleSurfaces({
     tenantConfig: {
       ...(tenantConfig ?? { template: "wellness" }),
       ...(businessModel ? { businessModel } : {}),
     },
     connections,
+    inspect,
   });
   // The signed-in PERSON, for the sidebar's "Hello, {name}" account footer —
   // this is the login identity, NOT the tenant's owner-name setting, so a
@@ -192,6 +205,9 @@ export default async function DashboardLayout({
           isSuperAdmin={isAdmin}
           pendingCount={pendingCount}
           hasStore={hasStore}
+          inspect={inspect}
+          inspectTenantName={siteName}
+          inspectExitHref={`/api/admin/inspect?on=0&to=${encodeURIComponent(`/admin/clients/${tenant}`)}`}
         >
           {children}
         </ConversationShell>

@@ -41,6 +41,7 @@ export type SurfaceId =
   | "website"
   | "google-business"
   | "analytics"
+  | "reports"
   | "reviews"
   // Vertical-set member surfaces (appended by the feature registry — see src/lib/features/registry.ts).
   | "schedule"
@@ -56,6 +57,10 @@ export interface DashboardSurface {
   state: SurfaceState;
   /** Which nav group it sits in. `manage` = always-on core; `presence` = the conditional pillars; `set` = a vertical-set member. */
   group: "manage" | "presence" | "set";
+  /** True only when this surface is shown because a super-admin is inspecting — the
+   *  tenant hasn't enabled it. Lets the nav mark it as a preview. Never set for a
+   *  real client (inspect requires isSuperAdmin, re-verified server-side). */
+  preview?: boolean;
 }
 
 /** Templates whose customers find them locally (maps + GBP matter). */
@@ -141,9 +146,13 @@ export function getWebsiteSections({ hasStore }: { hasStore: boolean }): Website
 export function getDashboardSurfaces({
   tenantConfig,
   connections,
+  inspect = false,
 }: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  /** Super-admin inspect mode — surface every vertical-set tab (enabled or not),
+   *  the extras marked `preview`. The six core/presence surfaces are unchanged. */
+  inspect?: boolean;
 }): DashboardSurface[] {
   const presence = getPresenceProfile(tenantConfig);
   const local = presence === "local" || presence === "hybrid";
@@ -164,9 +173,11 @@ export function getDashboardSurfaces({
       state: !local ? "hidden" : gbpConnected ? "shown" : "connect",
       group: "presence",
     },
-    // Analytics — the merged Reports + Health surface: one verdict, then the full
-    // weekly report and the site-health detail in one scroll.
+    // Analytics — the LIVE / rolling surface (range selector + live numbers + the
+    // anomaly + site health). The written recaps are the separate Reports tab.
     { id: "analytics", label: "Analytics", href: "/dashboard/analytics", state: "shown", group: "presence" },
+    // Reports — the written weekly + monthly recaps (verdict + narrative + proof).
+    { id: "reports", label: "Reports", href: "/dashboard/reports", state: "shown", group: "presence" },
     {
       id: "reviews",
       label: "Reviews",
@@ -182,7 +193,7 @@ export function getDashboardSurfaces({
   // Append the vertical-set member surfaces this tenant has enabled (e.g. Wellness →
   // Schedule/Members/Packages/Roster). Additive: the six surfaces above are unchanged,
   // so a tenant with no set features resolves exactly as before. See features/registry.ts.
-  surfaces.push(...getSetSurfaces(tenantConfig.features ?? []));
+  surfaces.push(...getSetSurfaces(tenantConfig.features ?? [], inspect));
 
   return surfaces;
 }
@@ -191,6 +202,7 @@ export function getDashboardSurfaces({
 export function getVisibleSurfaces(args: {
   tenantConfig: SurfaceTenantConfig;
   connections: Connection[];
+  inspect?: boolean;
 }): DashboardSurface[] {
   return getDashboardSurfaces(args).filter((s) => s.state !== "hidden");
 }

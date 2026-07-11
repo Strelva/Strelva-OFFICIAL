@@ -12,6 +12,15 @@ import { listTenantMedia, collectTenantMedia, uploadTenantMedia, deleteTenantMed
 
 const BLOB = "https://abc123.public.blob.vercel-storage.com";
 
+/** Minimal valid PNG header (signature + IHDR width/height) for dimension probing. */
+function pngHeader(width: number, height: number): Buffer {
+  const b = Buffer.alloc(24);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
+  b.writeUInt32BE(width, 16);
+  b.writeUInt32BE(height, 20);
+  return b;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.BLOB_READ_WRITE_TOKEN = "test-token";
@@ -38,6 +47,21 @@ describe("listTenantMedia", () => {
     expect(assets[0].filename).toBe("b.png");
     expect(assets[0]).toMatchObject({ url: `${BLOB}/media/gldf/b.png`, id: `${BLOB}/media/gldf/b.png`, size: 200 });
     expect(assets[1].filename).toBe("a.jpg");
+  });
+
+  it("reads persisted dimensions from the pathname, and stays Unknown (0x0) for legacy paths", async () => {
+    mockList.mockResolvedValue({
+      blobs: [
+        { url: `${BLOB}/media/gldf/uuid1/1024x768/new.jpg`, pathname: "media/gldf/uuid1/1024x768/new.jpg", size: 10, uploadedAt: new Date("2026-07-06T00:00:00Z") },
+        { url: `${BLOB}/media/gldf/uuid2/legacy.jpg`, pathname: "media/gldf/uuid2/legacy.jpg", size: 10, uploadedAt: new Date("2026-07-05T00:00:00Z") },
+      ],
+      hasMore: false,
+    });
+
+    const assets = await listTenantMedia("gldf");
+
+    expect(assets[0]).toMatchObject({ filename: "new.jpg", width: 1024, height: 768 });
+    expect(assets[1]).toMatchObject({ filename: "legacy.jpg", width: 0, height: 0 });
   });
 
   it("paginates via cursor until hasMore is false", async () => {
@@ -70,6 +94,25 @@ describe("uploadTenantMedia", () => {
     expect(body).toBeInstanceOf(Buffer);
     expect(opts).toMatchObject({ access: "public", contentType: "image/jpeg" });
     expect(asset).toMatchObject({ url: `${BLOB}/media/gldf/uuid/photo.jpg`, filename: "photo.jpg", size: 5 });
+  });
+
+  it("probes real pixel dimensions and persists them in the pathname + asset", async () => {
+    mockPut.mockResolvedValue({ url: `${BLOB}/media/gldf/uuid/800x600/photo.png`, pathname: "media/gldf/uuid/800x600/photo.png" });
+
+    const asset = await uploadTenantMedia("gldf", pngHeader(800, 600), "photo.png", "image/png");
+
+    // Size rides in the pathname (before the clean filename) so a later `list` reads it back.
+    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/800x600\/photo\.png$/);
+    expect(asset).toMatchObject({ width: 800, height: 600, filename: "photo.png" });
+  });
+
+  it("omits the size segment (stays honest 0x0) when the header can't be read", async () => {
+    mockPut.mockResolvedValue({ url: `${BLOB}/media/gldf/uuid/x.png`, pathname: "media/gldf/uuid/x.png" });
+
+    const asset = await uploadTenantMedia("gldf", Buffer.from("not-an-image"), "x.png", "image/png");
+
+    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/x\.png$/);
+    expect(asset).toMatchObject({ width: 0, height: 0 });
   });
 
   it("throws a clear error (not a cryptic BlobError) when the Blob token is missing", async () => {

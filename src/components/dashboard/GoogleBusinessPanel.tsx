@@ -6,7 +6,7 @@ import { useDashboard } from "./DashboardContext";
 import type { GbpState } from "@/lib/gbp-management";
 
 const UNLOCKS = [
-  { icon: Clock, title: "Hours that stay right", desc: "Change them once — your site and your Google listing match." },
+  { icon: Clock, title: "Hours that stay right", desc: "Change them once. Your site and your Google listing match." },
   { icon: FileText, title: "Posts to Google", desc: "Turn updates and offers into Google Posts, approved by you first." },
   { icon: Star, title: "Reviews in one place", desc: "See new reviews and approve AI-drafted replies without leaving here." },
   { icon: MapPin, title: "Found on Maps", desc: "Keep your listing complete so nearby customers actually find you." },
@@ -39,8 +39,8 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
         </h1>
         <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-gray-muted">
           Connecting Google links your Business Profile, Search Console, and Analytics in one step.
-          Strelva keeps your listing in sync with your site — hours, posts, and reviews, all approved
-          by you — and shows how customers actually find you in your weekly report.
+          Strelva keeps your listing in sync with your site (hours, posts, and reviews, all approved
+          by you) and shows how customers actually find you in your weekly report.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -73,6 +73,12 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
   const hours = state?.regularHours?.periods ?? [];
   const posts = state?.recentPosts ?? [];
 
+  // Lead with a plain-English health verdict, not a data dump. Opportunity-framed
+  // when something's missing — never shaming.
+  const verdict = hours.length
+    ? "Your listing is connected and your hours are set. Strelva keeps it in sync."
+    : "Your listing is connected. Add your hours so customers know when you're open.";
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="flex items-center justify-between gap-3">
@@ -91,9 +97,12 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
         </span>
       </div>
 
-      <p className="mt-3 max-w-[560px] text-[13px] leading-relaxed text-gray-muted">
-        Changes to your listing run through your approval queue before they publish to Google —
-        nothing goes live without your sign-off.
+      <p className="mt-4 text-[15px] font-medium leading-snug text-warm-black">
+        {verdict}
+      </p>
+      <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-gray-muted">
+        Changes to your listing run through your approval queue before they publish to Google.
+        Nothing goes live without your sign-off.
       </p>
 
       {/* Hours */}
@@ -139,7 +148,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           </ul>
         ) : (
           <p className="mt-2 text-[13px] text-gray-muted">
-            No posts yet. Ask Strelva to draft one from a recent update — you approve before it publishes.
+            No posts yet. Ask Strelva to draft one from a recent update. You approve before it publishes.
           </p>
         )}
       </section>

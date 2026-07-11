@@ -72,6 +72,11 @@ function Dot({ tone }: { tone: "red" | "amber" | "emerald" | "muted" }) {
 
 export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portfolioActions }: TodayFeedProps) {
   const highFlags = flags.filter((f) => f.severity !== "low");
+  // The primary "to approve" count is the one-click-approvable queue (portfolio
+  // actions), not content-preview drafts + digests — otherwise the header reads
+  // "nothing pending" while the box below shows N ready to approve. Content
+  // drafts + digests still render as their own secondary rows.
+  const readyToApprove = portfolioActions?.items ?? 0;
   const nothingWaiting =
     leads.unworked === 0 &&
     approvals.total === 0 &&
@@ -90,11 +95,11 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portf
         ) : (
           <span className="text-xs text-gray-muted">
             {leads.unworked > 0 && `${leads.unworked} new lead${leads.unworked === 1 ? "" : "s"}`}
-            {leads.unworked > 0 && (approvals.total > 0 || atRisk.length > 0) && " · "}
-            {approvals.total > 0 && `${approvals.total} to approve`}
-            {approvals.total > 0 && atRisk.length > 0 && " · "}
+            {leads.unworked > 0 && (readyToApprove > 0 || atRisk.length > 0) && " · "}
+            {readyToApprove > 0 && `${readyToApprove} to approve`}
+            {readyToApprove > 0 && atRisk.length > 0 && " · "}
             {atRisk.length > 0 && `${atRisk.length} at risk`}
-            {(leads.unworked > 0 || approvals.total > 0 || atRisk.length > 0) && highFlags.length > 0 && " · "}
+            {(leads.unworked > 0 || readyToApprove > 0 || atRisk.length > 0) && highFlags.length > 0 && " · "}
             {highFlags.length > 0 && `${highFlags.length} flag${highFlags.length === 1 ? "" : "s"}`}
           </span>
         )}
@@ -140,8 +145,8 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portf
               <Dot tone={approvals.total > 0 || (portfolioActions?.items ?? 0) > 0 ? "amber" : "muted"} />
               <span className="text-sm text-warm-white">Waiting for you</span>
               <span className="text-xs text-gray-muted">
-                {approvals.total > 0
-                  ? `${approvals.total} to approve`
+                {readyToApprove > 0
+                  ? `${readyToApprove} to approve`
                   : "nothing pending"}
               </span>
             </div>
@@ -159,7 +164,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portf
               <Dot tone="amber" />
               <span className="text-warm-white">{portfolioActions!.items}</span>
               <span className="text-gray-muted">
-                approval{portfolioActions!.items === 1 ? "" : "s"} across{" "}
+                ready to approve across{" "}
                 {portfolioActions!.clients} client{portfolioActions!.clients === 1 ? "" : "s"}
               </span>
               <span className="ml-auto text-accent">Approve →</span>

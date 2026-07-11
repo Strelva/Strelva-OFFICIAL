@@ -4,6 +4,7 @@ import {
   Globe,
   MapPin,
   BarChart3,
+  FileText,
   Star,
   CalendarDays,
   Users,
@@ -20,6 +21,7 @@ export const SURFACE_ICONS: Record<SurfaceId, LucideIcon> = {
   "website": Globe,
   "google-business": MapPin,
   "analytics": BarChart3,
+  "reports": FileText,
   "reviews": Star,
   // Vertical-set (wellness) member surfaces.
   "schedule": CalendarDays,
@@ -45,7 +47,8 @@ export const SURFACE_MATCH: Record<SurfaceId, string[]> = {
   "ask-ai": ["/dashboard/chat"],
   "website": ["/dashboard/site", "/dashboard/collections", "/dashboard/content", "/dashboard/assets", "/dashboard/history", "/dashboard/store"],
   "google-business": ["/dashboard/google"],
-  "analytics": ["/dashboard/analytics", "/dashboard/reports", "/dashboard/health"],
+  "analytics": ["/dashboard/analytics", "/dashboard/health"],
+  "reports": ["/dashboard/reports"],
   "reviews": ["/dashboard/reviews"],
   // Vertical-set (wellness) member surfaces — each maps 1:1 to its route.
   "schedule": ["/dashboard/schedule"],

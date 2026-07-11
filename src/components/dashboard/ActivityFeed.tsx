@@ -1,4 +1,5 @@
-import { FileText, Pencil, Sparkles, Star, MessageSquareQuote } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, FileText, Pencil, Sparkles, Star, MessageSquareQuote } from "lucide-react";
 import type { ActivityEntry } from "@/lib/storage/activity-store";
 import { buildActivityFeed, type ActivityFeedKind } from "@/lib/activity-feed";
 
@@ -9,6 +10,26 @@ import { buildActivityFeed, type ActivityFeedKind } from "@/lib/activity-feed";
  * sees the work instead of feeling like nothing is happening. Every line comes
  * from a real logged action (see activity-feed.ts) — never fabricated.
  */
+
+/**
+ * A subtle per-item relative timestamp so the feed reads like a live journal:
+ * "2h ago" for the last day, a weekday ("Tue") within the week, then a plain
+ * date ("Mar 4"). Fail-soft — an unparseable time renders nothing.
+ */
+function feedTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diff = Date.now() - then;
+  const hour = 3_600_000;
+  const day = 24 * hour;
+  if (diff < hour) {
+    if (diff < 60_000) return "just now";
+    return `${Math.floor(diff / 60_000)}m ago`;
+  }
+  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < 7 * day) return new Date(then).toLocaleDateString("en-US", { weekday: "short" });
+  return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 const KIND_ICON: Record<ActivityFeedKind, typeof Pencil> = {
   site: Pencil,
@@ -21,13 +42,19 @@ const KIND_ICON: Record<ActivityFeedKind, typeof Pencil> = {
 function EmptyState() {
   return (
     <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-4 py-4 text-[13px] leading-relaxed text-gray-muted">
-      Strelva just started managing your site — the updates we make will show up here as your proof
+      Strelva just started managing your site. The updates we make will show up here as your proof
       trail. Ask Strelva for one small change to see it land.
     </p>
   );
 }
 
-export function ActivityFeed({ activity }: { activity: ActivityEntry[] }) {
+export function ActivityFeed({
+  activity,
+  historyHref,
+}: {
+  activity: ActivityEntry[];
+  historyHref?: string;
+}) {
   const groups = buildActivityFeed(activity);
 
   return (
@@ -61,12 +88,17 @@ export function ActivityFeed({ activity }: { activity: ActivityEntry[] }) {
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
                         <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-medium leading-snug text-warm-black">{item.label}</p>
                         {item.detail ? (
                           <p className="mt-0.5 line-clamp-1 text-[12px] text-gray-muted">{item.detail}</p>
                         ) : null}
                       </div>
+                      {feedTime(item.time) ? (
+                        <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-gray-faint">
+                          {feedTime(item.time)}
+                        </span>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -75,6 +107,16 @@ export function ActivityFeed({ activity }: { activity: ActivityEntry[] }) {
           ))}
         </div>
       )}
+
+      {groups.length > 0 && historyHref ? (
+        <Link
+          href={historyHref}
+          className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:text-accent/80"
+        >
+          See everything Strelva did
+          <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
+        </Link>
+      ) : null}
     </section>
   );
 }

@@ -6,9 +6,10 @@
  * show every client's grade at a glance and the operator agent can reason over
  * it ("which client has the worst SEO?") without re-running a live scan.
  *
- * We store a compact summary (overall grade/score + per-category scores), not
- * the full per-check detail, to keep the record small. The full breakdown is
- * always available by re-running the scan on the tenant detail page.
+ * We store a compact summary (overall grade/score + per-category scores + the
+ * top few prioritized "fix first" issues), not the full per-check detail, to
+ * keep the record small. The full breakdown is always available by re-running
+ * the scan on the tenant detail page.
  */
 
 import { getRedis } from "./redis";
@@ -24,12 +25,43 @@ export interface ScanCategorySummary {
   score: number;
 }
 
+/**
+ * A single ranked "fix first" issue, compacted for storage — only the fields
+ * the admin `SiteScan` view renders on load. Field names/enums mirror the live
+ * `PrioritizedIssue` (src/lib/audit/prioritize.ts) so the persisted verdict and
+ * a fresh re-scan render through the same code path. The heavier fields
+ * (`status`, `score`, `categorySlug`, `details`) are intentionally dropped.
+ */
+export interface ScanPrioritizedIssue {
+  message: string;
+  category: string;
+  priority: "high" | "medium" | "low";
+  /** Plain-English "what this costs you", when the check carries it. */
+  impact?: string;
+  /** Conservative dollar/customer loss estimate, when credible. */
+  quantified?: string;
+}
+
 export interface ScanSummary {
   url: string;
   scannedAt: string;
   overallScore: number;
   grade: "A" | "B" | "C" | "D" | "F";
   categories: ScanCategorySummary[];
+  /**
+   * The top few ranked "fix first" issues, so the admin view shows the verdict
+   * the audit already produced on load (not null-until-rescan). Optional +
+   * capped: absent on legacy records and on a spotless site, so a missing field
+   * must never break deserialization.
+   */
+  prioritizedIssues?: ScanPrioritizedIssue[];
+  /**
+   * TRUE severity counts across ALL open issues (not just the capped
+   * `prioritizedIssues` list), so the on-load badge is accurate even when a
+   * site has more than 8 issues. Absent on legacy records — the consumer falls
+   * back to counting the capped list.
+   */
+  prioritizedCounts?: { high: number; medium: number; low: number };
 }
 
 /** Trailing scan history (a small ring buffer) for trend lines. */

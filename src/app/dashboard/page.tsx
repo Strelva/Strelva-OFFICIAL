@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink, FileText, Inbox, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
+import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
@@ -13,6 +13,8 @@ import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomai
 import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
+import { getSuggestions } from "@/lib/suggestions";
+import { DoThisNextCard } from "@/components/dashboard/DoThisNextCard";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { selectStrelvaWork } from "@/lib/activity-feed";
@@ -34,8 +36,8 @@ async function DashboardHome() {
     leadSummary,
     phoneActions,
   ] = await Promise.all([
-    getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
-    getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
+    getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
+    getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
     // The approval queue, surfaced inline on Today (folds the separate "Needs
     // you" route into the home). Degrades to an empty queue on a backend blip.
     getNeedsYouData(tenant).catch(() => ({ pending: [], resolved: [], pendingCount: 0, staleSectionCount: 0 })),
@@ -93,13 +95,19 @@ async function DashboardHome() {
   // Lead with the verdict — the weekly-report headline via the same buildVerdict
   // pattern Analytics uses, not a static slogan. Falls back to the primary metric
   // (or a plain "you're live" line) before the first report exists.
-  const verdict = brief
-    ? buildVerdict(brief.stats)
-    : isFresh
-      ? "Your site is live and ready for customers."
-      : pageViews.total > 0
-        ? `${pageViews.total.toLocaleString()} ${pageViews.total === 1 ? "person has" : "people have"} found you so far.`
-        : "Your site is live. Visits show up here as people find you.";
+  // Compute the verdict from LIVE page-view counts (not the frozen brief) so the
+  // Today headline reflects current reality and agrees with the live anomaly on
+  // Analytics — a stale brief could say "up from last week" while traffic is
+  // actually down right now. Falls back to plain lines before any traffic.
+  const liveDelta = pageViews.thisWeek - (pageViews.lastWeek ?? 0);
+  const verdict =
+    brief || pageViews.thisWeek > 0
+      ? buildVerdict({ pageViews: pageViews.thisWeek, pageViewsDelta: liveDelta })
+      : isFresh
+        ? "Your site is live and ready for customers."
+        : pageViews.total > 0
+          ? `${pageViews.total.toLocaleString()} ${pageViews.total === 1 ? "person has" : "people have"} found you so far.`
+          : "Your site is live. Visits show up here as people find you.";
 
   // Proactive nudges (unreplied reviews, stale site, no posts) make the product
   // feel managed — but NEVER for a brand-new tenant: a phantom "needs you: 1" on
@@ -107,6 +115,18 @@ async function DashboardHome() {
   if (!isFresh) {
     await generateProactiveSuggestions(tenant).catch(() => {});
   }
+
+  // "Do this next" — the single top pending suggestion (getSuggestions returns
+  // pending, newest-first) surfaced as a one-tap hand-off into chat. Never on
+  // day one; fail-soft to no card.
+  const topSuggestion = isFresh ? null : (await getSuggestions(tenant).catch(() => []))[0] ?? null;
+  const doNextPrompt = topSuggestion
+    ? topSuggestion.action.startsWith("prompt:")
+      ? topSuggestion.action.slice("prompt:".length)
+      : topSuggestion.action.startsWith("update_section:")
+        ? `Help me update my ${topSuggestion.action.slice("update_section:".length)} section`
+        : topSuggestion.title
+    : "";
 
   return (
     <>
@@ -126,7 +146,7 @@ async function DashboardHome() {
             </p>
             {brief ? (
               <Link
-                href={dashboardHref("/dashboard/analytics")}
+                href={dashboardHref("/dashboard/reports")}
                 className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-colors hover:text-warm-black"
               >
                 <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -169,6 +189,12 @@ async function DashboardHome() {
               checklist (self-hides once done/dismissed); everyone else gets the
               weekly-proof / retention panel. */}
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
+
+          {/* Do this next — your latest pending suggestion, one tap into
+              chat. Only when there's a real pending suggestion. */}
+          {topSuggestion ? (
+            <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
+          ) : null}
 
           {/* Needs you — the approval queue, front and center on Today. Only when
               something waits. */}
@@ -226,7 +252,9 @@ async function DashboardHome() {
           {/* "What Strelva did for you" — the anti-churn proof timeline. The
               managed service made visible. Only past day-one (its own honest
               empty state covers a new-but-not-day-one client). */}
-          {!isFresh ? <ActivityFeed activity={strelvaWork} /> : null}
+          {!isFresh ? (
+            <ActivityFeed activity={strelvaWork} historyHref={dashboardHref("/dashboard/history")} />
+          ) : null}
 
           {leadSummary.recent.length > 0 ? (
             <section className="rounded-2xl border border-glass-border bg-glass p-5">
@@ -250,8 +278,15 @@ async function DashboardHome() {
                     </div>
                     {lead.message ? (
                       <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-gray-muted">{lead.message}</p>
-                    ) : lead.email ? (
-                      <p className="mt-0.5 text-[12px] text-gray-muted">{lead.email}</p>
+                    ) : null}
+                    {lead.email ? (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
+                      >
+                        <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        Reply to {lead.email}
+                      </a>
                     ) : null}
                   </li>
                 ))}

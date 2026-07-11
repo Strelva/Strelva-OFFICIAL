@@ -81,6 +81,19 @@ describe("setLeadWorkflowStatus", () => {
     expect(kept.note).toBe("called, left VM"); // trimmed + preserved
   });
 
+  it("accepts the intermediate `converting` state distinctly from `converted`", async () => {
+    // Convert-click sets `converting` (onboard handoff); only a successful
+    // provision later flips it to `converted`. Both must round-trip.
+    mockGetRedis.mockReturnValue(fakeRedis());
+    const converting = await setLeadWorkflowStatus(TOKEN, "converting");
+    expect(converting.status).toBe("converting");
+    expect((await getLeadWorkflow(TOKEN)).status).toBe("converting");
+
+    const converted = await setLeadWorkflowStatus(TOKEN, "converted");
+    expect(converted.status).toBe("converted");
+    expect((await getLeadWorkflow(TOKEN)).status).toBe("converted");
+  });
+
   it("is a no-op returning computed state without Redis", async () => {
     mockGetRedis.mockReturnValue(null);
     const set = await setLeadWorkflowStatus(TOKEN, "dismissed");

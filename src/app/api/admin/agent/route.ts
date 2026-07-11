@@ -34,6 +34,13 @@ import { getScanSummary, getScanSummaries } from "@/lib/scan-store";
 
 export const maxDuration = 60;
 
+/**
+ * Read tools whose structured output the Mission Control console renders as a
+ * compact card instead of flattened prose. Kept small on purpose — only the
+ * high-value tables (portfolio health, ranked scans, the attention queue).
+ */
+const CARD_TOOLS = new Set(["read_portfolio", "read_scan", "read_attention"]);
+
 interface IncomingMessage {
   role: "user" | "assistant";
   content: string;
@@ -472,6 +479,21 @@ export async function POST(req: Request) {
               part.toolName === "propose_send_invite" ? "Preparing an invite..." :
               "Working on it...";
             controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
+          } else if (part.type === "tool-result") {
+            // A few read tools return structured data that reads far better as a
+            // compact card than as flattened prose. Mirror the client agent's
+            // __CARD__ channel: stream the raw tool output tagged with its tool
+            // name; the console renders a typed, read-only card and falls back to
+            // the agent's own text for everything else. Display-only — the
+            // propose_* → confirm → gated-endpoint mutation flow is untouched.
+            if (CARD_TOOLS.has(part.toolName)) {
+              const output = ("output" in part ? part.output : undefined) as unknown;
+              if (output && typeof output === "object" && !("error" in output)) {
+                controller.enqueue(
+                  encoder.encode(`__CARD__${JSON.stringify({ tool: part.toolName, data: output })}\n`)
+                );
+              }
+            }
           } else if (part.type === "text-delta") {
             const text = "text" in part ? part.text : "";
             if (text) {

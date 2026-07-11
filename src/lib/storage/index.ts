@@ -51,6 +51,7 @@ export {
   getBookingConfig,
   setBookingConfig,
   getDateOverrides,
+  setDateOverrides,
   getBookings,
   createBooking,
   createBookingAtomic,

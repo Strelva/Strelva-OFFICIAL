@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { visibilityHeadline } from "@/lib/visibility/diagnose";
 import type { VisibilityFinding, VisibilitySummary } from "@/lib/visibility/diagnose";
 import type { VisibilityDiff } from "@/lib/visibility/snapshots";
 
@@ -21,8 +22,8 @@ function diffLine(d: VisibilityDiff): string[] {
   const wins = d.changes.filter((c) => c.direction === "appeared" || c.direction === "improved");
   const losses = d.changes.filter((c) => c.direction === "disappeared" || c.direction === "declined");
   const lines: string[] = [];
-  for (const w of wins) lines.push(`▲ ${SURFACE_LABEL[w.surface]} for "${w.query}" — ${w.direction}`);
-  for (const l of losses) lines.push(`▼ ${SURFACE_LABEL[l.surface]} for "${l.query}" — ${l.direction}`);
+  for (const w of wins) lines.push(`▲ ${SURFACE_LABEL[w.surface]} for "${w.query}": ${w.direction}`);
+  for (const l of losses) lines.push(`▼ ${SURFACE_LABEL[l.surface]} for "${l.query}": ${l.direction}`);
   return lines;
 }
 
@@ -63,6 +64,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
   }
 
   const trend = diff ? diffLine(diff) : [];
+  const headline = visibilityHeadline(summary, findings);
 
   return (
     <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-4">
@@ -72,6 +74,8 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
           checked {new Date(summary.checkedAt).toLocaleDateString()}
         </span>
       </div>
+
+      {headline && <p className="text-sm text-warm-white">{headline}</p>}
 
       <div className="grid grid-cols-3 gap-3 text-center">
         <div className="rounded-lg bg-glass border border-glass-border p-3">
@@ -111,6 +115,10 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
                     {SURFACE_LABEL[f.surface]} · {f.severity}
                   </span>
                   <p className="text-sm text-warm-white mt-0.5">{f.problem}</p>
+                  <p className="text-xs text-gray-muted mt-1">{f.impact}</p>
+                  {f.quantified && (
+                    <p className="text-[11px] font-medium text-accent-text mt-1">{f.quantified}</p>
+                  )}
                   <p className="text-xs text-gray-muted mt-1">{f.recommendation}</p>
                 </div>
                 {f.actionable === "on_site" && (

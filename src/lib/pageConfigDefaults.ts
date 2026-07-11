@@ -48,7 +48,7 @@ const FOOD_BRAND_PAGE_CONFIG: SitePageConfig = {
       { type: "email-popup", visible: true, order: 9 },
     ],
     seo: {
-      title: "Your Business — Featured Offers",
+      title: "Your Business: Featured Offers",
       description:
         "A clear overview of what you offer, why customers choose you, and how to take the next step.",
       ogImage: "",

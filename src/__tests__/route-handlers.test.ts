@@ -1128,6 +1128,8 @@ describe("Ownership export and offboarding route handlers", () => {
         text: "Offboarding handoff requested from Ownership Center",
         type: "handoff",
         section: "ownership-center",
+        // The owner's own note rides along in the audit snapshot.
+        snapshot: expect.objectContaining({ notes: "Need to move DNS next Friday" }),
       }),
       "test-tenant",
     );

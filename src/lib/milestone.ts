@@ -164,13 +164,13 @@ function buildVisitors(input: MilestoneInput, startTime: number): MilestoneMetri
 
   return {
     key: "visitors",
-    label: "People who found you",
+    label: "People found you since you started",
     kind: "total",
     now: String(total),
     then: null,
     direction: "none",
     trackingSince: null,
-    caption: `${total === 1 ? "person" : "people"} found you since you started`,
+    caption: `${total === 1 ? "person" : "people"} found you so far`,
   };
 }
 

@@ -15,15 +15,23 @@ import {
   addTenantActivity,
 } from "@/lib/tenant-crm";
 
-/** Minimal in-memory Redis stand-in covering the get/set/mget this store uses. */
+/**
+ * Minimal in-memory Redis stand-in covering get/set/mget/del this store uses,
+ * with real `nx` semantics so the per-tenant CRM lock can be exercised.
+ */
 function fakeRedis() {
   const store = new Map<string, unknown>();
   return {
     store,
     get: vi.fn(async (key: string) => store.get(key) ?? null),
-    set: vi.fn(async (key: string, value: unknown) => {
+    set: vi.fn(async (key: string, value: unknown, opts?: { nx?: boolean; ex?: number }) => {
+      if (opts?.nx && store.has(key)) return null;
       store.set(key, value);
       return "OK";
+    }),
+    del: vi.fn(async (key: string) => {
+      const had = store.delete(key);
+      return had ? 1 : 0;
     }),
     mget: vi.fn(async (...keys: string[]) => keys.map((k) => store.get(k) ?? null)),
   };
@@ -206,6 +214,37 @@ describe("backward compatibility", () => {
     const crm = await addTenantContact("legacy", { name: "New Contact" });
     expect(crm.contacts).toHaveLength(1);
     expect(crm.activity).toEqual([]);
+  });
+});
+
+describe("concurrent mutators", () => {
+  it("does not drop a write when two mutators race (lock serializes read-modify-write)", async () => {
+    mockGetRedis.mockReturnValue(fakeRedis());
+
+    // A cron auto-log (addTenantActivity) racing an operator's tag edit. Both read
+    // the same initial empty record; without the lock the second persist would
+    // last-write-wins away the first's field. The lock must preserve BOTH.
+    await Promise.all([
+      setTenantTags("acme", ["vip"]),
+      addTenantActivity("acme", {
+        kind: "email",
+        summary: "Auto-logged email send",
+        author: "cron",
+      }),
+    ]);
+
+    const crm = await getTenantCrm("acme");
+    expect(crm.tags).toEqual(["vip"]);
+    expect(crm.activity).toHaveLength(1);
+    expect(crm.activity[0].summary).toBe("Auto-logged email send");
+  });
+
+  it("still writes when Redis is unconfigured (no lock, runs directly)", async () => {
+    // Degrade-to-default path: getRedis() null means no lock AND no persistence,
+    // so the mutator returns the computed record without throwing.
+    mockGetRedis.mockReturnValue(null);
+    const crm = await setTenantTags("acme", ["priority"]);
+    expect(crm.tags).toEqual(["priority"]);
   });
 });
 

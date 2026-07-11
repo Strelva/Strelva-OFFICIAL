@@ -37,6 +37,12 @@ async function scanKeyCount(
   return count;
 }
 
+/** One domain-drift finding, carrying the tenant so the ops board can deep-link it. */
+export interface DomainDriftItem {
+  tenantId: string;
+  message: string;
+}
+
 export interface OpsMetrics {
   webhookFailures: number;
   revalidationFailures: number;
@@ -44,7 +50,11 @@ export interface OpsMetrics {
   pendingEvents: Record<string, number>;
   totalPendingEvents: number;
   failedAiWrites: number;
+  /** Human-readable drift lines (kept for the count + attention feed). */
   tenantDomainDrift: string[];
+  /** Same drift, structured so each row links into `/admin/clients/[id]`. Always
+   * populated by `buildOpsReport`; optional so existing snapshot fixtures stay valid. */
+  domainDrift?: DomainDriftItem[];
 }
 
 type RecentFailure = Awaited<ReturnType<typeof getRecentFailures>>[number];
@@ -117,23 +127,28 @@ export async function buildOpsReport(): Promise<OpsReport> {
     }
   })();
 
+  const domainDrift: DomainDriftItem[] = [];
   for (const tenant of active) {
     const config = await getTenantConfig(tenant.id);
     const primaryDomain = config ? getTenantPrimaryDomain(config) : null;
     if (primaryDomain) {
       const envTenant = envDomainMap[primaryDomain];
       if (envTenant && envTenant !== tenant.id) {
-        metrics.tenantDomainDrift.push(
-          `${primaryDomain}: config=${tenant.id}, env=${envTenant}`
-        );
+        domainDrift.push({
+          tenantId: tenant.id,
+          message: `${primaryDomain}: config=${tenant.id}, env=${envTenant}`,
+        });
       }
       if (!envTenant && !primaryDomain.includes("strelva.com")) {
-        metrics.tenantDomainDrift.push(
-          `${primaryDomain}: missing from CUSTOM_DOMAIN_MAP`
-        );
+        domainDrift.push({
+          tenantId: tenant.id,
+          message: `${primaryDomain}: missing from CUSTOM_DOMAIN_MAP`,
+        });
       }
     }
   }
+  metrics.domainDrift = domainDrift;
+  metrics.tenantDomainDrift = domainDrift.map((d) => d.message);
 
   return {
     timestamp: new Date().toISOString(),

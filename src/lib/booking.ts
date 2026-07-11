@@ -62,6 +62,17 @@ function zonedNowAsUtcTimestamp(timezone: string): number {
   );
 }
 
+/**
+ * The tenant's LOCAL calendar day (YYYY-MM-DD) for a given instant. Bookings
+ * store their date as the tenant-local day, so "today" must be resolved in the
+ * tenant's timezone — a plain `new Date().toISOString()` is UTC and rolls to
+ * tomorrow after ~8pm ET, hiding tonight's appointments. `en-CA` formats as
+ * YYYY-MM-DD. `now` is injectable for deterministic tests.
+ */
+export function zonedTodayIso(timezone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
+}
+
 function localSlotAsUtcTimestamp(date: string, time: string): number {
   const [year, month, day] = date.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);

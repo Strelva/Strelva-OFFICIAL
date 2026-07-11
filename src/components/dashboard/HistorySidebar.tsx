@@ -52,6 +52,12 @@ interface HistorySidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
+  /** Super-admin inspect mode — render the "Inspecting {name}" strip + preview markers. */
+  inspect?: boolean;
+  /** Business name shown in the inspect strip. */
+  inspectTenantName?: string;
+  /** Exit-inspect link (clears the cookie). */
+  inspectExitHref?: string;
 }
 
 /** The business's own uploaded logo, falling back to its initial. Uses the
@@ -92,6 +98,9 @@ export function HistorySidebar({
   isOpen = true,
   onClose,
   pendingCount = 0,
+  inspect = false,
+  inspectTenantName,
+  inspectExitHref,
 }: HistorySidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -191,6 +200,28 @@ export function HistorySidebar({
         </button>
       </div>
 
+      {/* Inspect-mode strip — super-admin only (server-verified), distinct amber so
+          the operator always knows they're viewing a client's dashboard, not their own. */}
+      {inspect && (
+        <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-300/12 px-3 py-2 text-amber-100">
+          <Eye className="h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-semibold text-amber-50">
+              Inspecting {inspectTenantName || "client"}
+            </p>
+            <p className="text-[11px] text-amber-100/80 leading-tight">Operator preview</p>
+          </div>
+          {inspectExitHref && (
+            <a
+              href={inspectExitHref}
+              className="shrink-0 rounded-md border border-amber-400/40 px-2 py-1 text-[11px] font-medium text-amber-50 transition-colors hover:bg-amber-300/20"
+            >
+              Exit
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Business identity — the business this account manages: logo + name + its
           own domain. No search, no "visitors this week" (moved to the dashboard). */}
       <div className="flex min-w-0 items-center gap-2.5 px-4 pt-4 lg:pl-5">
@@ -234,6 +265,9 @@ export function HistorySidebar({
                     : SURFACE_MATCH[item.id].some((m) => effectivePathname?.startsWith(m));
                   const Icon = SURFACE_ICONS[item.id];
                   const isConnect = item.state === "connect";
+                  // Shown only because a super-admin is inspecting — the tenant hasn't
+                  // enabled it. Dimmed + an "Off" tag so enabled vs previewing reads at a glance.
+                  const isPreview = item.preview === true;
                   return (
                     <li key={item.id} className="py-0.5">
                       <Link
@@ -243,17 +277,23 @@ export function HistorySidebar({
                         className={`group flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
                           isActive
                             ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
-                            : isConnect
+                            : isConnect || isPreview
                               ? "text-gray-faint hover:bg-gray-bg hover:text-warm-black"
                               : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
                         }`}
                         aria-current={isActive ? "page" : undefined}
+                        title={isPreview ? "Not enabled for this client: operator preview" : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
                         {isConnect && (
                           <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
                             Connect
+                          </span>
+                        )}
+                        {isPreview && (
+                          <span className="shrink-0 rounded-full border border-amber-400/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+                            Off
                           </span>
                         )}
                       </Link>

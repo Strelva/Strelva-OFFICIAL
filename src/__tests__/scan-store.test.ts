@@ -20,6 +20,21 @@ const summary: ScanSummary = {
   categories: [{ name: "Basic SEO", slug: "seo", score: 82 }],
 };
 
+// A summary carrying the persisted "fix first" verdict (the new field).
+const summaryWithIssues: ScanSummary = {
+  ...summary,
+  prioritizedIssues: [
+    {
+      message: "Missing meta description",
+      category: "Basic SEO",
+      priority: "high",
+      impact: "Google writes its own, often poorly.",
+      quantified: "~$120/mo in conversions (estimated)",
+    },
+    { message: "No structured data", category: "AI readiness", priority: "medium" },
+  ],
+};
+
 beforeEach(() => vi.clearAllMocks());
 
 describe("scan-store summary", () => {
@@ -48,6 +63,27 @@ describe("scan-store summary", () => {
     mockGetRedis.mockReturnValue(null);
     expect(await getScanSummary("x")).toBeNull();
     await expect(saveScanSummary("x", summary)).resolves.toBeUndefined();
+  });
+
+  it("round-trips a summary carrying the compact prioritizedIssues verdict", async () => {
+    const store = new Map<string, unknown>();
+    mockGetRedis.mockReturnValue({
+      set: vi.fn((k: string, v: unknown) => {
+        store.set(k, v);
+        return Promise.resolve("OK");
+      }),
+      get: vi.fn((k: string) => Promise.resolve(store.get(k) ?? null)),
+    });
+    await saveScanSummary("gldf", summaryWithIssues);
+    expect(await getScanSummary("gldf")).toEqual(summaryWithIssues);
+  });
+
+  it("deserializes a legacy record with no prioritizedIssues to undefined (back-compat)", async () => {
+    // `summary` predates the field; a stored record without it must not throw.
+    mockGetRedis.mockReturnValue({ get: vi.fn().mockResolvedValue(summary) });
+    const got = await getScanSummary("gldf");
+    expect(got).toEqual(summary);
+    expect(got?.prioritizedIssues).toBeUndefined();
   });
 });
 

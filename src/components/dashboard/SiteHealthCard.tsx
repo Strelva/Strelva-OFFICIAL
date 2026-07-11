@@ -248,7 +248,7 @@ export function SiteHealthCard() {
             </Link>
           </div>
           <p className="mt-0.5 text-[12px] text-gray-muted">
-            Small boosts we&apos;re already watching — ask Strelva to knock one out in
+            Small boosts we&apos;re already watching. Ask Strelva to knock one out in
             chat, or we&apos;ll pick it up as we manage your site.
           </p>
           <ul className="mt-3 grid gap-2">

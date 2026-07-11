@@ -292,7 +292,7 @@ export function ClientsCrm({
                   )}
                   {c.launchStatus && c.launchScore != null && (
                     <span className={`font-medium ${TONE_TEXT[launchTone(c.launchStatus)]}`} title="Launch readiness">
-                      {c.launchScore}%
+                      Launch {c.launchScore}%
                     </span>
                   )}
                   {c.atRiskReason && (

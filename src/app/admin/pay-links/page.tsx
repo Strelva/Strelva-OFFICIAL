@@ -1,26 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type Door = "build" | "managed_start";
+import { useEffect, useMemo, useState } from "react";
 
 interface PayLink {
   slug: string;
   clientName: string;
-  door: Door;
+  /** Retained on existing records (build | managed_start), no longer operator-facing. */
+  door?: string;
   leadSlug?: string;
   amountCents?: number;
+  minCents?: number;
+  maxCents?: number;
   createdAt?: string;
   createdBy?: string;
 }
 
+type AmountMode = "fixed" | "range";
+
 const blankForm = {
   slug: "",
   clientName: "",
-  door: "build" as Door,
   leadSlug: "",
+  mode: "fixed" as AmountMode,
   amountDollars: "",
+  minDollars: "",
+  maxDollars: "",
 };
+
+function dollars(cents: number): string {
+  return `$${Math.round(cents / 100).toLocaleString()}`;
+}
 
 export default function PayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
@@ -31,6 +40,21 @@ export default function PayLinksPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
+
+  // Revenue roll-up across the pay-link book. A link's face amount counts as
+  // "collected" once a build payment converted it (its slug in paidSlugs), else
+  // "outstanding". Range links carry no single figure, so they're left out of
+  // the sum rather than guessed at.
+  const rollup = useMemo(() => {
+    let collected = 0;
+    let outstanding = 0;
+    for (const l of links) {
+      if (typeof l.amountCents !== "number") continue;
+      if (paidSlugs.has(l.slug)) collected += l.amountCents;
+      else outstanding += l.amountCents;
+    }
+    return { collected, outstanding };
+  }, [links, paidSlugs]);
 
   async function load() {
     setLoading(true);
@@ -52,23 +76,45 @@ export default function PayLinksPage() {
 
   async function submit() {
     setError(null);
-    const amountDollars = Number(form.amountDollars);
-    if (!form.slug.trim() || !form.clientName.trim() || !amountDollars) {
-      setError("Slug, client name, and amount are required.");
+    if (!form.slug.trim() || !form.clientName.trim()) {
+      setError("Slug and client name are required.");
       return;
     }
+
+    // The offer is "build" (a one-time charge) — the superseded managed-start
+    // door is gone from the UI; the backend still keys its one-time payment
+    // purpose off door:"build".
+    const body: Record<string, unknown> = {
+      slug: form.slug.trim(),
+      clientName: form.clientName.trim(),
+      door: "build",
+      leadSlug: form.leadSlug.trim() || form.slug.trim(),
+    };
+
+    if (form.mode === "range") {
+      const min = Number(form.minDollars);
+      const max = Number(form.maxDollars);
+      if (!min || !max) {
+        setError("A range link needs both a minimum and a maximum amount.");
+        return;
+      }
+      body.minCents = Math.round(min * 100);
+      body.maxCents = Math.round(max * 100);
+    } else {
+      const amount = Number(form.amountDollars);
+      if (!amount) {
+        setError("An amount is required.");
+        return;
+      }
+      body.amountCents = Math.round(amount * 100);
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/admin/pay-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: form.slug.trim(),
-          clientName: form.clientName.trim(),
-          door: form.door,
-          leadSlug: form.leadSlug.trim() || form.slug.trim(),
-          amountCents: Math.round(amountDollars * 100),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
@@ -110,27 +156,39 @@ export default function PayLinksPage() {
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Pay Links</h1>
         <p className="text-sm text-gray-muted mt-1">
-          Mint a per-client payment link to send before work starts.
+          Mint a payment link for a one-off charge: an occasional paid build or a one-time
+          invoice. Monthly plans bill separately through Stripe.
         </p>
       </div>
 
       <div className="rounded-xl bg-glass border border-glass-border p-5">
-        <h2 className="text-[15px] font-medium text-warm-white mb-4">New pay link</h2>
+        <h2 className="text-[15px] font-medium text-warm-white mb-4">New payment link</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="acme-coffee" />
           <Field label="Client name" value={form.clientName} onChange={(v) => setForm({ ...form, clientName: v })} placeholder="Acme Coffee" />
           <div>
-            <label className="block text-xs text-gray-muted mb-1">Door</label>
+            <label className="block text-xs text-gray-muted mb-1">Amount type</label>
             <select
-              value={form.door}
-              onChange={(e) => setForm({ ...form, door: e.target.value as Door })}
+              value={form.mode}
+              onChange={(e) => setForm({ ...form, mode: e.target.value as AmountMode })}
               className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
             >
-              <option value="build">Build (one-time)</option>
-              <option value="managed_start">Managed (start fee)</option>
+              <option value="fixed">Fixed amount</option>
+              <option value="range">Let them choose (range)</option>
             </select>
           </div>
-          <Field label="Amount (USD)" value={form.amountDollars} onChange={(v) => setForm({ ...form, amountDollars: v })} placeholder="1500" type="number" />
+          {form.mode === "range" ? (
+            <>
+              <Field label="Minimum (USD)" value={form.minDollars} onChange={(v) => setForm({ ...form, minDollars: v })} placeholder="500" type="number" />
+              <Field label="Maximum (USD)" value={form.maxDollars} onChange={(v) => setForm({ ...form, maxDollars: v })} placeholder="2500" type="number" />
+              <p className="sm:col-span-2 text-xs text-gray-faint">
+                The client picks any amount in this range on a $50-step slider, so the span
+                (max − min) must be a whole multiple of $50.
+              </p>
+            </>
+          ) : (
+            <Field label="Amount (USD)" value={form.amountDollars} onChange={(v) => setForm({ ...form, amountDollars: v })} placeholder="1500" type="number" />
+          )}
           <Field label="Lead slug (optional)" value={form.leadSlug} onChange={(v) => setForm({ ...form, leadSlug: v })} placeholder="defaults to slug" />
         </div>
         {error && <p className="text-sm text-red-300 mt-3">{error}</p>}
@@ -139,28 +197,34 @@ export default function PayLinksPage() {
           disabled={submitting}
           className="mt-4 rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
-          {submitting ? "Minting…" : "Mint pay link"}
+          {submitting ? "Minting…" : "Mint payment link"}
         </button>
       </div>
 
       <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
-        <div className="px-5 py-4 border-b border-glass-border">
+        <div className="px-5 py-4 border-b border-glass-border flex items-center justify-between gap-4">
           <h2 className="text-[15px] font-medium text-warm-white">
             Outstanding links {links.length > 0 && <span className="text-gray-muted">({links.length})</span>}
           </h2>
+          {(rollup.collected > 0 || rollup.outstanding > 0) && (
+            <p className="text-[13px] text-gray-muted shrink-0">
+              <span className="text-emerald-300">{dollars(rollup.collected)} collected</span>
+              <span className="text-gray-faint"> · </span>
+              <span className="text-warm-white">{dollars(rollup.outstanding)} outstanding</span>
+            </p>
+          )}
         </div>
         {loading ? (
           <p className="px-5 py-6 text-sm text-gray-muted">Loading…</p>
         ) : links.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-muted">No pay links yet.</p>
+          <p className="px-5 py-6 text-sm text-gray-muted">No payment links yet.</p>
         ) : (
           <ul className="divide-y divide-glass-border">
             {links.map((l) => (
               <li key={l.slug} className="px-5 py-3 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm text-warm-white truncate">
-                    {l.clientName}{" "}
-                    <span className="text-gray-faint">· {l.door}</span>
+                    {l.clientName}
                     {paidSlugs.has(l.slug) && (
                       <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
                         Paid
@@ -170,8 +234,10 @@ export default function PayLinksPage() {
                   <p className="text-xs text-gray-muted truncate">
                     /pay/{l.slug}
                     {typeof l.amountCents === "number"
-                      ? ` · $${(l.amountCents / 100).toLocaleString()}`
-                      : ""}
+                      ? ` · ${dollars(l.amountCents)}`
+                      : typeof l.minCents === "number" && typeof l.maxCents === "number"
+                        ? ` · ${dollars(l.minCents)}–${dollars(l.maxCents)}`
+                        : ""}
                   </p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">

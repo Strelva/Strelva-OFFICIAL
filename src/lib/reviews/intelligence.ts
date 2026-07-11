@@ -222,7 +222,7 @@ export function getAdminReviewIntelligence(
       replied: Boolean(a.review.reply),
       reason:
         a.analysis.urgency === "high"
-          ? "Urgent — needs a reply today"
+          ? "Urgent: needs a reply today"
           : a.review.rating > 0 && a.review.rating <= 2
             ? "Low rating, no reply yet"
             : a.analysis.sentiment.label === "negative"
