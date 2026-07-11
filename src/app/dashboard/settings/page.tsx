@@ -634,8 +634,8 @@ function UtilitiesSection() {
       icon: ImageIcon,
     },
     {
-      title: "Export & handoff",
-      description: "Download content and asset manifests or start a provider handoff.",
+      title: "Ownership & handoff",
+      description: "Export your content and assets, request your site files, and offboard cleanly — all in the Ownership section below.",
       href: "/dashboard/settings#ownership",
       icon: Download,
     },

@@ -72,10 +72,13 @@ export async function POST(request: Request) {
   }
 
   const siteLabel = tenantConfig?.siteName || tenant;
+  // The note is owner-supplied free text. Escape Slack's control characters so it
+  // can't inject mrkdwn like <!channel> or a disguised <url|label> into the ping.
+  const slackSafeNotes = notes.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   await sendSlackNotification(
     {
-      text: `Handoff requested — *${siteLabel}* (${tenant}) opened an Ownership Center handoff request.${
-        notes ? `\nNotes: ${notes}` : ""
+      text: `Handoff requested: *${siteLabel}* (${tenant}) opened an Ownership Center handoff request.${
+        slackSafeNotes ? `\nNotes: ${slackSafeNotes}` : ""
       }`,
     },
     "platform",
