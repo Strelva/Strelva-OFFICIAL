@@ -113,6 +113,38 @@ describe("getPortfolioActions", () => {
     // A tenant whose read failed doesn't 500 the whole snapshot.
   });
 
+  it("threads each event's type + metadata so the queue can render the real diff", async () => {
+    mockGetAllTenants.mockResolvedValue([{ id: "acme", siteName: "Acme Co", active: true }]);
+    const diffs = [{ field: "hero.title", type: "changed", before: "Old", after: "New" }];
+    mockGetEvents.mockResolvedValue([
+      evt({ id: "a1", tenantId: "acme", type: "content_update", metadata: { diffs } }),
+    ]);
+
+    const snap = await getPortfolioActions();
+    const item = snap.groups[0].items[0];
+    expect(item.type).toBe("content_update");
+    expect(item.metadata).toEqual({ diffs });
+  });
+
+  it("flags a group as capped when the pending read hits the fetch limit", async () => {
+    mockGetAllTenants.mockResolvedValue([
+      { id: "big", siteName: "Big Co", active: true },
+      { id: "small", siteName: "Small Co", active: true },
+    ]);
+    mockGetEvents.mockImplementation(async (tenantId: string) => {
+      if (tenantId === "big")
+        // 100 raw pending events (the cap) → capped, even if not all approvable.
+        return Array.from({ length: 100 }, (_, i) => evt({ id: `big-${i}`, tenantId: "big" }));
+      return [evt({ id: "small-1", tenantId: "small" })];
+    });
+
+    const snap = await getPortfolioActions();
+    const big = snap.groups.find((g) => g.tenantId === "big");
+    const small = snap.groups.find((g) => g.tenantId === "small");
+    expect(big?.capped).toBe(true);
+    expect(small?.capped).toBe(false);
+  });
+
   it("degrades a per-tenant read failure to an empty group", async () => {
     mockGetAllTenants.mockResolvedValue([
       { id: "acme", siteName: "Acme Co", active: true },
