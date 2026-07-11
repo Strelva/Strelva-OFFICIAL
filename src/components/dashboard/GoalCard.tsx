@@ -147,7 +147,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
             </button>
           </div>
         </div>
-        {error && <p className="mt-2 text-[12px] text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-[12px] text-critical">{error}</p>}
       </div>
     );
   }

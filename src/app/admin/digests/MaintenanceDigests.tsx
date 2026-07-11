@@ -46,7 +46,7 @@ export function MaintenanceDigests({ initialDigests }: { initialDigests: Mainten
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-[13px] text-red-400">{error}</p>}
+      {error && <p className="text-[13px] text-critical">{error}</p>}
       {digests.map((d) => (
         <div key={d.tenant} className="rounded-xl border border-glass-border bg-surface-raised p-5">
           <div className="mb-3 flex items-center justify-between gap-3">

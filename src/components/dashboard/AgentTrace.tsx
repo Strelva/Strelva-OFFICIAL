@@ -75,9 +75,9 @@ function TraceStepRow({ step, isLast }: { step: TraceStep; isLast: boolean }) {
     step.status === "running"
       ? "text-accent"
       : step.status === "success"
-        ? "text-green-600"
+        ? "text-positive"
         : step.status === "error"
-          ? "text-red-600"
+          ? "text-critical"
           : "text-gray-faint";
 
   return (

@@ -16,8 +16,8 @@ import { draftReviewReplyForReview } from "./review-actions";
  */
 
 const URGENCY_PILL: Record<"high" | "medium" | "low", string> = {
-  high: "bg-red-500/15 text-red-300 border-red-500/30",
-  medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  high: "bg-critical0/15 text-critical border-critical0/30",
+  medium: "bg-warning0/15 text-warning border-warning0/30",
   low: "bg-gray-bg text-gray-muted border-glass-border",
 };
 
@@ -25,7 +25,7 @@ type DraftState = "idle" | "drafting" | "drafted" | "error";
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span className="tabular-nums text-amber-300" aria-label={`${rating} stars`}>
+    <span className="tabular-nums text-warning" aria-label={`${rating} stars`}>
       {"★".repeat(Math.max(0, Math.min(5, Math.round(rating))))}
       <span className="text-gray-faint">{"★".repeat(5 - Math.max(0, Math.min(5, Math.round(rating))))}</span>
     </span>
@@ -59,7 +59,7 @@ function DraftReplyButton({ tenantId, reviewId }: { tenantId: string; reviewId: 
   }
 
   if (state === "drafted") {
-    return <span className="shrink-0 text-[11px] text-emerald-300">{message} ✓</span>;
+    return <span className="shrink-0 text-[11px] text-positive">{message} ✓</span>;
   }
 
   return (
@@ -72,7 +72,7 @@ function DraftReplyButton({ tenantId, reviewId }: { tenantId: string; reviewId: 
         {state === "drafting" ? "Drafting…" : "Draft reply"}
       </button>
       {state === "error" && message && (
-        <span className="text-[10px] text-red-300">{message}</span>
+        <span className="text-[10px] text-critical">{message}</span>
       )}
     </span>
   );
@@ -100,7 +100,7 @@ export function ReviewIntelPanel({
         </div>
         {atRisk && (
           <span
-            className="shrink-0 rounded-full border border-red-500/30 bg-red-500/15 px-2.5 py-1 text-[11px] font-medium text-red-300"
+            className="shrink-0 rounded-full border border-critical0/30 bg-critical0/15 px-2.5 py-1 text-[11px] font-medium text-critical"
             title={atRiskReason}
           >
             At risk
@@ -110,7 +110,7 @@ export function ReviewIntelPanel({
 
       {totalReviews > 0 && (
         <>
-          {atRiskReason && <p className="mt-2 text-[11px] text-red-300/90">{atRiskReason}</p>}
+          {atRiskReason && <p className="mt-2 text-[11px] text-critical/90">{atRiskReason}</p>}
 
           <div className="mt-4">
             <div className="flex items-center justify-between">

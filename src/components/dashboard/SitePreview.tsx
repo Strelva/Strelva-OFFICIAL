@@ -471,7 +471,7 @@ export function SitePreview({
       <div className="flex items-center gap-2 border-b border-gray-border bg-surface px-3 py-2 shrink-0">
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-            isLivePreview ? "bg-accent" : "bg-amber-300"
+            isLivePreview ? "bg-accent" : "bg-warning"
           }`}
         />
         <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
@@ -628,7 +628,7 @@ export function SitePreview({
           {previewStatus === "error" && !previewErrorDismissed && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
               <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
-                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-amber-300" strokeWidth={1.5} />
+                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-warning" strokeWidth={1.5} />
                 <p className="text-sm font-medium text-warm-white">Your preview is taking longer than expected</p>
                 <p className="mt-2 text-xs leading-5 text-gray-muted">
                   This is usually a brief network hiccup. You can still edit the selected section on the right, retry, or open your live site directly.

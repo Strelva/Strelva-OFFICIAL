@@ -100,16 +100,16 @@ export default async function AdminDraftsPage() {
                           {d.type !== "added" && d.before && (
                             d.before.length > 200 ? (
                               <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-red-300/80 line-through break-words marker:content-none">
+                                <summary className="cursor-pointer list-none text-xs text-critical/80 line-through break-words marker:content-none">
                                   {d.before.slice(0, 200)}
                                   <span className="ml-1 no-underline text-gray-faint group-open:hidden">[show full]</span>
                                 </summary>
-                                <span className="text-xs text-red-300/80 line-through break-words">
+                                <span className="text-xs text-critical/80 line-through break-words">
                                   {d.before}
                                 </span>
                               </details>
                             ) : (
-                              <span className="text-xs text-red-300/80 line-through break-words">
+                              <span className="text-xs text-critical/80 line-through break-words">
                                 {d.before}
                               </span>
                             )
@@ -117,16 +117,16 @@ export default async function AdminDraftsPage() {
                           {d.type !== "removed" && d.after && (
                             d.after.length > 200 ? (
                               <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-emerald-200 break-words marker:content-none">
+                                <summary className="cursor-pointer list-none text-xs text-positive break-words marker:content-none">
                                   {d.after.slice(0, 200)}
                                   <span className="ml-1 text-gray-faint group-open:hidden">[show full]</span>
                                 </summary>
-                                <span className="text-xs text-emerald-200 break-words">
+                                <span className="text-xs text-positive break-words">
                                   {d.after}
                                 </span>
                               </details>
                             ) : (
-                              <span className="text-xs text-emerald-200 break-words">
+                              <span className="text-xs text-positive break-words">
                                 {d.after}
                               </span>
                             )

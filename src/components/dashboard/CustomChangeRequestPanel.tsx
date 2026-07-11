@@ -147,12 +147,12 @@ export function CustomChangeRequestPanel() {
         />
 
         {error && (
-          <p className="mt-2 text-[11px] text-red-400">
+          <p className="mt-2 text-[11px] text-critical">
             {errorMessage ?? "Could not send the request. Try again."}
           </p>
         )}
         {sent && (
-          <p className="mt-2 flex items-center gap-1 text-[11px] text-emerald-400">
+          <p className="mt-2 flex items-center gap-1 text-[11px] text-positive">
             <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
             Request sent to Strelva.
           </p>

@@ -155,13 +155,13 @@ function PrimaryDomainFields() {
       </div>
 
       {error && (
-        <div className="mx-5 mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+        <div className="mx-5 mb-4 px-4 py-2.5 rounded-md bg-critical0/10 border border-critical0/20 text-xs text-critical">
           {error}
         </div>
       )}
 
       {saved && (
-        <div className="mx-5 mb-4 px-4 py-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center gap-2">
+        <div className="mx-5 mb-4 px-4 py-2.5 rounded-md bg-positive0/10 border border-positive0/20 text-xs text-positive flex items-center gap-2">
           <CheckCircle2 className="w-3.5 h-3.5" />
           Saved
         </div>
@@ -298,7 +298,7 @@ export function DomainsClient({ initialDomains }: Props) {
       </form>
 
       {error && (
-        <div className="mb-4 px-4 py-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+        <div className="mb-4 px-4 py-2.5 rounded-md bg-critical0/10 border border-critical0/20 text-xs text-critical">
           {error}
         </div>
       )}
@@ -326,12 +326,12 @@ export function DomainsClient({ initialDomains }: Props) {
                       {entry.domain}
                     </span>
                     {entry.status === "connected" ? (
-                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10">
+                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-positive bg-positive/10">
                         <CheckCircle2 className="w-3 h-3" strokeWidth={2} />
                         Connected
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
+                      <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-warning bg-warning/10">
                         <Clock className="w-3 h-3" strokeWidth={2} />
                         Pending DNS
                       </span>
@@ -358,7 +358,7 @@ export function DomainsClient({ initialDomains }: Props) {
                 <button
                   onClick={() => setConfirmingRemove(entry.domain)}
                   disabled={removing === entry.domain}
-                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
+                  className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-critical hover:bg-critical/10 transition-all duration-150 disabled:opacity-50"
                   aria-label={`Remove ${entry.domain}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />

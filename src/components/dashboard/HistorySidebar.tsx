@@ -203,18 +203,18 @@ export function HistorySidebar({
       {/* Inspect-mode strip — super-admin only (server-verified), distinct amber so
           the operator always knows they're viewing a client's dashboard, not their own. */}
       {inspect && (
-        <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-300/12 px-3 py-2 text-amber-100">
-          <Eye className="h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
+        <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/12 px-3 py-2 text-warning">
+          <Eye className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-semibold text-amber-50">
+            <p className="truncate text-[12px] font-semibold text-warning">
               Inspecting {inspectTenantName || "client"}
             </p>
-            <p className="text-[11px] text-amber-100/80 leading-tight">Operator preview</p>
+            <p className="text-[11px] text-warning/80 leading-tight">Operator preview</p>
           </div>
           {inspectExitHref && (
             <a
               href={inspectExitHref}
-              className="shrink-0 rounded-md border border-amber-400/40 px-2 py-1 text-[11px] font-medium text-amber-50 transition-colors hover:bg-amber-300/20"
+              className="shrink-0 rounded-md border border-warning/40 px-2 py-1 text-[11px] font-medium text-warning transition-colors hover:bg-warning/20"
             >
               Exit
             </a>
@@ -292,7 +292,7 @@ export function HistorySidebar({
                           </span>
                         )}
                         {isPreview && (
-                          <span className="shrink-0 rounded-full border border-amber-400/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+                          <span className="shrink-0 rounded-full border border-warning/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-warning/90">
                             Off
                           </span>
                         )}

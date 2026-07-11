@@ -31,8 +31,8 @@ const blank = {
 };
 
 const STATUS_DOT: Record<ProvisionStep["status"], string> = {
-  ok: "text-emerald-300",
-  failed: "text-red-300",
+  ok: "text-positive",
+  failed: "text-critical",
   skipped: "text-gray-faint",
 };
 const STATUS_MARK: Record<ProvisionStep["status"], string> = {
@@ -134,7 +134,7 @@ function OnboardForm() {
             </div>
             <Field label="Production domain (optional)" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} placeholder="acmehvac.com" />
           </div>
-          {error && <p className="text-sm text-red-300">{error}</p>}
+          {error && <p className="text-sm text-critical">{error}</p>}
           <button
             onClick={() => void run()}
             disabled={running}
@@ -162,11 +162,11 @@ function OnboardForm() {
             </ul>
           </div>
 
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-5">
-            <h2 className="text-[15px] font-medium text-amber-100 mb-3">Still needs a human</h2>
+          <div className="rounded-xl border border-warning0/25 bg-warning0/10 p-5">
+            <h2 className="text-[15px] font-medium text-warning mb-3">Still needs a human</h2>
             <ul className="space-y-1.5">
               {result.manualNext.map((n, i) => (
-                <li key={i} className="text-sm text-amber-100/90">• {n}</li>
+                <li key={i} className="text-sm text-warning/90">• {n}</li>
               ))}
             </ul>
           </div>

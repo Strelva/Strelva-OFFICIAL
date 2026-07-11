@@ -23,15 +23,15 @@ function timeAgo(iso: string): string {
 }
 
 const ACTION_COLOR: Record<string, string> = {
-  create: "text-emerald-300",
-  add: "text-emerald-300",
-  provision: "text-emerald-300",
+  create: "text-positive",
+  add: "text-positive",
+  provision: "text-positive",
   update: "text-accent",
   refresh: "text-accent",
   assign_user: "text-accent",
-  revoke: "text-red-300",
-  reject: "text-red-300",
-  remove: "text-red-300",
+  revoke: "text-critical",
+  reject: "text-critical",
+  remove: "text-critical",
 };
 
 function actionTint(action: string): string {

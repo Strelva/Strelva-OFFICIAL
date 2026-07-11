@@ -253,7 +253,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
         </div>
 
         {uploadError && (
-          <div className="px-5 pt-2 text-[12px] text-red-400" role="alert">{uploadError}</div>
+          <div className="px-5 pt-2 text-[12px] text-critical" role="alert">{uploadError}</div>
         )}
 
         {/* Content */}

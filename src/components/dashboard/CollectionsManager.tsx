@@ -256,7 +256,7 @@ export function CollectionsManager({
           {savedAction && (
             <span
               role="status"
-              className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300"
+              className="inline-flex items-center rounded-full border border-positive/30 bg-positive/10 px-2.5 py-1 text-[11px] font-medium text-positive"
             >
               {savedAction === "published" ? "Published" : "Saved"}
             </span>
@@ -290,7 +290,7 @@ export function CollectionsManager({
         </div>
       )}
 
-      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mb-3 text-sm text-critical">{error}</p>}
 
       {editing ? (
         <div className="rounded-lg border border-gray-border p-4">
@@ -298,7 +298,7 @@ export function CollectionsManager({
             <label key={f.name} className="mb-3 block text-sm">
               <span className="mb-1 block font-medium text-warm-black">
                 {f.label}
-                {f.required && <span className="ml-1 text-red-400">*</span>}
+                {f.required && <span className="ml-1 text-critical">*</span>}
               </span>
               <FieldInput
                 field={f}
@@ -318,7 +318,7 @@ export function CollectionsManager({
                 }}
               />
               {fieldErrors[f.name] && (
-                <span className="mt-1 block text-[12px] text-red-400">{fieldErrors[f.name]}</span>
+                <span className="mt-1 block text-[12px] text-critical">{fieldErrors[f.name]}</span>
               )}
             </label>
           ))}
@@ -355,7 +355,7 @@ export function CollectionsManager({
                 <span className="text-xs text-gray-muted">{e.status}</span>
               </button>
               {!readOnly && (
-                <button onClick={() => remove(e.slug)} aria-label="Delete" className="text-gray-muted hover:text-red-400">
+                <button onClick={() => remove(e.slug)} aria-label="Delete" className="text-gray-muted hover:text-critical">
                   <Trash2 className="h-4 w-4" />
                 </button>
               )}
@@ -389,7 +389,7 @@ function FieldInput({
   onPickImage?: () => void;
   onChange: (v: unknown) => void;
 }) {
-  const base = `w-full rounded-md border px-3 py-1.5 text-sm ${invalid ? "border-red-400/50" : "border-gray-border"}`;
+  const base = `w-full rounded-md border px-3 py-1.5 text-sm ${invalid ? "border-critical/50" : "border-gray-border"}`;
 
   // "Choose from your photos" — so an owner inserts an uploaded image URL instead
   // of pasting one. Shared by the single-URL image fields and the image list.

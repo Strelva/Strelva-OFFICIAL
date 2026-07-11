@@ -132,9 +132,9 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
                 )}
               </div>
               {results[f.query] && (
-                <p className="mt-2 text-xs text-green-300">Queued for review: {results[f.query]}</p>
+                <p className="mt-2 text-xs text-positive">Queued for review: {results[f.query]}</p>
               )}
-              {errors[f.query] && <p className="mt-2 text-xs text-red-300">{errors[f.query]}</p>}
+              {errors[f.query] && <p className="mt-2 text-xs text-critical">{errors[f.query]}</p>}
             </li>
           ))}
         </ul>

@@ -24,8 +24,8 @@ export default function DashboardError({
   return (
     <div className="flex items-center justify-center min-h-[60vh] p-6">
       <div className="text-center max-w-sm">
-        <div className="w-12 h-12 rounded-lg bg-red-600/[0.06] flex items-center justify-center mx-auto mb-4">
-          <AlertTriangle className="w-6 h-6 text-red-500" />
+        <div className="w-12 h-12 rounded-lg bg-critical/[0.06] flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-6 h-6 text-critical0" />
         </div>
         <h2 className="text-lg font-semibold text-warm-black mb-2">
           Something went wrong

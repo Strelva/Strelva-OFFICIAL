@@ -490,7 +490,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
               {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (
                 <CircleCheck className="w-4 h-4 text-success shrink-0" strokeWidth={1.5} />
               ) : conn.status === "needs_attention" ? (
-                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" strokeWidth={1.5} />
+                <AlertCircle className="w-4 h-4 text-warning0 shrink-0" strokeWidth={1.5} />
               ) : (
                 <Circle className="w-4 h-4 text-gray-subtle shrink-0" strokeWidth={1.5} />
               )}

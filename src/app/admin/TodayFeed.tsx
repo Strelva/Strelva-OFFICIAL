@@ -61,11 +61,11 @@ function timeAgo(iso: string): string {
 function Dot({ tone }: { tone: "red" | "amber" | "emerald" | "muted" }) {
   const cls =
     tone === "red"
-      ? "bg-red-400"
+      ? "bg-critical"
       : tone === "amber"
-        ? "bg-amber-400"
+        ? "bg-warning"
         : tone === "emerald"
-          ? "bg-emerald-400"
+          ? "bg-positive"
           : "bg-gray-faint";
   return <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cls}`} />;
 }
@@ -91,7 +91,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portf
           Needs you
         </span>
         {nothingWaiting ? (
-          <span className="text-xs text-emerald-300">You&apos;re clear</span>
+          <span className="text-xs text-positive">You&apos;re clear</span>
         ) : (
           <span className="text-xs text-gray-muted">
             {leads.unworked > 0 && `${leads.unworked} new lead${leads.unworked === 1 ? "" : "s"}`}

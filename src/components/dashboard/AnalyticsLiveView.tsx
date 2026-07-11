@@ -69,12 +69,12 @@ export function AnalyticsLiveView({
           {showAnomaly && anomaly && (
             <div
               className={`rounded-xl border p-4 sm:p-5 ${
-                anomaly.type === "drop" ? "border-amber-400/30 bg-amber-400/10" : "border-success/25 bg-success-dim/40"
+                anomaly.type === "drop" ? "border-warning/30 bg-warning/10" : "border-success/25 bg-success-dim/40"
               }`}
             >
               <div className="flex items-start gap-2.5">
                 {anomaly.type === "drop" ? (
-                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" strokeWidth={2} />
+                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-warning0" strokeWidth={2} />
                 ) : (
                   <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-success" strokeWidth={2} />
                 )}

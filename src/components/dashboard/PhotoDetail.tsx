@@ -103,7 +103,7 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
           size="sm"
           icon={
             copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600" strokeWidth={1.5} />
+              <Check className="w-3.5 h-3.5 text-positive" strokeWidth={1.5} />
             ) : (
               <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
             )
@@ -119,7 +119,7 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
             size="sm"
             icon={<Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />}
             onClick={() => setConfirmingDelete(true)}
-            className="mt-2 w-full text-red-600 hover:bg-red-50"
+            className="mt-2 w-full text-critical hover:bg-critical"
           >
             Delete photo
           </Button>

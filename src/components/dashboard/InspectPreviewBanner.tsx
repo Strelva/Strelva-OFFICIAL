@@ -25,10 +25,10 @@ export async function InspectPreviewBanner({
     FEATURE_REGISTRY.find((f) => f.id === featureId)?.label ?? featureId;
 
   return (
-    <div className="flex items-start gap-2.5 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2.5 text-amber-100">
-      <Eye className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
+    <div className="flex items-start gap-2.5 border-b border-warning/30 bg-warning/12 px-4 py-2.5 text-warning">
+      <Eye className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} />
       <p className="text-[12px] leading-relaxed">
-        <span className="font-semibold text-amber-50">Preview</span>:{" "}
+        <span className="font-semibold text-warning">Preview</span>:{" "}
         {tenantName} doesn&apos;t have {`${featureLabel} enabled`}. You&apos;re
         inspecting it as an operator; the client doesn&apos;t see this.
       </p>

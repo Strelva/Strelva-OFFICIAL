@@ -155,7 +155,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           Revalidation secret: {form.hasRevalidationSecret ? "set" : "missing"}
           {form.revalidateUrl ? ` · ${form.revalidateUrl}` : ""}
         </p>
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error && <p className="text-sm text-critical">{error}</p>}
         <button
           onClick={() => void save()}
           disabled={saving}
@@ -181,7 +181,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           </select>
         </div>
         {assignNote && (
-          <p className={`text-sm ${assignNote.startsWith("✓") ? "text-emerald-300" : "text-red-300"}`}>
+          <p className={`text-sm ${assignNote.startsWith("✓") ? "text-positive" : "text-critical"}`}>
             {assignNote}
           </p>
         )}
@@ -301,7 +301,7 @@ function FeaturesPanel({
         Google Business &amp; Reviews appear automatically based on the client&apos;s business type and connections.
       </p>
 
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-critical">{error}</p>}
       <button
         onClick={onSave}
         disabled={saving}

@@ -216,7 +216,7 @@ export function OwnershipSection() {
       </div>
 
       {(notice || error) && (
-        <div className={`rounded-lg border px-4 py-3 text-[12px] ${error ? "border-amber-400/20 bg-amber-400/10 text-amber-300" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"}`}>
+        <div className={`rounded-lg border px-4 py-3 text-[12px] ${error ? "border-warning/20 bg-warning/10 text-warning" : "border-positive/20 bg-positive/10 text-positive"}`}>
           {error || notice}
         </div>
       )}
@@ -230,7 +230,7 @@ export function OwnershipSection() {
           <div className="space-y-3">
             {OWNED_ITEMS.map((item) => (
               <div key={item} className="flex gap-3">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" strokeWidth={1.6} />
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" strokeWidth={1.6} />
                 <p className="text-[13px] leading-relaxed text-gray-muted">{item}</p>
               </div>
             ))}
@@ -358,7 +358,7 @@ export function OwnershipSection() {
               domains.map((domain) => (
                 <div key={domain.domain} className="grid grid-cols-[1fr_100px] border-b border-gray-border/50 px-4 py-3 last:border-b-0">
                   <span className="truncate text-[13px] text-warm-white">{domain.domain}</span>
-                  <span className={domain.status === "connected" ? "text-[12px] text-emerald-400" : "text-[12px] text-amber-400"}>
+                  <span className={domain.status === "connected" ? "text-[12px] text-positive" : "text-[12px] text-warning"}>
                     {domain.status}
                   </span>
                 </div>
@@ -367,9 +367,9 @@ export function OwnershipSection() {
               <div className="px-4 py-4 text-[13px] text-gray-muted">No custom domains are connected.</div>
             )}
           </div>
-          <div className="mt-4 rounded-lg border border-amber-400/20 bg-amber-400/10 p-4">
+          <div className="mt-4 rounded-lg border border-warning/20 bg-warning/10 p-4">
             <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" strokeWidth={1.5} />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.5} />
               <p className="text-[12px] leading-relaxed text-gray-muted">
                 Do not delete DNS records until the next provider confirms the replacement site is live. DNS changes can take hours to settle, and removing domains early can interrupt the live site.
               </p>
@@ -391,7 +391,7 @@ export function OwnershipSection() {
             {openingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
             Open billing portal
           </button>
-          {billingError && <p className="mt-3 text-[12px] text-amber-400">{billingError}</p>}
+          {billingError && <p className="mt-3 text-[12px] text-warning">{billingError}</p>}
           <div className="mt-5 border-t border-gray-border pt-4">
             <div className="mb-2 flex items-center gap-2">
               <UserMinus className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />

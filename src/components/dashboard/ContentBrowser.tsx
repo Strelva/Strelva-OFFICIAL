@@ -212,7 +212,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
               <Icon className="w-4 h-4" strokeWidth={1.5} />
               {data && (
                 <div className={`absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full ${
-                  data.status === "live" ? "bg-emerald-500"
+                  data.status === "live" ? "bg-positive0"
                     : data.status === "configured" ? "bg-gray-muted"
                     : "bg-gray-subtle"
                 }`} />
@@ -303,7 +303,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                   )}
 
                   {data?.freshness === "stale" && (
-                    <AlertTriangle className="w-3 h-3 text-amber-400 mr-1" strokeWidth={1.5} />
+                    <AlertTriangle className="w-3 h-3 text-warning mr-1" strokeWidth={1.5} />
                   )}
 
                   {/* Visibility toggle */}
@@ -360,9 +360,9 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
                     <div className="flex items-center justify-between h-9 px-3 pl-[38px] border-t border-gray-border/50 bg-surface-raised/50">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-[5px] h-[5px] rounded-full ${
-                          data.freshness === "fresh" ? "bg-emerald-500" :
-                          data.freshness === "aging" ? "bg-amber-400" :
-                          data.freshness === "stale" ? "bg-red-400" :
+                          data.freshness === "fresh" ? "bg-positive0" :
+                          data.freshness === "aging" ? "bg-warning" :
+                          data.freshness === "stale" ? "bg-critical" :
                           "bg-gray-subtle"
                         }`} />
                         <span className="text-[11px] font-mono text-gray-subtle">

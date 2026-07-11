@@ -189,9 +189,9 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
 function SavePill({ status }: { status: SaveStatus }) {
   if (status === "idle") return null;
   const copy: Record<Exclude<SaveStatus, "idle">, { label: string; cls: string }> = {
-    saving: { label: "Saving…", cls: "border-sky-400/30 bg-sky-400/10 text-sky-300" },
-    saved: { label: "Saved", cls: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
-    error: { label: "Could not save", cls: "border-red-400/30 bg-red-400/10 text-red-300" },
+    saving: { label: "Saving…", cls: "border-accent/30 bg-accent/10 text-accent" },
+    saved: { label: "Saved", cls: "border-positive/30 bg-positive/10 text-positive" },
+    error: { label: "Could not save", cls: "border-critical/30 bg-critical/10 text-critical" },
   };
   const item = copy[status];
   // Announce autosave outcome — there's no save button, so a non-sighted user

@@ -193,7 +193,7 @@ export function UseAsTestimonialModal({
 
           {/* Error */}
           {error && (
-            <p className="text-[12px] text-red-500">{error}</p>
+            <p className="text-[12px] text-critical0">{error}</p>
           )}
         </div>
 

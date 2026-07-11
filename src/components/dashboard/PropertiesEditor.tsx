@@ -621,14 +621,14 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
 
       {/* Save error */}
       {saveError && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-red-500/[0.04] shrink-0 animate-fade-in-up">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-critical0/[0.04] shrink-0 animate-fade-in-up">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-3 h-3 text-red-500" strokeWidth={1.5} />
-            <span className="text-[11px] text-red-600">Couldn&apos;t save. Try again</span>
+            <AlertCircle className="w-3 h-3 text-critical0" strokeWidth={1.5} />
+            <span className="text-[11px] text-critical">Couldn&apos;t save. Try again</span>
           </div>
           <button
             onClick={handleSave}
-            className="text-[11px] font-medium text-red-600 hover:text-red-700 transition-colors"
+            className="text-[11px] font-medium text-critical hover:text-critical transition-colors"
           >
             Retry
           </button>

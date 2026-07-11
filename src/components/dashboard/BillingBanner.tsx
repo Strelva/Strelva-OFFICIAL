@@ -50,7 +50,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
 
   if (isNone) {
     return (
-      <div className="flex items-center justify-between gap-4 border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+      <div className="flex items-center justify-between gap-4 border-b border-positive bg-positive px-4 py-3 text-sm text-positive">
         <div>
           <p>
             Your site is built and ready. Start your subscription to publish
@@ -59,7 +59,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
               type="button"
               onClick={startSubscription}
               disabled={starting}
-              className="font-medium underline text-emerald-950 disabled:opacity-60"
+              className="font-medium underline text-positive disabled:opacity-60"
             >
               {starting ? "Opening…" : "Start your subscription"}
             </button>
@@ -112,8 +112,8 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
     <div
       className={`flex items-center justify-between px-4 py-3 text-sm ${
         isCancelled
-          ? "bg-red-50 text-red-800 border-b border-red-200"
-          : "bg-amber-50 text-amber-800 border-b border-amber-200"
+          ? "bg-critical text-critical border-b border-critical"
+          : "bg-warning text-warning border-b border-warning"
       }`}
     >
       <div>
@@ -127,7 +127,7 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
             onClick={openBillingPortal}
             disabled={openingPortal}
             className={`underline font-medium disabled:opacity-60 ${
-              isCancelled ? "text-red-900" : "text-amber-900"
+              isCancelled ? "text-critical" : "text-warning"
             }`}
           >
             {openingPortal ? "Opening..." : "Manage billing"}

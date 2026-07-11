@@ -74,10 +74,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** Sage→amber→red tone for a letter grade or a 0-100 score. */
 function gradeTone(grade: string): string {
   const g = grade.charAt(0).toUpperCase();
-  if (g === "A") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+  if (g === "A") return "bg-positive0/15 text-positive border-positive0/30";
   if (g === "B") return "bg-accent/15 text-accent border-accent/30";
-  if (g === "C") return "bg-amber-500/15 text-amber-200 border-amber-500/30";
-  return "bg-red-500/15 text-red-300 border-red-500/30";
+  if (g === "C") return "bg-warning0/15 text-warning border-warning0/30";
+  return "bg-critical0/15 text-critical border-critical0/30";
 }
 
 function GradePill({ grade }: { grade: string }) {
@@ -116,9 +116,9 @@ function PortfolioCard({ data }: { data: Record<string, unknown> }) {
       <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-muted">
         <span>{typeof data.tenantCount === "number" ? data.tenantCount : tenants.length} clients</span>
         {mrr !== null && <span>${mrr.toLocaleString()} MRR</span>}
-        <span className="text-emerald-300">{String(launch.ready ?? 0)} ready</span>
-        <span className="text-amber-200">{String(launch.watch ?? 0)} watch</span>
-        <span className="text-red-300">{String(launch.blocked ?? 0)} blocked</span>
+        <span className="text-positive">{String(launch.ready ?? 0)} ready</span>
+        <span className="text-warning">{String(launch.watch ?? 0)} watch</span>
+        <span className="text-critical">{String(launch.blocked ?? 0)} blocked</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
@@ -136,7 +136,7 @@ function PortfolioCard({ data }: { data: Record<string, unknown> }) {
               const id = String(row.id ?? "");
               const status = String(row.launchStatus ?? "—");
               const tone =
-                status === "blocked" ? "text-red-300" : status === "watch" ? "text-amber-200" : "text-emerald-300";
+                status === "blocked" ? "text-critical" : status === "watch" ? "text-warning" : "text-positive";
               return (
                 <tr key={id || i} className="border-t border-glass-border/50">
                   <td className="py-1 pr-3"><TenantLink id={id} name={row.siteName ? String(row.siteName) : undefined} /></td>
@@ -207,8 +207,8 @@ function AttentionCard({ data }: { data: Record<string, unknown> }) {
   const items = Array.isArray(data.items) ? data.items : null;
   if (!items || items.length === 0) return null;
   const dot: Record<string, string> = {
-    high: "bg-red-400",
-    medium: "bg-amber-300",
+    high: "bg-critical",
+    medium: "bg-warning",
     low: "bg-gray-faint",
   };
   return (
@@ -500,9 +500,9 @@ export function OperatorConsole() {
           return (
             <div
               key={p.id}
-              className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-sm"
+              className="rounded-lg border border-warning0/25 bg-warning0/10 p-3 text-sm"
             >
-              <p className="text-amber-100">{p.summary}</p>
+              <p className="text-warning">{p.summary}</p>
               {st === "pending" && (
                 <button
                   onClick={() => commit(p)}
@@ -515,12 +515,12 @@ export function OperatorConsole() {
                 <p className="mt-2 text-xs text-gray-muted">Committing…</p>
               )}
               {st === "done" && (
-                <p className="mt-2 text-xs text-emerald-300">
+                <p className="mt-2 text-xs text-positive">
                   ✓ {proposalState[p.id]?.note}
                 </p>
               )}
               {st === "error" && (
-                <p className="mt-2 text-xs text-red-300">{proposalState[p.id]?.note}</p>
+                <p className="mt-2 text-xs text-critical">{proposalState[p.id]?.note}</p>
               )}
             </div>
           );

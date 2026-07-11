@@ -215,7 +215,7 @@ export function LayoutPanel() {
         </select>
         <div className="mt-2 h-4">
           {saving && <span className="text-[11px] text-accent">Saving draft...</span>}
-          {saveError && <span className="text-[11px] text-red-400">Layout draft could not save.</span>}
+          {saveError && <span className="text-[11px] text-critical">Layout draft could not save.</span>}
         </div>
       </div>
 

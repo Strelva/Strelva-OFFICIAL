@@ -366,7 +366,7 @@ export function AnalyticsView({
             {saving ? "Saving…" : "Save"}
           </button>
           {error && (
-            <p className="text-xs text-rose-400" role="alert">
+            <p className="text-xs text-critical" role="alert">
               {error}
             </p>
           )}

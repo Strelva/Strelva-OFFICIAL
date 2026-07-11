@@ -8,13 +8,13 @@ import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
 const SWIPE_THRESHOLD = 100;
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
-  google: { bg: "bg-blue-500/15", text: "text-blue-400" },
-  yelp: { bg: "bg-red-500/15", text: "text-red-400" },
-  instagram: { bg: "bg-pink-500/15", text: "text-pink-400" },
-  ai: { bg: "bg-purple-500/15", text: "text-purple-400" },
+  google: { bg: "bg-accent0/15", text: "text-accent" },
+  yelp: { bg: "bg-critical0/15", text: "text-critical" },
+  instagram: { bg: "bg-accent0/15", text: "text-accent" },
+  ai: { bg: "bg-accent0/15", text: "text-accent" },
   website: { bg: "bg-gray-bg", text: "text-gray-fg" },
-  calendly: { bg: "bg-green-500/15", text: "text-green-400" },
-  vegaro: { bg: "bg-green-500/15", text: "text-green-400" },
+  calendly: { bg: "bg-positive0/15", text: "text-positive" },
+  vegaro: { bg: "bg-positive0/15", text: "text-positive" },
   default: { bg: "bg-gray-bg", text: "text-gray-muted" },
 };
 
@@ -203,7 +203,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
       >
       <div className="flex items-start gap-3">
         {/* Source icon */}
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isCustomRequest ? "bg-amber-500/15 text-amber-500" : `${colors.bg} ${colors.text}`}`}>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isCustomRequest ? "bg-warning0/15 text-warning0" : `${colors.bg} ${colors.text}`}`}>
           {isCustomRequest ? <GitBranch className="w-3.5 h-3.5" strokeWidth={1.5} /> : icon}
         </div>
 
@@ -238,7 +238,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
           )}
           {isCustomRequest && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              <span className="rounded-full bg-warning0/10 px-2 py-0.5 text-[11px] font-medium text-warning">
                 {formatWorkflowStatus(workflowStatus)}
               </span>
               {repoName && (
@@ -261,7 +261,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             {workflowStatus === "requested" && (
               <button
                 onClick={() => onWorkflowAction(event.id, "triaged")}
-                className="h-9 rounded-lg bg-amber-500/10 px-2.5 text-[12px] font-medium text-amber-700 hover:bg-amber-500 hover:text-amber-950 flex items-center justify-center gap-1.5 transition-colors"
+                className="h-9 rounded-lg bg-warning0/10 px-2.5 text-[12px] font-medium text-warning hover:bg-warning0 hover:text-warning flex items-center justify-center gap-1.5 transition-colors"
                 title="Mark triaged"
               >
                 <ClipboardCheck className="w-4 h-4" strokeWidth={1.5} />

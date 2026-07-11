@@ -4,20 +4,20 @@ import { useState } from "react";
 import type { CrmActivityKind, CrmStage, TenantCrm } from "@/lib/tenant-crm";
 
 const STAGES: { value: CrmStage; label: string; dot: string }[] = [
-  { value: "lead", label: "Lead", dot: "bg-sky-400" },
-  { value: "building", label: "Building", dot: "bg-amber-400" },
-  { value: "live", label: "Live", dot: "bg-emerald-400" },
-  { value: "at_risk", label: "At risk", dot: "bg-orange-400" },
+  { value: "lead", label: "Lead", dot: "bg-accent" },
+  { value: "building", label: "Building", dot: "bg-warning" },
+  { value: "live", label: "Live", dot: "bg-positive" },
+  { value: "at_risk", label: "At risk", dot: "bg-warning" },
   { value: "churned", label: "Churned", dot: "bg-gray-faint" },
 ];
 
 const TAG_PALETTE = [
-  "bg-sky-500/15 text-sky-300",
-  "bg-emerald-500/15 text-emerald-300",
-  "bg-amber-500/15 text-amber-300",
-  "bg-violet-500/15 text-violet-300",
-  "bg-rose-500/15 text-rose-300",
-  "bg-teal-500/15 text-teal-300",
+  "bg-accent0/15 text-accent",
+  "bg-positive0/15 text-positive",
+  "bg-warning0/15 text-warning",
+  "bg-accent0/15 text-accent",
+  "bg-critical0/15 text-critical",
+  "bg-accent0/15 text-accent",
 ];
 
 function tagColor(tag: string): string {
@@ -218,7 +218,7 @@ export function ClientCrmSections({
       </div>
 
       {error && (
-        <p className="text-xs text-rose-400" role="alert">
+        <p className="text-xs text-critical" role="alert">
           {error}
         </p>
       )}
@@ -301,7 +301,7 @@ export function ClientCrmSections({
                 <button
                   onClick={() => write({ removeContactId: ct.id })}
                   disabled={busy}
-                  className="shrink-0 text-gray-faint hover:text-rose-400 transition-colors disabled:opacity-40"
+                  className="shrink-0 text-gray-faint hover:text-critical transition-colors disabled:opacity-40"
                   title="Remove contact"
                   aria-label={`Remove ${ct.name}`}
                 >
@@ -487,10 +487,10 @@ export function ClientCrmSections({
           <p
             className={`text-xs ${
               emailResult.tone === "ok"
-                ? "text-emerald-400"
+                ? "text-positive"
                 : emailResult.tone === "paused"
-                  ? "text-amber-400"
-                  : "text-rose-400"
+                  ? "text-warning"
+                  : "text-critical"
             }`}
             role="status"
           >

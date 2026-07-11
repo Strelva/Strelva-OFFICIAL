@@ -191,7 +191,7 @@ export default function PayLinksPage() {
           )}
           <Field label="Lead slug (optional)" value={form.leadSlug} onChange={(v) => setForm({ ...form, leadSlug: v })} placeholder="defaults to slug" />
         </div>
-        {error && <p className="text-sm text-red-300 mt-3">{error}</p>}
+        {error && <p className="text-sm text-critical mt-3">{error}</p>}
         <button
           onClick={() => void submit()}
           disabled={submitting}
@@ -208,7 +208,7 @@ export default function PayLinksPage() {
           </h2>
           {(rollup.collected > 0 || rollup.outstanding > 0) && (
             <p className="text-[13px] text-gray-muted shrink-0">
-              <span className="text-emerald-300">{dollars(rollup.collected)} collected</span>
+              <span className="text-positive">{dollars(rollup.collected)} collected</span>
               <span className="text-gray-faint"> · </span>
               <span className="text-warm-white">{dollars(rollup.outstanding)} outstanding</span>
             </p>
@@ -226,7 +226,7 @@ export default function PayLinksPage() {
                   <p className="text-sm text-warm-white truncate">
                     {l.clientName}
                     {paidSlugs.has(l.slug) && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                      <span className="ml-2 inline-flex items-center rounded-full bg-positive0/15 px-2 py-0.5 text-[11px] font-medium text-positive">
                         Paid
                       </span>
                     )}
@@ -251,7 +251,7 @@ export default function PayLinksPage() {
                     <span className="inline-flex items-center gap-1.5">
                       <button
                         onClick={() => void revoke(l.slug)}
-                        className="rounded-md border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200 hover:bg-red-500/20"
+                        className="rounded-md border border-critical0/25 bg-critical0/10 px-3 py-1 text-xs font-medium text-critical hover:bg-critical0/20"
                       >
                         Confirm revoke
                       </button>
@@ -265,7 +265,7 @@ export default function PayLinksPage() {
                   ) : (
                     <button
                       onClick={() => setConfirmingRevoke(l.slug)}
-                      className="rounded-md border border-red-500/25 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                      className="rounded-md border border-critical0/25 px-3 py-1 text-xs text-critical hover:bg-critical0/10"
                     >
                       Revoke
                     </button>

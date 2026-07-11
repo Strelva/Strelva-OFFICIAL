@@ -197,12 +197,12 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           {anomaly && (
             <div
               className={`rounded-xl border p-4 sm:p-5 animate-fade-in-up ${
-                anomaly.type === "drop" ? "border-amber-400/30 bg-amber-400/10" : "border-success/25 bg-success-dim/40"
+                anomaly.type === "drop" ? "border-warning/30 bg-warning/10" : "border-success/25 bg-success-dim/40"
               }`}
             >
               <div className="flex items-start gap-2.5">
                 {anomaly.type === "drop" ? (
-                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" strokeWidth={2} />
+                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-warning0" strokeWidth={2} />
                 ) : (
                   <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-success" strokeWidth={2} />
                 )}
@@ -282,7 +282,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                   <div className="flex items-center gap-2">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
-                        v.tone === "good" ? "bg-success" : v.tone === "attention" ? "bg-amber-400" : "bg-gray-faint"
+                        v.tone === "good" ? "bg-success" : v.tone === "attention" ? "bg-warning" : "bg-gray-faint"
                       }`}
                     />
                     <p className="text-[12px] font-medium text-warm-black">{v.label}</p>
@@ -348,7 +348,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                         <p className="truncate text-[13px] font-medium text-warm-black">&ldquo;{row.query}&rdquo;</p>
                         <span
                           className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] ${
-                            row.youLead ? "text-success" : "text-amber-500"
+                            row.youLead ? "text-success" : "text-warning0"
                           }`}
                         >
                           {row.youLead ? "You lead" : "Behind"}

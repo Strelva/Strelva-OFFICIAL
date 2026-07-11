@@ -214,7 +214,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
                   <button
                     type="button"
                     onClick={() => setConfirmId(b.id)}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-border px-3 py-2 text-[12px] font-medium text-gray-muted transition-colors hover:border-red-500/40 hover:text-red-400"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-border px-3 py-2 text-[12px] font-medium text-gray-muted transition-colors hover:border-critical0/40 hover:text-critical"
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={1.5} />
                     Cancel
@@ -508,7 +508,7 @@ function Availability({
                   <button
                     type="button"
                     onClick={() => removeOverride(idx)}
-                    className="ml-auto inline-flex items-center rounded-lg border border-gray-border p-2 text-gray-muted transition-colors hover:border-red-500/40 hover:text-red-400"
+                    className="ml-auto inline-flex items-center rounded-lg border border-gray-border p-2 text-gray-muted transition-colors hover:border-critical0/40 hover:text-critical"
                     aria-label="Remove this date"
                   >
                     <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -563,7 +563,7 @@ function ErrorBanner({
 }) {
   return (
     <div
-      className={`rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[13px] text-red-400 ${className}`}
+      className={`rounded-lg border border-critical0/30 bg-critical0/10 px-3 py-2 text-[13px] text-critical ${className}`}
     >
       {children}
     </div>

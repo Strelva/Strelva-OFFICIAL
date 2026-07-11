@@ -74,7 +74,7 @@ export function DomainManager({
         DNS + SSL status per claimed domain. Refresh re-checks verification.
       </p>
 
-      {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-3 text-sm text-critical">{error}</p>}
 
       <div className="mt-4 space-y-2">
         {domains.length === 0 && (
@@ -101,7 +101,7 @@ export function DomainManager({
                     <span className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[statusTone(d.sslStatus)]}`} /> SSL {d.sslStatus}
                   </span>
                 </div>
-                {d.error && <p className="mt-1 text-[11px] text-red-300/80">{d.error}</p>}
+                {d.error && <p className="mt-1 text-[11px] text-critical/80">{d.error}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
@@ -123,7 +123,7 @@ export function DomainManager({
                         void call(`remove:${d.domain}`, { method: "DELETE" }, `${base}?domain=${encodeURIComponent(d.domain)}`);
                       }}
                       disabled={busy !== null}
-                      className="rounded-md border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-40"
+                      className="rounded-md border border-critical0/25 bg-critical0/10 px-2.5 py-1 text-xs text-critical hover:bg-critical0/20 disabled:opacity-40"
                     >
                       {busy === `remove:${d.domain}` ? "…" : "Confirm"}
                     </button>
@@ -134,7 +134,7 @@ export function DomainManager({
                 ) : (
                   <button
                     onClick={() => setConfirmingRemove(d.domain)}
-                    className="rounded-md border border-red-500/25 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                    className="rounded-md border border-critical0/25 px-2.5 py-1 text-xs text-critical hover:bg-critical0/10"
                   >
                     Remove
                   </button>

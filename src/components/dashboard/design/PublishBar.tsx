@@ -95,12 +95,12 @@ export function PublishBar({
     <div className="h-12 border-t border-gray-border bg-surface flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-3">
         {hasDrafts ? (
-          <div className="flex items-center gap-1.5 text-amber-400">
+          <div className="flex items-center gap-1.5 text-warning">
             <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span className="text-[11px] font-medium">Draft preview active - review before publishing</span>
           </div>
         ) : (
-          <div className={`flex items-center gap-1.5 ${published && liveStatus === "failed" ? "text-amber-400" : "text-emerald-400"}`}>
+          <div className={`flex items-center gap-1.5 ${published && liveStatus === "failed" ? "text-warning" : "text-positive"}`}>
             {published && liveStatus === "failed" ? (
               <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
             ) : (
@@ -161,7 +161,7 @@ export function PublishBar({
           ) : published ? (
             <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
           ) : error ? (
-            <AlertCircle className="w-3.5 h-3.5 text-red-400" strokeWidth={1.5} />
+            <AlertCircle className="w-3.5 h-3.5 text-critical" strokeWidth={1.5} />
           ) : (
             <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
           )}
