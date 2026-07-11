@@ -116,11 +116,17 @@ export default async function AdminPage() {
   const leadWorkflow = await getAllLeadWorkflow(deliveryLeads.map((l) => l.statusToken)).catch(
     () => ({} as Record<string, { status: string }>),
   );
-  const unworkedLeads = deliveryLeads.filter(
-    (l) =>
-      l.deliveryStatus === "received" &&
-      (leadWorkflow[l.statusToken]?.status ?? "new") === "new",
-  );
+  // Age out stale unworked leads from the "needs you" nag so months-old junk
+  // (never dismissed) stops perpetually flagging the overview. They remain on
+  // the /admin/leads board to be worked or dismissed. A lead with no/invalid
+  // submit date is kept (treated as recent) so a real lead is never hidden.
+  const leadNagCutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+  const unworkedLeads = deliveryLeads.filter((l) => {
+    if (l.deliveryStatus !== "received") return false;
+    if ((leadWorkflow[l.statusToken]?.status ?? "new") !== "new") return false;
+    const submitted = new Date(l.submittedAt).getTime();
+    return Number.isNaN(submitted) || submitted >= leadNagCutoff;
+  });
   const todayLeads = {
     total: deliveryLeads.length,
     unworked: unworkedLeads.length,
