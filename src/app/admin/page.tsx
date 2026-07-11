@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, CheckCircle2, Flag, UserPlus } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel } from "./console";
+import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel, Meter } from "./console";
 import type { TenantConfig } from "@/lib/types";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
@@ -275,6 +275,29 @@ export default async function AdminPage() {
         </Panel>
 
         <div className="flex flex-col gap-4">
+          <Panel title="Portfolio" trailing={<PanelLink href="/admin/clients">Details →</PanelLink>} bodyClassName="space-y-4 px-[18px] pb-[18px] pt-0.5">
+            <div>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Launch readiness</p>
+              <Meter segments={[
+                { value: launchReadyCount, tone: "good", label: "ready" },
+                { value: launchWatchCount, tone: "warn", label: "watch" },
+                { value: launchBlockedCount, tone: "crit", label: "blocked" },
+              ]} />
+            </div>
+            <div className="h-px bg-glass-border" />
+            <div>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Client health</p>
+              <Meter segments={[
+                { value: TENANTS.length - todayAtRisk.length, tone: "good", label: "healthy" },
+                { value: todayAtRisk.length, tone: "crit", label: "at risk" },
+              ]} />
+            </div>
+            <div className="flex items-baseline justify-between border-t border-glass-border pt-3 text-[12px]">
+              <span className="text-gray-muted">Monthly revenue</span>
+              <span className="font-[family-name:var(--font-display)] text-[15px] font-medium tracking-[-0.01em] text-warm-white">${mrr.toLocaleString()}<span className="ml-1 text-[11px] text-gray-faint">/ {activeSubscriptions} paid</span></span>
+            </div>
+          </Panel>
+
           <Panel title="Your book" trailing={<PanelLink href="/admin/clients">All clients →</PanelLink>} bodyClassName="px-2 pb-2.5">
             {book.map((c) => (
               <Link key={c.id} href={`/admin/clients/${c.id}`} className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">

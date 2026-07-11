@@ -124,6 +124,43 @@ export function LaunchBar({ pct, tone }: { pct: number; tone?: Tone }) {
   );
 }
 
+const TONE_BG: Record<Tone, string> = {
+  good: "bg-positive",
+  warn: "bg-warning",
+  crit: "bg-critical",
+  neutral: "bg-gray-faint",
+  accent: "bg-accent",
+};
+
+/**
+ * A segmented proportion meter — one filled bar split by share, plus a legend.
+ * Used for at-a-glance portfolio spreads (launch ready/watch/blocked, at-risk vs
+ * healthy). Zero-value segments drop out of the bar but stay in the legend so the
+ * reader sees a real "0 blocked". Tones map to the same status hues as everything else.
+ */
+export function Meter({ segments }: { segments: { value: number; tone: Tone; label: string }[] }) {
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  return (
+    <div>
+      <div className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-white/[0.06]">
+        {segments
+          .filter((s) => s.value > 0)
+          .map((s, i) => (
+            <div key={i} className={TONE_BG[s.tone]} style={{ width: `${(s.value / total) * 100}%` }} />
+          ))}
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
+        {segments.map((s, i) => (
+          <span key={i} className="flex items-center gap-1.5 text-[11.5px] text-gray-muted">
+            <span className={`h-2 w-2 rounded-full ${TONE_BG[s.tone]}`} />
+            <span className="font-semibold tabular-nums text-warm-white">{s.value}</span> {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * A client's brand mark. Uses the real uploaded logo when present; otherwise a
  * calm monogram tile (initial on a neutral surface) — never a colored-initial dot.
