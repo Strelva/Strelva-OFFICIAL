@@ -214,7 +214,12 @@ describe("owner journey copy and links", () => {
     expect(weeklyReportRoute).toContain("getTenantDashboardUrl");
     expect(weeklyReportRoute).toContain('getTenantDashboardUrl(report.tenant, "/dashboard/reports")');
     // Migrated onto the shared email design system: content, not inline markup.
-    expect(weeklyReportRoute).toContain('heading: "Your weekly report"');
+    // Subject + h1 are verdict-first (buildReportSubject / buildReportHeading),
+    // not the generic "Your weekly report" label.
+    expect(weeklyReportRoute).toContain("buildReportSubject(report)");
+    expect(weeklyReportRoute).toContain("buildReportHeading(report)");
+    expect(weeklyReportRoute).not.toContain('heading: "Your weekly report"');
+    expect(weeklyReportRoute).not.toContain("Your weekly site update");
     expect(weeklyReportRoute).toContain("See your full report");
     expect(weeklyReportRoute).toContain("function reportToText");
     expect(weeklyReportRoute).toContain("renderEmailText");
