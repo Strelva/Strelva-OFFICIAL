@@ -16,6 +16,20 @@ vi.mock("@/lib/tenants", () => ({ getAllTenants: vi.fn(), getTenantConfig: vi.fn
 vi.mock("@/lib/storage", () => ({ listDrafts: vi.fn(), getAllAuditEvents: vi.fn() }));
 vi.mock("@/lib/pay-links", () => ({ listPayLinks: vi.fn() }));
 
+// Drive the model: streamText yields the parts the route reacts to. `tool` and
+// `stepCountIs` are pass-throughs so the tools object still builds. This lets us
+// assert the __CARD__ channel without a live LLM.
+const mockFullStream = vi.hoisted(() => ({ parts: [] as unknown[] }));
+vi.mock("ai", () => ({
+  tool: (def: unknown) => def,
+  stepCountIs: () => 8,
+  streamText: () => ({
+    fullStream: (async function* () {
+      for (const p of mockFullStream.parts) yield p;
+    })(),
+  }),
+}));
+
 function req(body: unknown) {
   return new Request("http://localhost/api/admin/agent", {
     method: "POST",
@@ -47,5 +61,44 @@ describe("POST /api/admin/agent (operator agent)", () => {
     const { POST } = await import("@/app/api/admin/agent/route");
     const res = await POST(req({}));
     expect(res.status).toBe(400);
+  });
+
+  it("streams a __CARD__ for a whitelisted read tool but not for others", async () => {
+    mockFullStream.parts = [
+      { type: "tool-call", toolName: "read_scan" },
+      {
+        type: "tool-result",
+        toolName: "read_scan",
+        output: { scanned: [{ tenant: "acme", siteName: "Acme", grade: "D", overallScore: 41 }], worst: { tenant: "acme" } },
+      },
+      // Not whitelisted → no card.
+      { type: "tool-result", toolName: "read_pay_links", output: { payLinks: [], count: 0 } },
+      { type: "text-delta", text: "Acme has the worst site health." },
+    ];
+    const { POST } = await import("@/app/api/admin/agent/route");
+    const res = await POST(req({ messages: [{ role: "user", content: "which client has the worst SEO" }] }));
+    expect(res.status).toBe(200);
+    const body = await res.text();
+
+    const cardLine = body.split("\n").find((l) => l.startsWith("__CARD__"));
+    expect(cardLine).toBeDefined();
+    const card = JSON.parse(cardLine!.slice(8));
+    expect(card.tool).toBe("read_scan");
+    expect(card.data.scanned[0].tenant).toBe("acme");
+    // Only the whitelisted tool produced a card.
+    expect(body.match(/__CARD__/g)?.length).toBe(1);
+    // The agent's own text still streams alongside the card.
+    expect(body).toContain("Acme has the worst site health.");
+  });
+
+  it("does not emit a __CARD__ when the read tool returned an error", async () => {
+    mockFullStream.parts = [
+      { type: "tool-result", toolName: "read_scan", output: { error: "No tenant" } },
+      { type: "text-delta", text: "No scan on record." },
+    ];
+    const { POST } = await import("@/app/api/admin/agent/route");
+    const res = await POST(req({ messages: [{ role: "user", content: "scan foo" }] }));
+    const body = await res.text();
+    expect(body).not.toContain("__CARD__");
   });
 });
