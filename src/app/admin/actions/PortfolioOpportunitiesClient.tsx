@@ -69,7 +69,7 @@ export function PortfolioOpportunitiesClient({
           Ready to work
         </h2>
         <p className="mt-1 text-sm text-gray-muted">
-          Latent work across the portfolio nobody has drafted yet. Draft it in one pass — every
+          Latent work across the portfolio nobody has drafted yet. Draft it in one pass. Every
           draft lands in the client&rsquo;s queue for approval, nothing publishes on its own.
         </p>
       </div>
@@ -130,7 +130,7 @@ export function PortfolioOpportunitiesClient({
                   {result.drafted > 0 ? (
                     <p className="text-emerald-300">
                       Drafted for {result.drafted} of {result.drafted + result.skipped + result.failed}{" "}
-                      client{result.drafted + result.skipped + result.failed === 1 ? "" : "s"} —
+                      client{result.drafted + result.skipped + result.failed === 1 ? "" : "s"},
                       waiting for approval below.
                       {result.skipped > 0
                         ? ` ${result.skipped} had nothing to draft or already had one.`
@@ -138,7 +138,7 @@ export function PortfolioOpportunitiesClient({
                     </p>
                   ) : (
                     <p className="text-gray-muted">
-                      Nothing new to draft — these clients had nothing to draft or already have a
+                      Nothing new to draft. These clients had nothing to draft or already have a
                       pending draft.
                     </p>
                   )}
@@ -146,7 +146,7 @@ export function PortfolioOpportunitiesClient({
                     <p className="mt-1 flex items-center gap-1 text-amber-300">
                       <CircleAlert className="h-3 w-3" strokeWidth={2} />
                       {result.failed} client{result.failed === 1 ? "" : "s"} couldn&rsquo;t be
-                      drafted — try again.
+                      drafted. Try again.
                     </p>
                   )}
                 </div>

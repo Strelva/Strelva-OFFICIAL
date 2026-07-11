@@ -224,13 +224,13 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
         {status === "success" && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
             <Check className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
-            <span className="text-[11px] text-emerald-400">Restored — preview updated</span>
+            <span className="text-[11px] text-emerald-400">Restored. Preview updated</span>
           </div>
         )}
         {status === "error" && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-red-500/[0.04] shrink-0">
             <AlertCircle className="w-3 h-3 text-red-500" strokeWidth={1.5} />
-            <span className="text-[11px] text-red-600">Couldn&apos;t restore — try again</span>
+            <span className="text-[11px] text-red-600">Couldn&apos;t restore. Try again</span>
           </div>
         )}
 

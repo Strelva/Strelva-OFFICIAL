@@ -42,7 +42,7 @@ const KIND_ICON: Record<ActivityFeedKind, typeof Pencil> = {
 function EmptyState() {
   return (
     <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-4 py-4 text-[13px] leading-relaxed text-gray-muted">
-      Strelva just started managing your site — the updates we make will show up here as your proof
+      Strelva just started managing your site. The updates we make will show up here as your proof
       trail. Ask Strelva for one small change to see it land.
     </p>
   );

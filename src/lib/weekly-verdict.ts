@@ -9,9 +9,9 @@
 export function buildVerdict(stats: { pageViews: number; pageViewsDelta?: number }): string {
   const views = stats.pageViews;
   const delta = stats.pageViewsDelta ?? 0;
-  if (views === 0) return "A quiet week — no visitors yet. Let's change that.";
+  if (views === 0) return "A quiet week. No visitors yet. Let's change that.";
   const people = `${views.toLocaleString()} ${views === 1 ? "person" : "people"} found you`;
-  if (delta > 0) return `It's working — ${people}, up from last week.`;
-  if (delta < 0) return `${people} this week — down from last week.`;
+  if (delta > 0) return `It's working. ${people}, up from last week.`;
+  if (delta < 0) return `${people} this week, down from last week.`;
   return `${people} this week.`;
 }

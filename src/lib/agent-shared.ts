@@ -197,7 +197,7 @@ export function buildGbpTools(hooks: GbpToolHooks) {
           title: "Google post draft",
           body: summary,
           metadata: { kind: "gbp_post_draft", summary, ctaUrl, photoUrl },
-          message: "Google post drafted — it will publish to your listing once approved.",
+          message: "Google post drafted. It will publish to your listing once approved.",
         }),
     }),
 
@@ -222,7 +222,7 @@ export function buildGbpTools(hooks: GbpToolHooks) {
           title: "Google hours update",
           body: hours.map((h) => `${h.day}: ${h.open}-${h.close}`).join("\n"),
           metadata: { kind: "gbp_hours_draft", hours },
-          message: "Hours update drafted — it will publish to Google once approved.",
+          message: "Hours update drafted. It will publish to Google once approved.",
         }),
     }),
 
@@ -243,7 +243,7 @@ export function buildGbpTools(hooks: GbpToolHooks) {
           title: "Google photo upload",
           body: `Add photo to Google listing (${chosenCategory}): ${photoUrl}`,
           metadata: { kind: "gbp_photo_draft", photoUrl, category: chosenCategory },
-          message: "Photo drafted — it will be added to your Google listing once approved.",
+          message: "Photo drafted. It will be added to your Google listing once approved.",
         });
       },
     }),
@@ -351,7 +351,7 @@ export function buildUndoTool(hooks: UndoToolHooks) {
         // forceReview guarantees the queued branch; the published arm is
         // defensive so the shape stays coherent if governance ever changes.
         const eventId = result.status === "queued" ? result.eventId : undefined;
-        const message = `I've drafted a revert of your ${section} back to the earlier version. It'll go live once you approve it — nothing changes on your site until then.`;
+        const message = `I've drafted a revert of your ${section} back to the earlier version. It'll go live once you approve it. Nothing changes on your site until then.`;
         const sourceProof = `Source: ${section} version history (restoring ${target.id})`;
         hooks.onQueued?.(section, eventId, message, sourceProof);
         return {

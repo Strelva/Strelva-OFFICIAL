@@ -265,7 +265,7 @@ describe("owner journey copy and links", () => {
 
     // Verdict framing: what they own, in plain words.
     expect(ownershipPage).toContain(
-      "Your domain, your content, your customers — leave anytime, with everything.",
+      "Your domain, your content, your customers. Leave anytime, with everything.",
     );
 
     // One-click repo/domain handoff request reusing the offboarding path,
@@ -273,7 +273,7 @@ describe("owner journey copy and links", () => {
     expect(ownershipPage).toContain("Request your site files");
     expect(ownershipPage).toContain("/api/offboarding/request");
     expect(ownershipPage).toContain(
-      "We've got your request — we'll reach out to hand over your files.",
+      "We've got your request. We'll reach out to hand over your files.",
     );
     // The fixed-string request is gone — the owner adds their own context.
     expect(ownershipPage).not.toContain("Client opened ownership settings handoff request.");

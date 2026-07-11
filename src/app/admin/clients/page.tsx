@@ -86,7 +86,7 @@ export default async function AdminClientsPage() {
             Clients
           </h1>
           <p className="text-sm text-gray-muted mt-1">
-            {clients.length} client{clients.length !== 1 ? "s" : ""} — one list for everyone we manage a site for
+            {clients.length} client{clients.length !== 1 ? "s" : ""}: one list for everyone we manage a site for
           </p>
         </div>
         <div className="flex items-center gap-4">

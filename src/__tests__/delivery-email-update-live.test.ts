@@ -60,10 +60,10 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
     const sent = mockSendEmail.mock.calls[0][0];
     expect(sent.subject).toBe("Your update to Rohlax Wellness is rolling out");
     expect(sent.html).toContain("Your update is approved.");
-    expect(sent.html).toContain("it can take a few minutes to appear");
+    expect(sent.html).toContain("It can take a few minutes to appear");
     // Must NOT promise it's live when it might not be.
     expect(sent.html).not.toContain("live for visitors right now");
-    expect(sent.text).toContain("it can take a few minutes to appear");
+    expect(sent.text).toContain("It can take a few minutes to appear");
     expect(sent.text).not.toContain("live for visitors right now");
   });
 });

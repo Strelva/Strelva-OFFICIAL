@@ -73,7 +73,7 @@ function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
           <div className="w-full border-t border-dashed border-glass-border" />
         </div>
         <p className="mt-2 text-center text-[11px] text-gray-muted">
-          Not enough traffic yet to chart — this fills in as more people find you.
+          Not enough traffic yet to chart. This fills in as more people find you.
         </p>
       </div>
     );

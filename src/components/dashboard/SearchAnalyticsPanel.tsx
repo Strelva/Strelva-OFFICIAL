@@ -97,8 +97,8 @@ export function SearchAnalyticsPanel({ search, ga, connectHref }: SearchAnalytic
       <Shell>
         <div className="rounded-xl border border-glass-border bg-glass p-5">
           <p className="text-[13px] leading-relaxed text-gray-muted">
-            Your search data is coming soon. We&apos;re gathering how people find you on Google —
-            check back shortly.
+            Your search data is coming soon. We&apos;re gathering how people find you on Google.
+            Check back shortly.
           </p>
         </div>
       </Shell>

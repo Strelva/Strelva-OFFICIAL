@@ -79,7 +79,7 @@ describe("orders store", () => {
       topProducts: [{ name: "Dried Mango", quantity: 7 }],
     });
     expect(v.headline).toBe("You've earned $125.00 from 3 orders this month.");
-    expect(v.detail).toBe("Dried Mango is your best seller — 7 sold.");
+    expect(v.detail).toBe("Dried Mango is your best seller: 7 sold.");
   });
 
   it("singularizes one order and omits the best-seller line when there is none", () => {

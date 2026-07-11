@@ -44,7 +44,7 @@ function buildUpdateLiveEmailOptions(params: {
   // visible "right now" if the client site may not have picked it up yet.
   const heading = params.rollingOut ? "Your update is approved." : "Your update is live.";
   const lead = params.rollingOut
-    ? `We just approved an update to ${whatChanged} on your site. It's rolling out now — it can take a few minutes to appear.`
+    ? `We just approved an update to ${whatChanged} on your site. It's rolling out now. It can take a few minutes to appear.`
     : `We just updated ${whatChanged} on your site. It's published and live for visitors right now.`;
   return {
     heading,
@@ -222,7 +222,7 @@ function buildPaymentPastDueOptions(params: {
     heading: "Your payment didn't go through",
     paragraphs: [
       `We tried to charge your card for ${business} and it didn't go through. Your site is still live for now, but if the payment isn't updated in the next few days your dashboard access will pause.`,
-      "Updating your card takes a minute — open your dashboard and click Manage billing.",
+      "Updating your card takes a minute. Open your dashboard and click Manage billing.",
     ],
     button: { label: "Update your card", url: params.dashboardUrl },
     footerNote: `For ${business}`,
@@ -557,7 +557,7 @@ function buildPaymentFailedEmailOptions(params: {
   return {
     heading: `Payment failed: ${business}`,
     paragraphs: [
-      `A subscription payment for ${business} failed. They're now past due — check the Stripe dashboard and follow up before access lapses.`,
+      `A subscription payment for ${business} failed. They're now past due. Check the Stripe dashboard and follow up before access lapses.`,
     ],
     rows,
     button: { label: "Open the tenant", url: params.tenantUrl },
@@ -820,7 +820,7 @@ function buildReviewNeedsReplyEmailOptions(params: {
   const stars = "★".repeat(Math.max(0, Math.min(5, params.review.rating)));
   const greeting = params.ownerName ? `Hi ${cleanSubjectText(params.ownerName)}, ` : "";
   const paragraphs = [
-    `${greeting}${author} left ${business} a new ${params.review.rating}-star review. A quick reply — especially in the first day or two — is one of the best local-SEO signals you can send, and it shows customers you're paying attention.`,
+    `${greeting}${author} left ${business} a new ${params.review.rating}-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.`,
   ];
   const rows: EmailRow[] = [
     { label: "From", value: author },
@@ -923,7 +923,7 @@ function buildHealthRegressionEmailOptions(params: {
     preheader: `${business}'s site health slipped to a ${params.currentGrade}.`,
     heading: "Your site health dropped",
     paragraphs: [
-      `${greeting}our latest scan of ${business} found the site-health grade slipped from ${params.previousGrade} to ${params.currentGrade}. This usually means something changed — a slower page, a broken link, or an SEO signal that regressed.`,
+      `${greeting}our latest scan of ${business} found the site-health grade slipped from ${params.previousGrade} to ${params.currentGrade}. This usually means something changed: a slower page, a broken link, or an SEO signal that regressed.`,
       "You don't need to do anything technical. Open your dashboard to see what changed, or just tell the assistant and we'll look into it for you.",
     ],
     rows: [

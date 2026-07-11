@@ -540,7 +540,7 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
     const platforms = sameAs.platforms;
     let message: string;
     if (sameAs.hasKnowledgeGraphLinks) {
-      message = `Linked to ${platforms.length} authority profile(s) including Wikipedia/Wikidata — a strong AI trust signal.`;
+      message = `Linked to ${platforms.length} authority profile(s) including Wikipedia/Wikidata: a strong AI trust signal.`;
     } else if (platforms.length >= 3) {
       message = `Linked to ${platforms.length} authority profiles (${platforms.join(", ")}), which helps AI tools trust and cite you.`;
     } else if (platforms.length > 0) {

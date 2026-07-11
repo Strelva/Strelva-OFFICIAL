@@ -440,7 +440,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
         tenantId,
         type: "growth",
         title: `People are searching "${q.query}"`,
-        description: `${q.clicks} people found you searching "${q.query}" — but your site doesn't highlight this topic. Want me to add content about it?`,
+        description: `${q.clicks} people found you searching "${q.query}", but your site doesn't highlight this topic. Want me to add content about it?`,
         action: `prompt:Add content about "${sanitizePromptValue(q.query)}" to my site`,
       }));
     }

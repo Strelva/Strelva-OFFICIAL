@@ -177,7 +177,7 @@ export function renderEmailText(opts: EmailOptions): string {
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);
-  parts.push("— Strelva");
+  parts.push("Strelva");
   if (opts.manageUrl) parts.push(`Manage: ${opts.manageUrl}`);
   if (opts.unsubscribeUrl) parts.push(`Unsubscribe: ${opts.unsubscribeUrl}`);
   return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();

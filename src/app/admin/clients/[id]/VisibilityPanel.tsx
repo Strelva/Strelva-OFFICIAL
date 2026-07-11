@@ -22,8 +22,8 @@ function diffLine(d: VisibilityDiff): string[] {
   const wins = d.changes.filter((c) => c.direction === "appeared" || c.direction === "improved");
   const losses = d.changes.filter((c) => c.direction === "disappeared" || c.direction === "declined");
   const lines: string[] = [];
-  for (const w of wins) lines.push(`▲ ${SURFACE_LABEL[w.surface]} for "${w.query}" — ${w.direction}`);
-  for (const l of losses) lines.push(`▼ ${SURFACE_LABEL[l.surface]} for "${l.query}" — ${l.direction}`);
+  for (const w of wins) lines.push(`▲ ${SURFACE_LABEL[w.surface]} for "${w.query}": ${w.direction}`);
+  for (const l of losses) lines.push(`▼ ${SURFACE_LABEL[l.surface]} for "${l.query}": ${l.direction}`);
   return lines;
 }
 

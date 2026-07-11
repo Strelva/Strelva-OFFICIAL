@@ -116,7 +116,7 @@ export interface GbpManagementResult {
  * as "being set up", never a raw error or a crash.
  */
 const SETUP_PENDING_MESSAGE =
-  "Your Google Business connection is being set up — this will publish automatically once Google approves access (usually within a few days).";
+  "Your Google Business connection is being set up. This will publish automatically once Google approves access (usually within a few days).";
 
 /**
  * True when a GBP API rejection is the "access not granted / quota 0" setup

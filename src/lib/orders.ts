@@ -60,14 +60,14 @@ export function buildStoreVerdict(summary: OrderSummary | null): StoreVerdict {
   if (!summary || count === 0) {
     return {
       headline: "No orders yet",
-      detail: "Your storefront is connected and ready — orders show up here the moment a customer checks out.",
+      detail: "Your storefront is connected and ready. Orders show up here the moment a customer checks out.",
     };
   }
   const revenue = formatMoney(summary.revenueCents, summary.currency);
   const orderWord = count === 1 ? "order" : "orders";
   const headline = `You've earned ${revenue} from ${count} ${orderWord} this month.`;
   const best = summary.topProducts[0];
-  const detail = best ? `${best.name} is your best seller — ${best.quantity} sold.` : null;
+  const detail = best ? `${best.name} is your best seller: ${best.quantity} sold.` : null;
   return { headline, detail };
 }
 

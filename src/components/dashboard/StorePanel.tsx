@@ -119,7 +119,7 @@ export function StorePanel({
 
         <div className="mt-4 flex flex-col gap-2.5 border-t border-gray-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] leading-relaxed text-gray-muted">
-            Your products are managed by Strelva — ask in chat to add or change one.
+            Your products are managed by Strelva. Ask in chat to add or change one.
           </p>
           <StoreChatButton prompt={PRODUCT_PROMPT} label="Ask Strelva" />
         </div>

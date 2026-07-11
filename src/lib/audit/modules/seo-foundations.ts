@@ -206,7 +206,7 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
       : "No meta description was found.",
     details: hasMetaDesc
       ? undefined
-      : "The description is the sentence shown under your title in search results — free ad space. Ask Strelva to write one so you control that first impression.",
+      : "The description is the sentence shown under your title in search results: free ad space. Ask Strelva to write one so you control that first impression.",
   });
 
   // -------------------------------------------------------------------------

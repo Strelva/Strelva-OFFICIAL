@@ -148,7 +148,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
       setCancelled((prev) => new Set(prev).add(id));
       setConfirmId(null);
     } catch {
-      setError("Couldn't cancel that appointment — please try again.");
+      setError("Couldn't cancel that appointment. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -169,7 +169,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
             Your booking page is live and ready
           </p>
           <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
-            As soon as someone books a time, their appointment shows up here — grouped by day,
+            As soon as someone books a time, their appointment shows up here, grouped by day,
             with one-tap cancel when plans change.
           </p>
         </div>
@@ -288,7 +288,7 @@ function Availability({
       if (!res.ok) throw new Error();
       setHoursSaved(true);
     } catch {
-      setHoursError("Couldn't save your hours — please try again.");
+      setHoursError("Couldn't save your hours. Please try again.");
     } finally {
       setSavingHours(false);
     }
@@ -339,7 +339,7 @@ function Availability({
       if (!res.ok) throw new Error();
       setOverridesSaved(true);
     } catch {
-      setOverridesError("Couldn't save your closed dates — please try again.");
+      setOverridesError("Couldn't save your closed dates. Please try again.");
     } finally {
       setSavingOverrides(false);
     }
@@ -518,7 +518,7 @@ function Availability({
                   type="text"
                   value={r.reason ?? ""}
                   onChange={(e) => patchOverride(idx, { reason: e.target.value })}
-                  placeholder="Reason (optional) — e.g. Thanksgiving"
+                  placeholder="Reason (optional): e.g. Thanksgiving"
                   maxLength={200}
                   className={`mt-2 w-full ${inputClass}`}
                 />

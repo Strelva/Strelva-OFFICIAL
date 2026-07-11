@@ -23,8 +23,8 @@ describe("door badge + product name", () => {
   });
 
   it("builds the Stripe product name per door", () => {
-    expect(payLinkProductName({ door: "build", clientName: "Acme" })).toBe("Website build — Acme");
-    expect(payLinkProductName({ door: "managed_start", clientName: "Acme" })).toBe("Managed plan start — Acme");
+    expect(payLinkProductName({ door: "build", clientName: "Acme" })).toBe("Website build: Acme");
+    expect(payLinkProductName({ door: "managed_start", clientName: "Acme" })).toBe("Managed plan start: Acme");
   });
 });
 

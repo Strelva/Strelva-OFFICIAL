@@ -66,7 +66,7 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
                 Connect Google and we&apos;ll show where your visitors come from
               </p>
               <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-                Search, maps, social, or a direct link — see which channels send people to your
+                Search, maps, social, or a direct link. See which channels send people to your
                 site and the pages they land on.
               </p>
               <Link
@@ -89,8 +89,8 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
       <Shell>
         <div className="rounded-xl border border-glass-border bg-glass p-5">
           <p className="text-[13px] leading-relaxed text-gray-muted">
-            Your visitor sources are coming soon. We&apos;re gathering where people find you —
-            check back shortly.
+            Your visitor sources are coming soon. We&apos;re gathering where people find you.
+            Check back shortly.
           </p>
         </div>
       </Shell>

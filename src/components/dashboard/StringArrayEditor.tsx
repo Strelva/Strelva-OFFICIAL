@@ -60,7 +60,7 @@ export function StringArrayEditor({ config, data, onDataChange }: StringArrayEdi
       <div className="flex items-center gap-2 mb-2">
         <div className="h-px flex-1 bg-gray-border" />
         <span className="text-[11px] text-gray-faint shrink-0">
-          {config.label} — {items.length}
+          {config.label}: {items.length}
         </span>
       </div>
 
