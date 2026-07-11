@@ -93,7 +93,10 @@ export default async function DashboardLayout({
   let businessLogoUrl = "";
   try {
     const settings = await getContent("settings", tenant);
-    if (settings.siteName) siteName = settings.siteName;
+    // Ignore the "Your Business" default placeholder (defaults.ts) — an unset
+    // content siteName falls back to it, which would otherwise mask the real
+    // resolved business name.
+    if (settings.siteName && settings.siteName !== "Your Business") siteName = settings.siteName;
     settingsBusinessModel = settings.businessModel || "";
     businessLogoUrl = settings.logoUrl || "";
   } catch {}

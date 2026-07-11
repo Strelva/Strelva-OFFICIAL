@@ -33,7 +33,7 @@ export default async function SitePage() {
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
         <ContentWorkspace
-          siteName={settings.siteName || getTenantSiteName(tenant, undefined)}
+          siteName={settings.siteName && settings.siteName !== "Your Business" ? settings.siteName : getTenantSiteName(tenant, undefined)}
           ownerName={settings.ownerName || "there"}
           sectionData={sectionData}
           timestamps={timestamps}
