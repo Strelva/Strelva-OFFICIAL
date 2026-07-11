@@ -142,7 +142,7 @@ async function DashboardHome() {
               {verdict}
             </h1>
             <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-gray-muted">
-              How people found you, what needs your attention, and the fastest way to update your site.
+              Strelva keeps your site working behind the scenes. Here&apos;s what&apos;s happening — and the fastest way to change anything is just to ask.
             </p>
             {brief ? (
               <Link
