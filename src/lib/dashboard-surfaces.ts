@@ -41,6 +41,7 @@ export type SurfaceId =
   | "website"
   | "google-business"
   | "analytics"
+  | "reports"
   | "reviews"
   // Vertical-set member surfaces (appended by the feature registry — see src/lib/features/registry.ts).
   | "schedule"
@@ -172,9 +173,11 @@ export function getDashboardSurfaces({
       state: !local ? "hidden" : gbpConnected ? "shown" : "connect",
       group: "presence",
     },
-    // Analytics — the merged Reports + Health surface: one verdict, then the full
-    // weekly report and the site-health detail in one scroll.
+    // Analytics — the LIVE / rolling surface (range selector + live numbers + the
+    // anomaly + site health). The written recaps are the separate Reports tab.
     { id: "analytics", label: "Analytics", href: "/dashboard/analytics", state: "shown", group: "presence" },
+    // Reports — the written weekly + monthly recaps (verdict + narrative + proof).
+    { id: "reports", label: "Reports", href: "/dashboard/reports", state: "shown", group: "presence" },
     {
       id: "reviews",
       label: "Reviews",

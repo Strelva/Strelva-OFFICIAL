@@ -35,7 +35,7 @@ export default async function ReportsPage({
       getWeeklyBriefs(tenant).catch(() => []),
       getMonthlyRecap(tenant).catch(() => null),
       getMonthlyRecaps(tenant).catch(() => []),
-      getDailyMetrics(tenant, 30).catch(() => []),
+      getDailyMetrics(tenant, 62).catch(() => []),
       getActivity(tenant, { actor: "ai" }).catch(() => []),
       getGoal(tenant).catch(() => null),
       getLatestSnapshots(tenant, 2).catch(() => []),
@@ -51,7 +51,17 @@ export default async function ReportsPage({
   const history = view === "monthly" ? monthlyHistory : weeklyHistory;
   const periodLabel = view === "monthly" ? "this month" : "this week";
 
-  const proofCards = buildProofCards(activity, dailyMetrics);
+  // The chart matches the recap's window: the last 30 days for the weekly view,
+  // the recap's calendar month (labelled) for the monthly view.
+  const last30 = dailyMetrics.slice(-30);
+  let chartMetrics = last30;
+  let chartLabel: string | undefined = undefined;
+  if (view === "monthly" && monthlyRecap) {
+    chartMetrics = dailyMetrics.filter((d) => d.date >= monthlyRecap.weekStart && d.date <= monthlyRecap.weekEnd);
+    chartLabel = new Date(`${monthlyRecap.weekStart}T00:00:00`).toLocaleDateString("en-US", { month: "long" });
+  }
+
+  const proofCards = buildProofCards(activity, last30);
   // The live traffic anomaly is a "right now" signal — it lives on Analytics.
   // Reports is the dated recap, so it doesn't carry a current-week alert.
   const benchmark = buildCompetitorBenchmark(snapshots[0] ?? null);
@@ -80,7 +90,8 @@ export default async function ReportsPage({
             brief={brief}
             history={history}
             periodLabel={periodLabel}
-            dailyMetrics={dailyMetrics}
+            chartLabel={chartLabel}
+            dailyMetrics={chartMetrics}
             proofCards={proofCards}
             goal={goal}
             benchmark={benchmark}

@@ -10,6 +10,7 @@ import { getLatestSnapshots, diffSnapshots, type VisibilityDiff } from "./visibi
 import { getReviews } from "./reviews";
 import { getClientReviewSummary, type ClientReviewSummary } from "./reviews/intelligence";
 import { computePeriodStats, type ResolvedRange } from "./analytics/period";
+import { collectPeriodHighlights } from "./analytics/metric-sources";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
@@ -208,7 +209,13 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   const visibilityWins = visSnapshots[0]
     ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
     : [];
-  const highlights = [...visibilityWins, ...buildHighlights(stats, weeklyEvents, activity, reviewSummary, phoneCounts.thisWeek)].slice(0, 5);
+  // Metric-source registry (GBP, etc.) contributes owner-facing proof for the week.
+  const sourceHighlights = await collectPeriodHighlights(tenantId, weekStartDate, weekEndDate);
+  const highlights = [
+    ...visibilityWins,
+    ...sourceHighlights,
+    ...buildHighlights(stats, weeklyEvents, activity, reviewSummary, phoneCounts.thisWeek),
+  ].slice(0, 5);
   const summary = await buildSummary({
     stats,
     phoneClicks: phoneCounts.thisWeek,
@@ -301,8 +308,11 @@ export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrie
   const visibilityWins = visSnapshots[0]
     ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
     : [];
+  // Metric-source registry (GBP, etc.) contributes owner-facing proof for the month.
+  const sourceHighlights = await collectPeriodHighlights(tenantId, monthStart, monthEndInclusive);
   const highlights = [
     ...visibilityWins,
+    ...sourceHighlights,
     ...buildHighlights(stats, monthEvents, activity, reviewSummary, period.phoneClicks, "this month"),
   ].slice(0, 5);
 
@@ -468,6 +478,7 @@ ${data.topServices.length ? `Top services:\n${data.topServices.map((s) => `- ${s
 ${data.topSearchQueries.length ? `Top searches:\n${data.topSearchQueries.map((q) => `- ${q.query}: ${q.clicks} clicks, ${q.impressions} impressions`).join("\n")}` : `No search query data this ${periodNoun}.`}
 ${data.staleSections.length ? `Stale sections:\n${data.staleSections.map((s) => `- ${s.section}: ${s.daysSinceUpdate} days`).join("\n")}` : "No stale sections."}
 ${data.nextAction ? `Suggested next action: ${data.nextAction.title} - ${data.nextAction.description}` : ""}
+${data.highlights.length ? `What Strelva did / recent wins (weave in the most concrete one, don't list all):\n${data.highlights.map((h) => `- ${h}`).join("\n")}` : ""}
 
 Rules:
 - 1 short paragraph, 2 sentences max

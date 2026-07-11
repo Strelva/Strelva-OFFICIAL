@@ -43,6 +43,9 @@ interface WeeklyBriefClientProps {
   /** "this week" (default) or "this month" — labels the period on the tiles so
    *  this same component renders the weekly brief and the monthly recap. */
   periodLabel?: string;
+  /** The trend-chart caption (default "Last 30 days"); the monthly recap passes
+   *  the calendar month so the chart matches its window. */
+  chartLabel?: string;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -59,7 +62,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot, periodLabel = "this week" }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot, periodLabel = "this week", chartLabel }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
     analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
@@ -229,7 +232,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
 
           {dailyMetrics.length >= 2 && (
             <div className="animate-fade-in-up" style={{ animationDelay: "75ms" }}>
-              <TrendChart metrics={dailyMetrics} />
+              <TrendChart metrics={dailyMetrics} label={chartLabel} />
             </div>
           )}
 

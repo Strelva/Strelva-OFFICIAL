@@ -18,6 +18,7 @@ describe("owner journey copy and links", () => {
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
     expect(surfaces).toContain('label: "Analytics"');
+    expect(surfaces).toContain('label: "Reports"');
     expect(surfaces).toContain('label: "Reviews"');
 
     // Old IA names should not resurface as top-level nav labels. ("Site" is now a
@@ -26,7 +27,6 @@ describe("owner journey copy and links", () => {
     expect(surfaces).not.toContain('label: "Sources"');
     expect(surfaces).not.toContain('label: "Ask AI"');
     expect(surfaces).not.toContain('label: "Dashboard"');
-    expect(surfaces).not.toContain('label: "Reports"');
     expect(surfaces).not.toContain('label: "Health"');
     expect(surfaces).not.toContain('label: "Leads"');
     // "Store" is a legitimate Website sub-tab label (getWebsiteSections), just not
