@@ -40,6 +40,9 @@ interface WeeklyBriefClientProps {
   /** Extra content rendered at the bottom of the report scroll (e.g. the site-health
    *  section on the merged Analytics surface), so every number stays in one scroll. */
   footerSlot?: ReactNode;
+  /** "this week" (default) or "this month" — labels the period on the tiles so
+   *  this same component renders the weekly brief and the monthly recap. */
+  periodLabel?: string;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -56,7 +59,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot, periodLabel = "this week" }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
     analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
@@ -233,7 +236,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           >
             <StatTile
               countUp
-              label="People found you this week"
+              label={`People found you ${periodLabel}`}
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
               icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
@@ -440,7 +443,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     {topServices[0].name}
                   </p>
                   <p className="text-[12px] text-gray-muted mt-1">
-                    {topServices[0].clicks} clicks this week
+                    {topServices[0].clicks} clicks {periodLabel}
                   </p>
                 </div>
               )}

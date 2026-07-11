@@ -41,10 +41,10 @@ function recapParagraphs(summary: string): string[] {
 export async function GET() {
   await recordHeartbeat("monthly-report").catch(() => {});
 
-  if (emailSendingPaused()) {
-    console.warn("[monthly-report] skipped — email sending paused");
-    return NextResponse.json({ status: "skipped", reason: "email_sending_paused" });
-  }
+  // The recap is GENERATED regardless (the on-screen Reports surface needs it);
+  // only the EMAIL send is gated on the pause switch. So a paused run still
+  // refreshes every tenant's monthly recap, it just doesn't email it.
+  const paused = emailSendingPaused();
 
   const now = new Date();
   // The recap covers the PREVIOUS calendar month; key the dedup marker to it.
@@ -63,7 +63,14 @@ export async function GET() {
 
   await mapPool(tenants, 8, async (tenant) => {
     try {
-      // Idempotent: skip a tenant already emailed this month.
+      // Always refresh the recap so the Reports surface is current.
+      const recap = await generateMonthlyRecap(tenant.id);
+
+      // Send gates: pause switch, then the once-per-month dedup marker.
+      if (paused) {
+        skipped.push({ tenantId: tenant.id, reason: "email_paused" });
+        return;
+      }
       if (redis) {
         const already = await redis.get(sentKey(tenant.id, monthKey)).catch(() => null);
         if (already) {
@@ -72,7 +79,6 @@ export async function GET() {
         }
       }
 
-      const recap = await generateMonthlyRecap(tenant.id);
       const heading = buildMonthlyHeading(recap);
       const paragraphs = recapParagraphs(recap.summary);
       const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
