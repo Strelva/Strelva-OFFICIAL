@@ -90,7 +90,9 @@ export interface PeriodStats {
   actionsPrior: number;
   actionsDelta: number;
   bookingClicks: number;
+  bookingClicksPrior: number;
   phoneClicks: number;
+  phoneClicksPrior: number;
   /** The window's daily series, for the chart. */
   series: DailyMetric[];
   /** True when the window has any traffic or actions (drives the honest empty state). */
@@ -132,9 +134,11 @@ export async function computePeriodStats(tenant: string, range: ResolvedRange): 
   const pageViews = sum(windowRows, (r) => r.pageViews);
   const pageViewsPrior = sum(priorRows, (r) => r.pageViews);
   const bookingClicks = sum(windowRows, (r) => r.bookingClicks);
+  const bookingClicksPrior = sum(priorRows, (r) => r.bookingClicks);
   const phoneClicks = sum(windowRows, (r) => r.phoneClicks ?? 0);
+  const phoneClicksPrior = sum(priorRows, (r) => r.phoneClicks ?? 0);
   const actions = bookingClicks + phoneClicks;
-  const actionsPrior = sum(priorRows, (r) => r.bookingClicks + (r.phoneClicks ?? 0));
+  const actionsPrior = bookingClicksPrior + phoneClicksPrior;
 
   return {
     range,
@@ -145,7 +149,9 @@ export async function computePeriodStats(tenant: string, range: ResolvedRange): 
     actionsPrior,
     actionsDelta: actions - actionsPrior,
     bookingClicks,
+    bookingClicksPrior,
     phoneClicks,
+    phoneClicksPrior,
     series: windowRows,
     hasData: pageViews > 0 || actions > 0,
   };

@@ -9,6 +9,7 @@ import { detectStaleSections } from "./reports";
 import { getLatestSnapshots, diffSnapshots, type VisibilityDiff } from "./visibility/snapshots";
 import { getReviews } from "./reviews";
 import { getClientReviewSummary, type ClientReviewSummary } from "./reviews/intelligence";
+import { computePeriodStats, type ResolvedRange } from "./analytics/period";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
@@ -42,39 +43,23 @@ function getWeekBounds(date: Date = new Date()): { weekStart: string; weekEnd: s
   };
 }
 
-export async function getWeeklyBrief(tenantId: string): Promise<WeeklyBrief | null> {
-  const redis = getRedis();
-  if (!redis) return null;
+const isMonthly = (b: WeeklyBrief): boolean => b.period === "month";
+const isWeekly = (b: WeeklyBrief): boolean => !isMonthly(b);
 
-  const raw = await redis.zrange(briefsKey(tenantId), 0, 0, { rev: true });
-  if (!raw.length) return null;
-
-  try {
-    const parsed = typeof raw[0] === "string" ? JSON.parse(raw[0]) : raw[0];
-    return parsed as WeeklyBrief;
-  } catch {
-    return null;
-  }
-}
-
-export async function getWeeklyBriefs(
-  tenantId: string,
-  limit: number = 12
-): Promise<WeeklyBrief[]> {
+/**
+ * All recaps (weekly + monthly) for a tenant, deduped by id and newest-first.
+ * The zset dedupes by member string, not by id, so a recap regenerated for the
+ * same period (cron retry / manual re-run) leaves multiple members sharing one
+ * id — which would otherwise render duplicate React keys and let surfaces read
+ * different stats. rev order is newest-first, so the first member seen for an id
+ * is the newest; keep that one.
+ */
+async function readRecaps(tenantId: string, fetchLimit: number): Promise<WeeklyBrief[]> {
   const redis = getRedis();
   if (!redis) return [];
 
-  // Fetch a generous window then dedupe by brief id. The zset dedupes by member
-  // string, not by id, so a brief regenerated for the same week (cron retry /
-  // manual re-run) leaves multiple members that share one id — which would
-  // otherwise render duplicate React keys and let different surfaces read
-  // different stats. rev order is newest-first, so the first member seen for an
-  // id is the newest; keep that one.
-  const raw = await redis.zrange(briefsKey(tenantId), 0, Math.max(limit * 4, 48) - 1, {
-    rev: true,
-  });
+  const raw = await redis.zrange(briefsKey(tenantId), 0, Math.max(fetchLimit, 48) - 1, { rev: true });
   const byId = new Map<string, WeeklyBrief>();
-
   for (const item of raw) {
     try {
       const parsed = (typeof item === "string" ? JSON.parse(item) : item) as WeeklyBrief;
@@ -83,8 +68,25 @@ export async function getWeeklyBriefs(
       // skip malformed
     }
   }
+  return Array.from(byId.values());
+}
 
-  return Array.from(byId.values()).slice(0, limit);
+export async function getWeeklyBrief(tenantId: string): Promise<WeeklyBrief | null> {
+  return (await readRecaps(tenantId, 24)).find(isWeekly) ?? null;
+}
+
+export async function getWeeklyBriefs(tenantId: string, limit: number = 12): Promise<WeeklyBrief[]> {
+  return (await readRecaps(tenantId, limit * 4)).filter(isWeekly).slice(0, limit);
+}
+
+/** The latest monthly recap for a tenant (the Reports monthly surface reads this). */
+export async function getMonthlyRecap(tenantId: string): Promise<WeeklyBrief | null> {
+  return (await readRecaps(tenantId, 36)).find(isMonthly) ?? null;
+}
+
+/** Monthly recap history, newest-first (the Reports archive reads this). */
+export async function getMonthlyRecaps(tenantId: string, limit: number = 12): Promise<WeeklyBrief[]> {
+  return (await readRecaps(tenantId, limit * 8)).filter(isMonthly).slice(0, limit);
 }
 
 export async function saveWeeklyBrief(brief: WeeklyBrief): Promise<void> {
@@ -237,6 +239,110 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
 }
 
 /**
+ * The monthly recap — same shape + narrative as the weekly brief, for the
+ * PREVIOUS COMPLETE calendar month (this month is still in progress and would
+ * read ~0). Reuses the period spine for the traffic/action stats and the shared
+ * highlight + summary builders (period="month" so the copy says "this month" /
+ * "vs last month"). Stored in the same recap store, tagged period="month", so
+ * the Reports surface can show weekly + monthly side by side.
+ */
+export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrief> {
+  const now = new Date();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  const monthStart = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), 1);
+  const priorEnd = new Date(monthStart.getFullYear(), monthStart.getMonth(), 0);
+  const priorStart = new Date(priorEnd.getFullYear(), priorEnd.getMonth(), 1);
+  const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+  const range: ResolvedRange = {
+    key: "month",
+    label: monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    priorLabel: "vs the month before",
+    from: monthStart,
+    to: monthEnd,
+    priorFrom: priorStart,
+    priorTo: priorEnd,
+  };
+
+  const [period, events, activity, searchData, timestamps, visSnapshots, reviews] = await Promise.all([
+    computePeriodStats(tenantId, range),
+    getEvents(tenantId, { limit: 200 }).catch(() => []),
+    getActivity(tenantId).catch(() => []),
+    getSearchData(tenantId).catch(() => null),
+    getSectionTimestamps(tenantId).catch(() => ({})),
+    getLatestSnapshots(tenantId, 2).catch(() => []),
+    getReviews(tenantId).catch(() => []),
+  ]);
+
+  const monthEndInclusive = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59, 999);
+  const monthEvents = events.filter((e) => {
+    const d = new Date(e.createdAt);
+    return d >= monthStart && d <= monthEndInclusive;
+  });
+  const reviewsReceived = monthEvents.filter((e) => e.type === "review").length;
+  const contentUpdates = monthEvents.filter((e) => e.type === "content_update").length;
+  const reviewSummary = getClientReviewSummary(reviews, 30);
+
+  const stats: WeeklyBriefStats = {
+    pageViews: period.pageViews,
+    bookingClicks: period.bookingClicks,
+    reviewsReceived,
+    contentUpdates,
+    pageViewsDelta: period.pageViewsDelta,
+    bookingClicksDelta: period.bookingClicks - period.bookingClicksPrior,
+    phoneClicks: period.phoneClicks,
+    phoneClicksDelta: period.phoneClicks - period.phoneClicksPrior,
+  };
+
+  const topSearchQueries = (searchData?.queries || []).slice(0, 3);
+  const staleSections = detectStaleSections(
+    timestamps,
+    ["hero", "services", "story", "testimonials", "events", "providers", "contact", "settings", "faq"]
+  ).slice(0, 3);
+  const visibilityWins = visSnapshots[0]
+    ? visibilityProofHighlights(diffSnapshots(visSnapshots[1] ?? null, visSnapshots[0]))
+    : [];
+  const highlights = [
+    ...visibilityWins,
+    ...buildHighlights(stats, monthEvents, activity, reviewSummary, period.phoneClicks, "this month"),
+  ].slice(0, 5);
+
+  const [suggestion] = await getSuggestions(tenantId);
+  const nextAction = suggestion ? { title: suggestion.title, description: suggestion.description } : undefined;
+
+  const summary = await buildSummary({
+    stats,
+    phoneClicks: period.phoneClicks,
+    highlights,
+    // Per-service monthly breakdown isn't aggregated yet; the monthly recap
+    // leads with the big-picture numbers + narrative. (Add a monthly service
+    // source when the metric-source registry grows.)
+    topServices: [],
+    topSearchQueries,
+    staleSections,
+    nextAction,
+    period: "month",
+  });
+
+  const recap: WeeklyBrief = {
+    id: `brief_month_${isoDate(monthStart)}_${tenantId}`,
+    tenantId,
+    period: "month",
+    weekStart: isoDate(monthStart),
+    weekEnd: isoDate(monthEnd),
+    summary,
+    stats,
+    highlights,
+    nextAction,
+    topServices: [],
+    topSearchQueries,
+    staleSections,
+    createdAt: new Date().toISOString(),
+  };
+  await saveWeeklyBrief(recap);
+  return recap;
+}
+
+/**
  * Owner-facing "you got found" proof from the week-over-week visibility diff.
  * Only positive moves (newly appearing / climbing) — losses are an operator
  * concern surfaced in Mission Control, not something to put in the owner's
@@ -289,12 +395,13 @@ export function buildHighlights(
   events: Array<{ type: string; title: string }>,
   activity: Array<{ text: string; actor?: string; type?: string }>,
   reviewSummary?: ClientReviewSummary,
-  phoneClicks = 0
+  phoneClicks = 0,
+  periodLabel = "this week"
 ): string[] {
   const highlights: string[] = [];
 
   if (stats.pageViews > 0) {
-    highlights.push(`${stats.pageViews} people visited your site this week`);
+    highlights.push(`${stats.pageViews} people visited your site ${periodLabel}`);
   }
 
   if (stats.bookingClicks > 0) {
@@ -311,7 +418,7 @@ export function buildHighlights(
   // analyze; fall back to the raw count from event metrics otherwise.
   if (reviewSummary && reviewSummary.newFiveStarThisPeriod > 0) {
     const n = reviewSummary.newFiveStarThisPeriod;
-    highlights.push(`${n} new 5-star review${n > 1 ? "s" : ""} this week`);
+    highlights.push(`${n} new 5-star review${n > 1 ? "s" : ""} ${periodLabel}`);
   } else if (stats.reviewsReceived > 0) {
     highlights.push(
       `${stats.reviewsReceived} new review${stats.reviewsReceived > 1 ? "s" : ""} received`
@@ -339,28 +446,33 @@ async function buildSummary(data: {
   topSearchQueries: Array<{ query: string; clicks: number; impressions: number }>;
   staleSections: Array<{ section: string; daysSinceUpdate: number }>;
   nextAction?: { title: string; description: string };
+  period?: "week" | "month";
 }): Promise<string> {
+  const period = data.period ?? "week";
+  const periodWord = period === "month" ? "monthly" : "weekly";
+  const vsPrior = period === "month" ? "vs last month" : "vs last week";
+  const periodNoun = period === "month" ? "month" : "week";
   try {
     const { text } = await generateText({
       model: google("gemini-2.5-flash"),
-      prompt: `Write a concise weekly dashboard brief for a local business owner.
+      prompt: `Write a concise ${periodWord} dashboard brief for a local business owner.
 
 Stats:
-- ${data.stats.pageViews} people found the site (${formatDelta(data.stats.pageViewsDelta)} vs last week)
-- ${data.stats.bookingClicks} clicked your booking link (${formatDelta(data.stats.bookingClicksDelta)} vs last week)
+- ${data.stats.pageViews} people found the site (${formatDelta(data.stats.pageViewsDelta)} ${vsPrior})
+- ${data.stats.bookingClicks} clicked your booking link (${formatDelta(data.stats.bookingClicksDelta)} ${vsPrior})
 - ${data.phoneClicks} called you from your site
 - ${data.stats.reviewsReceived} reviews received
 - ${data.stats.contentUpdates} AI site updates
 
-${data.topServices.length ? `Top services:\n${data.topServices.map((s) => `- ${s.name}: ${s.clicks} clicks`).join("\n")}` : "No service click data this week."}
-${data.topSearchQueries.length ? `Top searches:\n${data.topSearchQueries.map((q) => `- ${q.query}: ${q.clicks} clicks, ${q.impressions} impressions`).join("\n")}` : "No search query data this week."}
+${data.topServices.length ? `Top services:\n${data.topServices.map((s) => `- ${s.name}: ${s.clicks} clicks`).join("\n")}` : `No service click data this ${periodNoun}.`}
+${data.topSearchQueries.length ? `Top searches:\n${data.topSearchQueries.map((q) => `- ${q.query}: ${q.clicks} clicks, ${q.impressions} impressions`).join("\n")}` : `No search query data this ${periodNoun}.`}
 ${data.staleSections.length ? `Stale sections:\n${data.staleSections.map((s) => `- ${s.section}: ${s.daysSinceUpdate} days`).join("\n")}` : "No stale sections."}
 ${data.nextAction ? `Suggested next action: ${data.nextAction.title} - ${data.nextAction.description}` : ""}
 
 Rules:
 - 1 short paragraph, 2 sentences max
 - Lead with value proof, using "people found you" if page views are available
-- If page views are 0, frame it as a steady week and name the single best next lever (share the site, or ask Strelva to refresh a section) — an opportunity, never a failure
+- If page views are 0, frame it as a steady ${periodNoun} and name the single best next lever (share the site, or ask Strelva to refresh a section) — an opportunity, never a failure
 - Mention one concrete thing the AI handled or recommends
 - Write like a sharp, warm human texting the owner an update — plain, specific, confident. Never like software or a marketing email.
 - Talk about their real world: "your website", "the people who found you", "your booking link" — not "users", "conversions", "traffic", or "functionality"
