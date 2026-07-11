@@ -80,6 +80,52 @@ export function buildAnalyticsRows(search: SearchPerf, ga: GaPerf): EmailRow[] {
   return rows;
 }
 
+/** True when this site has ever recorded a visit, click, or call — i.e. a flat
+ *  week is a real quiet week, not tracking still coming online. */
+function hasTrackingHistory(report: WeeklyReportData): boolean {
+  return (
+    report.pageViews.total > 0 ||
+    report.bookingClicks.total > 0 ||
+    report.phoneClicks.total > 0
+  );
+}
+
+/**
+ * Verdict-first email subject. Leads with the proof number when there was
+ * traffic (the anti-churn "it's working" moment that lands before the bill
+ * recurs), frames an established-but-flat week as steady rather than empty, and
+ * stays honest — no invented verdict — while tracking is still coming online.
+ */
+export function buildReportSubject(report: WeeklyReportData): string {
+  const views = report.pageViews.thisWeek;
+  const actions = report.bookingClicks.thisWeek + report.phoneClicks.thisWeek;
+
+  if (views > 0) {
+    const people = views === 1 ? "person" : "people";
+    if (actions > 0) {
+      return `${views} ${people} found you and ${actions} took action this week`;
+    }
+    return `${views} ${people} found you this week`;
+  }
+
+  if (hasTrackingHistory(report)) {
+    return "A steady week. Here's where your site stands";
+  }
+  return "Your weekly report from Strelva";
+}
+
+/**
+ * Verdict-first email heading (the h1). The subject leads with the number; the
+ * heading renders the plain verdict the body then proves — never the generic
+ * "Your weekly report" label. Honest on a quiet or no-data week: an opportunity
+ * or a steady state, never a failure.
+ */
+export function buildReportHeading(report: WeeklyReportData): string {
+  if (report.pageViews.thisWeek > 0) return "Here's your proof this week";
+  if (hasTrackingHistory(report)) return "A steady week. Here's where you stand";
+  return "Your site is live and tracking";
+}
+
 // Sections that are operator/plumbing concepts, not something an owner would
 // recognize on their own site — never name these in a client-facing report.
 const NON_CLIENT_SECTIONS = new Set([
@@ -212,9 +258,9 @@ export function formatVisibilityLines(diff: VisibilityDiff | null): string {
       }
     } else if (surface === "ai_answer") {
       if (direction === "appeared") {
-        lines.push(`AI started recommending you for "${query}" — a win worth keeping.`);
+        lines.push(`AI started recommending you for "${query}". A win worth keeping.`);
       } else if (direction === "disappeared") {
-        lines.push(`AI stopped mentioning you for "${query}" — checked via one model, directional only.`);
+        lines.push(`AI stopped mentioning you for "${query}" (checked via one model, directional only).`);
       }
     }
   }
@@ -290,7 +336,7 @@ export function buildReportFallbackSummary(data: ReportSummaryInput): string {
     );
   } else if (hasTrafficData) {
     paragraphs.push(
-      `${greeting} no new visits landed this week — a good moment to share your site or freshen up a section.`,
+      `${greeting} a steady week — no new visits landed this week, but here's where you stand (${data.pageViews.total} total so far). The quickest way to bring the next few in is to share your site or ask Strelva to refresh a section.`,
     );
   } else {
     // No data ever recorded — visitor tracking is still coming online. Don't
@@ -414,12 +460,13 @@ ${staleSummary ? `Sections that haven't been updated in a while:\n${staleSummary
 ${workBlock}${visibilityBlock}${anomalyBlock}
 Rules:
 - 3-5 short paragraphs max
+- Open with ONE plain-English verdict sentence on how the week went, backed by the strongest real number (e.g. "Your site brought in 47 visitors and 3 booking clicks this week. Here's the proof."). Lead with the verdict, not a stat dump.
 - This goes to a non-technical business owner. NEVER mention internal settings, admin actions, dashboards, verification checks, timestamps, or whether a change was "confirmed live" — those are our concern, not theirs.
-- If there is real traffic or click data, lead with the most interesting number. If there is NO visit data yet, do NOT lead with or dwell on zero and do NOT imply the site is failing — open with what we did on the site and one concrete next step.
+- If there is real traffic or click data, the opening verdict leads with the most interesting number. If there was traffic before but this was a flat/quiet week, frame it as steady and point to the single best next lever (share the site, or ask Strelva to refresh a section) — an opportunity, never a failure. If there is NO visit data yet, do NOT lead with or dwell on zero and do NOT imply the site is failing — open with what we did on the site and one concrete next step.
 - If search query data is available, mention what people are searching to find the site — use their exact words
 - If per-service data is available, mention the most popular service by name
 - If sections are stale, suggest updating one specific section with a concrete idea
-- If a "what we did on the site" line is provided, include it as-is — it's honest proof of work in the owner's own terms
+- If a "what we did on the site" line is provided, include it as-is — it's honest, concrete proof of the work in the owner's own terms; make the wins the owner can see (what changed on their site, what customers praised), not vague activity
 - No filler or vague reassurance ("working behind the scenes", "building your presence"). Every sentence must say something concrete.
 - Never use these words: leverage, utilize, implement, functionality, solution, seamless, robust, streamline, empower, unlock, elevate, cutting-edge, "in today's", "e-commerce". No em dashes and no feature-spec phrasing. Say the actual thing in plain words.
 - If visibility changes are listed, include them as-is — these are position moves in Google or AI, use the exact phrasing provided

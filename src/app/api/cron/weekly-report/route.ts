@@ -3,7 +3,7 @@ import { recordHeartbeat } from "@/lib/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
 import { alertOnce } from "@/lib/monitoring";
-import { generateAllReports } from "@/lib/reports";
+import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
@@ -29,11 +29,13 @@ function reportSummaryParagraphs(summary: string): string[] {
     .filter(Boolean);
 }
 
-function reportToHtml(summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
   const paragraphs = reportSummaryParagraphs(summary);
   return renderEmailHtml({
     preheader: paragraphs[0],
-    heading: "Your weekly report",
+    // Verdict-first h1 (from buildReportHeading) — the plain verdict the body
+    // proves, never the generic "Your weekly report" label.
+    heading,
     paragraphs,
     // Compact Search & Analytics block — only present when a Google surface read
     // "ok" (buildAnalyticsRows returns []), so unconnected tenants omit it.
@@ -43,9 +45,9 @@ function reportToHtml(summary: string, siteName: string, dashboardUrl: string, a
   });
 }
 
-function reportToText(summary: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
   return renderEmailText({
-    heading: "Your weekly report",
+    heading,
     paragraphs: reportSummaryParagraphs(summary),
     rows: analyticsRows.length ? analyticsRows : undefined,
     button: { label: "See your full report", url: dashboardUrl },
@@ -115,17 +117,20 @@ await mapPool(reports, 8, async (report) => {
         return;
       }
 
-      const subject = report.pageViews.thisWeek > 0
-        ? `${report.pageViews.thisWeek} people found you this week`
-        : `Your weekly site update`;
+      // Verdict-first subject + heading — lead with the proof, frame a quiet
+      // week as steady (never empty), stay honest before tracking data lands.
+      const subject = buildReportSubject(report);
+      const heading = buildReportHeading(report);
 
       const html = reportToHtml(
+        heading,
         report.summary,
         report.tenant.siteName,
         getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
         report.analyticsRows,
       );
       const text = reportToText(
+        heading,
         report.summary,
         getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
         report.analyticsRows,

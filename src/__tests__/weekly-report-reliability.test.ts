@@ -33,9 +33,12 @@ vi.mock("../lib/storage", () => ({
 
 import {
   buildReportFallbackSummary,
+  buildReportSubject,
+  buildReportHeading,
   generateAllReports,
   generateWeeklyReport,
 } from "../lib/reports";
+import type { WeeklyReportData } from "../lib/reports";
 
 function tenant(overrides: Partial<TenantConfig>): TenantConfig {
   return {
@@ -68,8 +71,105 @@ const baseSummaryInput = {
   anomalyNarrative: "",
 };
 
+function reportData(overrides: Partial<WeeklyReportData> = {}): WeeklyReportData {
+  return {
+    tenant: tenant({ id: "t1" }),
+    pageViews: { total: 0, thisWeek: 0 },
+    bookingClicks: { total: 0, thisWeek: 0 },
+    phoneClicks: { total: 0, thisWeek: 0 },
+    topServices: [],
+    topSearchQueries: [],
+    staleSections: [],
+    recentActivity: [],
+    verifiedChanges: [],
+    failedVerifications: 0,
+    visibilityLines: "",
+    analyticsRows: [],
+    summary: "",
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("buildReportSubject (verdict-first)", () => {
+  it("leads with the proof number when there was traffic", () => {
+    const s = buildReportSubject(reportData({ pageViews: { total: 120, thisWeek: 47 } }));
+    expect(s).toBe("47 people found you this week");
+  });
+
+  it("folds customer actions into the subject when present", () => {
+    const s = buildReportSubject(
+      reportData({
+        pageViews: { total: 120, thisWeek: 47 },
+        bookingClicks: { total: 30, thisWeek: 2 },
+        phoneClicks: { total: 10, thisWeek: 1 },
+      }),
+    );
+    expect(s).toBe("47 people found you and 3 took action this week");
+  });
+
+  it("singularizes a single visitor", () => {
+    const s = buildReportSubject(reportData({ pageViews: { total: 1, thisWeek: 1 } }));
+    expect(s).toBe("1 person found you this week");
+  });
+
+  it("frames an established-but-flat week as steady, never empty", () => {
+    const s = buildReportSubject(reportData({ pageViews: { total: 120, thisWeek: 0 } }));
+    expect(s).toBe("A steady week. Here's where your site stands");
+    expect(s.toLowerCase()).not.toContain("update");
+  });
+
+  it("stays honest (no invented verdict) before any tracking data lands", () => {
+    const s = buildReportSubject(reportData());
+    expect(s).toBe("Your weekly report from Strelva");
+    expect(s).not.toMatch(/\b0\b/);
+  });
+});
+
+describe("buildReportHeading (verdict-first h1)", () => {
+  it("renders a proof verdict when there was traffic", () => {
+    expect(buildReportHeading(reportData({ pageViews: { total: 120, thisWeek: 47 } }))).toBe(
+      "Here's your proof this week",
+    );
+  });
+
+  it("reads as steady on an established-but-flat week", () => {
+    expect(buildReportHeading(reportData({ pageViews: { total: 120, thisWeek: 0 } }))).toBe(
+      "A steady week. Here's where you stand",
+    );
+  });
+
+  it("is honest and forward-looking before tracking data lands", () => {
+    expect(buildReportHeading(reportData())).toBe("Your site is live and tracking");
+  });
+
+  it("never falls back to the generic label", () => {
+    expect(buildReportHeading(reportData({ pageViews: { total: 120, thisWeek: 47 } }))).not.toBe(
+      "Your weekly report",
+    );
+  });
+});
+
+describe("buildReportFallbackSummary — quiet established week reads as steady + a lever", () => {
+  it("frames a flat week with history as steady and names the next lever", () => {
+    const out = buildReportFallbackSummary({
+      ...baseSummaryInput,
+      pageViews: { total: 120, thisWeek: 0 },
+      bookingClicks: { total: 0, thisWeek: 0 },
+      topServices: [],
+      topSearchQueries: [],
+      staleSections: [],
+    });
+    expect(out).toContain("a steady week");
+    expect(out).toContain("here's where you stand");
+    // The next lever is a concrete action, in the owner's own terms.
+    expect(out).toMatch(/share your site|ask Strelva/);
+    // Never reads as failure.
+    expect(out.toLowerCase()).not.toContain("failing");
+  });
 });
 
 describe("buildReportFallbackSummary (deterministic, claims-safe)", () => {
