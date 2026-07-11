@@ -109,7 +109,7 @@ Repo map, the starter-first rule, client lifecycle, access policy, and the quart
 ## Operational systems
 
 - Event queue: `src/lib/events.ts` — `UnifiedEvent` in Redis sorted sets; powers the dashboard review queue, weekly brief, activity log. `event:{id}` bodies carry a 90-day TTL; `addEvent` prunes the per-tenant index zset by score on every write so the index can't outgrow the record TTL (dangling members would otherwise dilute the recency window `getEvents`/`getOpenChangeRequest` scan).
-- Crons in `src/app/api/cron/` (source of truth is `vercel.json`): attention-digest, daily-summary, heartbeat, maintenance, maintenance-digest, ops-digest, order-review-request, poll-google-reviews, poll-instagram, poll-yelp, portfolio-scan, portfolio-snapshot, revalidation-reconcile, review-nudge, search-console, staleness, visibility, weekly-report.
+- Crons in `src/app/api/cron/` (source of truth is `vercel.json`): attention-digest, daily-summary, heartbeat, maintenance, maintenance-digest, monthly-report, ops-digest, order-review-request, poll-google-reviews, poll-instagram, poll-yelp, portfolio-scan, portfolio-snapshot, revalidation-reconcile, review-nudge, search-console, staleness, visibility, weekly-report.
 - Owner alert emails: `sendReviewNeedsReplyEmail` (a genuinely-new review) + `sendHealthRegressionEmail` (site-health grade slipped) in `src/lib/delivery-email.ts`. Both are **client** email (behind `emailSendingPaused()`, fail-soft) and **deduped once per event** via a persistent NX marker that is **rolled back on suppression/failure**, so a paused alert reaches the owner the day client email is switched on rather than being lost. Triggers: the review-needs-reply alert fires from the `poll-google-reviews` + `poll-yelp` crons via the shared `maybeAlertNewReview` (`src/lib/review-alert.ts`, `reb:review-alert-sent:*`); the health-regression alert fires from the `portfolio-scan` cron on a grade drop (`reb:health-alert-sent:{tenant}:{prev}>{cur}`).
 - One-click approve-from-email: `GET /api/approve` (`src/app/api/approve/route.ts` + `src/lib/approve-link.ts`). The review-needs-reply email carries "Approve" / "Not yet" links the owner clicks without signing in. Each link is an **HMAC-signed token** binding `{eventId, tenantId, action}` + a 14-day expiry (secret reuses the oauth-state chain: `APPROVE_LINK_SECRET` → `OAUTH_STATE_SECRET` → `INTERNAL_API_SECRET`). The route is public (token is the only auth), **tenant-scoped twice** (token binds the tenant + `resolveEventAction` rejects a `wrong_tenant` mismatch), **idempotent** (a replayed/double-clicked link hits an already-resolved event → friendly "already handled" page), and resolves through the SAME governance spine as the dashboard (`resolveEventAction`: approve → "approved" which performs the external write, not-yet → "dismissed"). No new external-write path — it drives the existing governed one.
 - Order-triggered review requests: `src/app/api/cron/order-review-request/route.ts` (schedule in `vercel.json`). A few days after a storefront order lands (via the `/api/v1/track` beacon → `src/lib/orders.ts`), emails the OWNER their Google review link (`sendReviewRequestEmail`) to forward to the customer. Guards mirror the review-nudge cron: **skips any tenant with no derivable review URL** (no `reviewsConfig.googlePlaceId` ⇒ no request — never invents a link), respects the client email pause, and **dedupes per order** with a bounded delay window (`REVIEW_REQUEST_DELAY_DAYS`, default 3) + a rolled-back-on-failure `reb:order-review-request-sent:*` marker.
@@ -218,8 +218,16 @@ Local-business owners will pay for a dashboard that proves their website is work
    - **Your presence** — **Website** (spine; Site + Content/Assets/**History**/Store as
      sub-tabs — History holds the change log + revert-to-last-good; **Store folds in** as a
      sub-tab only when the tenant runs a storefront, never a top-level tab), **Google
-     Business**, **Analytics** (the merged **Reports + Health** surface — verdict-first
-     `WeeklyBriefClient` + `SiteHealthCard`; the old separate Health tab is gone. Also carries
+     Business**, **Analytics** (the **LIVE / rolling** surface — a range selector
+     `Live · This week · This month · Custom` (`AnalyticsRangeSelector` → `?range=`) drives
+     every number; the headline verdict, tiles, and chart are all computed live for the
+     selected window from the daily metric series via `src/lib/analytics/period.ts`
+     (`resolveRange` + `computePeriodStats` + `periodHeadline`), so the headline can never
+     contradict the chart or the anomaly. `AnalyticsLiveView` + `SiteHealthCard`. **The written
+     recaps live on the separate Reports surface** — `/dashboard/reports` renders the weekly
+     brief + the monthly recap (`WeeklyBriefClient` with a Weekly/Monthly toggle; the monthly
+     recap = `generateMonthlyRecap` + the `monthly-report` cron, stored period-tagged in the
+     same recap store). Analytics also carries
      the **90-day "prove it" milestone** (`MilestonePanel.tsx` + `src/lib/milestone.ts`) — a
      real then→now recap (traffic, review count + rating, health grade) built only from stored
      history; the "then" health compares against a durable set-once day-0 anchor
