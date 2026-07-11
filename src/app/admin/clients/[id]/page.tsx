@@ -98,6 +98,13 @@ export default async function ClientDetailPage({
               Dashboard
             </a>
             <a
+              href={`/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`}
+              className="rounded-md px-3 py-2 text-sm text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
+              title="Open this client's dashboard as a read-only operator preview"
+            >
+              Inspect
+            </a>
+            <a
               href={publicUrl}
               target="_blank"
               rel="noopener noreferrer"

@@ -1,12 +1,16 @@
 import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { ComingSoonSurface } from "@/components/dashboard/ComingSoonSurface";
+import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 export default async function RosterPage() {
-  await requireDashboardFeature("roster");
+  const { tenant, preview } = await requireDashboardFeature("roster");
   return (
-    <ComingSoonSurface
-      title="Roster"
-      description="Today's classes and who's booked in — with one-tap check-in — will live here."
-    />
+    <>
+      {preview && <InspectPreviewBanner tenant={tenant} featureId="roster" />}
+      <ComingSoonSurface
+        title="Roster"
+        description="Today's classes and who's booked in — with one-tap check-in — will live here."
+      />
+    </>
   );
 }
