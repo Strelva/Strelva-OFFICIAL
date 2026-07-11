@@ -11,7 +11,7 @@ import {
 } from "../lib/features/registry";
 
 describe("feature registry — core", () => {
-  it("marks the four core features as core", () => {
+  it("marks the five core features as core", () => {
     for (const id of CORE_FEATURES) expect(isCore(id)).toBe(true);
   });
   it("does not mark set/conditional features as core", () => {
@@ -77,7 +77,7 @@ describe("feature registry — getSetSurfaces", () => {
 describe("feature registry — getToggleableRegistry", () => {
   it("groups core / conditional / sets for the UI", () => {
     const { core, conditional, sets } = getToggleableRegistry();
-    expect(core.map((f) => f.id)).toEqual(["today", "ask-ai", "website", "analytics"]);
+    expect(core.map((f) => f.id)).toEqual(["today", "ask-ai", "website", "analytics", "reports"]);
     expect(conditional.map((f) => f.id)).toEqual(["google-business", "reviews"]);
     const wellness = sets.find((s) => s.id === "wellness")!;
     expect(wellness.label).toBe("Wellness");

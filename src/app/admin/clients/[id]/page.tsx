@@ -20,6 +20,7 @@ import { DomainManager } from "./DomainManager";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { InviteButton } from "../../InviteButton";
+import { getTenantSiteName } from "@/lib/tenant-display";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +144,7 @@ export default async function ClientDetailPage({
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
-              {tenant.siteName || tenant.ownerName || tenant.id}
+              {getTenantSiteName(tenant.id, tenant)}
             </h1>
             <p className="text-sm text-gray-muted mt-1">
               {tenant.id} · {tenant.deliveryModel ?? "custom_repo"} · {tenant.active ? "active" : "archived"}
