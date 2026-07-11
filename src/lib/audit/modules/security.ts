@@ -140,11 +140,11 @@ function checkHttps(ctx: AuditContext): CheckResult {
     status: isHttps ? "pass" : "fail",
     score: isHttps ? 100 : 0,
     message: isHttps
-      ? "Site is served over HTTPS."
-      : "Site is not served over HTTPS.",
+      ? "Your site loads securely over HTTPS."
+      : "Your site does not load securely over HTTPS.",
     details: isHttps
       ? undefined
-      : "HTTPS is required for security and search ranking. Configure a TLS certificate and redirect HTTP to HTTPS.",
+      : "The secure padlock is what earns visitor trust and helps you rank. Ask Strelva to turn on HTTPS and send every visitor to the secure version.",
   };
 }
 
@@ -183,10 +183,12 @@ function checkSecurityHeaders(ctx: AuditContext): CheckResult {
     score,
     message:
       missing.length === 0
-        ? "All recommended security response headers are present."
-        : `${present} of ${SECURITY_HEADERS.length} recommended security headers are present.`,
+        ? "All recommended security headers are in place."
+        : `${present} of ${SECURITY_HEADERS.length} recommended security headers are in place.`,
     details:
-      missing.length === 0 ? undefined : `Missing headers: ${missing.join(", ")}.`,
+      missing.length === 0
+        ? undefined
+        : `Missing headers: ${missing.join(", ")}. Ask Strelva to add these — they harden the site behind the scenes with no visible change.`,
   };
 }
 
@@ -256,9 +258,9 @@ function checkMixedContent(ctx: AuditContext): CheckResult {
       name: "No mixed content",
       status: "fail",
       score: 0,
-      message: `Found ${active.length} active insecure HTTP resource(s) (scripts, styles, or iframes) on the HTTPS page.`,
+      message: `${active.length} file(s) on this secure page still load over an insecure connection (scripts, styles, or embeds).`,
       details:
-        "Active mixed content is blocked by browsers and breaks the page. Update these resources to use HTTPS: " +
+        "Browsers block these insecure files, which can break the page. Ask Strelva to switch them to the secure (HTTPS) version: " +
         active.slice(0, 5).join(", ") +
         (active.length > 5 ? ", ..." : "") +
         ".",
@@ -269,9 +271,9 @@ function checkMixedContent(ctx: AuditContext): CheckResult {
     name: "No mixed content",
     status: "warn",
     score: 50,
-    message: `Found ${passive.length} insecure HTTP resource(s) (images or media) on the HTTPS page.`,
+    message: `${passive.length} image or media file(s) on this secure page still load over an insecure connection.`,
     details:
-      "Passive mixed content weakens the secure padlock and may be blocked. Update these resources to use HTTPS: " +
+      "These weaken the secure padlock and may not load. Ask Strelva to switch them to the secure (HTTPS) version: " +
       passive.slice(0, 5).join(", ") +
       (passive.length > 5 ? ", ..." : "") +
       ".",
@@ -336,11 +338,11 @@ function checkFormSecurity(ctx: AuditContext): CheckResult {
   const insecure = formsFound - formsWithHttps;
   let message: string;
   if (insecure > 0) {
-    message = `${insecure} of ${formsFound} form(s) may submit data over an insecure connection.`;
+    message = `${insecure} of ${formsFound} form(s) may send what customers type over an insecure connection.`;
   } else if (formsWithCsrf < formsFound) {
-    message = `All ${formsFound} form(s) submit over HTTPS, but ${formsFound - formsWithCsrf} lack a visible CSRF token.`;
+    message = `All ${formsFound} form(s) submit securely, though ${formsFound - formsWithCsrf} could add extra tamper protection.`;
   } else {
-    message = `All ${formsFound} form(s) submit over HTTPS with a CSRF token.`;
+    message = `All ${formsFound} form(s) submit securely.`;
   }
 
   return {
@@ -350,7 +352,7 @@ function checkFormSecurity(ctx: AuditContext): CheckResult {
     message,
     details:
       insecure > 0
-        ? "Ensure every form posts to an HTTPS endpoint."
+        ? "Ask Strelva to make sure every form sends its data over the secure (HTTPS) connection so customer details stay protected."
         : undefined,
   };
 }
@@ -385,11 +387,11 @@ function checkCookieConsent(ctx: AuditContext): CheckResult {
     status: detected ? "pass" : "warn",
     score: detected ? 100 : 0,
     message: detected
-      ? "A cookie consent notice was detected."
-      : "No cookie consent notice was detected.",
+      ? "A cookie consent notice is in place."
+      : "No cookie consent notice was found.",
     details: detected
       ? undefined
-      : "A cookie consent banner supports GDPR and CCPA compliance for visitors in regulated regions.",
+      : "A short consent banner keeps you compliant with privacy rules (GDPR/CCPA) and shows visitors you handle their data carefully. Ask Strelva to add one.",
   };
 }
 
