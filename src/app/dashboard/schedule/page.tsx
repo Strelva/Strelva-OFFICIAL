@@ -2,9 +2,10 @@ import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { getBookings, getBookingConfig, getDateOverrides } from "@/lib/storage";
 import { DEFAULT_BOOKING_CONFIG, zonedTodayIso } from "@/lib/booking";
 import { SchedulePanel } from "@/components/dashboard/SchedulePanel";
+import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 export default async function SchedulePage() {
-  const { tenant } = await requireDashboardFeature("schedule");
+  const { tenant, preview } = await requireDashboardFeature("schedule");
 
   // Fail-soft: a transient backend blip degrades to an honest empty/default
   // surface rather than the full error boundary. The owner's own save actions
@@ -21,6 +22,9 @@ export default async function SchedulePage() {
   const today = zonedTodayIso(config.timezone);
 
   return (
-    <SchedulePanel bookings={bookings} config={config} overrides={overrides} today={today} />
+    <>
+      {preview && <InspectPreviewBanner tenant={tenant} featureId="schedule" />}
+      <SchedulePanel bookings={bookings} config={config} overrides={overrides} today={today} />
+    </>
   );
 }
