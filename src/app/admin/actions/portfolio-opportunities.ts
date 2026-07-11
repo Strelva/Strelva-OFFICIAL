@@ -261,8 +261,10 @@ async function draftReviewReplyForTenant(tenantId: string): Promise<OpportunityD
  *
  *   • unreplied_reviews → a pending review_reply_draft (approvable in the queue),
  *   • stale_sites / low_health → generateProactiveSuggestions (suggestion cards in
- *     the client's own queue). generateProactiveSuggestions is idempotent and never
- *     throws, so a re-click can't flood the queue with duplicates.
+ *     the client's own queue). It returns the REAL count of suggestions queued —
+ *     a client offered in the group but producing 0 (e.g. a stale one-pager with
+ *     no content engine and no unreplied review) is reported honestly as
+ *     `drafted:false, reason:"nothing_to_draft"`, never as a phantom "drafted".
  */
 export async function draftOpportunityForClients(
   kind: OpportunityKind,
@@ -276,8 +278,12 @@ export async function draftOpportunityForClients(
       } else {
         // stale_sites + low_health both clear through the governed proactive
         // generator, which queues pending suggestion cards for approval.
-        await generateProactiveSuggestions(tenantId);
-        results.push({ tenantId, drafted: true });
+        const drafted = await generateProactiveSuggestions(tenantId);
+        results.push(
+          drafted > 0
+            ? { tenantId, drafted: true }
+            : { tenantId, drafted: false, reason: "nothing_to_draft" },
+        );
       }
     } catch (err) {
       results.push({

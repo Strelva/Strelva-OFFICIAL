@@ -221,7 +221,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/connections/calendly/route.ts",
       "src/app/api/connections/google/route.ts",
       "src/app/api/connections/instagram/route.ts",
-      "src/app/api/connections/vegaro/route.ts",
       "src/app/api/connections/yelp/route.ts",
       "src/app/api/content/[section]/versions/route.ts",
       "src/app/api/events/[id]/route.ts",
@@ -250,7 +249,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/agent/route.ts",
       "src/app/api/booking/[id]/route.ts",
       "src/app/api/booking/config/route.ts",
-      "src/app/api/connections/vegaro/route.ts",
       "src/app/api/connections/yelp/route.ts",
       "src/app/api/content/[section]/versions/route.ts",
       "src/app/api/events/[id]/route.ts",
@@ -1019,7 +1017,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("fails closed on external booking webhooks without configured secrets", () => {
     const webhookRoutes = [
       "src/app/api/webhooks/calendly/route.ts",
-      "src/app/api/webhooks/vegaro/route.ts",
     ];
 
     for (const route of webhookRoutes) {

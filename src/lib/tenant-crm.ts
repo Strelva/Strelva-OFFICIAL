@@ -150,14 +150,57 @@ async function persist(crm: TenantCrm): Promise<TenantCrm> {
   return crm;
 }
 
+const LOCK_TTL_SECONDS = 5;
+const LOCK_MAX_ATTEMPTS = 5;
+const LOCK_RETRY_MS = 40;
+
+/**
+ * Run a read-modify-write under a short per-tenant Redis lock so a cron
+ * auto-log (`addTenantActivity`) racing an operator's stage/note edit can't
+ * last-write-wins one of them away. Mirrors the owner-lock idiom in
+ * `auth.ts` / `booking-store.ts`: `set(lockKey, nx, ex)` then `del` in `finally`.
+ *
+ * The lock only NARROWS the race — a miss must never drop the write or throw. So
+ * when Redis is unconfigured (dev) we run directly, and when the lock can't be
+ * acquired after a brief bounded retry we proceed anyway (degrading to the prior
+ * bare read-modify-write). Only a lock we actually acquired is released.
+ */
+async function withCrmLock<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+  const redis = getRedis();
+  if (!redis) return fn();
+
+  const lockKey = `reb:crm-lock:${tenantId}`;
+  let acquired = false;
+  for (let attempt = 0; attempt < LOCK_MAX_ATTEMPTS; attempt++) {
+    const got: unknown = await redis
+      .set(lockKey, "1", { nx: true, ex: LOCK_TTL_SECONDS })
+      .catch(() => null);
+    if (got !== null && got !== undefined && got !== false) {
+      acquired = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+  }
+
+  try {
+    return await fn();
+  } finally {
+    if (acquired) await redis.del(lockKey).catch(() => {});
+  }
+}
+
 export async function setTenantTags(tenantId: string, tags: string[]): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  return persist({ ...current, tags: sanitizeTags(tags), updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    return persist({ ...current, tags: sanitizeTags(tags), updatedAt: new Date().toISOString() });
+  });
 }
 
 export async function setTenantStage(tenantId: string, stage: CrmStage): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  return persist({ ...current, stage, updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    return persist({ ...current, stage, updatedAt: new Date().toISOString() });
+  });
 }
 
 export async function addTenantNote(
@@ -165,54 +208,62 @@ export async function addTenantNote(
   text: string,
   author: string,
 ): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  const note: CrmNote = {
-    id: crypto.randomUUID(),
-    text: text.trim().slice(0, MAX_NOTE_LEN),
-    author: author || "operator",
-    createdAt: new Date().toISOString(),
-  };
-  const notes = [note, ...current.notes].slice(0, MAX_NOTES);
-  return persist({ ...current, notes, updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    const note: CrmNote = {
+      id: crypto.randomUUID(),
+      text: text.trim().slice(0, MAX_NOTE_LEN),
+      author: author || "operator",
+      createdAt: new Date().toISOString(),
+    };
+    const notes = [note, ...current.notes].slice(0, MAX_NOTES);
+    return persist({ ...current, notes, updatedAt: new Date().toISOString() });
+  });
 }
 
 export async function addTenantContact(
   tenantId: string,
   contact: Omit<CrmContact, "id">,
 ): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  const entry: CrmContact = {
-    id: crypto.randomUUID(),
-    name: cleanField(contact.name) ?? "Unnamed",
-    email: cleanField(contact.email),
-    phone: cleanField(contact.phone),
-    role: cleanField(contact.role),
-  };
-  const contacts = [...current.contacts, entry].slice(0, MAX_CONTACTS);
-  return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    const entry: CrmContact = {
+      id: crypto.randomUUID(),
+      name: cleanField(contact.name) ?? "Unnamed",
+      email: cleanField(contact.email),
+      phone: cleanField(contact.phone),
+      role: cleanField(contact.role),
+    };
+    const contacts = [...current.contacts, entry].slice(0, MAX_CONTACTS);
+    return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+  });
 }
 
 export async function removeTenantContact(
   tenantId: string,
   contactId: string,
 ): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  const contacts = current.contacts.filter((c) => c.id !== contactId);
-  return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    const contacts = current.contacts.filter((c) => c.id !== contactId);
+    return persist({ ...current, contacts, updatedAt: new Date().toISOString() });
+  });
 }
 
 export async function addTenantActivity(
   tenantId: string,
   entry: { kind: CrmActivityKind; summary: string; author: string },
 ): Promise<TenantCrm> {
-  const current = await getTenantCrm(tenantId);
-  const item: CrmActivity = {
-    id: crypto.randomUUID(),
-    kind: ACTIVITY_KINDS.includes(entry.kind) ? entry.kind : "note",
-    summary: entry.summary.trim().slice(0, MAX_ACTIVITY_LEN),
-    author: entry.author || "operator",
-    at: new Date().toISOString(),
-  };
-  const activity = [item, ...current.activity].slice(0, MAX_ACTIVITY);
-  return persist({ ...current, activity, updatedAt: new Date().toISOString() });
+  return withCrmLock(tenantId, async () => {
+    const current = await getTenantCrm(tenantId);
+    const item: CrmActivity = {
+      id: crypto.randomUUID(),
+      kind: ACTIVITY_KINDS.includes(entry.kind) ? entry.kind : "note",
+      summary: entry.summary.trim().slice(0, MAX_ACTIVITY_LEN),
+      author: entry.author || "operator",
+      at: new Date().toISOString(),
+    };
+    const activity = [item, ...current.activity].slice(0, MAX_ACTIVITY);
+    return persist({ ...current, activity, updatedAt: new Date().toISOString() });
+  });
 }

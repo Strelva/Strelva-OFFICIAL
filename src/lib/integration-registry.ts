@@ -27,22 +27,6 @@ export const INTELLIGENCE_CATEGORY_LABELS: Record<IntelligenceCategory, string> 
   can_take_action: "Can Take Action",
 };
 
-/**
- * @deprecated The marketing-style fields `usageExamples`, `exampleInsight`,
- * and `aiCanUseThisTo` are no longer rendered anywhere in the UX. They are
- * kept as optional and retained on existing entries only so we don't churn
- * 600+ lines of data on a single commit; they'll be removed in a follow-up.
- *
- * Do NOT consume these fields in new UI code. Use `addsIntelligence` as the
- * one-line description of what a source provides, and surface insights from
- * real tenant data, never from registry strings.
- */
-export interface IntegrationUsageExample {
-  title: string;
-  prompt: string;
-  response: string;
-}
-
 export interface IntegrationDefinition {
   id: string;
   displayName: string;
@@ -66,12 +50,6 @@ export interface IntegrationDefinition {
   connectionProvider?: IntegrationProvider;
   settingsKey?: string;
   configField?: string;
-  /** @deprecated Do not render. Real insights come from tenant data. */
-  exampleInsight?: string;
-  /** @deprecated Do not render. */
-  aiCanUseThisTo?: string[];
-  /** @deprecated Do not render. */
-  usageExamples?: IntegrationUsageExample[];
 }
 
 export interface RawConnectionStatus {
@@ -109,31 +87,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Weekly reports, AI suggestions, chat",
     intelligenceCategory: "understands_demand",
     addsIntelligence: "What visitors do on the site and which calls-to-action they click.",
-    aiCanUseThisTo: [
-      "explain which pages and offers are getting attention",
-      "suggest clearer calls-to-action when customer actions are low",
-      "turn weekly traffic changes into plain-English next steps",
-    ],
-    exampleInsight:
-      "Customer actions dropped this week even though visits stayed steady. Want me to test a clearer product CTA on the homepage?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Website Activity What are visitors doing on my site that I should act on?",
     builtIn: true,
     usesSignalInAi: true,
-    usageExamples: [
-      {
-        title: "@Analytics: how did my site do this week?",
-        prompt: "@Analytics: how did my site do this week?",
-        response:
-          "Your site had 47 visitors this week, up 12% from last week. Your main offer got the most views (28). 3 people clicked your primary call-to-action after your latest update.",
-      },
-      {
-        title: "@Analytics: which page gets the most traffic?",
-        prompt: "@Analytics: which page gets the most traffic?",
-        response:
-          "Your main offer is your top performer with 28 views this week. Want me to test a clearer call-to-action there?",
-      },
-    ],
   },
   {
     id: "reviews",
@@ -150,33 +107,12 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_customers",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "What customers praise, object to, and repeat in their own words.",
-    aiCanUseThisTo: [
-      "draft review replies for approval",
-      "pull testimonial language into the website",
-      "spot repeated objections worth addressing in site copy",
-    ],
-    exampleInsight:
-      "Three reviews mention fast response time. Want me to add that proof near the contact CTA?",
     actionPaths: ["Draft review reply", "Suggest testimonial copy", "Queue site proof update"],
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Reviews What customer language should my site use?",
     builtIn: true,
     usesSignalInAi: true,
     canActWhenConnected: true,
-    usageExamples: [
-      {
-        title: "Use customer language",
-        prompt: "@Reviews What should my site say based on customer reviews?",
-        response:
-          "Customers keep mentioning fast response time and personal service. Want me to draft homepage proof copy around those themes?",
-      },
-      {
-        title: "Draft a reply",
-        prompt: "Draft a reply to my latest review",
-        response:
-          "I drafted a short reply that thanks the customer, references what they valued, and keeps the tone personal. Want me to queue it for review?",
-      },
-    ],
   },
   {
     id: "booking-clicks",
@@ -192,25 +128,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Reports, AI suggestions, chat",
     intelligenceCategory: "understands_demand",
     addsIntelligence: "Which offers, pages, and buttons create customer intent.",
-    aiCanUseThisTo: [
-      "explain whether visitors are taking the next step",
-      "suggest CTA copy when customer actions are weak",
-      "compare product interest against site traffic",
-    ],
-    exampleInsight:
-      "People view a product page but rarely take the next step. Want me to suggest a clearer CTA for that section?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Customer Actions Which calls-to-action should I improve?",
     builtIn: true,
     usesSignalInAi: true,
-    usageExamples: [
-      {
-        title: "Improve customer actions",
-        prompt: "@Customer Actions Which calls-to-action should I improve?",
-        response:
-          "Your product pages get attention but fewer customer actions. I can suggest a clearer button label and stronger proof nearby.",
-      },
-    ],
   },
   {
     id: "uploads",
@@ -226,25 +147,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Chat, content drafts, site updates",
     intelligenceCategory: "understands_content",
     addsIntelligence: "Recent photos and files the AI can use as content context.",
-    aiCanUseThisTo: [
-      "draft copy around uploaded photos or documents",
-      "suggest where new visuals belong on the site",
-      "keep site content grounded in real business assets",
-    ],
-    exampleInsight:
-      "You uploaded new product photos. Want me to suggest which homepage section should use them?",
     appearsIn: ["Chat", "Site updates"],
     sourcePrompt: "@Uploads What should I do with my recent files?",
     builtIn: true,
     usesSignalInAi: true,
-    usageExamples: [
-      {
-        title: "Use recent uploads",
-        prompt: "@Uploads What should I do with my recent files?",
-        response:
-          "I can use the latest photos as context for a refreshed homepage section and queue the update for review.",
-      },
-    ],
   },
   {
     id: "site-history",
@@ -260,25 +166,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Chat, reports, suggestions, site updates",
     intelligenceCategory: "understands_content",
     addsIntelligence: "What changed recently and which site sections may be stale.",
-    aiCanUseThisTo: [
-      "avoid repeating recent changes",
-      "explain what the AI updated in weekly reports",
-      "suggest the next stale section to refresh",
-    ],
-    exampleInsight:
-      "Your services copy was updated recently, but the homepage still uses older language. Want me to align it?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Site History What changed recently and what should be updated next?",
     builtIn: true,
     usesSignalInAi: true,
-    usageExamples: [
-      {
-        title: "Find stale content",
-        prompt: "@Site History What should be updated next?",
-        response:
-          "The services page changed recently, but the homepage still uses older positioning. I can queue a homepage copy update.",
-      },
-    ],
   },
   {
     id: "website",
@@ -294,27 +185,12 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Site updates, approvals, chat",
     intelligenceCategory: "can_take_action",
     addsIntelligence: "The current live site structure and content the AI can edit with approval.",
-    aiCanUseThisTo: [
-      "draft page-section updates",
-      "queue copy changes for review",
-      "keep the site aligned with current offers and signals",
-    ],
-    exampleInsight:
-      "Your reviews mention fast delivery. Want me to queue homepage proof copy that reflects that?",
     actionPaths: ["Draft site update", "Queue change for approval", "Preview changed section"],
     appearsIn: ["Chat", "Suggestions", "Site updates"],
     sourcePrompt: "@Website What is the highest-impact site update to queue?",
     builtIn: true,
     usesSignalInAi: true,
     canActWhenConnected: true,
-    usageExamples: [
-      {
-        title: "Queue a site update",
-        prompt: "@Website What should I update next?",
-        response:
-          "I can queue a homepage CTA update based on this week's customer-action pattern for approval.",
-      },
-    ],
   },
   {
     id: "social",
@@ -330,26 +206,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Chat, suggestions",
     intelligenceCategory: "can_take_action",
     addsIntelligence: "Which current site updates could become public social content.",
-    aiCanUseThisTo: [
-      "draft captions from current site copy",
-      "turn offers into reviewable social posts",
-      "keep social messaging aligned with the website",
-    ],
-    exampleInsight:
-      "Your new seasonal section can become a short post. Want me to draft it for review?",
     actionPaths: ["Draft social post", "Queue post for review"],
     appearsIn: ["Chat", "Suggestions"],
     sourcePrompt: "@Social Draft a post from the latest site update.",
     builtIn: true,
     canActWhenConnected: true,
-    usageExamples: [
-      {
-        title: "Draft a social post",
-        prompt: "@Social Draft a post from the latest site update.",
-        response:
-          "I drafted a caption from the latest site copy and can queue it for review.",
-      },
-    ],
   },
   {
     id: "booking-cta",
@@ -365,27 +226,12 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Site updates, chat, reports",
     intelligenceCategory: "can_take_action",
     addsIntelligence: "Where the site asks visitors to shop, contact, subscribe, or take the next step.",
-    aiCanUseThisTo: [
-      "draft clearer action button copy",
-      "align CTA language with the current offer",
-      "queue CTA updates for approval",
-    ],
-    exampleInsight:
-      "Your product pages bury the next step. Want me to queue a clearer shop or contact CTA?",
     actionPaths: ["Draft CTA update", "Queue site change for review"],
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Primary CTA Is my site action path clear enough?",
     builtIn: true,
     usesSignalInAi: true,
     canActWhenConnected: true,
-    usageExamples: [
-      {
-        title: "Improve primary CTA",
-        prompt: "@Primary CTA Is my site action path clear enough?",
-        response:
-          "The next step could be clearer. I can queue a CTA update for approval.",
-      },
-    ],
   },
   {
     id: "newsletter",
@@ -402,32 +248,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_content",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "What customers have been told and what can become a subscriber update.",
-    aiCanUseThisTo: [
-      "draft a newsletter from recent site changes",
-      "adapt website updates into customer-facing email copy",
-      "summarize subscriber list status when configured",
-    ],
-    exampleInsight:
-      "You updated the seasonal offer on the site. Want me to draft a short subscriber email that points people to book?",
     actionPaths: ["Draft newsletter for approval", "Queue subscriber update for review"],
     appearsIn: ["Chat", "Suggestions"],
     sourcePrompt: "@Newsletter Draft an update based on the latest site changes.",
     canActWhenConnected: true,
     settingsKey: "newsletter",
-    usageExamples: [
-      {
-        title: "Send an update",
-        prompt: "Send an update to subscribers about what changed this week",
-        response:
-          "I've drafted a newsletter about this week's update. It highlights what changed, why customers should care, and includes your primary call-to-action. Want me to send it?",
-      },
-      {
-        title: "How many subscribers do I have?",
-        prompt: "How many newsletter subscribers do I have?",
-        response:
-          "You have 142 active subscribers. Your last email had a 34% open rate, which is above average for small businesses. Want me to send another update?",
-      },
-    ],
   },
   {
     id: "google-search-console",
@@ -443,32 +268,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     usedIn: "Weekly reports, SEO insights, AI suggestions",
     intelligenceCategory: "understands_demand",
     addsIntelligence: "What people search before finding you.",
-    aiCanUseThisTo: [
-      "suggest better page titles around real searches",
-      "write service copy around demand that already exists",
-      "explain which offers are getting search impressions",
-    ],
-    exampleInsight:
-      "People are searching 'sports massage near me' but your site does not mention it clearly. Want me to add that?",
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Search Console What are people searching for that my site should mention?",
     usesSignalInAi: true,
     settingsKey: "googleSearchConsole",
     configField: "googleSearchConsoleKey",
-    usageExamples: [
-      {
-        title: "What are people searching to find me?",
-        prompt: "What search terms bring people to my site?",
-        response:
-          "Your top searches this week: 'local business near me' (23 clicks), 'services near me' (15 clicks), 'best provider nearby' (8 clicks). Your main offer page ranks #3 for the highest-intent search.",
-      },
-      {
-        title: "How can I rank higher?",
-        prompt: "How can I improve my Google ranking?",
-        response:
-          "You're showing up for a high-intent search but not getting clicks - your title might be too generic. Want me to test a title that leads with your strongest customer outcome?",
-      },
-    ],
   },
   {
     id: "google-business",
@@ -485,31 +289,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_customers",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "What customers say publicly and whether listing details match the site.",
-    aiCanUseThisTo: [
-      "spot review language worth adding to the website",
-      "draft review replies for approval",
-      "suggest listing or site copy updates when details disagree",
-    ],
-    exampleInsight:
-      "A new review praises same-day pickup. Want me to suggest homepage copy that makes that clearer?",
     actionPaths: ["Draft review reply", "Suggest listing updates", "Queue site copy changes"],
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Google Business Any review or listing updates I should act on?",
     connectionProvider: "google",
-    usageExamples: [
-      {
-        title: "Respond to my latest review",
-        prompt: "Respond to my latest Google review",
-        response:
-          "You got a 5-star review from Sarah M. I've drafted a reply thanking her, reinforcing what customers value most, and keeping the tone personal. Want me to post it?",
-      },
-      {
-        title: "Are my Google hours up to date?",
-        prompt: "Check if my Google Business hours match my site",
-        response:
-          "Your Google listing shows Mon-Fri 6am-8pm but your site says 7am-9pm. Want me to update Google to match?",
-      },
-    ],
   },
   {
     id: "instagram",
@@ -526,32 +309,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_content",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "What the business is saying publicly and what site updates could become social content.",
-    aiCanUseThisTo: [
-      "draft social captions from recent site updates",
-      "suggest content themes based on current offers",
-      "keep website and social messaging consistent",
-    ],
-    exampleInsight:
-      "Your site now highlights gift boxes. Want me to draft an Instagram caption and queue it for review?",
     actionPaths: ["Draft social post", "Queue scheduled post for review"],
     appearsIn: ["Chat", "Suggestions"],
     sourcePrompt: "@Instagram What should we turn into a social post this week?",
     connectionProvider: "instagram",
     settingsKey: "instagram",
-    usageExamples: [
-      {
-        title: "Post about this week's update",
-        prompt: "Create an Instagram post about what changed this week",
-        response:
-          "I've created a post with your selected photo, a caption that explains the update clearly, and relevant local hashtags. Scheduled for Thursday at 10am when your followers are most active.",
-      },
-      {
-        title: "What should I post this week?",
-        prompt: "Suggest Instagram content for this week",
-        response:
-          "Based on your current site: Monday - behind-the-scenes proof. Wednesday - customer story. Friday - timely reminder with your primary call-to-action.",
-      },
-    ],
   },
   {
     id: "calendly",
@@ -568,32 +330,11 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_demand",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "Which booking path the site sends interested visitors to.",
-    aiCanUseThisTo: [
-      "review whether booking CTAs match the current offer",
-      "suggest booking-page copy and button changes",
-      "explain booking-click trends alongside site activity",
-    ],
-    exampleInsight:
-      "Visitors are clicking Book Now, but the button label does not match your consultation offer. Want me to suggest a clearer CTA?",
     actionPaths: ["Suggest booking CTA update", "Queue website booking-link copy changes"],
     appearsIn: ["Chat", "Reports", "Suggestions", "Site updates"],
     sourcePrompt: "@Booking CTA Is my booking path clear enough?",
     connectionProvider: "calendly",
     settingsKey: "calendly",
-    usageExamples: [
-      {
-        title: "When am I free this week?",
-        prompt: "Check my availability for Thursday",
-        response:
-          "You have openings at 10am, 1pm, and 3:30pm on Thursday. Want me to send a booking link to a specific client?",
-      },
-      {
-        title: "Update my booking page",
-        prompt: "Add a 30-minute consultation option to my booking",
-        response:
-          "I've added a '30-min Free Consultation' option to your Calendly. It's now showing on your site's booking page too.",
-      },
-    ],
   },
   {
     id: "yelp",
@@ -610,31 +351,10 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     intelligenceCategory: "understands_customers",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "Customer language and reputation signals from Yelp reviews.",
-    aiCanUseThisTo: [
-      "draft review replies for approval",
-      "surface repeated objections or praise",
-      "suggest testimonial or trust copy for the site",
-    ],
-    exampleInsight:
-      "Yelp reviewers keep mentioning fast service. Want me to add that as proof near the booking CTA?",
     actionPaths: ["Draft Yelp review reply", "Suggest site proof copy"],
     appearsIn: ["Chat", "Reports", "Suggestions"],
     sourcePrompt: "@Yelp What customer language should my site reuse?",
     connectionProvider: "yelp",
-    usageExamples: [
-      {
-        title: "Any new Yelp reviews?",
-        prompt: "Check for new Yelp reviews",
-        response:
-          "You got 2 new reviews this week - both 5 stars! One mentions your instructor by name. Want me to draft thank-you responses?",
-      },
-      {
-        title: "What's my Yelp rating?",
-        prompt: "What's my current Yelp rating?",
-        response:
-          "You're at 4.7 stars from 38 reviews. Your highest-rated aspect is 'friendly staff.' Your competitors average 4.2 stars.",
-      },
-    ],
   },
   // Vegaro was here as a `coming_soon` placeholder. Removed — it occupied
   // real estate on the Sources page for a connection that wasn't actually

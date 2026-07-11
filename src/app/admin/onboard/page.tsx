@@ -57,6 +57,10 @@ function OnboardForm() {
     siteName: searchParams.get("siteName") ?? "",
     ownerEmail: searchParams.get("ownerEmail") ?? "",
   }));
+  // The lead being converted, if this onboard was opened from the Leads console.
+  // Threaded to provision so a SUCCESSFUL provision flips the lead → "converted"
+  // (an abandoned onboard leaves it "converting", never a phantom "converted").
+  const leadToken = searchParams.get("leadToken") ?? "";
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionResult | null>(null);
@@ -87,7 +91,7 @@ function OnboardForm() {
       const res = await fetch("/api/admin/provision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(leadToken ? { ...form, leadToken } : form),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
