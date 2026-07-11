@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { resolveRange, periodHeadline, type PeriodStats, type ResolvedRange } from "../lib/analytics/period";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
