@@ -4,6 +4,9 @@ import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { provisionTenant } from "@/lib/provisioning";
 import { getTenantConfig } from "@/lib/tenants";
+import { setLeadWorkflowStatus } from "@/lib/lead-workflow";
+
+const LEAD_TOKEN_RE = /^[a-f0-9]{36}$/;
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -70,6 +73,15 @@ export async function POST(req: Request) {
     actor: await getActorContext(result.tenantId),
     metadata: { steps: result.steps.map((s) => ({ key: s.key, status: s.status })) },
   });
+
+  // Flip the originating lead to "converted" only now that a tenant record
+  // actually exists (the tenant step didn't fail). Fail-soft: a workflow-store
+  // hiccup must never fail the provision response.
+  const leadToken = clean(body.leadToken);
+  const tenantCreated = result.steps.some((s) => s.key === "tenant" && s.status !== "failed");
+  if (leadToken && LEAD_TOKEN_RE.test(leadToken) && tenantCreated) {
+    await setLeadWorkflowStatus(leadToken, "converted").catch(() => {});
+  }
 
   return NextResponse.json(result);
 }

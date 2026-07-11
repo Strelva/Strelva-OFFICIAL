@@ -3,14 +3,17 @@
  * Sanity-hosted image library.
  *
  * Blob is the SINGLE source (no sidecar DB index): tenant isolation is a
- * `media/{tenant}/` pathname prefix, enforced on both list and delete. The only
- * fields Blob can't supply (width/height/lqip) aren't load-bearing — `lqip` is
- * unused and the UI's Dimensions row already degrades to "Unknown" — so no index
- * is needed and there's no dual-write to drift.
+ * `media/{tenant}/` pathname prefix, enforced on both list and delete. Blob's
+ * `list` can't supply pixel dimensions, so we persist them WHERE Blob does read
+ * them back — the pathname itself: a known size becomes a `{w}x{h}` path segment
+ * (`media/{tenant}/{id}/{w}x{h}/{name}`) that `list` parses on the way out. No
+ * sidecar to drift; `lqip` stays unused.
  *
- * Each upload lands in a per-upload subfolder (`media/{tenant}/{id}/{name}`) so a
- * same-name re-upload gets a unique path WITHOUT mangling the display filename
- * (the last path segment stays the clean name).
+ * Each upload lands in a per-upload subfolder (`media/{tenant}/{id}/[{w}x{h}/]{name}`)
+ * so a same-name re-upload gets a unique path WITHOUT mangling the display
+ * filename (the last path segment stays the clean name). Blobs uploaded before
+ * this (or whose header we couldn't read — e.g. AVIF) have no size segment and
+ * honestly read back as "Unknown"; we never backfill a guess.
  *
  * Images uploaded to the old Sanity library before the migration keep rendering
  * wherever they're already referenced in content (served by the read-only Sanity
@@ -20,6 +23,7 @@
 
 import { randomUUID } from "crypto";
 import type { MediaAsset } from "./media";
+import { readImageDimensions } from "./image-signature";
 
 /** Vercel Blob public-store host — used to gate the id passed to DELETE. */
 const BLOB_HOST = "blob.vercel-storage.com";
@@ -45,9 +49,21 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100) || "image";
 }
 
-/** Display filename from a blob pathname (`media/{tenant}/{id}/{name}`). */
+/** Display filename from a blob pathname (`media/{tenant}/{id}/[{w}x{h}/]{name}`). */
 function filenameFromPathname(pathname: string): string {
   return pathname.split("/").pop() || pathname;
+}
+
+/**
+ * Pixel dimensions encoded as the path segment before the filename
+ * (`.../{w}x{h}/{name}`), or {0,0} when there's no size segment (a pre-dimension
+ * blob, or one whose header we couldn't read). The uuid subfolder never matches
+ * `\d+x\d+`, so a legacy `.../{uuid}/{name}` path reads back as unknown.
+ */
+function dimsFromPathname(pathname: string): { width: number; height: number } {
+  const segs = pathname.split("/");
+  const m = segs[segs.length - 2]?.match(/^(\d+)x(\d+)$/);
+  return m ? { width: Number(m[1]), height: Number(m[2]) } : { width: 0, height: 0 };
 }
 
 export interface TenantMedia {
@@ -84,12 +100,13 @@ export async function collectTenantMedia(
         });
         for (const b of res.blobs) {
           const uploadedAt = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt);
+          const { width, height } = dimsFromPathname(b.pathname);
           assets.push({
             id: b.url, // opaque id = the blob URL (DELETE takes it back)
             url: b.url,
             filename: filenameFromPathname(b.pathname),
-            width: 0,
-            height: 0,
+            width,
+            height,
             size: b.size,
             createdAt: uploadedAt.toISOString(),
           });
@@ -130,7 +147,12 @@ export async function uploadTenantMedia(
   }
   const { put } = await import("@vercel/blob");
   const safe = sanitizeFilename(filename);
-  const blob = await put(`${mediaPrefix(tenant)}${randomUUID()}/${safe}`, buffer, {
+  // Persist real pixel size in the pathname so a page reload (which reads Blob's
+  // `list`, not this response) still shows dimensions. Unreadable headers just
+  // omit the segment and stay honestly "Unknown".
+  const dims = readImageDimensions(buffer);
+  const dimSeg = dims ? `${dims.width}x${dims.height}/` : "";
+  const blob = await put(`${mediaPrefix(tenant)}${randomUUID()}/${dimSeg}${safe}`, buffer, {
     access: "public",
     contentType,
   });
@@ -138,8 +160,8 @@ export async function uploadTenantMedia(
     id: blob.url,
     url: blob.url,
     filename: safe,
-    width: 0,
-    height: 0,
+    width: dims?.width ?? 0,
+    height: dims?.height ?? 0,
     size: buffer.length,
     createdAt: new Date().toISOString(),
   };

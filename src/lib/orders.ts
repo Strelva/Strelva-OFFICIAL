@@ -36,6 +36,41 @@ export interface OrderSummary {
   topProducts: OrderLineItem[];
 }
 
+/** Format cents as a currency string; falls back to a plain "$" on a bad code. */
+export function formatMoney(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+  } catch {
+    return `$${(cents / 100).toFixed(2)}`;
+  }
+}
+
+export interface StoreVerdict {
+  headline: string;
+  detail: string | null;
+}
+
+/**
+ * Verdict-first read of the store summary — the one honest sentence the owner
+ * should see before any metric grid. Empty state never shames ("connected and
+ * ready"); a live store leads with earnings + the best seller.
+ */
+export function buildStoreVerdict(summary: OrderSummary | null): StoreVerdict {
+  const count = summary?.orderCount ?? 0;
+  if (!summary || count === 0) {
+    return {
+      headline: "No orders yet",
+      detail: "Your storefront is connected and ready — orders show up here the moment a customer checks out.",
+    };
+  }
+  const revenue = formatMoney(summary.revenueCents, summary.currency);
+  const orderWord = count === 1 ? "order" : "orders";
+  const headline = `You've earned ${revenue} from ${count} ${orderWord} this month.`;
+  const best = summary.topProducts[0];
+  const detail = best ? `${best.name} is your best seller — ${best.quantity} sold.` : null;
+  return { headline, detail };
+}
+
 function ordersKey(tenant: string): string {
   return `orders:${tenant}`;
 }

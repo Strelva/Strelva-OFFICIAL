@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagnose";
+import { diagnoseVisibility, summarizeVisibility, visibilityHeadline } from "@/lib/visibility/diagnose";
 import type { VisibilitySnapshot } from "@/lib/visibility/snapshots";
 
 function snapshot(over: Partial<VisibilitySnapshot> = {}): VisibilitySnapshot {
@@ -61,6 +61,118 @@ describe("diagnoseVisibility", () => {
       })
     );
     expect(findings[0].severity).toBe("high");
+  });
+});
+
+describe("finding impact + quantified", () => {
+  it("attaches a plain-English impact to every finding", () => {
+    const findings = diagnoseVisibility(
+      snapshot({
+        aiResults: [{ query: "best bakery buffalo", model: "g", probed: true, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" }],
+        serpResults: [{ query: "bakery buffalo", provider: "s", tenantPosition: null, tenantInLocalPack: false, competitors: [], checkedAt: "x", skipped: false }],
+      })
+    );
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(f.impact).toBeTruthy();
+      expect(f.impact).toContain(f.query);
+    }
+  });
+
+  it("quantifies from REAL named competitors, not an invented dollar figure", () => {
+    const [ai] = diagnoseVisibility(
+      snapshot({
+        aiResults: [
+          {
+            query: "emergency plumber buffalo",
+            model: "g",
+            probed: true,
+            tenantMentioned: false,
+            competitors: [
+              { name: "A Plumbing", mentioned: true },
+              { name: "B Plumbing", mentioned: true },
+              { name: "C Plumbing", mentioned: false },
+            ],
+            checkedAt: "x",
+            methodologyNote: "",
+          },
+        ],
+      })
+    );
+    expect(ai.quantified).toBe("2 competitors named instead of you");
+    // Honesty rail: never a fabricated dollar/traffic number.
+    expect(ai.quantified).not.toMatch(/\$|\/mo/);
+  });
+
+  it("omits the quantified line when the probe named no rivals (qualitative only)", () => {
+    const [ai] = diagnoseVisibility(
+      snapshot({
+        aiResults: [{ query: "q", model: "g", probed: true, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" }],
+      })
+    );
+    expect(ai.quantified).toBeUndefined();
+    expect(ai.impact).toBeTruthy();
+  });
+
+  it("quantifies SERP gaps from real ranking / local-pack competitor counts", () => {
+    const findings = diagnoseVisibility(
+      snapshot({
+        serpResults: [
+          {
+            query: "roofer buffalo",
+            provider: "s",
+            tenantPosition: null,
+            tenantInLocalPack: false,
+            competitors: [
+              { name: "R1", position: 2, inLocalPack: true },
+              { name: "R2", position: null, inLocalPack: true },
+            ],
+            checkedAt: "x",
+            skipped: false,
+          },
+        ],
+      })
+    );
+    const organic = findings.find((f) => f.surface === "serp_organic");
+    const pack = findings.find((f) => f.surface === "serp_local_pack");
+    expect(organic?.quantified).toBe("1 competitor ranking on page 1 where you're not");
+    expect(pack?.quantified).toBe("2 competitors in the 3-pack where you're not");
+  });
+});
+
+describe("visibilityHeadline", () => {
+  it("leads with the AI wedge and names the gap query when partially cited", () => {
+    const snap = snapshot({
+      aiResults: [
+        { query: "best bakery buffalo", model: "g", probed: true, tenantMentioned: true, competitors: [], checkedAt: "x", methodologyNote: "" },
+        { query: "gluten free bakery buffalo", model: "g", probed: true, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" },
+      ],
+    });
+    const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
+    expect(headline).toBe('Cited in 1 of 2 AI answers — the wedge gap is "gluten free bakery buffalo".');
+  });
+
+  it("celebrates full AI citation without shame", () => {
+    const snap = snapshot({
+      aiResults: [{ query: "q", model: "g", probed: true, tenantMentioned: true, competitors: [], checkedAt: "x", methodologyNote: "" }],
+    });
+    const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
+    expect(headline).toContain("you're who the assistant names");
+  });
+
+  it("falls back to the SERP signal when no AI probe ran", () => {
+    const snap = snapshot({
+      aiResults: [{ query: "q", model: "g", probed: false, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" }],
+      serpResults: [{ query: "bakery buffalo", provider: "s", tenantPosition: null, tenantInLocalPack: false, competitors: [], checkedAt: "x", skipped: false }],
+    });
+    const headline = visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap));
+    expect(headline).toContain("On page 1 for 0 of 1 searches checked");
+    expect(headline).toContain('start with "bakery buffalo"');
+  });
+
+  it("returns null when nothing was measured", () => {
+    const snap = snapshot();
+    expect(visibilityHeadline(summarizeVisibility(snap), diagnoseVisibility(snap))).toBeNull();
   });
 });
 

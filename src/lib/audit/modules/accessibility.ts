@@ -53,9 +53,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Document Language",
       status: "fail",
       score: 0,
-      message: "The page is missing a lang attribute on the html tag.",
+      message: "The page does not say what language it is written in.",
       details:
-        "Add a language to the html tag, for example html lang=\"en\", so screen readers use the right pronunciation.",
+        "Setting the page language (for example, English) helps screen readers pronounce it correctly. Ask Strelva to set it.",
     });
   } else {
     record("pass");
@@ -77,9 +77,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Page Title",
       status: "fail",
       score: 0,
-      message: "The page has no title element.",
+      message: "The page has no title.",
       details:
-        "Add a descriptive title element in the head so screen readers and browser tabs can identify the page.",
+        "The title is what labels the browser tab and identifies the page to screen readers and search results. Ask Strelva to add a clear one.",
     });
   } else if (
     pageTitle.length < 10 ||
@@ -92,7 +92,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: "The page title is generic or too short.",
-      details: `Current title: "${pageTitle}". Use a unique, descriptive title that identifies the page content.`,
+      details: `Current title: "${pageTitle}". Ask Strelva to use a unique, descriptive title that says what the page is about.`,
     });
   } else {
     record("pass");
@@ -131,8 +131,8 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Image Alt Text",
       status: "fail",
       score: 0,
-      message: `${missingAltExamples.length} image(s) are missing an alt attribute.`,
-      details: `Add alt text describing each image, or alt="" if decorative. Examples: ${missingAltExamples.join(", ")}.`,
+      message: `${missingAltExamples.length} image(s) have no text description.`,
+      details: `A short description lets screen readers and image search understand each photo. Ask Strelva to add one to these (or mark them decorative). Examples: ${missingAltExamples.join(", ")}.`,
     });
   } else if (genericAltExamples.length > 0) {
     record("serious");
@@ -140,8 +140,8 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Image Alt Text",
       status: "warn",
       score: 50,
-      message: `${genericAltExamples.length} image(s) use generic alt text.`,
-      details: `Generic alt text provides no meaning. Replace values like: ${genericAltExamples.join(", ")}.`,
+      message: `${genericAltExamples.length} image(s) have a placeholder description that says nothing.`,
+      details: `Descriptions like these add no meaning. Ask Strelva to replace them with a few words about what's actually in the image: ${genericAltExamples.join(", ")}.`,
     });
   } else {
     // Only credit a pass when there were images to evaluate. A page with no
@@ -190,9 +190,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Link Text",
       status: "fail",
       score: 0,
-      message: `${emptyLinks} link(s) have no accessible text.`,
+      message: `${emptyLinks} link(s) have no readable text.`,
       details:
-        "Add descriptive text or an aria-label to each link so screen reader users know where it goes.",
+        "Screen-reader users can't tell where a blank link goes. Ask Strelva to give each one text that names its destination.",
     });
   } else if (genericLinks > 0) {
     record("serious");
@@ -200,8 +200,8 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Link Text",
       status: "warn",
       score: 50,
-      message: `${genericLinks} link(s) use generic text like "click here".`,
-      details: `Use text that describes the destination. Examples found: ${genericLinkExamples.join(", ")}.`,
+      message: `${genericLinks} link(s) use vague text like "click here".`,
+      details: `Vague links tell no one (or Google) where they lead. Ask Strelva to rename them to describe the destination. Examples found: ${genericLinkExamples.join(", ")}.`,
     });
   } else {
     record("pass");
@@ -247,7 +247,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: `${unlabeledFields} of ${totalFields} form field(s) have no label.`,
       details:
-        "Add a label element with a for attribute, or an aria-label, so users know what each field is for.",
+        "A visible label tells every visitor, including screen-reader users, what to type in each field. Ask Strelva to label them so your form is easy to complete.",
     });
   } else {
     record("pass");
@@ -307,8 +307,8 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Heading Structure",
       status: "warn",
       score: 50,
-      message: "The heading structure has problems.",
-      details: `Fix the following: ${headingProblems.join("; ")}. Use one H1 and do not skip levels.`,
+      message: "The heading order could be clearer.",
+      details: `The headings need tidying (${headingProblems.join("; ")}). Ask Strelva to use one main heading and step down in order so the page is easy to follow.`,
     });
   }
 
@@ -332,13 +332,13 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Landmark Regions",
       status: "warn",
       score: 60,
-      message: "The page has no main landmark.",
+      message: "The page's main content area isn't marked for assistive tools.",
       details: missingLandmarks.length
-        ? `Wrap the primary content in a main element. Also missing: ${missingLandmarks
+        ? `Marking the primary content lets assistive tools jump straight to it. Ask Strelva to add it. Also missing: ${missingLandmarks
             .map((l) => l.name)
             .filter((n) => n !== "main")
             .join(", ") || "none"}.`
-        : "Wrap the primary content in a main element.",
+        : "Marking the primary content lets assistive tools jump straight to it. Ask Strelva to add it.",
     });
   } else {
     record("pass");
@@ -386,7 +386,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 50,
       message: "The page has no skip-to-content link.",
       details:
-        "Add a 'Skip to main content' link at the top so keyboard users can bypass navigation.",
+        "A 'Skip to main content' link lets keyboard users jump past the menu straight to the page. Ask Strelva to add one.",
     });
   }
 
@@ -432,9 +432,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Button and Control Names",
       status: "fail",
       score: 0,
-      message: `${namelessControls} button(s) or icon control(s) have no accessible name.`,
+      message: `${namelessControls} button(s) or icon control(s) have no name a screen reader can read.`,
       details:
-        "Add text content or an aria-label to every button and icon-only control so screen readers can announce them.",
+        "Screen readers can't announce a button with no name, so those users can't use it. Ask Strelva to give each button and icon a clear label.",
     });
   } else {
     record("pass");
@@ -469,9 +469,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Iframe Titles",
       status: "warn",
       score: 50,
-      message: `${iframesWithoutTitle} of ${totalIframes} iframe(s) have no title.`,
+      message: `${iframesWithoutTitle} of ${totalIframes} embedded frame(s) (like a map or video) have no title.`,
       details:
-        "Add a title attribute describing each iframe, for example title=\"YouTube video player\".",
+        "A short title lets screen readers describe each embedded map or video. Ask Strelva to add one to each.",
     });
   } else {
     record("pass");
@@ -513,8 +513,8 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "ARIA Roles",
       status: "warn",
       score: 50,
-      message: `${invalidRoles} element(s) use an invalid ARIA role.`,
-      details: `Assistive technology ignores invalid roles. Fix values like: ${invalidRoleExamples.join(", ")}.`,
+      message: `${invalidRoles} element(s) use an accessibility label that isn't recognized.`,
+      details: `Assistive tools ignore labels they don't recognize, so those elements go unannounced. Ask Strelva to correct values like: ${invalidRoleExamples.join(", ")}.`,
     });
   } else {
     record("pass");
@@ -553,9 +553,9 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       name: "Table Headers",
       status: "warn",
       score: 50,
-      message: `${tablesWithoutHeaders} of ${totalDataTables} data table(s) have no header cells.`,
+      message: `${tablesWithoutHeaders} of ${totalDataTables} data table(s) have no header row.`,
       details:
-        "Add th elements with a scope attribute so screen reader users can understand the table structure.",
+        "Header cells let screen-reader users follow which column and row a value belongs to. Ask Strelva to add them.",
     });
   } else {
     record("pass");

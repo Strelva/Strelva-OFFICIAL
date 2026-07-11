@@ -42,7 +42,9 @@ import {
   getBookingConfig,
   setBookingConfig,
   getDateOverrides,
+  setDateOverrides,
 } from "@/lib/storage/booking-store";
+import type { DateOverride } from "@/lib/types";
 import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 
 beforeEach(() => {
@@ -74,6 +76,22 @@ describe("booking config store (Redis-backed)", () => {
 
   it("returns [] for date overrides when none are set", async () => {
     expect(await getDateOverrides("gldf")).toEqual([]);
+  });
+
+  it("round-trips saved date overrides through Redis, and getDateOverrides reads them", async () => {
+    const overrides: DateOverride[] = [
+      { date: "2026-11-26", available: false, reason: "Thanksgiving" },
+      { date: "2026-12-24", available: true, start: "09:00", end: "12:00", reason: "Christmas Eve" },
+    ];
+    await setDateOverrides(overrides, "gldf");
+
+    expect(store.has("reb:booking:overrides:gldf")).toBe(true);
+    expect(await getDateOverrides("gldf")).toEqual(overrides);
+  });
+
+  it("does not leak one tenant's date overrides to another", async () => {
+    await setDateOverrides([{ date: "2026-07-04", available: false }], "gldf");
+    expect(await getDateOverrides("rohlax")).toEqual([]);
   });
 
   it("fails CLOSED on a Redis read error instead of serving default hours", async () => {

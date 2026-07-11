@@ -85,11 +85,12 @@ describe("owner journey copy and links", () => {
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
-    expect(historyPage).toContain("getLatestSiteSnapshot(tenant)");
-    expect(historyPage).toContain("<SiteSafetyPanel latestSnapshot={latestSnapshot} />");
+    expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
+    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots} />");
     expect(safetyPanel).toContain("Revert to a last good version");
-    expect(safetyPanel).toContain("Save backup");
-    expect(safetyPanel).toContain("Restore latest backup");
+    expect(safetyPanel).toContain("Save a version now");
+    // Per-row restore over the whole version history, not just the latest.
+    expect(safetyPanel).toContain("Restore this version");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");
@@ -213,7 +214,12 @@ describe("owner journey copy and links", () => {
     expect(weeklyReportRoute).toContain("getTenantDashboardUrl");
     expect(weeklyReportRoute).toContain('getTenantDashboardUrl(report.tenant, "/dashboard/reports")');
     // Migrated onto the shared email design system: content, not inline markup.
-    expect(weeklyReportRoute).toContain('heading: "Your weekly report"');
+    // Subject + h1 are verdict-first (buildReportSubject / buildReportHeading),
+    // not the generic "Your weekly report" label.
+    expect(weeklyReportRoute).toContain("buildReportSubject(report)");
+    expect(weeklyReportRoute).toContain("buildReportHeading(report)");
+    expect(weeklyReportRoute).not.toContain('heading: "Your weekly report"');
+    expect(weeklyReportRoute).not.toContain("Your weekly site update");
     expect(weeklyReportRoute).toContain("See your full report");
     expect(weeklyReportRoute).toContain("function reportToText");
     expect(weeklyReportRoute).toContain("renderEmailText");
@@ -251,5 +257,30 @@ describe("owner journey copy and links", () => {
     expect(ownershipPage).toContain("DNS and domain handoff");
     expect(ownershipPage).toContain("Billing cancellation");
     expect(ownershipPage).toContain("Admin revocation");
+  });
+
+  it("leads ownership with a plain verdict and a one-click site-files request", () => {
+    const ownershipPage = readRepoFile("src/components/dashboard/OwnershipSection.tsx");
+    const settingsPage = readRepoFile("src/app/dashboard/settings/page.tsx");
+
+    // Verdict framing: what they own, in plain words.
+    expect(ownershipPage).toContain(
+      "Your domain, your content, your customers — leave anytime, with everything.",
+    );
+
+    // One-click repo/domain handoff request reusing the offboarding path,
+    // with an honest success message and confirm-before-send.
+    expect(ownershipPage).toContain("Request your site files");
+    expect(ownershipPage).toContain("/api/offboarding/request");
+    expect(ownershipPage).toContain(
+      "We've got your request — we'll reach out to hand over your files.",
+    );
+    // The fixed-string request is gone — the owner adds their own context.
+    expect(ownershipPage).not.toContain("Client opened ownership settings handoff request.");
+
+    // Single canonical export home: the settings shortcut points at Ownership,
+    // it is not a second export implementation.
+    expect(settingsPage).not.toContain("/api/tenant-export/");
+    expect(settingsPage).toContain("/dashboard/settings#ownership");
   });
 });

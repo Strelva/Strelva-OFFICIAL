@@ -11,6 +11,7 @@ import { runAudit } from "@/lib/audit/checks";
 import type { CategoryResult } from "@/lib/audit/types";
 import { type TrafficProfile, GENERIC_METRICS } from "@/lib/audit/impact";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
+import { prioritizeIssues } from "@/lib/audit/prioritize";
 import {
   saveScanSummary,
   pushScanHistory,
@@ -18,6 +19,7 @@ import {
   getScanBaseline,
   getScanHistory,
   type ScanSummary,
+  type ScanPrioritizedIssue,
 } from "@/lib/scan-store";
 import { selectRunWindow } from "@/lib/visibility/schedule";
 import { getGa4Perf } from "@/lib/analytics";
@@ -77,12 +79,44 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
   const grade = scoreToGrade(overallScore);
   const scannedAt = new Date().toISOString();
 
+  // Rank the audit's failing/warning checks into the "fix first" verdict and
+  // persist a compact, capped copy alongside the grade — so the admin view
+  // renders the verdict on load instead of null-until-rescan. Pure transform
+  // over the AuditResult we already have; the store deliberately stays small,
+  // so only the top few and only the fields the UI renders are kept.
+  const prioritized = prioritizeIssues({
+    url,
+    scannedAt,
+    overallScore,
+    grade,
+    categories: detail,
+  });
+  const prioritizedIssues: ScanPrioritizedIssue[] = prioritized.issues
+    .slice(0, 8)
+    .map((i) => ({
+      message: i.message,
+      category: i.category,
+      priority: i.priority,
+      impact: i.impact,
+      quantified: i.quantified,
+    }));
+  // Persist the TRUE severity counts (not derived from the capped list) so the
+  // on-load badge never understates when a site has more than 8 open issues.
+  const prioritizedCounts = {
+    high: prioritized.highCount,
+    medium: prioritized.mediumCount,
+    low: prioritized.lowCount,
+  };
+
   const summary: ScanSummary = {
     url,
     scannedAt,
     overallScore,
     grade,
     categories: detail.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
+    // Omit the field entirely on a spotless site so an empty list never bloats
+    // the record and legacy/empty reads stay identical.
+    ...(prioritizedIssues.length > 0 ? { prioritizedIssues, prioritizedCounts } : {}),
   };
   const point = { scannedAt, overallScore, grade };
   await saveScanSummary(tenantId, summary);

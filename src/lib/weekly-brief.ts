@@ -331,6 +331,7 @@ ${data.nextAction ? `Suggested next action: ${data.nextAction.title} - ${data.ne
 Rules:
 - 1 short paragraph, 2 sentences max
 - Lead with value proof, using "people found you" if page views are available
+- If page views are 0, frame it as a steady week and name the single best next lever (share the site, or ask Strelva to refresh a section) — an opportunity, never a failure
 - Mention one concrete thing the AI handled or recommends
 - Write like a sharp, warm human texting the owner an update — plain, specific, confident. Never like software or a marketing email.
 - Talk about their real world: "your website", "the people who found you", "your booking link" — not "users", "conversions", "traffic", or "functionality"
@@ -349,7 +350,7 @@ function buildFallbackSummary(stats: WeeklyBriefStats, phoneClicks = 0): string 
   if (stats.pageViews > 0) {
     parts.push(`${stats.pageViews} people found you this week`);
   } else {
-    parts.push("No site visits recorded this week");
+    parts.push("A steady week — no new visits landed yet");
   }
 
   if (stats.bookingClicks > 0) {

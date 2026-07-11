@@ -24,6 +24,7 @@ function stripProtocol(url: string): string {
 const WORKFLOW_BADGE: Record<LeadWorkflowStatus, string> = {
   new: "border-glass-border text-warm-white",
   contacted: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+  converting: "border-sky-500/30 bg-sky-500/10 text-sky-200",
   converted: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
   dismissed: "border-glass-border/60 text-gray-faint",
 };
@@ -31,6 +32,7 @@ const WORKFLOW_BADGE: Record<LeadWorkflowStatus, string> = {
 const WORKFLOW_LABEL: Record<LeadWorkflowStatus, string> = {
   new: "New",
   contacted: "Contacted",
+  converting: "Converting…",
   converted: "Converted",
   dismissed: "Dismissed",
 };
@@ -71,13 +73,16 @@ export function LeadRows({
   }
 
   async function convert(lead: DeliveryLead) {
-    // Records operator intent (status → converted) and hands off to the onboard
-    // flow prefilled. Does NOT create a tenant — the onboarding form still needs
-    // a human to submit.
-    await setStatus(lead.statusToken, "converted");
+    // Marks the lead "converting" (not "converted") and hands off to the onboard
+    // flow prefilled. The tenant does NOT exist yet — provisioning flips the lead
+    // to "converted" only on success (via the threaded statusToken), so an
+    // abandoned onboard leaves a visible "Converting…" lead, never a mislabeled
+    // "Converted" one with no tenant.
+    await setStatus(lead.statusToken, "converting");
     const q = new URLSearchParams({
       siteName: lead.businessName,
       ownerEmail: lead.email,
+      leadToken: lead.statusToken,
     });
     router.push(`/admin/onboard?${q.toString()}`);
   }

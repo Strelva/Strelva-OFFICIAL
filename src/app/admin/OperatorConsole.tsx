@@ -1,10 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/** A read-only structured answer card streamed from a whitelisted read tool. */
+interface OperatorCard {
+  tool: string;
+  data: unknown;
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  cards?: OperatorCard[];
 }
 
 type ProposalAction =
@@ -54,6 +61,187 @@ const COMMIT_MAP: Record<ProposalAction, { endpoint: string; method: string }> =
   send_invite: { endpoint: "/api/admin/invites", method: "POST" },
 };
 
+// ── Read-only answer cards ────────────────────────────────────────────────
+// The operator agent's read tools return structured data; a table beats a prose
+// wall for the high-value ones. These render that data and nothing else — no
+// action, no mutation. A shape the renderer doesn't recognize returns null so
+// the agent's own text (always present alongside) carries the answer instead.
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/** Sage→amber→red tone for a letter grade or a 0-100 score. */
+function gradeTone(grade: string): string {
+  const g = grade.charAt(0).toUpperCase();
+  if (g === "A") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+  if (g === "B") return "bg-accent/15 text-accent border-accent/30";
+  if (g === "C") return "bg-amber-500/15 text-amber-200 border-amber-500/30";
+  return "bg-red-500/15 text-red-300 border-red-500/30";
+}
+
+function GradePill({ grade }: { grade: string }) {
+  return (
+    <span className={`inline-flex min-w-[1.75rem] justify-center rounded border px-1.5 py-0.5 text-[11px] font-semibold ${gradeTone(grade)}`}>
+      {grade}
+    </span>
+  );
+}
+
+function TenantLink({ id, name }: { id: string; name?: string }) {
+  return (
+    <a href={`/admin/clients/${id}`} className="text-warm-white hover:text-accent hover:underline">
+      {name || id}
+    </a>
+  );
+}
+
+function CardShell({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mt-2 rounded-lg border border-glass-border bg-gray-bg/60 p-3">
+      <p className="mb-2 text-[11px] uppercase tracking-wide text-gray-faint">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+/** read_portfolio → per-tenant health rows + roll-up. */
+function PortfolioCard({ data }: { data: Record<string, unknown> }) {
+  const tenants = Array.isArray(data.tenants) ? data.tenants : null;
+  if (!tenants) return null;
+  const launch = isRecord(data.launch) ? data.launch : {};
+  const mrr = typeof data.mrr === "number" ? data.mrr : null;
+  return (
+    <CardShell title="Portfolio health">
+      <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-muted">
+        <span>{typeof data.tenantCount === "number" ? data.tenantCount : tenants.length} clients</span>
+        {mrr !== null && <span>${mrr.toLocaleString()} MRR</span>}
+        <span className="text-emerald-300">{String(launch.ready ?? 0)} ready</span>
+        <span className="text-amber-200">{String(launch.watch ?? 0)} watch</span>
+        <span className="text-red-300">{String(launch.blocked ?? 0)} blocked</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="text-gray-faint">
+            <tr>
+              <th className="py-1 pr-3 font-medium">Client</th>
+              <th className="py-1 pr-3 font-medium">Launch</th>
+              <th className="py-1 pr-3 font-medium">Score</th>
+              <th className="py-1 font-medium">Subscription</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tenants.map((t, i) => {
+              const row = isRecord(t) ? t : {};
+              const id = String(row.id ?? "");
+              const status = String(row.launchStatus ?? "—");
+              const tone =
+                status === "blocked" ? "text-red-300" : status === "watch" ? "text-amber-200" : "text-emerald-300";
+              return (
+                <tr key={id || i} className="border-t border-glass-border/50">
+                  <td className="py-1 pr-3"><TenantLink id={id} name={row.siteName ? String(row.siteName) : undefined} /></td>
+                  <td className={`py-1 pr-3 ${tone}`}>{status}</td>
+                  <td className="py-1 pr-3 text-gray-muted">{typeof row.launchScore === "number" ? row.launchScore : "—"}</td>
+                  <td className="py-1 text-gray-muted">{String(row.subscriptionStatus ?? "—")}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </CardShell>
+  );
+}
+
+/** read_scan → ranked SEO / site-health table (worst first) or a single grade. */
+function ScanCard({ data }: { data: Record<string, unknown> }) {
+  const scanned = Array.isArray(data.scanned) ? data.scanned : null;
+  if (scanned) {
+    if (scanned.length === 0) return null;
+    return (
+      <CardShell title="Site health — ranked (worst first)">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="text-gray-faint">
+              <tr>
+                <th className="py-1 pr-3 font-medium">Client</th>
+                <th className="py-1 pr-3 font-medium">Grade</th>
+                <th className="py-1 font-medium">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scanned.map((s, i) => {
+                const row = isRecord(s) ? s : {};
+                const id = String(row.tenant ?? "");
+                return (
+                  <tr key={id || i} className="border-t border-glass-border/50">
+                    <td className="py-1 pr-3"><TenantLink id={id} name={row.siteName ? String(row.siteName) : undefined} /></td>
+                    <td className="py-1 pr-3"><GradePill grade={String(row.grade ?? "?")} /></td>
+                    <td className="py-1 text-gray-muted">{typeof row.overallScore === "number" ? row.overallScore : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardShell>
+    );
+  }
+  // Single-tenant scan.
+  if (data.scanned === true && typeof data.tenantId === "string") {
+    return (
+      <CardShell title="Site health">
+        <div className="flex items-center gap-2 text-xs">
+          <TenantLink id={data.tenantId} />
+          <GradePill grade={String(data.grade ?? "?")} />
+          <span className="text-gray-muted">{typeof data.overallScore === "number" ? `${data.overallScore}/100` : ""}</span>
+        </div>
+      </CardShell>
+    );
+  }
+  return null;
+}
+
+/** read_attention → severity-ranked needs-attention list. */
+function AttentionCard({ data }: { data: Record<string, unknown> }) {
+  const items = Array.isArray(data.items) ? data.items : null;
+  if (!items || items.length === 0) return null;
+  const dot: Record<string, string> = {
+    high: "bg-red-400",
+    medium: "bg-amber-300",
+    low: "bg-gray-faint",
+  };
+  return (
+    <CardShell title="Needs attention">
+      <ul className="space-y-1.5">
+        {items.slice(0, 12).map((it, i) => {
+          const row = isRecord(it) ? it : {};
+          const severity = String(row.severity ?? "low");
+          const tenant = typeof row.tenant === "string" ? row.tenant : null;
+          return (
+            <li key={i} className="flex items-start gap-2 text-xs text-gray-muted">
+              <span className={`mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full ${dot[severity] ?? dot.low}`} />
+              <span>
+                {String(row.message ?? "")}
+                {tenant && <> · <TenantLink id={tenant} /></>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </CardShell>
+  );
+}
+
+/** Dispatch a card to its renderer; unknown tool or bad shape renders nothing. */
+function OperatorCardView({ card }: { card: OperatorCard }) {
+  if (!isRecord(card.data)) return null;
+  if (card.tool === "read_portfolio") return <PortfolioCard data={card.data} />;
+  if (card.tool === "read_scan") return <ScanCard data={card.data} />;
+  if (card.tool === "read_attention") return <AttentionCard data={card.data} />;
+  return null;
+}
+
 /**
  * Mission Control command bar. Chats with the read-only operator agent
  * (/api/admin/agent) over the __TOOL__/__RESULT__ text-stream protocol. The
@@ -69,11 +257,50 @@ export function OperatorConsole() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposalState, setProposalState] = useState<Record<string, { state: ProposalState; note?: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // The command palette deep-links an ask into the console: cross-page via a
+  // `?ask=…` query (read on mount), same-page via a live `strelva:ask` event.
+  // Both just prefill + focus the input — display/navigation only, no send.
+  useEffect(() => {
+    function applyAsk(ask: string) {
+      if (ask) setInput(ask);
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("ask")) {
+      applyAsk(params.get("ask") ?? "");
+      params.delete("ask");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+    function onAsk(e: Event) {
+      applyAsk(typeof (e as CustomEvent).detail === "string" ? (e as CustomEvent).detail : "");
+    }
+    window.addEventListener("strelva:ask", onAsk);
+    return () => window.removeEventListener("strelva:ask", onAsk);
+  }, []);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
     });
+  }
+
+  function pushCard(card: OperatorCard) {
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === "assistant") {
+          next[i] = { ...next[i], cards: [...(next[i].cards ?? []), card] };
+          break;
+        }
+      }
+      return next;
+    });
+    scrollToBottom();
   }
 
   async function send() {
@@ -108,7 +335,8 @@ export function OperatorConsole() {
       const flushAssistant = () => {
         setMessages((prev) => {
           const next = [...prev];
-          next[next.length - 1] = { role: "assistant", content: assistantText };
+          // Preserve any cards pushCard attached — only the text is streaming in.
+          next[next.length - 1] = { ...next[next.length - 1], role: "assistant", content: assistantText };
           return next;
         });
         scrollToBottom();
@@ -127,6 +355,19 @@ export function OperatorConsole() {
           }
           return;
         }
+        if (line.startsWith("__CARD__")) {
+          // Fail-soft: a malformed card is dropped; the agent's own text (always
+          // streamed too) carries the answer, so the console never goes blank.
+          try {
+            const parsed = JSON.parse(line.slice(8));
+            if (parsed && typeof parsed === "object" && typeof parsed.tool === "string") {
+              pushCard(parsed as OperatorCard);
+            }
+          } catch {
+            // ignore
+          }
+          return;
+        }
         assistantText += line + "\n";
         setToolStatus(null);
         flushAssistant();
@@ -139,7 +380,7 @@ export function OperatorConsole() {
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
         for (const line of lines) handleLine(line);
-        if (buffer && !buffer.startsWith("__TOOL__") && !buffer.startsWith("__RESULT__")) {
+        if (buffer && !buffer.startsWith("__TOOL__") && !buffer.startsWith("__RESULT__") && !buffer.startsWith("__CARD__")) {
           assistantText += buffer;
           buffer = "";
           setToolStatus(null);
@@ -152,6 +393,15 @@ export function OperatorConsole() {
             result = JSON.parse(buffer.slice(10));
           } catch {
             result = null;
+          }
+        } else if (buffer.startsWith("__CARD__")) {
+          try {
+            const parsed = JSON.parse(buffer.slice(8));
+            if (parsed && typeof parsed === "object" && typeof parsed.tool === "string") {
+              pushCard(parsed as OperatorCard);
+            }
+          } catch {
+            // ignore
           }
         } else if (!buffer.startsWith("__TOOL__")) {
           assistantText += buffer;
@@ -204,7 +454,7 @@ export function OperatorConsole() {
   }
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+    <div ref={rootRef} id="mission-control" className="rounded-xl bg-glass border border-glass-border overflow-hidden">
       <div className="px-5 py-4 border-b border-glass-border flex items-center gap-2">
         <span className="text-sm font-semibold text-warm-white">Mission Control</span>
         <span className="text-xs text-gray-muted">
@@ -224,18 +474,21 @@ export function OperatorConsole() {
           </div>
         )}
         {messages.map((m, i) => (
-          <div
-            key={`msg-${i}`}
-            className={
-              m.role === "user"
-                ? "text-sm text-warm-white"
-                : "text-sm text-gray-muted whitespace-pre-wrap"
-            }
-          >
-            <span className="text-xs uppercase tracking-wide text-gray-faint mr-2">
-              {m.role === "user" ? "You" : "Agent"}
-            </span>
-            {m.role === "assistant" ? toPlainText(m.content) : m.content}
+          <div key={`msg-${i}`} className="text-sm">
+            <div
+              className={
+                m.role === "user"
+                  ? "text-warm-white"
+                  : "text-gray-muted whitespace-pre-wrap"
+              }
+            >
+              <span className="text-xs uppercase tracking-wide text-gray-faint mr-2">
+                {m.role === "user" ? "You" : "Agent"}
+              </span>
+              {m.role === "assistant" ? toPlainText(m.content) : m.content}
+            </div>
+            {m.role === "assistant" &&
+              m.cards?.map((card, ci) => <OperatorCardView key={`card-${i}-${ci}`} card={card} />)}
           </div>
         ))}
         {toolStatus && (
@@ -276,6 +529,7 @@ export function OperatorConsole() {
 
       <div className="px-5 py-3 border-t border-glass-border flex gap-2">
         <input
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

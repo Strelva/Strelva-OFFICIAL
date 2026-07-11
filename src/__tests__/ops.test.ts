@@ -68,4 +68,17 @@ describe("buildOpsReport", () => {
     if (original === undefined) delete process.env.CUSTOM_DOMAIN_MAP;
     else process.env.CUSTOM_DOMAIN_MAP = original;
   });
+
+  it("carries the tenant on each structured domainDrift row for deep-linking", async () => {
+    const original = process.env.CUSTOM_DOMAIN_MAP;
+    process.env.CUSTOM_DOMAIN_MAP = "{}";
+    const report = await buildOpsReport();
+    const drift = report.metrics.domainDrift ?? [];
+    expect(drift.length).toBeGreaterThan(0);
+    expect(drift.every((d) => typeof d.tenantId === "string" && d.tenantId.length > 0)).toBe(true);
+    // the message list mirrors the structured rows one-for-one
+    expect(report.metrics.tenantDomainDrift).toEqual(drift.map((d) => d.message));
+    if (original === undefined) delete process.env.CUSTOM_DOMAIN_MAP;
+    else process.env.CUSTOM_DOMAIN_MAP = original;
+  });
 });

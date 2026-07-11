@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.setSystemTime(clock);
 });
 
-import { recordOrder, getOrders, getOrderSummary } from "@/lib/orders";
+import { recordOrder, getOrders, getOrderSummary, buildStoreVerdict } from "@/lib/orders";
 
 describe("orders store", () => {
   it("records an order and reads it back", async () => {
@@ -62,6 +62,30 @@ describe("orders store", () => {
     const s = await getOrderSummary("t1", 30);
     expect(s.orderCount).toBe(1);
     expect(s.revenueCents).toBe(1000);
+  });
+
+  it("builds an honest empty verdict when there are no orders", () => {
+    const v = buildStoreVerdict(null);
+    expect(v.headline).toBe("No orders yet");
+    expect(v.detail).toMatch(/connected and ready/i);
+    expect(buildStoreVerdict({ orderCount: 0, revenueCents: 0, currency: "USD", topProducts: [] })).toEqual(v);
+  });
+
+  it("leads the verdict with earnings and the best seller", () => {
+    const v = buildStoreVerdict({
+      orderCount: 3,
+      revenueCents: 12_500,
+      currency: "USD",
+      topProducts: [{ name: "Dried Mango", quantity: 7 }],
+    });
+    expect(v.headline).toBe("You've earned $125.00 from 3 orders this month.");
+    expect(v.detail).toBe("Dried Mango is your best seller — 7 sold.");
+  });
+
+  it("singularizes one order and omits the best-seller line when there is none", () => {
+    const v = buildStoreVerdict({ orderCount: 1, revenueCents: 999, currency: "USD", topProducts: [] });
+    expect(v.headline).toBe("You've earned $9.99 from 1 order this month.");
+    expect(v.detail).toBeNull();
   });
 
   it("releases the externalId lock when indexing fails, so a retried beacon isn't dropped", async () => {

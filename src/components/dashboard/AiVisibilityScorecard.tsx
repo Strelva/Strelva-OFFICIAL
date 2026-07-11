@@ -1,8 +1,18 @@
 "use client";
 
-import { Bot, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bot, Sparkles, MessageSquare } from "lucide-react";
 import type { AiVisibilityScorecard as Scorecard } from "@/lib/ai-visibility-scorecard";
 import { StatTile } from "./StatTile";
+import { useDashboardOptional } from "./DashboardContext";
+
+/** Short, human "as of" date for the subtle checked-on note. Null-safe. */
+function formatCheckedAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 /**
  * "You in AI answers" — the owner-facing AI-search visibility scorecard. Reads
@@ -11,6 +21,13 @@ import { StatTile } from "./StatTile";
  * in, which ones, and what's new this week. Never shames a query you're not in.
  */
 export function AiVisibilityScorecard({ data }: { data: Scorecard | null }) {
+  // Hooks first (Rules of Hooks) — the chat-prefill wiring reused for the
+  // zero-state next step; degrades to nothing outside a dashboard context.
+  const dashboard = useDashboardOptional();
+  const router = useRouter();
+  const setChatPrompt = dashboard?.setChatPrompt;
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+
   // Not tracking yet, or tracking but no probed answer has landed. Either way the
   // honest owner-facing state is the same soft "we check weekly, results land here".
   if (!data || !data.hasData) {
@@ -39,7 +56,16 @@ export function AiVisibilityScorecard({ data }: { data: Scorecard | null }) {
     );
   }
 
-  const { service, mentionedCount, total, mentionedQueries, newlyAppeared } = data;
+  const { service, mentionedCount, total, mentionedQueries, newlyAppeared, checkedAt } = data;
+  const checkedLabel = formatCheckedAt(checkedAt);
+
+  const askStrelva = () => {
+    if (!setChatPrompt) return;
+    setChatPrompt(
+      `AI assistants aren't naming us yet when people ask for a ${service}. What would help us show up?`
+    );
+    router.push(dashboardHref("/dashboard/chat"));
+  };
 
   const headline =
     mentionedCount > 0
@@ -105,9 +131,23 @@ export function AiVisibilityScorecard({ data }: { data: Scorecard | null }) {
           </div>
         )}
 
+        {/* Zero-state, made actionable: honest that you're not named yet, plus a
+            soft one-tap into the assistant to plan what would help. */}
+        {mentionedCount === 0 && setChatPrompt && (
+          <button
+            type="button"
+            onClick={askStrelva}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-glass px-3 py-2 text-[13px] font-medium text-warm-black transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Ask Strelva what would help
+          </button>
+        )}
+
         <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
           We check weekly by asking AI assistants the questions your customers ask them. AI
           answers vary by person and moment, so this is a directional read, not a fixed rank.
+          {checkedLabel ? ` Last checked ${checkedLabel}.` : ""}
         </p>
       </div>
     </div>
