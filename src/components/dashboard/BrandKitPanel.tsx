@@ -105,6 +105,10 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
             This is what Strelva draws on to write and update your site. The clearer it is,
             the more every change sounds like you.
           </p>
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent-dim/40 px-2.5 py-1 text-[11px] font-medium text-accent">
+            <Sparkles className="h-3 w-3" strokeWidth={1.8} />
+            Strelva reads this on every change it makes
+          </span>
         </div>
         <SavePill status={status} />
       </div>
