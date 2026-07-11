@@ -1,10 +1,18 @@
+"use client";
+
+import { useState, useTransition } from "react";
 import type { AdminReviewIntelligence } from "@/lib/reviews/intelligence";
+import { draftReviewReplyForReview } from "./review-actions";
 
 /**
  * Operator view of a client's reputation — the admin-only side of the review
  * intelligence. Surfaces the urgent-first "needs a reply" queue, sentiment
  * split, emerging concerns, and the at-risk flag. The client never sees any of
  * this; their dashboard shows only the positive summary.
+ *
+ * Each queued review carries an inline "Draft reply" that routes through the
+ * governed `review_reply_draft` path (see review-actions.ts) — it queues a
+ * PENDING draft for approval, never publishes to Google directly.
  */
 
 const URGENCY_PILL: Record<"high" | "medium" | "low", string> = {
@@ -12,6 +20,8 @@ const URGENCY_PILL: Record<"high" | "medium" | "low", string> = {
   medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   low: "bg-gray-bg text-gray-muted border-glass-border",
 };
+
+type DraftState = "idle" | "drafting" | "drafted" | "error";
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -22,11 +32,63 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-export function ReviewIntelPanel({ intel }: { intel: AdminReviewIntelligence }) {
+function DraftReplyButton({ tenantId, reviewId }: { tenantId: string; reviewId: string }) {
+  const [state, setState] = useState<DraftState>("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onClick() {
+    setState("drafting");
+    setMessage(null);
+    startTransition(async () => {
+      const res = await draftReviewReplyForReview(tenantId, reviewId).catch(() => null);
+      if (res?.ok && res.drafted) {
+        setState("drafted");
+        setMessage("Drafted — approve in the queue");
+      } else if (res?.ok && res.reason === "already_drafted") {
+        setState("drafted");
+        setMessage("Already drafted — in the queue");
+      } else if (res?.ok && res.reason === "already_replied") {
+        setState("drafted");
+        setMessage("Already replied");
+      } else {
+        setState("error");
+        setMessage("Draft failed — try again");
+      }
+    });
+  }
+
+  if (state === "drafted") {
+    return <span className="shrink-0 text-[11px] text-emerald-300">{message} ✓</span>;
+  }
+
+  return (
+    <span className="flex shrink-0 flex-col items-end gap-0.5">
+      <button
+        onClick={onClick}
+        disabled={pending || state === "drafting"}
+        className="rounded-md border border-glass-border bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-warm-white transition-colors hover:border-warm-white/25 disabled:opacity-50"
+      >
+        {state === "drafting" ? "Drafting…" : "Draft reply"}
+      </button>
+      {state === "error" && message && (
+        <span className="text-[10px] text-red-300">{message}</span>
+      )}
+    </span>
+  );
+}
+
+export function ReviewIntelPanel({
+  intel,
+  tenantId,
+}: {
+  intel: AdminReviewIntelligence;
+  tenantId: string;
+}) {
   const { totalReviews, sentimentBreakdown, needsResponse, unansweredNegative, concerns, atRisk, atRiskReason } = intel;
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-5">
+    <div id="reviews-operator" className="rounded-xl bg-glass border border-glass-border p-5 scroll-mt-24">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-[15px] font-medium text-warm-white">Reviews — operator view</h2>
@@ -69,11 +131,12 @@ export function ReviewIntelPanel({ intel }: { intel: AdminReviewIntelligence }) 
                     >
                       {flag.urgency}
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="text-warm-white">{flag.author}</span>{" "}
                       <Stars rating={flag.rating} />
                       <span className="block text-[11px] text-gray-muted">{flag.reason}</span>
                     </span>
+                    <DraftReplyButton tenantId={tenantId} reviewId={flag.reviewId} />
                   </li>
                 ))}
               </ul>

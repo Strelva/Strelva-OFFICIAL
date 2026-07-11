@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink, FileText, Inbox, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
+import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
@@ -13,6 +13,8 @@ import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomai
 import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
+import { getSuggestions } from "@/lib/suggestions";
+import { DoThisNextCard } from "@/components/dashboard/DoThisNextCard";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { selectStrelvaWork } from "@/lib/activity-feed";
@@ -108,6 +110,18 @@ async function DashboardHome() {
     await generateProactiveSuggestions(tenant).catch(() => {});
   }
 
+  // "Do this next" — the single top pending suggestion (getSuggestions returns
+  // pending, newest-first) surfaced as a one-tap hand-off into chat. Never on
+  // day one; fail-soft to no card.
+  const topSuggestion = isFresh ? null : (await getSuggestions(tenant).catch(() => []))[0] ?? null;
+  const doNextPrompt = topSuggestion
+    ? topSuggestion.action.startsWith("prompt:")
+      ? topSuggestion.action.slice("prompt:".length)
+      : topSuggestion.action.startsWith("update_section:")
+        ? `Help me update my ${topSuggestion.action.slice("update_section:".length)} section`
+        : topSuggestion.title
+    : "";
+
   return (
     <>
       <EngagementTracker event="dashboard-open" />
@@ -170,6 +184,12 @@ async function DashboardHome() {
               weekly-proof / retention panel. */}
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
 
+          {/* Do this next — your latest pending suggestion, one tap into
+              chat. Only when there's a real pending suggestion. */}
+          {topSuggestion ? (
+            <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
+          ) : null}
+
           {/* Needs you — the approval queue, front and center on Today. Only when
               something waits. */}
           {pendingCount > 0 ? (
@@ -226,7 +246,9 @@ async function DashboardHome() {
           {/* "What Strelva did for you" — the anti-churn proof timeline. The
               managed service made visible. Only past day-one (its own honest
               empty state covers a new-but-not-day-one client). */}
-          {!isFresh ? <ActivityFeed activity={strelvaWork} /> : null}
+          {!isFresh ? (
+            <ActivityFeed activity={strelvaWork} historyHref={dashboardHref("/dashboard/history")} />
+          ) : null}
 
           {leadSummary.recent.length > 0 ? (
             <section className="rounded-2xl border border-glass-border bg-glass p-5">
@@ -250,8 +272,15 @@ async function DashboardHome() {
                     </div>
                     {lead.message ? (
                       <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-gray-muted">{lead.message}</p>
-                    ) : lead.email ? (
-                      <p className="mt-0.5 text-[12px] text-gray-muted">{lead.email}</p>
+                    ) : null}
+                    {lead.email ? (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
+                      >
+                        <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        Reply to {lead.email}
+                      </a>
                     ) : null}
                   </li>
                 ))}

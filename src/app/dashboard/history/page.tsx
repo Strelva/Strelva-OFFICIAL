@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { getActivity, getLatestSiteSnapshot } from "@/lib/storage";
+import { getActivity, getSiteSnapshots } from "@/lib/storage";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
 
@@ -10,9 +10,11 @@ import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
 export default async function SiteHistoryPage() {
   const { tenant, clientFallbackRoot } = await requireDashboardView();
 
-  const [activity, latestSnapshot] = await Promise.all([
+  const [activity, snapshots] = await Promise.all([
     getActivity(tenant, { actor: "ai" }).catch(() => []),
-    getLatestSiteSnapshot(tenant).catch(() => null),
+    // The full saved-version history (daily + manual backups) so the owner can
+    // restore ANY good version, not just the latest.
+    getSiteSnapshots(tenant, 60).catch(() => []),
   ]);
   const recentChanges = activity.slice(0, 12);
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
@@ -32,7 +34,7 @@ export default async function SiteHistoryPage() {
           </p>
         </div>
 
-        <SiteSafetyPanel latestSnapshot={latestSnapshot} />
+        <SiteSafetyPanel snapshots={snapshots} />
 
         <section className="rounded-2xl border border-glass-border bg-glass p-5">
           <div className="mb-4 flex items-center justify-between gap-3">

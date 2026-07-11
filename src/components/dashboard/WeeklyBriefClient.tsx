@@ -286,7 +286,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           >
             <StatTile
               countUp
-              label="People found you"
+              label="People found you this week"
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
               icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}

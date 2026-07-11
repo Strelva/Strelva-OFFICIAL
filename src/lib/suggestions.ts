@@ -158,7 +158,11 @@ export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
   }
 
   const store = await readSuggestions();
-  return (store[tenantId] || []).filter((s) => s.status === "pending");
+  // Newest-first to match the Postgres path (created_at desc) so callers that
+  // take [0] get the latest pending suggestion in both modes.
+  return (store[tenantId] || [])
+    .filter((s) => s.status === "pending")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "createdAt" | "status">): Promise<Suggestion> {
