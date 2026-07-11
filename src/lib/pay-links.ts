@@ -1,23 +1,22 @@
 /**
- * Pay-links — per-client "pay before work starts" checkout links for the
- * two-door website offer (docs/strategy/website-offer-two-door.md).
+ * Pay-links — per-client one-off checkout links. A pay-link is a small
+ * Redis-backed record Jacob mints per client (via the super-admin
+ * POST /api/admin/pay-links route) that powers the public /pay/[slug] page +
+ * POST /api/pay/[slug] Stripe checkout, in mode:"payment" (a single charge).
  *
- * A pay-link is a small Redis-backed record Jacob mints per client (via the
- * super-admin POST /api/admin/pay-links route) that powers the public
- * /pay/[slug] page + POST /api/pay/[slug] Stripe checkout.
+ * The live offer is a pure monthly subscription with no upfront fee (founder
+ * decision 2026-06-26), so pay-links are now for the OCCASIONAL one-off charge —
+ * an out-of-band paid build or a one-time invoice. The admin UI mints these as
+ * door:"build" and no longer surfaces the superseded two-door choice
+ * (docs/strategy/website-offer-two-door.md).
  *
- * Two doors:
- *  - "build"         — Door 1: a one-time build payment ($1,500–2,500), which
- *                      includes the first 3 months of management ($99/mo after).
- *  - "managed_start" — Door 2: the $499 start payment that opens a $199/mo,
- *                      12-month-minimum managed plan (own-the-site after month 12).
+ * The `door` field (build | managed_start) is RETAINED in the data model: it
+ * keys the Stripe payment purpose (PAY_LINK_PURPOSE) and the public-page copy
+ * (pay-link-copy.ts), and existing "managed_start" records must keep resolving.
+ * New admin-minted links are always "build".
  *
- * Both doors create a Stripe Checkout session in mode:"payment" (the start /
- * build payment only). The recurring side is provisioned separately — this
- * record captures the up-front charge that must clear before work begins.
- *
- * NOTE: this is a NEW mechanism. The grandfathered /pay/rohlax page
- * (src/lib/rohlax-payment.ts) is intentionally separate and untouched.
+ * NOTE: the grandfathered /pay/rohlax page (src/lib/rohlax-payment.ts) is
+ * intentionally separate and untouched.
  */
 
 import { getRedis } from "./redis";
