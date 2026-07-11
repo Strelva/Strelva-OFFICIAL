@@ -5,7 +5,6 @@ const mockCreateInvite = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetTenantDashboardUrl = vi.hoisted(() => vi.fn());
-const mockGetUserList = vi.hoisted(() => vi.fn());
 const mockFindUserIdByEmail = vi.hoisted(() => vi.fn());
 const mockRequireTenantPermission = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
@@ -38,16 +37,6 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: mockGetTenantConfig,
 }));
 
-vi.mock("@clerk/nextjs/server", () => ({
-  clerkClient: vi.fn(() =>
-    Promise.resolve({
-      users: {
-        getUserList: mockGetUserList,
-      },
-    })
-  ),
-}));
-
 vi.mock("resend", () => ({
   Resend: vi.fn(function Resend() {
     return {
@@ -70,7 +59,6 @@ describe("admin invites route", () => {
       siteName: `A&B <script>alert("x")</script>`,
     });
     mockGetTenantDashboardUrl.mockReturnValue("https://admin.greatlakesdriedfruit.com/sign-up");
-    mockGetUserList.mockResolvedValue({ data: [] });
     mockFindUserIdByEmail.mockResolvedValue(null);
     mockCreateInvite.mockResolvedValue(true);
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");

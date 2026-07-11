@@ -8,8 +8,6 @@ import { getServiceHealth } from "@/lib/health";
 // Env vars that drive the external checks — cleared so they read "not configured"
 // (and never make a real network call) in tests.
 const ENV_KEYS = [
-  "CLERK_SECRET_KEY",
-  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
   "STRIPE_SECRET_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",
 ];

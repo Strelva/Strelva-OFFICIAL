@@ -1,16 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockCurrentUser = vi.hoisted(() => vi.fn());
+const mockGetAuthUserId = vi.hoisted(() => vi.fn());
+const mockGetCurrentUserTenants = vi.hoisted(() => vi.fn());
+const mockClaimPendingInvite = vi.hoisted(() => vi.fn());
 const mockGetAllTenants = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
-
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: mockAuth,
-  currentUser: mockCurrentUser,
-}));
 
 vi.mock("next/navigation", () => ({
   redirect: mockRedirect,
@@ -34,6 +30,9 @@ vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
   return {
     ...actual,
+    getAuthUserId: mockGetAuthUserId,
+    getCurrentUserTenants: mockGetCurrentUserTenants,
+    claimPendingInviteForCurrentUser: mockClaimPendingInvite,
     isSuperAdmin: mockIsSuperAdmin,
   };
 });
@@ -75,10 +74,9 @@ function textFrom(node: unknown): string {
 describe("account page access handoff", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue({ userId: "user_123" });
-    mockCurrentUser.mockResolvedValue({
-      publicMetadata: { tenants: ["missing-a", "missing-b"] },
-    });
+    mockGetAuthUserId.mockResolvedValue("user_123");
+    mockGetCurrentUserTenants.mockResolvedValue(["missing-a", "missing-b"]);
+    mockClaimPendingInvite.mockResolvedValue(null);
     mockGetAllTenants.mockResolvedValue([]);
     mockGetTenantConfig.mockResolvedValue(undefined);
     mockIsSuperAdmin.mockResolvedValue(false);

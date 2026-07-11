@@ -8,15 +8,8 @@ import {
 } from "../lib/production-readiness-rules";
 
 describe("production readiness rules", () => {
-  it("rejects Clerk test keys for production launch", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_test_example"))
-      .toBe("Must start with pk_live_ for production launch");
-    expect(validateProductionEnvValue("CLERK_SECRET_KEY", "sk_test_example"))
-      .toBe("Must start with sk_live_ for production launch");
-  });
-
   it("rejects copied production placeholder values", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_live_..."))
+    expect(validateProductionEnvValue("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co/..."))
       .toBe("Must replace placeholder value for production launch");
     expect(validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", "https://<deployment-url>"))
       .toBe("Must replace placeholder value for production launch");
@@ -31,15 +24,6 @@ describe("production readiness rules", () => {
       .toBe("Must not include a literal \\n; remove copied newline text in Vercel");
   });
 
-  it("requires Clerk to use the app-owned access routes", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_SIGN_IN_URL", "/app"))
-      .toBe("Must be /sign-in for production launch");
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_SIGN_UP_URL", "/app"))
-      .toBe("Must be /sign-up for production launch");
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_SIGN_IN_URL", "/sign-in")).toBeNull();
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_SIGN_UP_URL", "/sign-up")).toBeNull();
-  });
-
   it("requires a strong OAuth state signing secret", () => {
     expect(validateProductionEnvValue("OAUTH_STATE_SECRET", "short"))
       .toBe("Must be at least 32 characters for production launch");
@@ -47,9 +31,6 @@ describe("production readiness rules", () => {
   });
 
   it("accepts live-shaped production credentials", () => {
-    expect(validateProductionEnvValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_live_example")).toBeNull();
-    expect(validateProductionEnvValue("CLERK_SECRET_KEY", "sk_live_example")).toBeNull();
-    expect(validateProductionEnvValue("CLERK_WEBHOOK_SECRET", "whsec_example")).toBeNull();
     expect(validateProductionEnvValue("SUPER_ADMIN_EMAILS", "owner@example.com,admin@example.com")).toBeNull();
     expect(validateProductionEnvValue("GOOGLE_GENERATIVE_AI_API_KEY", "AIzaSyExample")).toBeNull();
     expect(validateProductionEnvValue("STRIPE_SECRET_KEY", "sk_live_example")).toBeNull();

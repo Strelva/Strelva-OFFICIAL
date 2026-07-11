@@ -123,11 +123,6 @@ function allOf(...validators: Array<(value: string) => string | null>) {
 }
 
 const productionEnvValidators: Record<string, (value: string) => string | null> = {
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: mustStartWith("pk_live_"),
-  CLERK_SECRET_KEY: mustStartWith("sk_live_"),
-  CLERK_WEBHOOK_SECRET: mustStartWith("whsec_"),
-  NEXT_PUBLIC_CLERK_SIGN_IN_URL: mustEqual("/sign-in"),
-  NEXT_PUBLIC_CLERK_SIGN_UP_URL: mustEqual("/sign-up"),
   SUPER_ADMIN_EMAILS: mustBeEmailList,
   // Supabase is the live auth + data backbone (post-cutover). Validate it.
   NEXT_PUBLIC_SUPABASE_URL: mustBeHttps,

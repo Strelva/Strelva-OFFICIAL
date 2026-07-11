@@ -32,17 +32,33 @@ const mockHeadersGet = vi.fn((key: string): string | null => {
   return null;
 });
 
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
-  currentUser: vi.fn(() =>
-    Promise.resolve({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "test@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: ["test-tenant"] },
-    })
-  ),
-  clerkClient: vi.fn(),
-}));
+// Drive request-context auth as an authorized super-admin so the handlers reach
+// their body-validation/logic under test. Pure helpers stay real via importOriginal.
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth")>();
+  return {
+    ...actual,
+    verifyAuth: () => Promise.resolve(true),
+    getAuthUserId: () => Promise.resolve("user_123"),
+    getCurrentUserEmail: () => Promise.resolve("test@example.com"),
+    getCurrentUserTenants: () => Promise.resolve(["test-tenant"]),
+    isSuperAdmin: () => Promise.resolve(true),
+    hasTenantAccess: () => Promise.resolve(true),
+    hasTenantPermission: () => Promise.resolve(true),
+    getTenantRole: () => Promise.resolve("super_admin" as const),
+    requireTenantAccess: () => Promise.resolve(null),
+    requireTenantPermission: () => Promise.resolve(null),
+    getActorContext: () =>
+      Promise.resolve({
+        userId: "user_123",
+        email: "test@example.com",
+        name: null,
+        type: "super_admin" as const,
+        isSuperAdmin: true,
+        isImpersonating: false,
+      }),
+  };
+});
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>
@@ -382,7 +398,7 @@ describe("v1 Public Content API Route Handlers", () => {
     vi.clearAllMocks();
   });
 
-  it("GET /api/v1/content/:tenant/:section returns tenant content without Clerk auth", async () => {
+  it("GET /api/v1/content/:tenant/:section returns tenant content without an auth session", async () => {
     const { GET } = await import("@/app/api/v1/content/[tenant]/[section]/route");
 
     const response = await GET(new Request("http://localhost/api/v1/content/test-tenant/hero"), {
@@ -393,7 +409,7 @@ describe("v1 Public Content API Route Handlers", () => {
     await expect(response.json()).resolves.toEqual({ headline: "Fresh content" });
   });
 
-  it("GET /api/v1/page-config/:tenant returns tenant page config without Clerk auth", async () => {
+  it("GET /api/v1/page-config/:tenant returns tenant page config without an auth session", async () => {
     const { GET } = await import("@/app/api/v1/page-config/[tenant]/route");
 
     const response = await GET(new Request("http://localhost/api/v1/page-config/test-tenant"), {

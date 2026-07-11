@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
-vi.mock("@clerk/nextjs/server", () => ({
-  clerkMiddleware: (handler: unknown) => handler,
-  createRouteMatcher: () => () => false,
-}));
-
 const mockConfigured = vi.fn(() => true);
 const mockCreate = vi.fn();
 

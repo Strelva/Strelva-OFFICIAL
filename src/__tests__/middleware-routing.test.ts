@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@clerk/nextjs/server", () => ({
-  clerkMiddleware: (handler: unknown) => handler,
-  createRouteMatcher: () => () => false,
-}));
-
 import {
   bareAdminConsoleRewritePath,
   buildContentSecurityPolicy,

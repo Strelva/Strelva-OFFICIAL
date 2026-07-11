@@ -47,7 +47,7 @@ export async function GET() {
   }
 
   // Daily dependency probe. The maintenance cron is the one guaranteed daily
-  // touchpoint, so use it to confirm Redis/Sanity/Clerk are reachable and page
+  // touchpoint, so use it to confirm Redis/Supabase are reachable and page
   // (deduped) if a core dependency is down or degraded.
   let healthStatus = "unknown";
   try {

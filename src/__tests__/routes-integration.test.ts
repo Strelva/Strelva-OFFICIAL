@@ -24,15 +24,27 @@ vi.mock("../lib/tenants", () => ({
   updateTenant: vi.fn(),
 }));
 
-// Mock Clerk
-const mockCurrentUser = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: "user_123" })),
-  clerkMiddleware: (handler: unknown) => handler,
-  currentUser: () => mockCurrentUser(),
-  createRouteMatcher: () => () => false,
-  clerkClient: vi.fn(),
+
+// Supabase auth layer that src/lib/auth.ts resolves against.
+const mockGetSessionUser = vi.fn();
+const mockGetMembershipRole = vi.fn();
+const mockIsSuperAdminUser = vi.fn();
+vi.mock("../lib/db/server-client", () => ({
+  isSupabaseAuthConfigured: () => true,
+  getSessionUser: () => mockGetSessionUser(),
 }));
+vi.mock("../lib/db/repositories", () => ({
+  getMembershipRole: (...a: unknown[]) => mockGetMembershipRole(...a),
+  isSuperAdminUser: (...a: unknown[]) => mockIsSuperAdminUser(...a),
+  listMembershipsForUser: vi.fn(() => Promise.resolve([])),
+  listTenantOwnerIds: vi.fn(() => Promise.resolve([])),
+  upsertMembership: vi.fn(() => Promise.resolve(undefined)),
+  getPendingInvite: vi.fn(() => Promise.resolve(null)),
+  markInviteClaimed: vi.fn(() => Promise.resolve(undefined)),
+  getUserByEmail: vi.fn(() => Promise.resolve(null)),
+}));
+
+const VERIFIED_USER = { id: "user_123", email: "user@example.com", email_confirmed_at: "2026-01-01T00:00:00Z" };
 
 import { extractTenantFromHost } from "../proxy";
 
@@ -55,38 +67,27 @@ describe("Content API - Tenant Access Checks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetTenantConfig.mockResolvedValue(makeTenantConfig());
+    mockGetSessionUser.mockResolvedValue(VERIFIED_USER);
+    mockGetMembershipRole.mockResolvedValue(null);
+    mockIsSuperAdminUser.mockResolvedValue(false);
   });
 
-  it("hasTenantAccess returns false when user has no tenants", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: [] },
-    });
+  it("hasTenantAccess returns false when user has no membership", async () => {
+    const { hasTenantAccess } = await import("../lib/auth");
+    const result = await hasTenantAccess("test-tenant");
+    expect(result).toBe(false);
+  });
+
+  it("hasTenantAccess returns false when user is signed out", async () => {
+    mockGetSessionUser.mockResolvedValue(null);
 
     const { hasTenantAccess } = await import("../lib/auth");
     const result = await hasTenantAccess("test-tenant");
     expect(result).toBe(false);
   });
 
-  it("hasTenantAccess returns false when user has different tenant", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: ["other-tenant"] },
-    });
-
-    const { hasTenantAccess } = await import("../lib/auth");
-    const result = await hasTenantAccess("test-tenant");
-    expect(result).toBe(false);
-  });
-
-  it("hasTenantAccess returns true when user has matching tenant", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: ["test-tenant", "other-tenant"] },
-    });
+  it("hasTenantAccess returns true when user has a matching membership", async () => {
+    mockGetMembershipRole.mockResolvedValue("owner");
 
     const { hasTenantAccess } = await import("../lib/auth");
     const result = await hasTenantAccess("test-tenant");
@@ -94,29 +95,14 @@ describe("Content API - Tenant Access Checks", () => {
   });
 
   it("hasTenantAccess returns true for super admin regardless of tenant assignment", async () => {
-    const originalEnv = process.env.SUPER_ADMIN_EMAILS;
-    process.env.SUPER_ADMIN_EMAILS = "superadmin@example.com";
-
-    mockCurrentUser.mockResolvedValue({
-      id: "admin_123",
-      emailAddresses: [{ emailAddress: "superadmin@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: [] },
-    });
+    mockIsSuperAdminUser.mockResolvedValue(true);
 
     const { hasTenantAccess } = await import("../lib/auth");
     const result = await hasTenantAccess("any-tenant");
     expect(result).toBe(true);
-
-    process.env.SUPER_ADMIN_EMAILS = originalEnv;
   });
 
   it("requireTenantAccess returns 403 response when access denied", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: [] },
-    });
-
     const { requireTenantAccess } = await import("../lib/auth");
     const result = await requireTenantAccess("test-tenant");
 
@@ -128,11 +114,7 @@ describe("Content API - Tenant Access Checks", () => {
   });
 
   it("requireTenantAccess returns null when access allowed", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: ["test-tenant"] },
-    });
+    mockGetMembershipRole.mockResolvedValue("owner");
 
     const { requireTenantAccess } = await import("../lib/auth");
     const result = await requireTenantAccess("test-tenant");
@@ -305,10 +287,13 @@ describe("Tenant Access Denial (403)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetTenantConfig.mockResolvedValue(makeTenantConfig());
+    mockGetSessionUser.mockResolvedValue(VERIFIED_USER);
+    mockGetMembershipRole.mockResolvedValue(null);
+    mockIsSuperAdminUser.mockResolvedValue(false);
   });
 
   it("returns 403 when user is not authenticated", async () => {
-    mockCurrentUser.mockResolvedValue(null);
+    mockGetSessionUser.mockResolvedValue(null);
 
     const { requireTenantAccess } = await import("../lib/auth");
     const result = await requireTenantAccess("test-tenant");
@@ -317,13 +302,8 @@ describe("Tenant Access Denial (403)", () => {
     expect(result!.status).toBe(403);
   });
 
-  it("returns 403 for multiple tenants but not the requested one", async () => {
-    mockCurrentUser.mockResolvedValue({
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "user@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: ["tenant-a", "tenant-b", "tenant-c"] },
-    });
-
+  it("returns 403 for a tenant the user has no membership in", async () => {
+    // Member of other tenants (getMembershipRole for the requested one → null).
     const { requireTenantAccess } = await import("../lib/auth");
     const result = await requireTenantAccess("tenant-d");
 
@@ -331,21 +311,12 @@ describe("Tenant Access Denial (403)", () => {
     expect(result!.status).toBe(403);
   });
 
-  it("multiple super admin emails work correctly", async () => {
-    const originalEnv = process.env.SUPER_ADMIN_EMAILS;
-    process.env.SUPER_ADMIN_EMAILS = "admin1@example.com, admin2@example.com, admin3@example.com";
-
-    mockCurrentUser.mockResolvedValue({
-      id: "admin_123",
-      emailAddresses: [{ emailAddress: "admin2@example.com", verification: { status: "verified" } }],
-      publicMetadata: { tenants: [] },
-    });
+  it("resolves super admin via the super_admins table", async () => {
+    mockIsSuperAdminUser.mockResolvedValue(true);
 
     const { isSuperAdmin } = await import("../lib/auth");
     const result = await isSuperAdmin();
     expect(result).toBe(true);
-
-    process.env.SUPER_ADMIN_EMAILS = originalEnv;
   });
 });
 

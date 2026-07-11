@@ -10,12 +10,6 @@ const SERVICE_DOT: Record<ServiceStatus, string> = {
   error: "bg-red-400",
 };
 
-// Clerk is a decommissioning legacy path (Supabase + Redis are the live
-// backbone). Its dot is muted so an operator doesn't read a dead path's
-// error/degraded state as a real outage.
-const LEGACY_SERVICES = new Set(["clerk"]);
-const LEGACY_DOT = "bg-gray-faint";
-
 function MetricCard({
   label,
   value,
@@ -68,8 +62,6 @@ export default async function OpsPage() {
         ? "text-amber-300"
         : "text-emerald-300";
   const serviceChecks = Object.entries(health.checks);
-  const backboneChecks = serviceChecks.filter(([name]) => !LEGACY_SERVICES.has(name));
-  const legacyChecks = serviceChecks.filter(([name]) => LEGACY_SERVICES.has(name));
 
   // The verdict: which categories are nonzero, in the order an operator triages
   // them. `href` deep-links to where the operator actually acts — an on-page
@@ -173,7 +165,7 @@ export default async function OpsPage() {
           </span>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
-          {backboneChecks.map(([name, c]) => (
+          {serviceChecks.map(([name, c]) => (
             <div key={name} className="flex items-center gap-2 text-sm">
               <span className={`h-2 w-2 rounded-full ${SERVICE_DOT[c.status]}`} />
               <span className="text-warm-white capitalize">{name}</span>
@@ -183,25 +175,6 @@ export default async function OpsPage() {
             </div>
           ))}
         </div>
-
-        {legacyChecks.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-glass-border">
-            <p className="text-xs uppercase tracking-wide text-gray-faint mb-2">
-              Legacy (decommissioning)
-            </p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {legacyChecks.map(([name, c]) => (
-                <div key={name} className="flex items-center gap-2 text-sm">
-                  <span className={`h-2 w-2 rounded-full ${LEGACY_DOT}`} />
-                  <span className="text-gray-muted capitalize">{name} (legacy)</span>
-                  <span className="text-xs text-gray-faint">
-                    {c.status === "ok" ? `${c.responseMs}ms` : c.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
