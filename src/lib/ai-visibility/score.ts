@@ -140,7 +140,7 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
       pass: !blocked,
       weight: 28,
       detail: blocked
-        ? `robots.txt blocks AI crawlers (${who.join(", ")}) — you've told AI not to read you`
+        ? `robots.txt blocks AI crawlers (${who.join(", ")}). You've told AI not to read you`
         : "robots.txt does not block AI crawlers",
     });
   } else {
@@ -149,7 +149,7 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
       label: "AI crawlers allowed",
       pass: true,
       weight: 28,
-      detail: "No robots.txt found — AI crawlers are not blocked (default allow)",
+      detail: "No robots.txt found. AI crawlers are not blocked (default allow)",
     });
   }
 
@@ -183,7 +183,7 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
       ? `Found schema.org types: ${Array.from(new Set(schemaTypes)).slice(0, 4).join(", ")}`
       : ldBlocks.length
         ? "Has JSON-LD but no business/LocalBusiness type AI can ground on"
-        : "No schema.org structured data — AI has no machine-readable facts about you",
+        : "No schema.org structured data. AI has no machine-readable facts about you",
   });
 
   // 3) Entity / NAP clarity (name, address, phone)
@@ -200,7 +200,7 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
     weight: 16,
     detail: napPass
       ? "Phone and address are present for AI to attribute"
-      : `Missing ${[!hasPhone ? "phone" : "", !hasAddress ? "address" : ""].filter(Boolean).join(" & ")} — AI can't confirm who/where you are`,
+      : `Missing ${[!hasPhone ? "phone" : "", !hasAddress ? "address" : ""].filter(Boolean).join(" & ")}. AI can't confirm who/where you are`,
   });
 
   // 4) Answer-format content (FAQ / Q&A AI can lift into an answer)
@@ -263,7 +263,7 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
       recommended: mentioned, // if it surfaced in a "best/recommend" answer, treat as recommended
       note: mentioned
         ? `AI named "${input.business}" when asked for the best ${what}${where}.`
-        : `AI did NOT name "${input.business}" when asked for the best ${what}${where} — a competitor got the recommendation.`,
+        : `AI did NOT name "${input.business}" when asked for the best ${what}${where}. A competitor got the recommendation.`,
     };
   } catch (err) {
     return {
@@ -317,15 +317,15 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
   // Honest verdict: only invoke "AI doesn't recommend you" when actually probed.
   let verdict: string;
   if (citation.probed && !citation.mentioned) {
-    verdict = `AI won't recommend ${input.business} — you're invisible when customers ask AI for the best ${input.category ?? "option"}.`;
+    verdict = `AI won't recommend ${input.business}. You're invisible when customers ask AI for the best ${input.category ?? "option"}.`;
   } else if (citation.probed && citation.mentioned && grade <= "C") {
-    verdict = `AI knows ${input.business} but your site is hard for it to read — your lead is fragile.`;
+    verdict = `AI knows ${input.business} but your site is hard for it to read. Your lead is fragile.`;
   } else if (!citation.probed && score < 70) {
-    verdict = `${input.business} is at high risk of being invisible to AI search — AI can barely read your site.`;
+    verdict = `${input.business} is at high risk of being invisible to AI search. AI can barely read your site.`;
   } else if (!citation.probed) {
-    verdict = `${input.business} is reasonably readable by AI — run the live probe to confirm AI actually recommends you.`;
+    verdict = `${input.business} is reasonably readable by AI. Run the live probe to confirm AI actually recommends you.`;
   } else {
-    verdict = `${input.business} shows up when customers ask AI — keep it that way.`;
+    verdict = `${input.business} shows up when customers ask AI. Keep it that way.`;
   }
 
   const failing = signals.filter((s) => !s.pass).sort((a, b) => b.weight - a.weight);

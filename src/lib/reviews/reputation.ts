@@ -140,12 +140,12 @@ export function buildReputationSummary(
   } else if (avg >= 4.5) {
     verdict =
       coverage >= STRONG_COVERAGE
-        ? `Your reputation is strong — ${avg.toFixed(1)}★ across ${total} ${plural}, and you reply to most of them`
-        : `Your reputation is strong — ${avg.toFixed(1)}★ across ${total} ${plural}`;
+        ? `Your reputation is strong: ${avg.toFixed(1)}★ across ${total} ${plural}, and you reply to most of them`
+        : `Your reputation is strong: ${avg.toFixed(1)}★ across ${total} ${plural}`;
   } else if (avg >= 4) {
-    verdict = `People rate you well — ${avg.toFixed(1)}★ across ${total} ${plural}`;
+    verdict = `People rate you well: ${avg.toFixed(1)}★ across ${total} ${plural}`;
   } else if (avg > 0) {
-    verdict = `${avg.toFixed(1)}★ across ${total} ${plural} — every reply you add builds trust`;
+    verdict = `${avg.toFixed(1)}★ across ${total} ${plural}. Every reply you add builds trust`;
   } else {
     verdict = `${total} ${plural} so far`;
   }

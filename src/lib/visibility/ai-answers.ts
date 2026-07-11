@@ -36,7 +36,7 @@ export interface AiAnswerResult {
 const MODEL_ID = "gemini-2.5-flash";
 const METHODOLOGY =
   `Checked via ${MODEL_ID} at one point in time. AI answers vary by model, ` +
-  `location, and session — this is a directional signal, not a definitive rank.`;
+  `location, and session. This is a directional signal, not a definitive rank.`;
 
 function normaliseName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();

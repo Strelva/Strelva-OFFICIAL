@@ -102,7 +102,7 @@ export default async function OpsPage() {
     {
       key: "pending",
       count: m.totalPendingEvents,
-      label: `${m.totalPendingEvents} pending in the review queue`,
+      label: `${m.totalPendingEvents} open in the review queue`,
       href: "/admin/actions",
     },
     {
@@ -133,7 +133,7 @@ export default async function OpsPage() {
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
             <p className="text-[15px] font-medium text-warm-white">
-              All clear — nothing broken.
+              All clear. Nothing broken.
             </p>
           </div>
         </div>
@@ -214,7 +214,7 @@ export default async function OpsPage() {
         />
         <MetricCard label="Failed AI writes" value={m.failedAiWrites} bad />
         <MetricCard label="Stale SMS approvals" value={m.staleSmsApprovals} bad />
-        <MetricCard label="Pending queue" value={m.totalPendingEvents} href="/admin/actions" />
+        <MetricCard label="Open items" value={m.totalPendingEvents} href="/admin/actions" />
         <MetricCard label="Domain drift" value={m.tenantDomainDrift.length} bad href="#domain-drift" />
       </div>
 
@@ -238,7 +238,7 @@ export default async function OpsPage() {
                   >
                     {f.tenantId}
                   </Link>
-                  {f.url ? ` · ${f.url}` : ""} — {f.error}
+                  {f.url ? ` · ${f.url}` : ""}: {f.error}
                 </li>
               ))}
             </ul>
@@ -288,8 +288,8 @@ export default async function OpsPage() {
                   className="text-warm-white underline-offset-2 hover:underline"
                 >
                   {tenant}
-                </Link>{" "}
-                — {count} pending
+                </Link>
+                : {count} pending
               </li>
             ))}
           </ul>

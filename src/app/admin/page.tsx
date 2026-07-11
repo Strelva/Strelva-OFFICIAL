@@ -46,6 +46,23 @@ function recentSignups(tenants: TenantConfig[]) {
     }));
 }
 
+// Count "needs you" leads: received, still unworked, and not months-old junk
+// (a missing/invalid submit date counts as recent so a real lead is never
+// hidden). Lives outside the page component so the impure Date.now() isn't
+// called during render (React purity rule / compiler).
+function countUnworkedLeads(
+  deliveryLeads: DeliveryLead[],
+  leadWorkflow: Record<string, { status: string }>,
+): number {
+  const leadNagCutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+  return deliveryLeads.filter((l) => {
+    if (l.deliveryStatus !== "received") return false;
+    if ((leadWorkflow[l.statusToken]?.status ?? "new") !== "new") return false;
+    const submitted = new Date(l.submittedAt).getTime();
+    return Number.isNaN(submitted) || submitted >= leadNagCutoff;
+  }).length;
+}
+
 export default async function AdminPage() {
   const ALL_TENANTS = await getAllTenants();
   const TENANTS = ALL_TENANTS.filter(isActiveTenant);
@@ -116,14 +133,12 @@ export default async function AdminPage() {
   const leadWorkflow = await getAllLeadWorkflow(deliveryLeads.map((l) => l.statusToken)).catch(
     () => ({} as Record<string, { status: string }>),
   );
-  const unworkedLeads = deliveryLeads.filter(
-    (l) =>
-      l.deliveryStatus === "received" &&
-      (leadWorkflow[l.statusToken]?.status ?? "new") === "new",
-  );
+  // Age out stale unworked leads from the "needs you" nag so months-old junk
+  // (never dismissed) stops perpetually flagging the overview. They remain on
+  // the /admin/leads board to be worked or dismissed.
   const todayLeads = {
     total: deliveryLeads.length,
-    unworked: unworkedLeads.length,
+    unworked: countUnworkedLeads(deliveryLeads, leadWorkflow),
     recent: deliveryLeads.slice(0, 4).map((l) => ({
       businessName: l.businessName,
       location: l.location,
@@ -212,7 +227,7 @@ export default async function AdminPage() {
         <Link href="/admin/drafts">
           <StatTile
             icon={<FileText className="h-4 w-4" strokeWidth={1.5} />}
-            label="Drafts"
+            label="Content drafts"
             value={totalDrafts}
             detail={totalDrafts > 0 ? "review needed" : "all clear"}
           />

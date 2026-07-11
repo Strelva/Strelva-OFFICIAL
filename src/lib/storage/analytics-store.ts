@@ -185,6 +185,10 @@ export interface DailyMetric {
   date: string;
   pageViews: number;
   bookingClicks: number;
+  /** Phone-link taps, folded into "customer actions" alongside booking clicks.
+   *  Optional so existing fixtures/consumers stay valid; getDailyMetrics always
+   *  populates it. */
+  phoneClicks?: number;
 }
 
 export async function getDailyMetrics(
@@ -196,16 +200,20 @@ export async function getDailyMetrics(
   if (dataSourceIsPostgres()) {
     const pageRows = await pgMetricRows(tenant, "page-view");
     const bookingRows = await pgMetricRows(tenant, "booking-click");
+    const phoneRows = await pgMetricRows(tenant, "phone-click");
     const pageByDay = new Map<string, number>();
     const bookByDay = new Map<string, number>();
+    const phoneByDay = new Map<string, number>();
     for (const r of pageRows) pageByDay.set(r.day, (pageByDay.get(r.day) || 0) + r.count);
     for (const r of bookingRows) bookByDay.set(r.day, (bookByDay.get(r.day) || 0) + r.count);
+    for (const r of phoneRows) phoneByDay.set(r.day, (phoneByDay.get(r.day) || 0) + r.count);
     for (let i = days - 1; i >= 0; i--) {
       const key = isoDay(i);
       result.push({
         date: key,
         pageViews: pageByDay.get(key) || 0,
         bookingClicks: bookByDay.get(key) || 0,
+        phoneClicks: phoneByDay.get(key) || 0,
       });
     }
     return result;
@@ -222,6 +230,7 @@ export async function getDailyMetrics(
       date: key,
       pageViews: clicks[`page-view:${key}`] || 0,
       bookingClicks: clicks[`booking-click:${key}`] || 0,
+      phoneClicks: clicks[`phone-click:${key}`] || 0,
     });
   }
   return result;

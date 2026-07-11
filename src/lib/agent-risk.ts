@@ -145,7 +145,7 @@ export function assessRisk(operation: AgentOperation): RiskAssessment {
     if (introducesMarkup(operation.before, operation.after)) {
       return {
         level: "medium",
-        reason: "Change introduces markup or script — needs review.",
+        reason: "Change introduces markup or script. Needs review.",
         requiresPreview: true,
         autoApply: false,
       };
@@ -157,7 +157,7 @@ export function assessRisk(operation: AgentOperation): RiskAssessment {
     ) {
       return {
         level: "medium",
-        reason: "Change to a link, payment, or contact field — needs review.",
+        reason: "Change to a link, payment, or contact field. Needs review.",
         requiresPreview: true,
         autoApply: false,
       };

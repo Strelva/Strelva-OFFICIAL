@@ -93,7 +93,7 @@ export function CustomChangeRequestPanel() {
           Code, animation, custom component, and deeper layout changes go to the Strelva team.
         </p>
         <p className="mt-2 text-[12px] leading-5 text-gray-muted">
-          Design, template, and code changes are quoted separately — they&apos;re not part of your care plan.
+          Design, template, and code changes are quoted separately. They&apos;re not part of your care plan.
         </p>
       </div>
 

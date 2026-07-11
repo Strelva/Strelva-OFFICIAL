@@ -18,6 +18,10 @@ export function getTenantSiteName(tenant: string, config: TenantConfig | undefin
   if (config?.siteName) return config.siteName;
   if (tenant === DEFAULT_TENANT) return "Strelva";
   if (FALLBACK_TENANT_NAMES[tenant]) return FALLBACK_TENANT_NAMES[tenant];
+  // A tenant whose site_name was never set still has a real owner/business name
+  // — use it before falling back to a title-cased id, so the dashboard shows the
+  // actual business instead of a generic "Your Business" placeholder.
+  if (config?.ownerName) return config.ownerName;
 
   return titleCaseTenantId(tenant) || "Strelva";
 }

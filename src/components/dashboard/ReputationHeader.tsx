@@ -82,13 +82,13 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
   let velocityDetail: string;
   let velocityIcon: React.ReactNode;
   if (rep.lowData) {
-    velocityDetail = "Let's get more — share your review link";
+    velocityDetail = "Let's get more. Share your review link";
     velocityIcon = <TrendingUp className="h-4 w-4" strokeWidth={1.5} />;
   } else if (velocity.trend === "up") {
     velocityDetail = `Up from ${velocity.prior} the 30 days before`;
     velocityIcon = <TrendingUp className="h-4 w-4 text-positive" strokeWidth={1.5} />;
   } else if (velocity.trend === "down") {
-    velocityDetail = `${velocity.prior} came in the 30 days before — the share link brings them back`;
+    velocityDetail = `${velocity.prior} came in the 30 days before. The share link brings them back`;
     velocityIcon = <TrendingDown className="h-4 w-4" strokeWidth={1.5} />;
   } else {
     velocityDetail = "Steady with the 30 days before";
@@ -136,7 +136,7 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
 
       <p className="mt-4 text-[14px] leading-relaxed text-gray-muted">
         {gbpConnected
-          ? "Draft a warm, on-brand reply for any review below — Google reviews publish straight to your listing."
+          ? "Draft a warm, on-brand reply for any review below. Google reviews publish straight to your listing."
           : `Draft a warm, on-brand reply for any review below, then copy it into ${copyDest}.`}
       </p>
     </div>

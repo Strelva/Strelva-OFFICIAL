@@ -87,18 +87,18 @@ export function visibilityHeadline(
     const noun = summary.aiProbed === 1 ? "AI answer" : "AI answers";
     if (summary.aiPresent >= summary.aiProbed) {
       const scope = summary.aiProbed === 1 ? "the" : `all ${summary.aiProbed}`;
-      return `Cited in ${scope} ${noun} we probed — you're who the assistant names.`;
+      return `Cited in ${scope} ${noun} we probed. You're who the assistant names.`;
     }
     const wedge = findings.find((f) => f.surface === "ai_answer");
-    const tail = wedge ? ` — the wedge gap is "${wedge.query}".` : ".";
+    const tail = wedge ? `. The wedge gap is "${wedge.query}".` : ".";
     return `Cited in ${summary.aiPresent} of ${summary.aiProbed} ${noun}${tail}`;
   }
   if (summary.serpChecked > 0) {
     if (summary.serpRanked >= summary.serpChecked) {
-      return `On page 1 for all ${summary.serpChecked} ${summary.serpChecked === 1 ? "search" : "searches"} checked — hold it and grow reviews.`;
+      return `On page 1 for all ${summary.serpChecked} ${summary.serpChecked === 1 ? "search" : "searches"} checked. Hold it and grow reviews.`;
     }
     const wedge = findings.find((f) => f.surface === "serp_organic");
-    const tail = wedge ? ` — start with "${wedge.query}".` : ".";
+    const tail = wedge ? `. Start with "${wedge.query}".` : ".";
     return `On page 1 for ${summary.serpRanked} of ${summary.serpChecked} searches checked${tail}`;
   }
   return null;
@@ -151,10 +151,10 @@ export function diagnoseVisibility(snapshot: VisibilitySnapshot): VisibilityFind
         query: serp.query,
         surface: "serp_local_pack",
         problem: `Not in the local 3-pack for "${serp.query}".`,
-        recommendation: `Local-pack ranking is driven mostly by your Google Business Profile and reviews, not the site — keep NAP consistent and grow reviews.`,
+        recommendation: `Local-pack ranking is driven mostly by your Google Business Profile and reviews, not the site. Keep NAP consistent and grow reviews.`,
         severity: "medium",
         actionable: "off_site",
-        impact: `You're missing from the Google map for "${serp.query}" — where nearby customers look first.`,
+        impact: `You're missing from the Google map for "${serp.query}", where nearby customers look first.`,
         quantified: rivalCount(packRivals, "in the 3-pack where you're not"),
       });
     }

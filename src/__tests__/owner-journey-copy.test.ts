@@ -18,6 +18,7 @@ describe("owner journey copy and links", () => {
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');
     expect(surfaces).toContain('label: "Analytics"');
+    expect(surfaces).toContain('label: "Reports"');
     expect(surfaces).toContain('label: "Reviews"');
 
     // Old IA names should not resurface as top-level nav labels. ("Site" is now a
@@ -26,7 +27,6 @@ describe("owner journey copy and links", () => {
     expect(surfaces).not.toContain('label: "Sources"');
     expect(surfaces).not.toContain('label: "Ask AI"');
     expect(surfaces).not.toContain('label: "Dashboard"');
-    expect(surfaces).not.toContain('label: "Reports"');
     expect(surfaces).not.toContain('label: "Health"');
     expect(surfaces).not.toContain('label: "Leads"');
     // "Store" is a legitimate Website sub-tab label (getWebsiteSections), just not
@@ -143,17 +143,19 @@ describe("owner journey copy and links", () => {
   });
 
   it("keeps weekly reports reachable as the proof surface", () => {
-    // Reports folded into the merged Analytics surface; /dashboard/reports aliases to it.
-    const analyticsPage = readRepoFile("src/app/dashboard/analytics/page.tsx");
+    // Analytics split into LIVE (rolling range view) + Reports (the written recap).
+    // The weekly brief now lives on /dashboard/reports; analytics is the live view.
+    const reportsPage = readRepoFile("src/app/dashboard/reports/page.tsx");
     const weeklyBrief = readRepoFile("src/components/dashboard/WeeklyBriefClient.tsx");
+    const trendChart = readRepoFile("src/components/dashboard/TrendChart.tsx");
 
-    expect(analyticsPage).toContain("getWeeklyBrief(tenant)");
-    expect(analyticsPage).toContain("getWeeklyBriefs(tenant)");
-    expect(analyticsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
-    expect(analyticsPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard"))');
+    expect(reportsPage).toContain("getWeeklyBrief(tenant)");
+    expect(reportsPage).toContain("getWeeklyBriefs(tenant)");
+    expect(reportsPage).toMatch(/<WeeklyBriefClient\b[\s\S]*brief=\{brief\}[\s\S]*history=\{history\}/);
+    expect(reportsPage).not.toContain("redirect(");
     // Verdict-first: lead with a plain-English verdict + the 30-day trend.
     expect(weeklyBrief).toContain("buildVerdict");
-    expect(weeklyBrief).toContain("Last 30 days");
+    expect(trendChart).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
     expect(weeklyBrief).toContain("Open dashboard");
   });
@@ -265,7 +267,7 @@ describe("owner journey copy and links", () => {
 
     // Verdict framing: what they own, in plain words.
     expect(ownershipPage).toContain(
-      "Your domain, your content, your customers — leave anytime, with everything.",
+      "Your domain, your content, your customers. Leave anytime, with everything.",
     );
 
     // One-click repo/domain handoff request reusing the offboarding path,
@@ -273,7 +275,7 @@ describe("owner journey copy and links", () => {
     expect(ownershipPage).toContain("Request your site files");
     expect(ownershipPage).toContain("/api/offboarding/request");
     expect(ownershipPage).toContain(
-      "We've got your request — we'll reach out to hand over your files.",
+      "We've got your request. We'll reach out to hand over your files.",
     );
     // The fixed-string request is gone — the owner adds their own context.
     expect(ownershipPage).not.toContain("Client opened ownership settings handoff request.");

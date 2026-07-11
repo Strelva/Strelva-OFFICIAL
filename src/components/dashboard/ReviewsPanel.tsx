@@ -60,7 +60,7 @@ export function ReviewRequestCard({
       <div className="mb-6 rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
         <h2 className="text-[14px] font-medium text-warm-black">Get more reviews</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-          Connect your Google listing to share a review link with happy customers — more reviews is
+          Connect your Google listing to share a review link with happy customers. More reviews is
           the strongest thing you can do for your reputation.
         </p>
         <Link
@@ -78,7 +78,7 @@ export function ReviewRequestCard({
     <div className="mb-6 rounded-xl border border-accent/20 bg-accent-dim/40 p-4 sm:p-5">
       <h2 className="text-[14px] font-medium text-warm-black">Get more reviews</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-        Send a happy customer this message — the link opens straight to your Google review form.
+        Send a happy customer this message. The link opens straight to your Google review form.
       </p>
 
       {/* Ready-to-send message the owner can paste into a text or email. */}
@@ -220,7 +220,7 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
     } catch {
       setError(
         canPublish
-          ? "Couldn't publish to Google — nothing was posted. Try again."
+          ? "Couldn't publish to Google. Nothing was posted. Try again."
           : "Could not save the reply. Try again.",
       );
     } finally {
@@ -399,7 +399,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
               <MessageSquare className="h-5 w-5" strokeWidth={1.5} />
             </div>
             <p className="text-[14px] font-medium text-warm-black">
-              No reviews yet — connect Google to pull them in
+              No reviews yet. Connect Google to pull them in
             </p>
             <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
               Once your Google Business Profile is connected, your reviews show up here and Strelva

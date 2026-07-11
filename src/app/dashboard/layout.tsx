@@ -6,6 +6,7 @@ import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
 import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfacesContext";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
+import { getTenantSiteName } from "@/lib/tenant-display";
 import { getConnections } from "@/lib/connections";
 import { getVisibleSurfaces, tenantHasStore } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
@@ -84,12 +85,18 @@ export default async function DashboardLayout({
   const previewUrl = shouldUseLocalClientPreviewUrl
     ? localClientPreviewUrl || ""
     : tenantEditablePreviewUrl;
-  let siteName = "Your Business";
+  // Resolve the real business name (config.siteName, known-tenant name, or the
+  // owner name) instead of a generic "Your Business" when the content settings
+  // haven't set a site name yet. The editable content siteName still wins.
+  let siteName = getTenantSiteName(tenant, tenantConfig ?? undefined);
   let settingsBusinessModel = "";
   let businessLogoUrl = "";
   try {
     const settings = await getContent("settings", tenant);
-    siteName = settings.siteName || siteName;
+    // Ignore the "Your Business" default placeholder (defaults.ts) — an unset
+    // content siteName falls back to it, which would otherwise mask the real
+    // resolved business name.
+    if (settings.siteName && settings.siteName !== "Your Business") siteName = settings.siteName;
     settingsBusinessModel = settings.businessModel || "";
     businessLogoUrl = settings.logoUrl || "";
   } catch {}

@@ -55,8 +55,8 @@ export function detectTrafficAnomaly(dailyMetrics: DailyMetric[]): TrafficAnomal
       recentAvg: round1(recentAvg),
       baselineAvg: round1(baselineAvg),
       headline: `Traffic is down ${Math.abs(pct)}% from your usual`,
-      why: `You're averaging ${round1(recentAvg)} visitors a day this week versus ${round1(baselineAvg)} before. Dips like this usually follow a stretch with no fresh updates — search and customers reward an active site.`,
-      suggestion: "Ask the AI to post this week's update or refresh a page — that's the fastest way to pull visitors back.",
+      why: `You're averaging ${round1(recentAvg)} visitors a day this week versus ${round1(baselineAvg)} before. Dips like this usually follow a stretch with no fresh updates. Search and customers reward an active site.`,
+      suggestion: "Ask the AI to post this week's update or refresh a page: that's the fastest way to pull visitors back.",
     };
   }
 
@@ -67,7 +67,7 @@ export function detectTrafficAnomaly(dailyMetrics: DailyMetric[]): TrafficAnomal
       recentAvg: round1(recentAvg),
       baselineAvg: round1(baselineAvg),
       headline: `Traffic jumped ${pct}% above your usual`,
-      why: `You're averaging ${round1(recentAvg)} visitors a day, up from ${round1(baselineAvg)}. Something is working — a post, a season, or a search bump.`,
+      why: `You're averaging ${round1(recentAvg)} visitors a day, up from ${round1(baselineAvg)}. Something is working: a post, a season, or a search bump.`,
       suggestion: "Make sure your booking or call button is front and center so the extra visitors actually convert while interest is high.",
     };
   }

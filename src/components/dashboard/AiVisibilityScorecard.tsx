@@ -70,7 +70,7 @@ export function AiVisibilityScorecard({ data }: { data: Scorecard | null }) {
   const headline =
     mentionedCount > 0
       ? `When people ask AI assistants for a ${service}, you come up in ${mentionedCount} of ${total} questions.`
-      : `We asked AI assistants for a ${service} across ${total} of the questions your customers ask — you're not named yet, and we'll flag the moment that changes.`;
+      : `We asked AI assistants for a ${service} across ${total} of the questions your customers ask. You're not named yet, and we'll flag the moment that changes.`;
 
   return (
     <div className="space-y-2">

@@ -106,7 +106,7 @@ export function OnboardingChecklist({
         <div>
           <p className="text-[15px] font-semibold text-warm-black">Get set up</p>
           <p className="mt-0.5 text-[12px] text-gray-muted">
-            {doneCount} of {steps.length} done — a few quick wins to start.
+            {doneCount} of {steps.length} done: a few quick wins to start.
           </p>
         </div>
         <button

@@ -60,7 +60,7 @@ export async function buildMaintenanceDigest(tenant: string, siteName: string): 
       id: `content-${stale.section}`,
       type: "content",
       title: `Refresh the ${stale.section} section`,
-      detail: `Last updated ${stale.daysSinceUpdate} days ago — a fresh pass keeps it current for customers and search.`,
+      detail: `Last updated ${stale.daysSinceUpdate} days ago. A fresh pass keeps it current for customers and search.`,
       action: `prompt:Suggest one small, useful refresh for my ${stale.section} section and make it after I approve.`,
     });
   }
@@ -76,7 +76,7 @@ export async function buildMaintenanceDigest(tenant: string, siteName: string): 
         id: `health-${c.slug}`,
         type: "health",
         title: `Improve ${c.name}`,
-        detail: `Scoring ${c.score}/100 — below where it should be. Fixing it lifts your overall site health.`,
+        detail: `Scoring ${c.score}/100, below where it should be. Fixing it lifts your overall site health.`,
         action: `prompt:Fix the biggest ${c.name} issue on my site and show me before it goes live.`,
       });
     }

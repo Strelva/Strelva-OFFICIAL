@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TrendingUp, TrendingDown, MousePointerClick, Star, FileText, Sparkles, ExternalLink, MessageCircle, ShieldCheck, ArrowUpRight } from "lucide-react";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
 import { buildVerdict } from "@/lib/weekly-verdict";
+import { TrendChart } from "@/components/dashboard/TrendChart";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
 import { metricVerdicts } from "@/lib/proof";
@@ -39,6 +40,12 @@ interface WeeklyBriefClientProps {
   /** Extra content rendered at the bottom of the report scroll (e.g. the site-health
    *  section on the merged Analytics surface), so every number stays in one scroll. */
   footerSlot?: ReactNode;
+  /** "this week" (default) or "this month" — labels the period on the tiles so
+   *  this same component renders the weekly brief and the monthly recap. */
+  periodLabel?: string;
+  /** The trend-chart caption (default "Last 30 days"); the monthly recap passes
+   *  the calendar month so the chart matches its window. */
+  chartLabel?: string;
 }
 
 /** "#3" / "map pack" / "not ranked" — a compact rank pill. */
@@ -48,60 +55,6 @@ function rankLabel(rank: number | null, inPack: boolean): string {
   return "not ranked";
 }
 
-/** A lightweight 30-day traffic sparkline (no chart dependency). */
-function TrendChart({ metrics }: { metrics: DailyMetric[] }) {
-  if (metrics.length < 2) return null;
-  const values = metrics.map((m) => m.pageViews);
-  const total = values.reduce((a, b) => a + b, 0);
-  const max = Math.max(1, ...values);
-  const w = 300;
-  const h = 56;
-
-  // Below a handful of visitors, a real chart is a single spike on a flat line —
-  // it reads as a rendering glitch, not data. Show a calm baseline + a plain note
-  // so an early, low-traffic week looks deliberate.
-  if (total < 5) {
-    return (
-      <div className="rounded-xl border border-glass-border bg-glass p-4">
-        <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
-          <p className="text-[12px] text-gray-muted">
-            <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> {total === 1 ? "visitor" : "visitors"}
-          </p>
-        </div>
-        <div className="flex h-14 items-center justify-center">
-          <div className="w-full border-t border-dashed border-glass-border" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-gray-muted">
-          Not enough traffic yet to chart — this fills in as more people find you.
-        </p>
-      </div>
-    );
-  }
-
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - (v / max) * (h - 4) - 2;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const line = `M ${pts.join(" L ")}`;
-  const area = `M 0,${h} L ${pts.join(" L ")} L ${w},${h} Z`;
-  return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-muted">Last 30 days</p>
-        <p className="text-[12px] text-gray-muted">
-          <span className="font-semibold text-warm-black">{total.toLocaleString()}</span> visitors
-        </p>
-      </div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-14 w-full" aria-hidden="true">
-        <path d={area} fill="var(--accent-dim)" opacity={0.5} />
-        <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      </svg>
-    </div>
-  );
-}
-
 function formatWeekRange(start: string, end: string): string {
   const startDate = new Date(start + "T00:00:00");
   const endDate = new Date(end + "T00:00:00");
@@ -109,7 +62,7 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} - ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot }: WeeklyBriefClientProps) {
+export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot, periodLabel = "this week", chartLabel }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
     analyticsConnectHref || dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
@@ -224,7 +177,10 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug text-warm-black tracking-[-0.01em] sm:text-[32px]">
-                {buildVerdict(brief.stats)}
+                {buildVerdict(
+                  brief.stats,
+                  periodLabel === "this month" ? { periodNoun: "month", priorPhrase: "from last month" } : undefined
+                )}
               </h1>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-glass-border bg-glass px-3 py-1.5 text-[12px] text-gray-fg">
@@ -276,7 +232,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
 
           {dailyMetrics.length >= 2 && (
             <div className="animate-fade-in-up" style={{ animationDelay: "75ms" }}>
-              <TrendChart metrics={dailyMetrics} />
+              <TrendChart metrics={dailyMetrics} label={chartLabel} />
             </div>
           )}
 
@@ -286,9 +242,10 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           >
             <StatTile
               countUp
-              label="People found you this week"
+              label={`People found you ${periodLabel}`}
               value={brief.stats.pageViews}
               delta={brief.stats.pageViewsDelta ?? 0}
+              deltaLabel={periodLabel === "this month" ? "vs last month" : "vs last week"}
               icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
@@ -296,6 +253,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               label="Customer actions"
               value={brief.stats.bookingClicks + (brief.stats.phoneClicks ?? 0)}
               delta={(brief.stats.bookingClicksDelta ?? 0) + (brief.stats.phoneClicksDelta ?? 0)}
+              deltaLabel={periodLabel === "this month" ? "vs last month" : "vs last week"}
               detail={(brief.stats.phoneClicks ?? 0) > 0 ? "Booked or called you" : undefined}
               icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
@@ -319,8 +277,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               What this means
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
-              {verdicts.map((v) => (
-                <div key={v.key} className="rounded-xl border border-glass-border bg-glass p-4">
+              {verdicts.map((v, i) => (
+                <div key={`${v.key}-${i}`} className="rounded-xl border border-glass-border bg-glass p-4">
                   <div className="flex items-center gap-2">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
@@ -353,8 +311,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                 Proof it&apos;s working
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {proofCards.map((c) => (
-                  <div key={c.changedAt} className="rounded-xl border border-success/25 bg-success-dim/40 p-4">
+                {proofCards.map((c, i) => (
+                  <div key={`${c.changedAt}-${i}`} className="rounded-xl border border-success/25 bg-success-dim/40 p-4">
                     <div className="flex items-center gap-2">
                       <ArrowUpRight className="h-4 w-4 shrink-0 text-success" strokeWidth={2} />
                       <p className="text-[14px] font-semibold text-warm-black">{c.headline}</p>
@@ -384,8 +342,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               <div className="rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
                 <p className="text-[14px] font-medium text-warm-black">{benchmark.headline}</p>
                 <div className="mt-4 space-y-3.5">
-                  {benchmark.rows.map((row) => (
-                    <div key={row.query} className="border-t border-glass-border pt-3 first:border-t-0 first:pt-0">
+                  {benchmark.rows.map((row, i) => (
+                    <div key={`${row.query}-${i}`} className="border-t border-glass-border pt-3 first:border-t-0 first:pt-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-[13px] font-medium text-warm-black">&ldquo;{row.query}&rdquo;</p>
                         <span
@@ -400,9 +358,9 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-dim px-2.5 py-1 text-[11px] font-medium text-warm-black">
                           You <span className="text-accent">{rankLabel(row.yourRank, row.yourInPack)}</span>
                         </span>
-                        {row.competitors.map((c) => (
+                        {row.competitors.map((c, i) => (
                           <span
-                            key={c.name}
+                            key={`${c.name}-${i}`}
                             className="inline-flex items-center gap-1.5 rounded-full border border-gray-border px-2.5 py-1 text-[11px] text-gray-muted"
                           >
                             <span className="max-w-[120px] truncate text-warm-black">{c.name}</span>
@@ -443,8 +401,8 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     </tr>
                   </thead>
                   <tbody>
-                    {searchRows.map((q) => (
-                      <tr key={q.query} className="border-t border-glass-border first:border-t-0">
+                    {searchRows.map((q, i) => (
+                      <tr key={`${q.query}-${i}`} className="border-t border-glass-border first:border-t-0">
                         <td className="px-4 py-2.5 text-warm-black">{q.query}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.clicks.toLocaleString()}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.impressions.toLocaleString()}</td>
@@ -493,7 +451,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                     {topServices[0].name}
                   </p>
                   <p className="text-[12px] text-gray-muted mt-1">
-                    {topServices[0].clicks} clicks this week
+                    {topServices[0].clicks} clicks {periodLabel}
                   </p>
                 </div>
               )}
@@ -557,9 +515,9 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
                 Brief History
               </h2>
               <div className="space-y-2">
-                {history.slice(1).map((item) => (
+                {history.slice(1).map((item, i) => (
                   <details
-                    key={item.id}
+                    key={`${item.id}-${i}`}
                     className="rounded-xl border border-glass-border bg-surface-raised px-4 py-3"
                   >
                     <summary className="cursor-pointer text-[13px] font-medium text-warm-black">

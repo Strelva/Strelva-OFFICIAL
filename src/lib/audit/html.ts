@@ -325,7 +325,7 @@ ${categoryRows}
     </div>
 
     <footer>
-      Prepared by Strelva — <a href="https://strelva.com">strelva.com</a>
+      Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>
     </footer>
   </main>
 </body>

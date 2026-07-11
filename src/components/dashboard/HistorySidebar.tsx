@@ -292,7 +292,7 @@ export function HistorySidebar({
                               : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
                         }`}
                         aria-current={isActive ? "page" : undefined}
-                        title={isPreview ? "Not enabled for this client — operator preview" : undefined}
+                        title={isPreview ? "Not enabled for this client: operator preview" : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>

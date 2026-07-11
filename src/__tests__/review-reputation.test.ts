@@ -204,7 +204,7 @@ describe("ReputationHeader render", () => {
     const html = render({ reviews, gbpConnected: true, copyDest: "Google" });
     expect(html).toContain("Last 30 days");
     // Keeps the prior number, points at the action, no shame language.
-    expect(html).toContain("the share link brings them back");
+    expect(html).toContain("The share link brings them back");
     expect(html.toLowerCase()).not.toContain("down from");
   });
 

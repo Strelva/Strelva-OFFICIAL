@@ -14,7 +14,7 @@ import { getRedis } from "../redis";
 import { recordMailSendPg } from "../db/repositories";
 import { dualWritePgEnabled, mailToInsert } from "../db/dual-write";
 
-export type MailKind = "weekly_report" | "daily_summary" | "invite" | "other";
+export type MailKind = "weekly_report" | "monthly_report" | "daily_summary" | "invite" | "other";
 
 export interface MailRecord {
   tenant: string;

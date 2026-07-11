@@ -51,9 +51,9 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
   // Check-in marks the booking done; Undo puts it back to confirmed so a
   // mis-tap is always recoverable (there's no separate "arrived" status).
   const checkIn = (id: string) =>
-    setStatus(id, "completed", "Couldn't check that one in — please try again.");
+    setStatus(id, "completed", "Couldn't check that one in. Please try again.");
   const undoCheckIn = (id: string) =>
-    setStatus(id, "confirmed", "Couldn't undo that — please try again.");
+    setStatus(id, "confirmed", "Couldn't undo that. Please try again.");
 
   const remaining = active.filter((b) => statuses[b.id] !== "completed").length;
 

@@ -36,8 +36,8 @@ async function DashboardHome() {
     leadSummary,
     phoneActions,
   ] = await Promise.all([
-    getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
-    getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
+    getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
+    getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
     // The approval queue, surfaced inline on Today (folds the separate "Needs
     // you" route into the home). Degrades to an empty queue on a backend blip.
     getNeedsYouData(tenant).catch(() => ({ pending: [], resolved: [], pendingCount: 0, staleSectionCount: 0 })),
@@ -95,13 +95,19 @@ async function DashboardHome() {
   // Lead with the verdict — the weekly-report headline via the same buildVerdict
   // pattern Analytics uses, not a static slogan. Falls back to the primary metric
   // (or a plain "you're live" line) before the first report exists.
-  const verdict = brief
-    ? buildVerdict(brief.stats)
-    : isFresh
-      ? "Your site is live and ready for customers."
-      : pageViews.total > 0
-        ? `${pageViews.total.toLocaleString()} ${pageViews.total === 1 ? "person has" : "people have"} found you so far.`
-        : "Your site is live. Visits show up here as people find you.";
+  // Compute the verdict from LIVE page-view counts (not the frozen brief) so the
+  // Today headline reflects current reality and agrees with the live anomaly on
+  // Analytics — a stale brief could say "up from last week" while traffic is
+  // actually down right now. Falls back to plain lines before any traffic.
+  const liveDelta = pageViews.thisWeek - (pageViews.lastWeek ?? 0);
+  const verdict =
+    brief || pageViews.thisWeek > 0
+      ? buildVerdict({ pageViews: pageViews.thisWeek, pageViewsDelta: liveDelta })
+      : isFresh
+        ? "Your site is live and ready for customers."
+        : pageViews.total > 0
+          ? `${pageViews.total.toLocaleString()} ${pageViews.total === 1 ? "person has" : "people have"} found you so far.`
+          : "Your site is live. Visits show up here as people find you.";
 
   // Proactive nudges (unreplied reviews, stale site, no posts) make the product
   // feel managed — but NEVER for a brand-new tenant: a phantom "needs you: 1" on
@@ -140,7 +146,7 @@ async function DashboardHome() {
             </p>
             {brief ? (
               <Link
-                href={dashboardHref("/dashboard/analytics")}
+                href={dashboardHref("/dashboard/reports")}
                 className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-colors hover:text-warm-black"
               >
                 <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />

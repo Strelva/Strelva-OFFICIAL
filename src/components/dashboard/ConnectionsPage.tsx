@@ -293,7 +293,7 @@ export function ConnectionsPage() {
         </div>
       </div>
       <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
-        Connect the accounts Strelva manages for you — Google Business, reviews, booking, and more. Each one expands what we can see and update on your behalf.
+        Connect the accounts Strelva manages for you: Google Business, reviews, booking, and more. Each one expands what we can see and update on your behalf.
       </p>
 
       {!query.trim() && (

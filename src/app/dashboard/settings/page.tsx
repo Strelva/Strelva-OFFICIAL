@@ -85,8 +85,8 @@ const BUSINESS_FIELDS: readonly IdentityField[] = [
     description: "Sets whether Google Business & Reviews apply to you",
     options: [
       { value: "", label: "Auto (based on your site)" },
-      { value: "local", label: "Local — customers visit or I serve an area" },
-      { value: "online", label: "Online only — no physical/local presence" },
+      { value: "local", label: "Local: customers visit or I serve an area" },
+      { value: "online", label: "Online only: no physical/local presence" },
       { value: "hybrid", label: "Both online and local" },
     ],
   },
@@ -206,6 +206,9 @@ const LEGACY_HASH_TO_SECTION: Record<string, string> = {
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 function SaveStatusPill({ status }: { status: SaveStatus }) {
+  // Nothing has happened yet at rest, so don't show a "Saved" pill before the
+  // owner has edited anything — it reads as a save that never occurred.
+  if (status === "idle") return null;
   const copy: Record<SaveStatus, { label: string; className: string }> = {
     idle: { label: "Saved", className: "border-glass-border text-gray-faint" },
     dirty: { label: "Unsaved changes", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
@@ -396,7 +399,7 @@ function AccountSection() {
         </div>
       </div>
       <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
-        This is the account you&apos;re signed in with — it stays the same across every
+        This is the account you&apos;re signed in with. It stays the same across every
         business you can access. Your business&apos;s public details live in{" "}
         <span className="text-warm-white">Business info</span>.
       </p>
@@ -617,13 +620,13 @@ function UtilitiesSection() {
   const utilities = [
     {
       title: "Brand Kit",
-      description: "Tell Strelva about your business — what you do, your voice, and your media.",
+      description: "Tell Strelva about your business: what you do, your voice, and your media.",
       href: "/dashboard/brand-kit",
       icon: Sparkles,
     },
     {
       title: "Connections",
-      description: "Connect the accounts Strelva manages — Google Business, reviews, booking.",
+      description: "Connect the accounts Strelva manages: Google Business, reviews, booking.",
       href: "/dashboard/integrations",
       icon: Link2,
     },
@@ -635,7 +638,7 @@ function UtilitiesSection() {
     },
     {
       title: "Ownership & handoff",
-      description: "Export your content and assets, request your site files, and offboard cleanly — all in the Ownership section below.",
+      description: "Export your content and assets, request your site files, and offboard cleanly, all in the Ownership section below.",
       href: "/dashboard/settings#ownership",
       icon: Download,
     },
@@ -1314,7 +1317,7 @@ function BillingSection() {
               if (!res.ok) {
                 setBillingError(
                   res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "You're on a managed plan — there's no billing portal to open. Message Strelva anytime about your plan."
+                    ? "You're on a managed plan. There's no billing portal to open. Message Strelva anytime about your plan."
                     : body?.error || "Couldn't open the billing portal. Try again.",
                 );
                 return;
@@ -1345,11 +1348,11 @@ function BillingSection() {
 const SECTION_META: Record<string, { title: string; description: string }> = {
   business: {
     title: "Business",
-    description: "Everything about your site — details, branding, structure, connected services, and quick tools.",
+    description: "Everything about your site: details, branding, structure, connected services, and quick tools.",
   },
   account: {
     title: "Account",
-    description: "Your personal details on this dashboard — separate from the business you manage.",
+    description: "Your personal details on this dashboard, separate from the business you manage.",
   },
   domains: {
     title: "Domain health",
@@ -1384,7 +1387,7 @@ const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: s
   {
     id: "dependencies",
     eyebrow: "Connected services",
-    description: "Outside services your site relies on — anything paused or failing is flagged before it can affect your site.",
+    description: "Outside services your site relies on. Anything paused or failing is flagged before it can affect your site.",
   },
   {
     id: "utilities",

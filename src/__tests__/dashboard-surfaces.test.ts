@@ -49,7 +49,7 @@ describe("getPresenceProfile", () => {
 describe("getDashboardSurfaces — vertical-set surfaces (additive)", () => {
   it("a tenant with no set features resolves to exactly the six base surfaces (behavior-preserving)", () => {
     const ids = getDashboardSurfaces({ tenantConfig: { template: "wellness", features: [] }, connections: [] }).map((s) => s.id);
-    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reviews"]);
+    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews"]);
   });
 
   it("appends the wellness set surfaces after the base six when enabled", () => {
@@ -58,7 +58,7 @@ describe("getDashboardSurfaces — vertical-set surfaces (additive)", () => {
       connections: [],
     });
     expect(s.map((x) => x.id)).toEqual([
-      "today", "ask-ai", "website", "google-business", "analytics", "reviews",
+      "today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews",
       "schedule", "members", "packages", "roster",
     ]);
     expect(at(s, "schedule")).toMatchObject({ href: "/dashboard/schedule", state: "shown", group: "set" });
@@ -70,20 +70,20 @@ describe("getDashboardSurfaces — vertical-set surfaces (additive)", () => {
       connections: [],
     }).map((s) => s.id);
     expect(ids).toEqual([
-      "today", "ask-ai", "website", "google-business", "analytics", "reviews", "schedule", "roster",
+      "today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews", "schedule", "roster",
     ]);
   });
 
   it("the e-commerce store flag adds no top-level set surface (Store stays a Website sub-tab)", () => {
     const ids = getDashboardSurfaces({ tenantConfig: { template: "wellness", features: ["commerce"] }, connections: [] }).map((s) => s.id);
-    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reviews"]);
+    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews"]);
   });
 });
 
 describe("getDashboardSurfaces — the 6-item conditional nav", () => {
   it("emits exactly the target surface set in order", () => {
     const ids = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] }).map((s) => s.id);
-    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reviews"]);
+    expect(ids).toEqual(["today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews"]);
   });
 
   it("uses owner-language labels (Today / Ask Strelva / Analytics)", () => {

@@ -61,25 +61,25 @@ export function payLinkDoorTerms(config: PayLinkCopyConfig): string {
   }
   const start = startAmountLabel(config);
   const startPhrase = start ? `This is your ${start} start payment. ` : "This is your start payment. ";
-  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum — and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
+  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum, and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
 }
 
 /** The shorter reassurance line shown inside the form, under the amount. */
 export function payLinkReassurance(config: PayLinkCopyConfig): string {
   const monthly = formatWholeDollarsUsd(MANAGED_MONTHLY_CENTS);
   if (config.door === "build") {
-    return `A one-time payment to get your site built — and it includes your first ${BUILD_INCLUDED_MONTHS} months of management.`;
+    return `A one-time payment to get your site built, and it includes your first ${BUILD_INCLUDED_MONTHS} months of management.`;
   }
   const start = startAmountLabel(config);
   const startPhrase = start ? `Your ${start} start payment. ` : "Your start payment. ";
-  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum — and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
+  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum, and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
 }
 
 /** Stripe product display name for the door. */
 export function payLinkProductName(config: PayLinkCopyConfig & { clientName: string }): string {
   return config.door === "build"
-    ? `Website build — ${config.clientName}`
-    : `Managed plan start — ${config.clientName}`;
+    ? `Website build: ${config.clientName}`
+    : `Managed plan start: ${config.clientName}`;
 }
 
 /** Stripe product description for the door. */

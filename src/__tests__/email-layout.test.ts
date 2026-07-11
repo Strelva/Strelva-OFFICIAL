@@ -56,7 +56,7 @@ describe("email design system layout", () => {
     expect(text).toContain("Hi Chelsea.");
     expect(text).toContain("Plan: Monthly");
     expect(text).toContain("View: https://x");
-    expect(text).toContain("— Strelva");
+    expect(text).toContain("\nStrelva");
     expect(text).not.toContain("<");
   });
 });
