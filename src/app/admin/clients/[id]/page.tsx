@@ -191,7 +191,9 @@ export default async function ClientDetailPage({
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
-      <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
+      <div id="site-health" className="scroll-mt-24">
+        <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
+      </div>
 
       <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
 
