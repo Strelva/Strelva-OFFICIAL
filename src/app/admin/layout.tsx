@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { getAllTenants } from "@/lib/tenants";
 import { AdminRail } from "./AdminRail";
+import { AdminMobileNav } from "./AdminMobileNav";
 import { CommandPalette } from "./CommandPalette";
 
 export default async function AdminLayout({
@@ -28,6 +29,8 @@ export default async function AdminLayout({
       >
         Skip to content
       </a>
+
+      <AdminMobileNav operatorName={operatorName} badges={{ clients: activeClients }} />
 
       <div className="md:grid md:grid-cols-[236px_1fr]">
         <div className="hidden md:block">
