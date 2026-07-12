@@ -10,6 +10,13 @@ import { ReplyVoicePanel } from "./ReplyVoicePanel";
 import { useDashboard } from "./DashboardContext";
 import type { ReplyVoice } from "@/lib/reviews/reply-voice";
 
+/** An AI reply already drafted for a review and waiting in the queue. */
+export interface PreDraft {
+  reply: string;
+  /** ISO time this auto-posts (auto mode); null when it waits for approval. */
+  autoPostAt: string | null;
+}
+
 interface ReviewsPanelProps {
   reviews: ReviewItem[];
   googlePlaceId?: string;
@@ -17,6 +24,8 @@ interface ReviewsPanelProps {
   gbpConnected?: boolean;
   /** The client's reply voice (mode + guidance + templates). */
   voice: ReplyVoice;
+  /** Pre-drafted replies keyed by review id — so the card shows the ready reply, not a to-do. */
+  preDrafts: Record<string, PreDraft>;
 }
 
 /** Small copy-to-clipboard button with a "Copied" flip; falls back silently to
@@ -152,9 +161,20 @@ export function copyDestination(reviews: ReviewItem[]): string {
   return "the platform";
 }
 
-function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected: boolean }) {
+/** "in about 8h" / "shortly" — a soft countdown to an auto-post. Client-only. */
+function untilLabel(iso: string): string {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "shortly";
+  const h = Math.round(ms / 3_600_000);
+  if (h >= 1) return `in about ${h}h`;
+  return `in about ${Math.max(1, Math.round(ms / 60_000))}m`;
+}
+
+function ReviewCard({ review, gbpConnected, preDraft, voiceMode }: { review: ReviewItem; gbpConnected: boolean; preDraft?: PreDraft; voiceMode: ReplyVoice["mode"] }) {
   const { dashboardHref, readOnly } = useDashboard();
-  const [draft, setDraft] = useState<string | null>(review.reply ?? null);
+  // Seed the draft from an already-written reply: a saved one, or the AI reply
+  // Strelva pre-drafted (so the card opens with "here's your reply", not a to-do).
+  const [draft, setDraft] = useState<string | null>(review.reply ?? preDraft?.reply ?? null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,10 +290,23 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
         </div>
       ) : draft ? (
         <div className="mt-4">
-          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
-            <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
-            Drafted reply
-          </p>
+          {preDraft && !hasExistingReply ? (
+            <div className="mb-2 rounded-lg bg-accent-dim px-3 py-2">
+              <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-accent">
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} /> Strelva already drafted this reply
+              </p>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-warm-black/80">
+                {preDraft.autoPostAt
+                  ? `It posts to Google ${untilLabel(preDraft.autoPostAt)} in your voice. Edit it here first if you want.`
+                  : "Written in your voice. Approve to post, or edit it first."}
+              </p>
+            </div>
+          ) : (
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
+              <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
+              Drafted reply
+            </p>
+          )}
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -351,6 +384,24 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
             </button>
           </div>
         </div>
+      ) : voiceMode !== "off" ? (
+        // Replies are on — this one just hasn't been drafted yet (Strelva catches
+        // the backlog up on a schedule). Read as "handled", not a to-do; the
+        // impatient can still draft it now.
+        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-gray-muted">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.6} />
+          <span>Strelva is writing a reply in your voice &mdash; it&rsquo;ll appear here shortly.</span>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={generateDraft}
+              disabled={loading}
+              className="font-medium text-accent transition-opacity hover:underline disabled:opacity-50"
+            >
+              {loading ? "drafting…" : "draft it now"}
+            </button>
+          )}
+        </div>
       ) : (
         <div className="mt-4">
           <button
@@ -379,7 +430,7 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
   );
 }
 
-export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voice }: ReviewsPanelProps) {
+export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voice, preDrafts }: ReviewsPanelProps) {
   const { dashboardHref } = useDashboard();
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
@@ -432,7 +483,13 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voi
 
         <div className="space-y-3">
           {reviews.map((review) => (
-            <ReviewCard key={review.id} review={review} gbpConnected={gbpConnected} />
+            <ReviewCard
+              key={review.id}
+              review={review}
+              gbpConnected={gbpConnected}
+              preDraft={preDrafts[review.externalId ?? review.id]}
+              voiceMode={voice.mode}
+            />
           ))}
         </div>
       </div>

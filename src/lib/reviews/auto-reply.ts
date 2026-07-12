@@ -15,14 +15,90 @@
  */
 
 import type { TenantConfig, UnifiedEvent } from "../types";
-import { getEvents } from "../events";
+import { getEvents, addEvent } from "../events";
 import { resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
+import { getReviews } from "../reviews";
+import { draftReviewReply, storeRecentReply } from "../review-replies";
 
 /** The catch-window between "drafted" and "auto-posted" — long enough for the
  *  owner to veto a bad AI reply, short enough that the reply is still timely. */
 export const AUTO_POST_DELAY_MS = 12 * 60 * 60 * 1000;
+
+function hasReply(reply: string | undefined | null): boolean {
+  return typeof reply === "string" && reply.trim().length > 0;
+}
+
+/**
+ * Draft replies for the backlog of unreplied reviews — the ones that predate a
+ * client turning replies on, so the reviews page reads "handled", not a to-do.
+ * New reviews are drafted by the pollers; this catches up the rest, capped per
+ * tenant per run so it drains over a few cron cycles instead of one Gemini
+ * stampede. Mode-aware: off skips, auto stamps the same safety-window timer.
+ */
+export async function draftReplyBacklog(
+  nowMs: number,
+  capPerTenant = 5,
+): Promise<{ drafted: number }> {
+  const tenants = await getAllTenants().catch(() => [] as TenantConfig[]);
+  let drafted = 0;
+
+  for (const t of tenants) {
+    if (t.active === false) continue;
+    const voice = await getReplyVoice(t.id).catch(() => null);
+    if (!voice || voice.mode === "off") continue;
+
+    const [reviews, pending] = await Promise.all([
+      getReviews(t.id).catch(() => []),
+      getEvents(t.id, { status: "pending", limit: 200 }).catch(() => [] as UnifiedEvent[]),
+    ]);
+    const alreadyDrafted = new Set(
+      pending
+        .filter((e) => e.metadata?.kind === "review_reply_draft")
+        .map((e) => e.metadata?.reviewId),
+    );
+
+    let n = 0;
+    for (const r of reviews) {
+      if (n >= capPerTenant) break;
+      if (hasReply(r.reply)) continue;
+      const reviewId = r.externalId ?? r.id;
+      if (alreadyDrafted.has(reviewId)) continue;
+      try {
+        const reply = await draftReviewReply(
+          { reviewId, reviewerName: r.author, rating: r.rating, comment: r.text },
+          t,
+        );
+        await addEvent({
+          tenantId: t.id,
+          source: "ai",
+          type: "review",
+          title: `Drafted reply for ${r.author}'s ${r.rating}-star review`,
+          body: reply,
+          status: "pending",
+          metadata: {
+            kind: "review_reply_draft",
+            reviewId,
+            rating: r.rating,
+            author: r.author,
+            draftedReply: reply,
+            ...(voice.mode === "auto"
+              ? { autoPostAt: new Date(nowMs + AUTO_POST_DELAY_MS).toISOString() }
+              : {}),
+          },
+        });
+        await storeRecentReply(t.id, reply).catch(() => {});
+        drafted += 1;
+        n += 1;
+      } catch {
+        // one review failing to draft must not stall the rest
+      }
+    }
+  }
+
+  return { drafted };
+}
 
 /** Publish any auto-mode drafts whose safety window has elapsed. Best-effort,
  *  per-tenant isolated — one failure never blocks the rest. */

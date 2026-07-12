@@ -12,12 +12,17 @@
 
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
-import { runDueAutoPosts } from "@/lib/reviews/auto-reply";
+import { runDueAutoPosts, draftReplyBacklog } from "@/lib/reviews/auto-reply";
 
 export const maxDuration = 300;
 
 export async function GET() {
-  const result = await runDueAutoPosts(Date.now());
+  const now = Date.now();
+  // Catch up any unreplied backlog first (so it's drafted + queued), then fire
+  // the auto-mode drafts whose window has elapsed.
+  const backlog = await draftReplyBacklog(now);
+  const posted = await runDueAutoPosts(now);
+  const result = { drafted: backlog.drafted, ...posted };
   await recordHeartbeat("review-auto-post", { ok: true, ...result });
   return NextResponse.json({ ranAt: new Date().toISOString(), ...result });
 }

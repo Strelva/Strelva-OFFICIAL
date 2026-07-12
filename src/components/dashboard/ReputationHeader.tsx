@@ -185,8 +185,8 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
 
       <p className="mt-4 text-[14px] leading-relaxed text-gray-muted">
         {gbpConnected
-          ? "Draft a warm, on-brand reply for any review below. Google reviews publish straight to your listing."
-          : `Draft a warm, on-brand reply for any review below, then copy it into ${copyDest}.`}
+          ? "Strelva drafts a reply for every review below, in your voice. Google reviews post to your listing once approved."
+          : `Strelva drafts a reply for every review below, in your voice. Approve it, then copy it into ${copyDest}.`}
       </p>
     </div>
   );
