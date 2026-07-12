@@ -17,12 +17,10 @@ export function DeploymentStatus({ status }: { status: VercelProjectStatus | nul
     state ? "Building" :
     "Not deployed yet";
 
-  const deployedAgo = status.deployedAt
-    ? (() => {
-        const d = Math.floor((Date.now() - status.deployedAt!) / 86_400_000);
-        if (d <= 0) return "today";
-        return d === 1 ? "1d ago" : `${d}d ago`;
-      })()
+  // Absolute date (deterministic from the timestamp) — a relative "Nd ago" would
+  // need Date.now(), which isn't allowed in a component render.
+  const deployedLabel = status.deployedAt
+    ? new Date(status.deployedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;
 
   return (
@@ -48,7 +46,7 @@ export function DeploymentStatus({ status }: { status: VercelProjectStatus | nul
       <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-base px-3 py-2">
           <dt className="text-[12px] text-gray-muted">Last deploy</dt>
-          <dd className="text-[12.5px] font-medium text-warm-white tabular-nums">{deployedAgo ?? "—"}</dd>
+          <dd className="text-[12.5px] font-medium text-warm-white tabular-nums">{deployedLabel ?? "—"}</dd>
         </div>
         <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-base px-3 py-2">
           <dt className="flex items-center gap-1.5 text-[12px] text-gray-muted">
