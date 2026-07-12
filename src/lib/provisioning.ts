@@ -139,6 +139,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         repoName: subdomain,
         contractVersion: CUSTOM_REPO_CONTRACT_VERSION,
         revalidationHealth: "unknown",
+        // Auto-wire the connect-back so a new tenant needs no manual step: the
+        // starter serves /api/capabilities, so point the manifest at it now. It
+        // fails-soft to the base manifest until the site is live, then reflects
+        // the repo's real capabilities (so a custom-repo storefront reads as a
+        // store instead of getting "enable e-commerce" nudges).
+        productionUrl: siteUrl,
+        capabilityManifestUrl: `${siteUrl}/api/capabilities`,
       },
       branding: { initials: initials(input.siteName) },
     });

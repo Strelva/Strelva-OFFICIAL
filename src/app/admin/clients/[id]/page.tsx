@@ -12,6 +12,7 @@ import { getReviews } from "@/lib/reviews";
 import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";
 import { getTenantCrm } from "@/lib/tenant-crm";
 import { getSuggestions, operatorSuggestions } from "@/lib/suggestions";
+import { getVercelProjectStatus } from "@/lib/vercel";
 import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
@@ -22,6 +23,7 @@ import { DomainManager } from "./DomainManager";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
+import { DeploymentStatus } from "./DeploymentStatus";
 import { InviteButton } from "../../InviteButton";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { ClientLogo, Chip } from "../../console";
@@ -73,7 +75,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -88,8 +90,10 @@ export default async function ClientDetailPage({
       getTenantAtRisk(id).catch(() => noRisk),
       getDailyMetrics(id, 14).catch(() => []),
       getSuggestions(id).catch(() => []),
+      getVercelProjectStatus(`${id}-site`).catch(() => null),
     ]);
   const opportunities = operatorSuggestions(suggestions);
+  const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
 
   const latestVis = visSnapshots[0] ?? null;
   const visSummary = latestVis ? summarizeVisibility(latestVis) : null;
@@ -204,6 +208,8 @@ export default async function ClientDetailPage({
       <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
 
       <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
+
+      <DeploymentStatus status={deployStatus} />
 
       <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
 

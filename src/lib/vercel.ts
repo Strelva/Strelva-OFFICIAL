@@ -110,6 +110,66 @@ export async function deleteVercelProject(
   }
 }
 
+export interface VercelProjectStatus {
+  /** READY | BUILDING | ERROR | QUEUED | CANCELED | INITIALIZING | null (never deployed). */
+  state: string | null;
+  /** ms epoch of the latest production deploy, or null. */
+  deployedAt: number | null;
+  /** Last git commit message on the production deploy, if the project is git-linked. */
+  commitMessage: string | null;
+  /** Branch/ref of the last deploy. */
+  commitRef: string | null;
+  /** Vercel dashboard URL for the project. */
+  inspectorUrl: string;
+  /** True when a git repo is connected to the project. */
+  gitLinked: boolean;
+}
+
+/** One-call production status for a tenant's site project (by name `{tenant}-site`),
+ *  for the operator cockpit so deploy + git state show in-platform instead of a
+ *  trip to the Vercel dashboard. Fails soft: a missing token or project returns a
+ *  benign "never deployed" shape, never throws. */
+export async function getVercelProjectStatus(
+  projectName: string
+): Promise<VercelResult<VercelProjectStatus>> {
+  const token = vercelToken();
+  if (!token) return { ok: false, error: "VERCEL_API_TOKEN not set" };
+  const team = process.env.VERCEL_TEAM_ID;
+  const inspectorUrl = `https://vercel.com/${team ? `${team}/` : ""}${projectName}`;
+  try {
+    const res = await fetch(
+      `${VERCEL_API}/v9/projects/${encodeURIComponent(projectName)}${teamQuery()}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    );
+    if (res.status === 404) {
+      return { ok: true, data: { state: null, deployedAt: null, commitMessage: null, commitRef: null, inspectorUrl, gitLinked: false } };
+    }
+    if (!res.ok) return { ok: false, error: await errorMessage(res) };
+    const p = (await res.json()) as {
+      link?: { type?: string };
+      latestDeployments?: Array<{
+        readyState?: string; createdAt?: number;
+        meta?: { githubCommitMessage?: string; githubCommitRef?: string; gitCommitMessage?: string; gitCommitRef?: string };
+      }>;
+    };
+    const latest = p.latestDeployments?.[0];
+    const meta = latest?.meta ?? {};
+    return {
+      ok: true,
+      data: {
+        state: latest?.readyState ?? null,
+        deployedAt: latest?.createdAt ?? null,
+        commitMessage: meta.githubCommitMessage ?? meta.gitCommitMessage ?? null,
+        commitRef: meta.githubCommitRef ?? meta.gitCommitRef ?? null,
+        inspectorUrl,
+        gitLinked: Boolean(p.link?.type),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
+
 export async function addVercelDomain(
   projectId: string,
   domain: string
