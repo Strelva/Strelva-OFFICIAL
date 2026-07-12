@@ -64,15 +64,21 @@ jobs:
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"
 
-      - name: Operator surface smoke
+      - name: Surface smoke
         # Separate step because it needs the dev super-admin bypass ON
-        # (REB_DEV_UNGATED_ACCESS=1, set by the smoke:surfaces script) to reach
-        # the /admin console, whereas the public smoke above runs with it OFF.
-        # tests/operator-surfaces.spec.ts is data-independent: it asserts every
-        # admin list surface renders its header on this clean dev-file backend
-        # (no DB/Redis/seeded tenant), so a broken operator page fails the build.
-        # The tenant-detail cockpit + owner dashboard need a seeded fixture and
-        # stay in the local ungated suite, not CI.
-        run: pnpm smoke:surfaces
+        # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces)
+        # to reach the /admin console and resolve the owner dashboard, whereas the
+        # public smoke above runs with the bypass OFF.
+        #
+        # operator-surfaces.spec.ts (admin list surfaces) needs no backend at all.
+        # owner-surfaces.spec.ts (owner dashboard + client cockpit) needs a tenant
+        # to resolve, so we seed a SYNTHETIC gldf fixture (no real secrets) into
+        # the dev-file tenant path first. Content comes from the committed
+        # gldf-content-defaults; the operational stores stay empty, and every
+        # assertion is data-independent, so a broken page fails the build without
+        # any DB/Redis/prod access.
+        run: |
+          cp tests/fixtures/tenants.fixture.json dev-tenants.json
+          pnpm smoke:surfaces
         env:
           CI: true
