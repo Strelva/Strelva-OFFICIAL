@@ -7,6 +7,7 @@ import { sanitizePromptValue } from "./capabilities";
 import { addEvent, getEvents, resolveEvent, updateEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getProducts } from "./products";
+import { getSiteCapabilityManifest } from "./site-capabilities";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import type { ContentSection } from "./types";
 import { dataSourceIsPostgres } from "./db/source-flags";
@@ -382,7 +383,7 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
     "providers", "contact", "settings", "faq",
   ];
 
-  const [timestamps, bookingClicks, settings, testimonials, events, services, dailyMetrics, products, tenantConfig] =
+  const [timestamps, bookingClicks, settings, testimonials, events, services, dailyMetrics, products, tenantConfig, manifest] =
     await Promise.all([
       getSectionTimestamps(tenantId),
       getClickCounts("booking-click", tenantId),
@@ -393,12 +394,24 @@ export async function generateSuggestionsForTenant(tenantId: string): Promise<Su
       getDailyMetrics(tenantId, 14),
       getProducts(tenantId).catch(() => []),
       getTenantConfig(tenantId).catch(() => null),
+      getSiteCapabilityManifest(tenantId).catch(() => null),
     ]);
+
+  // A store served by the client's OWN custom repo won't show up in getProducts
+  // (that only sees the platform's product store), so trust the capability manifest
+  // too: GLDF sells from its custom repo, and without this the engine keeps telling
+  // it to "enable e-commerce" for a storefront that already exists.
+  const STORE_FEATURE = /\b(cart|checkout|commerce|shop|store|product|storefront)\b/i;
+  const declaresStore =
+    (manifest?.customOnlyFeatures ?? []).some((f) => STORE_FEATURE.test(f)) ||
+    Boolean(manifest?.sections?.shop) ||
+    Boolean(manifest?.sections?.products) ||
+    Boolean(manifest?.sections?.storefront);
 
   // What the site already has, so we never recommend "enabling" something that's
   // already live (e.g. telling a store owner with 4 products to "enable e-commerce").
   const capabilities = {
-    hasStore: products.length > 0,
+    hasStore: products.length > 0 || declaresStore,
     productCount: products.length,
     hasBlog: new Set(tenantConfig?.features ?? []).has("blog"),
   };
