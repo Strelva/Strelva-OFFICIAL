@@ -105,7 +105,7 @@ export function PortfolioOpportunitiesClient({
     <div className="max-w-3xl space-y-4">
       <div className="space-y-3">
         <div>
-          <h2 className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
+          <h2 className="flex items-center gap-2.5 font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
             <Sparkles className="h-5 w-5 text-accent" strokeWidth={2} />
             Ready to work
           </h2>

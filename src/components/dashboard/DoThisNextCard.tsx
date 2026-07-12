@@ -26,7 +26,7 @@ export function DoThisNextCard({ title, prompt }: { title: string; prompt: strin
         Do this next
       </p>
       <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="min-w-0 font-[family-name:var(--font-display)] text-[18px] font-normal leading-snug text-warm-black">
+        <h2 className="min-w-0 font-display text-[18px] font-normal leading-snug text-warm-black">
           {title}
         </h2>
         <button

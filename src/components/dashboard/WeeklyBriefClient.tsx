@@ -75,7 +75,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
               Analytics
             </p>
-            <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-black tracking-[-0.02em]">
+            <h1 className="font-display text-[28px] sm:text-[32px] font-medium text-warm-black tracking-[-0.02em]">
               Your first weekly report is still warming up
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
@@ -176,7 +176,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="max-w-xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug text-warm-black tracking-[-0.01em] sm:text-[32px]">
+              <h1 className="max-w-xl font-display text-[28px] font-medium leading-snug text-warm-black tracking-[-0.01em] sm:text-[32px]">
                 {buildVerdict(
                   brief.stats,
                   periodLabel === "this month" ? { periodNoun: "month", priorPhrase: "from last month" } : undefined

@@ -34,7 +34,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           <MapPin className="h-3.5 w-3.5" strokeWidth={1.7} />
           Google Business
         </div>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-[28px] font-normal leading-tight text-warm-black">
+        <h1 className="mt-2 font-display text-[28px] font-normal leading-tight text-warm-black">
           Connect your Google listing
         </h1>
         <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-gray-muted">
@@ -87,7 +87,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
             <MapPin className="h-3.5 w-3.5" strokeWidth={1.7} />
             Google Business
           </div>
-          <h1 className="mt-2 font-[family-name:var(--font-display)] text-[26px] font-normal leading-tight text-warm-black">
+          <h1 className="mt-2 font-display text-[26px] font-normal leading-tight text-warm-black">
             Your Google listing
           </h1>
         </div>

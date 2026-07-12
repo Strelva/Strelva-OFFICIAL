@@ -36,7 +36,7 @@ function Pulse({ label, value, sub, series }: { label: string; value: string | n
   return (
     <div className="flex flex-col rounded-2xl border border-glass-border bg-glass p-4">
       <p className="text-[11px] text-gray-muted">{label}</p>
-      <p className="mt-1.5 font-[family-name:var(--font-display)] text-[23px] font-medium tracking-[-0.02em] text-warm-white">{value}</p>
+      <p className="mt-1.5 font-display text-[23px] font-medium tracking-[-0.02em] text-warm-white">{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-gray-faint">{sub}</p>}
       {series && series.length > 1 && (
         <div className="mt-2.5">
@@ -166,7 +166,7 @@ export default async function ClientDetailPage({
         <div className="flex items-center gap-4">
           <ClientLogo name={getTenantSiteName(tenant.id, tenant)} size={48} />
           <div>
-            <h1 className="font-[family-name:var(--font-display)] text-[24px] font-medium tracking-[-0.02em] text-warm-white sm:text-[26px]">
+            <h1 className="font-display text-[24px] font-medium tracking-[-0.02em] text-warm-white sm:text-[26px]">
               {getTenantSiteName(tenant.id, tenant)}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-gray-muted">

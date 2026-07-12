@@ -87,7 +87,7 @@ export function TodayFeed({ leads, approvals, atRisk, signups, flags = [], portf
   return (
     <section className="rounded-xl border border-glass-border bg-glass overflow-hidden">
       <div className="px-5 py-3 border-b border-glass-border flex items-center justify-between gap-2">
-        <span className="font-[family-name:var(--font-display)] text-sm font-medium text-warm-white">
+        <span className="font-display text-sm font-medium text-warm-white">
           Needs you
         </span>
         {nothingWaiting ? (

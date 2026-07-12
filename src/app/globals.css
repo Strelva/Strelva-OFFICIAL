@@ -192,6 +192,14 @@
   --color-m-danger: var(--m-danger);
 }
 
+/* Display (heading) font. Replaces the arbitrary `font-display`
+   class, which Turbopack's dev compiler mis-serialized on cold builds (the RSC payload
+   bled into the CSS parse and crashed the dev server). A named utility carries no inline
+   arbitrary value, so there's nothing to mis-serialize; the rendered font is unchanged. */
+@utility font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
 /* Base */
 html {
   scroll-behavior: auto;

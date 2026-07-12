@@ -220,7 +220,7 @@ function TenantSuspended({ siteName }: { siteName: string }) {
   return (
     <main className="marketing-root flex min-h-dvh items-center justify-center px-6">
       <div className="max-w-md text-center">
-        <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal text-m-text">
+        <h1 className="font-display text-[24px] font-normal text-m-text">
           {siteName} is paused
         </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-m-text-2">

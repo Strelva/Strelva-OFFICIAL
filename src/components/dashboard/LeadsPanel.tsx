@@ -100,7 +100,7 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
             Leads
           </p>
-          <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
+          <h1 className="font-display text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
             Who reached out
           </h1>
           <p className="mt-3 flex items-center gap-1.5 text-[14px] text-gray-muted">

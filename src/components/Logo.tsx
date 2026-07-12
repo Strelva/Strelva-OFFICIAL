@@ -23,7 +23,7 @@ export function LogoFull({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2.5 text-m-text ${className}`}>
       <LogoMark className="size-7" />
-      <span className="font-[family-name:var(--font-display)] text-[20px] font-medium leading-none tracking-[-0.01em]">
+      <span className="font-display text-[20px] font-medium leading-none tracking-[-0.01em]">
         Strelva
       </span>
     </span>
