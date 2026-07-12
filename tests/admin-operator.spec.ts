@@ -5,22 +5,24 @@ test.skip(
   "Admin operator smoke requires REB_DEV_UNGATED_ACCESS=1 for local operator coverage.",
 );
 
-test("admin operator surfaces show client readiness and draft review paths", async ({ page }) => {
+test("admin operator surfaces: overview feed, client cockpit, drafts", async ({ page }) => {
   await page.goto("/admin");
 
+  // Grouped console nav (post-redesign).
   await expect(page.getByRole("navigation").getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Clients" })).toHaveAttribute("href", "/admin/clients");
   await expect(page.getByRole("navigation").getByRole("link", { name: "Drafts" })).toHaveAttribute("href", "/admin/drafts");
-  await expect(page.getByRole("heading", { name: "Client Overview" })).toBeVisible();
-  await expect(page.getByText(/active clients across your portfolio/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Controlled platform launch proof loop" })).toBeVisible();
-  await expect(page.getByText("Launch command center")).toBeVisible();
-  await expect(page.getByText(/custom-repo delivery, trustworthy AI action receipts/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /New Client/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Invite" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Dashboard" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Site" }).first()).toBeVisible();
 
+  // The overview is now the "Needs you" attention feed, not the old client table.
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
+  await expect(page.getByText("Needs you").first()).toBeVisible();
+
+  // Client cockpit: the invite flow moved here, and the Start-plan control lives here.
+  await page.goto("/admin/clients/gldf");
+  await expect(page.getByRole("button", { name: /Invite/i }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start a plan" })).toBeVisible();
+
+  // Drafts surface.
   await page.goto("/admin/drafts");
-  await expect(page.getByRole("heading", { name: "Pending Drafts" })).toBeVisible();
-  await expect(page.getByText("Review AI-generated content changes before they go live")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Pending drafts/i })).toBeVisible();
 });
