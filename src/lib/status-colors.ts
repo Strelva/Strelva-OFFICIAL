@@ -1,11 +1,12 @@
 /**
  * Shared status-color vocabulary for the admin/operator UI.
  *
- * Before this, the same emerald/amber/red pill classes were redefined as local
- * Record maps in five admin files (overview, audit, ops, onboard, SiteScan).
- * This is the single source of truth: map any domain status to a semantic
- * `Tone`, then look up the pill/dot/text classes. Pure constants — safe to
- * import from server or client components.
+ * Before this, the same status pill classes were redefined as local Record maps
+ * in five admin files (overview, audit, ops, onboard, SiteScan). This is the
+ * single source of truth: map any domain status to a semantic `Tone`, then look
+ * up the pill/dot/text classes — which resolve to the brand tokens
+ * (positive/warning/critical), never raw palette shades. Pure constants — safe
+ * to import from server or client components.
  */
 
 export type Tone = "good" | "warn" | "bad" | "info" | "neutral";
