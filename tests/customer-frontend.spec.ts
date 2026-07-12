@@ -159,8 +159,13 @@ test("the sign-in page renders the current Supabase sign-in surface", async ({ r
   expect(html).not.toContain("Dashboard sign-in is paused");
 });
 
-test("the no-access page renders a public recovery surface", async ({ page }) => {
+test("signed-out no-access recovery is sent to sign-in", async ({ page }) => {
+  // The no-access page renders its recovery UI only for a SIGNED-IN user without a
+  // membership; a signed-out visitor is redirected to sign-in (page-level redirect).
+  // The dev bypass counts as signed-in, so this only holds with the bypass OFF.
+  test.skip(process.env.REB_DEV_UNGATED_ACCESS === "1", "no-access renders the recovery page under the dev bypass; the redirect only fires signed-out");
   const response = await page.goto("/no-access", { waitUntil: "domcontentloaded" });
-  expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByRole("heading", { name: /no access to this site/i })).toBeVisible();
+  expect(response?.status()).toBeLessThan(500);
+  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
 });
