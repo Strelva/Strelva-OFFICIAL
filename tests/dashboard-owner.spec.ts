@@ -139,3 +139,18 @@ test("settings sections and report views switch on interaction", async ({ page }
   await page.getByRole("button", { name: "Monthly", exact: true }).click();
   await expect(page).toHaveURL(/view=monthly/);
 });
+
+test("analytics range selector drives the reporting window", async ({ page }) => {
+  // Every number on Analytics is computed for the selected window; the range
+  // selector must move that window and reflect it in the URL (?range=).
+  await page.goto("/dashboard/analytics", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "This week", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "This month", exact: true }).click();
+  await expect(page).toHaveURL(/range=month/);
+
+  await page.getByRole("button", { name: "Live", exact: true }).click();
+  await expect(page).toHaveURL(/range=live/);
+  // The verdict/section chrome still renders after a window switch.
+  await expect(page.getByText("How people find you on Google").first()).toBeVisible();
+});
