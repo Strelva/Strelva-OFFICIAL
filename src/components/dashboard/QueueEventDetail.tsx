@@ -57,12 +57,12 @@ function QueueDiff({ diffs }: { diffs: PreviewDiff[] }) {
                 + {truncate(d.after)}
               </div>
             ) : d.type === "removed" ? (
-              <div className="mt-0.5 rounded bg-red-500/10 px-1.5 py-0.5 text-red-500 line-through">
+              <div className="mt-0.5 rounded bg-critical0/10 px-1.5 py-0.5 text-critical0 line-through">
                 − {truncate(d.before)}
               </div>
             ) : (
               <div className="mt-0.5 space-y-0.5">
-                <div className="rounded bg-red-500/10 px-1.5 py-0.5 text-red-500 line-through">
+                <div className="rounded bg-critical0/10 px-1.5 py-0.5 text-critical0 line-through">
                   {truncate(d.before)}
                 </div>
                 <div className="rounded bg-success-dim px-1.5 py-0.5 text-success">

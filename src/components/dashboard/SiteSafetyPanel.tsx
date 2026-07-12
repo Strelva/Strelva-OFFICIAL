@@ -194,7 +194,7 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
         </p>
       ) : null}
       {error ? (
-        <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-700">
+        <p className="mt-3 rounded-lg border border-critical/30 bg-critical0/10 px-3 py-2 text-[12px] text-critical">
           {error}
         </p>
       ) : null}

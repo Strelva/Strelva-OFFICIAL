@@ -23,9 +23,9 @@ function stripProtocol(url: string): string {
 
 const WORKFLOW_BADGE: Record<LeadWorkflowStatus, string> = {
   new: "border-glass-border text-warm-white",
-  contacted: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-  converting: "border-sky-500/30 bg-sky-500/10 text-sky-200",
-  converted: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  contacted: "border-warning0/30 bg-warning0/10 text-warning",
+  converting: "border-accent0/30 bg-accent0/10 text-accent",
+  converted: "border-positive0/30 bg-positive0/10 text-positive",
   dismissed: "border-glass-border/60 text-gray-faint",
 };
 
@@ -100,7 +100,7 @@ export function LeadRows({
 
   function renderTable(rows: DeliveryLead[], receded: boolean) {
     return (
-      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -225,7 +225,7 @@ export function LeadRows({
   return (
     <div className="space-y-6">
       {active.length === 0 ? (
-        <div className="rounded-xl bg-glass border border-glass-border p-10 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
           <p className="text-sm font-medium text-warm-white">No leads to work</p>
           <p className="mt-1 text-xs text-gray-muted">
             {dismissed.length > 0

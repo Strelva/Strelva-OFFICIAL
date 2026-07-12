@@ -84,7 +84,7 @@ export function CreateTenantForm() {
   }
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-6">
+    <div className="rounded-2xl border border-glass-border bg-glass p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-medium text-warm-white">New Client</h2>
         <button
@@ -96,7 +96,7 @@ export function CreateTenantForm() {
       </div>
 
       {error && (
-        <div role="alert" className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-critical0/10 border border-critical0/20 text-critical text-sm">
           {error}
         </div>
       )}

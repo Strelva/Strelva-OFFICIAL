@@ -175,7 +175,7 @@ function ReportOutput({ data }: { data: ReportData }) {
       {expanded && (
         <div className="p-4 animate-fade-in-up">
           {/* Headline */}
-          <p className="text-[15px] font-medium text-warm-black mb-4">
+          <p className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black mb-4">
             {data.pageViews.thisWeek > 0
               ? `${data.pageViews.thisWeek} people found you this week`
               : "No visitors yet this week"}
@@ -490,7 +490,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
               {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (
                 <CircleCheck className="w-4 h-4 text-success shrink-0" strokeWidth={1.5} />
               ) : conn.status === "needs_attention" ? (
-                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" strokeWidth={1.5} />
+                <AlertCircle className="w-4 h-4 text-warning0 shrink-0" strokeWidth={1.5} />
               ) : (
                 <Circle className="w-4 h-4 text-gray-subtle shrink-0" strokeWidth={1.5} />
               )}

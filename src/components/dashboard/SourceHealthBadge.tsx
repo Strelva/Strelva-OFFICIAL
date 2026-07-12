@@ -39,16 +39,16 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   sync_failed: {
     icon: AlertCircle,
     label: "Sync failed",
-    bg: "bg-red-500/10",
-    text: "text-red-400",
-    dot: "bg-red-400",
+    bg: "bg-critical0/10",
+    text: "text-critical",
+    dot: "bg-critical",
   },
   needs_reauth: {
     icon: AlertCircle,
     label: "Needs reauth",
-    bg: "bg-amber-500/10",
-    text: "text-amber-500",
-    dot: "bg-amber-500",
+    bg: "bg-warning0/10",
+    text: "text-warning0",
+    dot: "bg-warning0",
   },
   unknown: {
     icon: AlertCircle,
@@ -81,9 +81,9 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   needs_attention: {
     icon: AlertCircle,
     label: "Needs attention",
-    bg: "bg-amber-500/10",
-    text: "text-amber-500",
-    dot: "bg-amber-500",
+    bg: "bg-warning0/10",
+    text: "text-warning0",
+    dot: "bg-warning0",
   },
   can_act_here: {
     icon: CheckCircle2,
@@ -95,16 +95,16 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   stale: {
     icon: Clock,
     label: "Stale",
-    bg: "bg-amber-500/10",
-    text: "text-amber-500",
-    dot: "bg-amber-500",
+    bg: "bg-warning0/10",
+    text: "text-warning0",
+    dot: "bg-warning0",
   },
   error: {
     icon: AlertCircle,
     label: "Error",
-    bg: "bg-red-500/10",
-    text: "text-red-400",
-    dot: "bg-red-400",
+    bg: "bg-critical0/10",
+    text: "text-critical",
+    dot: "bg-critical",
   },
   disconnected: {
     icon: RefreshCw,

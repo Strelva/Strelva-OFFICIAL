@@ -80,7 +80,7 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[13px] text-red-400">
+          <div className="mb-4 rounded-lg border border-critical0/30 bg-critical0/10 px-3 py-2 text-[13px] text-critical">
             {error}
           </div>
         )}
@@ -113,7 +113,7 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
                         <span className="text-gray-muted">–</span>
                         <span className="text-gray-muted">{formatTime(b.endTime)}</span>
                       </div>
-                      <p className="mt-1.5 truncate text-[15px] font-medium text-warm-black">
+                      <p className="mt-1.5 truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-black">
                         {b.clientName}
                       </p>
                       <p className="mt-0.5 truncate text-[13px] text-gray-muted">{b.serviceName}</p>

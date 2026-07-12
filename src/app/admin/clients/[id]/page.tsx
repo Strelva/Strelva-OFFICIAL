@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isSuperAdmin } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
-import { getClickCounts, getActivity, listDrafts } from "@/lib/storage";
+import { getClickCounts, getActivity, listDrafts, getDailyMetrics } from "@/lib/storage";
+import { Sparkline } from "@/components/dashboard/Sparkline";
 import { getScanSummary, getScanHistory } from "@/lib/scan-store";
 import { listTenantDomainClaims, serializeDomainClaim } from "@/lib/domains";
 import { getLatestSnapshots, diffSnapshots } from "@/lib/visibility/snapshots";
@@ -21,15 +22,22 @@ import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { InviteButton } from "../../InviteButton";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { ClientLogo, Chip } from "../../console";
+import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-function Pulse({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function Pulse({ label, value, sub, series }: { label: string; value: string | number; sub?: string; series?: number[] }) {
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-4">
-      <p className="text-xs text-gray-muted">{label}</p>
-      <p className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-faint mt-0.5">{sub}</p>}
+    <div className="flex flex-col rounded-2xl border border-glass-border bg-glass p-4">
+      <p className="text-[11px] text-gray-muted">{label}</p>
+      <p className="mt-1.5 font-[family-name:var(--font-display)] text-[23px] font-medium tracking-[-0.02em] text-warm-white">{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-gray-faint">{sub}</p>}
+      {series && series.length > 1 && (
+        <div className="mt-2.5">
+          <Sparkline series={series} />
+        </div>
+      )}
     </div>
   );
 }
@@ -63,7 +71,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -76,6 +84,7 @@ export default async function ClientDetailPage({
       getReviews(id).catch(() => []),
       getTenantCrm(id).catch(() => null),
       getTenantAtRisk(id).catch(() => noRisk),
+      getDailyMetrics(id, 14).catch(() => []),
     ]);
 
   const latestVis = visSnapshots[0] ?? null;
@@ -122,74 +131,63 @@ export default async function ClientDetailPage({
     verdict = { tone: "emerald", message: "Healthy. Nothing needs you." };
   }
   const verdictTone = {
-    red: "border-red-500/30 bg-red-500/10",
-    amber: "border-amber-500/30 bg-amber-500/10",
-    emerald: "border-emerald-500/30 bg-emerald-500/10",
+    red: "border-critical/25 bg-critical/10",
+    amber: "border-warning/25 bg-warning/10",
+    emerald: "border-positive/25 bg-positive/10",
   }[verdict.tone];
   const verdictDot = {
-    red: "bg-red-400",
-    amber: "bg-amber-400",
-    emerald: "bg-emerald-400",
+    red: "bg-critical",
+    amber: "bg-warning",
+    emerald: "bg-positive",
   }[verdict.tone];
 
   const publicUrl = getTenantPublicUrl(tenant);
   const dashboardUrl = getTenantDashboardFallbackUrl(tenant);
 
+  const inspectHref = `/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`;
+  const actionCls = "inline-flex items-center gap-1.5 rounded-[9px] border border-glass-border px-3 py-2 text-[12px] font-medium text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white";
+
   return (
-    <div className="max-w-5xl space-y-10">
-      <div>
-        <Link href="/admin/clients" className="text-sm text-gray-muted hover:text-warm-white">
-          ← Clients
-        </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+    <div className="max-w-6xl space-y-5">
+      <Link href="/admin/clients" className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gray-muted transition-colors hover:text-warm-white">
+        <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} /> All clients
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <ClientLogo name={getTenantSiteName(tenant.id, tenant)} size={48} />
           <div>
-            <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
+            <h1 className="font-[family-name:var(--font-display)] text-[24px] font-medium tracking-[-0.02em] text-warm-white sm:text-[26px]">
               {getTenantSiteName(tenant.id, tenant)}
             </h1>
-            <p className="text-sm text-gray-muted mt-1">
-              {tenant.id} · {tenant.deliveryModel ?? "custom_repo"} · {tenant.active ? "active" : "archived"}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-gray-muted">
+              <span>{tenant.id}</span><span className="text-gray-faint">·</span>
+              <span>{tenant.deliveryModel ?? "custom_repo"}</span>
+              {tenant.active ? null : <Chip tone="neutral">archived</Chip>}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <InviteButton tenantId={tenant.id} siteName={tenant.siteName} ownerEmail={tenant.ownerEmail} />
-            <a
-              href={dashboardUrl}
-              className="rounded-md px-3 py-2 text-sm text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-            >
-              Dashboard
-            </a>
-            <a
-              href={`/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`}
-              className="rounded-md px-3 py-2 text-sm text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-              title="Open this client's dashboard as a read-only operator preview"
-            >
-              Inspect
-            </a>
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md px-3 py-2 text-sm text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white"
-            >
-              Site ↗
-            </a>
-          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <InviteButton tenantId={tenant.id} siteName={tenant.siteName} ownerEmail={tenant.ownerEmail} />
+          <a href={dashboardUrl} className={actionCls}><LayoutDashboard className="h-3.5 w-3.5" strokeWidth={1.7} /> Dashboard</a>
+          <a href={inspectHref} className={actionCls} title="Open this client's dashboard as a read-only preview"><Eye className="h-3.5 w-3.5" strokeWidth={1.7} /> Inspect</a>
+          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className={actionCls}><ExternalLink className="h-3.5 w-3.5" strokeWidth={1.7} /> Site</a>
         </div>
       </div>
 
-      {/* Fused verdict — the single next action for this client, above the panels. */}
-      <div className={`rounded-xl border p-5 ${verdictTone}`}>
-        <p className="text-xs uppercase tracking-wide text-gray-muted">Next action</p>
-        <div className="mt-1 flex items-center gap-2.5">
-          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${verdictDot}`} />
-          <p className="text-[15px] font-medium text-warm-white">{verdict.message}</p>
+      {/* Next action */}
+      <div className={`flex items-center gap-3 rounded-2xl border p-4 ${verdictTone}`}>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${verdictDot}`} />
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-muted">Next action</p>
+          <p className="mt-0.5 text-[13.5px] font-semibold text-warm-white">{verdict.message}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} />
-        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} />
-        <Pulse label="Content drafts" value={Object.keys(drafts).length} />
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
+        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
+        <Pulse label="Content drafts" value={Object.keys(drafts).length} sub="awaiting review" />
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
@@ -221,8 +219,8 @@ export default async function ClientDetailPage({
       <ClientCrmSections tenantId={tenant.id} ownerEmail={tenant.ownerEmail ?? null} initialCrm={crm} />
 
       {activity.length > 0 && (
-        <div className="rounded-xl bg-glass border border-glass-border p-5">
-          <h2 className="text-[15px] font-medium text-warm-white mb-3">Recent activity</h2>
+        <div className="rounded-2xl border border-glass-border bg-glass p-5">
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-3">Recent activity</h2>
           <ul className="space-y-2">
             {activity.slice(0, 8).map((a, i) => (
               <li key={i} className="flex items-start justify-between gap-4 text-sm">

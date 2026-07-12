@@ -64,8 +64,8 @@ export function PortfolioOpportunitiesClient({
   return (
     <div className="max-w-3xl space-y-4">
       <div>
-        <h2 className="flex items-center gap-2 font-[family-name:var(--font-display)] text-[20px] font-medium text-warm-white">
-          <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} />
+        <h2 className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
+          <Sparkles className="h-5 w-5 text-accent" strokeWidth={2} />
           Ready to work
         </h2>
         <p className="mt-1 text-sm text-gray-muted">
@@ -128,7 +128,7 @@ export function PortfolioOpportunitiesClient({
               {result && (
                 <div className="border-t border-glass-border px-5 py-2.5 text-[12px]">
                   {result.drafted > 0 ? (
-                    <p className="text-emerald-300">
+                    <p className="text-positive">
                       Drafted for {result.drafted} of {result.drafted + result.skipped + result.failed}{" "}
                       client{result.drafted + result.skipped + result.failed === 1 ? "" : "s"},
                       waiting for approval below.
@@ -143,7 +143,7 @@ export function PortfolioOpportunitiesClient({
                     </p>
                   )}
                   {result.failed > 0 && (
-                    <p className="mt-1 flex items-center gap-1 text-amber-300">
+                    <p className="mt-1 flex items-center gap-1 text-warning">
                       <CircleAlert className="h-3 w-3" strokeWidth={2} />
                       {result.failed} client{result.failed === 1 ? "" : "s"} couldn&rsquo;t be
                       drafted. Try again.

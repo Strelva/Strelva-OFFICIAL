@@ -18,8 +18,8 @@ interface FreshCategory {
 }
 
 const PRIORITY_PILL: Record<PrioritizedIssue["priority"], string> = {
-  high: "bg-red-500/15 text-red-300 border-red-500/30",
-  medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  high: "bg-critical0/15 text-critical border-critical0/30",
+  medium: "bg-warning0/15 text-warning border-warning0/30",
   low: "bg-gray-bg text-gray-muted border-glass-border",
 };
 
@@ -114,10 +114,10 @@ export function SiteScan({
         : null;
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-5">
+    <div className="rounded-2xl border border-glass-border bg-glass p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-[15px] font-medium text-warm-white">SEO + site health</h2>
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">SEO + site health</h2>
           <p className="mt-0.5 text-xs text-gray-muted">
             {scan
               ? `Last scanned ${ago(scan.scannedAt)} · ${scan.url.replace(/^https?:\/\//, "")}`
@@ -134,7 +134,7 @@ export function SiteScan({
         </button>
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-3 text-sm text-critical">{error}</p>}
 
       {scan && (
         <div className="mt-5">
@@ -174,7 +174,7 @@ export function SiteScan({
                     />
                   </div>
                   {fails.length > 0 && (
-                    <p className="mt-1 text-[11px] text-red-300/80">
+                    <p className="mt-1 text-[11px] text-critical/80">
                       {fails.slice(0, 2).join(" · ")}
                     </p>
                   )}

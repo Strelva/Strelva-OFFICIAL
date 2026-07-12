@@ -53,14 +53,14 @@ export default async function AdminDraftsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Pending Drafts</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Pending drafts</h1>
         <p className="text-sm text-gray-muted mt-1">
           Review AI-generated content changes before they go live
         </p>
       </div>
 
       {allDrafts.length === 0 ? (
-        <div className="rounded-xl bg-glass border border-glass-border p-12 text-center">
+        <div className="rounded-2xl border border-glass-border bg-glass p-12 text-center">
           <p className="text-gray-muted">No pending drafts across any clients.</p>
           <p className="text-xs text-gray-faint mt-2">
             Drafts appear here when the AI agent proposes content changes.
@@ -71,7 +71,7 @@ export default async function AdminDraftsPage() {
           {allDrafts.map((draft) => (
             <div
               key={`${draft.tenantId}-${draft.section}`}
-              className="rounded-xl bg-glass border border-glass-border p-6"
+              className="rounded-2xl border border-glass-border bg-glass p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -100,16 +100,16 @@ export default async function AdminDraftsPage() {
                           {d.type !== "added" && d.before && (
                             d.before.length > 200 ? (
                               <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-red-300/80 line-through break-words marker:content-none">
+                                <summary className="cursor-pointer list-none text-xs text-critical/80 line-through break-words marker:content-none">
                                   {d.before.slice(0, 200)}
                                   <span className="ml-1 no-underline text-gray-faint group-open:hidden">[show full]</span>
                                 </summary>
-                                <span className="text-xs text-red-300/80 line-through break-words">
+                                <span className="text-xs text-critical/80 line-through break-words">
                                   {d.before}
                                 </span>
                               </details>
                             ) : (
-                              <span className="text-xs text-red-300/80 line-through break-words">
+                              <span className="text-xs text-critical/80 line-through break-words">
                                 {d.before}
                               </span>
                             )
@@ -117,16 +117,16 @@ export default async function AdminDraftsPage() {
                           {d.type !== "removed" && d.after && (
                             d.after.length > 200 ? (
                               <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-emerald-200 break-words marker:content-none">
+                                <summary className="cursor-pointer list-none text-xs text-positive break-words marker:content-none">
                                   {d.after.slice(0, 200)}
                                   <span className="ml-1 text-gray-faint group-open:hidden">[show full]</span>
                                 </summary>
-                                <span className="text-xs text-emerald-200 break-words">
+                                <span className="text-xs text-positive break-words">
                                   {d.after}
                                 </span>
                               </details>
                             ) : (
-                              <span className="text-xs text-emerald-200 break-words">
+                              <span className="text-xs text-positive break-words">
                                 {d.after}
                               </span>
                             )

@@ -82,21 +82,27 @@ export default async function AdminClientsPage() {
     };
   });
 
+  const activeCount = clients.filter((c) => c.active).length;
+
   return (
-    <div className="max-w-5xl space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="max-w-6xl">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
+          <h1 className="font-[family-name:var(--font-display)] text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
             Clients
           </h1>
-          <p className="text-sm text-gray-muted mt-1">
-            {clients.length} client{clients.length !== 1 ? "s" : ""}: one list for everyone we manage a site for
+          <p className="mt-1.5 text-[13px] text-gray-muted">
+            One list for every business you manage a site for <span className="text-gray-faint">·</span>{" "}
+            <b className="font-semibold text-warm-white">{activeCount} active</b>
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5">
           <ScanAllButton />
-          <Link href="/admin" className="text-sm text-gray-muted hover:text-warm-white transition-colors">
-            ← Overview
+          <Link
+            href="/admin/onboard"
+            className="inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105"
+          >
+            New client
           </Link>
         </div>
       </div>

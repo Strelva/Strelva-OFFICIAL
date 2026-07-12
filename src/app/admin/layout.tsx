@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { getAllTenants } from "@/lib/tenants";
-import { NavLinks } from "./NavLinks";
+import { AdminRail } from "./AdminRail";
 import { CommandPalette } from "./CommandPalette";
-import { CommandTrigger } from "./CommandTrigger";
 
 export default async function AdminLayout({
   children,
@@ -14,10 +12,13 @@ export default async function AdminLayout({
   const isAdmin = await isSuperAdmin();
   if (!isAdmin) redirect("/");
 
-  const tenants = (await getAllTenants().catch(() => [])).map((t) => ({
-    id: t.id,
-    siteName: t.siteName,
-  }));
+  const [allTenants, actor] = await Promise.all([
+    getAllTenants().catch(() => []),
+    getActorContext().catch(() => ({ name: null } as { name: string | null })),
+  ]);
+  const tenants = allTenants.map((t) => ({ id: t.id, siteName: t.siteName }));
+  const activeClients = allTenants.filter((t) => t.active !== false).length;
+  const operatorName = actor.name?.split(" ")[0] || "Operator";
 
   return (
     <div data-dashboard className="min-h-screen bg-surface-base text-warm-white">
@@ -27,42 +28,15 @@ export default async function AdminLayout({
       >
         Skip to content
       </a>
-      {/* Top nav */}
-      <nav className="border-b border-glass-border bg-surface-base/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <Link href="/admin" className="flex items-center gap-2.5 group">
-              <span
-                className="h-2 w-2 rounded-full shrink-0"
-                style={{ background: "oklch(73% 0.07 145)" }}
-                aria-hidden
-              />
-              <span className="font-display text-xl tracking-tight text-warm-white leading-none">
-                Strelva
-              </span>
-            </Link>
-            <div className="hidden md:block h-5 w-px bg-glass-border" />
-            <div className="hidden md:block">
-              <NavLinks />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <CommandTrigger />
-            <Link
-              href="/account"
-              className="text-sm text-gray-faint hover:text-warm-white transition-colors"
-            >
-              Client dashboards →
-            </Link>
-          </div>
-        </div>
-        <div className="md:hidden border-t border-glass-border px-4 py-2 overflow-x-auto">
-          <NavLinks />
-        </div>
-      </nav>
 
-      {/* Content */}
-      <main id="main-content" className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+      <div className="md:grid md:grid-cols-[236px_1fr]">
+        <div className="hidden md:block">
+          <AdminRail operatorName={operatorName} badges={{ clients: activeClients }} />
+        </div>
+        <main id="main-content" className="min-h-screen px-5 py-6 md:px-8 md:py-7">
+          {children}
+        </main>
+      </div>
 
       <CommandPalette tenants={tenants} />
     </div>

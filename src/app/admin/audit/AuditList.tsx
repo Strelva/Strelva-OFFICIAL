@@ -23,15 +23,15 @@ function timeAgo(iso: string): string {
 }
 
 const ACTION_COLOR: Record<string, string> = {
-  create: "text-emerald-300",
-  add: "text-emerald-300",
-  provision: "text-emerald-300",
+  create: "text-positive",
+  add: "text-positive",
+  provision: "text-positive",
   update: "text-accent",
   refresh: "text-accent",
   assign_user: "text-accent",
-  revoke: "text-red-300",
-  reject: "text-red-300",
-  remove: "text-red-300",
+  revoke: "text-critical",
+  reject: "text-critical",
+  remove: "text-critical",
 };
 
 function actionTint(action: string): string {
@@ -103,7 +103,7 @@ export function AuditList({ events }: { events: AuditEventView[] }) {
         </span>
       </div>
 
-      <div className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         {filtered.length === 0 ? (
           <p className="px-5 py-6 text-sm text-gray-muted">
             {events.length === 0 ? "No audited actions yet." : "No actions match these filters."}

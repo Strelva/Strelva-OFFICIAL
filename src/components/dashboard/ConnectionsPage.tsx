@@ -343,7 +343,7 @@ export function ConnectionsPage() {
             className="mt-3 w-full rounded-xl border border-accent/25 bg-accent-dim px-3 py-2.5 text-left transition-colors hover:border-accent/45"
           >
             <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Recommended</p>
-            <p className="mt-2 text-[15px] font-medium text-warm-white">{featured.name}</p>
+            <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{featured.name}</p>
             <p className="mt-1 text-[12px] text-gray-muted">{featured.description}</p>
           </button>
         </div>

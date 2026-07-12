@@ -31,8 +31,8 @@ const blank = {
 };
 
 const STATUS_DOT: Record<ProvisionStep["status"], string> = {
-  ok: "text-emerald-300",
-  failed: "text-red-300",
+  ok: "text-positive",
+  failed: "text-critical",
   skipped: "text-gray-faint",
 };
 const STATUS_MARK: Record<ProvisionStep["status"], string> = {
@@ -106,7 +106,7 @@ function OnboardForm() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">Onboard a client</h1>
+        <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Onboard a client</h1>
         <p className="text-sm text-gray-muted mt-1">
           Automates the tenant record, revalidation secret, owner invite, and the Vercel
           project/env/domain. The site itself stays a hand-built repo you connect after.
@@ -114,7 +114,7 @@ function OnboardForm() {
       </div>
 
       {!result && (
-        <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
+        <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Subdomain *" value={form.subdomain} onChange={(v) => setForm({ ...form, subdomain: v })} placeholder="acme-hvac" />
             <Field label="Site name *" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} placeholder="Acme HVAC" />
@@ -134,7 +134,7 @@ function OnboardForm() {
             </div>
             <Field label="Production domain (optional)" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} placeholder="acmehvac.com" />
           </div>
-          {error && <p className="text-sm text-red-300">{error}</p>}
+          {error && <p className="text-sm text-critical">{error}</p>}
           <button
             onClick={() => void run()}
             disabled={running}
@@ -147,8 +147,8 @@ function OnboardForm() {
 
       {result && (
         <div className="space-y-5">
-          <div className="rounded-xl bg-glass border border-glass-border p-5">
-            <h2 className="text-[15px] font-medium text-warm-white mb-3">
+          <div className="rounded-2xl border border-glass-border bg-glass p-5">
+            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-3">
               {result.tenantId} · {result.siteUrl}
             </h2>
             <ul className="space-y-2">
@@ -162,19 +162,19 @@ function OnboardForm() {
             </ul>
           </div>
 
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-5">
-            <h2 className="text-[15px] font-medium text-amber-100 mb-3">Still needs a human</h2>
+          <div className="rounded-xl border border-warning0/25 bg-warning0/10 p-5">
+            <h2 className="text-[15px] font-medium text-warning mb-3">Still needs a human</h2>
             <ul className="space-y-1.5">
               {result.manualNext.map((n, i) => (
-                <li key={i} className="text-sm text-amber-100/90">• {n}</li>
+                <li key={i} className="text-sm text-warning/90">• {n}</li>
               ))}
             </ul>
           </div>
 
           {Object.keys(result.clientEnv).length > 0 && (
-            <div className="rounded-xl bg-glass border border-glass-border p-5">
+            <div className="rounded-2xl border border-glass-border bg-glass p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-medium text-warm-white">Client repo env</h2>
+                <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Client repo env</h2>
                 <button
                   onClick={copyEnv}
                   className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"

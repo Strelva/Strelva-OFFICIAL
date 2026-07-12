@@ -21,9 +21,9 @@ export function AgentPreview({
   isApplying,
 }: AgentPreviewProps) {
   const riskColors = {
-    low: "text-green-600 bg-green-50 border-green-200",
-    medium: "text-amber-600 bg-amber-50 border-amber-200",
-    high: "text-red-600 bg-red-50 border-red-200",
+    low: "text-positive bg-positive border-positive",
+    medium: "text-warning bg-warning border-warning",
+    high: "text-critical bg-critical border-critical",
   };
 
   const RiskIcon = risk.level === "high" ? AlertTriangle : Info;
@@ -67,10 +67,10 @@ export function AgentPreview({
                   <span
                     className={`text-[11px] px-1.5 py-0.5 rounded ${
                       diff.type === "added"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-positive text-positive"
                         : diff.type === "removed"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-blue-100 text-blue-700"
+                          ? "bg-critical text-critical"
+                          : "bg-accent text-accent"
                     }`}
                   >
                     {diff.type}
@@ -79,26 +79,26 @@ export function AgentPreview({
 
                 {diff.type === "changed" && (
                   <div className="space-y-2">
-                    <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                      <p className="text-[11px] text-red-800 line-through">
+                    <div className="bg-critical border border-critical rounded-md px-3 py-2">
+                      <p className="text-[11px] text-critical line-through">
                         {truncate(diff.before, 200)}
                       </p>
                     </div>
-                    <div className="bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                      <p className="text-[11px] text-green-800">{truncate(diff.after, 200)}</p>
+                    <div className="bg-positive border border-positive rounded-md px-3 py-2">
+                      <p className="text-[11px] text-positive">{truncate(diff.after, 200)}</p>
                     </div>
                   </div>
                 )}
 
                 {diff.type === "added" && (
-                  <div className="bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                    <p className="text-[11px] text-green-800">{truncate(diff.after, 200)}</p>
+                  <div className="bg-positive border border-positive rounded-md px-3 py-2">
+                    <p className="text-[11px] text-positive">{truncate(diff.after, 200)}</p>
                   </div>
                 )}
 
                 {diff.type === "removed" && (
-                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                    <p className="text-[11px] text-red-800 line-through">
+                  <div className="bg-critical border border-critical rounded-md px-3 py-2">
+                    <p className="text-[11px] text-critical line-through">
                       {truncate(diff.before, 200)}
                     </p>
                   </div>

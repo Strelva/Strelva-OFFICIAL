@@ -67,11 +67,11 @@ export function ConversationShell({
       {/* Main content area */}
       <main id="main-content" className="flex-1 flex flex-col min-w-0 dashboard-gradient">
         {impersonation.isActive && !viewAsClient && (
-          <div className="shrink-0 border-b border-amber-400/30 bg-amber-300/12 px-4 py-2 text-amber-100">
+          <div className="shrink-0 border-b border-warning/30 bg-warning/12 px-4 py-2 text-warning">
             <div className="flex items-center gap-2 text-[12px]">
-              <ShieldAlert className="h-4 w-4 text-amber-200" strokeWidth={1.7} />
-              <span className="font-medium text-amber-50">Acting as Strelva admin</span>
-              <span className="hidden sm:inline text-amber-100/80">
+              <ShieldAlert className="h-4 w-4 text-warning" strokeWidth={1.7} />
+              <span className="font-medium text-warning">Acting as Strelva admin</span>
+              <span className="hidden sm:inline text-warning/80">
                 {impersonation.actorEmail || "Super admin"} is viewing tenant {impersonation.tenantId}. Admin saves are audit logged.
               </span>
             </div>

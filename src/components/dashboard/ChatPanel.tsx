@@ -762,7 +762,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                   onClick={() => sendChat(chip.label)}
                   className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} ${
                     chip.hideOnMobile ? "hidden sm:block" : ""
-                  } rounded-xl bg-glass border border-glass-border hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
+                  } rounded-2xl border border-glass-border bg-glass hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
@@ -790,20 +790,20 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                 className={`flex items-start gap-3 px-3 py-3 rounded-lg animate-fade-in-up ${
                   updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
                     ? "bg-success-dim border border-success/20"
-                    : "bg-red-500/10 border border-red-500/20"
+                    : "bg-critical0/10 border border-critical0/20"
                 }`}
               >
                 {updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued" ? (
                   <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" strokeWidth={2} />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" strokeWidth={2} />
+                  <AlertCircle className="w-4 h-4 text-critical shrink-0 mt-0.5" strokeWidth={2} />
                 )}
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-[12px] font-medium ${
                       updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
                         ? "text-success"
-                        : "text-red-400"
+                        : "text-critical"
                     }`}
                   >
                     {updateToast.text}
@@ -942,7 +942,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((file) => (
-                <span key={file.url} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[11px] text-amber-200">
+                <span key={file.url} className="rounded-full border border-warning/20 bg-warning/10 px-2 py-1 text-[11px] text-warning">
                   {file.name}
                 </span>
               ))}

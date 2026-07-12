@@ -81,7 +81,9 @@ export default async function ReportsPage({
                   <ReportsViewToggle current={view} />
                 </div>
               )}
-              {milestone && <MilestonePanel milestone={milestone} />}
+              {milestone && (
+                <MilestonePanel milestone={milestone} visitorSeries={dailyMetrics.map((m) => m.pageViews)} />
+              )}
             </div>
           </div>
         )}

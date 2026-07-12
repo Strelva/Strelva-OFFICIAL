@@ -116,8 +116,8 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3">
-        <h2 className="text-[15px] font-medium text-warm-white">Tenant config</h2>
+      <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Tenant config</h2>
         <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
         <Field label="Owner name" value={form.ownerName} onChange={(v) => setForm({ ...form, ownerName: v })} />
         <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
@@ -155,7 +155,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           Revalidation secret: {form.hasRevalidationSecret ? "set" : "missing"}
           {form.revalidateUrl ? ` · ${form.revalidateUrl}` : ""}
         </p>
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error && <p className="text-sm text-critical">{error}</p>}
         <button
           onClick={() => void save()}
           disabled={saving}
@@ -165,8 +165,8 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         </button>
       </div>
 
-      <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-3 self-start">
-        <h2 className="text-[15px] font-medium text-warm-white">Grant access</h2>
+      <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3 self-start">
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Grant access</h2>
         <Field label="Email" value={assignEmail} onChange={setAssignEmail} placeholder="owner@business.com" />
         <div>
           <label className="block text-xs text-gray-muted mb-1">Role</label>
@@ -181,7 +181,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           </select>
         </div>
         {assignNote && (
-          <p className={`text-sm ${assignNote.startsWith("✓") ? "text-emerald-300" : "text-red-300"}`}>
+          <p className={`text-sm ${assignNote.startsWith("✓") ? "text-positive" : "text-critical"}`}>
             {assignNote}
           </p>
         )}
@@ -255,9 +255,9 @@ function FeaturesPanel({
   };
 
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-5 space-y-5">
+    <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-5">
       <div>
-        <h2 className="text-[15px] font-medium text-warm-white">Features</h2>
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Features</h2>
         <p className="text-xs text-gray-faint mt-1">Which dashboard tools this client sees. Not billing.</p>
       </div>
 
@@ -301,7 +301,7 @@ function FeaturesPanel({
         Google Business &amp; Reviews appear automatically based on the client&apos;s business type and connections.
       </p>
 
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-critical">{error}</p>}
       <button
         onClick={onSave}
         disabled={saving}

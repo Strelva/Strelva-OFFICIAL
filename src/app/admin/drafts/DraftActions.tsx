@@ -41,7 +41,7 @@ export function DraftActions({
       <button
         onClick={() => handleAction("approve")}
         disabled={loading !== null}
-        className="w-28 px-4 py-1.5 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+        className="w-28 px-4 py-1.5 rounded-md text-xs font-medium bg-positive hover:bg-positive0 text-white transition-colors disabled:opacity-50"
       >
         {loading === "approve" ? "Approving…" : "Approve"}
       </button>
@@ -52,7 +52,7 @@ export function DraftActions({
       >
         {loading === "reject" ? "Rejecting…" : "Reject"}
       </button>
-      {error && <p role="status" aria-live="polite" className="text-[11px] text-red-300 max-w-28 text-right">{error}</p>}
+      {error && <p role="status" aria-live="polite" className="text-[11px] text-critical max-w-28 text-right">{error}</p>}
     </div>
   );
 }

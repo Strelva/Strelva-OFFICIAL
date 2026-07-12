@@ -31,9 +31,9 @@ export function Sparkline({
   const last = values[values.length - 1];
   // Map the tone dot bg class to a stroke color via currentColor.
   const toneText: Record<string, string> = {
-    "bg-emerald-400": "text-emerald-400",
-    "bg-amber-400": "text-amber-400",
-    "bg-red-400": "text-red-400",
+    "bg-positive": "text-positive",
+    "bg-warning": "text-warning",
+    "bg-critical": "text-critical",
     "bg-accent": "text-accent",
     "bg-gray-faint": "text-gray-faint",
   };

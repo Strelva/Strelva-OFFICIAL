@@ -57,7 +57,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-md px-2 py-1.5 text-center text-xs text-amber-300 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
+        className="w-full rounded-md px-2 py-1.5 text-center text-xs text-warning transition-colors hover:bg-warning0/10 hover:text-warning"
       >
         Invite
       </button>
@@ -77,8 +77,8 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
             role="status"
             className={`mb-4 rounded-lg border p-4 text-sm ${
               result.success
-                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                : "border-red-500/25 bg-red-500/10 text-red-300"
+                ? "border-positive0/25 bg-positive0/10 text-positive"
+                : "border-critical0/25 bg-critical0/10 text-critical"
             }`}
           >
             <p className="font-medium">
@@ -87,7 +87,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
             <p className="mt-1 text-xs opacity-90">{result.message}</p>
             {result.signUpUrl && (
               <div className="mt-3 space-y-2">
-                <p className="text-xs text-emerald-200">
+                <p className="text-xs text-positive">
                   Share this link only with {email.trim().toLowerCase()}.{" "}
                   Access is tied to that exact email, and it opens the stable fallback route for this site.
                 </p>
@@ -95,7 +95,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                   href={result.signUpUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block rounded-md border border-emerald-500/20 bg-surface-inset px-3 py-2 break-all font-mono text-[11px] text-emerald-100 hover:text-white"
+                  className="block rounded-md border border-positive0/20 bg-surface-inset px-3 py-2 break-all font-mono text-[11px] text-positive hover:text-white"
                 >
                   <span className="sr-only">Open manual signup link: </span>
                   {result.signUpUrl}
@@ -112,12 +112,12 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                       setCopyFailed(true);
                     }
                   }}
-                  className="rounded-md bg-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-200"
+                  className="rounded-md bg-positive px-3 py-1.5 text-xs font-medium text-positive hover:bg-positive"
                 >
                   {copied ? "Copied signup link" : "Copy signup link"}
                 </button>
                 {copyFailed && (
-                  <p className="text-xs text-emerald-200">
+                  <p className="text-xs text-positive">
                     Copy failed. Select the manual signup link above.
                   </p>
                 )}
@@ -155,7 +155,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-amber-500 text-black px-4 py-2 text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-50"
+              className="rounded-md bg-warning0 text-black px-4 py-2 text-sm font-medium hover:bg-warning transition-colors disabled:opacity-50"
             >
               {loading ? "Sending..." : "Send Invite"}
             </button>

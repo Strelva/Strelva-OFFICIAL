@@ -1,29 +1,27 @@
 import Link from "next/link";
-import { Boxes, Banknote, FileText, TrendingUp, Users } from "lucide-react";
+import { Plus, CheckCircle2, Flag, UserPlus } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
+import { getTenantSiteName } from "@/lib/tenant-display";
+import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel, Meter } from "./console";
 import type { TenantConfig } from "@/lib/types";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
-import { getTenantDeliveryModel } from "@/lib/custom-repos";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getEffectiveSubscriptionStatus, isGrandfathered } from "@/lib/subscription";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
 import { getPortfolioSummary, computeMrrDollars } from "@/lib/portfolio";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
-import { buildRevenueSummary } from "@/lib/revenue";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
 import { listPendingDigests } from "@/lib/maintenance-digest";
 import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
 import type { DeliveryLead } from "@/lib/access-request-delivery";
 import type { MaintenanceDigest } from "@/lib/maintenance-digest";
-import { StatTile } from "@/components/dashboard/StatTile";
 import { OperatorConsole } from "./OperatorConsole";
-import { TodayFeed, type TodayFlag } from "./TodayFeed";
-import { getPortfolioActions } from "./actions/portfolio-actions";
+import { type TodayFlag } from "./TodayFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +101,6 @@ export default async function AdminPage() {
     (t) => isGrandfathered(t.id) || t.planOverride === "founder_comp",
   ).length;
   const totalDrafts = tenantData.reduce((sum, d) => sum + d.draftCount, 0);
-  const customRepoCount = TENANTS.filter((t) => getTenantDeliveryModel(t) === "custom_repo").length;
   const launchReadyCount = tenantData.filter((d) => d.launchReadiness.status === "ready").length;
   const launchBlockedCount = tenantData.filter((d) => d.launchReadiness.status === "blocked").length;
   const launchWatchCount = tenantData.length - launchReadyCount - launchBlockedCount;
@@ -120,8 +117,6 @@ export default async function AdminPage() {
       href: (i.href ?? "/admin/clients").replace("/admin/tenants/", "/admin/clients/"),
       severity: i.severity,
     }));
-
-  const revenue = await buildRevenueSummary();
 
   // Operator "needs you" aggregation. Each source degrades to empty.
   const [deliveryLeads, pendingDigests, atRiskSignals] = await Promise.all([
@@ -166,108 +161,186 @@ export default async function AdminPage() {
 
   // Aggregated pending approvals across every client — the count links into the
   // portfolio "clear everything" screen. Degrades to zero on any read failure.
-  const portfolioActions = await getPortfolioActions().catch(() => ({
-    groups: [],
-    totalItems: 0,
-    totalClients: 0,
+  // "Your book" — the active clients, at a glance. Launch/last-activity from the
+  // portfolio snapshot; at-risk from the churn signals; name via the shared resolver.
+  const snapById = new Map((portfolio?.tenants ?? []).map((s) => [s.id, s]));
+  const atRiskById = new Map(atRiskSignals.map((s) => [s.tenantId, s]));
+  const book = TENANTS.slice(0, 6).map((t) => ({
+    id: t.id,
+    name: getTenantSiteName(t.id, t),
+    launchScore: snapById.get(t.id)?.launchScore ?? null,
+    atRisk: atRiskById.has(t.id),
+    quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
   }));
 
+  const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length;
+
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="max-w-6xl">
       {/* Header */}
-      <div>
-        <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
-          Overview
-        </h1>
-        <p className="text-sm text-gray-muted mt-1">
-          What needs you today across {TENANTS.length} active client{TENANTS.length !== 1 ? "s" : ""}
-          {archivedTenantCount ? ` · ${archivedTenantCount} archived` : ""}
-        </p>
-      </div>
-
-      {/* The single triage surface */}
-      <TodayFeed
-        leads={todayLeads}
-        approvals={todayApprovals}
-        atRisk={todayAtRisk}
-        signups={todaySignups}
-        flags={flags}
-        portfolioActions={{
-          items: portfolioActions.totalItems,
-          clients: portfolioActions.totalClients,
-        }}
-      />
-
-      {/* One link into the single client list */}
-      <Link
-        href="/admin/clients"
-        className="flex items-center justify-between rounded-xl border border-glass-border bg-glass px-5 py-3 text-sm transition-colors hover:border-gray-border"
-      >
-        <span className="text-warm-white">
-          View all {TENANTS.length} client{TENANTS.length !== 1 ? "s" : ""}
-        </span>
-        <span className="text-accent">Open list →</span>
-      </Link>
-
-      {/* Portfolio roll-ups */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatTile icon={<Users className="h-4 w-4" strokeWidth={1.5} />} label="Active" value={activeTenants} detail="clients live" />
-        <StatTile
-          icon={<Banknote className="h-4 w-4" strokeWidth={1.5} />}
-          label="Collected"
-          value={`$${Math.round(revenue.totalCents / 100).toLocaleString()}`}
-          detail={`${revenue.count} build payment${revenue.count !== 1 ? "s" : ""}`}
-        />
-        <StatTile
-          icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
-          label="MRR"
-          value={`$${mrr.toLocaleString()}`}
-          detail={`${activeSubscriptions} paid${grandfatheredCount > 0 ? ` · ${grandfatheredCount} grandfathered` : ""}`}
-        />
-        <Link href="/admin/drafts">
-          <StatTile
-            icon={<FileText className="h-4 w-4" strokeWidth={1.5} />}
-            label="Content drafts"
-            value={totalDrafts}
-            detail={totalDrafts > 0 ? "review needed" : "all clear"}
-          />
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-[family-name:var(--font-display)] text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
+            Overview
+          </h1>
+          <p className="mt-1.5 text-[13px] text-gray-muted">
+            <b className="font-semibold text-warm-white">{TENANTS.length}</b> active client{TENANTS.length !== 1 ? "s" : ""}
+            {needsYouCount > 0 && (
+              <> <span className="text-gray-faint">·</span> <span className="font-semibold text-critical">{needsYouCount} need attention</span></>
+            )}
+            {todayLeads.unworked === 0 && (<> <span className="text-gray-faint">·</span> leads all clear</>)}
+            {archivedTenantCount ? (<> <span className="text-gray-faint">·</span> {archivedTenantCount} archived</>) : null}
+          </p>
+        </div>
+        <Link href="/admin/onboard" className="inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105">
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.4} /> New client
         </Link>
-        <StatTile icon={<Boxes className="h-4 w-4" strokeWidth={1.5} />} label="Custom repos" value={customRepoCount} detail="delivery path" />
       </div>
 
-      {/* Launch readiness — one line, no internal-doc copy */}
-      {tenantData.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-glass-border bg-glass px-5 py-3 text-sm">
-          <span className="text-gray-muted">Launch readiness</span>
-          <span className="text-emerald-300">{launchReadyCount} ready</span>
-          <span className="text-gray-faint">·</span>
-          <span className="text-amber-300">{launchWatchCount} watch</span>
-          <span className="text-gray-faint">·</span>
-          <span className="text-red-300">{launchBlockedCount} blocked</span>
+      {/* Vitals */}
+      <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <Vital label="Monthly revenue" value={`$${mrr.toLocaleString()}`}
+          verdict={<>{activeSubscriptions} paid{grandfatheredCount ? ` · ${grandfatheredCount} grandfathered` : ""}</>}
+          verdictTone={mrr === 0 ? "warn" : undefined} />
+        <Vital label="Active clients" value={activeTenants}
+          delta={todaySignups.length ? `+${todaySignups.length} wk` : undefined} deltaTone="good"
+          verdict={todaySignups[0] ? <>{todaySignups[0].siteName} joined recently</> : "steady"} verdictTone={todaySignups[0] ? "good" : undefined} />
+        <Vital label="Needs you" value={needsYouCount}
+          delta={needsYouCount ? "act" : undefined} deltaTone="crit"
+          verdict={<>{todayAtRisk.length} at-risk · {todayApprovals.total} approvals</>} verdictTone={needsYouCount ? "crit" : undefined} />
+        <Vital label="Launch-ready" value={`${launchReadyCount}/${TENANTS.length}`}
+          delta={launchBlockedCount ? `${launchBlockedCount} blocked` : undefined} deltaTone="warn"
+          verdict={<>{launchWatchCount} watch · {launchBlockedCount} blocked</>} />
+      </div>
+
+      {/* Main grid */}
+      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <Panel title="Needs you" trailing={<PanelCount>{needsYouCount} open</PanelCount>} bodyClassName="px-2 pb-2">
+          {todayAtRisk.length > 0 && (
+            <>
+              <GroupLabel tone="crit" label="At risk" note={`${todayAtRisk.length} quiet · no AI use in 7 days`} />
+              {todayAtRisk.map((c) => (
+                <Link key={c.tenantId} href={`/admin/clients/${c.tenantId}`} className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                  <ClientLogo name={c.siteName} size={30} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold tracking-[-0.01em] text-warm-white">{c.siteName}</div>
+                    <div className="mt-0.5 truncate text-[11.5px] text-gray-muted">Quiet {c.daysSinceActivity}d · {c.reasons[0]}</div>
+                  </div>
+                  <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Reach out</span>
+                </Link>
+              ))}
+            </>
+          )}
+          {todayApprovals.total > 0 && (
+            <>
+              <div className="mx-3 my-1.5 h-px bg-glass-border" />
+              <GroupLabel tone="warn" label="Waiting for you" note={`${todayApprovals.total} to review`} />
+              <Link href="/admin/actions" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><CheckCircle2 className="h-4 w-4 text-warning" strokeWidth={1.7} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-warm-white">{todayApprovals.total} change{todayApprovals.total !== 1 ? "s" : ""} ready to approve</div>
+                  <div className="mt-0.5 text-[11.5px] text-gray-muted">{todayApprovals.drafts} draft{todayApprovals.drafts !== 1 ? "s" : ""}{todayApprovals.digests ? ` · ${todayApprovals.digests} maintenance` : ""}</div>
+                </div>
+                <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Review</span>
+              </Link>
+            </>
+          )}
+          {flags.length > 0 && (
+            <>
+              <div className="mx-3 my-1.5 h-px bg-glass-border" />
+              <GroupLabel tone="warn" label="Portfolio flags" note={`${flags.length} to clear`} />
+              {flags.map((f, i) => (
+                <Link key={i} href={f.href} className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                  <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><Flag className="h-3.5 w-3.5 text-warning" strokeWidth={1.7} /></span>
+                  <div className="min-w-0 flex-1 text-[12.5px] text-warm-white">{f.message}</div>
+                  <span className="shrink-0 rounded-[7px] border border-gray-border px-3 py-1.5 text-[11.5px] font-medium text-gray-muted opacity-0 transition group-hover:opacity-100 group-hover:text-warm-white">View</span>
+                </Link>
+              ))}
+            </>
+          )}
+          <div className="mx-3 my-1.5 h-px bg-glass-border" />
+          <GroupLabel tone={todayLeads.unworked ? "warn" : "good"} label="Leads" note={todayLeads.unworked ? `${todayLeads.unworked} unworked` : undefined} />
+          {todayLeads.unworked === 0 ? (
+            <div className="flex items-center gap-2.5 px-3 py-2.5 text-[12.5px] text-gray-muted">
+              <CheckCircle2 className="h-4 w-4 text-positive" strokeWidth={2} /> All clear — every lead worked or dismissed.
+            </div>
+          ) : (
+            <Link href="/admin/leads" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><UserPlus className="h-4 w-4 text-gray-muted" strokeWidth={1.7} /></span>
+              <div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-warm-white">{todayLeads.unworked} lead{todayLeads.unworked !== 1 ? "s" : ""} to work</div><div className="mt-0.5 text-[11.5px] text-gray-muted">{todayLeads.recent[0]?.businessName}{todayLeads.recent.length > 1 ? ` + ${todayLeads.recent.length - 1} more` : ""}</div></div>
+              <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Open</span>
+            </Link>
+          )}
+          <div className="h-1.5" />
+        </Panel>
+
+        <div className="flex flex-col gap-4">
+          <Panel title="Portfolio" trailing={<PanelLink href="/admin/clients">Details →</PanelLink>} bodyClassName="space-y-4 px-[18px] pb-[18px] pt-0.5">
+            <div>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Launch readiness</p>
+              <Meter segments={[
+                { value: launchReadyCount, tone: "good", label: "ready" },
+                { value: launchWatchCount, tone: "warn", label: "watch" },
+                { value: launchBlockedCount, tone: "crit", label: "blocked" },
+              ]} />
+            </div>
+            <div className="h-px bg-glass-border" />
+            <div>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Client health</p>
+              <Meter segments={[
+                { value: TENANTS.length - todayAtRisk.length, tone: "good", label: "healthy" },
+                { value: todayAtRisk.length, tone: "crit", label: "at risk" },
+              ]} />
+            </div>
+            <div className="flex items-baseline justify-between border-t border-glass-border pt-3 text-[12px]">
+              <span className="text-gray-muted">Monthly revenue</span>
+              <span className="font-[family-name:var(--font-display)] text-[15px] font-medium tracking-[-0.01em] text-warm-white">${mrr.toLocaleString()}<span className="ml-1 text-[11px] text-gray-faint">/ {activeSubscriptions} paid</span></span>
+            </div>
+          </Panel>
+
+          <Panel title="Your book" trailing={<PanelLink href="/admin/clients">All clients →</PanelLink>} bodyClassName="px-2 pb-2.5">
+            {book.map((c) => (
+              <Link key={c.id} href={`/admin/clients/${c.id}`} className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                <ClientLogo name={c.name} size={32} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-[13px] font-semibold text-warm-white"><span className="truncate">{c.name}</span>{c.atRisk && <Chip tone="crit">at risk</Chip>}</div>
+                  <div className="mt-0.5 text-[11.5px] text-gray-muted">{c.quietDays != null ? `quiet ${c.quietDays}d` : "active"}</div>
+                </div>
+                {c.launchScore != null && <div className="w-[52px] shrink-0"><LaunchBar pct={c.launchScore} /></div>}
+              </Link>
+            ))}
+            {book.length === 0 && <div className="px-3 py-4 text-[12.5px] text-gray-faint">No active clients yet.</div>}
+          </Panel>
+
+          {todaySignups.length > 0 && (
+            <Panel title="Recent signups" bodyClassName="px-2 pb-2.5">
+              {todaySignups.map((s) => (
+                <div key={s.tenantId} className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-positive/12"><UserPlus className="h-3.5 w-3.5 text-positive" strokeWidth={1.8} /></span>
+                  <div className="min-w-0 flex-1 text-[12.5px] text-warm-white"><b className="font-semibold">{s.siteName}</b> signed up</div>
+                </div>
+              ))}
+            </Panel>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Mission Control — demoted to a collapsible secondary tool */}
-      <details className="group rounded-xl border border-glass-border bg-glass">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-sm text-warm-white [&::-webkit-details-marker]:hidden">
-          <span className="font-medium">Mission Control</span>
-          <span className="text-xs text-gray-muted group-open:hidden">Ask about the portfolio →</span>
-          <span className="hidden text-xs text-gray-muted group-open:inline">Collapse</span>
-        </summary>
-        <div className="border-t border-glass-border p-4">
-          <OperatorConsole />
-        </div>
-      </details>
+      {/* Secondary tools */}
+      <div className="mt-6 space-y-4">
+        <details className="group rounded-2xl border border-glass-border bg-glass">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
+            <span className="font-semibold">Mission Control</span>
+            <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
+            <span className="hidden text-[12px] text-gray-muted group-open:inline">Collapse</span>
+          </summary>
+          <div className="border-t border-glass-border p-4"><OperatorConsole /></div>
+        </details>
+        <CreateTenantForm />
+      </div>
 
-      {/* Add a client */}
-      <CreateTenantForm />
-
-      <div className="lg:hidden rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
-        <p className="text-sm font-medium text-amber-200">Admin works best on desktop</p>
-        <p className="mt-1 text-xs leading-5 text-amber-100/70">
-          Client dashboards stay available from their fallback URLs, but tenant triage, invite handling,
-          and domain checks need the full-width admin views.
-        </p>
+      <div className="mt-6 rounded-2xl border border-warning/20 bg-warning/10 p-4 lg:hidden">
+        <p className="text-[13px] font-medium text-warning">Admin works best on desktop</p>
+        <p className="mt-1 text-[11.5px] leading-5 text-warm-white/70">Tenant triage, invites, and domain checks need the full-width admin views.</p>
       </div>
     </div>
   );

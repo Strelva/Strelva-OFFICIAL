@@ -8,7 +8,7 @@ export default function AdminError({
   reset: () => void;
 }) {
   return (
-    <div className="rounded-xl bg-glass border border-glass-border p-8 text-center">
+    <div className="rounded-2xl border border-glass-border bg-glass p-8 text-center">
       <h2 className="text-lg font-semibold text-warm-white">
         Something broke in the operator portal
       </h2>

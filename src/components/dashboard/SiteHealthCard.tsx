@@ -171,8 +171,8 @@ export function SiteHealthCard() {
 
   if (state === "error") {
     return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-6 text-center">
-        <p className="text-sm font-medium text-red-400">{error}</p>
+      <div className="rounded-xl border border-critical0/30 bg-critical0/10 px-5 py-6 text-center">
+        <p className="text-sm font-medium text-critical">{error}</p>
         <button
           type="button"
           onClick={() => void load(false)}
@@ -211,7 +211,7 @@ export function SiteHealthCard() {
             </div>
           </div>
           <div>
-            <h2 className="text-[15px] font-medium text-warm-black">Site Health</h2>
+            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black">Site Health</h2>
             <p className="text-[12px] text-gray-muted">
               Scanned {new Date(audit.scannedAt).toLocaleDateString()}
             </p>

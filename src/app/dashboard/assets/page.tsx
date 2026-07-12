@@ -250,8 +250,8 @@ export default function PhotosPage() {
               className={cn(
                 "mt-4 rounded-lg border px-4 py-3 text-[12px]",
                 uploadSummary.failed > 0
-                  ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
-                  : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+                  ? "border-warning/20 bg-warning/10 text-warning"
+                  : "border-positive/20 bg-positive/10 text-positive",
               )}
             >
               <p className="font-medium text-warm-white">
@@ -264,7 +264,7 @@ export default function PhotosPage() {
                     <span
                       className={cn(
                         "shrink-0 font-medium",
-                        result.status === "uploaded" ? "text-emerald-300" : "text-amber-300",
+                        result.status === "uploaded" ? "text-positive" : "text-warning",
                       )}
                     >
                       {result.message}

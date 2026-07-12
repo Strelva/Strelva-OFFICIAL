@@ -211,10 +211,10 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
   if (status === "idle") return null;
   const copy: Record<SaveStatus, { label: string; className: string }> = {
     idle: { label: "Saved", className: "border-glass-border text-gray-faint" },
-    dirty: { label: "Unsaved changes", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
+    dirty: { label: "Unsaved changes", className: "border-warning/30 bg-warning/10 text-warning" },
     saving: { label: "Saving...", className: "border-accent/30 bg-accent-dim text-accent" },
-    saved: { label: "Saved", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
-    error: { label: "Could not save", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+    saved: { label: "Saved", className: "border-positive/30 bg-positive/10 text-positive" },
+    error: { label: "Could not save", className: "border-critical/30 bg-critical/10 text-critical" },
   };
   const item = copy[status];
   return (
@@ -352,7 +352,7 @@ function ProfileSection({
                 }}
                 disabled={readOnly}
                 className={`w-full bg-surface-base border rounded-lg px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors disabled:opacity-60 ${
-                  fieldErrors[field.key] ? "border-red-400/50" : "border-glass-border"
+                  fieldErrors[field.key] ? "border-critical/50" : "border-glass-border"
                 } ${
                   field.mono
                     ? "text-accent text-[12px]"
@@ -361,7 +361,7 @@ function ProfileSection({
               />
             )}
             {fieldErrors[field.key] && (
-              <p className="mt-1.5 text-[11px] text-red-400">{fieldErrors[field.key]}</p>
+              <p className="mt-1.5 text-[11px] text-critical">{fieldErrors[field.key]}</p>
             )}
           </FormRow>
         ))}
@@ -388,7 +388,7 @@ function AccountSection() {
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
+            <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{name}</p>
             {isAdmin && (
               <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
                 Strelva Admin
@@ -479,8 +479,8 @@ function BrandSection() {
 
   if (!theme) {
     return (
-      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-center">
-        <p className="text-sm text-red-400">Couldn&apos;t load theme data</p>
+      <div className="bg-critical0/10 border border-critical0/20 rounded-lg p-6 text-center">
+        <p className="text-sm text-critical">Couldn&apos;t load theme data</p>
       </div>
     );
   }
@@ -794,7 +794,7 @@ function NavigationFooterSection() {
                 setNavigation(next);
                 saveContent("navigation", next);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-red-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical"
               aria-label="Remove navigation item"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1026,7 +1026,7 @@ function CustomComponentsSection() {
         <p className="text-[12px] text-gray-muted">Admin-only custom components exposed to this site manifest.</p>
         <SaveStatusPill status={saveStatus} />
       </div>
-      {error && <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">{error}</p>}
+      {error && <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-[12px] text-warning">{error}</p>}
       <div className="space-y-3">
         {components.map((component, index) => (
           <div key={`${component.id}-${index}`} className="rounded-lg border border-glass-border bg-glass p-4">
@@ -1038,7 +1038,7 @@ function CustomComponentsSection() {
               <button
                 type="button"
                 onClick={() => setConfirmRemoveIndex(index)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-red-300"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical"
                 aria-label="Remove component"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1105,10 +1105,10 @@ function CustomComponentsSection() {
 // ---------------------------------------------------------------------------
 
 const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string }> = {
-  healthy: { label: "Healthy", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
-  degraded: { label: "Degraded", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
-  paused: { label: "Paused", className: "border-red-400/30 bg-red-400/10 text-red-300" },
-  failing: { label: "Failing", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  healthy: { label: "Healthy", className: "border-positive/30 bg-positive/10 text-positive" },
+  degraded: { label: "Degraded", className: "border-warning/30 bg-warning/10 text-warning" },
+  paused: { label: "Paused", className: "border-critical/30 bg-critical/10 text-critical" },
+  failing: { label: "Failing", className: "border-critical/30 bg-critical/10 text-critical" },
   unknown: { label: "Unknown", className: "border-glass-border text-gray-faint" },
 };
 
@@ -1146,7 +1146,7 @@ function DependencyHealthSection() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-4 text-[12px] text-red-200">
+      <div className="rounded-lg border border-critical/20 bg-critical/10 p-4 text-[12px] text-critical">
         {error}
       </div>
     );
@@ -1170,14 +1170,14 @@ function DependencyHealthSection() {
   return (
     <div className="space-y-4">
       {data.hasBlockingDependency && (
-        <div className="rounded-lg border border-amber-400/25 bg-amber-300/10 p-4">
+        <div className="rounded-lg border border-warning/25 bg-warning/10 p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} />
             <div>
-              <p className="text-[13px] font-medium text-amber-50">
+              <p className="text-[13px] font-medium text-warning">
                 A custom repo dependency needs attention before the client site depends on it.
               </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
+              <p className="mt-1 text-[12px] leading-relaxed text-warning/80">
                 Strelva is showing this here so paused services are caught before they look like a storefront or AI issue.
               </p>
             </div>
@@ -1237,22 +1237,22 @@ function DependencyHealthSection() {
 const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className: string; note: string }> = {
   active: {
     label: "Active",
-    className: "bg-emerald-400/10 text-emerald-400",
+    className: "bg-positive/10 text-positive",
     note: "Everything included. Cancel anytime.",
   },
   trialing: {
     label: "Trialing",
-    className: "bg-sky-400/10 text-sky-400",
+    className: "bg-accent/10 text-accent",
     note: "Trial access is active.",
   },
   past_due: {
     label: "Past due",
-    className: "bg-amber-400/10 text-amber-400",
+    className: "bg-warning/10 text-warning",
     note: "Payment needs attention to keep the dashboard fully available.",
   },
   cancelled: {
     label: "Canceled",
-    className: "bg-red-400/10 text-red-400",
+    className: "bg-critical/10 text-critical",
     note: "This subscription is canceled.",
   },
   none: {
@@ -1264,7 +1264,7 @@ const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className
 
 const FOUNDER_COMP_COPY = {
   label: "Founder comp",
-  className: "bg-amber-300/12 text-amber-200",
+  className: "bg-warning/12 text-warning",
   note: "Full access is comped for this founder account. No customer billing is due.",
 };
 
@@ -1301,7 +1301,7 @@ function BillingSection() {
             </p>
           )}
           {billingError && (
-            <p className="mt-3 text-[12px] text-amber-300">{billingError}</p>
+            <p className="mt-3 text-[12px] text-warning">{billingError}</p>
           )}
         </div>
         <button
@@ -1525,7 +1525,7 @@ export default function SettingsPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-red-400 mb-3">Couldn&apos;t load settings</p>
+          <p className="text-sm text-critical mb-3">Couldn&apos;t load settings</p>
           <button
             onClick={() => {
               setLoadError(false);

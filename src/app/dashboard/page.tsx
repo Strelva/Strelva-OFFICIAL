@@ -3,7 +3,7 @@ import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePo
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { getClickCounts, getActivity } from "@/lib/storage";
+import { getClickCounts, getActivity, getDailyMetrics } from "@/lib/storage";
 import { getNeedsYouData } from "@/lib/needs-you";
 import { QueuePage } from "@/components/dashboard/QueuePage";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
@@ -35,6 +35,7 @@ async function DashboardHome() {
     retentionSignals,
     leadSummary,
     phoneActions,
+    dailyMetrics,
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
     getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
@@ -66,6 +67,9 @@ async function DashboardHome() {
     // A tel: tap is a customer action too — often the #1 local conversion — so it
     // folds into the top-line "Customer actions" total alongside booking clicks.
     getClickCounts("phone-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
+    // 14-day daily series for the KPI-tile sparklines. Fail-soft to empty — the
+    // Sparkline self-suppresses on a flat/short series, so the tiles stay plain.
+    getDailyMetrics(tenant, 14).catch(() => []),
   ]);
   const pendingCount = needsYou.pendingCount;
   // Customer actions = booking clicks + phone taps (booking's per-service
@@ -142,7 +146,7 @@ async function DashboardHome() {
               {verdict}
             </h1>
             <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-gray-muted">
-              How people found you, what needs your attention, and the fastest way to update your site.
+              Strelva keeps your site working behind the scenes. Here&apos;s what&apos;s happening — and the fastest way to change anything is just to ask.
             </p>
             {brief ? (
               <Link
@@ -222,6 +226,7 @@ async function DashboardHome() {
             value={pageViews.total}
             detail={`${pageViews.thisWeek} in the last 7 days`}
             icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
+            series={dailyMetrics.map((m) => m.pageViews)}
           />
           <StatTile
             label="Customer actions"
@@ -232,6 +237,7 @@ async function DashboardHome() {
                 : `${customerActionsThisWeek} in the last 7 days`
             }
             icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
+            series={dailyMetrics.map((m) => m.bookingClicks + (m.phoneClicks ?? 0))}
           />
           {/* "Needs you" already headlines the approval queue right above, so the
               third tile carries the managed-service proof instead: how much

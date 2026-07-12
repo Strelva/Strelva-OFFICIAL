@@ -126,7 +126,7 @@ export function OnboardingChecklist({
               className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-gray-bg transition-colors"
             >
               {s.done ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" strokeWidth={2} />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-positive0" strokeWidth={2} />
               ) : (
                 <Circle className="h-4 w-4 shrink-0 text-gray-muted" strokeWidth={1.5} />
               )}

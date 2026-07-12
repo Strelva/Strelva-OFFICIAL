@@ -54,6 +54,7 @@ export default async function AnalyticsPage({
         searchPerf={searchPerf}
         gaPerf={gaPerf}
         milestone={milestone}
+        visitorSeries={dailyMetrics.map((m) => m.pageViews)}
         aiVisibility={aiVisibility}
       />
     </>

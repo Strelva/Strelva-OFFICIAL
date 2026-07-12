@@ -34,6 +34,7 @@ export function AnalyticsLiveView({
   searchPerf,
   gaPerf,
   milestone,
+  visitorSeries,
   aiVisibility,
 }: {
   stats: PeriodStats;
@@ -43,6 +44,10 @@ export function AnalyticsLiveView({
   searchPerf: SearchPerf;
   gaPerf: GaPerf;
   milestone: Milestone | null;
+  /** Stable daily-visitor series for the milestone growth sparkline — kept
+   *  separate from the range-driven `stats.series` so it doesn't shift with the
+   *  range selector (the "since you started" story is fixed). */
+  visitorSeries?: number[];
   aiVisibility: AiViz | null;
 }) {
   const headline = periodHeadline(stats);
@@ -69,12 +74,12 @@ export function AnalyticsLiveView({
           {showAnomaly && anomaly && (
             <div
               className={`rounded-xl border p-4 sm:p-5 ${
-                anomaly.type === "drop" ? "border-amber-400/30 bg-amber-400/10" : "border-success/25 bg-success-dim/40"
+                anomaly.type === "drop" ? "border-warning/30 bg-warning/10" : "border-success/25 bg-success-dim/40"
               }`}
             >
               <div className="flex items-start gap-2.5">
                 {anomaly.type === "drop" ? (
-                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" strokeWidth={2} />
+                  <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-warning0" strokeWidth={2} />
                 ) : (
                   <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-success" strokeWidth={2} />
                 )}
@@ -128,7 +133,7 @@ export function AnalyticsLiveView({
           <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
           <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
           {aiVisibility && <AiVisibilityScorecard data={aiVisibility} />}
-          {milestone && <MilestonePanel milestone={milestone} />}
+          {milestone && <MilestonePanel milestone={milestone} visitorSeries={visitorSeries} />}
 
           <details className="group rounded-2xl border border-glass-border bg-glass">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">

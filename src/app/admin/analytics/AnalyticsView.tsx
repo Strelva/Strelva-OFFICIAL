@@ -89,9 +89,9 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl bg-glass border border-glass-border overflow-hidden">
+    <section className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
       <div className="px-5 py-3 border-b border-glass-border">
-        <h2 className="text-[15px] font-medium text-warm-white">{title}</h2>
+        <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-gray-faint">{subtitle}</p>}
       </div>
       <div className="p-5">{children}</div>
@@ -308,7 +308,7 @@ export function AnalyticsView({
   return (
     <div className="space-y-6">
       {/* Tenant switcher */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-glass border border-glass-border px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-glass-border bg-glass px-3 py-2.5">
         <span className="mr-1 text-xs text-gray-muted">Client</span>
         {tenants.map((t) => {
           const active = t.id === selected;
@@ -330,9 +330,9 @@ export function AnalyticsView({
       </div>
 
       {/* Config row */}
-      <section className="rounded-xl bg-glass border border-glass-border p-5">
+      <section className="rounded-2xl border border-glass-border bg-glass p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-[15px] font-medium text-warm-white">Connection</h2>
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Connection</h2>
           <span className="text-[11px] text-gray-faint">
             saved {formatUpdated(savedAt)}
           </span>
@@ -366,7 +366,7 @@ export function AnalyticsView({
             {saving ? "Saving…" : "Save"}
           </button>
           {error && (
-            <p className="text-xs text-rose-400" role="alert">
+            <p className="text-xs text-critical" role="alert">
               {error}
             </p>
           )}

@@ -3,6 +3,7 @@
 import { Star, MessageSquare, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { ReviewItem } from "@/lib/types";
 import { buildReputationSummary } from "@/lib/reviews/reputation";
+import { Sparkline } from "./Sparkline";
 
 /** A rating tile with stars — StatTile-styled but carrying the star row that a
  *  plain number tile can't. Matches the glass card the other tiles use. */
@@ -42,20 +43,65 @@ function MetricTile({
   value,
   detail,
   icon,
+  series,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: React.ReactNode;
+  series?: number[];
 }) {
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4">
+    <div className="flex flex-col rounded-xl border border-glass-border bg-glass p-4">
       <div className="mb-3 flex items-center gap-2 text-gray-muted">
         {icon}
         <span className="text-[11px] font-medium uppercase tracking-[0.14em]">{label}</span>
       </div>
       <p className="text-[28px] font-semibold leading-none tabular-nums text-warm-black">{value}</p>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{detail}</p>
+      {series && series.length > 1 && (
+        <div className="mt-3 pt-0.5">
+          <Sparkline series={series} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The canonical reviews viz — a 5→1 star breakdown, each row a bar sized to the
+ *  busiest bucket. Built from the reviews already on the page; hidden under a
+ *  handful of reviews (one lopsided bar reads as a glitch, not a distribution). */
+function RatingDistribution({ reviews }: { reviews: ReviewItem[] }) {
+  const counts = [0, 0, 0, 0, 0]; // index 0 = 1★ … 4 = 5★
+  for (const r of reviews) {
+    const s = Math.round(r.rating);
+    if (s >= 1 && s <= 5) counts[s - 1] += 1;
+  }
+  if (reviews.length < 4) return null;
+  const max = Math.max(1, ...counts);
+
+  return (
+    <div className="mt-3 rounded-xl border border-glass-border bg-glass p-4">
+      <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+        Rating breakdown
+      </p>
+      <div className="space-y-2">
+        {[5, 4, 3, 2, 1].map((star) => {
+          const c = counts[star - 1];
+          return (
+            <div key={star} className="flex items-center gap-3">
+              <span className="flex w-7 shrink-0 items-center justify-end gap-0.5 text-[12px] tabular-nums text-gray-muted">
+                {star}
+                <Star className="h-3 w-3 fill-gray-faint text-gray-faint" strokeWidth={0} />
+              </span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${(c / max) * 100}%` }} />
+              </div>
+              <span className="w-7 shrink-0 text-right text-[12px] tabular-nums text-gray-muted">{c}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -117,8 +163,11 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
           value={velocityValue}
           detail={velocityDetail}
           icon={velocityIcon}
+          series={velocity.months.map((m) => m.count)}
         />
       </div>
+
+      <RatingDistribution reviews={reviews} />
 
       {rep.lovedFor.length > 0 && summary.averageRating >= 4 && (
         <div className="mt-4 flex flex-wrap items-center gap-2">

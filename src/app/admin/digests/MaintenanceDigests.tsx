@@ -46,12 +46,12 @@ export function MaintenanceDigests({ initialDigests }: { initialDigests: Mainten
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-[13px] text-red-400">{error}</p>}
+      {error && <p className="text-[13px] text-critical">{error}</p>}
       {digests.map((d) => (
         <div key={d.tenant} className="rounded-xl border border-glass-border bg-surface-raised p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-[15px] font-medium text-warm-white">{d.siteName || d.tenant}</p>
+              <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{d.siteName || d.tenant}</p>
               <p className="text-[12px] text-gray-muted">
                 {d.items.length} item{d.items.length === 1 ? "" : "s"} · week of {d.weekOf}
               </p>

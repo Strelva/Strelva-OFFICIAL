@@ -134,7 +134,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
     <div className="max-w-3xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">
+          <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
             Portfolio actions
           </h1>
           <p className="mt-1 text-sm text-gray-muted">
@@ -164,7 +164,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
 
       {totalItems === 0 ? (
         <div className="rounded-xl border border-glass-border bg-glass px-5 py-10 text-center">
-          <p className="text-sm text-emerald-300">Portfolio is clear.</p>
+          <p className="text-sm text-positive">Portfolio is clear.</p>
           <Link href="/admin" className="mt-2 inline-block text-xs text-accent hover:underline">
             Back to overview →
           </Link>
@@ -221,7 +221,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
                               <span className="truncate text-sm text-warm-white">{item.title}</span>
                             </div>
                             {state?.failed && (
-                              <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-300">
+                              <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
                                 <CircleAlert className="h-3 w-3" strokeWidth={2} />
                                 {state.message}
                               </p>

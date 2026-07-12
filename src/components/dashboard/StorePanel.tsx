@@ -3,6 +3,31 @@ import { formatMoney, buildStoreVerdict, type OrderRecord, type OrderSummary } f
 import { sanitizePromptValue } from "@/lib/capabilities";
 import type { Product } from "@/lib/products";
 import { StoreChatButton } from "./StoreChatButton";
+import { Sparkline } from "./Sparkline";
+
+/** Daily revenue (in dollars) across the span the recent orders cover, gap-filled
+ *  so the sparkline reads as a real timeline. Anchored to the orders' own date
+ *  range — no "today" read — so it stays a pure server-render. Capped to the last
+ *  30 days to match the tile's window; returns [] under two active days (the
+ *  Sparkline then self-suppresses). */
+function dailyRevenueSeries(orders: OrderRecord[]): number[] {
+  const byDay = new Map<string, number>();
+  for (const o of orders) {
+    const day = o.createdAt.slice(0, 10);
+    if (day) byDay.set(day, (byDay.get(day) ?? 0) + o.amountCents);
+  }
+  if (byDay.size < 2) return [];
+  const days = [...byDay.keys()].sort();
+  const out: number[] = [];
+  for (
+    let d = new Date(days[0] + "T00:00:00Z");
+    d <= new Date(days[days.length - 1] + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + 1)
+  ) {
+    out.push((byDay.get(d.toISOString().slice(0, 10)) ?? 0) / 100);
+  }
+  return out.slice(-30);
+}
 
 // Owner-initiated review request, routed through the governed agent chat — we
 // hold no customer PII on an order (just items/amount/date), so the ask is
@@ -29,6 +54,7 @@ export function StorePanel({
   products?: Product[];
 }) {
   const verdict = buildStoreVerdict(summary);
+  const revenueSeries = dailyRevenueSeries(orders);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
@@ -55,6 +81,11 @@ export function StorePanel({
           <p className="text-[26px] font-semibold leading-none text-warm-black">
             {formatMoney(summary?.revenueCents ?? 0, summary?.currency ?? "USD")}
           </p>
+          {revenueSeries.length > 1 && (
+            <div className="mt-3">
+              <Sparkline series={revenueSeries} />
+            </div>
+          )}
         </div>
         <div className="rounded-xl border border-glass-border bg-glass p-4">
           <div className="mb-2 flex items-center gap-2 text-gray-muted">

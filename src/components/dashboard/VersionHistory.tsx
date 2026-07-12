@@ -222,15 +222,15 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
         </div>
 
         {status === "success" && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-emerald-500/[0.04] shrink-0">
-            <Check className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
-            <span className="text-[11px] text-emerald-400">Restored. Preview updated</span>
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-positive0/[0.04] shrink-0">
+            <Check className="w-3 h-3 text-positive" strokeWidth={1.5} />
+            <span className="text-[11px] text-positive">Restored. Preview updated</span>
           </div>
         )}
         {status === "error" && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-red-500/[0.04] shrink-0">
-            <AlertCircle className="w-3 h-3 text-red-500" strokeWidth={1.5} />
-            <span className="text-[11px] text-red-600">Couldn&apos;t restore. Try again</span>
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-critical0/[0.04] shrink-0">
+            <AlertCircle className="w-3 h-3 text-critical0" strokeWidth={1.5} />
+            <span className="text-[11px] text-critical">Couldn&apos;t restore. Try again</span>
           </div>
         )}
 

@@ -279,7 +279,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
           <span className="text-[11px] text-gray-faint uppercase tracking-wider">
             What this signal is
           </span>
-          <p className="mt-2 text-[15px] font-medium text-warm-black">{detail.addsIntelligence}</p>
+          <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-black">{detail.addsIntelligence}</p>
           {canUseNow ? (
             <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
               This integration is active. The AI uses it in chat, suggestions, and the weekly report when relevant data lands.
