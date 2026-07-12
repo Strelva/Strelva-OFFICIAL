@@ -5,10 +5,14 @@ import { detectStaleSections } from "./reports";
 import { suggestionAudience } from "./suggestions";
 import type { ContentSection, UnifiedEvent } from "./types";
 
-/** A client should only ever see owner-facing asks in "Needs you". Operator
- *  suggestion cards (our craft) are filtered out here so pre-existing ones queued
- *  before the audience split disappear too — new ones no longer create an event. */
-function isClientVisible(e: UnifiedEvent): boolean {
+/** A client should only ever see owner-facing asks in "Needs you":
+ *  - operator suggestion cards (our craft) are filtered out (Phase 1), and
+ *  - Strelva-initiated drafts tagged `reviewAudience: "operator"` are approved by
+ *    the operator first; they reach the client only if the operator escalates
+ *    (which flips them to "owner"). Client-requested changes default to "owner".
+ *  Events with no tag default to visible, so nothing legacy silently disappears. */
+export function isClientVisibleEvent(e: UnifiedEvent): boolean {
+  if (e.metadata?.reviewAudience === "operator") return false;
   return e.type !== "suggestion" || suggestionAudience(e.title) === "owner";
 }
 
@@ -45,8 +49,8 @@ export async function getNeedsYouData(tenant: string): Promise<NeedsYouData> {
   // Drop operator suggestion cards from both lists, and derive the count from the
   // client-visible pending set so the badge and the rendered queue never disagree
   // (a queue of only operator suggestions must read as empty, not "1 to review").
-  const visiblePending = pending.filter(isClientVisible);
-  const visibleResolved = resolved.filter(isClientVisible);
+  const visiblePending = pending.filter(isClientVisibleEvent);
+  const visibleResolved = resolved.filter(isClientVisibleEvent);
   const hiddenPending = pending.length - visiblePending.length;
 
   return {

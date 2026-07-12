@@ -8,6 +8,7 @@
  * results so the UI can report honest partial failures.
  */
 import { isSuperAdmin } from "@/lib/auth";
+import { escalateEventToOwner } from "@/lib/event-actions";
 import {
   bulkResolvePortfolioActions,
   type PortfolioResolveInput,
@@ -32,6 +33,28 @@ export async function resolvePortfolioActions(
     .slice(0, MAX_BATCH);
 
   const results = await bulkResolvePortfolioActions(safe);
+  return { ok: true, results };
+}
+
+/**
+ * "Ask the client" — escalate a pending operator-approval draft to the owner's
+ * queue when the operator is unsure. Re-verifies super-admin (the layout gate does
+ * not protect a server action POST). Nothing publishes; the item just moves to the
+ * client's "Needs you" for their decision.
+ */
+export async function escalatePortfolioActions(
+  items: PortfolioResolveInput[],
+): Promise<{ ok: boolean; results: Array<{ eventId: string; changed: boolean; reason?: string }> }> {
+  if (!(await isSuperAdmin())) return { ok: false, results: [] };
+  if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
+
+  const safe = items
+    .filter((i) => i && typeof i.tenantId === "string" && typeof i.eventId === "string")
+    .slice(0, MAX_BATCH);
+
+  const results = await Promise.all(
+    safe.map(async (i) => ({ eventId: i.eventId, ...(await escalateEventToOwner(i.tenantId, i.eventId)) })),
+  );
   return { ok: true, results };
 }
 

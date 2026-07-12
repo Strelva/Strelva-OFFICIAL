@@ -165,6 +165,8 @@ describe("agent-executor update_business_hours", () => {
             { day: "MONDAY", open: "09:00", close: "17:00" },
             { day: "SATURDAY", open: "10:00", close: "14:00" },
           ],
+          // The proactive executor tags its drafts operator-approve-first.
+          reviewAudience: "operator",
         },
       })
     );

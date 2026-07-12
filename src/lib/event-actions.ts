@@ -74,6 +74,27 @@ function parseHHMM(v: unknown): { hours: number; minutes: number } | null {
   return { hours, minutes };
 }
 
+/**
+ * Escalate a pending operator-approval draft to the client. Flips the draft's
+ * `reviewAudience` to "owner" so it appears in the client's "Needs you" for THEIR
+ * decision — used when the operator is unsure and wants the owner to make the call.
+ * Stays pending (nothing publishes); tenant-scoped for safety.
+ */
+export async function escalateEventToOwner(
+  tenantId: string,
+  eventId: string,
+): Promise<{ changed: boolean; reason?: string }> {
+  const event = await getEvent(eventId);
+  if (!event) return { changed: false, reason: "not_found" };
+  if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
+  if (event.status !== "pending") return { changed: false, reason: "not_pending" };
+  const updated = await updateEvent(eventId, (e) => ({
+    ...e,
+    metadata: { ...e.metadata, reviewAudience: "owner", escalatedByOperator: true },
+  }));
+  return { changed: Boolean(updated) };
+}
+
 export async function resolveEventAction(
   tenantId: string,
   eventId: string,

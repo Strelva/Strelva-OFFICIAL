@@ -107,6 +107,14 @@ export interface GbpToolHooks {
   onQueued: (toolName: string, eventId: string, message: string) => void | Promise<void>;
   /** Fired when queuing failed. Optional — the executor just lets it surface. */
   onError?: (toolName: string, error: string) => void | Promise<void>;
+  /**
+   * Who approves the resulting draft. The client-chat route omits this (defaults
+   * "owner" — the owner asked, so the owner approves). The proactive executor sets
+   * "operator": Strelva-initiated changes are approved by the operator first and
+   * only reach the client's queue if the operator escalates. High-risk facts stay
+   * governed either way.
+   */
+  reviewAudience?: "operator" | "owner";
 }
 
 const GBP_DAY = z.enum([
@@ -165,7 +173,7 @@ export function buildGbpTools(hooks: GbpToolHooks) {
         title: args.title,
         body: args.body.slice(0, 500),
         status: "pending",
-        metadata: args.metadata,
+        metadata: { ...args.metadata, reviewAudience: hooks.reviewAudience ?? "owner" },
       });
       await hooks.onQueued(toolName, event.id, args.message);
       return {

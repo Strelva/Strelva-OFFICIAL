@@ -417,10 +417,13 @@ export async function executeAgentPromptDetailed(
   if (gbpWriteAllowed) {
     const gbpTools = buildGbpTools({
       tenantId,
+      // Proactive path: the operator approves before it goes live (escalates to the
+      // client only if unsure), so these drafts don't land in the client's queue.
+      reviewAudience: "operator",
       onQueued: (toolName, eventId) => {
         sendSlackNotification(
           {
-            text: `AI drafted ${toolName} for *${tenantId}* — needs owner approval (eventId=${eventId})`,
+            text: `AI drafted ${toolName} for *${tenantId}* — needs operator approval (eventId=${eventId})`,
           },
           "tenant",
           tenantConfig,

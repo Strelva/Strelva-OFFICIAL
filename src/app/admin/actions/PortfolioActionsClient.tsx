@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, ChevronDown, CircleAlert, Loader2 } from "lucide-react";
 import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
-import { resolvePortfolioActions } from "./actions";
+import { resolvePortfolioActions, escalatePortfolioActions } from "./actions";
 import type {
   PortfolioActionGroup,
   PortfolioActionItem,
@@ -128,6 +128,32 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
     [groups, resolve],
   );
 
+  // "Ask the client" — hand a draft you're unsure about to the owner's queue for
+  // their call. Drops it from this queue on success (it's now theirs to decide).
+  const escalate = useCallback(
+    (item: PortfolioActionItem) => {
+      setProcessing((prev) => new Set(prev).add(item.id));
+      startTransition(async () => {
+        try {
+          const res = await escalatePortfolioActions([{ tenantId: item.tenantId, eventId: item.id }]);
+          if (res.ok && res.results[0]?.changed) {
+            setGroups((prev) =>
+              prev.map((g) => ({ ...g, items: g.items.filter((it) => it.id !== item.id) })).filter((g) => g.items.length > 0),
+            );
+          }
+        } finally {
+          setProcessing((prev) => {
+            const next = new Set(prev);
+            next.delete(item.id);
+            return next;
+          });
+          router.refresh();
+        }
+      });
+    },
+    [router],
+  );
+
   const anyProcessing = processing.size > 0;
 
   return (
@@ -242,6 +268,15 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
                                 {isOpen ? "Hide" : "Review"}
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => escalate(item)}
+                              disabled={anyProcessing}
+                              title="Hand this to the client to decide"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border px-2.5 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:text-warm-white disabled:opacity-50"
+                            >
+                              Ask client
+                            </button>
                             <button
                               type="button"
                               onClick={() => resolve([item])}
