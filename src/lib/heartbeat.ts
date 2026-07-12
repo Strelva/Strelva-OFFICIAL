@@ -41,6 +41,7 @@ export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
   visibility: 8 * 24 * 3600, // weekly (Tue)
   "revalidation-reconcile": 7 * 3600, // every 6h
   "portfolio-snapshot": 5 * 3600, // every 4h
+  "review-auto-post": 5 * 3600, // every 3h
 };
 
 const HEARTBEAT_TTL_SECONDS = 14 * 24 * 3600; // keep two weeks of last-seen

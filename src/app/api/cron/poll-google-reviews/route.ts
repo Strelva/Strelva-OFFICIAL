@@ -19,6 +19,8 @@ import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
+import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
+import { AUTO_POST_DELAY_MS } from "@/lib/reviews/auto-reply";
 import { buildApproveUrl } from "@/lib/approve-link";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { maybeAlertNewReview } from "@/lib/review-alert";
@@ -221,47 +223,57 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
       console.error(`[poll-google-reviews] addReview failed for ${tenantId}/${review.reviewId}:`, err);
     });
 
-    // Draft a filter-safe reply and queue it for human approval.
-    // This is fire-and-recover: a draft failure must not block the review event.
+    // Draft a filter-safe reply and queue it per the client's reply mode.
+    // off → don't touch their reviews. approve → pending for their OK. auto →
+    // pending WITH an autoPostAt so the auto-post cron publishes it after the
+    // safety window (cancellable until then). Fire-and-recover: a draft failure
+    // must not block the review event.
     let draftedReply: string | undefined;
     let draftEventId: string | undefined;
-    try {
-      draftedReply = await draftReviewReply(
-        {
-          reviewId: review.reviewId,
-          reviewerName: review.reviewer.displayName,
-          rating,
-          comment: review.comment,
-        },
-        tenant
-      );
+    const replyMode = (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode;
+    if (replyMode !== "off") {
+      try {
+        draftedReply = await draftReviewReply(
+          {
+            reviewId: review.reviewId,
+            reviewerName: review.reviewer.displayName,
+            rating,
+            comment: review.comment,
+          },
+          tenant
+        );
 
-      const draftEvent = await addEvent({
-        tenantId,
-        source: "ai",
-        type: "review",
-        title: `Drafted reply for ${review.reviewer.displayName}'s ${rating}-star review`,
-        body: draftedReply,
-        // Always pending — human must approve before publish
-        status: "pending",
-        metadata: {
-          kind: "review_reply_draft",
-          reviewId: review.reviewId,
-          rating,
-          author: review.reviewer.displayName,
-          draftedReply,
-          reviewCreatedAt: review.createTime,
-        },
-      });
-      draftEventId = draftEvent.id;
+        const draftEvent = await addEvent({
+          tenantId,
+          source: "ai",
+          type: "review",
+          title: `Drafted reply for ${review.reviewer.displayName}'s ${rating}-star review`,
+          body: draftedReply,
+          // Pending either way — auto mode publishes via the cron after the
+          // window, never bypassing the governed approval path.
+          status: "pending",
+          metadata: {
+            kind: "review_reply_draft",
+            reviewId: review.reviewId,
+            rating,
+            author: review.reviewer.displayName,
+            draftedReply,
+            reviewCreatedAt: review.createTime,
+            ...(replyMode === "auto"
+              ? { autoPostAt: new Date(Date.now() + AUTO_POST_DELAY_MS).toISOString() }
+              : {}),
+          },
+        });
+        draftEventId = draftEvent.id;
 
-      // Store in recent-replies for near-duplicate detection on future drafts.
-      await storeRecentReply(tenantId, draftedReply);
-    } catch (err) {
-      console.error(
-        `[poll-google-reviews] Reply drafting failed for ${tenantId} reviewId=${review.reviewId}:`,
-        err
-      );
+        // Store in recent-replies for near-duplicate detection on future drafts.
+        await storeRecentReply(tenantId, draftedReply);
+      } catch (err) {
+        console.error(
+          `[poll-google-reviews] Reply drafting failed for ${tenantId} reviewId=${review.reviewId}:`,
+          err
+        );
+      }
     }
 
     // Alert the owner (once per review, client-gated). When a reply draft exists,
