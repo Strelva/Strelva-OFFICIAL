@@ -165,6 +165,9 @@ export async function PATCH(req: Request) {
       productionDomain: z.string().max(253),
       adminDomain: z.string().max(253),
       revalidateUrl: z.string().max(2048),
+      // Operator-settable when wiring a client's revalidation (super-admin gated).
+      revalidationSecret: z.string().max(512),
+      siteUrl: z.string().max(2048),
       active: z.boolean(),
       subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
       planOverride: z.enum(["", "founder_comp"]),
