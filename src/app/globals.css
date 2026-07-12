@@ -69,9 +69,10 @@
   --accent-dim:  oklch(73% 0.07 145 / 0.12);
   --accent-text: oklch(80% 0.08 145);
   /* Positive/go — sage-family (hue 145), more vivid than --accent so it reads
-     "go". NOT emerald: kept on-hue so success and accent are one family. */
-  --success:     oklch(70% 0.14 145);
-  --success-dim: oklch(70% 0.14 145 / 0.12);
+     "go". NOT emerald: kept on-hue AND near the accent's low chroma so success
+     reads as the same muted-sage family, not a saturated green that clashes. */
+  --success:     oklch(72% 0.095 145);
+  --success-dim: oklch(72% 0.095 145 / 0.12);
 
   /* Semantic status set — the ONLY status hues allowed in the dashboard.
      positive = sage-go (--success), warning = one amber, critical = one red,
