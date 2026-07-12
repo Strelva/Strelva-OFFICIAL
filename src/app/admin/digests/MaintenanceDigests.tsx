@@ -49,7 +49,7 @@ export function MaintenanceDigests({ initialDigests }: { initialDigests: Mainten
       {error && <p className="text-[13px] text-critical">{error}</p>}
       {digests.map((d) => (
         <div key={d.tenant} className="rounded-xl border border-glass-border bg-surface-raised p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{d.siteName || d.tenant}</p>
               <p className="text-[12px] text-gray-muted">
