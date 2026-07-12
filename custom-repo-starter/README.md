@@ -18,8 +18,29 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `scaffold-seo.ts` | Pure `buildMetadata` / `buildSitemap` / `buildRobots` mappers → Next.js `<head>` + sitemap + robots |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
+| `PageRenderer.tsx` | Config-driven section renderer — turns a page's `PageSectionConfig[]` into rendered sections so page layout is DATA, not code |
+| `dynamic-page-route.template.tsx` | Template for `app/[...slug]/page.tsx` — renders ANY page from the platform's page config (new pages become a data op, no per-page code) |
 | `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
 | `README.md` | This file |
+
+## Dynamic pages (layout as data)
+
+The platform serves page config as `SitePageConfig` (a map of page slug → `{ sections, seo }`),
+so a site's pages and their section layout are **data, not code** — the AI/operator can add a
+page, reorder sections, or toggle one without a repo change. To turn that on in a client repo:
+
+1. Copy `dynamic-page-route.template.tsx` to `src/app/[...slug]/page.tsx`.
+2. Provide the two client-specific imports it needs:
+   - a `sitePageConfigFallback` (your typed fallback `SitePageConfig` for offline/build render), and
+   - a `sectionRegistry: SectionRegistry` mapping each section `type` to its component
+     (`{ hero: HeroSection, services: ServicesSection, ... }`) — this is where your repo's real
+     section designs live. `PageRenderer` renders visible sections in `order`, and skips a section
+     type the registry doesn't have a component for yet.
+
+New pages then require zero code — they're a config entry. The one thing that still needs code is a
+**new section _type_** (a novel component your repo doesn't ship); until then the registry is the
+ceiling. Keep components as dumb renderers of `config.props` + fetched content so the platform can
+keep doing more without touching the repo.
 
 ## Quick Start
 
