@@ -24,6 +24,7 @@ import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
 import { DeploymentStatus } from "./DeploymentStatus";
+import { StartPlanPanel } from "./StartPlanPanel";
 import { InviteButton } from "../../InviteButton";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { ClientLogo, Chip } from "../../console";
@@ -210,6 +211,12 @@ export default async function ClientDetailPage({
       <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
 
       <DeploymentStatus status={deployStatus} />
+
+      <StartPlanPanel
+        tenantId={tenant.id}
+        ownerEmail={tenant.ownerEmail ?? ""}
+        subscriptionStatus={tenant.subscriptionStatus ?? "none"}
+      />
 
       <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
 

@@ -6,6 +6,7 @@ import {
   BillingConfigurationError,
   createTenantSubscriptionCheckout,
 } from "@/lib/billing";
+import { planByKey } from "@/lib/billing-plans";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -31,7 +32,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { tenantId, customerEmail: rawCustomerEmail, customerName } = body;
+  const { tenantId, customerEmail: rawCustomerEmail, customerName, plan: rawPlan } = body;
+  const plan = planByKey(typeof rawPlan === "string" ? rawPlan : undefined);
   const normalizedTenantId = typeof tenantId === "string" ? tenantId.trim() : "";
   const customerEmail = normalizeEmail(rawCustomerEmail);
   const normalizedCustomerName = typeof customerName === "string" ? customerName.trim() : "";
@@ -59,11 +61,13 @@ export async function POST(req: Request) {
       tenant: tenantConfig,
       customerEmail,
       customerName: normalizedCustomerName || undefined,
+      priceId: plan.priceId,
     });
 
     return NextResponse.json({
       checkoutUrl: result.checkoutUrl,
       stripeCustomerId: result.stripeCustomerId,
+      plan: { key: plan.key, label: plan.label, monthly: plan.monthly },
     });
   } catch (err) {
     if (err instanceof BillingConfigurationError) {
