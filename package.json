@@ -17,6 +17,7 @@
     "smoke:admin": "REB_DEV_UNGATED_ACCESS=1 playwright test tests/admin-operator.spec.ts",
     "smoke:dashboard": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/dashboard-owner.spec.ts",
     "smoke:surfaces": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/operator-surfaces.spec.ts tests/owner-surfaces.spec.ts",
+    "check:ci": "bash scripts/check-ci.sh",
     "bench:agent": "npx tsx scripts/run-benchmark.ts",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
     "deprovision-tenant": "npx tsx --env-file=.env.local scripts/deprovision-tenant.ts",

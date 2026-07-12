@@ -66,6 +66,28 @@ Do NOT set `CONTENT_SOURCE=file` while asserting tenant **content** rendering �
 source-flags guard refuses dev-file content in a prod-like context (`CI=true`) and 500s.
 The Surface smoke only asserts chrome, so it's unaffected.
 
+## Actions-minutes budget (2,000/mo, resets the 1st)
+
+The org's free tier is 2,000 GitHub Actions minutes/month with a $0 overage budget
+(so it HARD-BLOCKS when exhausted — every workflow then fails in ~2s with no runner).
+Guardrails in the workflows keep usage well under that:
+
+- **`concurrency: cancel-in-progress`** on all three workflows — a new push cancels
+  the superseded run instead of letting both finish. Biggest saver during active dev.
+- **CodeQL runs weekly only** (was every push+PR) — it analyzes with `upload: never`
+  until code scanning is enabled in repo settings, so per-event runs produced nothing.
+  Re-add `push`/`pull_request` + flip `upload` when scanning is turned on.
+- **`paths-ignore`** on CI for `**.md` / `docs/**` — docs-only changes skip the build.
+- **Playwright browsers cached** across runs.
+
+**Before you push (avoid burning a run to find a failure):** run the CI-faithful check
+locally. `pnpm check:ci` runs lint + typecheck + vitest + the no-Redis surface smoke —
+the same gates the runner enforces. If it's green, CI will be too.
+
+If minutes are exhausted mid-cycle and a PR must land: either merge on a local
+`pnpm check:ci` green-light, or raise the Actions spending cap a few dollars for a
+couple of validating runs. Usage resets on the 1st.
+
 ## Do NOT
 
 - Publish to a real client tenant (gldf/rohlax) from a test — editor smokes stay on the
