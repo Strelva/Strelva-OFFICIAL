@@ -211,7 +211,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
-              {isCustomRequest ? "custom repo request" : event.source}
+              {isCustomRequest ? "site change request" : event.source}
             </span>
             <span className="text-[11px] text-gray-subtle">
               {formatTimestamp(event.createdAt)}

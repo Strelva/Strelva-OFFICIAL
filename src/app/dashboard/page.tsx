@@ -195,28 +195,10 @@ async function DashboardHome() {
               weekly-proof / retention panel. */}
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
 
-          {/* Do this next — your latest pending suggestion, one tap into
-              chat. Only when there's a real pending suggestion. */}
-          {topSuggestion ? (
-            <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
-          ) : null}
-
-          {/* Needs you — the approval queue, front and center on Today. Only when
-              something waits. */}
-          {pendingCount > 0 ? (
-            <section className="overflow-hidden rounded-2xl border border-accent/25 bg-glass">
-              <div className="h-[520px]">
-                <QueuePage
-                  initialPending={needsYou.pending}
-                  initialResolved={needsYou.resolved}
-                  pendingCount={needsYou.pendingCount}
-                  staleSectionCount={needsYou.staleSectionCount}
-                  compact
-                />
-              </div>
-            </section>
-          ) : null}
-
+          {/* Proof first. A returning owner should feel "look what's working /
+              what got handled for me" before being asked to do anything, so the
+              reassuring numbers and the managed-service receipt lead; the approval
+              queue follows below. */}
           {!isFresh ? (
           <section className="grid gap-3 md:grid-cols-3">
           {/* Lead with the cumulative number (the reassuring one that matches the
@@ -240,9 +222,6 @@ async function DashboardHome() {
             icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             series={dailyMetrics.map((m) => m.bookingClicks + (m.phoneClicks ?? 0))}
           />
-          {/* "Needs you" already headlines the approval queue right above, so the
-              third tile carries the managed-service proof instead: how much
-              Strelva did to the site this week. */}
           <StatTile
             label="Site updates"
             value={retentionSignals.aiChangesThisWeek}
@@ -261,6 +240,27 @@ async function DashboardHome() {
               empty state covers a new-but-not-day-one client). */}
           {!isFresh ? (
             <ActivityFeed activity={strelvaWork} historyHref={dashboardHref("/dashboard/history")} />
+          ) : null}
+
+          {/* Then — only after the proof — the few things that actually need the
+              owner. Do-this-next (a rare owner-facing suggestion) and the approval
+              queue. */}
+          {topSuggestion ? (
+            <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
+          ) : null}
+
+          {pendingCount > 0 ? (
+            <section className="overflow-hidden rounded-2xl border border-accent/25 bg-glass">
+              <div className="h-[520px]">
+                <QueuePage
+                  initialPending={needsYou.pending}
+                  initialResolved={needsYou.resolved}
+                  pendingCount={needsYou.pendingCount}
+                  staleSectionCount={needsYou.staleSectionCount}
+                  compact
+                />
+              </div>
+            </section>
           ) : null}
 
           {leadSummary.recent.length > 0 ? (

@@ -77,12 +77,15 @@ export async function GET(request: Request) {
       return previewUnavailable(400);
     }
 
+    // Bound the upstream fetch of the client's live site (mirrors live-preview),
+    // so a hung or slow client site can't hang the preview request indefinitely.
     const upstream = await fetch(target, {
       headers: {
         Accept: "text/html,application/xhtml+xml",
         "User-Agent": "ScaffoldWebEditPreview/1.0",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
 
     const contentType = upstream.headers.get("content-type") || "";

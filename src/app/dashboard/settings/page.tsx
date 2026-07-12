@@ -338,8 +338,8 @@ function ProfileSection({
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 onBlur={() => handleBlurSave(field.key)}
                 disabled={readOnly}
-                rows={2}
-                className="w-full bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[13px] text-warm-white outline-none resize-none focus:border-accent/40 transition-colors disabled:opacity-60"
+                rows={3}
+                className="w-full bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[13px] text-warm-white outline-none resize-y min-h-[64px] focus:border-accent/40 transition-colors disabled:opacity-60"
               />
             ) : (
               <input
@@ -1175,7 +1175,7 @@ function DependencyHealthSection() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} />
             <div>
               <p className="text-[13px] font-medium text-warning">
-                A custom repo dependency needs attention before the client site depends on it.
+                One of the outside services your site uses needs attention.
               </p>
               <p className="mt-1 text-[12px] leading-relaxed text-warning/80">
                 Strelva is showing this here so paused services are caught before they look like a storefront or AI issue.
@@ -1189,7 +1189,7 @@ function DependencyHealthSection() {
         <div className="rounded-lg border border-glass-border bg-glass p-4">
           <p className="text-[13px] text-warm-white">No external dependencies recorded</p>
           <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-            Add dependencies to the tenant custom repo metadata as they become operationally important.
+            No outside services are being tracked for your site yet.
           </p>
         </div>
       )}
@@ -1356,7 +1356,7 @@ const SECTION_META: Record<string, { title: string; description: string }> = {
   },
   domains: {
     title: "Domain health",
-    description: "Production and admin domains, DNS records, SSL state, and repair steps.",
+    description: "Your website and admin web addresses, plus how to fix them if something looks off.",
   },
   plan: {
     title: "Plan",
@@ -1382,7 +1382,7 @@ const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: s
   {
     id: "site-config",
     eyebrow: "Site config",
-    description: "Design tokens, navigation, footer content, supported capabilities, and custom components.",
+    description: "Your site's colors and fonts, menu, footer, and the features it supports.",
   },
   {
     id: "dependencies",

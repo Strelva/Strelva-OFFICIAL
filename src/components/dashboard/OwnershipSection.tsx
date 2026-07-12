@@ -23,15 +23,15 @@ type Domain = { domain: string; status: "connected" | "pending"; isApex: boolean
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
 const OWNED_ITEMS = [
-  "Your domain: registered in your name from day one. You hold the registrar/Cloudflare account; Strelva only has a DNS-edit member role.",
+  "Your domain: registered in your name from day one. The account that holds your domain is in your name; Strelva only has permission to update its settings while it manages your site.",
   "All your content: business name, copy, services, pricing, hours, FAQs, testimonials, blog posts, and the uploaded photos, logos, and product images on the site. Export it anytime from this dashboard.",
   "On the monthly plan: the full site repo and source files, which transfer to you at month 12 or earlier via buyout. Your domain is already yours either way.",
 ];
 
 const MANAGED_ITEMS = [
   "Hosting and deployment: the production build, deploy pipeline, uptime monitoring, and SSL that keep your site live while you're subscribed.",
-  "The platform: dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and cache/revalidation plumbing.",
-  "Strelva platform source code and deployment credentials. (The platform itself stays with Strelva; your site repo is what transfers to you.)",
+  "The platform: dashboard software, AI tools, review workflow, analytics, weekly reports, integrations, and the behind-the-scenes systems that keep your site fast and up to date.",
+  "The Strelva platform software itself stays with Strelva. Your website and its files are what transfer to you.",
 ];
 
 const HANDOFF_STEPS = [
@@ -41,7 +41,7 @@ const HANDOFF_STEPS = [
   },
   {
     title: "Export assets",
-    body: "Download the asset manifest and save the originals from every listed URL. Confirm logo, hero, service, provider, product, and story images are present.",
+    body: "Download your image list and save the originals from every listed link. Confirm logo, hero, service, provider, product, and story images are present.",
   },
   {
     title: "Repo + files transfer",
@@ -66,7 +66,7 @@ const BILLING_COPY: Record<SubscriptionStatus, string> = {
   trialing: "Your trial is active.",
   past_due: "Payment needs attention before normal cancellation flow may be available.",
   cancelled: "Your subscription is already canceled.",
-  none: "No Stripe subscription is connected in this tenant.",
+  none: "No active plan is connected to this account.",
 };
 
 function downloadBlob(data: Blob, filename: string) {
@@ -124,7 +124,7 @@ export function OwnershipSection() {
         blob,
         filenameFromDisposition(res.headers.get("Content-Disposition"), `${dashboard?.tenantId || "site"}-${kind}.json`),
       );
-      setNotice(kind === "content" ? "Content export downloaded." : "Asset manifest downloaded.");
+      setNotice(kind === "content" ? "Content export downloaded." : "Image list downloaded.");
     } catch {
       setError("Could not download that export. Try again or ask Strelva for a handoff package.");
     } finally {

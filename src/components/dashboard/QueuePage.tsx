@@ -8,6 +8,7 @@ import { SuggestionCard } from "./SuggestionCard";
 import { QueueEventDetail } from "./QueueEventDetail";
 import type { UnifiedEvent } from "@/lib/types";
 import { useDashboardOptional } from "./DashboardContext";
+import { segmentPill } from "./segment-pill";
 
 type QueueAction =
   | "approved"
@@ -141,32 +142,22 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
         </div>
       </header>
 
-      {/* Tabs - min-h ensures 44px tap targets */}
+      {/* Tabs — same segmented-pill language as every other dashboard sub-nav. */}
       <div className={`shrink-0 pt-4 ${compact ? "px-4" : "px-4 sm:px-8"}`}>
-        <div className="flex gap-1 p-1 bg-surface-inset border border-glass-border rounded-xl w-fit">
-          <button
-            onClick={() => setTab("pending")}
-            className={`px-4 py-2 min-h-[42px] text-[13px] font-medium rounded-lg transition-all duration-200 ${
-              tab === "pending"
-                ? "bg-surface-raised text-warm-black shadow-sm"
-                : "text-gray-muted hover:text-gray-fg"
-            }`}
-          >
+        <div className="flex items-center gap-2">
+          <button onClick={() => setTab("pending")} className={`min-h-[36px] ${segmentPill(tab === "pending")}`}>
             Needs You
             {pendingCount > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 text-[11px] font-semibold bg-accent-dim text-accent rounded-full">
+              <span
+                className={`ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                  tab === "pending" ? "bg-on-accent/15 text-on-accent" : "bg-accent-dim text-accent"
+                }`}
+              >
                 {pendingCount}
               </span>
             )}
           </button>
-          <button
-            onClick={() => setTab("resolved")}
-            className={`px-4 py-2 min-h-[42px] text-[13px] font-medium rounded-lg transition-all duration-200 ${
-              tab === "resolved"
-                ? "bg-surface-raised text-warm-black shadow-sm"
-                : "text-gray-muted hover:text-gray-fg"
-            }`}
-          >
+          <button onClick={() => setTab("resolved")} className={`min-h-[36px] ${segmentPill(tab === "resolved")}`}>
             Done
           </button>
         </div>

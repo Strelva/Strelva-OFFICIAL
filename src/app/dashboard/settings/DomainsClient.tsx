@@ -333,7 +333,7 @@ export function DomainsClient({ initialDomains }: Props) {
                     ) : (
                       <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded text-warning bg-warning/10">
                         <Clock className="w-3 h-3" strokeWidth={2} />
-                        Pending DNS
+                        Waiting to connect
                       </span>
                     )}
                   </div>
