@@ -10,12 +10,19 @@ interface Cmd {
   href: string;
 }
 
+// Mirrors the rail so every section is reachable from the palette, in the same
+// grouped order (workspace → clients → review → system).
 const NAV: Cmd[] = [
   { id: "nav-overview", label: "Overview", hint: "Section", href: "/admin" },
+  { id: "nav-clients", label: "Clients", hint: "Section", href: "/admin/clients" },
+  { id: "nav-leads", label: "Leads", hint: "Section", href: "/admin/leads" },
   { id: "nav-onboard", label: "Onboard a client", hint: "Section", href: "/admin/onboard" },
-  { id: "nav-paylinks", label: "Pay Links", hint: "Section", href: "/admin/pay-links" },
-  { id: "nav-ops", label: "Operations", hint: "Section", href: "/admin/ops" },
+  { id: "nav-paylinks", label: "Pay links", hint: "Section", href: "/admin/pay-links" },
+  { id: "nav-analytics", label: "Analytics", hint: "Section", href: "/admin/analytics" },
+  { id: "nav-actions", label: "Actions", hint: "Section", href: "/admin/actions" },
   { id: "nav-drafts", label: "Drafts", hint: "Section", href: "/admin/drafts" },
+  { id: "nav-maintenance", label: "Maintenance", hint: "Section", href: "/admin/digests" },
+  { id: "nav-ops", label: "Ops", hint: "Section", href: "/admin/ops" },
   { id: "nav-audit", label: "Audit trail", hint: "Section", href: "/admin/audit" },
 ];
 
