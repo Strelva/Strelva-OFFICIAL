@@ -17,12 +17,14 @@ const review = (reasonCode: AiGovernanceDecision["reasonCode"]): AiGovernanceDec
   reasonCode,
 });
 
+// Key-aware: the content-autonomy read and the streak read hit different Redis keys.
+// Default: autonomy off ("approve" → null), streak well past the threshold.
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGet.mockResolvedValue(10); // streak well past the threshold
+  mockGet.mockImplementation((k: string) => (k.includes("content-autonomy") ? null : 10));
 });
 
-describe("maybeAutoApprove", () => {
+describe("maybeAutoApprove — earned-trust streak", () => {
   it("NEVER upgrades a high_risk_facts review, even for a trusted tenant past its streak", async () => {
     const out = await maybeAutoApprove(trusted, "contact", review("high_risk_facts"));
     expect(out.action).toBe("review"); // booking/payment/hours stay human-gated
@@ -41,6 +43,29 @@ describe("maybeAutoApprove", () => {
 
   it("never upgrades a non-low-risk section", async () => {
     const out = await maybeAutoApprove(trusted, "hero", review("marketing_copy"));
+    expect(out.action).toBe("review");
+  });
+});
+
+describe("maybeAutoApprove — owner content autonomy 'auto'", () => {
+  // Autonomy on, but NO streak/threshold: the owner opted into hands-off routine updates.
+  const optedIn = { id: "gldf", autoApproveThreshold: 0 } as unknown as TenantConfig;
+  beforeEach(() => {
+    mockGet.mockImplementation((k: string) => (k.includes("content-autonomy") ? "auto" : 0));
+  });
+
+  it("publishes a low-risk copy edit with no streak needed", async () => {
+    const out = await maybeAutoApprove(optedIn, "contact", review("factual_auto"));
+    expect(out).toMatchObject({ action: "publish", reasonCode: "auto_approved" });
+  });
+
+  it("STILL never publishes a high_risk_facts change on auto (hours/prices/booking stay gated)", async () => {
+    const out = await maybeAutoApprove(optedIn, "contact", review("high_risk_facts"));
+    expect(out.action).toBe("review");
+  });
+
+  it("STILL never publishes a non-low-risk section on auto", async () => {
+    const out = await maybeAutoApprove(optedIn, "hero", review("marketing_copy"));
     expect(out.action).toBe("review");
   });
 });

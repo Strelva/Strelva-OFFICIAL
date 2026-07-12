@@ -7,6 +7,7 @@ import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
+import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPanel";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
@@ -1595,7 +1596,10 @@ export default function SettingsPage() {
 
           {/* Section content */}
           {activeSection === "business" && (
-            <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
+            <div className="space-y-6">
+              <ContentAutonomyPanel />
+              <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
+            </div>
           )}
           {activeSection === "account" && <AccountSection />}
           {activeSection === "domains" && <DomainsSection />}

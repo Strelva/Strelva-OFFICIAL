@@ -17,6 +17,7 @@
 import { getRedis } from "./redis";
 import type { TenantConfig, ContentSection } from "./types";
 import type { AiGovernanceDecision } from "./ai-governance";
+import { getContentAutonomy } from "./content-autonomy";
 import { logger } from "./logger";
 
 const APPROVAL_COUNT_PREFIX = "reb:auto-approve:streak:";
@@ -48,11 +49,27 @@ export async function maybeAutoApprove(
   // client's booking link or payment URL live with no human in the loop.
   if (governance.reasonCode === "high_risk_facts") return governance;
 
-  const threshold = tenantConfig?.autoApproveThreshold;
-  if (!threshold || threshold <= 0) return governance;
+  if (!tenantConfig) return governance;
 
-  // Only auto-approve low-risk sections
+  // Only auto-approve low-risk sections. (Combined with the high_risk_facts guard
+  // above, this is the safety envelope: routine copy only, never money/contact.)
   if (!LOW_RISK_SECTIONS.has(section)) return governance;
+
+  // 1. Owner opted into hands-off routine updates — publish low-risk copy directly,
+  // no streak needed. High-risk facts already returned above, so this stays safe.
+  const autonomy = await getContentAutonomy(tenantConfig.id).catch(() => "approve" as const);
+  if (autonomy === "auto") {
+    logger.info("[auto-approve] Owner enabled hands-off routine updates", { tenantId: tenantConfig.id, section });
+    return {
+      action: "publish",
+      reason: `Auto-published: owner enabled hands-off routine updates. Original: ${governance.reason}`,
+      reasonCode: "auto_approved",
+    };
+  }
+
+  // 2. Otherwise fall back to the operator-set earned-trust streak.
+  const threshold = tenantConfig.autoApproveThreshold;
+  if (!threshold || threshold <= 0) return governance;
 
   const streak = await getApprovalStreak(tenantConfig.id);
   if (streak < threshold) return governance;
