@@ -32,19 +32,10 @@ test("cron maintenance endpoint is not public", async ({ request }) => {
   expect(res.status()).not.toBe(302);
 });
 
-// Skipped: encodes the temporary "Dashboard signup is paused" launch state. The
-// app now renders Clerk on the signup surface, so this assertion is stale and
-// awaits a deliberate rewrite once the auth launch flow is settled (see the
-// matching note in customer-frontend.spec.ts).
-test.skip("signup page explains invited email recovery", async ({ page }) => {
-  await page.goto("/sign-up");
-
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Strelva/);
-  await expect(page.getByRole("heading", { name: /dashboard signup is paused/i })).toBeVisible();
-  await expect(page.getByText("Build requests stay email-first")).toBeVisible();
-  await expect(page.getByRole("link", { name: /request your build/i })).toHaveAttribute(
-    "href",
-    "/access-request",
-  );
+test("sign-up page renders the current create-account surface", async ({ request }) => {
+  const response = await request.get("/sign-up");
+  expect(response.status()).toBeLessThan(400);
+  const html = await response.text();
+  expect(html).toContain("Dashboards are created from your build");
+  expect(html).not.toContain("Dashboard signup is paused");
 });

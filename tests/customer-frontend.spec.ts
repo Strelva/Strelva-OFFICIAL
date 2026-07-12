@@ -126,93 +126,41 @@ test("normal tenant pages keep anti-framing protections", async ({ request }) =>
   expect(response.headers()["x-frame-options"]).toBe("DENY");
 });
 
-// NOTE: the following smoke tests encode the temporary "Dashboard sign-in is
-// paused / no-Clerk handoff" launch state. The app has since deliberately moved
-// on — Clerk auth was opened on tenant/admin hosts ("Open Clerk auth on tenant
-// admin hosts") and the paused-page copy was rewritten — so these assertions are
-// stale. They're skipped pending a deliberate rewrite against the settled auth
-// launch flow (whether marketing-host sign-in stays paused is a launch decision).
-// See docs/launch-blockers.md. Skipping keeps CI green without asserting an
-// outdated flow.
-test.skip("signed-out dashboard customers get the sign-in flow instead of a broken page", async ({ page }) => {
+// The current Supabase sign-in/sign-up + signed-out auth-gate surfaces. These
+// replace the old "no-Clerk / sign-in paused" smoke tests, which asserted a
+// launch-state page that has since been removed. The signed-out REDIRECT tests
+// only hold with the dev bypass OFF — the mode CI's public smoke runs in — so
+// they skip under the local ungated harness (REB_DEV_UNGATED_ACCESS=1), where the
+// bypass grants the dashboard and no redirect fires. (The old admin-host + invited-
+// email variants were dropped: they need a seeded invite + tenant-host resolution
+// to assert anything meaningful, which the public smoke harness doesn't provide.)
+
+test("signed-out dashboard visitors are sent to sign-in, never shown the dashboard", async ({ page }) => {
+  test.skip(process.env.REB_DEV_UNGATED_ACCESS === "1", "the auth-gate redirect only fires with the dev bypass OFF");
   const response = await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
-  await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
-  await expect(page.getByText("Temporary access handoff")).toBeVisible();
-  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: /email jacob/i })).toHaveAttribute(
-    "href",
-    /mailto:jacob@strelva\.com/,
-  );
+  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
 });
 
-test.skip("signed-out account handoff returns users to sign-in", async ({ page }) => {
+test("signed-out account access is sent to sign-in", async ({ page }) => {
+  test.skip(process.env.REB_DEV_UNGATED_ACCESS === "1", "the auth-gate redirect only fires with the dev bypass OFF");
   const response = await page.goto("/account", { waitUntil: "domcontentloaded" });
-
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
-  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
 });
 
-test.skip("admin tenant host starts at the dashboard sign-in flow", async ({ page }) => {
-  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(adminOrigin, { waitUntil: "domcontentloaded" });
-
-  expect(response?.status()).toBeLessThan(500);
-  await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
-  await expect(page.getByRole("heading", { name: /dashboard sign-in is paused/i })).toBeVisible();
-  await expect(page.getByText("Temporary access handoff")).toBeVisible();
-});
-
-test.skip("admin tenant host sign-in keeps the invited email context", async ({ page }) => {
-  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(`${adminOrigin}/sign-in?email=owner%40example.com`, { waitUntil: "domcontentloaded" });
-
-  expect(response?.status()).toBeLessThan(500);
-  await expect(page).toHaveURL(/\/sign-in\?email=owner%40example\.com/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
-  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
-});
-
-test.skip("admin tenant host sign-up uses the tenant invite context", async ({ page }) => {
-  const adminOrigin = `${tenantUrl.protocol}//admin.${tenantHost}`;
-  const response = await page.goto(`${adminOrigin}/sign-up?email=owner%40example.com`, { waitUntil: "domcontentloaded" });
-
-  expect(response?.status()).toBeLessThan(500);
-  await expect(page).toHaveURL(/\/sign-up/);
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard signup is paused\. \| Strelva/);
-  await expect(page.getByRole("heading", { name: /dashboard signup is paused/i })).toBeVisible();
-  await expect(page.getByText("Free-site requests stay email-first")).toBeVisible();
-  await expect(page.getByRole("link", { name: /request free site/i })).toHaveAttribute(
-    "href",
-    "/access-request",
-  );
-});
-
-test.skip("signed-out no-access recovery returns users to sign-in", async ({ page }) => {
-  const response = await page.goto("/no-access", { waitUntil: "domcontentloaded" });
-
-  expect(response?.status()).toBeLessThan(500);
-  await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page).not.toHaveURL(/\/app/);
-  await expect(page).toHaveTitle(/Dashboard sign-in is paused\. \| Strelva/);
-  await expect(page.getByText(/we are not using clerk sign-in right now/i)).toBeVisible();
-});
-
-test.skip("sign-in page uses the temporary no-Clerk handoff", async ({ request }) => {
+test("the sign-in page renders the current Supabase sign-in surface", async ({ request }) => {
   const response = await request.get("/sign-in");
   expect(response.status()).toBeLessThan(400);
-
   const html = await response.text();
-  expect(html).toContain("Dashboard sign-in is paused.");
-  expect(html).toContain("We are not using Clerk sign-in right now.");
-  expect(html).not.toContain("Loading secure sign-in");
+  expect(html).toContain("Sign in to your dashboard");
+  expect(html).not.toContain("Dashboard sign-in is paused");
+});
+
+test("the no-access page renders a public recovery surface", async ({ page }) => {
+  const response = await page.goto("/no-access", { waitUntil: "domcontentloaded" });
+  expect(response?.status()).toBeLessThan(400);
+  await expect(page.getByRole("heading", { name: /no access to this site/i })).toBeVisible();
 });
