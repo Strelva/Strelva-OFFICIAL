@@ -243,8 +243,8 @@ async function DashboardHome() {
           ) : null}
 
           {/* Then — only after the proof — the few things that actually need the
-              owner. Do-this-next (a rare owner-facing suggestion) and the approval
-              queue. */}
+              owner: a rare owner-facing "do this next", then the "Needs you"
+              approval queue. */}
           {topSuggestion ? (
             <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
           ) : null}
