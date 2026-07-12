@@ -54,12 +54,12 @@ describe("getDashboardSurfaces — vertical-set surfaces (additive)", () => {
 
   it("appends the wellness set surfaces after the base six when enabled", () => {
     const s = getDashboardSurfaces({
-      tenantConfig: { template: "wellness", features: ["schedule", "members", "packages", "roster"] },
+      tenantConfig: { template: "wellness", features: ["schedule", "members", "roster"] },
       connections: [],
     });
     expect(s.map((x) => x.id)).toEqual([
       "today", "ask-ai", "website", "google-business", "analytics", "reports", "reviews",
-      "schedule", "members", "packages", "roster",
+      "schedule", "members", "roster",
     ]);
     expect(at(s, "schedule")).toMatchObject({ href: "/dashboard/schedule", state: "shown", group: "set" });
   });

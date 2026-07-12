@@ -46,7 +46,6 @@ export type SurfaceId =
   // Vertical-set member surfaces (appended by the feature registry — see src/lib/features/registry.ts).
   | "schedule"
   | "members"
-  | "packages"
   | "roster";
 
 export interface DashboardSurface {

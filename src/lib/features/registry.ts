@@ -48,7 +48,9 @@ export type CoreFeatureId = (typeof CORE_FEATURES)[number];
 
 /** Vertical sets: a set id → its member feature ids. Toggling a set flips all members together. */
 export const SETS: Record<string, { label: string; members: string[] }> = {
-  wellness: { label: "Wellness", members: ["schedule", "members", "packages", "roster"] },
+  // "packages" (class packs / memberships) is intentionally omitted until it's a
+  // real surface — a nav item leading to "Coming soon" is worse than no item.
+  wellness: { label: "Wellness", members: ["schedule", "members", "roster"] },
   // E-commerce reuses the existing storefront mechanism: `commerce` drives the Website ▸ Store
   // sub-tab via tenantHasStore(), so this set adds no new top-level surface.
   ecommerce: { label: "E-commerce", members: ["commerce"] },
@@ -69,7 +71,6 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
   // ── Wellness set (surface-bearing members) ─────────────────────────────────
   { id: "schedule", label: "Schedule", tier: "set", set: "wellness", setLabel: "Wellness", surface: { id: "schedule", label: "Schedule", href: "/dashboard/schedule" } },
   { id: "members",  label: "Members",  tier: "set", set: "wellness", setLabel: "Wellness", surface: { id: "members",  label: "Members",  href: "/dashboard/members" } },
-  { id: "packages", label: "Packages", tier: "set", set: "wellness", setLabel: "Wellness", surface: { id: "packages", label: "Packages", href: "/dashboard/packages" } },
   { id: "roster",   label: "Roster",   tier: "set", set: "wellness", setLabel: "Wellness", surface: { id: "roster",   label: "Roster",   href: "/dashboard/roster" } },
 
   // ── E-commerce set (reuses the existing Store sub-tab; no new surface) ──────

@@ -8,7 +8,6 @@ import {
   Star,
   CalendarDays,
   Users,
-  Ticket,
   ClipboardList,
   type LucideIcon,
 } from "lucide-react";
@@ -26,7 +25,6 @@ export const SURFACE_ICONS: Record<SurfaceId, LucideIcon> = {
   // Vertical-set (wellness) member surfaces.
   "schedule": CalendarDays,
   "members": Users,
-  "packages": Ticket,
   "roster": ClipboardList,
 };
 
@@ -53,6 +51,5 @@ export const SURFACE_MATCH: Record<SurfaceId, string[]> = {
   // Vertical-set (wellness) member surfaces — each maps 1:1 to its route.
   "schedule": ["/dashboard/schedule"],
   "members": ["/dashboard/members"],
-  "packages": ["/dashboard/packages"],
   "roster": ["/dashboard/roster"],
 };

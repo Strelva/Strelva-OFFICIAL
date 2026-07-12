@@ -19,7 +19,7 @@ describe("applyFeatureChange — core lock", () => {
 
 describe("applyFeatureChange — clean + expand + dedupe", () => {
   it("expands a set id into its members", () => {
-    expect(applyFeatureChange([], ["wellness"])).toEqual(["schedule", "members", "packages", "roster"]);
+    expect(applyFeatureChange([], ["wellness"])).toEqual(["schedule", "members", "roster"]);
   });
 
   it("drops unknown ids", () => {
@@ -27,11 +27,11 @@ describe("applyFeatureChange — clean + expand + dedupe", () => {
   });
 
   it("dedupes when a set and its member are both passed", () => {
-    expect(applyFeatureChange([], ["wellness", "schedule"])).toEqual(["schedule", "members", "packages", "roster"]);
+    expect(applyFeatureChange([], ["wellness", "schedule"])).toEqual(["schedule", "members", "roster"]);
   });
 
   it("removing a set turns off all its members", () => {
     // Was fully wellness-enabled; next has none of them → result is empty (no core stored to protect).
-    expect(applyFeatureChange(["schedule", "members", "packages", "roster"], [])).toEqual([]);
+    expect(applyFeatureChange(["schedule", "members", "roster"], [])).toEqual([]);
   });
 });

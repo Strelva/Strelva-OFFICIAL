@@ -43,14 +43,14 @@ describe("feature registry — isKnownFeature / cleanFeatureIds", () => {
 
 describe("feature registry — expandSets", () => {
   it("expands a set id into its member features", () => {
-    expect(expandSets(["wellness"])).toEqual(["schedule", "members", "packages", "roster"]);
+    expect(expandSets(["wellness"])).toEqual(["schedule", "members", "roster"]);
   });
   it("expands e-commerce to the legacy store flag", () => {
     expect(expandSets(["ecommerce"])).toEqual(["commerce"]);
   });
   it("leaves plain feature ids as-is and dedupes", () => {
     expect(expandSets(["reviews", "wellness", "schedule"])).toEqual([
-      "reviews", "schedule", "members", "packages", "roster",
+      "reviews", "schedule", "members", "roster",
     ]);
   });
 });
@@ -61,8 +61,8 @@ describe("feature registry — getSetSurfaces", () => {
     expect(getSetSurfaces(["reviews", "google-business"])).toEqual([]);
   });
   it("returns the wellness surfaces in registry order for enabled members", () => {
-    const surfaces = getSetSurfaces(["schedule", "members", "packages", "roster"]);
-    expect(surfaces.map((s) => s.id)).toEqual(["schedule", "members", "packages", "roster"]);
+    const surfaces = getSetSurfaces(["schedule", "members", "roster"]);
+    expect(surfaces.map((s) => s.id)).toEqual(["schedule", "members", "roster"]);
     expect(surfaces.every((s) => s.state === "shown" && s.group === "set")).toBe(true);
     expect(surfaces[0]).toMatchObject({ id: "schedule", href: "/dashboard/schedule", label: "Schedule" });
   });
@@ -81,6 +81,6 @@ describe("feature registry — getToggleableRegistry", () => {
     expect(conditional.map((f) => f.id)).toEqual(["google-business", "reviews"]);
     const wellness = sets.find((s) => s.id === "wellness")!;
     expect(wellness.label).toBe("Wellness");
-    expect(wellness.members.map((m) => m.id)).toEqual(["schedule", "members", "packages", "roster"]);
+    expect(wellness.members.map((m) => m.id)).toEqual(["schedule", "members", "roster"]);
   });
 });
