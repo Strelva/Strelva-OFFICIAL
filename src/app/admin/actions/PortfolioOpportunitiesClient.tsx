@@ -3,7 +3,10 @@
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CircleAlert, Loader2, Sparkles, Wand2 } from "lucide-react";
+import {
+  CircleAlert, Loader2, Sparkles, Wand2, MessageSquare, FileText, Wrench,
+  PenLine, Eye, Send, ArrowRight, type LucideIcon,
+} from "lucide-react";
 import { draftPortfolioOpportunity } from "./actions";
 import type {
   OpportunityGroup,
@@ -13,6 +16,40 @@ import type {
 
 /** Per-group result after a "Draft these" pass — what landed, what didn't. */
 type GroupResult = { drafted: number; skipped: number; failed: number };
+
+/** What each opportunity kind actually produces, in plain terms — so the
+ *  operator knows what a button will draft before clicking it. */
+const KIND_INFO: Record<OpportunityKind, { icon: LucideIcon; drafts: string }> = {
+  unreplied_reviews: { icon: MessageSquare, drafts: "a reply written in the client's voice" },
+  stale_sites: { icon: FileText, drafts: "a fresh post or update for the site" },
+  low_health: { icon: Wrench, drafts: "the prioritized fixes for their site health" },
+};
+
+/** The governed pipeline every draft follows — shown once so "Draft fixes /
+ *  replies" reads as "start this", not "publish now". Nothing skips a step. */
+function FlowStrip() {
+  const steps: { icon: LucideIcon; label: string; sub: string }[] = [
+    { icon: PenLine, label: "Strelva drafts", sub: "AI writes it" },
+    { icon: Eye, label: "You approve", sub: "review first" },
+    { icon: Send, label: "Goes live", sub: "posts to their site / Google" },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 rounded-xl border border-glass-border bg-glass px-4 py-3">
+      {steps.map((s, i) => (
+        <div key={s.label} className="flex items-center gap-1.5">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent-dim text-accent">
+            <s.icon className="h-3.5 w-3.5" strokeWidth={1.9} />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-[12.5px] font-semibold text-warm-white">{s.label}</span>
+            <span className="block text-[11px] text-gray-faint">{s.sub}</span>
+          </span>
+          {i < steps.length - 1 && <ArrowRight className="mx-1.5 h-3.5 w-3.5 shrink-0 text-gray-faint" strokeWidth={2} />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Reasons that are "nothing to do", not a failure, so we don't alarm the operator. */
 const BENIGN_REASONS = new Set(["already_drafted", "no_unreplied_review", "nothing_to_draft"]);
@@ -63,15 +100,18 @@ export function PortfolioOpportunitiesClient({
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div>
-        <h2 className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
-          <Sparkles className="h-5 w-5 text-accent" strokeWidth={2} />
-          Ready to work
-        </h2>
-        <p className="mt-1 text-sm text-gray-muted">
-          Latent work across the portfolio nobody has drafted yet. Draft it in one pass. Every
-          draft lands in the client&rsquo;s queue for approval, nothing publishes on its own.
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
+            <Sparkles className="h-5 w-5 text-accent" strokeWidth={2} />
+            Ready to work
+          </h2>
+          <p className="mt-1 text-sm text-gray-muted">
+            Work waiting across the portfolio that nobody has drafted yet. Hit draft and Strelva
+            writes it for each client &mdash; you approve before anything goes live.
+          </p>
+        </div>
+        <FlowStrip />
       </div>
 
       <div className="space-y-3">
@@ -84,19 +124,28 @@ export function PortfolioOpportunitiesClient({
               className="rounded-xl border border-glass-border bg-glass overflow-hidden"
             >
               <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-warm-white">{group.title}</span>
-                    <span className="shrink-0 rounded-full bg-gray-bg px-2 py-0.5 text-[11px] text-gray-muted">
-                      {group.clients.length}
-                    </span>
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-glass-border bg-surface-raised text-accent">
+                    {(() => { const K = KIND_INFO[group.kind].icon; return <K className="h-[18px] w-[18px]" strokeWidth={1.8} />; })()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-warm-white">{group.title}</span>
+                      <span className="shrink-0 rounded-full bg-gray-bg px-2 py-0.5 text-[11px] text-gray-muted">
+                        {group.clients.length}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-sm text-gray-muted">{group.summary}</p>
+                    <p className="mt-1 text-[12.5px] text-gray-faint">
+                      Drafts {KIND_INFO[group.kind].drafts}, ready to approve in each client&rsquo;s queue.
+                    </p>
                   </div>
-                  <p className="mt-0.5 text-sm text-gray-muted">{group.summary}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => draftGroup(group)}
                   disabled={processing !== null}
+                  title={`Draft ${KIND_INFO[group.kind].drafts} for ${group.clients.length} client${group.clients.length === 1 ? "" : "s"} — lands in their approval queue`}
                   className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
                   {busy ? (
