@@ -27,25 +27,9 @@ test("admin operator surfaces: overview feed, client cockpit, drafts", async ({ 
   await expect(page.getByRole("heading", { name: /Pending drafts/i })).toBeVisible();
 });
 
-test("admin operator surfaces render across the console", async ({ page }) => {
-  // Every operator surface in the grouped rail loads and shows its own header,
-  // so a broken import / server error on any one of them fails loudly here.
-  const surfaces: Array<[string, RegExp]> = [
-    ["/admin/leads", /Leads/],
-    ["/admin/analytics", /Search \+ Analytics/],
-    ["/admin/audit", /Site audits/],
-    ["/admin/actions", /Ready to work|Portfolio actions/],
-    ["/admin/onboard", /Onboard a client/],
-    ["/admin/pay-links", /Pay links/],
-    ["/admin/ops", /Operational health/],
-    ["/admin/digests", /Maintenance digests/],
-  ];
-  for (const [path, heading] of surfaces) {
-    const res = await page.goto(path, { waitUntil: "domcontentloaded" });
-    expect(res?.status(), `${path} status`).toBeLessThan(400);
-    await expect(page.getByRole("heading", { name: heading }).first(), path).toBeVisible();
-  }
-});
+// NOTE: the data-independent walk of the admin list surfaces lives in
+// tests/operator-surfaces.spec.ts (it runs in CI on a clean backend). The tests
+// below need the seeded gldf tenant + its data, so they stay local-only.
 
 test("admin client cockpit renders the operator panels", async ({ page }) => {
   // The merged /admin/clients/[id] cockpit stacks every operator panel for one

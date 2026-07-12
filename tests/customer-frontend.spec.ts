@@ -47,7 +47,16 @@ test("access request returns a no-login delivery status handoff", async ({ page 
   await page.getByLabel("Email").fill("owner@example.com");
   await page.getByLabel("Site request").fill("I need a cleaner site and easier updates.");
   await expect(page.getByLabel("Business")).toHaveValue("Demo Studio");
-  await page.getByRole("button", { name: /request your build/i }).click();
+
+  // Wait for the intake round-trip to complete before asserting the success
+  // state — under full-suite load the click could otherwise fire before the
+  // client submit handler hydrated, and the success heading never rendered.
+  const submit = page.getByRole("button", { name: /request your build/i });
+  await expect(submit).toBeEnabled();
+  await Promise.all([
+    page.waitForResponse("**/api/access-request/intake"),
+    submit.click(),
+  ]);
 
   await expect(page.getByRole("heading", { name: /request received/i })).toBeVisible();
   await expect(page.getByText(/we emailed your delivery-status link/i)).toBeVisible();

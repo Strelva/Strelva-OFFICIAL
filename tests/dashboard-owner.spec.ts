@@ -140,6 +140,19 @@ test("settings sections and report views switch on interaction", async ({ page }
   await expect(page).toHaveURL(/view=monthly/);
 });
 
+test("dashboard surfaces are feature-gated per tenant", async ({ page }) => {
+  // A feature the tenant HAS (gldf runs a storefront) renders its surface...
+  const store = await page.goto("/dashboard/store", { waitUntil: "domcontentloaded" });
+  expect(store?.status(), "store status").toBeLessThan(400);
+  await expect(page.getByRole("heading", { name: "Best sellers" }).first()).toBeVisible();
+
+  // ...a feature it LACKS (no booking/scheduling) resolves to the gated
+  // not-found, not a crash or a half-rendered surface leaking the wrong set.
+  const schedule = await page.goto("/dashboard/schedule", { waitUntil: "domcontentloaded" });
+  expect(schedule?.status(), "schedule status").toBeLessThan(500);
+  await expect(page.getByText(/404|not found|not available|isn't available/i).first()).toBeVisible();
+});
+
 test("analytics range selector drives the reporting window", async ({ page }) => {
   // Every number on Analytics is computed for the selected window; the range
   // selector must move that window and reflect it in the URL (?range=).
