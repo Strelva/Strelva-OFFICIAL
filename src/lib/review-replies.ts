@@ -18,6 +18,7 @@ import { google } from "@ai-sdk/google";
 import { getRedis } from "./redis";
 import type { TenantConfig } from "./types";
 import { analyzeReview, TOPIC_LABELS } from "./reviews/sentiment";
+import { getReplyVoice, defaultReplyVoice, buildVoicePromptSection } from "./reviews/reply-voice";
 
 /**
  * A one-line hint about what the reviewer actually talked about, derived from
@@ -274,9 +275,14 @@ export async function draftReviewReply(
   const businessName = tenantConfig.siteName || tenantConfig.id;
   const comment = review.comment?.trim() || "(no comment left)";
   const contextHint = buildReplyContextHint(review.rating, review.comment?.trim() || "");
+  // The client's own voice — how they sound + an example reply to mirror. Empty
+  // string when they haven't tuned it, so the base behaviour is unchanged.
+  const voice = await getReplyVoice(tenantConfig.id).catch(() => defaultReplyVoice());
+  const voiceSection = buildVoicePromptSection(voice, review.rating);
   const basePrompt =
     DRAFT_PROMPT(review.reviewerName, review.rating, comment, businessName) +
-    (contextHint ? `\n\n8. ${contextHint}` : "");
+    (contextHint ? `\n\n8. ${contextHint}` : "") +
+    voiceSection;
 
   // ── First AI pass ──────────────────────────────────────────────────────────
   let firstDraft: string | null = null;

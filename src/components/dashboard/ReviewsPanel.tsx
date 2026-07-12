@@ -6,13 +6,17 @@ import { Star, Sparkles, Check, Copy, Loader2, MessageSquare, Send } from "lucid
 import type { ReviewItem } from "@/lib/types";
 import { buildGoogleReviewLink, buildReviewShareMessage } from "@/lib/reviews/reputation";
 import { ReputationHeader } from "./ReputationHeader";
+import { ReplyVoicePanel } from "./ReplyVoicePanel";
 import { useDashboard } from "./DashboardContext";
+import type { ReplyVoice } from "@/lib/reviews/reply-voice";
 
 interface ReviewsPanelProps {
   reviews: ReviewItem[];
   googlePlaceId?: string;
   /** True when the tenant's Google Business connection is live — Google reviews then publish replies directly. */
   gbpConnected?: boolean;
+  /** The client's reply voice (mode + guidance + templates). */
+  voice: ReplyVoice;
 }
 
 /** Small copy-to-clipboard button with a "Copied" flip; falls back silently to
@@ -375,7 +379,7 @@ function ReviewCard({ review, gbpConnected }: { review: ReviewItem; gbpConnected
   );
 }
 
-export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: ReviewsPanelProps) {
+export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voice }: ReviewsPanelProps) {
   const { dashboardHref } = useDashboard();
   // Positive, client-facing summary only — the owner sees good numbers as good
   // numbers. Concerns / the response queue live admin-side (reviews-intel API).
@@ -421,6 +425,8 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false }: R
     <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
       <div className="mx-auto w-full max-w-3xl">
         <ReputationHeader reviews={reviews} gbpConnected={gbpConnected} copyDest={copyDest} />
+
+        <ReplyVoicePanel initialVoice={voice} />
 
         <ReviewRequestCard placeId={googlePlaceId} connectHref={connectHref} />
 
