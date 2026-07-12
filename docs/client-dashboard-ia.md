@@ -145,8 +145,9 @@ definitions live in `src/app/globals.css` (the `[data-dashboard]` block) and are
 in [`../DESIGN.md`](../DESIGN.md); the contract the IA depends on:
 
 - **One sage color system.** `--accent = oklch(73% 0.07 145)` (brand sage; buttons, links,
-  focus). `--success = oklch(70% 0.14 145)` — sage-family "go", deliberately **not** emerald,
-  kept on-hue so success and accent are one family.
+  focus). `--success = oklch(72% 0.095 145)` — sage-family "go", deliberately **not** emerald,
+  kept on-hue AND near the accent's low chroma so success reads as the same muted-sage family
+  (it was 0.14 and read as a clashing saturated green on the health bars — dropped to 0.095).
 - **One semantic status set** (the only status hues allowed): `--positive` (= `--success`),
   `--warning` (one amber, `#ca8a04`), `--critical` (one red, `--terra`), `--neutral` (gray).
   No off-brand blue/gold; do not add a fourth hue.

@@ -19,9 +19,13 @@ rewrites the bare admin host root onto the `/admin` path:
   `/sign-in` (a different host, so it can't re-enter the rewrite). The `/admin`
   layout re-checks `isSuperAdmin` as defense in depth.
 
-Nav (`src/app/admin/NavLinks.tsx`) is grouped to **five primary links** — Overview,
-Clients, Leads, Analytics, Ops — plus a **"More"** dropdown for the operator-technical
-surfaces (Actions, Onboard, Pay Links, Maintenance, Drafts, Audit), so the top bar stays scannable.
+Nav is a **left rail** (`src/app/admin/AdminRail.tsx`) grouped by purpose — **Overview**,
+then **Clients** (Clients / Leads / Onboard / Pay links / Analytics), **Review** (Actions /
+Drafts / Maintenance), and **System** (Ops / Audit). Every tool is one click and always
+visible; there is no "More" dropdown (the old `NavLinks.tsx` is gone). On a phone the rail
+is hidden and `AdminMobileNav.tsx` gives a top-bar + slide-in drawer with the same nav. All
+`/admin` surfaces share the design system in `src/app/admin/console.tsx`
+(`Panel`/`Vital`/`Meter`/`Grade`/`ClientLogo`, verdict-first, sage + 3 status hues).
 
 ## Consolidation (one list, one detail)
 

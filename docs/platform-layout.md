@@ -45,7 +45,7 @@ The owner dashboard = **Business Info** (top) + **Features** (middle) + **Profil
 |------|---------|----------|-------------|
 | **Core** | 🔒 Yes | Today, Ask Strelva, Website, Analytics | the always-on base of every sub-account |
 | **Conditional** | No | Google Business (physical location), Reviews | features gated by a property/connection |
-| **Vertical set** | No | Wellness {Schedule, Members, Packages, Roster} · E-commerce {Products, Orders, Storefront} | a **snapshot** — a bundle you apply per vertical |
+| **Vertical set** | No | Wellness {Schedule, Members, Roster} (Packages deferred until built — pulled from nav so it isn't a "Coming soon" dead end) · E-commerce {Products, Orders, Storefront} | a **snapshot** — a bundle you apply per vertical |
 
 A vertical set is exactly GHL's "snapshot" idea: a named bundle of features you switch on together for a business type.
 
