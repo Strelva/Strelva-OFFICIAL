@@ -27,6 +27,17 @@ is hidden and `AdminMobileNav.tsx` gives a top-bar + slide-in drawer with the sa
 `/admin` surfaces share the design system in `src/app/admin/console.tsx`
 (`Panel`/`Vital`/`Meter`/`Grade`/`ClientLogo`, verdict-first, sage + 3 status hues).
 
+**Mobile row rule.** Dense list rows (`ClientsCrm.tsx`, `SiteAuditsBoard.tsx`) are a flex
+row on phones and a fixed multi-column grid **only at `md+`** (`flex ... md:grid
+md:grid-cols-[…]`). Never ship a fixed `grid-cols-[…px…]` at the base breakpoint: the reserved
+tracks stay allocated even when their cells are `hidden md:block`, which crushes the identity
+column and overlaps the name with the trailing control. Same rule for card headers that pair a
+name with actions (`MaintenanceDigests.tsx` stacks under `sm`). Wide tables (`LeadRows.tsx`)
+live in an `overflow-x-auto` wrapper so the page body never scrolls sideways. `Chip` is
+`shrink-0 whitespace-nowrap` so status labels never wrap. Verify mobile by scrolling the
+surface at 390px — the client dashboard scrolls in an **inner container**, so a `fullPage`
+screenshot only captures above the fold; a viewport-fit / overflow check is NOT sufficient.
+
 ## Consolidation (one list, one detail)
 
 The console used to spread clients across **four** lists. That collapsed to **one client
