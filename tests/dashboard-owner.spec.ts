@@ -98,3 +98,44 @@ test("client fallback editor keeps drafts isolated from the active site", async 
     await request.delete("/client/gldf/api/publish");
   }
 });
+
+test("client presence surfaces render their real content", async ({ page }) => {
+  // Walk the owner-facing presence set and assert each surface shows its own
+  // stable copy (not just a 200), so a regression on any one fails loudly.
+  // Numbers are dynamic, so these anchor on fixed section titles / verdicts.
+  const surfaces: Array<[string, RegExp]> = [
+    ["/dashboard", /What Strelva did for you/],
+    ["/dashboard/analytics", /How people find you on Google/],
+    ["/dashboard/reviews", /How Strelva answers your reviews/],
+    ["/dashboard/google", /Connect your Google listing/],
+    ["/dashboard/health", /Site [Hh]ealth/],
+    ["/dashboard/history", /History & safety/],
+    ["/dashboard/store", /Best sellers/],
+  ];
+  for (const [path, needle] of surfaces) {
+    const res = await page.goto(path, { waitUntil: "domcontentloaded" });
+    expect(res?.status(), `${path} status`).toBeLessThan(400);
+    await expect(page.getByText(needle).first(), path).toBeVisible();
+  }
+});
+
+test("settings sections and report views switch on interaction", async ({ page }) => {
+  // Settings consolidated to Business / Account / Domains / Plan — switching
+  // sections must swap the in-page content, not just the active pill.
+  await page.goto("/dashboard/settings", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Business", exact: true })).toBeVisible();
+  // Business is the default section: the autonomy panel is shown.
+  await expect(page.getByText("How much Strelva handles on its own")).toBeVisible();
+
+  await page.getByRole("button", { name: "Domains", exact: true }).click();
+  await expect(page.getByText("Production Domain").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await expect(page.getByText(/Manage billing|Current plan|Billing/i).first()).toBeVisible();
+
+  // Reports: the Weekly/Monthly recap toggle drives the view via the query param.
+  await page.goto("/dashboard/reports", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "Weekly", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Monthly", exact: true }).click();
+  await expect(page).toHaveURL(/view=monthly/);
+});
