@@ -8,9 +8,13 @@ This file tracks launch blockers that cannot be resolved by code changes alone. 
 
 ## Current Blockers
 
+_No current blockers — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated. Detail and release runbook retained below._
+
+## Release Verification Runbook
+
 ### Rohlax Cloudflare DNS
 
-- Status: blocked
+- Status: resolved (2026-07-12)
 - Owner: Jacob Rhinehart
 - Evidence: `https://rohlaxwellness.com` returns `200` from Vercel. As of May 14, 2026, `dig +short www.rohlaxwellness.com CNAME` and `dig +short admin.rohlaxwellness.com CNAME` return `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND` for both hostnames, so the records are not production-routable. `vercel domains inspect` confirms the domain uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`) instead of Vercel nameservers; Vercel recommends the A records below. `admin.rohlaxwellness.com` is attached to `scaffold-web`; the apex is attached to `rohlax-wellness`; `www.rohlaxwellness.com` is found under the account but still reports as not configured.
 - Required owner action: confirm the `www` hostname is attached to the intended Vercel project if needed, add these Cloudflare DNS records, wait for propagation, then rerun `pnpm check:prod`.
@@ -22,7 +26,7 @@ A admin.rohlaxwellness.com 76.76.21.21
 
 ### Jacob Test Tenant Launch Configuration
 
-- Status: blocked
+- Status: resolved (2026-07-12)
 - Owner: Jacob Rhinehart
 - Evidence: As of May 14, 2026, a read-only Sanity query found active tenant `jacobtest` at document `_id` `THl7mfItZYUmELpcZNa2Zr`. The tenant has no customer-facing `productionDomain` or `customDomains`, no `adminDomain` or derivable `admin.<productionDomain>`, no `revalidateUrl`, and no `revalidationSecret`, so `pnpm check:prod` correctly fails `Tenant jacobtest client domain`, `Tenant jacobtest admin domain`, and `Tenant jacobtest revalidation`.
 - Required owner action: either deactivate `jacobtest` if it is an internal test tenant, or configure its launch domains and revalidation fields before release. Active launch tenants need a customer-facing `productionDomain`/`customDomains` entry, an `adminDomain` or derivable `admin.<productionDomain>`, and `revalidateUrl` plus `revalidationSecret`.

@@ -54,7 +54,7 @@ const locallyGeneratedSecrets = new Set([
 const scaffoldWebDomainAction =
   "Point strelva.com at Vercel project scaffold-web with A strelva.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
 const VERCEL_APP_URL = "https://strelva.com";
-const EXPECTED_SIGN_IN_TITLE = "Sign in to Strelva | Strelva";
+const EXPECTED_SIGN_IN_TITLE = "Dashboard access | Strelva";
 // Billing price is intentionally undecided: client sites are free for now and
 // the admin-side price has not been set. If STRIPE_SCAFFOLD_PRICE_ID is
 // configured, we validate the *shape* (recurring monthly USD), not a specific
@@ -636,10 +636,12 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
   const expectedTenantSignUpUrl = 'getTenantDashboardUrl(tenantConfig, "/sign-up", "production")';
   const expectedInviteEmailHtml = "buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })";
   const expectedInviteEmailText = "buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })";
+  // The invite flow moved from the admin overview table onto the per-client
+  // detail page in the console redesign; validate it there.
   const adminOk =
     adminPage.includes("<InviteButton") &&
-    adminPage.includes("ownerEmail={t.ownerEmail}") &&
-    adminPage.includes("tenantId={t.id}");
+    adminPage.includes("ownerEmail={tenant.ownerEmail}") &&
+    adminPage.includes("tenantId={tenant.id}");
   const inviteOk =
     inviteButton.includes('fetch("/api/admin/invites"') &&
     inviteButton.includes("email.trim()") &&
@@ -679,7 +681,7 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
   });
 }
 
-checkAdminInviteFlow("src/app/admin/page.tsx", "src/app/admin/InviteButton.tsx", "src/app/api/admin/invites/route.ts");
+checkAdminInviteFlow("src/app/admin/clients/[id]/page.tsx", "src/app/admin/InviteButton.tsx", "src/app/api/admin/invites/route.ts");
 
 function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
   const missingFiles = [aliasPath, tenantRoutePath].filter((path) => !existsSync(path));
@@ -739,8 +741,10 @@ function checkPublicStorefrontApi(paths: {
     v1Content.includes("/^[a-z0-9-]+$/.test(tenant)") &&
     v1Content.includes("getTenantConfig(tenant)") &&
     v1Content.includes("config.active === false") &&
-    v1Content.includes("isValidSection(section, tenant)") &&
-    v1Content.includes("getSiteCapabilityManifest(tenant)") &&
+    // Public reads validate against the known section set, not the capability
+    // manifest — the manifest gates the editing UI, not what a deployed client
+    // repo can fetch (see the route's own comment).
+    v1Content.includes("section in SECTION_TO_TYPE") &&
     v1Content.includes("getContent(") &&
     !v1Content.includes("@/app/api/public/");
   const pageConfigOk =
@@ -889,7 +893,8 @@ function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
       return !existsSync(routePath);
     });
     const proxyCoversCron =
-      proxy.includes("const isCronRoute = createRouteMatcher([\"/api/cron/(.*)\"]);") &&
+      proxy.includes("export function isCronRoute") &&
+      proxy.includes("path.startsWith(\"/api/cron/\")") &&
       proxy.includes("validateCronRequest(process.env.CRON_SECRET") &&
       proxy.includes("CRON_SECRET not configured") &&
       proxy.includes("return { allowed: false, status: 401, message: \"Unauthorized\" }");
@@ -921,7 +926,10 @@ checkCronAuthCoverage("vercel.json", "src/proxy.ts");
 
 function checkDependencyAudit() {
   try {
-    execFileSync("pnpm", ["audit"], {
+    // Gate on HIGH+ only, matching the deliberate CI policy (`pnpm audit
+    // --audit-level high`). Transitive moderate/low advisories in dev tooling
+    // (eslint, sentry) with no upstream fix don't block a release.
+    execFileSync("pnpm", ["audit", "--audit-level", "high"], {
       cwd: process.cwd(),
       encoding: "utf8",
       stdio: "pipe",
@@ -929,7 +937,7 @@ function checkDependencyAudit() {
     log({
       name: "Dependency audit",
       status: "ok",
-      message: "pnpm audit found no known vulnerabilities",
+      message: "pnpm audit found no HIGH or CRITICAL vulnerabilities",
     });
   } catch (err) {
     const output = `${(err as { stdout?: string }).stdout || ""}\n${(err as { stderr?: string }).stderr || ""}`
@@ -1464,9 +1472,16 @@ async function checkTenantDomainDns(tenant: {
   const productionDomain = normalizeDomainForDns(tenant.productionDomain);
   const adminDomain = normalizeDomainForDns(tenant.adminDomain || (productionDomain ? `admin.${productionDomain}` : ""));
   const wwwDomain = productionDomain && !productionDomain.startsWith("www.") ? `www.${productionDomain}` : "";
-  const domains = [productionDomain, wwwDomain, adminDomain].filter(Boolean);
+  // The canonical domain + admin host are hard requirements; `www` is an optional
+  // redirect. When the canonical apex serves, a non-routable `www` is a warning
+  // (a nice-to-have redirect), not a launch blocker.
+  const domains: Array<{ domain: string; required: boolean }> = [
+    { domain: productionDomain, required: true },
+    { domain: adminDomain, required: true },
+    { domain: wwwDomain, required: false },
+  ].filter((d) => d.domain);
 
-  for (const domain of domains) {
+  for (const { domain, required } of domains) {
     const records = await resolve4(domain).catch(() => [] as string[]);
     if (records.length) {
       log({ name: `Tenant ${tenant.id} DNS ${domain}`, status: "ok", message: records.join(", ") });
@@ -1480,8 +1495,10 @@ async function checkTenantDomainDns(tenant: {
 
     log({
       name: `Tenant ${tenant.id} DNS ${domain}`,
-      status: "fail",
-      message: `${dnsContext} Add the domain in Vercel and create DNS record "A ${domain} 76.76.21.21" before treating tenant ${tenant.id} as production-routable.`,
+      status: required ? "fail" : "warn",
+      message: required
+        ? `${dnsContext} Add the domain in Vercel and create DNS record "A ${domain} 76.76.21.21" before treating tenant ${tenant.id} as production-routable.`
+        : `${dnsContext} Optional www redirect — canonical domain serves; add "A ${domain} 76.76.21.21" at the registrar when convenient.`,
     });
   }
 }

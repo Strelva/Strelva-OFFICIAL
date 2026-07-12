@@ -524,7 +524,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("src/app/no-access/page.tsx");
     expect(source).toContain("src/app/(marketing)/account/page.tsx");
     expect(source).toContain("src/components/auth/UseInvitedEmailButton.tsx");
-    expect(source).toContain("src/app/admin/page.tsx");
+    expect(source).toContain("src/app/admin/clients/[id]/page.tsx");
     expect(source).toContain("src/app/admin/InviteButton.tsx");
     expect(source).toContain("src/app/api/admin/invites/route.ts");
     expect(source).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
@@ -577,7 +577,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("src/app/api/v1/content/[tenant]/[section]/route.ts");
     expect(source).toContain("src/app/api/v1/page-config/[tenant]/route.ts");
     expect(source).toContain("config.active === false");
-    expect(source).toContain("isValidSection(section, tenant)");
+    expect(source).toContain("section in SECTION_TO_TYPE");
     expect(source).toContain("/api/v1 storefront APIs own the contract directly");
     expect(source).toContain("OAuth callback state");
     expect(source).toContain("src/app/api/oauth/calendly/callback/route.ts");
@@ -597,8 +597,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("remove Porkbun/l.ink forwarding");
     expect(source).toContain("Production domain routing");
     expect(source).toContain("requiredEnv entries are covered by check:prod or storefront handoff docs");
-    expect(source).toContain('"pnpm", ["audit"]');
-    expect(source).toContain("pnpm audit found no known vulnerabilities");
+    expect(source).toContain('"pnpm", ["audit", "--audit-level", "high"]');
+    expect(source).toContain("pnpm audit found no HIGH or CRITICAL vulnerabilities");
     expect(source).toContain("pnpm audit reported vulnerabilities; resolve them before release:");
     expect(source).toContain("slice(0, 8)");
     expect(packageJson).toContain('"check:release"');
