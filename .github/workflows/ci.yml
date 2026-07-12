@@ -64,21 +64,12 @@ jobs:
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"
 
-      - name: Surface smoke
-        # Separate step because it needs the dev super-admin bypass ON
-        # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces)
-        # to reach the /admin console and resolve the owner dashboard, whereas the
-        # public smoke above runs with the bypass OFF.
-        #
-        # operator-surfaces.spec.ts (admin list surfaces) needs no backend at all.
-        # owner-surfaces.spec.ts (owner dashboard + client cockpit) needs a tenant
-        # to resolve, so we seed a SYNTHETIC gldf fixture (no real secrets) into
-        # the dev-file tenant path first. Content comes from the committed
-        # gldf-content-defaults; the operational stores stay empty, and every
-        # assertion is data-independent, so a broken page fails the build without
-        # any DB/Redis/prod access.
-        run: |
-          cp tests/fixtures/tenants.fixture.json dev-tenants.json
-          pnpm smoke:surfaces
-        env:
-          CI: true
+      # NOTE: the ungated "Surface smoke" (operator-surfaces / owner-surfaces via
+      # `pnpm smoke:surfaces` + the tenants fixture) is intentionally NOT wired here
+      # yet. It exercises the /admin console pages, and on a cold CI runner Turbopack
+      # DEV mis-serializes the `font-[family-name:var(--font-display)]` arbitrary
+      # class in globals.css (RSC payload bleeds into the CSS parse), crashing the
+      # dev webServer before the tests run. `pnpm build` (prod) compiles it fine, and
+      # the ungated bypass requires NODE_ENV!=production so `next start` can't be used
+      # instead. The specs + fixture ship and run locally (`pnpm smoke:surfaces`);
+      # wiring them into CI is deferred behind fixing that Turbopack dev-CSS bug.
