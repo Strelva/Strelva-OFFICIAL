@@ -67,7 +67,14 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
         ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan failed");
+      const raw = err instanceof Error ? err.message : "";
+      const name = rows.find((r) => r.id === id)?.siteName ?? "that site";
+      // A DNS/connection failure is the common case (wrong or unresolvable
+      // domain) — say that plainly instead of leaking "getaddrinfo ENOTFOUND".
+      const msg = /ENOTFOUND|getaddrinfo|ECONNREFUSED|fetch failed/i.test(raw)
+        ? `Couldn't reach ${name}'s site — check the production domain is live.`
+        : `Couldn't scan ${name}${raw ? `: ${raw}` : "."}`;
+      setError(msg);
     } finally {
       setBusy((b) => {
         const n = new Set(b);
