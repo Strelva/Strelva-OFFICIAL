@@ -12,6 +12,8 @@ pnpm build                        # Production build
 pnpm lint                         # ESLint
 pnpm test                         # Run all Vitest tests
 pnpm test src/__tests__/core.test.ts  # Single test file
+pnpm smoke                        # Playwright (public smoke; bypass OFF)
+pnpm smoke:surfaces               # Ungated admin/owner console smoke (bypass ON + fixture)
 pnpm typecheck                    # tsc --noEmit
 pnpm provision-tenant             # Create new tenant
 pnpm check:prod                   # Production readiness checklist
@@ -21,6 +23,8 @@ npx tsx scripts/ai-visibility.ts "<Business>" --site=x.com --category="HVAC" --c
 ```
 
 For subdomain testing: `gldf.localhost:3000` routes to tenant `gldf`. Custom domain routing is exercised via `CUSTOM_DOMAIN_MAP` in `.env`.
+
+**Test + CI layout** (vitest layers, the two Playwright bypass modes, the CI jobs, and the CI-faithful local sim — blank Redis + data sources, or a green local run lies): [docs/testing-and-ci.md](./docs/testing-and-ci.md).
 
 ## Stack
 
@@ -276,7 +280,11 @@ Local-business owners will pay for a dashboard that proves their website is work
 
 > Dashboard UI conventions: accent buttons pair `bg-accent` with `text-on-accent` (dark
 > ink — white fails WCAG AA on the light sage accent). `text-warm-black` / `text-gray-muted`
-> are theme-aware and render light on the dark dashboard.
+> are theme-aware and render light on the dark dashboard. **Display (heading) font: use the
+> `font-display` `@utility` (`src/app/globals.css`), NEVER the arbitrary
+> `font-[family-name:var(--font-display)]` class — Turbopack DEV mis-serializes that inline
+> arbitrary value on a cold compile (RSC payload bleeds into the CSS parse) and crashes the
+> dev server / breaks CI, even though the prod build compiles it fine.**
 
 ## What You See (Jacob)
 - Slack notifications for every AI change
