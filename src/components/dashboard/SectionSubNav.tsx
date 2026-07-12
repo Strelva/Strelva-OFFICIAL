@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
+import { segmentPill } from "./segment-pill";
 
 /**
  * The ONE sub-nav for the Website pillar. Folds every Website sub-section —
@@ -44,10 +45,10 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
 
   return (
     <nav
-      className="shrink-0 overflow-x-auto border-b border-glass-border bg-surface-base/70 px-2 sm:px-4 lg:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="shrink-0 overflow-x-auto border-b border-glass-border px-4 py-3 sm:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       aria-label="Website sections"
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {items.map((item) => {
           const isActive = eff.startsWith(item.href);
           return (
@@ -55,11 +56,7 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
               key={item.href}
               href={dashboardHref(item.href)}
               prefetch={false}
-              className={`inline-flex min-h-[44px] shrink-0 items-center rounded-lg px-3 text-[13px] font-medium transition-colors lg:min-h-[38px] ${
-                isActive
-                  ? "bg-gray-bg-hover text-warm-black"
-                  : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
-              }`}
+              className={`min-h-[36px] shrink-0 ${segmentPill(isActive)}`}
               aria-current={isActive ? "page" : undefined}
             >
               {item.label}

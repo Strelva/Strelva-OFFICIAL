@@ -2,21 +2,13 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { segmentPill as pill } from "./segment-pill";
 
 const PRESETS = [
   { key: "live", label: "Live" },
   { key: "week", label: "This week" },
   { key: "month", label: "This month" },
 ] as const;
-
-function pill(active: boolean): string {
-  return [
-    "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-    active
-      ? "bg-accent text-on-accent"
-      : "border border-glass-border bg-glass text-gray-fg hover:text-warm-black",
-  ].join(" ");
-}
 
 /** The analytics range switch: Live (rolling) or a dated window (this week /
  *  this month / a custom span). Updates the URL `?range=` so the server

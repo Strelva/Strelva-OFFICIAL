@@ -276,7 +276,7 @@ export function HistorySidebar({
                         onClick={onClose}
                         className={`group flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
                           isActive
-                            ? "bg-gray-bg-hover text-warm-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]"
+                            ? "bg-gray-bg-hover text-warm-black"
                             : isConnect || isPreview
                               ? "text-gray-faint hover:bg-gray-bg hover:text-warm-black"
                               : "text-gray-muted hover:bg-gray-bg hover:text-warm-black"
