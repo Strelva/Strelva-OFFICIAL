@@ -43,7 +43,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
           Search &amp; Analytics
         </p>
-        <h2 className="mt-1 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">
+        <h2 className="mt-1 font-display text-[18px] font-normal text-warm-black">
           How people find you on Google
         </h2>
       </div>

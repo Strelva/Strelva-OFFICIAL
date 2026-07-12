@@ -33,7 +33,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
           Traffic
         </p>
-        <h2 className="mt-1 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">
+        <h2 className="mt-1 font-display text-[18px] font-normal text-warm-black">
           Where your visitors come from
         </h2>
       </div>

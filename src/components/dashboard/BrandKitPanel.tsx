@@ -98,7 +98,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
             <Sparkles className="h-3.5 w-3.5" strokeWidth={1.7} />
             Brand Kit
           </div>
-          <h1 className="mt-2 font-[family-name:var(--font-display)] text-[28px] font-normal leading-tight text-warm-black">
+          <h1 className="mt-2 font-display text-[28px] font-normal leading-tight text-warm-black">
             Teach Strelva about your business
           </h1>
           <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-gray-muted">

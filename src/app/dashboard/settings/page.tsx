@@ -1589,7 +1589,7 @@ export default function SettingsPage() {
           {/* Section header — each tab owns its own framing now (no generic banner). */}
           {meta && (
             <div className="mb-8">
-              <h1 className="font-[family-name:var(--font-display)] text-[28px] sm:text-[32px] font-medium text-warm-white">{meta.title}</h1>
+              <h1 className="font-display text-[28px] sm:text-[32px] font-medium text-warm-white">{meta.title}</h1>
               <p className="text-[13px] leading-relaxed text-gray-muted mt-1.5">{meta.description}</p>
             </div>
           )}

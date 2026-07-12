@@ -63,7 +63,7 @@ export function ActivityFeed({
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
           What Strelva did for you
         </p>
-        <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">
+        <h2 className="mt-2 font-display text-[18px] font-normal text-warm-black">
           {groups.length > 0 ? "We've been busy on your site" : "Your updates land here"}
         </h2>
       </div>

@@ -3,12 +3,22 @@ name: CI
 on:
   push:
     branches: [main]
+    # Docs/markdown-only changes don't need the full build+smoke — save Actions minutes.
+    paths-ignore: ["**.md", "docs/**", ".vscode/**", "LICENSE"]
   # Run on EVERY pull request, not just those targeting main. Stacked PRs
   # (e.g. harden/* based on another harden/*) otherwise get zero CI — the gate
   # only fired once the whole stack reached main, so the intermediate PRs were
   # never enforced. No branch filter = every PR runs lint/typecheck/test/
   # coverage/build/audit/smoke before it can merge.
   pull_request:
+    paths-ignore: ["**.md", "docs/**", ".vscode/**", "LICENSE"]
+
+# Cancel a superseded run when new commits land on the same branch/PR. This is the
+# single biggest Actions-minutes saver during active development: without it, every
+# push starts a fresh ~6-min build while the previous one keeps running to completion.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -48,8 +58,21 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # On a cache hit only install the OS deps (fast); the ~100MB chromium
+        # download is restored from cache. On a miss, install both.
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            pnpm exec playwright install-deps chromium
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
 
       - name: Smoke tests
         # Runs against `next dev` (see playwright.config.ts). Dev mode is
@@ -63,3 +86,23 @@ jobs:
           CI: true
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"
+
+      - name: Surface smoke
+        # Ungated console coverage — needs the dev super-admin bypass ON
+        # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces) to
+        # reach the /admin console and resolve the owner dashboard, whereas the public
+        # smoke above runs with the bypass OFF.
+        #
+        # operator-surfaces.spec.ts (admin list surfaces) needs no backend at all.
+        # owner-surfaces.spec.ts (owner dashboard + client cockpit) needs a tenant to
+        # resolve, so we seed a SYNTHETIC gldf fixture (no real secrets) into the
+        # dev-file tenant path first. Content comes from the committed
+        # gldf-content-defaults; the operational stores stay empty and every assertion
+        # is data-independent, so a broken page fails the build without any
+        # DB/Redis/prod access. (Re-enabled once the `font-display` @utility replaced
+        # the arbitrary `font-[family-name:...]` class that crashed Turbopack dev.)
+        run: |
+          cp tests/fixtures/tenants.fixture.json dev-tenants.json
+          pnpm smoke:surfaces
+        env:
+          CI: true

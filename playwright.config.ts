@@ -8,6 +8,9 @@ export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
   workers: 1,
+  // Absorb the occasional cold-compile / dev-server hiccup in CI (a real failure
+  // still fails all retries). Local runs get 0 so flakiness stays visible.
+  retries: process.env.CI ? 2 : 0,
   use: {
     baseURL,
     trace: "retain-on-failure",

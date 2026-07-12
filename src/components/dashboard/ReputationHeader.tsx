@@ -146,7 +146,7 @@ export function ReputationHeader({ reviews, gbpConnected, copyDest }: Reputation
       <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
         Reputation
       </p>
-      <h1 className="max-w-2xl font-[family-name:var(--font-display)] text-[24px] font-normal leading-snug tracking-[-0.01em] text-warm-black sm:text-[30px]">
+      <h1 className="max-w-2xl font-display text-[24px] font-normal leading-snug tracking-[-0.01em] text-warm-black sm:text-[30px]">
         {rep.verdict}
       </h1>
 

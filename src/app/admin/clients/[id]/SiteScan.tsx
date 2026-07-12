@@ -145,7 +145,7 @@ export function SiteScan({
               {scan.grade}
             </div>
             <div>
-              <p className="font-[family-name:var(--font-display)] text-2xl font-normal text-warm-white">{scan.overallScore}/100</p>
+              <p className="font-display text-2xl font-normal text-warm-white">{scan.overallScore}/100</p>
               <p className="text-xs text-gray-faint">
                 {detail ? "fresh scan" : "last stored result"}
               </p>

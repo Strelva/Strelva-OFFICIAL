@@ -73,7 +73,7 @@ function NoAccessState() {
     >
       <div className="text-center max-w-md">
         <h1
-          className="font-[family-name:var(--font-display)] text-[26px] font-normal mb-3"
+          className="font-display text-[26px] font-normal mb-3"
           style={{ color: "var(--m-text)" }}
         >
           No invited sites on this account
@@ -134,7 +134,7 @@ function TenantPicker({ tenants, isSuperAdmin = false }: TenantPickerProps) {
     >
       <div className="w-full max-w-md">
         <h1
-          className="font-[family-name:var(--font-display)] text-[26px] font-normal mb-2 text-center"
+          className="font-display text-[26px] font-normal mb-2 text-center"
           style={{ color: "var(--m-text)" }}
         >
           Choose a site

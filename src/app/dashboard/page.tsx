@@ -143,7 +143,7 @@ async function DashboardHome() {
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Today
             </p>
-            <h1 className="max-w-2xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug text-warm-black sm:text-[32px]">
+            <h1 className="max-w-2xl font-display text-[28px] font-medium leading-snug text-warm-black sm:text-[32px]">
               {verdict}
             </h1>
             <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-gray-muted">
@@ -270,7 +270,7 @@ async function DashboardHome() {
                   <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
                     Who reached out
                   </p>
-                  <h2 className="mt-2 font-[family-name:var(--font-display)] text-[18px] font-normal text-warm-black">
+                  <h2 className="mt-2 font-display text-[18px] font-normal text-warm-black">
                     {leadSummary.count} {leadSummary.count === 1 ? "person" : "people"} this month
                   </h2>
                 </div>

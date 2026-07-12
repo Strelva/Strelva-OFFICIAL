@@ -88,7 +88,7 @@ export default async function AdminClientsPage() {
     <div className="max-w-6xl">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
             Clients
           </h1>
           <p className="mt-1.5 text-[13px] text-gray-muted">

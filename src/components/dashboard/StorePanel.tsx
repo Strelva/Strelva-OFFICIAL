@@ -64,7 +64,7 @@ export function StorePanel({
       </div>
 
       {/* Verdict — the one honest sentence before any metric */}
-      <h1 className="mt-2 font-[family-name:var(--font-display)] text-[28px] font-normal leading-tight text-warm-black">
+      <h1 className="mt-2 font-display text-[28px] font-normal leading-tight text-warm-black">
         {verdict.headline}
       </h1>
       {verdict.detail && (

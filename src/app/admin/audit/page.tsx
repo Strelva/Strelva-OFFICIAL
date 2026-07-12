@@ -50,7 +50,7 @@ export default async function AuditPage() {
   return (
     <div className="max-w-6xl space-y-10">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Site audits</h1>
+        <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Site audits</h1>
         <p className="mt-1 text-sm text-gray-muted">
           Run a health + SEO audit on any client&rsquo;s live site &mdash; grade, score, and what to fix first.
         </p>
@@ -60,7 +60,7 @@ export default async function AuditPage() {
 
       <div className="space-y-4">
         <div>
-          <h2 className="font-[family-name:var(--font-display)] text-[20px] font-medium tracking-[-0.01em] text-warm-white">Operator activity</h2>
+          <h2 className="font-display text-[20px] font-medium tracking-[-0.01em] text-warm-white">Operator activity</h2>
           <p className="mt-1 text-sm text-gray-muted">Every operator action across the portfolio, newest first.</p>
         </div>
         <AuditList events={view} />

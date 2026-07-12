@@ -88,7 +88,7 @@ export function Vital({
           <span className={`rounded-md px-[7px] py-0.5 text-[11.5px] font-semibold ${TONE_CHIP[deltaTone]}`}>{delta}</span>
         )}
       </div>
-      <div className="mt-[11px] flex items-baseline gap-1.5 font-[family-name:var(--font-display)] text-[29px] font-medium leading-none tracking-[-0.02em] text-warm-white">
+      <div className="mt-[11px] flex items-baseline gap-1.5 font-display text-[29px] font-medium leading-none tracking-[-0.02em] text-warm-white">
         {value}
         {suffix && <span className="text-[15px] text-gray-faint">{suffix}</span>}
       </div>
@@ -187,7 +187,7 @@ export function ClientLogo({
         <img src={logoUrl} alt="" className="h-full w-full object-cover" />
       ) : (
         <span
-          className="font-[family-name:var(--font-display)] font-semibold text-gray-muted"
+          className="font-display font-semibold text-gray-muted"
           style={{ fontSize: Math.round(size * 0.42) }}
         >
           {initial}

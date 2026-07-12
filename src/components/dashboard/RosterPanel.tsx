@@ -64,7 +64,7 @@ export function RosterPanel({ bookings, today }: { bookings: Booking[]; today: s
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
             Roster · {friendlyToday(today)}
           </p>
-          <h1 className="font-[family-name:var(--font-display)] text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
+          <h1 className="font-display text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
             {active.length === 0
               ? "Nothing booked today"
               : `${active.length} booked today`}

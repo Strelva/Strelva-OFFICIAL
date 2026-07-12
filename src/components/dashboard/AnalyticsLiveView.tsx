@@ -63,7 +63,7 @@ export function AnalyticsLiveView({
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Analytics</p>
             <AnalyticsRangeSelector current={stats.range.key} />
           </div>
-          <h1 className="max-w-2xl font-[family-name:var(--font-display)] text-[28px] font-medium leading-snug tracking-[-0.01em] text-warm-black sm:text-[32px]">
+          <h1 className="max-w-2xl font-display text-[28px] font-medium leading-snug tracking-[-0.01em] text-warm-black sm:text-[32px]">
             {headline}
           </h1>
         </div>

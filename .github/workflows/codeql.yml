@@ -1,12 +1,17 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # Was push+PR on every change, but analyze runs with `upload: never` (code
+  # scanning isn't enabled in repo settings), so per-event runs burned ~3 Actions
+  # minutes producing nothing usable. Weekly schedule only until scanning is turned
+  # on — then restore `push`/`pull_request` (and flip `upload:` below) in one edit.
   schedule:
     - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:

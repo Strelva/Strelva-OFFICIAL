@@ -158,7 +158,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
     return (
       <>
         {error && <ErrorBanner>{error}</ErrorBanner>}
-        <h2 className="mb-4 font-[family-name:var(--font-display)] text-[22px] font-normal tracking-[-0.01em] text-warm-black">
+        <h2 className="mb-4 font-display text-[22px] font-normal tracking-[-0.01em] text-warm-black">
           No appointments yet
         </h2>
         <div className="rounded-xl dashboard-panel p-6 text-center">
@@ -180,7 +180,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
   return (
     <>
       {error && <ErrorBanner>{error}</ErrorBanner>}
-      <h2 className="mb-1 font-[family-name:var(--font-display)] text-[22px] font-normal tracking-[-0.01em] text-warm-black">
+      <h2 className="mb-1 font-display text-[22px] font-normal tracking-[-0.01em] text-warm-black">
         You have {thisWeek} {thisWeek === 1 ? "appointment" : "appointments"} this week
       </h2>
       <p className="mb-5 text-[13px] text-gray-muted">

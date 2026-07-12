@@ -274,7 +274,7 @@ export function ConnectionsPage() {
             Integrations
           </p>
           <div className="flex items-baseline gap-3">
-            <h1 className="font-[family-name:var(--font-display)] text-[24px] sm:text-[30px] font-normal text-warm-black tracking-[-0.01em]">
+            <h1 className="font-display text-[24px] sm:text-[30px] font-normal text-warm-black tracking-[-0.01em]">
               Connect your accounts
             </h1>
             <span className="text-[13px] text-gray-muted">
