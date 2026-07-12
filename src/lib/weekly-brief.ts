@@ -4,7 +4,7 @@ import type { WeeklyBrief, WeeklyBriefStats } from "./types";
 import { getRedis } from "./redis";
 import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSearchData, getSectionTimestamps } from "./storage";
 import { getEvents } from "./events";
-import { getSuggestions } from "./suggestions";
+import { getSuggestions, ownerSuggestions } from "./suggestions";
 import { detectStaleSections } from "./reports";
 import { getLatestSnapshots, diffSnapshots, type VisibilityDiff } from "./visibility/snapshots";
 import { getReviews } from "./reviews";
@@ -176,7 +176,8 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     phoneClicksDelta: phoneCounts.thisWeek - phoneCounts.lastWeek,
   };
 
-  const [suggestion] = await getSuggestions(tenantId);
+  // Owner-facing only — the brief never hands the client our operator craft.
+  const [suggestion] = ownerSuggestions(await getSuggestions(tenantId));
   const nextAction = suggestion
     ? { title: suggestion.title, description: suggestion.description }
     : undefined;
@@ -316,7 +317,7 @@ export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrie
     ...buildHighlights(stats, monthEvents, activity, reviewSummary, period.phoneClicks, "this month"),
   ].slice(0, 5);
 
-  const [suggestion] = await getSuggestions(tenantId);
+  const [suggestion] = ownerSuggestions(await getSuggestions(tenantId));
   const nextAction = suggestion ? { title: suggestion.title, description: suggestion.description } : undefined;
 
   const summary = await buildSummary({

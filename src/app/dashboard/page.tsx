@@ -13,7 +13,7 @@ import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomai
 import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
-import { getSuggestions } from "@/lib/suggestions";
+import { getSuggestions, ownerSuggestions } from "@/lib/suggestions";
 import { DoThisNextCard } from "@/components/dashboard/DoThisNextCard";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
@@ -120,10 +120,11 @@ async function DashboardHome() {
     await generateProactiveSuggestions(tenant).catch(() => {});
   }
 
-  // "Do this next" — the single top pending suggestion (getSuggestions returns
-  // pending, newest-first) surfaced as a one-tap hand-off into chat. Never on
+  // "Do this next" — the single top OWNER-facing pending suggestion (getSuggestions
+  // returns pending, newest-first) surfaced as a one-tap hand-off into chat.
+  // Operator craft is filtered out; the client is never handed our work. Never on
   // day one; fail-soft to no card.
-  const topSuggestion = isFresh ? null : (await getSuggestions(tenant).catch(() => []))[0] ?? null;
+  const topSuggestion = isFresh ? null : ownerSuggestions(await getSuggestions(tenant).catch(() => []))[0] ?? null;
   const doNextPrompt = topSuggestion
     ? topSuggestion.action.startsWith("prompt:")
       ? topSuggestion.action.slice("prompt:".length)

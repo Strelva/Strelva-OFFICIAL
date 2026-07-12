@@ -11,6 +11,7 @@ import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagno
 import { getReviews } from "@/lib/reviews";
 import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";
 import { getTenantCrm } from "@/lib/tenant-crm";
+import { getSuggestions, operatorSuggestions } from "@/lib/suggestions";
 import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
@@ -20,6 +21,7 @@ import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
+import { OperatorOpportunities } from "./OperatorOpportunities";
 import { InviteButton } from "../../InviteButton";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { ClientLogo, Chip } from "../../console";
@@ -71,7 +73,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -85,7 +87,9 @@ export default async function ClientDetailPage({
       getTenantCrm(id).catch(() => null),
       getTenantAtRisk(id).catch(() => noRisk),
       getDailyMetrics(id, 14).catch(() => []),
+      getSuggestions(id).catch(() => []),
     ]);
+  const opportunities = operatorSuggestions(suggestions);
 
   const latestVis = visSnapshots[0] ?? null;
   const visSummary = latestVis ? summarizeVisibility(latestVis) : null;
@@ -194,6 +198,8 @@ export default async function ClientDetailPage({
       <div id="site-health" className="scroll-mt-24">
         <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
       </div>
+
+      <OperatorOpportunities suggestions={opportunities} />
 
       <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
 

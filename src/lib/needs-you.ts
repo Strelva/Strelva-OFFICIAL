@@ -2,7 +2,15 @@ import { getEvents, getQueueCount } from "./events";
 import { getSectionTimestamps } from "./storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { detectStaleSections } from "./reports";
+import { suggestionAudience } from "./suggestions";
 import type { ContentSection, UnifiedEvent } from "./types";
+
+/** A client should only ever see owner-facing asks in "Needs you". Operator
+ *  suggestion cards (our craft) are filtered out here so pre-existing ones queued
+ *  before the audience split disappear too — new ones no longer create an event. */
+function isClientVisible(e: UnifiedEvent): boolean {
+  return e.type !== "suggestion" || suggestionAudience(e.title) === "owner";
+}
 
 export interface NeedsYouData {
   pending: UnifiedEvent[];
@@ -34,5 +42,17 @@ export async function getNeedsYouData(tenant: string): Promise<NeedsYouData> {
     ? detectStaleSections(timestamps, siteModel.contentSections as ContentSection[]).length
     : 0;
 
-  return { pending, resolved, pendingCount, staleSectionCount };
+  // Drop operator suggestion cards from both lists, and derive the count from the
+  // client-visible pending set so the badge and the rendered queue never disagree
+  // (a queue of only operator suggestions must read as empty, not "1 to review").
+  const visiblePending = pending.filter(isClientVisible);
+  const visibleResolved = resolved.filter(isClientVisible);
+  const hiddenPending = pending.length - visiblePending.length;
+
+  return {
+    pending: visiblePending,
+    resolved: visibleResolved,
+    pendingCount: Math.max(0, pendingCount - hiddenPending),
+    staleSectionCount,
+  };
 }

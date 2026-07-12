@@ -24,6 +24,33 @@ export interface Suggestion {
   status: "pending" | "accepted" | "dismissed";
 }
 
+// --- Audience: who a suggestion is actually FOR ---
+//
+// Every suggestion this engine generates is *operator* craft — writing site copy,
+// fixing SEO, drafting posts, chasing traffic. None of it is something a business
+// owner knows how to do or should be handed as homework. So operator suggestions
+// never become a client "Needs you" card; they surface on the admin cockpit and we
+// do them for the client, who sees the RESULT in the activity feed. The only asks a
+// client should ever see are things ONLY they can do (connect Google/Yelp, share
+// their review link) — those are `owner`, and today they live as per-surface connect
+// states, not as suggestions. Kept as a title allow-list (no schema column) so it
+// classifies both freshly-generated and already-stored suggestions uniformly.
+const OWNER_SUGGESTION_TITLES = new Set<string>([]);
+
+export function suggestionAudience(title: string): "owner" | "operator" {
+  return OWNER_SUGGESTION_TITLES.has(title) ? "owner" : "operator";
+}
+
+/** The client-safe subset — suggestions a business owner should actually see. */
+export function ownerSuggestions(list: Suggestion[]): Suggestion[] {
+  return list.filter((s) => suggestionAudience(s.title) === "owner");
+}
+
+/** The operator work-list — suggestions we do for the client, surfaced admin-side. */
+export function operatorSuggestions(list: Suggestion[]): Suggestion[] {
+  return list.filter((s) => suggestionAudience(s.title) === "operator");
+}
+
 // --- Postgres dual-path helpers (self-contained; do not move to repositories.ts) ---
 //
 // The `suggestions` table maps 1:1 to the Suggestion interface (camelCase ->
@@ -238,7 +265,9 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
 
     await pgInsertSuggestion(entry);
 
-    await addSuggestionEvent(entry);
+    // Only owner-facing suggestions become a client "Needs you" card. Operator
+    // craft is stored (surfaced admin-side) but never handed to the client.
+    if (suggestionAudience(entry.title) === "owner") await addSuggestionEvent(entry);
     return entry;
   }
 
@@ -264,7 +293,7 @@ export async function addSuggestion(suggestion: Omit<Suggestion, "id" | "created
   tenantSuggestions.push(entry);
   store[suggestion.tenantId] = tenantSuggestions;
   await writeSuggestions(store);
-  await addSuggestionEvent(entry);
+  if (suggestionAudience(entry.title) === "owner") await addSuggestionEvent(entry);
   return entry;
 }
 

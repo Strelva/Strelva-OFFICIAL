@@ -19,10 +19,13 @@ type GroupResult = { drafted: number; skipped: number; failed: number };
 
 /** What each opportunity kind actually produces, in plain terms — so the
  *  operator knows what a button will draft before clicking it. */
-const KIND_INFO: Record<OpportunityKind, { icon: LucideIcon; drafts: string }> = {
-  unreplied_reviews: { icon: MessageSquare, drafts: "a reply written in the client's voice" },
-  stale_sites: { icon: FileText, drafts: "a fresh post or update for the site" },
-  low_health: { icon: Wrench, drafts: "the prioritized fixes for their site health" },
+const KIND_INFO: Record<OpportunityKind, { icon: LucideIcon; drafts: string; lands: string }> = {
+  // Review replies are an owner decision — they land in the client's approval queue.
+  // Site/health work is operator craft — it lands on our side (each client's cockpit),
+  // never as client homework.
+  unreplied_reviews: { icon: MessageSquare, drafts: "a reply written in the client's voice", lands: "ready to approve in each client's queue" },
+  stale_sites: { icon: FileText, drafts: "a fresh post or update for the site", lands: "onto your work-list on each client's page" },
+  low_health: { icon: Wrench, drafts: "the prioritized fixes for their site health", lands: "onto your work-list on each client's page" },
 };
 
 /** The governed pipeline every draft follows — shown once so "Draft fixes /
@@ -137,7 +140,7 @@ export function PortfolioOpportunitiesClient({
                     </div>
                     <p className="mt-0.5 text-sm text-gray-muted">{group.summary}</p>
                     <p className="mt-1 text-[12.5px] text-gray-faint">
-                      Drafts {KIND_INFO[group.kind].drafts}, ready to approve in each client&rsquo;s queue.
+                      Drafts {KIND_INFO[group.kind].drafts}, {KIND_INFO[group.kind].lands}.
                     </p>
                   </div>
                 </div>
@@ -145,7 +148,7 @@ export function PortfolioOpportunitiesClient({
                   type="button"
                   onClick={() => draftGroup(group)}
                   disabled={processing !== null}
-                  title={`Draft ${KIND_INFO[group.kind].drafts} for ${group.clients.length} client${group.clients.length === 1 ? "" : "s"} — lands in their approval queue`}
+                  title={`Draft ${KIND_INFO[group.kind].drafts} for ${group.clients.length} client${group.clients.length === 1 ? "" : "s"} — ${KIND_INFO[group.kind].lands}`}
                   className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
                   {busy ? (
