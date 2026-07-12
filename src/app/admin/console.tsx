@@ -103,7 +103,7 @@ export function Vital({
 
 /** A status pill: at-risk / live / building / neutral. Text, not a dot. */
 export function Chip({ tone = "neutral", children, className = "" }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-[-0.01em] ${TONE_CHIP[tone]} ${className}`}>{children}</span>;
+  return <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-[-0.01em] ${TONE_CHIP[tone]} ${className}`}>{children}</span>;
 }
 
 /** SEO/site-health letter grade, colored by band. */

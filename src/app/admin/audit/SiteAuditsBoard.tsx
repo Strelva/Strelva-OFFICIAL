@@ -127,8 +127,8 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
           {rows.map((r) => {
             const scanning = busy.has(r.id);
             return (
-              <div key={r.id} className="grid grid-cols-[1fr_auto_150px_auto_auto] items-center gap-5 px-4 py-3">
-                <div className="flex min-w-0 items-center gap-3">
+              <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto_150px_auto_auto] md:gap-5">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <ClientLogo name={r.siteName} size={34} />
                   <div className="min-w-0">
                     <Link href={`/admin/clients/${r.id}`} className="truncate text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white hover:text-accent">

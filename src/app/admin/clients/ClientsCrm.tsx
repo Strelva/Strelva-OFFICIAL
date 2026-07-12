@@ -158,14 +158,14 @@ export function ClientsCrm({
               const stage = rec.stage ? STAGE_BY_VALUE.get(rec.stage) : null;
               const busy = saving[c.id];
               return (
-                <div key={c.id} className="relative grid grid-cols-[1fr_auto_130px_auto] items-center gap-5 px-4 py-3 transition-colors hover:bg-glass-active">
+                <div key={c.id} className="relative flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-glass-active md:grid md:grid-cols-[1fr_auto_130px_auto] md:gap-5">
                   <Link href={`/admin/clients/${c.id}`} className="absolute inset-0 z-0" aria-label={`Open ${c.siteName}`} />
 
                   {/* Identity */}
-                  <div className="pointer-events-none relative z-[1] flex min-w-0 items-center gap-3">
+                  <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 items-center gap-3">
                     <ClientLogo name={c.siteName} size={34} />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">{c.siteName}</span>
                         {c.atRiskReason && <Chip tone="crit">at risk</Chip>}
                         {!c.active && <Chip tone="neutral">archived</Chip>}
