@@ -45,6 +45,26 @@ export function operatorEmailsPaused(): boolean {
 }
 
 /**
+ * PROSPECT email — the audit-report scorecard sent to someone who ran the free
+ * /audit tool. NOT a client (no tenant, no lifecycle), and it's the mail we WANT
+ * flowing to warm the sending domain before client lifecycle email switches on.
+ * So it's a THIRD switch, separate from the client `emailSendingPaused()` gate:
+ * it DEFAULTS ON and is silenced only by an explicit `PROSPECT_EMAILS_ENABLED="false"`,
+ * mirroring the operator switch. Warming the domain on prospect + operator mail while
+ * client lifecycle stays paused is deliberate (Noah, 2026-07-13).
+ */
+export function prospectEmailsEnabled(): boolean {
+  return process.env.PROSPECT_EMAILS_ENABLED !== "false";
+}
+
+/**
+ * True when prospect email is explicitly disabled. Convenience inverse.
+ */
+export function prospectEmailsPaused(): boolean {
+  return !prospectEmailsEnabled();
+}
+
+/**
  * END-CUSTOMER transactional email — e.g. a booking confirmation sent to the studio's
  * CUSTOMER, not to the studio owner. This is a THIRD category, distinct from both the
  * client `emailSendingPaused()` gate (owner/prospect mail) and `operatorEmailsEnabled()`

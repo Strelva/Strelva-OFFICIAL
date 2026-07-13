@@ -1,15 +1,16 @@
 /**
  * Prospect-facing "your site health report is ready" email. Sent when someone
- * runs the gated full audit on the marketing site. This is a CLIENT/prospect
- * send, so it is gated behind `emailSendingPaused()` — dormant (returns false,
- * no-op) until client email is switched on. The on-page "View full report" link
- * delivers the report in the meantime, so the flow works with sends off.
+ * runs the gated full audit on the marketing site. This is a PROSPECT send (no
+ * tenant, no lifecycle), gated on its OWN `prospectEmailsEnabled()` switch —
+ * separate from the client `emailSendingPaused()` gate so it flows to warm the
+ * sending domain while client lifecycle email stays paused. The on-page "View
+ * full report" link also delivers the report, so the flow works either way.
  *
  * Deliberately a LINK, not a PDF attachment: the report lives at reportUrl
  * (the hosted one-pager), which the recipient views in-browser and prints to PDF.
  */
 
-import { emailSendingPaused } from "./email-enabled";
+import { prospectEmailsEnabled } from "./email-enabled";
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailHighlight } from "./email/layout";
 import { findingsFromCategories } from "./lead-audit";
 import type { AuditResult } from "./audit/types";
@@ -85,7 +86,7 @@ export async function sendAuditReportEmail(params: {
   result: AuditResult;
   reportUrl: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) return false;
+  if (!prospectEmailsEnabled()) return false;
   if (!process.env.RESEND_API_KEY) return false;
 
   const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
