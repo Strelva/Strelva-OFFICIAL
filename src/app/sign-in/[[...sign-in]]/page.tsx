@@ -164,6 +164,14 @@ export default async function SignInPage({
         </section>
 
         <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
+          {searchValue(params.error) === "auth_callback" && (
+            <p className="mb-4 rounded-[12px] border border-[color:var(--m-danger,#d33)]/30 bg-[color:var(--m-danger,#d33)]/10 px-4 py-3 text-[13px] leading-[1.6] text-[color:var(--m-danger,#d33)]">
+              Sign-in didn&apos;t complete. Please try again.
+              {searchValue(params.reason) ? (
+                <span className="mt-1 block font-mono text-[11px] opacity-80">{searchValue(params.reason)}</span>
+              ) : null}
+            </p>
+          )}
           <SupabaseSignIn next="/account" />
         </section>
       </div>
