@@ -11,12 +11,23 @@ import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult, CheckResult, LetterGrade } from "@/lib/audit/types";
 
-export interface LeadAuditFix {
-  title: string;
+/** One specific, actionable finding — what's wrong AND the exact fix, straight
+ *  from the check (e.g. issue: "LocalBusiness schema is missing required
+ *  field(s): address", fix: "Add address so AI tools can describe you"). This
+ *  is the detail an agent needs to actually change the site. */
+export interface LeadAuditFinding {
   category: string;
-  detail: string;
-  quantified?: string;
+  name: string;
+  status: "warn" | "fail";
+  score: number;
   priority: NonNullable<CheckResult["priority"]>;
+  /** The granular technical finding (check.message) — the exact problem. */
+  issue: string;
+  /** The specific fix instruction (check.details), when the check gives one. */
+  fix?: string;
+  /** Plain-English business impact, when quantified. */
+  impact?: string;
+  quantified?: string;
 }
 
 export interface LeadAuditResult {
@@ -26,8 +37,9 @@ export interface LeadAuditResult {
   grade: LetterGrade;
   /** Per-category name → score, for at-a-glance status across leads. */
   categories: { name: string; slug: string; score: number }[];
-  /** Worst-first prioritized fixes across all categories. */
-  topFixes: LeadAuditFix[];
+  /** EVERY non-passing check, worst-first — the full "exactly what's wrong +
+   *  how to fix it" list an agent acts on. */
+  findings: LeadAuditFinding[];
   /** The full engine result, for the sendable HTML report. */
   full: AuditResult;
 }
@@ -35,13 +47,14 @@ export interface LeadAuditResult {
 const PRIORITY_RANK: Record<NonNullable<CheckResult["priority"]>, number> = { high: 0, medium: 1, low: 2 };
 
 /** Run the full audit for one URL and shape it for lists, agents, and reports. */
-export async function auditUrl(url: string, limitFixes = 6): Promise<LeadAuditResult> {
+export async function auditUrl(url: string): Promise<LeadAuditResult> {
   const categories = await runAudit(url);
   const score = computeOverallScore(categories);
   const grade = scoreToGrade(score);
   const full: AuditResult = { url, scannedAt: new Date().toISOString(), overallScore: score, grade, categories };
 
-  const topFixes: LeadAuditFix[] = categories
+  // Every non-passing check, worst-first, with its granular finding + fix.
+  const findings: LeadAuditFinding[] = categories
     .flatMap((cat) => cat.checks.filter((c) => c.status !== "pass").map((c) => ({ cat, c })))
     .sort((a, b) => {
       const pa = PRIORITY_RANK[a.c.priority ?? "low"];
@@ -50,13 +63,16 @@ export async function auditUrl(url: string, limitFixes = 6): Promise<LeadAuditRe
       if (a.c.status !== b.c.status) return a.c.status === "fail" ? -1 : 1;
       return a.c.score - b.c.score;
     })
-    .slice(0, limitFixes)
     .map(({ cat, c }) => ({
-      title: c.name,
       category: cat.name,
-      detail: c.impact || c.message,
-      quantified: c.quantified,
+      name: c.name,
+      status: c.status as "warn" | "fail",
+      score: c.score,
       priority: c.priority ?? "low",
+      issue: c.message,
+      fix: c.details,
+      impact: c.impact,
+      quantified: c.quantified,
     }));
 
   return {
@@ -65,7 +81,7 @@ export async function auditUrl(url: string, limitFixes = 6): Promise<LeadAuditRe
     score,
     grade,
     categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
-    topFixes,
+    findings,
     full,
   };
 }

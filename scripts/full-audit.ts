@@ -52,12 +52,15 @@ function printOne(r: LeadAuditResult, html?: string) {
   console.log(`  ${c}${BOLD}GRADE  ${r.grade}${R}    ${c}${r.score}/100${R}\n`);
   console.log(`  ${BOLD}By category${R}`);
   for (const cat of r.categories) console.log(`   ${scoreColor(cat.score)}${bar(cat.score)}${R} ${String(cat.score).padStart(3)}  ${cat.name}`);
-  if (r.topFixes.length) {
-    console.log(`\n  ${BOLD}Fix these first${R}`);
-    r.topFixes.forEach((f, i) => {
-      console.log(`   ${c}${i + 1}.${R} ${BOLD}${f.title}${R}  ${DIM}[${f.category}]${R}${f.quantified ? `  \x1b[31m${f.quantified}${R}` : ""}`);
-      console.log(`      ${DIM}${f.detail}${R}`);
+  if (r.findings.length) {
+    console.log(`\n  ${BOLD}What's wrong (${r.findings.length}) — exact findings + fixes${R}`);
+    r.findings.slice(0, 12).forEach((f, i) => {
+      const pc = f.priority === "high" ? "\x1b[31m" : f.priority === "medium" ? "\x1b[33m" : DIM;
+      console.log(`   ${pc}${(f.status === "fail" ? "✗" : "!")}${R} ${BOLD}${f.name}${R}  ${DIM}[${f.category} · ${f.priority}]${R}${f.quantified ? `  \x1b[31m${f.quantified}${R}` : ""}`);
+      console.log(`      ${f.issue}`);
+      if (f.fix) console.log(`      ${DIM}→ ${f.fix}${R}`);
     });
+    if (r.findings.length > 12) console.log(`   ${DIM}…and ${r.findings.length - 12} more (use --json for all)${R}`);
   }
   console.log(`\n  ${rule}\n  ${DIM}Powered by Strelva · strelva.com${R}`);
   if (html) console.log(`  ${BOLD}HTML:${R} ${html}`);
@@ -98,7 +101,7 @@ async function main() {
   if (flag("html")) for (const r of results) if (!("error" in r)) writeHtml(r);
   if (flag("json")) {
     // Compact shape for agents — drop the heavy `full` engine result.
-    const compact = results.map((r) => ("error" in r ? r : { url: r.url, grade: r.grade, score: r.score, scannedAt: r.scannedAt, categories: r.categories, topFixes: r.topFixes }));
+    const compact = results.map((r) => ("error" in r ? r : { url: r.url, grade: r.grade, score: r.score, scannedAt: r.scannedAt, categories: r.categories, findings: r.findings }));
     console.log(JSON.stringify(compact, null, 2));
   } else {
     printTable(results);
