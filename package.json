@@ -24,6 +24,7 @@
     "deprovision-tenant": "npx tsx --env-file=.env.local scripts/deprovision-tenant.ts",
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:custom-repos": "tsx scripts/custom-repo-workspace-check.ts",
+    "audit:full": "npx tsx --env-file=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "tsc --noEmit"
   },
