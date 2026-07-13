@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Catch type errors before they burn a CI run. Skippable with --no-verify.
+echo "pre-push: typecheck…"
+pnpm typecheck || { echo "typecheck failed — fix before pushing (or 'git push --no-verify' to skip)."; exit 1; }

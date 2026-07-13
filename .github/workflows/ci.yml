@@ -58,13 +58,20 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The Playwright e2e smoke (~2.5 min, the most expensive part) runs only on a
+      # NON-DRAFT pull request. It skips draft-PR pushes (iterate cheaply — fast
+      # checks only) and main pushes (the PR already validated the same squashed
+      # tree). lint/typecheck/vitest/build above still run on every event. Mark a PR
+      # "ready for review" to run the e2e gate before merge.
       - name: Cache Playwright browsers
+        if: github.event.pull_request.draft == false
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright browsers
+        if: github.event.pull_request.draft == false
         # On a cache hit only install the OS deps (fast); the ~100MB chromium
         # download is restored from cache. On a miss, install both.
         run: |
@@ -75,6 +82,7 @@ jobs:
           fi
 
       - name: Smoke tests
+        if: github.event.pull_request.draft == false
         # Runs against `next dev` (see playwright.config.ts). Dev mode is
         # deliberate: it tolerates a missing Clerk key (prod `next start` throws
         # "Missing publishableKey" with no auth env) and keeps the lenient
@@ -88,6 +96,7 @@ jobs:
           REB_DEV_UNGATED_ACCESS: "0"
 
       - name: Surface smoke
+        if: github.event.pull_request.draft == false
         # Ungated console coverage — needs the dev super-admin bypass ON
         # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces) to
         # reach the /admin console and resolve the owner dashboard, whereas the public
