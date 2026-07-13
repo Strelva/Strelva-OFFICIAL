@@ -21,7 +21,10 @@ import { sendSlackNotification } from "@/lib/slack";
  */
 
 const MAX_LEADS_PER_DAY = 8;
-const REPORT_BASE_URL = (process.env.AUDIT_REPORT_BASE_URL ?? "https://strelva.com").replace(/\/$/, "");
+// The public report lives on the marketing site (strelva.com/audit/report/{id}),
+// which proxies to this app's renderer. So the shareable/emailed link is a real
+// Strelva URL, not this control-plane host.
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL ?? "https://strelva.com").replace(/\/$/, "");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const lead = { name, email, url };
     const reportId = await saveAuditReport(result, lead);
-    const reportUrl = reportId ? `${REPORT_BASE_URL}/api/audit/report/${reportId}` : null;
+    const reportUrl = reportId ? `${PUBLIC_SITE_URL}/audit/report/${reportId}` : null;
 
     // Operator notification (fire-and-forget; a Slack blip never fails the lead).
     const host = url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
