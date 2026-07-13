@@ -10,7 +10,7 @@
  */
 
 import { emailSendingPaused } from "./email-enabled";
-import { renderEmailHtml, renderEmailText, type EmailOptions } from "./email/layout";
+import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailHighlight } from "./email/layout";
 import { findingsFromCategories } from "./lead-audit";
 import type { AuditResult } from "./audit/types";
 
@@ -18,12 +18,27 @@ function displayHost(url: string): string {
   return url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
+const GRADE_TONE: Record<AuditResult["grade"], EmailHighlight["tone"]> = {
+  A: "positive",
+  B: "positive",
+  C: "warning",
+  D: "critical",
+  F: "critical",
+};
+
+/** One crisp line for a bulleted fix: the first whole sentence of its "why",
+ *  no invented numbers (the anonymous audit strips those upstream). */
+function bulletText(impact: string | undefined, issue: string): string {
+  const source = (impact || issue).replace(/\s+/g, " ").trim();
+  const first = source.split(/(?<=[.!?])\s/)[0] || source;
+  return first.length > 110 ? `${first.slice(0, 109).trimEnd()}…` : first;
+}
+
 /** The report email's content, as primitives the shared layout renders (heading,
- *  paragraphs, a rows table, a button) — never hand-rolled markup. A scorecard:
- *  the overall grade plus every category score. No invented dollar figures — we
- *  have no traffic data for the site, so the honest signal is the scores. The
- *  ranked issues + exact fixes live in the full report. Exported so the exact
- *  email can be rendered for review. */
+ *  paragraphs, a grade card, a bulleted list, a button) — never hand-rolled
+ *  markup. The grade + score headline, then the top few issues (names + a plain
+ *  "why", no invented figures). The full ranked list + exact fixes live in the
+ *  report. Exported so the exact email can be rendered for review. */
 export function buildAuditReportEmailOptions(
   lead: { name: string; url: string },
   result: AuditResult,
@@ -31,29 +46,32 @@ export function buildAuditReportEmailOptions(
 ): EmailOptions {
   const host = displayHost(lead.url);
   const findings = findingsFromCategories(result.categories);
+  const highCount = findings.filter((f) => f.priority === "high").length;
   const greeting = lead.name ? `Hi ${lead.name.split(/\s+/)[0]},` : "Hi,";
 
-  const summary =
+  const note =
     findings.length === 0
-      ? `We audited ${host}. It scored ${result.grade} — ${result.overallScore} out of 100, and already covers the fundamentals we check. Here's how each area did:`
-      : `We audited ${host}. It scored ${result.grade} — ${result.overallScore} out of 100, with ${findings.length} thing${findings.length === 1 ? "" : "s"} worth fixing. Here's how each area scored:`;
+      ? "No priority issues — the fundamentals are covered."
+      : `${findings.length} issue${findings.length === 1 ? "" : "s"} worth fixing${highCount ? `, ${highCount} high-impact` : ""}.`;
 
-  // Every subsection score — the honest, data-free signal. Overall first, then
-  // each category worst-first so the weakest areas lead.
-  const rows = [
-    { label: "Overall", value: `${result.grade} · ${result.overallScore} / 100` },
-    ...[...result.categories]
-      .sort((a, b) => a.score - b.score)
-      .map((c) => ({ label: c.name, value: `${c.score} / 100` })),
-  ];
+  const bullets = findings.slice(0, 3).map((f) => ({ title: f.name, text: bulletText(f.impact, f.issue) }));
 
   return {
     preheader: `${result.grade} · ${result.overallScore}/100 for ${host}`,
     heading: "Your site health report is ready",
-    paragraphs: [greeting, summary],
-    rows,
+    paragraphs: [
+      greeting,
+      `We ran a full audit on ${host}. Here's the headline — your full report has every issue with the exact fix.`,
+    ],
+    highlight: {
+      value: result.grade,
+      label: `${result.overallScore} out of 100`,
+      note,
+      tone: GRADE_TONE[result.grade],
+    },
+    bullets: bullets.length ? bullets : undefined,
     button: { label: "See the full report", url: reportUrl },
-    footerNote: `The full report ranks every issue with the exact fix. You requested this audit at strelva.com/audit.`,
+    footerNote: "You requested this audit at strelva.com/audit.",
   };
 }
 
