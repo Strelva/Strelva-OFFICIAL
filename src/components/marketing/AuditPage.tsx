@@ -147,6 +147,9 @@ export function AuditPage() {
   const [error, setError] = useState("");
   const [progressStep, setProgressStep] = useState(0);
   const [reportLoading, setReportLoading] = useState(false);
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadState, setLeadState] = useState<"idle" | "submitting" | "done">("idle");
+  const [leadError, setLeadError] = useState("");
 
   const progressSteps = [
     "Connecting to site...",
@@ -221,6 +224,34 @@ export function AuditPage() {
     setResult(null);
     setError("");
     setUrl("");
+    setLeadEmail("");
+    setLeadState("idle");
+    setLeadError("");
+  }
+
+  // Lead-magnet gate: unlock the full report with an email. We capture the lead
+  // (best-effort — a failed capture never blocks the report) and then open it.
+  async function handleGetReport(e: React.FormEvent) {
+    e.preventDefault();
+    if (leadState === "submitting" || !result) return;
+    const email = leadEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLeadError("Please enter a valid email address.");
+      return;
+    }
+    setLeadState("submitting");
+    setLeadError("");
+    try {
+      await fetch("/api/audit/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: result.url, email, grade: result.grade, score: result.overallScore }),
+      });
+    } catch {
+      // capture is best-effort; still deliver the report
+    }
+    setLeadState("done");
+    void handleDownloadReport();
   }
 
   // POST the current result to the report renderer and open the returned HTML
@@ -476,35 +507,68 @@ export function AuditPage() {
                 score higher — with AI-powered updates, health monitoring, and
                 weekly reports.
               </p>
-              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/access-request?ref=audit"
-                  className="marketing-button-primary h-12 px-6"
-                >
-                  Request your build
-                  <ArrowRight className="size-4" />
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleDownloadReport}
-                  disabled={reportLoading}
-                  className="marketing-button-secondary h-12 px-6 disabled:opacity-60"
-                >
-                  {reportLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Download className="size-4" />
-                  )}
-                  {reportLoading ? "Preparing..." : "Save as PDF"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="marketing-button-secondary h-12 px-6"
-                >
-                  Scan another site
-                </button>
-              </div>
+              {leadState === "done" ? (
+                <>
+                  <p className="mx-auto mt-5 max-w-[440px] text-[14px] font-medium text-m-text">
+                    Report unlocked. We&apos;ll follow up at {leadEmail}.
+                  </p>
+                  <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <Link href="/access-request?ref=audit" className="marketing-button-primary h-12 px-6">
+                      Request your build
+                      <ArrowRight className="size-4" />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleDownloadReport}
+                      disabled={reportLoading}
+                      className="marketing-button-secondary h-12 px-6 disabled:opacity-60"
+                    >
+                      {reportLoading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                      {reportLoading ? "Preparing..." : "Open report"}
+                    </button>
+                    <button type="button" onClick={handleReset} className="marketing-button-secondary h-12 px-6">
+                      Scan another site
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <form onSubmit={handleGetReport} className="mx-auto mt-6 flex max-w-[460px] flex-col gap-2 sm:flex-row">
+                    <input
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="you@yourbusiness.com"
+                      aria-label="Email address"
+                      className="h-12 flex-1 rounded-xl border border-m-rule bg-m-paper px-4 text-[15px] text-m-text outline-none placeholder:text-m-text-3 focus:border-m-accent"
+                    />
+                    <button
+                      type="submit"
+                      disabled={leadState === "submitting"}
+                      className="marketing-button-primary h-12 shrink-0 px-6 disabled:opacity-60"
+                    >
+                      {leadState === "submitting" ? <Loader2 className="size-4 animate-spin" /> : null}
+                      Get the full report
+                    </button>
+                  </form>
+                  {leadError && <p className="mt-2 text-[13px] text-m-danger">{leadError}</p>}
+                  <div className="mt-4 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                    <Link
+                      href="/access-request?ref=audit"
+                      className="text-[14px] font-medium text-m-text-2 underline underline-offset-4 transition-colors hover:text-m-text"
+                    >
+                      or request your build
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="text-[14px] font-medium text-m-text-2 underline underline-offset-4 transition-colors hover:text-m-text"
+                    >
+                      scan another site
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
