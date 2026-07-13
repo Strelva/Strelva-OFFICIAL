@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Block committing secrets. Uses the gitleaks binary if installed, else docker,
+# else warns (the Security CI workflow is the backstop). Staged changes only.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || {
+    echo "gitleaks: potential secret in staged changes — commit blocked (--no-verify to override)."; exit 1; }
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm -v "$(pwd):/repo" zricethezav/gitleaks:latest \
+    protect --source=/repo --staged --redact --no-banner || exit 1
+else
+  echo "gitleaks not installed (brew install gitleaks) — skipping local secret scan; CI still checks."
+fi

@@ -70,15 +70,21 @@ The Surface smoke only asserts chrome, so it's unaffected.
 
 The org's free tier is 2,000 GitHub Actions minutes/month with a $0 overage budget
 (so it HARD-BLOCKS when exhausted — every workflow then fails in ~2s with no runner).
-Guardrails in the workflows keep usage well under that:
+There are only two workflows now (CI + Security). Guardrails keep usage well under 2,000:
 
-- **`concurrency: cancel-in-progress`** on all three workflows — a new push cancels
-  the superseded run instead of letting both finish. Biggest saver during active dev.
-- **CodeQL runs weekly only** (was every push+PR) — it analyzes with `upload: never`
-  until code scanning is enabled in repo settings, so per-event runs produced nothing.
-  Re-add `push`/`pull_request` + flip `upload` when scanning is turned on.
-- **`paths-ignore`** on CI for `**.md` / `docs/**` — docs-only changes skip the build.
-- **Playwright browsers cached** across runs.
+- **`concurrency: cancel-in-progress`** on both workflows — a new push cancels the
+  superseded run instead of letting both finish. Biggest saver during active dev.
+- **CodeQL was deleted.** It analyzed with `upload: never` (code scanning isn't enabled),
+  so it burned ~3 min/event producing nothing usable. Re-add it (`git show` the old
+  `codeql.yml` from history) only after enabling code scanning in repo settings.
+- **The Playwright e2e smoke (public + surface, ~2.5 min) runs only on NON-DRAFT PRs.**
+  Draft-PR pushes and main pushes run the fast checks (lint/typecheck/vitest/build) only —
+  iterate in a draft PR, mark it "ready for review" to run the e2e gate before merge.
+- **`paths-ignore`** on CI for `**.md` / `docs/**`; **Playwright browsers cached**.
+- **Local git hooks** (`.githooks/`, wired via the `prepare` script's `core.hooksPath`):
+  pre-commit runs gitleaks on staged changes (never commit a secret); pre-push runs
+  typecheck (catch type errors before they reach a runner). Both skippable with
+  `--no-verify`; gitleaks degrades to a warning if the binary/docker isn't present.
 
 **Before you push (avoid burning a run to find a failure):** run the CI-faithful check
 locally. `pnpm check:ci` runs lint + typecheck + vitest + the no-Redis surface smoke —
