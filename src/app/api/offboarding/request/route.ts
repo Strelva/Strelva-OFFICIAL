@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { logActivity } from "@/lib/storage";
 import { addEvent } from "@/lib/events";
 import { getTenantConfig } from "@/lib/tenants";
@@ -21,8 +21,6 @@ export async function POST(request: Request) {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "billing:manage");
   if (permissionDenied) return permissionDenied;
 

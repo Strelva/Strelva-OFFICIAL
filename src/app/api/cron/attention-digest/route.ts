@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildAttentionBriefing } from "@/lib/attention";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -11,7 +12,10 @@ export const maxDuration = 300;
  * digest from the portfolio brain. Auth via the proxy (CRON_SECRET). Stays
  * quiet when there's nothing high/medium to act on.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   try {
     const briefing = await buildAttentionBriefing();
     const high = briefing.items.filter((i) => i.severity === "high");

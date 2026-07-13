@@ -14,6 +14,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 import {
   lintReplyDraft,
   buildDeterministicReply,
@@ -392,7 +393,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
     const { GET } = await import(
       "@/app/api/cron/poll-google-reviews/route"
     );
-    await GET();
+    await GET(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
 
@@ -411,7 +412,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
     const { GET } = await import(
       "@/app/api/cron/poll-google-reviews/route"
     );
-    await GET();
+    await GET(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
     const draftCall = calls.find(
@@ -425,7 +426,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
     const { GET } = await import(
       "@/app/api/cron/poll-google-reviews/route"
     );
-    await GET();
+    await GET(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
     const draftCall = calls.find(

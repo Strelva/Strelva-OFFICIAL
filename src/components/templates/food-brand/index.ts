@@ -1,5 +1,6 @@
 import type { ContentSection, PageSectionConfig, SitePageConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 
 // Section components
 import { Hero } from "./Hero";
@@ -161,5 +162,5 @@ export const foodBrandTemplate: TemplateDefinition = {
   Footer,
   themeVars: THEME_VARS,
   defaultPageConfig: FOOD_BRAND_PAGE_CONFIG,
-  contentSections: ["hero", "story", "products", "testimonials", "contact", "settings", "theme", "rewardsConfig", "navigation", "footer"],
+  contentSections: [...getTemplateManifest("food-brand").contentSections],
 };

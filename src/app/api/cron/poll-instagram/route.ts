@@ -18,6 +18,7 @@ import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import type { Connection } from "@/lib/types";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -180,8 +181,9 @@ async function pollTenant(tenantId: string): Promise<number> {
   return newMedia.length;
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check)
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);

@@ -12,6 +12,7 @@ import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import type { EmailRow } from "@/lib/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -52,8 +53,9 @@ function reportToText(summary: string, dashboardUrl: string, analyticsRows: Emai
   });
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check)
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   // Global email kill-switch: while sending is paused (domain cutover / test
   // tenants) the report's only purpose — the email — can't go out, so skip the

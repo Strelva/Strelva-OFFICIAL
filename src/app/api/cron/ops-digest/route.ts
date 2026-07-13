@@ -20,6 +20,7 @@ import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAtRiskTenants } from "@/lib/churn";
 import { getAllTenants } from "@/lib/tenants";
 import { sendOpsDigestEmail } from "@/lib/delivery-email";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -31,7 +32,10 @@ function opsBoardUrl(): string {
   return new URL("/admin", base).toString();
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   try {
     const [leads, tenants, atRiskSignals] = await Promise.all([
       getDeliveryLeads().catch(() => []),

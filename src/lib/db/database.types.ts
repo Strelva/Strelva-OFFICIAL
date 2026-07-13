@@ -1737,7 +1737,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_site_metric: {
+        Args: {
+          p_day: string
+          p_metric: string
+          p_tenant_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

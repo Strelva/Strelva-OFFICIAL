@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 const mockBuildAttentionBriefing = vi.hoisted(() => vi.fn());
 const mockBuildPortfolioSnapshot = vi.hoisted(() => vi.fn());
@@ -35,7 +36,7 @@ describe("GET /api/cron/attention-digest", () => {
       ],
     });
     const { GET } = await import("@/app/api/cron/attention-digest/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     expect(res.status).toBe(200);
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
@@ -48,7 +49,7 @@ describe("GET /api/cron/attention-digest", () => {
       items: [{ severity: "low", kind: "drafts", message: "1 draft waiting" }],
     });
     const { GET } = await import("@/app/api/cron/attention-digest/route");
-    await GET();
+    await GET(authenticatedCronRequest());
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });
@@ -58,7 +59,7 @@ describe("GET /api/cron/portfolio-snapshot", () => {
     mockBuildPortfolioSnapshot.mockResolvedValue({ snapshotAt: "t", tenantCount: 3 });
     mockSetPortfolioSummary.mockResolvedValue(undefined);
     const { GET } = await import("@/app/api/cron/portfolio-snapshot/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     const body = await res.json();
     expect(body).toMatchObject({ ok: true, tenants: 3 });
     expect(mockSetPortfolioSummary).toHaveBeenCalledTimes(1);
@@ -68,7 +69,7 @@ describe("GET /api/cron/portfolio-snapshot", () => {
     process.env.SLACK_WEBHOOK_URL = "";
     mockBuildPortfolioSnapshot.mockRejectedValue(new Error("redis down"));
     const { GET } = await import("@/app/api/cron/portfolio-snapshot/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     expect(res.status).toBe(500);
   });
 });

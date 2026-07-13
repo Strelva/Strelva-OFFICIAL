@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getSanityReadClient } from "@/lib/sanity";
 import type { ContentSection } from "@/lib/types";
@@ -79,8 +79,6 @@ export async function GET() {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const blocked = await requireTenantPermission(tenant, "billing:manage");
   if (blocked) return blocked;
 

@@ -41,8 +41,6 @@ export async function PUT(request: Request) {
     if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);

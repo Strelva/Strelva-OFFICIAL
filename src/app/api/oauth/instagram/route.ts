@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { createOAuthState } from "@/lib/oauth-state";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -23,8 +23,6 @@ export async function GET() {
   }
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "settings:write");
   if (permissionDenied) return permissionDenied;
   const blocked = await requireActiveSubscription(tenant);

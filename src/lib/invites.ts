@@ -45,9 +45,8 @@ export async function createInvite(
 
   // Also write the invite to Postgres. This is LOAD-BEARING on the Supabase auth
   // path: the handle_new_user trigger + claimPendingInviteForCurrentUser grant
-  // access by reading the Postgres `invites` table, so without this a newly
-  // invited client signs in and gets no membership. Null-safe (no-op when
-  // Supabase is unconfigured); never throws into the invite flow.
+  // access by reading the Postgres `invites` table. A failure must reach the
+  // operator rather than producing an invite that cannot grant client access.
   await createInvitePg({
     email: email.toLowerCase(),
     tenant_id: tenant,

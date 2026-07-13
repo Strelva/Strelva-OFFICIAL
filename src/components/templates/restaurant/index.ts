@@ -1,5 +1,6 @@
 import type { ContentSection, PageSectionConfig, SitePageConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 
 // Reuse shared public components — restaurant doesn't need custom UI,
 // just a different page structure and section selection
@@ -166,15 +167,5 @@ export const restaurantTemplate: TemplateDefinition = {
     "--sage-dark": "#6b5434",
   },
   defaultPageConfig: RESTAURANT_PAGE_CONFIG,
-  contentSections: [
-    "hero",
-    "services",
-    "story",
-    "testimonials",
-    "events",
-    "contact",
-    "settings",
-    "theme",
-    "faq",
-  ],
+  contentSections: [...getTemplateManifest("restaurant").contentSections],
 };

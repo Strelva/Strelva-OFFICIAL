@@ -1,5 +1,6 @@
 import type { ContentSection, PageSectionConfig, SitePageConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 
 // Reuse shared public components — professional layout emphasizes
 // credibility: story/team, practice areas, testimonials, consultation CTA
@@ -160,14 +161,5 @@ export const professionalTemplate: TemplateDefinition = {
     "--sage-dark": "#142a45",
   },
   defaultPageConfig: PROFESSIONAL_PAGE_CONFIG,
-  contentSections: [
-    "hero",
-    "services",
-    "story",
-    "testimonials",
-    "contact",
-    "settings",
-    "theme",
-    "faq",
-  ],
+  contentSections: [...getTemplateManifest("professional").contentSections],
 };

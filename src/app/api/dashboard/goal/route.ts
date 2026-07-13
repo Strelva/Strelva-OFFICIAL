@@ -15,8 +15,6 @@ export async function GET() {
 /** PUT { metric, target } to set the weekly goal. */
 export async function PUT(req: Request) {
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const blocked = await requireTenantPermission(tenant, "settings:write");
   if (blocked) return blocked;
 
@@ -29,8 +27,6 @@ export async function PUT(req: Request) {
 /** DELETE the weekly goal. */
 export async function DELETE() {
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const blocked = await requireTenantPermission(tenant, "settings:write");
   if (blocked) return blocked;
 

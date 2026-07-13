@@ -38,8 +38,6 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid collection type" }, { status: 400 });
   }
   const tenant = await requireTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
   const actor = await getActorContext(tenant);
@@ -78,8 +76,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid collection type" }, { status: 400 });
   }
   const tenant = await requireTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
   const actor = await getActorContext(tenant);

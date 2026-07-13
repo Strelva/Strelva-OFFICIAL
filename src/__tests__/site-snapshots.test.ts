@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 const mockGetContent = vi.hoisted(() => vi.fn());
 const mockSetContent = vi.hoisted(() => vi.fn());
@@ -183,7 +184,7 @@ describe("site snapshots", () => {
   it("maintenance creates one daily backup per active tenant while pruning events", async () => {
     const { GET } = await import("@/app/api/cron/maintenance/route");
 
-    const response = await GET();
+    const response = await GET(authenticatedCronRequest());
 
     await expect(response.json()).resolves.toMatchObject({
       tenants: 1,

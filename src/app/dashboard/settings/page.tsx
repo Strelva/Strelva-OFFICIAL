@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, type ReactNode } from "react";
-import Link from "next/link";
-import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Code2, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
@@ -10,8 +9,11 @@ import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL } from "@/lib/pricing";
-import type { CustomRepoExternalDependency } from "@/lib/types";
+import { AccountSection } from "./AccountSection";
+import { BillingSection } from "./BillingSection";
+import { DependencyHealthSection } from "./DependencyHealthSection";
+import { UtilitiesSection } from "./UtilitiesSection";
+import { useDashboardApiPath } from "./useDashboardApiPath";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,26 +42,6 @@ type SiteCapabilitiesData = {
   customOnlyFeatures?: string[];
   customComponents?: { id: string; label: string; description?: string; adminOnly: boolean; supportedProps?: string[] }[];
 };
-type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
-type DependencyHealthData = {
-  deliveryModel: string;
-  dependencies: CustomRepoExternalDependency[];
-  blockingDependencies: CustomRepoExternalDependency[];
-  hasBlockingDependency: boolean;
-  summary: {
-    status: string;
-    severity: string;
-  };
-};
-
-function useDashboardApiPath() {
-  const dashboard = useDashboardOptional();
-  return useCallback(
-    (path: string) => dashboard?.dashboardHref(path) ?? path,
-    [dashboard],
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Identity field definitions
 // ---------------------------------------------------------------------------
@@ -368,43 +350,6 @@ function ProfileSection({
 }
 
 // ---------------------------------------------------------------------------
-// Account section — read-only login identity (who you are, not the business)
-// ---------------------------------------------------------------------------
-
-function AccountSection() {
-  const dashboard = useDashboardOptional();
-  const name = dashboard?.impersonation.actorName?.trim() || "You";
-  const email = dashboard?.impersonation.actorEmail || null;
-  const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
-
-  return (
-    <div className="rounded-xl border border-glass-border bg-glass p-5">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-semibold text-accent">
-          {(name[0] || "U").toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-medium text-warm-white">{name}</p>
-            {isAdmin && (
-              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
-                Strelva Admin
-              </span>
-            )}
-          </div>
-          {email && <p className="truncate text-[12px] text-gray-muted">{email}</p>}
-        </div>
-      </div>
-      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
-        This is the account you&apos;re signed in with — it stays the same across every
-        business you can access. Your business&apos;s public details live in{" "}
-        <span className="text-warm-white">Business info</span>.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Brand section
 // ---------------------------------------------------------------------------
 
@@ -604,69 +549,6 @@ function BrandSection() {
 
 function DomainsSection() {
   return <DomainsClient initialDomains={[]} />;
-}
-
-// ---------------------------------------------------------------------------
-// Utilities section
-// ---------------------------------------------------------------------------
-
-function UtilitiesSection() {
-  const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
-
-  const utilities = [
-    {
-      title: "Brand Kit",
-      description: "Tell Strelva about your business — what you do, your voice, and your media.",
-      href: "/dashboard/brand-kit",
-      icon: Sparkles,
-    },
-    {
-      title: "Connections",
-      description: "Connect the accounts Strelva manages — Google Business, reviews, booking.",
-      href: "/dashboard/integrations",
-      icon: Link2,
-    },
-    {
-      title: "Photo library",
-      description: "Upload and reuse real photos, logos, and files Strelva can reference in chat.",
-      href: "/dashboard/assets",
-      icon: ImageIcon,
-    },
-    {
-      title: "Export & handoff",
-      description: "Download content and asset manifests or start a provider handoff.",
-      href: "/dashboard/settings#ownership",
-      icon: Download,
-    },
-  ];
-
-  return (
-    <div className="grid gap-3">
-      {utilities.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={dashboardHref(item.href)}
-            className="group flex items-start gap-4 rounded-xl border border-glass-border bg-glass px-4 py-4 transition-colors hover:border-accent/35"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
-              <Icon className="h-4 w-4" strokeWidth={1.5} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14px] font-medium text-warm-white group-hover:text-white">
-                {item.title}
-              </span>
-              <span className="mt-1 block text-[12px] leading-relaxed text-gray-muted">
-                {item.description}
-              </span>
-            </span>
-          </Link>
-        );
-      })}
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1097,247 +979,6 @@ function CustomComponentsSection() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Dependency health section
-// ---------------------------------------------------------------------------
-
-const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string }> = {
-  healthy: { label: "Healthy", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
-  degraded: { label: "Degraded", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
-  paused: { label: "Paused", className: "border-red-400/30 bg-red-400/10 text-red-300" },
-  failing: { label: "Failing", className: "border-red-400/30 bg-red-400/10 text-red-300" },
-  unknown: { label: "Unknown", className: "border-glass-border text-gray-faint" },
-};
-
-function DependencyStatusPill({ status }: { status: string }) {
-  const copy = DEPENDENCY_STATUS_COPY[status] || DEPENDENCY_STATUS_COPY.unknown;
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${copy.className}`}>
-      {copy.label}
-    </span>
-  );
-}
-
-function DependencyHealthSection() {
-  const apiPath = useDashboardApiPath();
-  const [data, setData] = useState<DependencyHealthData | null>(null);
-  const [error, setError] = useState("");
-
-  const load = useCallback(() => {
-    fetch(apiPath("/api/custom-repo/dependencies"), { credentials: "same-origin" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Could not load dependency health");
-        return res.json();
-      })
-      .then((next) => {
-        setError("");
-        setData(next);
-      })
-      .catch(() => setError("Could not load dependency health."));
-  }, [apiPath]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(load, 0);
-    return () => window.clearTimeout(timeout);
-  }, [load]);
-
-  if (error) {
-    return (
-      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-4 text-[12px] text-red-200">
-        {error}
-      </div>
-    );
-  }
-
-  if (!data) return <SkeletonLine width="w-full" height="h-24" />;
-
-  if (data.deliveryModel !== "custom_repo") {
-    return (
-      <div className="rounded-lg border border-glass-border bg-glass p-4">
-        <p className="text-[13px] text-warm-white">No connected services to monitor</p>
-        <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-          This site doesn&apos;t rely on any outside services we need to keep an eye on.
-        </p>
-      </div>
-    );
-  }
-
-  const hasDependencies = data.dependencies.length > 0;
-
-  return (
-    <div className="space-y-4">
-      {data.hasBlockingDependency && (
-        <div className="rounded-lg border border-amber-400/25 bg-amber-300/10 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" strokeWidth={1.7} />
-            <div>
-              <p className="text-[13px] font-medium text-amber-50">
-                A custom repo dependency needs attention before the client site depends on it.
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
-                Strelva is showing this here so paused services are caught before they look like a storefront or AI issue.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!hasDependencies && (
-        <div className="rounded-lg border border-glass-border bg-glass p-4">
-          <p className="text-[13px] text-warm-white">No external dependencies recorded</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-            Add dependencies to the tenant custom repo metadata as they become operationally important.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {data.dependencies.map((dependency) => (
-          <div key={dependency.id} className="rounded-lg border border-glass-border bg-glass p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[14px] font-medium text-warm-white">{dependency.name}</p>
-                <p className="mt-1 text-[12px] text-gray-muted">{dependency.provider} · {dependency.purpose}</p>
-              </div>
-              <DependencyStatusPill status={dependency.status} />
-            </div>
-            {(dependency.source || dependency.detectedAt) && (
-              <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-gray-faint">
-                {dependency.source || "Recorded dependency"}{dependency.detectedAt ? ` · ${dependency.detectedAt}` : ""}
-              </p>
-            )}
-            {dependency.notes && (
-              <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{dependency.notes}</p>
-            )}
-            {dependency.actionUrl && (
-              <a
-                href={dependency.actionUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
-              >
-                Open dependency
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </a>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Billing section
-// ---------------------------------------------------------------------------
-
-const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className: string; note: string }> = {
-  active: {
-    label: "Active",
-    className: "bg-emerald-400/10 text-emerald-400",
-    note: "Everything included. Cancel anytime.",
-  },
-  trialing: {
-    label: "Trialing",
-    className: "bg-sky-400/10 text-sky-400",
-    note: "Trial access is active.",
-  },
-  past_due: {
-    label: "Past due",
-    className: "bg-amber-400/10 text-amber-400",
-    note: "Payment needs attention to keep the dashboard fully available.",
-  },
-  cancelled: {
-    label: "Canceled",
-    className: "bg-red-400/10 text-red-400",
-    note: "This subscription is canceled.",
-  },
-  none: {
-    label: "Not set up",
-    className: "bg-gray-border text-gray-muted",
-    note: "No subscription is connected yet.",
-  },
-};
-
-const FOUNDER_COMP_COPY = {
-  label: "Founder comp",
-  className: "bg-amber-300/12 text-amber-200",
-  note: "Full access is comped for this founder account. No customer billing is due.",
-};
-
-function BillingSection() {
-  const dashboard = useDashboardOptional();
-  const apiPath = useDashboardApiPath();
-  const [billingError, setBillingError] = useState("");
-  const [openingPortal, setOpeningPortal] = useState(false);
-  const status = dashboard?.subscriptionStatus ?? "none";
-  const isFounderComp = dashboard?.planOverride === "founder_comp";
-  const copy = isFounderComp ? FOUNDER_COMP_COPY : BILLING_STATUS_COPY[status];
-
-  return (
-    <div className="rounded-lg border border-glass-border overflow-hidden">
-      <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-gray-muted mb-2">
-            Current plan
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-white">
-              {isFounderComp ? "Founder comp" : SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}
-            </span>
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${copy.className}`}>
-              {copy.label}
-            </span>
-          </div>
-          <p className="text-[12px] text-gray-faint">
-            {copy.note}
-          </p>
-          {!isFounderComp && dashboard?.hasStripeCustomer && (
-            <p className="mt-1 text-[12px] text-gray-faint">
-              Manage billing opens your secure Stripe portal to update payment, change plan, or cancel.
-            </p>
-          )}
-          {billingError && (
-            <p className="mt-3 text-[12px] text-amber-300">{billingError}</p>
-          )}
-        </div>
-        <button
-          onClick={async () => {
-            setBillingError("");
-            setOpeningPortal(true);
-            try {
-              const res = await fetch(apiPath("/api/billing/portal"), {
-                method: "POST",
-                credentials: "same-origin",
-              });
-              const body = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                setBillingError(
-                  res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "You're on a managed plan — there's no billing portal to open. Message Strelva anytime about your plan."
-                    : body?.error || "Couldn't open the billing portal. Try again.",
-                );
-                return;
-              }
-              const { portalUrl } = body;
-              if (portalUrl) window.open(portalUrl, "_blank");
-            } catch {
-              setBillingError("Couldn't open the billing portal. Check your connection and try again.");
-            } finally {
-              setOpeningPortal(false);
-            }
-          }}
-          disabled={openingPortal || isFounderComp}
-          className="min-h-[38px] w-full rounded-lg border border-glass-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-glass disabled:opacity-60 sm:w-auto"
-        >
-          {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Section headers
 // ---------------------------------------------------------------------------

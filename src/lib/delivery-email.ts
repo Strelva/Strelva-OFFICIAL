@@ -2,8 +2,8 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
-import { emailSendingPaused, operatorEmailsEnabled, customerEmailPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/lib/email/layout";
+import { sendEmail } from "@/lib/email/send";
 
 function cleanSubjectText(value: string): string {
   return value
@@ -94,23 +94,14 @@ export async function sendUpdateLiveEmail(params: {
    */
   rollingOut?: boolean;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const subjectSiteName = cleanSubjectText(params.siteName);
     const subject = params.rollingOut
       ? `Your update to ${subjectSiteName} is rolling out`
       : `Your update to ${subjectSiteName} is live`;
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject,
       html: buildUpdateLiveEmailHtml({
@@ -124,9 +115,7 @@ export async function sendUpdateLiveEmail(params: {
         rollingOut: params.rollingOut,
       }),
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: update-live email");
     return true;
   } catch (err) {
@@ -179,31 +168,20 @@ export async function sendBookingConfirmation(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (customerEmailPaused()) {
-    console.warn(`[email] customer email paused (CUSTOMER_EMAIL_ENABLED != true) — skipped ${params.to}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const business = cleanSubjectText(params.businessName);
     // Send "from" the studio's name when we have it, but always over the verified domain.
     const fromName = business || "Strelva";
     const opts = buildBookingConfirmationOptions(params);
 
-    const result = await resend.emails.send({
-      from: `${fromName} <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "customer",
+      fromName,
       to: params.to,
       subject: business ? `Your booking with ${business} is confirmed` : "Your booking is confirmed",
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: booking confirmation");
     return true;
   } catch (err) {
@@ -243,28 +221,16 @@ export async function sendPaymentPastDueEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildPaymentPastDueOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `Action needed: your payment for ${cleanSubjectText(params.businessName)} didn't go through`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email");
     return true;
   } catch (err) {
@@ -320,19 +286,9 @@ export async function sendNewLeadEmail(params: {
   dashboardUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
-
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: "Someone reached out through your website",
       html: buildNewLeadEmailHtml({
@@ -348,10 +304,7 @@ export async function sendNewLeadEmail(params: {
         dashboardUrl: params.dashboardUrl,
       }),
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
+    return sent;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-lead email failed:`, err);
     return false;
@@ -447,28 +400,14 @@ export async function sendNewIntakeLeadEmail(params: {
   leadsUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (!operatorEmailsEnabled()) {
-    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — team lead notification skipped`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
-
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "operator",
       to: resolveLeadNotifyRecipients(),
       subject: `New lead: ${cleanSubjectText(params.lead.businessName)}`,
       html: buildNewIntakeLeadEmailHtml({ lead: params.lead, leadsUrl: params.leadsUrl }),
       text: buildNewIntakeLeadEmailText({ lead: params.lead, leadsUrl: params.leadsUrl }),
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-intake-lead email failed:`, err);
     return false;
@@ -517,29 +456,15 @@ export async function sendNewSignupEmail(params: {
   tenantUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (!operatorEmailsEnabled()) {
-    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — new-signup notification skipped`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildNewSignupEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "operator",
       to: resolveLeadNotifyRecipients(),
       subject: `New paying signup: ${cleanSubjectText(params.businessName)}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-signup email failed:`, err);
     return false;
@@ -579,29 +504,15 @@ export async function sendPaymentFailedEmail(params: {
   tenantUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (!operatorEmailsEnabled()) {
-    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — payment-failed notification skipped`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildPaymentFailedEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "operator",
       to: resolveLeadNotifyRecipients(),
       subject: `Payment failed: ${cleanSubjectText(params.businessName)}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Payment-failed email failed:`, err);
     return false;
@@ -647,28 +558,16 @@ export async function sendWelcomeEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildWelcomeEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: "Welcome to Strelva",
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: welcome email");
     return true;
   } catch (err) {
@@ -710,28 +609,16 @@ export async function sendSiteLiveEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildSiteLiveEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `${cleanSubjectText(params.businessName)} is live`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: site-live email");
     return true;
   } catch (err) {
@@ -776,28 +663,16 @@ export async function sendReviewRequestEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildReviewRequestEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `A few reviews go a long way for ${cleanSubjectText(params.businessName)}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: review-request email");
     return true;
   } catch (err) {
@@ -875,28 +750,16 @@ export async function sendReviewNeedsReplyEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildReviewNeedsReplyEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `New ${params.review.rating}-star review for ${cleanSubjectText(params.businessName)}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(
       params.tenantId,
       `Sent: review-reply alert (${params.review.rating}-star from ${cleanSubjectText(params.review.author)})`,
@@ -956,28 +819,16 @@ export async function sendHealthRegressionEmail(params: {
   tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildHealthRegressionEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    const sent = await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `${cleanSubjectText(params.businessName)}'s site health dropped to ${params.currentGrade}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
+    if (!sent) return false;
     await logSentEmailToCrm(
       params.tenantId,
       `Sent: health-drop alert (${params.previousGrade} → ${params.currentGrade})`,
@@ -995,20 +846,11 @@ export async function sendDeliveryStatusEmail(params: {
   statusUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (emailSendingPaused()) {
-    console.warn(`[email] sending paused (EMAIL_SENDING_ENABLED != true) — skipped ${params.email}`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const subjectBusinessName = cleanSubjectText(params.businessName);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "client",
       to: params.email,
       subject: `We received ${subjectBusinessName}'s site request`,
       html: buildDeliveryStatusEmailHtml({
@@ -1020,10 +862,6 @@ export async function sendDeliveryStatusEmail(params: {
         statusUrl: params.statusUrl,
       }),
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Delivery status email failed:`, err);
     return false;
@@ -1089,29 +927,15 @@ export async function sendOpsDigestEmail(params: {
   opsUrl: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  if (!operatorEmailsEnabled()) {
-    console.warn(`${params.logPrefix ?? "[email]"} operator emails disabled (OPERATOR_EMAILS_ENABLED=false) — ops digest skipped`);
-    return false;
-  }
-  if (!process.env.RESEND_API_KEY) return false;
-
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const opts = buildOpsDigestEmailOptions(params);
 
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "operator",
       to: resolveLeadNotifyRecipients(),
       subject: "Strelva daily ops",
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Ops-digest email failed:`, err);
     return false;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { addEvent, getOpenChangeRequest } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth, isSuperAdmin } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth, isSuperAdmin } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";
@@ -58,8 +58,6 @@ export async function POST(request: Request) {
 
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);

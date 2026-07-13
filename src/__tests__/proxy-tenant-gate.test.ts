@@ -14,6 +14,7 @@ vi.mock("@/lib/db/server-client", () => ({
 }));
 vi.mock("@/lib/db/middleware-client", () => ({
   createMiddlewareSupabase: () => mockCreate(),
+  applyMiddlewareSupabaseResponse: (_req: unknown, response: unknown) => response,
 }));
 
 import { requestIsSuperAdmin } from "../proxy";

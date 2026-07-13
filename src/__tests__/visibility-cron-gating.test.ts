@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 import type { TenantConfig } from "@/lib/types";
 import type { VisibilitySnapshot } from "@/lib/visibility/snapshots";
 
@@ -91,7 +92,7 @@ describe("GET /api/cron/visibility — gating + derivation", () => {
     ]);
 
     const { GET } = await import("@/app/api/cron/visibility/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     const body = await res.json();
 
     // Probed: full + derive.
@@ -133,7 +134,7 @@ describe("GET /api/cron/visibility — gating + derivation", () => {
       tenant({ id: "a", industry: "plumber", visibility: { trade: "plumber", towns: ["Buffalo, NY"], competitors: [] } }),
     ]);
     const { GET } = await import("@/app/api/cron/visibility/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     const body = await res.json();
     expect(body.ok).toBe(1);
     expect(body.unconfigured).toBe(0);

@@ -1,5 +1,6 @@
 import type { ContentSection, PageSectionConfig, SitePageConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 
 // Reuse shared public components — trades layout prioritizes
 // services+pricing, social proof, and a strong estimate CTA
@@ -153,14 +154,5 @@ export const tradesTemplate: TemplateDefinition = {
     "--sage-dark": "#1d4ed8",
   },
   defaultPageConfig: TRADES_PAGE_CONFIG,
-  contentSections: [
-    "hero",
-    "services",
-    "story",
-    "testimonials",
-    "contact",
-    "settings",
-    "theme",
-    "faq",
-  ],
+  contentSections: [...getTemplateManifest("trades").contentSections],
 };

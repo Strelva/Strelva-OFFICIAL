@@ -18,7 +18,7 @@ import {
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sectionSchemas } from "@/lib/schemas";
 import { diffFields } from "@/lib/utils";
 import { revalidateClientSite } from "@/lib/revalidate-client";
@@ -55,15 +55,13 @@ export async function POST() {
 
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
     const [template, contentDrafts, pageConfigDraft, actor] = await Promise.all([
-      getTemplateForTenant(tenant),
+      getTemplateManifestForTenant(tenant),
       listDrafts(tenant),
       getDraftPageConfig(tenant),
       getActorContext(tenant),
@@ -191,8 +189,6 @@ export async function DELETE() {
 
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
 

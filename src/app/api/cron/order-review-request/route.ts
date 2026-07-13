@@ -27,6 +27,7 @@ import { getRedis } from "@/lib/redis";
 import { getOrders } from "@/lib/orders";
 import { sendReviewRequestEmail } from "@/lib/delivery-email";
 import type { TenantConfig } from "@/lib/types";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -54,8 +55,9 @@ function resolveReviewUrl(tenant: TenantConfig): string | null {
   return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check).
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
   const tenants = (await getAllTenants()).filter(isActiveTenant);
   const redis = getRedis();
   const now = Date.now();
