@@ -172,3 +172,79 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
     }
   });
 });
+
+// The prospect audit-report email warms the sending domain: it flows while
+// CLIENT lifecycle email is paused, on its OWN switch, and is silenced only by
+// an explicit PROSPECT_EMAILS_ENABLED="false".
+describe("prospect email switch (PROSPECT_EMAILS_ENABLED)", () => {
+  const original = { ...process.env };
+
+  const auditResult = {
+    url: "https://acme.example.com",
+    scannedAt: "2026-07-13T00:00:00.000Z",
+    overallScore: 72,
+    grade: "B" as const,
+    categories: [
+      {
+        name: "SEO Foundations",
+        slug: "seo-foundations",
+        weight: 20,
+        score: 55,
+        checks: [
+          { name: "Title tag", status: "fail" as const, score: 30, message: "Missing title", impact: "Search engines can't tell what this page is about.", priority: "high" as const },
+        ],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    sendMock.mockClear();
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_DOMAIN = "updates.strelva.com";
+  });
+
+  afterEach(() => {
+    process.env = { ...original };
+  });
+
+  it("prospectEmailsEnabled defaults TRUE and only PROSPECT_EMAILS_ENABLED='false' disables it", async () => {
+    const { prospectEmailsEnabled, prospectEmailsPaused } = await import("@/lib/email-enabled");
+    for (const v of [undefined, "", "true", "TRUE", "1", "no"]) {
+      if (v === undefined) delete process.env.PROSPECT_EMAILS_ENABLED;
+      else process.env.PROSPECT_EMAILS_ENABLED = v;
+      expect(prospectEmailsEnabled()).toBe(true);
+      expect(prospectEmailsPaused()).toBe(false);
+    }
+    process.env.PROSPECT_EMAILS_ENABLED = "false";
+    expect(prospectEmailsEnabled()).toBe(false);
+    expect(prospectEmailsPaused()).toBe(true);
+  });
+
+  it("sendAuditReportEmail SENDS while CLIENT email is paused (prospect switch is independent)", async () => {
+    process.env.EMAIL_SENDING_ENABLED = "false"; // client lifecycle paused
+    delete process.env.PROSPECT_EMAILS_ENABLED; // prospect default ON
+    const { sendAuditReportEmail } = await import("@/lib/audit-report-email");
+    const ok = await sendAuditReportEmail({
+      lead: { name: "Dana Lee", email: "dana@acme.example.com", url: auditResult.url },
+      result: auditResult,
+      reportUrl: "https://strelva.com/audit/report/tok_123",
+    });
+    expect(ok).toBe(true);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][0].to).toBe("dana@acme.example.com");
+  });
+
+  it("sendAuditReportEmail is silenced ONLY by PROSPECT_EMAILS_ENABLED=false", async () => {
+    process.env.EMAIL_SENDING_ENABLED = "true"; // client email on — must not matter
+    process.env.PROSPECT_EMAILS_ENABLED = "false"; // prospect kill switch
+    const { sendAuditReportEmail } = await import("@/lib/audit-report-email");
+    const ok = await sendAuditReportEmail({
+      lead: { name: "Dana Lee", email: "dana@acme.example.com", url: auditResult.url },
+      result: auditResult,
+      reportUrl: "https://strelva.com/audit/report/tok_123",
+    });
+    expect(ok).toBe(false);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+});
