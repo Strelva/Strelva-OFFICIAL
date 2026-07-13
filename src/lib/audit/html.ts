@@ -84,7 +84,12 @@ export function renderAuditReport(result: AuditResult): string {
   // Score ring as a conic-gradient dial so it prints cleanly with no canvas/JS.
   const ringPct = Math.max(0, Math.min(100, result.overallScore));
 
-  const fixes = topFixes(result.categories, 5);
+  // Only show categories we actually measured. Weight-0 categories (e.g. Core
+  // Web Vitals / Mobile with no PageSpeed key) are excluded from the grade and
+  // must not appear as a misleading "50" bar or a fix.
+  const measured = result.categories.filter((cat) => cat.weight > 0);
+
+  const fixes = topFixes(measured, 5);
   const fixRows = fixes
     .map((fix, i) => {
       const check = findCheck(result.categories, fix.category, fix.name);
@@ -112,7 +117,7 @@ export function renderAuditReport(result: AuditResult): string {
     ? `      <ol class="fixes">\n${fixRows}\n      </ol>`
     : `      <p class="muted">No priority issues were found. This site already covers the fundamentals we check.</p>`;
 
-  const categoryRows = result.categories
+  const categoryRows = measured
     .map((cat) => {
       const hex = scoreHex(cat.score);
       const pct = Math.max(0, Math.min(100, cat.score));
