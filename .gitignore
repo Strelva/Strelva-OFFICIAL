@@ -84,3 +84,6 @@ coverage
 
 # Local sales artifacts (AI-visibility scorecards / outreach kit) — scratch, not platform code
 outbound/
+
+# one-shot ops script (run via `!` then delete); never commit
+clear-stale-reval-failures.mjs
