@@ -65,6 +65,11 @@ export function stripFabricatedEstimates(categories: AuditResult["categories"]):
  *  finding (issue) + exact fix. Shared by the CLI, the scan API, and the report. */
 export function findingsFromCategories(categories: AuditResult["categories"]): LeadAuditFinding[] {
   return categories
+    // Skip unmeasured (weight-0) categories — e.g. Core Web Vitals / Mobile when
+    // no PageSpeed key. They're excluded from the grade already; their placeholder
+    // check would otherwise leak a "not measured / set GOOGLE_PAGESPEED_API_KEY"
+    // dev message into a prospect's findings.
+    .filter((cat) => cat.weight > 0)
     .flatMap((cat) => cat.checks.filter((c) => c.status !== "pass").map((c) => ({ cat, c })))
     .sort((a, b) => {
       const pa = PRIORITY_RANK[a.c.priority ?? "low"];
@@ -98,7 +103,9 @@ export async function auditUrl(url: string): Promise<LeadAuditResult> {
     scannedAt: full.scannedAt,
     score,
     grade,
-    categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
+    // Measured categories only — weight-0 (unmeasured, e.g. CWV/Mobile without a
+    // PageSpeed key) are excluded from the grade and shouldn't show a "50" score.
+    categories: categories.filter((c) => c.weight > 0).map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
     findings: findingsFromCategories(categories),
     full,
   };

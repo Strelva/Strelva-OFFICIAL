@@ -100,7 +100,9 @@ export async function POST(request: NextRequest) {
       url,
       overallScore,
       grade,
-      categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
+      // Only measured categories — weight-0 (e.g. unmeasured CWV/Mobile) would
+      // show a misleading "50" bar on the results panel.
+      categories: categories.filter((c) => c.weight > 0).map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
       emailed,
     });
   } catch (err) {
