@@ -50,6 +50,21 @@ export interface EmailButton {
   url: string;
 }
 
+/** A metric card: a big value (grade, number, price), a label, and an optional
+ *  note. `tone` colors the value. Email-safe (table + inline styles). */
+export interface EmailHighlight {
+  value: string;
+  label: string;
+  note?: string;
+  tone?: "critical" | "warning" | "positive" | "neutral";
+}
+
+/** A bulleted item: a bold title and optional trailing text, dot-marked. */
+export interface EmailBullet {
+  title: string;
+  text?: string;
+}
+
 export interface EmailOptions {
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
@@ -57,6 +72,10 @@ export interface EmailOptions {
   heading: string;
   /** Body paragraphs, rendered in order. Plain text (auto-escaped). */
   paragraphs?: string[];
+  /** Optional metric card (e.g. an audit grade + score), shown under the paragraphs. */
+  highlight?: EmailHighlight;
+  /** Optional dot-marked list (e.g. top issues), shown under the highlight. */
+  bullets?: EmailBullet[];
   /** Optional label/value table (lead details, receipts). Values auto-escaped. */
   rows?: EmailRow[];
   /** Optional primary call-to-action button. */
@@ -106,6 +125,43 @@ function secondaryButtonHtml(button: EmailButton): string {
     </td></tr></table>`;
 }
 
+const HIGHLIGHT_TONE = {
+  critical: "#b3261e",
+  warning: "#9a6a00",
+  positive: "#137a3e",
+  neutral: TOKENS.ink,
+} as const;
+
+function highlightHtml(h: EmailHighlight): string {
+  const color = HIGHLIGHT_TONE[h.tone ?? "neutral"];
+  const note = h.note
+    ? `<div style="margin-top:4px;font-size:13px;line-height:1.5;color:${TOKENS.muted};">${escapeEmailHtml(h.note)}</div>`
+    : "";
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0 18px;"><tr>
+      <td style="border:1px solid ${TOKENS.hairline};border-radius:12px;background:#f7f8f8;padding:16px 18px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="padding-right:16px;vertical-align:middle;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:44px;line-height:1;font-weight:700;color:${color};">${escapeEmailHtml(h.value)}</div></td>
+          <td style="vertical-align:middle;"><div style="font-size:16px;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(h.label)}</div>${note}</td>
+        </tr></table>
+      </td></tr></table>`;
+}
+
+function bulletsHtml(items: EmailBullet[]): string {
+  const rows = items
+    .map((b, i) => {
+      const text = b.text ? ` &mdash; ${escapeEmailHtml(b.text)}` : "";
+      const border = i === 0 ? "" : `border-top:1px solid ${TOKENS.hairline};`;
+      return `<tr><td style="padding:10px 0;${border}">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td width="16" valign="top" style="padding-top:7px;"><div style="width:7px;height:7px;border-radius:50%;background:${TOKENS.accent};"></div></td>
+          <td style="font-size:14px;line-height:1.55;color:${TOKENS.muted};"><span style="font-weight:600;color:${TOKENS.ink};">${escapeEmailHtml(b.title)}</span>${text}</td>
+        </tr></table>
+      </td></tr>`;
+    })
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:2px 0 10px;">${rows}</table>`;
+}
+
 function rowsHtml(rows: EmailRow[]): string {
   const body = rows
     .map(
@@ -145,6 +201,8 @@ export function renderEmailHtml(opts: EmailOptions): string {
         `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${TOKENS.muted};">${escapeEmailHtml(p)}</p>`,
     )
     .join("");
+  const highlight = opts.highlight ? highlightHtml(opts.highlight) : "";
+  const bullets = opts.bullets && opts.bullets.length ? bulletsHtml(opts.bullets) : "";
   const rows = opts.rows && opts.rows.length ? rowsHtml(opts.rows) : "";
   const button = opts.button ? buttonHtml(opts.button) : "";
   const secondaryButton = opts.secondaryButton ? secondaryButtonHtml(opts.secondaryButton) : "";
@@ -159,7 +217,7 @@ ${preheader}
       <tr><td style="padding:28px 32px 0;">${logo()}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
-        ${paragraphs}${rows}${button}${secondaryButton}
+        ${paragraphs}${highlight}${bullets}${rows}${button}${secondaryButton}
       </td></tr>
       <tr><td style="padding:12px 32px 26px;"><div style="border-top:1px solid ${TOKENS.hairline};">${footerHtml(opts)}</div></td></tr>
     </table>
@@ -172,6 +230,13 @@ ${preheader}
 export function renderEmailText(opts: EmailOptions): string {
   const parts: string[] = [opts.heading, ""];
   for (const p of opts.paragraphs ?? []) parts.push(p, "");
+  if (opts.highlight) {
+    parts.push(`${opts.highlight.value} — ${opts.highlight.label}`);
+    if (opts.highlight.note) parts.push(opts.highlight.note);
+    parts.push("");
+  }
+  for (const b of opts.bullets ?? []) parts.push(`- ${b.title}${b.text ? ` — ${b.text}` : ""}`);
+  if (opts.bullets && opts.bullets.length) parts.push("");
   if (opts.rows) for (const r of opts.rows) parts.push(`${r.label}: ${r.value}`);
   if (opts.rows && opts.rows.length) parts.push("");
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");

@@ -1,68 +1,110 @@
-import { NextResponse } from "next/server";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
-import { sendNewIntakeLeadEmail } from "@/lib/delivery-email";
-import { recordLead } from "@/lib/leads";
+import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
+import { getRedis } from "@/lib/redis";
+import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { runAudit } from "@/lib/audit/checks";
+import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
+import type { AuditResult } from "@/lib/audit/types";
+import { stripFabricatedEstimates } from "@/lib/lead-audit";
+import { saveAuditReport } from "@/lib/audit-report-store";
+import { sendAuditReportEmail } from "@/lib/audit-report-email";
+import { sendSlackNotification } from "@/lib/slack";
 
 /**
- * Lead-magnet capture for the public /audit tool. A prospect unlocks the full
- * report by giving their email; we record the lead and notify the team so it's
- * followed up, then the client opens the report inline. No prospect email is
- * sent here (that path is behind the platform email pause) — the team
- * notification (operator-gated, ON by default, defaults to jacob@) is what makes
- * this a real inbound funnel today.
+ * Gated full-audit lead capture for the marketing site. One call does the whole
+ * flow: validate name+email+url, run the deep audit, persist the report under a
+ * shareable id, notify the operator (Slack), and send the prospect their report
+ * email (dormant while client email is paused). Returns the grade + category
+ * summary + the report link — NOT the itemized findings, which live in the
+ * report (the reason the email is worth opening). This is the audit-lead pipe,
+ * distinct from the /access-request build-request pipe.
  */
 
+const MAX_LEADS_PER_DAY = 8;
+// The public report lives on the marketing site (strelva.com/audit/report/{id}),
+// which proxies to this app's renderer. So the shareable/emailed link is a real
+// Strelva URL, not this control-plane host.
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL ?? "https://strelva.com").replace(/\/$/, "");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function hostOf(url: string): string {
-  try {
-    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
-  } catch {
-    return url.slice(0, 120);
-  }
-}
+export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
 
-export async function POST(req: Request) {
-  // Tighter than a page view: a form submit with an email. 8/hour per IP.
-  if (await isRateLimitedWindowedAsync(rateLimitKey(req, "audit-lead"), 8, 3600_000)) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  const redis = getRedis();
+  if (redis) {
+    const limited = await isRateLimitedWindowedAsync(`audit-lead:${ip}`, MAX_LEADS_PER_DAY, 86400000);
+    if (limited) {
+      return NextResponse.json(
+        { error: "You've run several audits today. Please try again tomorrow." },
+        { status: 429 },
+      );
+    }
   }
 
-  let body: { url?: string; email?: string; grade?: string; score?: number };
+  let body: { name?: string; email?: string; url?: string };
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const url = typeof body.url === "string" ? body.url.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!url) return NextResponse.json({ error: "A site URL is required." }, { status: 400 });
+  const name = String(body.name ?? "").trim().slice(0, 120);
+  const email = String(body.email ?? "").trim().slice(0, 160);
+  const rawUrl = String(body.url ?? "").trim();
+
+  if (!name) return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
   if (!EMAIL_RE.test(email)) return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  if (!rawUrl) return NextResponse.json({ error: "A site URL is required." }, { status: 400 });
 
-  const host = hostOf(url);
-  const scoreLine = body.grade ? `Grade ${body.grade}${typeof body.score === "number" ? ` (${body.score}/100)` : ""}` : "";
+  let url = rawUrl;
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  try {
+    new URL(url);
+  } catch {
+    return NextResponse.json({ error: "That doesn't look like a valid URL." }, { status: 400 });
+  }
 
-  // Persist (best-effort) under a platform audit bucket, and notify the team.
-  // Both are isolated so a failure in one never blocks the capture response.
-  await recordLead("audit", {
-    name: host,
-    email,
-    message: `Ran the free audit for ${url}. ${scoreLine}`.trim(),
-    source: "audit-magnet",
-  }).catch(() => null);
+  try {
+    const categories = stripFabricatedEstimates(await runAudit(url));
+    const overallScore = computeOverallScore(categories);
+    const grade = scoreToGrade(overallScore);
+    const result: AuditResult = {
+      url,
+      scannedAt: new Date().toISOString(),
+      overallScore,
+      grade,
+      categories,
+    };
 
-  await sendNewIntakeLeadEmail({
-    lead: {
-      businessName: host,
-      email,
-      currentWebsite: url,
-      description: `Ran the free site audit and unlocked the full report. ${scoreLine}`.trim(),
-      planLabel: "Audit lead (unlocked report)",
-    },
-    leadsUrl: "https://admin.strelva.com/admin/leads",
-    logPrefix: "[audit-lead]",
-  }).catch(() => null);
+    const lead = { name, email, url };
+    const reportId = await saveAuditReport(result, lead);
+    const reportUrl = reportId ? `${PUBLIC_SITE_URL}/audit/report/${reportId}` : null;
 
-  return NextResponse.json({ ok: true });
+    // Operator notification (fire-and-forget; a Slack blip never fails the lead).
+    const host = url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    void sendSlackNotification({
+      text: `New audit lead\n*${name}* <${email}>\n${host} — grade ${grade} (${overallScore}/100)${reportUrl ? `\nReport: ${reportUrl}` : ""}`,
+    });
+
+    // Prospect email — real send only when client email is switched on.
+    const emailed = reportUrl
+      ? await sendAuditReportEmail({ lead, result, reportUrl })
+      : false;
+
+    return NextResponse.json({
+      reportId,
+      reportUrl,
+      url,
+      overallScore,
+      grade,
+      categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
+      emailed,
+    });
+  } catch (err) {
+    Sentry.captureException(err, { tags: { feature: "audit-lead" }, extra: { url } });
+    return NextResponse.json({ error: "The audit failed to run. Please try again." }, { status: 500 });
+  }
 }

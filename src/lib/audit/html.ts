@@ -319,9 +319,9 @@ ${categoryRows}
     </ul>
 
     <div class="cta">
-      <p class="cta-title">Strelva builds and manages sites that score higher.</p>
-      <p class="cta-sub">AI-powered updates, health monitoring, and a plain-English weekly report. You own your domain and your content from day one.</p>
-      <a class="cta-link" href="https://strelva.com/access-request?ref=audit-report">Request your build</a>
+      <p class="cta-title">We can do all of this for you.</p>
+      <p class="cta-sub">Strelva builds and manages your site end to end — every issue in this report fixed, and kept that way. AI-powered updates, health monitoring, and a plain-English weekly report. You own your domain and content from day one.</p>
+      <a class="cta-link" href="https://strelva.com/access-request?ref=audit-report">Let Strelva handle it</a>
     </div>
 
     <footer>
