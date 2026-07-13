@@ -46,15 +46,10 @@ export interface LeadAuditResult {
 
 const PRIORITY_RANK: Record<NonNullable<CheckResult["priority"]>, number> = { high: 0, medium: 1, low: 2 };
 
-/** Run the full audit for one URL and shape it for lists, agents, and reports. */
-export async function auditUrl(url: string): Promise<LeadAuditResult> {
-  const categories = await runAudit(url);
-  const score = computeOverallScore(categories);
-  const grade = scoreToGrade(score);
-  const full: AuditResult = { url, scannedAt: new Date().toISOString(), overallScore: score, grade, categories };
-
-  // Every non-passing check, worst-first, with its granular finding + fix.
-  const findings: LeadAuditFinding[] = categories
+/** Every non-passing check across all categories, worst-first, with its granular
+ *  finding (issue) + exact fix. Shared by the CLI, the scan API, and the report. */
+export function findingsFromCategories(categories: AuditResult["categories"]): LeadAuditFinding[] {
+  return categories
     .flatMap((cat) => cat.checks.filter((c) => c.status !== "pass").map((c) => ({ cat, c })))
     .sort((a, b) => {
       const pa = PRIORITY_RANK[a.c.priority ?? "low"];
@@ -74,6 +69,14 @@ export async function auditUrl(url: string): Promise<LeadAuditResult> {
       impact: c.impact,
       quantified: c.quantified,
     }));
+}
+
+/** Run the full audit for one URL and shape it for lists, agents, and reports. */
+export async function auditUrl(url: string): Promise<LeadAuditResult> {
+  const categories = await runAudit(url);
+  const score = computeOverallScore(categories);
+  const grade = scoreToGrade(score);
+  const full: AuditResult = { url, scannedAt: new Date().toISOString(), overallScore: score, grade, categories };
 
   return {
     url,
@@ -81,7 +84,7 @@ export async function auditUrl(url: string): Promise<LeadAuditResult> {
     score,
     grade,
     categories: categories.map((c) => ({ name: c.name, slug: c.slug, score: c.score })),
-    findings,
+    findings: findingsFromCategories(categories),
     full,
   };
 }

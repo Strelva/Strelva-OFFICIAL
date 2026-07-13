@@ -4,6 +4,7 @@ import { getRedis } from "@/lib/redis";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
+import { findingsFromCategories } from "@/lib/lead-audit";
 import type { AuditResult } from "@/lib/audit/types";
 
 const MAX_SCANS_PER_DAY = 3;
@@ -96,12 +97,15 @@ export async function POST(request: NextRequest) {
     const overallScore = computeOverallScore(categories);
     const grade = scoreToGrade(overallScore);
 
-    const result: AuditResult = {
+    const result: AuditResult & { findings: ReturnType<typeof findingsFromCategories> } = {
       url: normalizedUrl,
       scannedAt: new Date().toISOString(),
       overallScore,
       grade,
       categories,
+      // Additive: every non-passing check with its exact issue + fix, worst-first.
+      // The public marketing "Full audit" surfaces these; legacy callers ignore it.
+      findings: findingsFromCategories(categories),
     };
 
     // Cache successful result for 1 hour
