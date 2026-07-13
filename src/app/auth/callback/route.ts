@@ -22,10 +22,24 @@ function safeNext(next: string | null): string {
   return next;
 }
 
+/** Bounce back to sign-in with a short, URL-safe reason tag so a failed round-trip
+ *  is diagnosable from the address bar (and logged) instead of an opaque error. */
+function fail(origin: string, reason: string): NextResponse {
+  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}`);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
+
+  // The provider (Supabase/Google) can redirect back with an error instead of a
+  // code (e.g. redirect-URL not allow-listed, consent denied). Surface it verbatim.
+  const providerError = searchParams.get("error_description") || searchParams.get("error");
+  if (providerError) {
+    console.error("[auth/callback] provider returned error:", providerError);
+    return fail(origin, `provider:${providerError.slice(0, 120)}`);
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -34,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   if (!code || !url || !key) {
     console.error("[auth/callback] missing code/env", { hasCode: !!code, hasUrl: !!url, hasKey: !!key });
-    return NextResponse.redirect(`${origin}/sign-in?error=auth_callback`);
+    return fail(origin, !code ? "no_code" : "no_env");
   }
 
   // Build the success redirect first; the Supabase client writes session cookies
@@ -56,8 +70,17 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
+    // A double-hit on this route (prefetch, browser retry) consumes the code on the
+    // first pass and this second pass fails "code already used" — but the first pass
+    // already set the session cookie. If we already have a valid session, treat the
+    // exchange failure as benign and continue to `next` rather than bouncing to sign-in.
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      console.warn("[auth/callback] exchange failed but a session already exists (double-hit); continuing:", error.message);
+      return response;
+    }
     console.error("[auth/callback] exchangeCodeForSession failed:", error.message);
-    return NextResponse.redirect(`${origin}/sign-in?error=auth_callback`);
+    return fail(origin, `exchange:${error.message.slice(0, 120)}`);
   }
 
   return response;
