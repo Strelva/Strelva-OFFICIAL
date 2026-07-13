@@ -5,6 +5,7 @@ import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult } from "@/lib/audit/types";
+import { stripFabricatedEstimates } from "@/lib/lead-audit";
 import { saveAuditReport } from "@/lib/audit-report-store";
 import { sendAuditReportEmail } from "@/lib/audit-report-email";
 import { sendSlackNotification } from "@/lib/slack";
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const categories = await runAudit(url);
+    const categories = stripFabricatedEstimates(await runAudit(url));
     const overallScore = computeOverallScore(categories);
     const grade = scoreToGrade(overallScore);
     const result: AuditResult = {

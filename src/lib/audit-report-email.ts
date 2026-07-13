@@ -18,19 +18,12 @@ function displayHost(url: string): string {
   return url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
-/** One tidy line for the email table: the first whole sentence of the fix's
- *  "why", plus its quantified impact set off with a middot (never a mid-word cut
- *  or a doubled paren). */
-function fixLine(impact: string | undefined, issue: string, quantified?: string): string {
-  const source = (impact || issue).replace(/\s+/g, " ").trim();
-  let text = source.split(/(?<=[.!?])\s/)[0] || source;
-  if (text.length > 140) text = `${text.slice(0, 139).trimEnd()}…`;
-  return quantified ? `${text} · ${quantified}` : text;
-}
-
 /** The report email's content, as primitives the shared layout renders (heading,
- *  paragraphs, a rows table, a button) — never hand-rolled markup. Exported so
- *  the exact email can be rendered for review. */
+ *  paragraphs, a rows table, a button) — never hand-rolled markup. A scorecard:
+ *  the overall grade plus every category score. No invented dollar figures — we
+ *  have no traffic data for the site, so the honest signal is the scores. The
+ *  ranked issues + exact fixes live in the full report. Exported so the exact
+ *  email can be rendered for review. */
 export function buildAuditReportEmailOptions(
   lead: { name: string; url: string },
   result: AuditResult,
@@ -38,32 +31,29 @@ export function buildAuditReportEmailOptions(
 ): EmailOptions {
   const host = displayHost(lead.url);
   const findings = findingsFromCategories(result.categories);
-  const highCount = findings.filter((f) => f.priority === "high").length;
   const greeting = lead.name ? `Hi ${lead.name.split(/\s+/)[0]},` : "Hi,";
-
-  // The top few fixes as a label/value table — the substance a prospect wants to
-  // see before clicking through. The full ranked list lives in the report.
-  const topFixes = findings.slice(0, 4);
-  const rows =
-    findings.length === 0
-      ? [{ label: "Overall grade", value: `${result.grade} · ${result.overallScore}/100 — no priority issues found` }]
-      : [
-          { label: "Overall grade", value: `${result.grade} · ${result.overallScore}/100` },
-          ...topFixes.map((f) => ({ label: f.name, value: fixLine(f.impact, f.issue, f.quantified) })),
-        ];
 
   const summary =
     findings.length === 0
-      ? `We ran a full audit on ${host} and it scored ${result.grade} (${result.overallScore}/100) — it already covers the fundamentals we check.`
-      : `We ran a full audit on ${host}. It scored ${result.grade} (${result.overallScore}/100), with ${findings.length} thing${findings.length === 1 ? "" : "s"} worth fixing${highCount ? `, ${highCount} high-impact` : ""}. Here are the ones to start with:`;
+      ? `We audited ${host}. It scored ${result.grade} — ${result.overallScore} out of 100, and already covers the fundamentals we check. Here's how each area did:`
+      : `We audited ${host}. It scored ${result.grade} — ${result.overallScore} out of 100, with ${findings.length} thing${findings.length === 1 ? "" : "s"} worth fixing. Here's how each area scored:`;
+
+  // Every subsection score — the honest, data-free signal. Overall first, then
+  // each category worst-first so the weakest areas lead.
+  const rows = [
+    { label: "Overall", value: `${result.grade} · ${result.overallScore} / 100` },
+    ...[...result.categories]
+      .sort((a, b) => a.score - b.score)
+      .map((c) => ({ label: c.name, value: `${c.score} / 100` })),
+  ];
 
   return {
-    preheader: `Grade ${result.grade} (${result.overallScore}/100) for ${host}`,
+    preheader: `${result.grade} · ${result.overallScore}/100 for ${host}`,
     heading: "Your site health report is ready",
     paragraphs: [greeting, summary],
     rows,
-    button: { label: "View full report", url: reportUrl },
-    footerNote: `Your full report lists every issue with the exact fix. You requested this audit at strelva.com/audit.`,
+    button: { label: "See the full report", url: reportUrl },
+    footerNote: `The full report ranks every issue with the exact fix. You requested this audit at strelva.com/audit.`,
   };
 }
 
