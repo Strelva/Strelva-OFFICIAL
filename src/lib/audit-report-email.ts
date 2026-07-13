@@ -18,7 +18,20 @@ function displayHost(url: string): string {
   return url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
-function buildOptions(
+/** One tidy line for the email table: the first whole sentence of the fix's
+ *  "why", plus its quantified impact set off with a middot (never a mid-word cut
+ *  or a doubled paren). */
+function fixLine(impact: string | undefined, issue: string, quantified?: string): string {
+  const source = (impact || issue).replace(/\s+/g, " ").trim();
+  let text = source.split(/(?<=[.!?])\s/)[0] || source;
+  if (text.length > 140) text = `${text.slice(0, 139).trimEnd()}…`;
+  return quantified ? `${text} · ${quantified}` : text;
+}
+
+/** The report email's content, as primitives the shared layout renders (heading,
+ *  paragraphs, a rows table, a button) — never hand-rolled markup. Exported so
+ *  the exact email can be rendered for review. */
+export function buildAuditReportEmailOptions(
   lead: { name: string; url: string },
   result: AuditResult,
   reportUrl: string,
@@ -26,24 +39,31 @@ function buildOptions(
   const host = displayHost(lead.url);
   const findings = findingsFromCategories(result.categories);
   const highCount = findings.filter((f) => f.priority === "high").length;
-  const issuesLine =
-    findings.length === 0
-      ? "We didn't find any priority issues — your site already covers the fundamentals."
-      : `${findings.length} issue${findings.length === 1 ? "" : "s"} worth fixing${highCount ? `, ${highCount} of them high-impact` : ""}.`;
-
   const greeting = lead.name ? `Hi ${lead.name.split(/\s+/)[0]},` : "Hi,";
+
+  // The top few fixes as a label/value table — the substance a prospect wants to
+  // see before clicking through. The full ranked list lives in the report.
+  const topFixes = findings.slice(0, 4);
+  const rows =
+    findings.length === 0
+      ? [{ label: "Overall grade", value: `${result.grade} · ${result.overallScore}/100 — no priority issues found` }]
+      : [
+          { label: "Overall grade", value: `${result.grade} · ${result.overallScore}/100` },
+          ...topFixes.map((f) => ({ label: f.name, value: fixLine(f.impact, f.issue, f.quantified) })),
+        ];
+
+  const summary =
+    findings.length === 0
+      ? `We ran a full audit on ${host} and it scored ${result.grade} (${result.overallScore}/100) — it already covers the fundamentals we check.`
+      : `We ran a full audit on ${host}. It scored ${result.grade} (${result.overallScore}/100), with ${findings.length} thing${findings.length === 1 ? "" : "s"} worth fixing${highCount ? `, ${highCount} high-impact` : ""}. Here are the ones to start with:`;
 
   return {
     preheader: `Grade ${result.grade} (${result.overallScore}/100) for ${host}`,
     heading: "Your site health report is ready",
-    paragraphs: [
-      greeting,
-      `We ran a full audit on ${host}. Here's the headline, and your complete report with every issue and how to fix it is one click away.`,
-      issuesLine,
-    ],
-    rows: [{ label: "Overall grade", value: `${result.grade} — ${result.overallScore}/100` }],
+    paragraphs: [greeting, summary],
+    rows,
     button: { label: "View full report", url: reportUrl },
-    footerNote: "You requested this audit at strelva.com/audit.",
+    footerNote: `Your full report lists every issue with the exact fix. You requested this audit at strelva.com/audit.`,
   };
 }
 
@@ -60,7 +80,7 @@ export async function sendAuditReportEmail(params: {
   if (emailSendingPaused()) return false;
   if (!process.env.RESEND_API_KEY) return false;
 
-  const opts = buildOptions(params.lead, params.result, params.reportUrl);
+  const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
   try {
     const { Resend } = await import("resend");
     const resend = new Resend(process.env.RESEND_API_KEY);
