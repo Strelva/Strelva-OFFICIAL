@@ -9,8 +9,6 @@ import type { SocialPost } from "@/lib/types";
 const VALID_PLATFORMS = ["instagram", "facebook", "x"] as const;
 
 async function requireSocialWriteAccess(tenant: string): Promise<NextResponse | null> {
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
   return requireActiveSubscription(tenant);

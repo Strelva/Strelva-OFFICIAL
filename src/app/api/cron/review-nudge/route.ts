@@ -20,6 +20,7 @@ import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { sendReviewRequestEmail } from "@/lib/delivery-email";
 import type { TenantConfig } from "@/lib/types";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -48,8 +49,9 @@ function resolveReviewUrl(tenant: TenantConfig): string | null {
   return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check).
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
   const tenants = (await getAllTenants()).filter(isActiveTenant);
   const redis = getRedis();
   const now = Date.now();

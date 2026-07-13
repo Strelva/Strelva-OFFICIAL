@@ -8,6 +8,7 @@ import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/lib/redis";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { maybeAlertNewReview } from "@/lib/review-alert";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -43,8 +44,9 @@ async function fetchYelpReviews(apiKey: string, businessId: string): Promise<Yel
   return data.reviews;
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check)
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);

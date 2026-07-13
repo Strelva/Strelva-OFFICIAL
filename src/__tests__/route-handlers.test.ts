@@ -48,6 +48,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     getTenantRole: () => Promise.resolve("super_admin" as const),
     requireTenantAccess: () => Promise.resolve(null),
     requireTenantPermission: () => Promise.resolve(null),
+    requireTenantPermissions: () => Promise.resolve(null),
     getActorContext: () =>
       Promise.resolve({
         userId: "user_123",

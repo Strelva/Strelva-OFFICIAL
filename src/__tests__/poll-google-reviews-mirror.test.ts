@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 // A transient addReview (Reviews-tab mirror) failure must leave that reviewId
 // OUT of the seen-set cursor so the next poll retries it — otherwise the review
@@ -113,7 +114,7 @@ afterEach(() => {
 describe("poll-google-reviews mirror-failure cursor", () => {
   it("excludes a reviewId whose addReview threw from the seen-set, but keeps its mirrored sibling", async () => {
     const { GET } = await import("@/app/api/cron/poll-google-reviews/route");
-    await GET();
+    await GET(authenticatedCronRequest());
 
     // Both reviews were attempted against the Reviews-tab mirror.
     expect(mockAddReview).toHaveBeenCalledTimes(2);

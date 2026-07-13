@@ -1,6 +1,6 @@
 import { getEvents, getQueueCount } from "./events";
 import { getSectionTimestamps } from "./storage";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { detectStaleSections } from "./reports";
 import { suggestionAudience } from "./suggestions";
 import type { ContentSection, UnifiedEvent } from "./types";
@@ -31,7 +31,7 @@ export interface NeedsYouData {
  */
 export async function getNeedsYouData(tenant: string): Promise<NeedsYouData> {
   const [siteModel, pending, resolved, pendingCount, timestamps] = await Promise.all([
-    getTemplateForTenant(tenant).catch(() => null),
+    getTemplateManifestForTenant(tenant).catch(() => null),
     getEvents(tenant, { status: "pending", limit: 50 }).catch(() => [] as UnifiedEvent[]),
     getEvents(tenant, { limit: 30 })
       .then((events) =>

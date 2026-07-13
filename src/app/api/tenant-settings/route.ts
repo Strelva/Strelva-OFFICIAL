@@ -3,7 +3,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import {
   getActorContext,
   requireTenantAccess,
-  requireTenantPermission,
+  requireTenantPermissions,
   type TenantPermission,
 } from "@/lib/auth";
 import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/tenants";
@@ -56,14 +56,6 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
-    const actor = await getActorContext(tenant);
-    const currentConfig = await getTenantConfig(tenant);
-    if (!currentConfig) {
-      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-    }
-
     const body = await readJsonObject(req);
     if (!body) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -77,13 +69,16 @@ export async function PUT(req: Request) {
     if (typeof body.productionDomain === "string" || typeof body.adminDomain === "string") {
       sensitivePermissions.add("domains:manage");
     }
-    for (const permission of sensitivePermissions) {
-      const blocked = await requireTenantPermission(tenant, permission);
-      if (blocked) return blocked;
-    }
     if (sensitivePermissions.size === 0) {
-      const blocked = await requireTenantPermission(tenant, "settings:write");
-      if (blocked) return blocked;
+      sensitivePermissions.add("settings:write");
+    }
+    const blocked = await requireTenantPermissions(tenant, sensitivePermissions);
+    if (blocked) return blocked;
+
+    const actor = await getActorContext(tenant);
+    const currentConfig = await getTenantConfig(tenant);
+    if (!currentConfig) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
     if (typeof body.businessRules === "string") {

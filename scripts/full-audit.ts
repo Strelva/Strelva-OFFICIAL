@@ -54,7 +54,7 @@ function printOne(r: LeadAuditResult, html?: string) {
   for (const cat of r.categories) console.log(`   ${scoreColor(cat.score)}${bar(cat.score)}${R} ${String(cat.score).padStart(3)}  ${cat.name}`);
   if (r.findings.length) {
     console.log(`\n  ${BOLD}What's wrong (${r.findings.length}) — exact findings + fixes${R}`);
-    r.findings.slice(0, 12).forEach((f, i) => {
+    r.findings.slice(0, 12).forEach((f) => {
       const pc = f.priority === "high" ? "\x1b[31m" : f.priority === "medium" ? "\x1b[33m" : DIM;
       console.log(`   ${pc}${(f.status === "fail" ? "✗" : "!")}${R} ${BOLD}${f.name}${R}  ${DIM}[${f.category} · ${f.priority}]${R}${f.quantified ? `  \x1b[31m${f.quantified}${R}` : ""}`);
       console.log(`      ${f.issue}`);

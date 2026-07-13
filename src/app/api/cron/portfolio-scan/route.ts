@@ -6,6 +6,7 @@ import { getScanSummaries } from "@/lib/scan-store";
 import { getRedis } from "@/lib/redis";
 import { sendHealthRegressionEmail } from "@/lib/delivery-email";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -27,7 +28,10 @@ const HEALTH_ALERT_TTL_SECONDS = 14 * 24 * 60 * 60;
  * full letter (vs that baseline) gets one owner email — deduped per transition,
  * gated by the client email pause, fail-soft.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   // Cap how many tenants one daily run scans (each scan is ~35s; concurrency 6
   // under a 300s budget tops out near ~50 before the function would time out and
   // silently drop the tail). The cap ROTATES daily so every tenant is still

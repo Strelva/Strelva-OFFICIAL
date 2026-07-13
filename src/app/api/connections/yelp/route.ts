@@ -19,9 +19,6 @@ export async function POST(req: Request) {
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
-
   const permissionDenied = await requireTenantPermission(tenant, "settings:write");
   if (permissionDenied) return permissionDenied;
 
@@ -81,9 +78,6 @@ export async function DELETE(_req: Request) {
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
-
   const permissionDenied = await requireTenantPermission(tenant, "settings:write");
   if (permissionDenied) return permissionDenied;
 

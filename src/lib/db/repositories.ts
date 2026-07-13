@@ -1,11 +1,11 @@
 /**
  * Typed Postgres repositories — the Supabase side of the migration.
  *
- * Design for the migration's dual-write phase: every function is NULL-SAFE.
- * When Supabase isn't configured (env unset), reads return empty/null and
- * writes are no-ops, so a caller can dual-write to Redis + Postgres without a
- * branch and without breaking anything while Postgres is dark. Once a subsystem
- * cuts over, reads come from here with a Redis fallback.
+ * Migration mirrors remain best-effort, but Postgres is now authoritative for
+ * tenant, identity, content, collection, draft, audit, and activity mutations.
+ * Those writes throw when unavailable or rejected so callers never report a
+ * successful change that was not persisted. Reads retain their documented
+ * empty/null fallbacks while the remaining legacy read paths are decommissioned.
  *
  * This file establishes the pattern on representative subsystems
  * (tenants, events, leads, build-payments, mail-log). The remaining 30 tables
@@ -14,13 +14,29 @@
 
 import { getSupabase, type Row, type Insert } from "./client";
 
-/** Wrap a query; log + swallow so a Postgres hiccup never breaks the caller. */
-async function safe<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
+/** Explicitly best-effort work: migration mirrors, telemetry, and fallback reads. */
+async function bestEffort<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await run();
   } catch (err) {
     console.error(`[db] ${label} failed:`, err instanceof Error ? err.message : err);
     return fallback;
+  }
+}
+
+function requiredDb(label: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[db] ${label} failed: Supabase is not configured`);
+  return db;
+}
+
+/** Log an authoritative failure, then preserve it for the mutation boundary. */
+async function required<T>(label: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    console.error(`[db] ${label} failed:`, err instanceof Error ? err.message : err);
+    throw err;
   }
 }
 
@@ -31,7 +47,7 @@ async function safe<T>(label: string, run: () => Promise<T>, fallback: T): Promi
 export async function getTenant(id: string): Promise<Row<"tenants"> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getTenant ${id}`, async () => {
+  return bestEffort(`getTenant ${id}`, async () => {
     const { data, error } = await db.from("tenants").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
     return data;
@@ -41,7 +57,7 @@ export async function getTenant(id: string): Promise<Row<"tenants"> | null> {
 export async function listActiveTenants(): Promise<Row<"tenants">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe("listActiveTenants", async () => {
+  return bestEffort("listActiveTenants", async () => {
     const { data, error } = await db.from("tenants").select("*").eq("active", true);
     if (error) throw error;
     return data ?? [];
@@ -49,12 +65,12 @@ export async function listActiveTenants(): Promise<Row<"tenants">[]> {
 }
 
 export async function upsertTenant(tenant: Insert<"tenants">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`upsertTenant ${tenant.id}`, async () => {
+  const label = `upsertTenant ${tenant.id}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db.from("tenants").upsert(tenant);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +80,7 @@ export async function upsertTenant(tenant: Insert<"tenants">): Promise<void> {
 export async function insertEvent(event: Insert<"unified_events">): Promise<string | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`insertEvent ${event.tenant_id}`, async () => {
+  return bestEffort(`insertEvent ${event.tenant_id}`, async () => {
     const { data, error } = await db.from("unified_events").insert(event).select("id").single();
     if (error) throw error;
     return data.id;
@@ -74,7 +90,7 @@ export async function insertEvent(event: Insert<"unified_events">): Promise<stri
 export async function listEvents(tenantId: string, limit = 50): Promise<Row<"unified_events">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listEvents ${tenantId}`, async () => {
+  return bestEffort(`listEvents ${tenantId}`, async () => {
     const { data, error } = await db
       .from("unified_events")
       .select("*")
@@ -93,7 +109,7 @@ export async function setEventStatus(
 ): Promise<void> {
   const db = getSupabase();
   if (!db) return;
-  await safe(`setEventStatus ${id}`, async () => {
+  await bestEffort(`setEventStatus ${id}`, async () => {
     const update: {
       status: string;
       resolved_at: string;
@@ -116,7 +132,7 @@ export async function setEventStatus(
 export async function upsertLead(lead: Insert<"delivery_leads">): Promise<void> {
   const db = getSupabase();
   if (!db) return;
-  await safe(`upsertLead ${lead.email}`, async () => {
+  await bestEffort(`upsertLead ${lead.email}`, async () => {
     const { error } = await db.from("delivery_leads").upsert(lead, { onConflict: "email" });
     if (error) throw error;
   }, undefined);
@@ -125,7 +141,7 @@ export async function upsertLead(lead: Insert<"delivery_leads">): Promise<void> 
 export async function listLeads(): Promise<Row<"delivery_leads">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe("listLeads", async () => {
+  return bestEffort("listLeads", async () => {
     const { data, error } = await db
       .from("delivery_leads")
       .select("*")
@@ -142,7 +158,7 @@ export async function listLeads(): Promise<Row<"delivery_leads">[]> {
 export async function recordBuildPayment(payment: Insert<"build_payments">): Promise<void> {
   const db = getSupabase();
   if (!db) return;
-  await safe(`recordBuildPayment ${payment.session_id}`, async () => {
+  await bestEffort(`recordBuildPayment ${payment.session_id}`, async () => {
     const { error } = await db.from("build_payments").upsert(payment, { onConflict: "session_id" });
     if (error) throw error;
   }, undefined);
@@ -151,7 +167,7 @@ export async function recordBuildPayment(payment: Insert<"build_payments">): Pro
 export async function listBuildPayments(): Promise<Row<"build_payments">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe("listBuildPayments", async () => {
+  return bestEffort("listBuildPayments", async () => {
     const { data, error } = await db
       .from("build_payments")
       .select("*")
@@ -168,7 +184,7 @@ export async function listBuildPayments(): Promise<Row<"build_payments">[]> {
 export async function recordMailSendPg(entry: Insert<"mail_log">): Promise<void> {
   const db = getSupabase();
   if (!db) return;
-  await safe(`recordMailSendPg ${entry.tenant_id}`, async () => {
+  await bestEffort(`recordMailSendPg ${entry.tenant_id}`, async () => {
     const { error } = await db.from("mail_log").insert(entry);
     if (error) throw error;
   }, undefined);
@@ -177,7 +193,7 @@ export async function recordMailSendPg(entry: Insert<"mail_log">): Promise<void>
 export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"mail_log">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`getMailLogPg ${tenantId}`, async () => {
+  return bestEffort(`getMailLogPg ${tenantId}`, async () => {
     const { data, error } = await db
       .from("mail_log")
       .select("*")
@@ -201,18 +217,18 @@ export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"m
 // users -----------------------------------------------------------------------
 
 export async function upsertUser(user: Insert<"users">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`upsertUser ${user.email}`, async () => {
+  const label = `upsertUser ${user.email}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db.from("users").upsert(user, { onConflict: "email" });
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 export async function getUserByEmail(email: string): Promise<Row<"users"> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getUserByEmail ${email}`, async () => {
+  return bestEffort(`getUserByEmail ${email}`, async () => {
     const { data, error } = await db.from("users").select("*").eq("email", email).maybeSingle();
     if (error) throw error;
     return data;
@@ -222,7 +238,7 @@ export async function getUserByEmail(email: string): Promise<Row<"users"> | null
 export async function getUserByClerkId(clerkId: string): Promise<Row<"users"> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getUserByClerkId ${clerkId}`, async () => {
+  return bestEffort(`getUserByClerkId ${clerkId}`, async () => {
     const { data, error } = await db.from("users").select("*").eq("clerk_id", clerkId).maybeSingle();
     if (error) throw error;
     return data;
@@ -234,7 +250,7 @@ export async function getUserByClerkId(clerkId: string): Promise<Row<"users"> | 
 export async function listMembershipsForUser(userId: string): Promise<Row<"memberships">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listMembershipsForUser ${userId}`, async () => {
+  return bestEffort(`listMembershipsForUser ${userId}`, async () => {
     const { data, error } = await db.from("memberships").select("*").eq("user_id", userId);
     if (error) throw error;
     return data ?? [];
@@ -245,7 +261,7 @@ export async function listMembershipsForUser(userId: string): Promise<Row<"membe
 export async function getMembershipRole(userId: string, tenantId: string): Promise<string | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getMembershipRole ${userId}/${tenantId}`, async () => {
+  return bestEffort(`getMembershipRole ${userId}/${tenantId}`, async () => {
     const { data, error } = await db
       .from("memberships")
       .select("role")
@@ -262,7 +278,7 @@ export async function getMembershipRole(userId: string, tenantId: string): Promi
 export async function listTenantOwnerIds(tenantId: string): Promise<string[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listTenantOwnerIds ${tenantId}`, async () => {
+  return bestEffort(`listTenantOwnerIds ${tenantId}`, async () => {
     const { data, error } = await db
       .from("memberships")
       .select("user_id")
@@ -274,14 +290,14 @@ export async function listTenantOwnerIds(tenantId: string): Promise<string[]> {
 }
 
 export async function upsertMembership(membership: Insert<"memberships">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`upsertMembership ${membership.user_id}/${membership.tenant_id}`, async () => {
+  const label = `upsertMembership ${membership.user_id}/${membership.tenant_id}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db
       .from("memberships")
       .upsert(membership, { onConflict: "user_id,tenant_id" });
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 // super_admins ----------------------------------------------------------------
@@ -291,7 +307,7 @@ export async function upsertMembership(membership: Insert<"memberships">): Promi
 export async function isSuperAdminUser(userId: string): Promise<boolean> {
   const db = getSupabase();
   if (!db) return false;
-  return safe(`isSuperAdminUser ${userId}`, async () => {
+  return bestEffort(`isSuperAdminUser ${userId}`, async () => {
     const { data, error } = await db
       .from("super_admins")
       .select("user_id")
@@ -313,7 +329,7 @@ export async function getPendingInvite(
 ): Promise<Row<"invites"> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getPendingInvite ${email}`, async () => {
+  return bestEffort(`getPendingInvite ${email}`, async () => {
     let q = db
       .from("invites")
       .select("*")
@@ -328,19 +344,19 @@ export async function getPendingInvite(
 }
 
 export async function createInvite(invite: Insert<"invites">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`createInvite ${invite.email}/${invite.tenant_id}`, async () => {
+  const label = `createInvite ${invite.email}/${invite.tenant_id}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db.from("invites").upsert(invite, { onConflict: "email,tenant_id" });
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 /** Mark an invite claimed once access is granted (mirrors consumeInvite). */
 export async function markInviteClaimed(email: string, tenantId: string): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`markInviteClaimed ${email}/${tenantId}`, async () => {
+  const label = `markInviteClaimed ${email}/${tenantId}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db
       .from("invites")
       .update({ claimed_at: new Date().toISOString() })
@@ -348,14 +364,13 @@ export async function markInviteClaimed(email: string, tenantId: string): Promis
       .eq("tenant_id", tenantId)
       .is("claimed_at", null);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 // ---------------------------------------------------------------------------
 // CONTENT (Phase 3 — Postgres as the content source, replacing Sanity).
 // `section` is the stored Sanity _type (= SECTION_TO_TYPE[appSection]); `data` is
-// the section JSONB. Null-safe: returns null when Supabase is unconfigured so the
-// content store falls through to Sanity.
+// the section JSONB. Reads retain the migration fallback; writes are authoritative.
 // ---------------------------------------------------------------------------
 
 export async function getContentData(
@@ -364,7 +379,7 @@ export async function getContentData(
 ): Promise<Record<string, unknown> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getContentData ${tenant}/${section}`, async () => {
+  return bestEffort(`getContentData ${tenant}/${section}`, async () => {
     const { data, error } = await db
       .from("content")
       .select("data")
@@ -406,7 +421,7 @@ export async function listEntries(
 ): Promise<Row<"collection_entries">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listEntries ${tenantId}/${type}`, async () => {
+  return bestEffort(`listEntries ${tenantId}/${type}`, async () => {
     let q = db
       .from("collection_entries")
       .select("*")
@@ -428,7 +443,7 @@ export async function getEntryBySlug(
 ): Promise<Row<"collection_entries"> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getEntryBySlug ${tenantId}/${type}/${slug}`, async () => {
+  return bestEffort(`getEntryBySlug ${tenantId}/${type}/${slug}`, async () => {
     const { data, error } = await db
       .from("collection_entries")
       .select("*")
@@ -444,10 +459,10 @@ export async function getEntryBySlug(
 /** Create or update an entry (keyed on tenant_id+type+slug). Returns the row. */
 export async function upsertEntry(
   entry: Insert<"collection_entries">
-): Promise<Row<"collection_entries"> | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  return safe(`upsertEntry ${entry.tenant_id}/${entry.type}/${entry.slug}`, async () => {
+): Promise<Row<"collection_entries">> {
+  const label = `upsertEntry ${entry.tenant_id}/${entry.type}/${entry.slug}`;
+  const db = requiredDb(label);
+  return required(label, async () => {
     const { data, error } = await db
       .from("collection_entries")
       .upsert({ ...entry, updated_at: new Date().toISOString() }, { onConflict: "tenant_id,type,slug" })
@@ -455,13 +470,13 @@ export async function upsertEntry(
       .single();
     if (error) throw error;
     return data;
-  }, null);
+  });
 }
 
 export async function deleteEntry(tenantId: string, type: string, slug: string): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`deleteEntry ${tenantId}/${type}/${slug}`, async () => {
+  const label = `deleteEntry ${tenantId}/${type}/${slug}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db
       .from("collection_entries")
       .delete()
@@ -469,7 +484,7 @@ export async function deleteEntry(tenantId: string, type: string, slug: string):
       .eq("type", type)
       .eq("slug", slug);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +497,7 @@ export async function getDraftContentData(
 ): Promise<Record<string, unknown> | null> {
   const db = getSupabase();
   if (!db) return null;
-  return safe(`getDraftContentData ${tenant}/${section}`, async () => {
+  return bestEffort(`getDraftContentData ${tenant}/${section}`, async () => {
     const { data, error } = await db
       .from("draft_content")
       .select("data")
@@ -499,9 +514,9 @@ export async function upsertDraftContentData(
   section: string,
   data: Record<string, unknown>
 ): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`upsertDraftContentData ${tenant}/${section}`, async () => {
+  const label = `upsertDraftContentData ${tenant}/${section}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db
       .from("draft_content")
       .upsert(
@@ -509,26 +524,26 @@ export async function upsertDraftContentData(
         { onConflict: "tenant_id,section" }
       );
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 export async function deleteDraftContentData(tenant: string, section: string): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`deleteDraftContentData ${tenant}/${section}`, async () => {
+  const label = `deleteDraftContentData ${tenant}/${section}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db
       .from("draft_content")
       .delete()
       .eq("tenant_id", tenant)
       .eq("section", section);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 export async function listDraftSections(tenant: string): Promise<string[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listDraftSections ${tenant}`, async () => {
+  return bestEffort(`listDraftSections ${tenant}`, async () => {
     const { data, error } = await db
       .from("draft_content")
       .select("section")
@@ -543,18 +558,18 @@ export async function listDraftSections(tenant: string): Promise<string[]> {
 // ---------------------------------------------------------------------------
 
 export async function insertAuditLog(entry: Insert<"audit_logs">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`insertAuditLog ${entry.id}`, async () => {
+  const label = `insertAuditLog ${entry.id}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db.from("audit_logs").insert(entry);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 export async function listAuditLogs(tenant: string, limit = 100): Promise<Row<"audit_logs">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listAuditLogs ${tenant}`, async () => {
+  return bestEffort(`listAuditLogs ${tenant}`, async () => {
     const { data, error } = await db
       .from("audit_logs")
       .select("*")
@@ -569,7 +584,7 @@ export async function listAuditLogs(tenant: string, limit = 100): Promise<Row<"a
 export async function listAllAuditLogs(limit = 100): Promise<Row<"audit_logs">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe("listAllAuditLogs", async () => {
+  return bestEffort("listAllAuditLogs", async () => {
     const { data, error } = await db
       .from("audit_logs")
       .select("*")
@@ -585,12 +600,12 @@ export async function listAllAuditLogs(limit = 100): Promise<Row<"audit_logs">[]
 // ---------------------------------------------------------------------------
 
 export async function insertActivity(entry: Insert<"activity_log">): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  await safe(`insertActivity ${entry.tenant_id}`, async () => {
+  const label = `insertActivity ${entry.tenant_id}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
     const { error } = await db.from("activity_log").insert(entry);
     if (error) throw error;
-  }, undefined);
+  });
 }
 
 export async function listActivity(
@@ -599,7 +614,7 @@ export async function listActivity(
 ): Promise<Row<"activity_log">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe(`listActivity ${tenant}`, async () => {
+  return bestEffort(`listActivity ${tenant}`, async () => {
     let q = db
       .from("activity_log")
       .select("*")
@@ -621,7 +636,7 @@ export async function listActivity(
 export async function listAllTenants(): Promise<Row<"tenants">[]> {
   const db = getSupabase();
   if (!db) return [];
-  return safe("listAllTenants", async () => {
+  return bestEffort("listAllTenants", async () => {
     const { data, error } = await db
       .from("tenants")
       .select("*")

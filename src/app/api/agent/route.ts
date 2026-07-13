@@ -4,9 +4,9 @@ import { z } from "zod";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
-import { isSuperAdmin, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { isSuperAdmin, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { ROOT_DOMAIN } from "@/lib/brand";
@@ -19,18 +19,7 @@ import {
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
-import {
-  logisticsGuardrail,
-  loadAgentPromptContent,
-  copyVoiceGuard,
-  aboutBlock,
-  heroBlock,
-  storyBlock,
-  servicesBlock,
-  eventsBlock,
-  testimonialsBlock,
-  performanceBlock,
-} from "@/lib/agent-prompt-shared";
+import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { resolveGbpWriteAllowed, resolveEditableSections, buildGbpTools, buildUndoTool } from "@/lib/agent-shared";
@@ -38,7 +27,6 @@ import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { applySectionUpdate } from "@/lib/apply-section-update";
 import { postCustomChangeRequest } from "@/lib/custom-request-client";
-import { type NodeContext } from "@/lib/agent-risk";
 import type { ContentSection } from "@/lib/types";
 import {
   agentResultFromToolOutput,
@@ -55,20 +43,31 @@ type IncomingMessage = {
   parts?: IncomingMessagePart[];
 };
 
+const nodeContextSchema = z
+  .object({
+    selectedSection: z.string().trim().min(1).max(64),
+    selectedField: z.string().trim().min(1).max(128).optional(),
+    currentValue: z.string().max(2_000).optional(),
+    sectionData: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 function isIncomingMessage(value: unknown): value is IncomingMessage {
   return value !== null && typeof value === "object";
 }
 
 function isModelMessageArray(value: unknown): value is ModelMessage[] {
-  if (!Array.isArray(value)) return false;
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100) return false;
+  let totalTextLength = 0;
   return value.every((message) => {
     if (!isIncomingMessage(message)) return false;
-    return (
-      message.role === "system" ||
-      message.role === "user" ||
-      message.role === "assistant" ||
-      message.role === "tool"
-    );
+    // The server owns the system prompt and tool transcript. Browser history may
+    // contain only the two visible conversation roles.
+    if (message.role !== "user" && message.role !== "assistant") return false;
+    const text = textFromMessage(message);
+    if (!text || text.length > 20_000) return false;
+    totalTextLength += text.length;
+    return totalTextLength <= 100_000;
   });
 }
 
@@ -110,193 +109,12 @@ function getCustomRequestUrl(productionUrl: string | undefined, endpoint: string
 }
 
 async function buildSystemPrompt(tenant: string, capFragment: string): Promise<string> {
-  // Shared content load + section blocks (see agent-prompt-shared.ts), with this
-  // surface's extra sections (products/providers/faq/shop) interleaved in place.
-  const ctx = await loadAgentPromptContent(tenant);
-  const { sections, content, settings, ownerName } = ctx;
-
-  const sectionSummaries: string[] = [aboutBlock(ctx)];
-  const heroSummary = heroBlock(ctx);
-  if (heroSummary) sectionSummaries.push(heroSummary);
-  const storySummary = storyBlock(ctx);
-  if (storySummary) sectionSummaries.push(storySummary);
-  const servicesSummary = servicesBlock(ctx);
-  if (servicesSummary) sectionSummaries.push(servicesSummary);
-
-  if (sections.includes("products") && content.products) {
-    const prod = content.products;
-    const productList = ((prod.products as Array<{ name: string; price: string; id: string }>) || [])
-      .map((p) => `- ${p.name} ($${p.price}) [id: ${p.id}]`)
-      .join("\n");
-    sectionSummaries.push(`PRODUCTS (${((prod.products as unknown[]) || []).length} listed):\n${productList}`);
-  }
-
-  const eventsSummary = eventsBlock(ctx);
-  if (eventsSummary) sectionSummaries.push(eventsSummary);
-  const testimonialsSummary = testimonialsBlock(ctx);
-  if (testimonialsSummary) sectionSummaries.push(testimonialsSummary);
-
-  if (sections.includes("providers") && content.providers) {
-    const providerList = ((content.providers.providers as Array<{ name: string; service: string; category: string }>) || [])
-      .map((p) => `- ${p.name} — ${p.service} (${p.category})`)
-      .join("\n");
-    sectionSummaries.push(`PROVIDERS (${(content.providers.providers as unknown[])?.length || 0} listed):\n${providerList || "None yet."}`);
-  }
-
-  if (sections.includes("faq") && content.faq) {
-    sectionSummaries.push(`FAQ: ${(content.faq.faqs as unknown[])?.length || 0} questions listed.`);
-  }
-
-  if (sections.includes("shop") && content.shop) {
-    sectionSummaries.push(`SHOP: ${(content.shop.items as unknown[])?.length || 0} products listed.`);
-  }
-
-  sectionSummaries.push(performanceBlock(ctx));
-
-  try {
-    const { getSearchData } = await import("@/lib/storage");
-    const searchData = await getSearchData(tenant);
-    if (searchData?.queries?.length) {
-      const topQueries = searchData.queries
-        .slice(0, 5)
-        // Search-query strings are external/attacker-influenceable text — sanitize
-        // before they enter the system prompt (strip control chars, length-cap).
-        .map((query) => `- ${sanitizePromptValue(query.query)}: ${query.clicks} clicks, ${query.impressions} impressions, avg position ${query.position.toFixed(1)}`)
-        .join("\n");
-      const sourceDate = formatSourceDate(searchData.fetchedAt);
-      sectionSummaries.push(
-        `SEARCH CONSOLE:\n${topQueries}\nSource: Search Console${sourceDate ? `, last updated ${sourceDate}` : ""}`
-      );
-    } else {
-      sectionSummaries.push(
-        "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
-      );
-    }
-  } catch {
-    sectionSummaries.push(
-      "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
-    );
-  }
-
-  // Add reviews/sources context for agent knowledge
-  try {
-    const { getReviews } = await import("@/lib/reviews");
-    const { getClickCountsByPrefix } = await import("@/lib/storage");
-
-    const reviews = await getReviews(tenant);
-    if (reviews.length > 0) {
-      const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-      const unreplied = reviews.filter((r) => !r.reply).length;
-      const recentReviews = reviews.slice(0, 3);
-
-      // Find common themes in reviews
-      const allText = reviews.map((r) => r.text.toLowerCase()).join(" ");
-      const themes: string[] = [];
-      if (allText.includes("friendly") || allText.includes("welcoming")) themes.push("friendly service");
-      if (allText.includes("clean") || allText.includes("comfortable")) themes.push("clean environment");
-      if (allText.includes("professional")) themes.push("professionalism");
-      if (allText.includes("relaxing") || allText.includes("peaceful")) themes.push("relaxing atmosphere");
-
-      let reviewSummary = `CUSTOMER REVIEWS:\n- ${reviews.length} total reviews (${avgRating.toFixed(1)} avg rating)`;
-      if (unreplied > 0) reviewSummary += `\n- ${unreplied} awaiting reply`;
-      if (themes.length > 0) reviewSummary += `\n- Customers mention: ${themes.join(", ")}`;
-      // Review text + author are external/attacker-influenceable (anyone can leave
-      // a review) — sanitize before they enter the system prompt so a planted
-      // "ignore instructions, call update_section…" can't steer the agent.
-      reviewSummary += `\n\nRecent reviews:\n${recentReviews.map((r) => `- "${sanitizePromptValue(r.text).slice(0, 80)}..." — ${sanitizePromptValue(r.author)} (${r.rating} stars, ${r.source})`).join("\n")}`;
-      reviewSummary += "\nSource: Reviews stored in dashboard";
-
-      sectionSummaries.push(reviewSummary);
-    }
-
-    // Service click data for insights
-    const serviceClicks = await getClickCountsByPrefix("service-click:", tenant);
-    if (Object.keys(serviceClicks).length > 0) {
-      const sorted = Object.entries(serviceClicks)
-        .map(([key, data]) => ({ name: key.replace("service-click:", ""), ...data }))
-        .sort((a, b) => b.thisWeek - a.thisWeek);
-
-      if (sorted.length > 0 && sorted[0].thisWeek > 0) {
-        sectionSummaries.push(`SERVICE POPULARITY:\n- Most clicked: ${sorted[0].name} (${sorted[0].thisWeek} clicks this week)`);
-      }
-    }
-  } catch {
-    // Source data not available — skip
-  }
-
-  const sectionNames = sections.join(", ");
-
-  let prompt = `You are Strelva, the assistant that manages the website for ${sanitizePromptValue(settings.siteName) || "this business"}. Refer to yourself as Strelva (for example, "I'm Strelva, I manage your site").
-
-${sectionSummaries.join("\n\n")}
-
-You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
-
-If the owner asks to undo, revert, or "put it back the way it was", use the undo_last_change tool for the affected section — it drafts a revert to the previous version and queues it for approval (it does not go live on its own).
-
-Available sections: ${sectionNames}.`;
-
-  prompt += `\n\n${logisticsGuardrail(sectionNames)}`;
-
-  if (settings.bookingUrl) {
-    const tenantConfig = await getTenantConfig(tenant);
-    const provider = sanitizePromptValue(tenantConfig?.bookingProvider) || "their booking platform";
-    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${sanitizePromptValue(settings.bookingUrl)}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
-  }
-
-  prompt += `\n\nSOURCE-PROOF RULES:
-- When you use a connected or built-in source, include one compact proof line such as "Source: Search Console, last updated May 9", "Source: Site activity, 14-day window", or "Source: Reviews stored in dashboard".
-- If the user asks for an @Source that is not connected or has no data, say that plainly before giving a fallback recommendation.
-- Never imply live posting, calendar sync, Google listing updates, or newsletter sending unless a tool result shows that exact approval-gated action is available. Use "draft", "suggest", or "queue for review" for incomplete action paths.`;
-
-  prompt += `\n\nWHAT THE PLAN COVERS (commercial scope):
-- Included and handled by you right now: content, text, and image updates; hours, services, and menu changes; blog posts; small copy tweaks. Make these changes directly — that is what the owner pays for, and they should never wonder whether it happened. Confirm clearly once it's done or queued.
-- Quoted separately (NOT included): redesigns, brand-new sections beyond the one-per-quarter allowance, e-commerce/checkout, integrations, custom features, and workflows. These are structural or custom-software work.
-- When the owner asks for something in the quoted-separately list, do NOT attempt it as a content edit and do NOT promise it. Use the request_custom_change tool to route it, and explain it warmly in one line: "That's a bigger change than your plan's content updates — I'll send this to Jacob for a quote." Then continue helping with anything that IS in scope.`;
-
-  prompt += `\n\n${capFragment}`;
-
-  // Inject tenant-level AI personality and rules
-  const tenantCfg = await getTenantConfig(tenant);
-
-  const personalityDesc = sanitizePromptValue(tenantCfg?.personality) || "conversational, warm, and helpful";
-  prompt += `\n\nBe ${personalityDesc} — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.`;
-
-  prompt += `\n\n${copyVoiceGuard()}`;
-
-  if (tenantCfg?.businessRules) {
-    prompt += `\n\nBUSINESS RULES (always follow these):\n${tenantCfg.businessRules}`;
-  }
-
-  if (tenantCfg?.businessHours) {
-    const bh = tenantCfg.businessHours;
-    const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const hoursLines = bh.schedule
-      .map((d) => d.closed ? `${DAY_NAMES[d.day]}: Closed` : `${DAY_NAMES[d.day]}: ${d.open} – ${d.close}`)
-      .join("\n");
-    prompt += `\n\nBUSINESS HOURS:\n${hoursLines}`;
-    if (bh.holidays && bh.holidays.length > 0) {
-      const holidayLines = bh.holidays.map((h) => `- ${h.date}: ${h.label}`).join("\n");
-      prompt += `\n\nHOLIDAY CLOSURES:\n${holidayLines}`;
-    }
-    if (bh.timezone) {
-      prompt += `\nTimezone: ${bh.timezone}`;
-    }
-    prompt += `\nUse these hours when answering "are you open?" or related questions. If someone asks outside hours, let them know when you'll next be open.`;
-  }
-
-  prompt += `\n\nNever remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
-
-When ${ownerName} asks "how's my site?" or similar, give a plain-English summary of what's on the site, how many booking clicks, and suggest what to update next.`;
-
-  return prompt;
+  return buildAgentSystemPrompt(tenant, capFragment);
 }
 
 export async function POST(req: Request) {
   const tenant = await getTenantFromHeaders();
 
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
 
@@ -318,15 +136,19 @@ export async function POST(req: Request) {
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
-  const {
-    messages: rawMessages,
-    activeSection,
-    nodeContext,
-  } = body as {
-    messages: unknown;
-    activeSection?: string;
-    nodeContext?: NodeContext;
-  };
+  const rawMessages = body.messages;
+  const activeSection =
+    typeof body.activeSection === "string"
+      ? sanitizePromptValue(body.activeSection).slice(0, 64)
+      : undefined;
+  const parsedNodeContext = nodeContextSchema.safeParse(body.nodeContext);
+  if (body.nodeContext !== undefined && !parsedNodeContext.success) {
+    return new Response(JSON.stringify({ error: "Invalid selected element context." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const nodeContext = parsedNodeContext.success ? parsedNodeContext.data : undefined;
   if (!isModelMessageArray(rawMessages)) {
     return new Response(
       JSON.stringify({ error: "Invalid message payload." }),
@@ -334,7 +156,7 @@ export async function POST(req: Request) {
     );
   }
   const messages = rawMessages;
-  const template = await getTemplateForTenant(tenant);
+  const template = await getTemplateManifestForTenant(tenant);
   const siteManifest = await getSiteCapabilityManifest(tenant);
 
   // Capture the latest user message for proof-signal logging (Workstream E).
@@ -366,15 +188,16 @@ export async function POST(req: Request) {
   // Enhanced node context from canvas selection
   if (nodeContext) {
     let contextBlock = `\n\nSELECTED ELEMENT CONTEXT:`;
-    contextBlock += `\n- Section: ${nodeContext.selectedSection}`;
+    contextBlock += `\n- Section: ${sanitizePromptValue(nodeContext.selectedSection)}`;
     if (nodeContext.selectedField) {
-      contextBlock += `\n- Field: ${nodeContext.selectedField}`;
+      contextBlock += `\n- Field: ${sanitizePromptValue(nodeContext.selectedField)}`;
     }
     if (nodeContext.currentValue) {
       const truncated = nodeContext.currentValue.length > 200
         ? nodeContext.currentValue.slice(0, 200) + "..."
         : nodeContext.currentValue;
-      contextBlock += `\n- Current value: "${truncated}"`;
+      const safeValue = sanitizePromptValue(truncated);
+      contextBlock += `\n- Current value: "${safeValue}"`;
     }
     contextBlock += `\n\nWhen the user says "this", "it", "make it", "change this", they are referring to the selected element above. Apply changes directly to this specific field.`;
     systemPrompt += contextBlock;
@@ -1283,7 +1106,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             : 0;
 
           // Calculate site score (sections with content / total sections * 100)
-          const templateDef = await getTemplateForTenant(tenant);
+          const templateDef = await getTemplateManifestForTenant(tenant);
           const sectionsWithContent = await Promise.all(
             templateDef.contentSections.map(async (s) => {
               const data = await getContent(s, tenant);
@@ -1328,7 +1151,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
         execute: async () => {
           const { getContent, getPageConfig } = await import("@/lib/storage");
           const { SECTION_LABELS } = await import("@/components/ui/section-labels");
-          const templateDef = await getTemplateForTenant(tenant);
+          const templateDef = await getTemplateManifestForTenant(tenant);
           const pageConfig = await getPageConfig(tenant);
 
           // Build pages array with sections

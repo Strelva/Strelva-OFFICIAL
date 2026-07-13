@@ -35,8 +35,6 @@ export async function DELETE() {
 
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "settings:write");
     if (permissionDenied) return permissionDenied;
 

@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { ContentSection, PageSectionConfig, SitePageConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 import { JadaIveySite } from "./JadaIveySite";
 
 const EmptyChrome = () => null;
@@ -46,5 +47,5 @@ export const fashionStylistTemplate: TemplateDefinition = {
   Footer: EmptyChrome,
   themeVars: {},
   defaultPageConfig: FASHION_STYLIST_PAGE_CONFIG,
-  contentSections: ["settings", "contact", "hero", "theme", "navigation", "footer"],
+  contentSections: [...getTemplateManifest("fashion-stylist").contentSections],
 };

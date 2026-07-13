@@ -1,11 +1,16 @@
-import { createMiddlewareSupabase } from "@/lib/db/middleware-client";
+import {
+  applyMiddlewareSupabaseResponse,
+  createMiddlewareSupabase,
+} from "@/lib/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
+import { validateCronRequest } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
+export { validateCronRequest } from "@/lib/cron-auth";
 
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   "gldf.strelva.com": "https://greatlakesdriedfruit.com",
@@ -262,19 +267,6 @@ export function extractTenantFromClientPath(pathname: string): {
   return { tenant, targetPath: rest, shouldRedirectToDashboard: false };
 }
 
-export function validateCronRequest(expectedSecret: string | undefined, authorization: string | null) {
-  if (!expectedSecret) {
-    return { allowed: false, status: 500, message: "CRON_SECRET not configured" };
-  }
-
-  const cronSecret = authorization?.replace("Bearer ", "");
-  if (cronSecret === expectedSecret) {
-    return { allowed: true, status: 200, message: "OK" };
-  }
-
-  return { allowed: false, status: 401, message: "Unauthorized" };
-}
-
 function isPreviewRequest(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("preview") === "true";
 }
@@ -350,6 +342,7 @@ export function buildContentSecurityPolicy(params: {
 }
 
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
+  applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
   response.headers.set(
     "Content-Security-Policy",

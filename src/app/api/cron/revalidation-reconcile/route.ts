@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { reconcileRevalidations } from "@/lib/revalidate-client";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   const results = await reconcileRevalidations();
 

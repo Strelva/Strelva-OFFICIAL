@@ -11,12 +11,16 @@
  */
 
 import { NextResponse } from "next/server";
+import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { runDueAutoPosts, draftReplyBacklog } from "@/lib/reviews/auto-reply";
 
 export const maxDuration = 300;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   const now = Date.now();
   // Catch up any unreplied backlog first (so it's drafted + queued), then fire
   // the auto-mode drafts whose window has elapsed.

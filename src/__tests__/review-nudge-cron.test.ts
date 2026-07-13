@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 // The review-nudge cron must:
 //  - send only when a review URL is derivable (Google Place ID on config),
@@ -49,7 +50,7 @@ describe("GET /api/cron/review-nudge", () => {
       tenant({ id: "gldf", siteName: "GLDF", reviewsConfig: { googlePlaceId: "PLACE_123" } }),
     ]);
     const { GET } = await import("@/app/api/cron/review-nudge/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     const body = await res.json();
 
     expect(body).toMatchObject({ ok: true, sent: 1, skippedNoUrl: 0 });
@@ -69,7 +70,7 @@ describe("GET /api/cron/review-nudge", () => {
   it("skips a tenant with no review URL (no Place ID)", async () => {
     mockGetAllTenants.mockResolvedValue([tenant({ id: "norev", reviewsConfig: {} })]);
     const { GET } = await import("@/app/api/cron/review-nudge/route");
-    const body = await (await GET()).json();
+    const body = await (await GET(authenticatedCronRequest())).json();
 
     expect(body).toMatchObject({ sent: 0, skippedNoUrl: 1 });
     expect(mockSendReviewRequestEmail).not.toHaveBeenCalled();
@@ -82,7 +83,7 @@ describe("GET /api/cron/review-nudge", () => {
       tenant({ id: "recent", reviewsConfig: { googlePlaceId: "P" } }),
     ]);
     const { GET } = await import("@/app/api/cron/review-nudge/route");
-    const body = await (await GET()).json();
+    const body = await (await GET(authenticatedCronRequest())).json();
 
     expect(body).toMatchObject({ sent: 0, skippedThrottled: 1 });
     expect(mockSendReviewRequestEmail).not.toHaveBeenCalled();
@@ -94,7 +95,7 @@ describe("GET /api/cron/review-nudge", () => {
       tenant({ id: "old", reviewsConfig: { googlePlaceId: "P" } }),
     ]);
     const { GET } = await import("@/app/api/cron/review-nudge/route");
-    const body = await (await GET()).json();
+    const body = await (await GET(authenticatedCronRequest())).json();
 
     expect(body).toMatchObject({ sent: 1 });
     expect(mockSendReviewRequestEmail).toHaveBeenCalledTimes(1);
@@ -106,7 +107,7 @@ describe("GET /api/cron/review-nudge", () => {
       tenant({ id: "paused", reviewsConfig: { googlePlaceId: "P" } }),
     ]);
     const { GET } = await import("@/app/api/cron/review-nudge/route");
-    const body = await (await GET()).json();
+    const body = await (await GET(authenticatedCronRequest())).json();
 
     expect(body).toMatchObject({ sent: 0, skippedNotSent: 1 });
     expect(mockRedisSet).not.toHaveBeenCalled();

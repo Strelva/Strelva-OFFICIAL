@@ -1,4 +1,4 @@
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sitePageConfigSchema } from "@/lib/schemas";
 import { getSiteCapabilityManifest, manifestSupportsSection } from "@/lib/site-capabilities";
 import type { SitePageConfig } from "@/lib/types";
@@ -15,7 +15,7 @@ export async function parseAndValidatePageConfig(
   }
 
   const pageConfig = parsed.data as SitePageConfig;
-  const template = await getTemplateForTenant(tenant);
+  const template = await getTemplateManifestForTenant(tenant);
   const manifest = await getSiteCapabilityManifest(tenant);
   const allowedSections = new Set(Object.keys(template.components));
 

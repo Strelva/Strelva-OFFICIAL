@@ -2,21 +2,10 @@ import { generateText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
 import { getRedis } from "@/lib/redis";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
-import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
-import {
-  logisticsGuardrail,
-  loadAgentPromptContent,
-  copyVoiceGuard,
-  aboutBlock,
-  heroBlock,
-  storyBlock,
-  servicesBlock,
-  eventsBlock,
-  testimonialsBlock,
-  performanceBlock,
-} from "@/lib/agent-prompt-shared";
+import { capabilityPromptFragment } from "@/lib/capabilities";
+import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { sendSlackNotification } from "@/lib/slack";
 import { detectStaleSections } from "@/lib/reports";
 import { applySectionUpdate } from "@/lib/apply-section-update";
@@ -125,56 +114,14 @@ async function buildSystemPrompt(
     }
   }
 
-  // Shared content load + section blocks (see agent-prompt-shared.ts) — identical
-  // to the dashboard chat surface. The executor-specific bits (caching above,
-  // stale-section hints below) stay here.
-  const ctx = await loadAgentPromptContent(tenant);
-  const { sections, settings } = ctx;
-
-  const sectionSummaries: string[] = [aboutBlock(ctx)];
-  for (const block of [
-    heroBlock(ctx),
-    storyBlock(ctx),
-    servicesBlock(ctx),
-    eventsBlock(ctx),
-    testimonialsBlock(ctx),
-  ]) {
-    if (block) sectionSummaries.push(block);
-  }
-  sectionSummaries.push(performanceBlock(ctx));
-
-  const staleSections = detectStaleSections(timestamps, sections).slice(0, 5);
+  const template = await getTemplateManifestForTenant(tenant);
+  const staleSections = detectStaleSections(timestamps, template.contentSections).slice(0, 5);
+  let prompt = await buildAgentSystemPrompt(tenant, capFragment);
   if (staleSections.length > 0) {
-    sectionSummaries.push(
-      `STALE SECTIONS TO WATCH:\n${staleSections
-        .map((s) => `- ${s.section}: ${s.daysSinceUpdate} days since update`)
-        .join("\n")}`
-    );
+    prompt += `\n\nSTALE SECTIONS TO WATCH:\n${staleSections
+      .map((section) => `- ${section.section}: ${section.daysSinceUpdate} days since update`)
+      .join("\n")}`;
   }
-
-  const sectionNames = sections.join(", ");
-
-  let prompt = `You are the website assistant for ${sanitizePromptValue(settings.siteName) || "this business"}.
-
-${sectionSummaries.join("\n\n")}
-
-You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
-
-Available sections: ${sectionNames}.`;
-
-  prompt += `\n\n${logisticsGuardrail(sectionNames)}`;
-
-  if (settings.bookingUrl) {
-    const tenantConfig = await getTenantConfig(tenant);
-    const provider = sanitizePromptValue(tenantConfig?.bookingProvider) || "their booking platform";
-    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${sanitizePromptValue(settings.bookingUrl)}. When someone asks about booking, direct them there.`;
-  }
-
-  prompt += `\n\n${capFragment}`;
-
-  prompt += `\n\nBe conversational, warm, and helpful. Confirm changes after making them. Never remove content unless explicitly asked. For array items, preserve all existing items unless told to remove specific ones.`;
-
-  prompt += `\n\n${copyVoiceGuard()}`;
 
   promptCache.set(tenant, { signature, prompt, cachedAt: Date.now() });
   if (redis) {
@@ -200,7 +147,7 @@ export async function executeAgentPromptDetailed(
   userMessage: string
 ): Promise<AgentExecutionTrace> {
   addSentryBreadcrumb("agent", "Agent execution started", { tenantId, messageLength: userMessage.length });
-  const template = await getTemplateForTenant(tenantId);
+  const template = await getTemplateManifestForTenant(tenantId);
   const tenantConfig = await getTenantConfig(tenantId);
   // Parity with the streaming route: honor the site capability manifest (which sections
   // are editable + whether they can auto-publish) and the Google-Business write gate.

@@ -15,9 +15,16 @@
  * duplication is removed. All tenant-controlled values stay sanitized.
  */
 
-import { getContent, getClickCounts } from "@/lib/storage";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import {
+  getClickCounts,
+  getClickCountsByPrefix,
+  getContent,
+  getSearchData,
+} from "@/lib/storage";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sanitizePromptValue } from "@/lib/capabilities";
+import { getReviews } from "@/lib/reviews";
+import { getTenantConfig } from "@/lib/tenants";
 import type { ContentSection } from "@/lib/types";
 
 export function logisticsGuardrail(sectionNames: string): string {
@@ -62,7 +69,7 @@ export interface AgentPromptContent {
  * callers sanitize the rest at interpolation.
  */
 export async function loadAgentPromptContent(tenant: string): Promise<AgentPromptContent> {
-  const template = await getTemplateForTenant(tenant);
+  const template = await getTemplateManifestForTenant(tenant);
   const sections = template.contentSections;
 
   const contentEntries = await Promise.all(
@@ -151,4 +158,223 @@ export function testimonialsBlock(ctx: AgentPromptContent): string | null {
 
 export function performanceBlock(ctx: AgentPromptContent): string {
   return `SITE PERFORMANCE:\n- Booking clicks: ${ctx.bookingClicks.total} total (${ctx.bookingClicks.thisWeek} this week)`;
+}
+
+function formatSourceDate(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/**
+ * Canonical system prompt for both the streaming chat and background executor.
+ * Keeping persona, commercial scope, evidence rules, and tenant rules here
+ * prevents an approved suggestion from running under weaker instructions than chat.
+ */
+export async function buildAgentSystemPrompt(
+  tenant: string,
+  capabilityFragment: string
+): Promise<string> {
+  const ctx = await loadAgentPromptContent(tenant);
+  const { sections, content, settings, ownerName } = ctx;
+
+  const sectionSummaries: string[] = [aboutBlock(ctx)];
+  for (const block of [heroBlock(ctx), storyBlock(ctx), servicesBlock(ctx)]) {
+    if (block) sectionSummaries.push(block);
+  }
+
+  if (sections.includes("products") && content.products) {
+    const products =
+      (content.products.products as Array<{
+        name: string;
+        price: string;
+        id: string;
+      }>) || [];
+    sectionSummaries.push(
+      `PRODUCTS (${products.length} listed):\n${products
+        .map((product) => `- ${product.name} ($${product.price}) [id: ${product.id}]`)
+        .join("\n")}`
+    );
+  }
+
+  for (const block of [eventsBlock(ctx), testimonialsBlock(ctx)]) {
+    if (block) sectionSummaries.push(block);
+  }
+
+  if (sections.includes("providers") && content.providers) {
+    const providers =
+      (content.providers.providers as Array<{
+        name: string;
+        service: string;
+        category: string;
+      }>) || [];
+    sectionSummaries.push(
+      `PROVIDERS (${providers.length} listed):\n${
+        providers
+          .map((provider) => `- ${provider.name} — ${provider.service} (${provider.category})`)
+          .join("\n") || "None yet."
+      }`
+    );
+  }
+
+  if (sections.includes("faq") && content.faq) {
+    sectionSummaries.push(
+      `FAQ: ${(content.faq.faqs as unknown[])?.length || 0} questions listed.`
+    );
+  }
+  if (sections.includes("shop") && content.shop) {
+    sectionSummaries.push(
+      `SHOP: ${(content.shop.items as unknown[])?.length || 0} products listed.`
+    );
+  }
+
+  sectionSummaries.push(performanceBlock(ctx));
+
+  try {
+    const searchData = await getSearchData(tenant);
+    if (searchData?.queries?.length) {
+      const topQueries = searchData.queries
+        .slice(0, 5)
+        .map(
+          (query) =>
+            `- ${sanitizePromptValue(query.query)}: ${query.clicks} clicks, ${query.impressions} impressions, avg position ${query.position.toFixed(1)}`
+        )
+        .join("\n");
+      const sourceDate = formatSourceDate(searchData.fetchedAt);
+      sectionSummaries.push(
+        `SEARCH CONSOLE:\n${topQueries}\nSource: Search Console${
+          sourceDate ? `, last updated ${sourceDate}` : ""
+        }`
+      );
+    } else {
+      sectionSummaries.push(
+        "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
+      );
+    }
+  } catch {
+    sectionSummaries.push(
+      "SEARCH CONSOLE: No Search Console data is available yet. If the user asks for @Search Console, say that plainly and offer to review site copy without real search terms."
+    );
+  }
+
+  try {
+    const reviews = await getReviews(tenant);
+    if (reviews.length > 0) {
+      const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+      const unreplied = reviews.filter((review) => !review.reply).length;
+      const reviewText = reviews.map((review) => review.text.toLowerCase()).join(" ");
+      const themes: string[] = [];
+      if (reviewText.includes("friendly") || reviewText.includes("welcoming")) {
+        themes.push("friendly service");
+      }
+      if (reviewText.includes("clean") || reviewText.includes("comfortable")) {
+        themes.push("clean environment");
+      }
+      if (reviewText.includes("professional")) themes.push("professionalism");
+      if (reviewText.includes("relaxing") || reviewText.includes("peaceful")) {
+        themes.push("relaxing atmosphere");
+      }
+
+      let summary = `CUSTOMER REVIEWS:\n- ${reviews.length} total reviews (${averageRating.toFixed(1)} avg rating)`;
+      if (unreplied > 0) summary += `\n- ${unreplied} awaiting reply`;
+      if (themes.length > 0) summary += `\n- Customers mention: ${themes.join(", ")}`;
+      summary += `\n\nRecent reviews:\n${reviews
+        .slice(0, 3)
+        .map(
+          (review) =>
+            `- "${sanitizePromptValue(review.text).slice(0, 80)}..." — ${sanitizePromptValue(review.author)} (${review.rating} stars, ${review.source})`
+        )
+        .join("\n")}`;
+      summary += "\nSource: Reviews stored in dashboard";
+      sectionSummaries.push(summary);
+    }
+
+    const serviceClicks = await getClickCountsByPrefix("service-click:", tenant);
+    const sorted = Object.entries(serviceClicks)
+      .map(([key, data]) => ({ name: key.replace("service-click:", ""), ...data }))
+      .sort((left, right) => right.thisWeek - left.thisWeek);
+    if (sorted[0]?.thisWeek > 0) {
+      sectionSummaries.push(
+        `SERVICE POPULARITY:\n- Most clicked: ${sorted[0].name} (${sorted[0].thisWeek} clicks this week)`
+      );
+    }
+  } catch {
+    // Connected evidence is optional; core content still makes a useful prompt.
+  }
+
+  const sectionNames = sections.join(", ");
+  let prompt = `You are Strelva, the assistant that manages the website for ${sanitizePromptValue(settings.siteName) || "this business"}. Refer to yourself as Strelva (for example, "I'm Strelva, I manage your site").
+
+${sectionSummaries.join("\n\n")}
+
+You can read and update any section of the website. Always read the current content first before making changes. When updating, send back the COMPLETE section data — do not send partial updates.
+
+If the owner asks to undo, revert, or "put it back the way it was", use the undo_last_change tool for the affected section — it drafts a revert to the previous version and queues it for approval (it does not go live on its own).
+
+Available sections: ${sectionNames}.`;
+
+  prompt += `\n\n${logisticsGuardrail(sectionNames)}`;
+
+  const tenantConfig = await getTenantConfig(tenant);
+  if (settings.bookingUrl) {
+    const provider = sanitizePromptValue(tenantConfig?.bookingProvider) || "their booking platform";
+    prompt += `\n\nBOOKING: All booking is handled through ${provider} at ${sanitizePromptValue(settings.bookingUrl)}. When someone asks about booking, direct them there. You cannot book appointments directly — always link to the booking page.`;
+  }
+
+  prompt += `\n\nSOURCE-PROOF RULES:
+- When you use a connected or built-in source, include one compact proof line such as "Source: Search Console, last updated May 9", "Source: Site activity, 14-day window", or "Source: Reviews stored in dashboard".
+- If the user asks for an @Source that is not connected or has no data, say that plainly before giving a fallback recommendation.
+- Never imply live posting, calendar sync, Google listing updates, or newsletter sending unless a tool result shows that exact approval-gated action is available. Use "draft", "suggest", or "queue for review" for incomplete action paths.`;
+
+  prompt += `\n\nWHAT THE PLAN COVERS (commercial scope):
+- Included and handled by you right now: content, text, and image updates; hours, services, and menu changes; blog posts; small copy tweaks. Make these changes directly — that is what the owner pays for, and they should never wonder whether it happened. Confirm clearly once it's done or queued.
+- Quoted separately (NOT included): redesigns, brand-new sections beyond the one-per-quarter allowance, e-commerce/checkout, integrations, custom features, and workflows. These are structural or custom-software work.
+- When the owner asks for something in the quoted-separately list, do NOT attempt it as a content edit and do NOT promise it. Use the request_custom_change tool to route it, and explain it warmly in one line: "That's a bigger change than your plan's content updates — I'll send this to Jacob for a quote." Then continue helping with anything that IS in scope.`;
+
+  prompt += `\n\n${capabilityFragment}`;
+
+  const personality =
+    sanitizePromptValue(tenantConfig?.personality) || "conversational, warm, and helpful";
+  prompt += `\n\nBe ${personality} — ${ownerName} talks to you like a coworker, not a robot. Confirm changes after making them. If a request is ambiguous, ask for clarification.`;
+  prompt += `\n\n${copyVoiceGuard()}`;
+
+  if (tenantConfig?.businessRules) {
+    prompt += `\n\nBUSINESS RULES (always follow these):\n${tenantConfig.businessRules}`;
+  }
+
+  if (tenantConfig?.businessHours) {
+    const dayNames = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    const hoursLines = tenantConfig.businessHours.schedule
+      .map((day) =>
+        day.closed
+          ? `${dayNames[day.day]}: Closed`
+          : `${dayNames[day.day]}: ${day.open} – ${day.close}`
+      )
+      .join("\n");
+    prompt += `\n\nBUSINESS HOURS:\n${hoursLines}`;
+    if (tenantConfig.businessHours.holidays?.length) {
+      prompt += `\n\nHOLIDAY CLOSURES:\n${tenantConfig.businessHours.holidays
+        .map((holiday) => `- ${holiday.date}: ${holiday.label}`)
+        .join("\n")}`;
+    }
+    if (tenantConfig.businessHours.timezone) {
+      prompt += `\nTimezone: ${tenantConfig.businessHours.timezone}`;
+    }
+    prompt += `\nUse these hours when answering "are you open?" or related questions. If someone asks outside hours, let them know when you'll next be open.`;
+  }
+
+  prompt += `\n\nNever remove content unless explicitly asked. For array items (services, events, testimonials, products, providers), preserve all existing items unless told to remove specific ones.
+
+When ${ownerName} asks "how's my site?" or similar, give a plain-English summary of what's on the site, how many booking clicks, and suggest what to update next.`;
+
+  return prompt;
 }

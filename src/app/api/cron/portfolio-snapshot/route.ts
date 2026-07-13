@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { buildPortfolioSnapshot, setPortfolioSummary } from "@/lib/portfolio";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -12,7 +13,10 @@ export const maxDuration = 300;
  * every load. Auth is handled by the proxy (CRON_SECRET). Scheduled off-peak in
  * vercel.json to avoid the existing 6am poller stampede.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   try {
     const snapshot = await buildPortfolioSnapshot();
     await setPortfolioSummary(snapshot);

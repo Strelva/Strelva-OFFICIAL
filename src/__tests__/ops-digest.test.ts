@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 // Two layers:
 //  1. sendOpsDigestEmail composes the right RECIPIENTS (operator notify list,
@@ -130,7 +131,7 @@ describe("GET /api/cron/ops-digest — composition", () => {
     ]);
 
     const { GET } = await import("@/app/api/cron/ops-digest/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -158,7 +159,7 @@ describe("GET /api/cron/ops-digest — composition", () => {
     mockSendOpsDigestEmail.mockRejectedValue(new Error("boom"));
 
     const { GET } = await import("@/app/api/cron/ops-digest/route");
-    const res = await GET();
+    const res = await GET(authenticatedCronRequest());
     expect(res.status).toBe(500);
   });
 });
