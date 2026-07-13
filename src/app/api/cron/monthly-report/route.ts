@@ -12,6 +12,7 @@ import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { getRedis } from "@/lib/redis";
 import type { WeeklyBrief } from "@/lib/types";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Iterates tenants; matches the platform function ceiling so it can't die
 // mid-batch at scale.
@@ -38,7 +39,10 @@ function recapParagraphs(summary: string): string[] {
   return summary.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   await recordHeartbeat("monthly-report").catch(() => {});
 
   // The recap is GENERATED regardless (the on-screen Reports surface needs it);

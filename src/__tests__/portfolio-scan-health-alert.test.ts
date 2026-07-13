@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 // The portfolio-scan cron must alert the owner when a fresh scan's grade dropped
 // a full letter vs the LAST STORED grade — once per transition, gated by the
@@ -32,7 +33,7 @@ function prior(grade: string, score = 82) {
 
 async function run() {
   const { GET } = await import("@/app/api/cron/portfolio-scan/route");
-  return (await GET()).json();
+  return (await GET(authenticatedCronRequest())).json();
 }
 
 describe("GET /api/cron/portfolio-scan — health regression alert", () => {

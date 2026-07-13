@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, getActorContext } from "@/lib/auth";
+import { requireTenantPermission, getActorContext } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { appendTestimonial } from "@/lib/testimonials";
@@ -24,8 +24,6 @@ import { clientRevalidationTargetForSections } from "@/lib/content-revalidation"
 export async function POST(req: Request) {
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const actor = await getActorContext(tenant);

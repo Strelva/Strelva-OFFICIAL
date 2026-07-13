@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkHeartbeats } from "@/lib/heartbeat";
 import { alertOnce } from "@/lib/monitoring";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -12,7 +13,10 @@ export const maxDuration = 300;
  * dead cron is noticed in minutes, not from an angry customer. CRON_SECRET-gated
  * by the proxy (isCronRoute matches /api/cron/*).
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   const statuses = await checkHeartbeats();
   const stale = statuses.filter((s) => s.stale);
   for (const s of stale) {

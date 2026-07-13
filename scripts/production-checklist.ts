@@ -871,12 +871,12 @@ function checkStripeBillingWebhookRoute(path: string) {
 
 checkStripeBillingWebhookRoute("src/app/api/billing/webhook/route.ts");
 
-function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
-  if (!existsSync(vercelPath) || !existsSync(proxyPath)) {
+function checkCronAuthCoverage(vercelPath: string, proxyPath: string, authPath: string) {
+  if (!existsSync(vercelPath) || !existsSync(proxyPath) || !existsSync(authPath)) {
     log({
       name: "Cron auth coverage",
       status: "fail",
-      message: `${vercelPath} and ${proxyPath} are required to verify cron auth coverage`,
+      message: `${vercelPath}, ${proxyPath}, and ${authPath} are required to verify cron auth coverage`,
     });
     return;
   }
@@ -886,24 +886,40 @@ function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
       crons?: Array<{ path?: string; schedule?: string }>;
     };
     const proxy = readFileSync(proxyPath, "utf8");
+    const auth = readFileSync(authPath, "utf8");
     const crons = vercelConfig.crons || [];
     const invalidCron = crons.find((cron) => !cron.path?.startsWith("/api/cron/") || !cron.schedule);
     const missingRoute = crons.find((cron) => {
       const routePath = `src/app${cron.path}/route.ts`;
       return !existsSync(routePath);
     });
+    const missingHandlerGuard = crons.find((cron) => {
+      const routePath = `src/app${cron.path}/route.ts`;
+      if (!existsSync(routePath)) return true;
+      const route = readFileSync(routePath, "utf8");
+      return !route.includes("requireCronRequest(request)");
+    });
     const proxyCoversCron =
       proxy.includes("export function isCronRoute") &&
       proxy.includes("path.startsWith(\"/api/cron/\")") &&
-      proxy.includes("validateCronRequest(process.env.CRON_SECRET") &&
-      proxy.includes("CRON_SECRET not configured") &&
-      proxy.includes("return { allowed: false, status: 401, message: \"Unauthorized\" }");
+      proxy.includes("validateCronRequest(process.env.CRON_SECRET");
+    const authFailsClosed =
+      auth.includes('authorization === `Bearer ${expectedSecret}`') &&
+      auth.includes('message: "CRON_SECRET not configured"') &&
+      auth.includes('message: "Unauthorized"');
 
-    if (!crons.length || invalidCron || missingRoute || !proxyCoversCron) {
+    if (
+      !crons.length ||
+      invalidCron ||
+      missingRoute ||
+      missingHandlerGuard ||
+      !proxyCoversCron ||
+      !authFailsClosed
+    ) {
       log({
         name: "Cron auth coverage",
         status: "fail",
-        message: `${vercelPath} cron paths must map to /api/cron route files and ${proxyPath} must fail closed with CRON_SECRET validation`,
+        message: `${vercelPath} cron paths must map to guarded /api/cron handlers, and both ${proxyPath} and ${authPath} must fail closed with CRON_SECRET validation`,
       });
       return;
     }
@@ -911,7 +927,7 @@ function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
     log({
       name: "Cron auth coverage",
       status: "ok",
-      message: `${crons.length} Vercel cron route(s) are covered by proxy CRON_SECRET validation`,
+      message: `${crons.length} Vercel cron route(s) are covered by proxy CRON_SECRET validation and handler-level defense in depth`,
     });
   } catch (err) {
     log({
@@ -922,7 +938,7 @@ function checkCronAuthCoverage(vercelPath: string, proxyPath: string) {
   }
 }
 
-checkCronAuthCoverage("vercel.json", "src/proxy.ts");
+checkCronAuthCoverage("vercel.json", "src/proxy.ts", "src/lib/cron-auth.ts");
 
 function checkDependencyAudit() {
   try {

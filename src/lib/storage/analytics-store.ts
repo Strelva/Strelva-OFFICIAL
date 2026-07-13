@@ -32,20 +32,12 @@ async function pgIncrementMetric(tenant: string, metric: string): Promise<void> 
   if (!db) return;
   const day = isoDay();
   try {
-    const { data } = await db
-      .from("site_metrics")
-      .select("count")
-      .eq("tenant_id", tenant)
-      .eq("metric", metric)
-      .eq("day", day)
-      .maybeSingle();
-    const next = ((data?.count as number | undefined) ?? 0) + 1;
-    await db
-      .from("site_metrics")
-      .upsert(
-        { tenant_id: tenant, metric, day, count: next },
-        { onConflict: "tenant_id,metric,day" }
-      );
+    const { error } = await db.rpc("increment_site_metric", {
+      p_tenant_id: tenant,
+      p_metric: metric,
+      p_day: day,
+    });
+    if (error) throw error;
   } catch {
     // tracking is fire-and-forget; swallow
   }

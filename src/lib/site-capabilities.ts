@@ -1,4 +1,4 @@
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { CUSTOM_REPO_CONTRACT_VERSION, getCustomRepoMetadata } from "@/lib/custom-repos";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteCapabilityManifestSchema } from "@/lib/schemas";
@@ -67,7 +67,7 @@ export async function buildDefaultCapabilityManifest(
   tenant: string,
   tenantConfig?: TenantConfig
 ): Promise<SiteCapabilityManifest> {
-  const template = await getTemplateForTenant(tenant);
+  const template = await getTemplateManifestForTenant(tenant);
   const customRepo = getCustomRepoMetadata(tenantConfig);
   const contentSections = new Set<string>(template.contentSections);
 

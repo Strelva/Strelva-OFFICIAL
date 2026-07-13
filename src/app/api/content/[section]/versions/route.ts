@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getVersions, logActivity, logAuditEvent, restoreVersion } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import type { ContentSection } from "@/lib/types";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
@@ -18,7 +18,7 @@ export async function GET(
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 
-    const template = await getTemplateForTenant(tenant);
+    const template = await getTemplateManifestForTenant(tenant);
     if (!template.contentSections.includes(section as ContentSection)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }
@@ -39,15 +39,13 @@ export async function POST(
 
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
     const actor = await getActorContext(tenant);
 
-    const template = await getTemplateForTenant(tenant);
+    const template = await getTemplateManifestForTenant(tenant);
     if (!template.contentSections.includes(section as ContentSection)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
     }

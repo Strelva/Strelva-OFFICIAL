@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSuggestions, updateSuggestion } from "@/lib/suggestions";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -10,8 +10,6 @@ export async function GET() {
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
 
@@ -27,8 +25,6 @@ export async function POST(req: Request) {
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
 

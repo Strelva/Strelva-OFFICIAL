@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The migration's dual-write design hinges on: when Supabase is NOT configured,
-// the client is null and every repository degrades (reads -> empty/null, writes
-// -> no-op) WITHOUT throwing. This locks that contract so a caller can dual-write
-// to Redis + Postgres safely while Postgres is still dark.
+// Reads and explicit migration mirrors degrade when Supabase is unavailable.
+// Postgres-authoritative writes must reject so a caller never reports success
+// for tenant/content/identity data that was not persisted.
 
 import { getSupabase, isSupabaseConfigured } from "../lib/db/client";
 import * as repos from "../lib/db/repositories";
@@ -29,10 +28,7 @@ describe("Supabase data layer — degrades gracefully when unconfigured", () => 
     await expect(repos.getMailLogPg("gldf")).resolves.toEqual([]);
   });
 
-  it("writes are no-ops that resolve (no throw) and inserts return null id", async () => {
-    await expect(
-      repos.upsertTenant({ id: "gldf", site_name: "GLDF", created_at: "2026-01-01" })
-    ).resolves.toBeUndefined();
+  it("best-effort migration mirrors remain no-ops and inserts return null id", async () => {
     await expect(
       repos.insertEvent({ tenant_id: "gldf", source: "ai", type: "content_update" })
     ).resolves.toBeNull();
@@ -46,5 +42,21 @@ describe("Supabase data layer — degrades gracefully when unconfigured", () => 
     await expect(
       repos.recordMailSendPg({ tenant_id: "gldf", kind: "weekly_report", ok: true })
     ).resolves.toBeUndefined();
+  });
+
+  it("authoritative writes reject when Postgres is unavailable", async () => {
+    await expect(
+      repos.upsertTenant({ id: "gldf", site_name: "GLDF", created_at: "2026-01-01" })
+    ).rejects.toThrow("Supabase is not configured");
+    await expect(
+      repos.upsertMembership({
+        user_id: "00000000-0000-0000-0000-000000000001",
+        tenant_id: "gldf",
+        role: "owner",
+      })
+    ).rejects.toThrow("Supabase is not configured");
+    await expect(
+      repos.upsertDraftContentData("gldf", "hero", { heading: "Hello" })
+    ).rejects.toThrow("Supabase is not configured");
   });
 });

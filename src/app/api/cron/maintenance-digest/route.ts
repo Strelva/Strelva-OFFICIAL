@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mapPool } from "@/lib/concurrency";
 import { recordHeartbeat } from "@/lib/heartbeat";
+import { requireCronRequest } from "@/lib/cron-auth";
 import { getActiveTenants } from "@/lib/tenants";
 import {
   buildMaintenanceDigest,
@@ -16,7 +17,10 @@ export const maxDuration = 300;
  * review (the autonomous-maintenance digest). Runs Monday before the weekly
  * report so the operator can greenlight the week's work up front.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
+
   const tenants = await getActiveTenants();
   let generated = 0;
 

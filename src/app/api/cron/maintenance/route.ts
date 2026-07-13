@@ -7,13 +7,15 @@ import { getAllTenants } from "@/lib/tenants";
 import { pruneOldEvents } from "@/lib/events";
 import { createDailySiteSnapshot } from "@/lib/storage";
 import { queueRetentionReengagement } from "@/lib/retention";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
 export const maxDuration = 300;
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check)
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   const tenants = await getAllTenants();
   const active = tenants.filter((t) => t.active);

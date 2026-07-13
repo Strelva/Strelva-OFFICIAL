@@ -14,7 +14,7 @@ import {
 } from "@/lib/storage";
 import { diffFields } from "@/lib/utils";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { getTemplateForTenant } from "@/components/templates/registry";
+import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { revalidateClientSite } from "@/lib/revalidate-client";
@@ -24,7 +24,7 @@ import { clientRevalidationTargetForSections } from "@/lib/content-revalidation"
 import { scheduleVerification } from "@/lib/verify-live";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
-  const template = await getTemplateForTenant(tenant);
+  const template = await getTemplateManifestForTenant(tenant);
   return template.contentSections.includes(section as ContentSection);
 }
 
@@ -76,8 +76,6 @@ export async function PUT(
 
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const actor = await getActorContext(tenant);
@@ -182,8 +180,6 @@ export async function DELETE(
 
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const actor = await getActorContext(tenant);

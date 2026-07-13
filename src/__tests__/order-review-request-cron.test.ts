@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
 // The order-review-request cron must:
 //  - email the owner their review link once an order has aged past the delay,
@@ -49,7 +50,7 @@ function order(ageDays: number, id = "ord_1") {
 
 async function run() {
   const { GET } = await import("@/app/api/cron/order-review-request/route");
-  return (await GET()).json();
+  return (await GET(authenticatedCronRequest())).json();
 }
 
 describe("GET /api/cron/order-review-request", () => {

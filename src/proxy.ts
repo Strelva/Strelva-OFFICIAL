@@ -1,4 +1,5 @@
-import { createMiddlewareSupabase } from "@/lib/db/middleware-client";
+import { applyMiddlewareSupabaseResponse, createMiddlewareSupabase } from "@/lib/db/middleware-client";
+import { validateCronRequest } from "@/lib/cron-auth";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -262,18 +263,11 @@ export function extractTenantFromClientPath(pathname: string): {
   return { tenant, targetPath: rest, shouldRedirectToDashboard: false };
 }
 
-export function validateCronRequest(expectedSecret: string | undefined, authorization: string | null) {
-  if (!expectedSecret) {
-    return { allowed: false, status: 500, message: "CRON_SECRET not configured" };
-  }
-
-  const cronSecret = authorization?.replace("Bearer ", "");
-  if (cronSecret === expectedSecret) {
-    return { allowed: true, status: 200, message: "OK" };
-  }
-
-  return { allowed: false, status: 401, message: "Unauthorized" };
-}
+// The cron-auth policy lives in @/lib/cron-auth (shared with the route-handler
+// defense-in-depth guard). Re-exported here so existing importers of the proxy
+// keep working. The extracted version is stricter: it requires an exact
+// `Bearer <secret>` match, not a bare secret.
+export { validateCronRequest };
 
 function isPreviewRequest(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("preview") === "true";
@@ -350,6 +344,9 @@ export function buildContentSecurityPolicy(params: {
 }
 
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
+  // Carry any refreshed Supabase session cookies (produced while validating the
+  // request) onto whatever response the proxy returns, so a refreshed token isn't dropped.
+  applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
   response.headers.set(
     "Content-Security-Policy",

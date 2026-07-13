@@ -364,8 +364,21 @@ export async function requireTenantPermission(
   tenant: string,
   permission: TenantPermission
 ): Promise<NextResponse | null> {
-  const allowed = await hasTenantPermission(tenant, permission);
-  if (!allowed) {
+  return requireTenantPermissions(tenant, [permission]);
+}
+
+export async function requireTenantPermissions(
+  tenant: string,
+  permissions: Iterable<TenantPermission>
+): Promise<NextResponse | null> {
+  const role = await getTenantRole(tenant);
+  if (!role) {
+    return NextResponse.json({ error: "Forbidden: no access to this tenant" }, { status: 403 });
+  }
+  if (
+    role !== "super_admin" &&
+    [...permissions].some((permission) => !roleHasPermission(role, permission))
+  ) {
     return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
   }
   return null;

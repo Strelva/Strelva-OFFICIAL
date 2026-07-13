@@ -78,6 +78,7 @@ vi.mock("@/lib/capabilities", () => ({
 }));
 
 vi.mock("@/lib/agent-prompt-shared", () => ({
+  buildAgentSystemPrompt: () => Promise.resolve("SYSTEM PROMPT"),
   loadAgentPromptContent: () =>
     Promise.resolve({
       sections: ["hero"],

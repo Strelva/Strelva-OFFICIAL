@@ -4,7 +4,7 @@
  * Validates that with the flag on:
  *  - reads come off the Postgres `site_metrics` table (snake_case columns
  *    metric/day/count) and get mapped into the store's camelCase shapes, and
- *  - writes hit `site_metrics` with the right snake_case columns.
+ *  - writes use the atomic `increment_site_metric` Postgres function.
  *
  * Sanity is forced OFF (core.hasSanity=false) so only the Postgres branch runs;
  * the Supabase client is mocked with a chainable+thenable builder so both list
@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const supa = vi.hoisted(() => ({
   result: { data: null as unknown, error: null as unknown },
   lastTable: "",
+  lastRpc: undefined as unknown,
   lastInsert: undefined as unknown,
   lastUpsert: undefined as unknown,
 }));
@@ -40,6 +41,10 @@ function builder(): unknown {
 vi.mock("@/lib/db/client", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   getSupabase: () => ({
+    rpc: (name: string, args: unknown) => {
+      supa.lastRpc = { name, args };
+      return Promise.resolve({ data: 1, error: null });
+    },
     from: (t: string) => {
       supa.lastTable = t;
       return builder();
@@ -76,6 +81,7 @@ beforeEach(() => {
   supa.result = { data: null, error: null };
   supa.lastInsert = undefined;
   supa.lastUpsert = undefined;
+  supa.lastRpc = undefined;
   supa.lastTable = "";
 });
 
@@ -163,31 +169,30 @@ describe("analytics-store Postgres dual-path", () => {
     expect(byPrefix["nav-click"]).toBeUndefined();
   });
 
-  it("trackClick writes the today counter to site_metrics with snake_case columns", async () => {
-    // First call (.maybeSingle()) returns the existing count; the upsert follows.
-    supa.result = { data: { count: 6 }, error: null };
-
+  it("trackClick increments the today counter atomically in Postgres", async () => {
     await trackClick("booking-click", TENANT);
 
-    expect(supa.lastTable).toBe("site_metrics");
-    expect(supa.lastUpsert).toEqual({
-      tenant_id: TENANT,
-      metric: "booking-click",
-      day: today,
-      count: 7, // existing 6 + 1
+    expect(supa.lastRpc).toEqual({
+      name: "increment_site_metric",
+      args: {
+        p_tenant_id: TENANT,
+        p_metric: "booking-click",
+        p_day: today,
+      },
     });
+    expect(supa.lastUpsert).toBeUndefined();
   });
 
-  it("trackClick starts the counter at 1 when no prior row exists", async () => {
-    supa.result = { data: null, error: null };
-
+  it("trackClick uses the same atomic operation for a new counter", async () => {
     await trackClick("page-view", TENANT);
 
-    expect(supa.lastUpsert).toMatchObject({
-      tenant_id: TENANT,
-      metric: "page-view",
-      day: today,
-      count: 1,
+    expect(supa.lastRpc).toEqual({
+      name: "increment_site_metric",
+      args: {
+        p_tenant_id: TENANT,
+        p_metric: "page-view",
+        p_day: today,
+      },
     });
   });
 

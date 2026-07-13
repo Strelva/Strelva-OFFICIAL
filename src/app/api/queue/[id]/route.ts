@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction, type EventWorkflowAction } from "@/lib/event-actions";
@@ -24,8 +24,6 @@ export async function PATCH(
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
-  if (denied) return denied;
   const permissionDenied = await requireTenantPermission(tenant, "publishing:manage");
   if (permissionDenied) return permissionDenied;
 

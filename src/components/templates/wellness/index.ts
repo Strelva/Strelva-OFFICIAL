@@ -1,5 +1,6 @@
 import type { ContentSection, PageSectionConfig } from "@/lib/types";
 import type { TemplateDefinition } from "../registry";
+import { getTemplateManifest } from "@/lib/template-manifests";
 
 // Section components
 import { Hero } from "@/components/public/Hero";
@@ -211,17 +212,5 @@ export const wellnessTemplate: TemplateDefinition = {
   Footer,
   themeVars: {},
   defaultPageConfig: DEFAULT_PAGE_CONFIG,
-  contentSections: [
-    "hero",
-    "services",
-    "story",
-    "testimonials",
-    "events",
-    "providers",
-    "contact",
-    "settings",
-    "theme",
-    "faq",
-    "shop",
-  ],
+  contentSections: [...getTemplateManifest("wellness").contentSections],
 };

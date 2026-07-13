@@ -31,8 +31,6 @@ export async function POST(req: Request) {
 
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);
@@ -80,8 +78,6 @@ export async function PATCH(req: Request) {
 
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const permissionDenied = await requireTenantPermission(tenant, "content:write");
     if (permissionDenied) return permissionDenied;
     const blocked = await requireActiveSubscription(tenant);

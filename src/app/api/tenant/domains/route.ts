@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireTenantPermission } from "@/lib/auth";
 import {
   addCustomDomain,
   listTenantDomainClaims,
@@ -31,8 +31,6 @@ function missingTenantResponse(err: unknown): NextResponse | null {
 export async function GET() {
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const blocked = await requireTenantPermission(tenant, "domains:manage");
     if (blocked) return blocked;
 
@@ -54,8 +52,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const blocked = await requireTenantPermission(tenant, "domains:manage");
     if (blocked) return blocked;
 
@@ -83,8 +79,6 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const blocked = await requireTenantPermission(tenant, "domains:manage");
     if (blocked) return blocked;
 
@@ -112,8 +106,6 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const tenant = await requireTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
-    if (denied) return denied;
     const blocked = await requireTenantPermission(tenant, "domains:manage");
     if (blocked) return blocked;
 

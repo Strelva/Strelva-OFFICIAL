@@ -16,6 +16,7 @@ import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { postSlack, readAndResetDailyCounts } from "@/lib/proof-signals";
 import { recordDailyEngagement } from "@/lib/churn";
+import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -27,8 +28,9 @@ function yesterdayKey(): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function GET() {
-  // Auth handled by proxy (CRON_SECRET check)
+export async function GET(request: Request) {
+  const denied = requireCronRequest(request);
+  if (denied) return denied;
 
   const day = yesterdayKey();
   const tenants = await getAllTenants();
