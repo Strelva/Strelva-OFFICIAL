@@ -41,7 +41,7 @@ const goodHtml = `<!doctype html>
     <h3>Our Team</h3>
     <p>We help local customers every day. ${filler}.</p>
     <ul><li>Fast service</li><li>Fair pricing</li><li>Friendly staff</li></ul>
-    <ol><li>Call us</li><li>Book a time</li><li>Get results</li></ol>
+    <ol><li><a href="tel:+15551234567">Call us</a></li><li><a href="/book">Book a time</a></li><li>Get results</li></ol>
     <img src="/a.jpg" alt="Our storefront" />
     <img src="/b.jpg" alt="Our team at work" />
     <p>Ready to begin? <a href="/contact">Contact us</a> today to get started.</p>
