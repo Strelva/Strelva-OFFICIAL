@@ -9,6 +9,8 @@ echo "== lint =="
 pnpm lint
 echo "== typecheck =="
 pnpm typecheck
+echo "== ontology invariants =="
+pnpm check:ontology
 echo "== vitest =="
 pnpm test
 

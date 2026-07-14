@@ -17,7 +17,8 @@ pnpm smoke:surfaces               # Ungated admin/owner console smoke (bypass ON
 pnpm typecheck                    # tsc --noEmit
 pnpm provision-tenant             # Create new tenant
 pnpm check:prod                   # Production readiness checklist
-pnpm check:custom-repos           # Verify sibling custom-repo workspaces
+pnpm check:custom-repos           # Verify sibling custom-repo workspaces (executable conformance, not string-grep)
+pnpm check:ontology               # Ontology invariants gate (file-size ceiling + lifecycle CHECK constraints; runs in check:ci)
 npx tsx scripts/ai-visibility.ts "<Business>" --site=x.com --category="HVAC" --city="Buffalo, NY" [--html] [--out=<dir>]
                                   # AI-visibility scorecard (door-opener artifact; --html writes a sendable one-pager, --out=<dir> sets where)
 ```
