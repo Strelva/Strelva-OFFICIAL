@@ -1,5 +1,30 @@
 import { getRedis } from "./redis";
+import { decryptSecret, encryptSecret } from "./crypto/secrets";
 import type { IntegrationProvider, Connection } from "./types";
+
+// At-rest envelope encryption for the secret-bearing fields. Redis auto-JSON-
+// serializes the whole Connection, so we encrypt before write and decrypt after
+// read. Both helpers are INERT until SECRETS_ENC_KEY is set (staged rollout), and
+// encrypt/decrypt pass through null/undefined/"" so the optional fields are safe.
+function encodeConnection(c: Connection): Connection {
+  return {
+    ...c,
+    accessToken: encryptSecret(c.accessToken),
+    // `?? undefined` only narrows the type (the null branch can't occur for a
+    // string|undefined input) so the object still matches Connection's optionals.
+    refreshToken: encryptSecret(c.refreshToken) ?? undefined,
+    apiKey: encryptSecret(c.apiKey) ?? undefined,
+  };
+}
+
+function decodeConnection(c: Connection): Connection {
+  return {
+    ...c,
+    accessToken: decryptSecret(c.accessToken),
+    refreshToken: decryptSecret(c.refreshToken) ?? undefined,
+    apiKey: decryptSecret(c.apiKey) ?? undefined,
+  };
+}
 
 function connectionKey(tenantId: string, provider: IntegrationProvider): string {
   return `connections:${tenantId}:${provider}`;
@@ -17,7 +42,7 @@ export async function getConnection(
   if (!redis) return null;
 
   const data = await redis.get<Connection>(connectionKey(tenantId, provider));
-  return data ?? null;
+  return data ? decodeConnection(data) : null;
 }
 
 export async function getConnections(tenantId: string): Promise<Connection[]> {
@@ -33,7 +58,7 @@ export async function getConnections(tenantId: string): Promise<Connection[]> {
     cursor = String(next);
     for (const key of keys) {
       const data = await redis.get<Connection>(key);
-      if (data) connections.push(data);
+      if (data) connections.push(decodeConnection(data));
     }
   } while (cursor !== "0");
 
@@ -46,7 +71,7 @@ export async function saveConnection(connection: Connection): Promise<void> {
 
   await redis.set(
     connectionKey(connection.tenantId, connection.provider),
-    connection
+    encodeConnection(connection)
   );
 }
 
@@ -60,7 +85,9 @@ export async function updateLastSynced(
   const existing = await getConnection(tenantId, provider);
   if (!existing) return;
 
-  await redis.set(connectionKey(tenantId, provider), {
+  // getConnection returns a DECODED (plaintext) object, so write it back through
+  // saveConnection to re-encrypt — a direct redis.set here would persist plaintext.
+  await saveConnection({
     ...existing,
     lastSyncedAt: new Date().toISOString(),
   });

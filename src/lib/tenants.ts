@@ -8,6 +8,7 @@ import { getTenantPrimaryDomain, normalizeTenantDomain } from "./tenant-urls";
 import { tenantsSourceIsPostgres } from "./db/source-flags";
 import { listAllTenants, getTenant as getTenantRow, upsertTenant } from "./db/repositories";
 import type { Row, Insert } from "./db/client";
+import { decryptSecret, encryptSecret } from "./crypto/secrets";
 
 /**
  * Postgres `tenants` row -> TenantConfig (the spine mapper). The Postgres table
@@ -57,11 +58,11 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     businessRules: r.business_rules ?? undefined,
     personality: r.personality ?? undefined,
     businessHours: (r.business_hours as unknown as TenantConfig["businessHours"]) ?? undefined,
-    slackWebhookUrl: r.slack_webhook_url ?? undefined,
-    googleSearchConsoleKey: r.google_search_console_key ?? undefined,
-    instagramAccessToken: r.instagram_access_token ?? undefined,
+    slackWebhookUrl: decryptSecret(r.slack_webhook_url) ?? undefined,
+    googleSearchConsoleKey: decryptSecret(r.google_search_console_key) ?? undefined,
+    instagramAccessToken: decryptSecret(r.instagram_access_token) ?? undefined,
     revalidateUrl: r.revalidate_url ?? undefined,
-    revalidationSecret: r.revalidation_secret ?? undefined,
+    revalidationSecret: decryptSecret(r.revalidation_secret) ?? undefined,
     branding: (r.branding as TenantConfig["branding"]) ?? undefined,
     visibility: (r.visibility as unknown as TenantConfig["visibility"]) ?? undefined,
   };
@@ -119,11 +120,11 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.businessRules !== undefined) row.business_rules = t.businessRules;
   if (t.personality !== undefined) row.personality = t.personality;
   if (t.businessHours !== undefined) row.business_hours = j(t.businessHours);
-  if (t.slackWebhookUrl !== undefined) row.slack_webhook_url = t.slackWebhookUrl;
-  if (t.googleSearchConsoleKey !== undefined) row.google_search_console_key = t.googleSearchConsoleKey;
-  if (t.instagramAccessToken !== undefined) row.instagram_access_token = t.instagramAccessToken;
+  if (t.slackWebhookUrl !== undefined) row.slack_webhook_url = encryptSecret(t.slackWebhookUrl);
+  if (t.googleSearchConsoleKey !== undefined) row.google_search_console_key = encryptSecret(t.googleSearchConsoleKey);
+  if (t.instagramAccessToken !== undefined) row.instagram_access_token = encryptSecret(t.instagramAccessToken);
   if (t.revalidateUrl !== undefined) row.revalidate_url = t.revalidateUrl;
-  if (t.revalidationSecret !== undefined) row.revalidation_secret = t.revalidationSecret;
+  if (t.revalidationSecret !== undefined) row.revalidation_secret = encryptSecret(t.revalidationSecret);
   if (t.branding !== undefined) row.branding = j(t.branding);
   if (t.visibility !== undefined) row.visibility = j(t.visibility);
   return row;
