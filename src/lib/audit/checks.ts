@@ -89,10 +89,18 @@ async function fetchPageSpeedData(
   apiKey: string | undefined
 ): Promise<PageSpeedResult | null> {
   if (!apiKey) return null;
-  const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE`;
-  const res = await fetchWithTimeout(apiUrl, 30_000);
-  if (!res.ok) return null;
-  return res.json();
+  // Never let a slow/failed PageSpeed call throw — a timeout or a non-JSON error
+  // body would otherwise bubble out of runAudit and 500 the whole audit (incl.
+  // the public /audit that now forwards here). Degrade to null → the two
+  // performance categories become weight-0/unmeasured, honestly excluded.
+  try {
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE`;
+    const res = await fetchWithTimeout(apiUrl, 30_000);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

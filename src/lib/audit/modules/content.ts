@@ -11,17 +11,66 @@ import { averageCheckScores } from "../scoring";
 // the category score and map each signal to a plain-English CheckResult.
 // ---------------------------------------------------------------------------
 
-const CTA_PHRASES = [
+// Action-intent text matched ONLY against button/anchor text (never free body
+// prose — "order" matched 94 nouns on a shop page, "reserve" matched "All Rights
+// Reserved"). Element-anchored so a real CTA counts and boilerplate doesn't.
+const CTA_TEXT_PATTERNS = [
   "contact us",
   "get started",
   "learn more",
   "call now",
+  "call today",
   "request quote",
+  "get a quote",
   "free estimate",
   "book now",
+  "book",
   "schedule",
   "get in touch",
+  "add to cart",
+  "shop now",
+  "buy now",
+  "order online",
+  "order now",
+  "reserve",
+  "subscribe",
+  "sign up",
+  "get directions",
+  "view menu",
+  "see menu",
+  "request appointment",
 ];
+
+// CTA affordances detected by href/attribute (a phone/cart/checkout/booking
+// link IS a call to action regardless of its label).
+const CTA_AFFORDANCES: [string, string][] = [
+  ["tel", 'a[href^="tel:"]'],
+  ["mailto", 'a[href^="mailto:"]'],
+  ["cart", 'a[href*="cart"], a[href*="checkout"]'],
+  ["order", 'a[href*="/order"]'],
+  ["book", 'a[href*="book"], a[href*="appointment"], a[href*="calendly"]'],
+];
+
+// Count DISTINCT call-to-action signals over links/buttons across the WHOLE
+// document (before the nav/header/footer strip, so hero + header CTAs count).
+function countCtas($: AuditContext["$"]): number {
+  const seen = new Set<string>();
+  $("a, button, [role='button'], input[type='submit']").each((_i, el) => {
+    const $el = $(el);
+    const text = ($el.text() || $el.attr("value") || "").toLowerCase().trim();
+    if (!text) return;
+    for (const p of CTA_TEXT_PATTERNS) {
+      if (text.includes(p)) {
+        seen.add(p);
+        break;
+      }
+    }
+  });
+  for (const [key, sel] of CTA_AFFORDANCES) {
+    if ($(sel).length) seen.add(key);
+  }
+  return seen.size;
+}
 
 interface ContentAnalysis {
   wordCount: number;
@@ -76,16 +125,29 @@ function analyze(ctx: AuditContext): ContentAnalysis {
       "script, style, nav, header, footer, .nav, .navigation, .menu, .sidebar, .footer, .header"
     )
     .remove();
-  const $main = $clone
-    .find("main, article, .content, .main-content, #content, #main")
-    .first();
   // cheerio.load always wraps parsed HTML in a body, so $bodyEl is the reliable
   // fallback (typed Cheerio<Element>, unlike the document-level clone root).
   const $bodyEl = $clone.find("body");
-  const $textRoot = $main.length ? $main : $bodyEl;
-  const rawText = $textRoot.text();
-  const bodyText = rawText.replace(/\s+/g, " ").trim();
-  const wordCount = bodyText.split(/\s+/).filter((w) => w.length > 0).length;
+  const wordsOf = (s: string) =>
+    s
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+  const $main = $clone
+    .find("main, article, .content, .main-content, #content, #main")
+    .first();
+  // Prefer the main-content region so leftover boilerplate doesn't inflate the
+  // count, but only when it actually holds the page's content. Some layouts
+  // render a (near-)empty <main> shell with the real content in sibling
+  // sections; trusting it blindly collapsed the word count to ~0 and misreported
+  // a full page as thin (RHM: empty <main> beside 375 words of real copy).
+  const bodyWords = wordsOf($bodyEl.text());
+  const mainWords = $main.length ? wordsOf($main.text()) : [];
+  const words =
+    mainWords.length >= bodyWords.length * 0.5 ? mainWords : bodyWords;
+  const bodyText = words.join(" ");
+  const wordCount = words.length;
 
   // Headings.
   const h1 = $("h1").length;
@@ -149,10 +211,9 @@ function analyze(ctx: AuditContext): ContentAnalysis {
     else withoutAlt++;
   });
 
-  // Lists and CTA phrases.
+  // Lists and CTA signals.
   const listCount = $("ul, ol").length;
-  const bodyLower = bodyText.toLowerCase();
-  const ctaCount = CTA_PHRASES.filter((p) => bodyLower.includes(p)).length;
+  const ctaCount = countCtas($);
 
   return {
     wordCount,
@@ -351,7 +412,7 @@ export function checkContent(ctx: AuditContext): CategoryResult {
         : a.ctaCount === 1
           ? "One clear next step found. Adding a few more guides visitors to act."
           : "No clear next step for visitors. Tell them exactly what to do next (call, book, or get a quote) to turn interest into action.",
-    details: `${a.ctaCount} CTA phrase(s)`,
+    details: `${a.ctaCount} call-to-action(s)`,
   });
 
   // Category score = the OWSH /100 weighting (sum of earned points, capped 100).

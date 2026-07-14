@@ -303,7 +303,7 @@ function checkFormSecurity(ctx: AuditContext): CheckResult {
   }
 
   let formsWithHttps = 0;
-  let formsWithCsrf = 0;
+  let unprotectedSensitive = 0; // auth/state-changing forms lacking CSRF AND anti-abuse
 
   forms.each((_, el) => {
     const $form = $(el);
@@ -324,23 +324,41 @@ function checkFormSecurity(ctx: AuditContext): CheckResult {
     }
 
     const formHtml = $.html($form);
+    // A CSRF token only matters for a form that performs a sensitive,
+    // state-changing action (login/account/password). A public contact or
+    // newsletter form submitting over HTTPS is secure without one — grading it
+    // down was capping every clean local-SMB site at 70/warn.
+    const sensitive =
+      /type=["']?password/i.test(formHtml) ||
+      /(?:login|log-in|signin|sign-in|register|sign-?up|account|password|settings)/i.test(
+        `${action} ${$form.attr("id") ?? ""} ${$form.attr("name") ?? ""} ${$form.attr("class") ?? ""}`
+      );
+    if (!sensitive) return;
+
     const hasCsrf =
       /name=["']?(?:csrf|_token|authenticity_token|_csrf_token)[^"']*["']?/i.test(
         formHtml
       ) || /type=["']?hidden["'][^>]*name=["']?(?:token|nonce)/i.test(formHtml);
-    if (hasCsrf) formsWithCsrf++;
+    // Honeypot / captcha / a hosted third-party form handler are legitimate
+    // anti-abuse that stand in for a CSRF token on a no-backend form.
+    const hasAntiAbuse =
+      /_gotcha|honeypot|recaptcha|hcaptcha|cf-turnstile|g-recaptcha/i.test(formHtml) ||
+      /formspree|netlify|getform|basin|web3forms/i.test(action);
+    if (!hasCsrf && !hasAntiAbuse) unprotectedSensitive++;
   });
 
   const httpsRatio = formsWithHttps / formsFound;
-  const csrfRatio = formsWithCsrf / formsFound;
-  const score = Math.round(httpsRatio * 70 + csrfRatio * 30);
+  // HTTPS submission is the whole score for ordinary public forms; only a
+  // sensitive form missing both CSRF and anti-abuse caps it.
+  let score = Math.round(httpsRatio * 100);
+  if (unprotectedSensitive > 0) score = Math.min(score, 60);
 
   const insecure = formsFound - formsWithHttps;
   let message: string;
   if (insecure > 0) {
     message = `${insecure} of ${formsFound} form(s) may send what customers type over an insecure connection.`;
-  } else if (formsWithCsrf < formsFound) {
-    message = `All ${formsFound} form(s) submit securely, though ${formsFound - formsWithCsrf} could add extra tamper protection.`;
+  } else if (unprotectedSensitive > 0) {
+    message = `${unprotectedSensitive} sign-in/account form(s) should add a security token to block tampering.`;
   } else {
     message = `All ${formsFound} form(s) submit securely.`;
   }
@@ -382,16 +400,20 @@ function checkCookieConsent(ctx: AuditContext): CheckResult {
     }
   }
 
+  // Absence is a soft nudge, not a security hole: most local US small
+  // businesses with no ad/tracking cookies don't legally need a banner (and
+  // banner-fatigue argues against adding one), so a missing notice scores a
+  // neutral warn rather than 0 — which used to drag the whole security grade.
   return {
     name: "Cookie consent",
     status: detected ? "pass" : "warn",
-    score: detected ? 100 : 0,
+    score: detected ? 100 : 60,
     message: detected
       ? "A cookie consent notice is in place."
       : "No cookie consent notice was found.",
     details: detected
       ? undefined
-      : "A short consent banner keeps you compliant with privacy rules (GDPR/CCPA) and shows visitors you handle their data carefully. Ask Strelva to add one.",
+      : "Only needed if you run analytics or ad cookies that track visitors. If you do, ask Strelva to add a short consent banner to stay compliant with GDPR/CCPA.",
   };
 }
 

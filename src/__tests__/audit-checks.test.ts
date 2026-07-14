@@ -352,4 +352,30 @@ describe("runAudit", () => {
 
     expect(richScore).toBeGreaterThan(emptyScore);
   });
+
+  it("counts real body copy when <main> is an empty shell (content in sibling sections)", async () => {
+    // Regression: some layouts server-render an empty <main> beside the real
+    // content. The content module read the shell and misreported a full page as
+    // "0 words" / "0 CTAs" (RHM Innovations graded F off this false negative).
+    const shellHtml = `<!doctype html><html lang="en"><head>
+      <title>Shell Layout — Real Content Outside Main</title>
+      </head><body>
+      <main class="main"></main>
+      <section>
+      <h1>Independence in Every Shower</h1>
+      <h2>How It Works</h2>
+      <p>${"Accessible walk-in showers installed fast for homes across the region. ".repeat(30)}</p>
+      <a href="/contact">Contact us</a>
+      </section>
+      </body></html>`;
+    mockFetch.mockResolvedValueOnce(mockResponse(shellHtml));
+    const results = await runAudit("https://example.com");
+    const content = results.find((c) => c.slug === "content");
+    const enough = content?.checks.find((c) => c.name === "Enough content");
+    const cta = content?.checks.find((c) => c.name === "Clear calls to action");
+
+    expect(enough?.details).not.toContain("0 words");
+    expect(enough?.score).toBeGreaterThan(0);
+    expect(cta?.score).toBeGreaterThan(0);
+  });
 });

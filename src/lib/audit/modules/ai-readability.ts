@@ -34,6 +34,10 @@ const AUTHORITY_PLATFORMS: Record<string, RegExp> = {
   twitter: /twitter\.com|x\.com/i,
   instagram: /instagram\.com/i,
   youtube: /youtube\.com/i,
+  // Google Business Profile / Maps — the #1 authority profile for a local
+  // business, and the one AI assistants lean on most. Matched narrowly so it
+  // doesn't fire on a generic google.com link.
+  google: /maps\.app\.goo\.gl|maps\.google\.|g\.page|business\.google\.com/i,
 };
 
 // Business schema types that signal "this is a real business" to AI.
@@ -60,6 +64,38 @@ const VALID_BUSINESS_TYPES = [
   "EducationalOrganization",
   "Service",
   "FinancialProduct",
+  // Common schema.org LocalBusiness subtypes real clients emit as their exact
+  // @type. Without these the audit reads "structured data but nothing identifies
+  // a business" and caps the schema score (e.g. a brewery's BarOrPub).
+  "BarOrPub",
+  "Brewery",
+  "Winery",
+  "Distillery",
+  "Bakery",
+  "CafeOrCoffeeShop",
+  "IceCreamShop",
+  "BeautySalon",
+  "HairSalon",
+  "NailSalon",
+  "DaySpa",
+  "Dentist",
+  "Physician",
+  "VeterinaryCare",
+  "Plumber",
+  "Electrician",
+  "HVACBusiness",
+  "RoofingContractor",
+  "GeneralContractor",
+  "HousePainter",
+  "Locksmith",
+  "MovingCompany",
+  "Attorney",
+  "AccountingService",
+  "InsuranceAgency",
+  "Florist",
+  "PetStore",
+  "TravelAgency",
+  "ChildCare",
 ];
 
 // Google rich-result requirements per type (from schema-validator.ts).
@@ -243,6 +279,19 @@ function analyzeSameAs(sameAs: unknown): SameAsAnalysis {
     authorityScore,
     hasKnowledgeGraphLinks,
   };
+}
+
+// Visible authority/social links present as <a href> in the page — a real (if
+// weaker) AI-trust signal even when the site declares no schema `sameAs`.
+function visibleAuthorityPlatforms($: AuditContext["$"]): string[] {
+  const found = new Set<string>();
+  $("a[href]").each((_i, el) => {
+    const href = $(el).attr("href") || "";
+    for (const [platform, regex] of Object.entries(AUTHORITY_PLATFORMS)) {
+      if (regex.test(href)) found.add(platform);
+    }
+  });
+  return [...found];
 }
 
 // ---------------------------------------------------------------------------
@@ -536,15 +585,29 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
 
   // --- 4. Entity authority (sameAs) --------------------------------------
   {
-    const score = Math.min(100, sameAs.authorityScore);
-    const platforms = sameAs.platforms;
+    // Schema-declared `sameAs` is the strongest AI cross-check signal; visible
+    // social/authority links in the page are a weaker but real signal, so credit
+    // them at a lower rate (was: schema-only, which falsely reported "nothing
+    // linked" on sites that plainly link their socials, e.g. RHM's 7 links).
+    const schemaPlatforms = sameAs.platforms;
+    const visible = visibleAuthorityPlatforms($);
+    const visibleOnly = visible.filter((p) => !schemaPlatforms.includes(p));
+    const allPlatforms = [...new Set([...schemaPlatforms, ...visible])];
+    let score = Math.min(100, sameAs.authorityScore + visibleOnly.length * 12);
+    // A local business that links its official profiles (Google + a couple
+    // socials) shouldn't read as a deep fail just because they aren't declared
+    // in structured data — floor it at warn. Full pass still requires schema sameAs.
+    if (allPlatforms.length >= 3) score = Math.max(score, 55);
+
     let message: string;
     if (sameAs.hasKnowledgeGraphLinks) {
-      message = `Linked to ${platforms.length} authority profile(s) including Wikipedia/Wikidata: a strong AI trust signal.`;
-    } else if (platforms.length >= 3) {
-      message = `Linked to ${platforms.length} authority profiles (${platforms.join(", ")}), which helps AI tools trust and cite you.`;
-    } else if (platforms.length > 0) {
-      message = `Only ${platforms.length} authority profile(s) linked (${platforms.join(", ")}). Link more so AI tools trust your business.`;
+      message = `Linked to ${schemaPlatforms.length} authority profile(s) including Wikipedia/Wikidata: a strong AI trust signal.`;
+    } else if (schemaPlatforms.length >= 3) {
+      message = `Linked to ${schemaPlatforms.length} authority profiles (${schemaPlatforms.join(", ")}), which helps AI tools trust and cite you.`;
+    } else if (schemaPlatforms.length > 0) {
+      message = `Only ${schemaPlatforms.length} authority profile(s) declared in your structured data (${schemaPlatforms.join(", ")}). Link more so AI tools trust your business.`;
+    } else if (allPlatforms.length > 0) {
+      message = `You link ${allPlatforms.length} social profile(s) (${allPlatforms.join(", ")}), but they aren't declared in your structured data, so AI tools can't reliably cross-check them.`;
     } else {
       message =
         "No verified social or authority profiles linked. AI tools have nothing to cross-check, so they trust you less.";
@@ -557,7 +620,9 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
       details:
         score >= 80
           ? undefined
-          : "Link your official profiles (Google, LinkedIn, Facebook, and ideally Wikipedia) from the site so AI can confirm you are a real business.",
+          : allPlatforms.length > 0
+            ? "Ask Strelva to declare your social profiles as structured data (sameAs) so AI tools can confirm you're a real business, not just link them in the page."
+            : "Link your official profiles (Google, LinkedIn, Facebook, and ideally Wikipedia) from the site so AI can confirm you are a real business.",
     });
   }
 

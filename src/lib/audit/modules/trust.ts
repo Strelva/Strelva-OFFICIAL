@@ -102,6 +102,45 @@ interface TrustAnalysis {
   isHttps: boolean;
 }
 
+const US_STATE_NAMES =
+  "alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming";
+
+// A structured JSON-LD PostalAddress (street + locality + region) is a
+// higher-confidence "we have a real address" signal than any body-text regex,
+// and it's what a well-built site emits. The brittle visible-text pattern was
+// false-negativing sites (e.g. Orange Crate) that declare a full address in
+// schema but format it loosely in the page copy.
+function hasStructuredPostalAddress($: AuditContext["$"]): boolean {
+  let found = false;
+  $('script[type="application/ld+json"]').each((_i, el) => {
+    if (found) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse($(el).text() || "{}");
+    } catch {
+      return;
+    }
+    const queue: unknown[] = Array.isArray(parsed) ? [...parsed] : [parsed];
+    while (queue.length) {
+      const node = queue.shift();
+      if (!node || typeof node !== "object") continue;
+      const obj = node as Record<string, unknown>;
+      if (Array.isArray(obj["@graph"])) queue.push(...(obj["@graph"] as unknown[]));
+      const addrs = Array.isArray(obj.address) ? obj.address : [obj.address];
+      for (const a of addrs) {
+        if (a && typeof a === "object") {
+          const ao = a as Record<string, unknown>;
+          if (ao.streetAddress && ao.addressLocality && ao.addressRegion) {
+            found = true;
+            return;
+          }
+        }
+      }
+    }
+  });
+  return found;
+}
+
 function analyze(ctx: AuditContext): TrustAnalysis {
   const $ = ctx.$;
   const bodyText = ($("body").text() || "").toLowerCase();
@@ -132,9 +171,14 @@ function analyze(ctx: AuditContext): TrustAnalysis {
   const hasTerms =
     $('a[href*="terms"], a:contains("Terms of Service"), a:contains("Terms")').length > 0;
 
-  const addressPattern =
-    /\d+\s+[\w\s]+(?:st(?:reet)?|ave(?:nue)?|blvd|rd|dr(?:ive)?|ln|lane|way|ct|court|pl(?:ace)?)[,.\s]+[\w\s]+,?\s*[A-Z]{2}\s*\d{5}/i;
-  const hasPhysicalAddress = addressPattern.test(bodyText);
+  // Street + city + state (2-letter code OR spelled-out state name); the ZIP is
+  // a bonus, not a gate. A structured JSON-LD PostalAddress also qualifies.
+  const addressPattern = new RegExp(
+    `\\d+\\s+[\\w\\s]+(?:st(?:reet)?|ave(?:nue)?|blvd|rd|dr(?:ive)?|ln|lane|way|ct|court|pl(?:ace)?)[,.\\s]+[\\w\\s]+,?\\s*(?:[a-z]{2}|${US_STATE_NAMES})\\b(?:\\s*\\d{5})?`,
+    "i"
+  );
+  const hasPhysicalAddress =
+    addressPattern.test(bodyText) || hasStructuredPostalAddress($);
 
   const phonePattern = /(?:\+1\s?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}/;
   const hasPhoneNumber = phonePattern.test(bodyText);
