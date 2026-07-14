@@ -40,7 +40,7 @@ describe("access request delivery flow", () => {
       ...originalEnv,
       NEXT_PUBLIC_SANITY_PROJECT_ID: "",
       SANITY_API_TOKEN: "",
-      NEXT_PUBLIC_SITE_URL: "https://strelva.com",
+      NEXT_PUBLIC_APP_URL: "https://app.strelva.com",
       RESEND_API_KEY: "re_test",
       RESEND_DOMAIN: "updates.strelva.com",
     };
@@ -69,7 +69,7 @@ describe("access request delivery flow", () => {
       success: true,
       emailSent: true,
     });
-    expect(body.statusUrl).toMatch(/^https:\/\/strelva\.com\/delivery\/[a-f0-9]{36}$/);
+    expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       from: "Strelva <hello@updates.strelva.com>",
       to: "owner@example.com",
@@ -143,7 +143,7 @@ describe("access request delivery flow", () => {
       success: true,
       emailSent: false,
     });
-    expect(body.statusUrl).toMatch(/^https:\/\/strelva\.com\/delivery\/[a-f0-9]{36}$/);
+    expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
   });
 
   it("returns the existing status link for repeat email submissions", async () => {

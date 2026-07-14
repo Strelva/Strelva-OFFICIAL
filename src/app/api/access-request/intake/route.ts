@@ -9,6 +9,7 @@ import {
   type DeliveryPlan,
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
+import { OPERATOR_URL } from "@/lib/brand";
 
 export async function POST(req: Request) {
   if (await isRateLimitedWindowedAsync(rateLimitKey(req, "access-request-intake"), 5, 3600_000)) {
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
   // never fails the intake response.
   const leadsUrl = new URL(
     "/admin/leads",
-    process.env.NEXT_PUBLIC_SITE_URL || requestOrigin,
+    OPERATOR_URL,
   ).toString();
   await sendNewIntakeLeadEmail({
     lead: {

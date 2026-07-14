@@ -19,6 +19,42 @@ export function sanitizePromptValue(value: unknown): string {
 }
 
 export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social" | "google_business";
+export type AgentSurface = "chat" | "background";
+
+export const AGENT_TOOL_CATALOG = {
+  read_section: ["chat", "background"],
+  update_section: ["chat", "background"],
+  undo_last_change: ["chat", "background"],
+  request_custom_change: ["chat"],
+  upload_image: ["chat"],
+  get_metrics: ["chat"],
+  explain_traffic: ["chat"],
+  get_activity: ["chat"],
+  get_suggestions: ["chat", "background"],
+  create_suggestion: ["chat", "background"],
+  draft_newsletter: ["chat"],
+  list_subscribers: ["chat"],
+  create_gbp_post: ["chat", "background"],
+  update_business_hours: ["chat", "background"],
+  upload_gbp_photo: ["chat", "background"],
+  draft_social_post: ["chat"],
+  list_social_posts: ["chat"],
+  get_reviews: ["chat"],
+  reply_to_review: ["chat"],
+  toggle_section_visibility: ["chat"],
+  reorder_sections: ["chat"],
+  show_report: ["chat"],
+  show_content: ["chat"],
+  show_photos: ["chat"],
+  show_connections: ["chat"],
+  preview_site: ["chat"],
+  list_entries: ["chat"],
+  save_entry: ["chat"],
+  create_blog_post: ["background"],
+  list_blog_posts: ["background"],
+} as const satisfies Record<string, readonly AgentSurface[]>;
+
+export type AgentToolId = keyof typeof AGENT_TOOL_CATALOG;
 
 const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social", "google_business"];
 
@@ -26,36 +62,36 @@ export interface Capability {
   id: CapabilityId;
   name: string;
   description: string;
-  tools: string[];
+  tools: AgentToolId[];
   available: boolean;
 }
 
-const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string; tools: string[] }> = {
+const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string; tools: AgentToolId[] }> = {
   website: {
     name: "Website Management",
     description:
       "Read, update, and manage all sections of your website, including undoing the last change (revert to an earlier version), which is drafted for your approval before it goes live",
-    tools: ["read_section", "update_section", "undo_last_change", "upload_image"],
+    tools: ["read_section", "update_section", "undo_last_change", "request_custom_change", "upload_image", "toggle_section_visibility", "reorder_sections", "show_content", "show_photos", "preview_site"],
   },
   analytics: {
     name: "Analytics",
     description: "View site traffic, booking clicks, and activity history",
-    tools: ["get_metrics", "get_activity"],
+    tools: ["get_metrics", "explain_traffic", "get_activity", "show_report"],
   },
   email: {
     name: "Email & Newsletter",
-    description: "Send newsletters and manage subscribers",
-    tools: ["send_newsletter", "list_subscribers"],
+    description: "Draft newsletters for review and inspect subscribers",
+    tools: ["draft_newsletter", "list_subscribers"],
   },
   blog: {
     name: "Blog",
-    description: "Write and publish blog posts",
-    tools: ["create_post", "list_posts"],
+    description: "List and save collection-backed blog entries",
+    tools: ["save_entry", "list_entries"],
   },
   reviews: {
     name: "Review Management",
-    description: "Monitor and respond to reviews across platforms",
-    tools: ["get_reviews", "respond_review"],
+    description: "Monitor reviews and queue governed replies",
+    tools: ["get_reviews", "reply_to_review"],
   },
   social: {
     name: "Social Media",
@@ -82,19 +118,26 @@ export function getAllCapabilities(): Capability[] {
   }));
 }
 
-export function getAllTools(): Set<string> {
-  const tools = new Set<string>();
-  for (const capId of ALL_CAPABILITIES) {
-    for (const tool of CAPABILITY_DEFS[capId].tools) {
-      tools.add(tool);
+export function getAllTools(surface: AgentSurface = "chat"): Set<AgentToolId> {
+  return new Set(
+    (Object.entries(AGENT_TOOL_CATALOG) as Array<[AgentToolId, readonly AgentSurface[]]>)
+      .filter(([, surfaces]) => surfaces.includes(surface))
+      .map(([tool]) => tool),
+  );
+}
+
+export function assertAgentToolCatalog(toolNames: string[], surface: AgentSurface): void {
+  for (const name of toolNames) {
+    const surfaces = (AGENT_TOOL_CATALOG as Record<string, readonly AgentSurface[]>)[name];
+    if (!surfaces?.includes(surface)) {
+      throw new Error(`Agent tool "${name}" is not registered for the ${surface} surface`);
     }
   }
-  return tools;
 }
 
 export async function getActivatedCapabilities(_tenantId: string): Promise<{
   capabilities: Capability[];
-  activeTools: Set<string>;
+  activeTools: Set<AgentToolId>;
 }> {
   return {
     capabilities: getAllCapabilities(),

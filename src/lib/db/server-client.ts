@@ -4,12 +4,11 @@
  * Unlike the SERVICE_ROLE client in `client.ts` (full access, bypasses RLS, for
  * trusted control-plane work), this client carries the signed-in user's session
  * from cookies, so Row Level Security applies. This is the client that user-facing
- * request handlers should use once auth is migrated — RLS becomes the hard floor
- * under any authorization bug (see docs/auth-tenancy-architecture.md, Plane 3).
+ * request handlers may adopt when they are migrated to RLS-backed repositories.
+ * Today application authorization guards are the live enforcement boundary.
  *
  * NULL-SAFE: returns null when Supabase Auth isn't configured (public env unset),
- * exactly like getSupabase()/getRedis(), so the app keeps running on Clerk until
- * the auth swap is flipped on. Every consumer MUST handle null.
+ * exactly like getSupabase()/getRedis(). Every consumer MUST handle null.
  *
  * Uses @supabase/ssr cookie adapter (getAll/setAll). Server-only — needs next/headers.
  */
@@ -31,8 +30,7 @@ function publicSupabaseEnv(): { url: string; key: string } | null {
   return url && key ? { url, key } : null;
 }
 
-/** True when Supabase Auth is configured for this environment. Use as the cutover
- *  flag: callers prefer this client when true, fall back to Clerk when false. */
+/** True when Supabase Auth is configured for this environment. */
 export function isSupabaseAuthConfigured(): boolean {
   return publicSupabaseEnv() !== null;
 }

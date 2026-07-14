@@ -7,7 +7,7 @@
   },
   "compatibleRohlax": {
     "tag": "rohlax-v2026.05.12.1",
-    "commit": "daece71b1c0476be355772744a4b39bcb1cd8944"
+    "commit": "00e4323a9a93029070e802f9da0345cc441b6f59"
   },
   "contractVersion": "v1",
   "customRepoWorkspace": {
@@ -15,7 +15,7 @@
     "repos": [
       {
         "tenant": "gldf",
-        "localPath": "../gldf",
+        "localPath": "../greatlakesdriedfruits",
         "capabilityManifestPath": "/api/reb-capabilities",
         "revalidatePath": "/api/v1/revalidate"
       },

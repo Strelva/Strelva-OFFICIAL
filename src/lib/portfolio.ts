@@ -22,18 +22,25 @@ import {
   type LaunchReadinessStatus,
 } from "./launch-readiness";
 import { getTenantDeliveryModel } from "./custom-repos";
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "./pricing";
+import { planMonthlyCents } from "./billing-plans";
 
 /**
  * Monthly recurring revenue in dollars. Counts only tenants on a real paid
  * subscription — excludes grandfathered ($0) and founder-comp ($0) — so the
- * overview card and the operator agent (both call this) always agree. One live
- * Stripe price today, so it's billable-count × the plan price.
+ * overview card and the operator agent (both call this) always agree. Each
+ * tenant contributes its captured Stripe amount, with its selected plan as the
+ * compatibility fallback for records created before amount capture.
  */
 export function computeMrrDollars(
-  tenants: Array<{ id: string; subscriptionStatus?: string; planOverride?: string | null }>,
+  tenants: Array<{
+    id: string;
+    subscriptionStatus?: string;
+    subscriptionPlan?: string;
+    planMonthlyCents?: number;
+    planOverride?: string | null;
+  }>,
 ): number {
-  const billable = tenants.filter(
+  return tenants.filter(
     // Only "active" counts as revenue. A "trialing" sub has access but hasn't
     // been charged yet (no MRR until its first invoice.paid flips it to active),
     // so counting it here inflates the metric the operator agent reasons over.
@@ -41,8 +48,12 @@ export function computeMrrDollars(
       t.subscriptionStatus === "active" &&
       t.planOverride !== "founder_comp" &&
       !isGrandfathered(t.id),
-  ).length;
-  return billable * SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS;
+  ).reduce((sum, tenant) => {
+    const cents = Number.isInteger(tenant.planMonthlyCents) && tenant.planMonthlyCents! >= 0
+      ? tenant.planMonthlyCents!
+      : planMonthlyCents(tenant.subscriptionPlan);
+    return sum + cents / 100;
+  }, 0);
 }
 import { buildOpsReport, type OpsReport } from "./ops";
 import { getRedis } from "./redis";
@@ -160,16 +171,30 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
   };
 }
 
-/** Read the cached snapshot, or null on miss / no Redis. */
-export async function getPortfolioSummary(): Promise<PortfolioSnapshot | null> {
+export type PortfolioSummaryState =
+  | { availability: "available"; snapshot: PortfolioSnapshot }
+  | { availability: "empty" | "unavailable"; snapshot: null };
+
+/** Read the cached snapshot without conflating a genuine cache miss with an
+ * unavailable cache. Operator surfaces use this richer state to avoid a false
+ * "nothing needs attention" verdict during an outage. */
+export async function getPortfolioSummaryState(): Promise<PortfolioSummaryState> {
   const redis = getRedis();
-  if (!redis) return null;
+  if (!redis) return { availability: "unavailable", snapshot: null };
   try {
-    return (await redis.get<PortfolioSnapshot>(PORTFOLIO_CACHE_KEY)) ?? null;
+    const snapshot = await redis.get<PortfolioSnapshot>(PORTFOLIO_CACHE_KEY);
+    return snapshot
+      ? { availability: "available", snapshot }
+      : { availability: "empty", snapshot: null };
   } catch (err) {
     console.warn("[portfolio] cache read failed", err);
-    return null;
+    return { availability: "unavailable", snapshot: null };
   }
+}
+
+/** Compatibility read for non-operator callers that only need the snapshot. */
+export async function getPortfolioSummary(): Promise<PortfolioSnapshot | null> {
+  return (await getPortfolioSummaryState()).snapshot;
 }
 
 /** Write-through the snapshot. Best-effort; logs on failure. */

@@ -501,7 +501,7 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       expect.objectContaining({
         businessName: "Acme Co",
         ownerEmail: "owner@acme.com",
-        tenantUrl: expect.stringContaining("/admin/tenants/acme"),
+        tenantUrl: "https://admin.strelva.com/admin/clients/acme",
       }),
     );
     // Renewal safety: nothing here should fire the payment-failed alert.
@@ -540,7 +540,7 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       expect.objectContaining({
         businessName: "Acme Co",
         ownerEmail: "owner@acme.com",
-        tenantUrl: expect.stringContaining("/admin/tenants/acme"),
+        tenantUrl: "https://admin.strelva.com/admin/clients/acme",
       }),
     );
   });

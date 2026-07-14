@@ -103,7 +103,7 @@ export function maskEmail(email: string): string {
 }
 
 export function buildDeliveryStatusUrl(origin: string, token: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || origin;
+  const base = process.env.NEXT_PUBLIC_APP_URL || origin;
   return new URL(`/delivery/${token}`, base).toString();
 }
 
@@ -205,6 +205,23 @@ export async function getDeliveryLeadByToken(token: string): Promise<DeliveryLea
   return coerceLead(raw);
 }
 
+/** Advance the canonical lead lifecycle stored on the delivery lead. Operator
+ * workflow labels are projections of this state (see lead-workflow.ts). */
+export async function updateDeliveryLeadStatus(
+  token: string,
+  deliveryStatus: DeliveryStatus,
+): Promise<DeliveryLead | null> {
+  const lead = await getDeliveryLeadByToken(token);
+  if (!lead) return null;
+  const next: DeliveryLead = {
+    ...lead,
+    deliveryStatus: normalizeDeliveryStatus(deliveryStatus),
+    statusUpdatedAt: new Date().toISOString(),
+  };
+  await saveDeliveryLead(next);
+  return next;
+}
+
 /**
  * Read the most recent delivery leads, newest-first, from the `leads:all` Redis
  * zset. Each member is a `lead:{email}` key hydrated to the full DeliveryLead.
@@ -254,10 +271,8 @@ export async function saveDeliveryLead(lead: DeliveryLead): Promise<boolean> {
     persisted = true;
   }
 
-  // Postgres shadow-write (Phase-2 dual-write). NULL-SAFE: a no-op when Supabase
-  // env is unset. Redis stays the source of truth; this builds the Postgres
-  // copy so we can validate parity before cutting reads over. Best-effort — never
-  // fails the lead save. Gated by DUAL_WRITE_PG (kill-switch without redeploy).
+  // Postgres mirror. Redis remains authoritative for this pre-tenant lifecycle
+  // until delivery-lead reads are deliberately cut over (see persistence map).
   if (dualWritePgEnabled()) {
     await upsertLead({
       email: lead.email,

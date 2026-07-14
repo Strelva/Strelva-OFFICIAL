@@ -6,13 +6,12 @@ import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, Group
 import type { TenantConfig } from "@/lib/types";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { CreateTenantForm } from "./CreateTenantForm";
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getEffectiveSubscriptionStatus, isGrandfathered } from "@/lib/subscription";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
-import { getPortfolioSummary, computeMrrDollars } from "@/lib/portfolio";
+import { getPortfolioSummaryState, computeMrrDollars } from "@/lib/portfolio";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
@@ -22,6 +21,8 @@ import type { DeliveryLead } from "@/lib/access-request-delivery";
 import type { MaintenanceDigest } from "@/lib/maintenance-digest";
 import { OperatorConsole } from "./OperatorConsole";
 import { type TodayFlag } from "./TodayFeed";
+import { readOperatorData } from "@/lib/operator-data";
+import { DataAvailabilityNotice } from "./DataAvailabilityNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -70,13 +71,22 @@ export default async function AdminPage() {
   // clients (that's /admin/clients) — it only needs the portfolio roll-ups.
   const tenantData = await Promise.all(
     TENANTS.map(async (t) => {
-      const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus] = await Promise.all([
-        getActivity(t.id).catch(() => []),
-        listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
-        listThreads(t.id).catch(() => []),
-        getWeeklyBrief(t.id).catch(() => null),
-        getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
+      const [activityRead, draftsRead, threadsRead, weeklyBriefRead, subscriptionRead] = await Promise.all([
+        readOperatorData("client activity", () => getActivity(t.id), []),
+        readOperatorData("client drafts", () => listDrafts(t.id), {} as Record<string, boolean>),
+        readOperatorData("client conversations", () => listThreads(t.id), []),
+        readOperatorData("weekly briefs", () => getWeeklyBrief(t.id), null),
+        readOperatorData(
+          "subscription status",
+          () => getEffectiveSubscriptionStatus(t.id),
+          t.subscriptionStatus ?? "none",
+        ),
       ]);
+      const activity = activityRead.data;
+      const drafts = draftsRead.data;
+      const threads = threadsRead.data;
+      const weeklyBrief = weeklyBriefRead.data;
+      const effectiveSubscriptionStatus = subscriptionRead.data;
       const launchReadiness = buildTenantLaunchReadiness({
         tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
         infrastructure: getTenantLaunchReadinessResults(t),
@@ -86,7 +96,13 @@ export default async function AdminPage() {
         draftCount: Object.keys(drafts).length,
         hasWeeklyBrief: Boolean(weeklyBrief),
       });
-      return { draftCount: Object.keys(drafts).length, launchReadiness };
+      return {
+        draftCount: Object.keys(drafts).length,
+        launchReadiness,
+        unavailableSources: [activityRead, draftsRead, threadsRead, weeklyBriefRead, subscriptionRead]
+          .filter((read) => !read.available)
+          .map((read) => read.source),
+      };
     })
   );
 
@@ -94,9 +110,12 @@ export default async function AdminPage() {
   // MRR counted in ONE place (computeMrrDollars) so this card and Mission
   // Control never disagree; grandfathered/founder-comp ($0) excluded.
   const mrr = computeMrrDollars(TENANTS);
-  const activeSubscriptions = SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS
-    ? Math.round(mrr / SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS)
-    : 0;
+  const activeSubscriptions = TENANTS.filter(
+    (tenant) =>
+      tenant.subscriptionStatus === "active" &&
+      tenant.planOverride !== "founder_comp" &&
+      !isGrandfathered(tenant.id),
+  ).length;
   const grandfatheredCount = TENANTS.filter(
     (t) => isGrandfathered(t.id) || t.planOverride === "founder_comp",
   ).length;
@@ -107,7 +126,8 @@ export default async function AdminPage() {
 
   // Portfolio attention flags — folded into the single "Needs you" feed rather
   // than a second adjacent list. Deep-link to the merged client detail URL.
-  const portfolio = await getPortfolioSummary();
+  const portfolioState = await getPortfolioSummaryState();
+  const portfolio = portfolioState.snapshot;
   const attention = portfolio ? buildAttentionFromSnapshot(portfolio) : await buildAttentionBriefing();
   const flags: TodayFlag[] = attention.items
     .filter((i) => i.severity !== "low")
@@ -119,15 +139,21 @@ export default async function AdminPage() {
     }));
 
   // Operator "needs you" aggregation. Each source degrades to empty.
-  const [deliveryLeads, pendingDigests, atRiskSignals] = await Promise.all([
-    getDeliveryLeads().catch((): DeliveryLead[] => []),
-    listPendingDigests().catch((): MaintenanceDigest[] => []),
-    getAtRiskTenants().catch((): AtRiskSignal[] => []),
+  const [deliveryLeadsRead, pendingDigestsRead, atRiskRead] = await Promise.all([
+    readOperatorData("delivery leads", getDeliveryLeads, [] as DeliveryLead[]),
+    readOperatorData("maintenance drafts", listPendingDigests, [] as MaintenanceDigest[]),
+    readOperatorData("retention signals", getAtRiskTenants, [] as AtRiskSignal[]),
   ]);
+  const deliveryLeads = deliveryLeadsRead.data;
+  const pendingDigests = pendingDigestsRead.data;
+  const atRiskSignals = atRiskRead.data;
 
-  const leadWorkflow = await getAllLeadWorkflow(deliveryLeads.map((l) => l.statusToken)).catch(
-    () => ({} as Record<string, { status: string }>),
+  const leadWorkflowRead = await readOperatorData(
+    "lead workflow",
+    () => getAllLeadWorkflow(deliveryLeads.map((l) => l.statusToken)),
+    {} as Record<string, { status: string }>,
   );
+  const leadWorkflow = leadWorkflowRead.data;
   // Age out stale unworked leads from the "needs you" nag so months-old junk
   // (never dismissed) stops perpetually flagging the overview. They remain on
   // the /admin/leads board to be worked or dismissed.
@@ -174,6 +200,13 @@ export default async function AdminPage() {
   }));
 
   const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length;
+  const unavailableSources = Array.from(new Set([
+    ...tenantData.flatMap((data) => data.unavailableSources),
+    ...[deliveryLeadsRead, pendingDigestsRead, atRiskRead, leadWorkflowRead]
+      .filter((read) => !read.available)
+      .map((read) => read.source),
+    ...(portfolioState.availability === "unavailable" ? ["portfolio snapshot"] : []),
+  ])).sort();
 
   return (
     <div className="max-w-6xl">
@@ -196,6 +229,8 @@ export default async function AdminPage() {
           <Plus className="h-3.5 w-3.5" strokeWidth={2.4} /> New client
         </Link>
       </div>
+
+      <DataAvailabilityNotice sources={unavailableSources} />
 
       {/* Vitals */}
       <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">

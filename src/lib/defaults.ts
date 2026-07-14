@@ -71,6 +71,8 @@ export const defaultProviders: ProvidersContent = {
 };
 
 export const defaultContact: ContactContent = {
+  headline: "",
+  description: "",
   email: "",
   phone: "",
   address: "",
@@ -89,11 +91,16 @@ export const defaultSettings: SiteSettings = {
   siteKeywords: "",
   ownerName: "",
   ownerTitle: "",
+  trustBadge: "",
   footerTagline: "",
   copyrightText: "Your Business",
   bookingUrl: "",
   instagramHandle: "",
   vagaro_embed_id: "",
+  logoUrl: "",
+  marqueeText: "",
+  brandVoice: "",
+  businessModel: "",
 };
 
 export const defaultFaq: FaqContent = {

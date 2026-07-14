@@ -108,6 +108,8 @@ interface DashboardContextValue {
   subscriptionStatus: SubscriptionStatus;
   hasStripeCustomer: boolean;
   planOverride: PlanOverride;
+  commercialPlanLabel: string;
+  commercialPlanMonthlyCents: number;
 
   // Super-admin visibility
   impersonation: ImpersonationContext;
@@ -152,6 +154,8 @@ export function DashboardProvider({
   subscriptionStatus = "none",
   hasStripeCustomer = false,
   planOverride = null,
+  commercialPlanLabel = "Growth",
+  commercialPlanMonthlyCents = 19_900,
   impersonation,
   readOnly = false,
 }: {
@@ -166,6 +170,8 @@ export function DashboardProvider({
   subscriptionStatus?: SubscriptionStatus;
   hasStripeCustomer?: boolean;
   planOverride?: PlanOverride;
+  commercialPlanLabel?: string;
+  commercialPlanMonthlyCents?: number;
   impersonation?: ImpersonationContext;
   readOnly?: boolean;
 }) {
@@ -352,6 +358,8 @@ export function DashboardProvider({
       subscriptionStatus,
       hasStripeCustomer,
       planOverride,
+      commercialPlanLabel,
+      commercialPlanMonthlyCents,
       impersonation: impersonation || { isActive: false, actorEmail: null, actorName: null, isSuperAdmin: false, tenantId },
       readOnly,
     }),
@@ -363,7 +371,7 @@ export function DashboardProvider({
       hasDraft, setHasDraft, hasPageConfigDraft, setHasPageConfigDraft, reloadDraftState,
       editReceipts, addEditReceipts, markDraftReceipts, tenantId, siteUrl, previewUrl,
       liveSyncEnabled, dashboardBasePath, dashboardHref, siteModel, autoPublish, subscriptionStatus,
-      hasStripeCustomer, planOverride, impersonation, readOnly,
+      hasStripeCustomer, planOverride, commercialPlanLabel, commercialPlanMonthlyCents, impersonation, readOnly,
     ],
   );
 

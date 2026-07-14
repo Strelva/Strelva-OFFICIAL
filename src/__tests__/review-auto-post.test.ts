@@ -57,6 +57,13 @@ describe("runDueAutoPosts", () => {
     expect(res.posted).toBe(1);
   });
 
+  it("reports a due draft as failed when governance leaves it pending", async () => {
+    mockGetEvents.mockResolvedValue([draft({ autoPostAt: new Date(NOW - 60_000).toISOString() })]);
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "provider_failed" });
+    const res = await runDueAutoPosts(NOW);
+    expect(res).toEqual({ posted: 0, failed: 1 });
+  });
+
   it("does NOT post a draft still inside its window", async () => {
     mockGetEvents.mockResolvedValue([draft({ autoPostAt: new Date(NOW + 3_600_000).toISOString() })]);
     const res = await runDueAutoPosts(NOW);

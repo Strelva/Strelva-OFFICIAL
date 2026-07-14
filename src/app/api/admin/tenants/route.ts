@@ -4,7 +4,7 @@ import { getActorContext, isSuperAdmin } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant, getTenantConfig } from "@/lib/tenants";
-import { applyFeatureChange, cleanFeatureIds, expandSets, FeatureGuardError } from "@/lib/features/registry";
+import { applyFeatureChange, cleanTenantFeatureIds, FeatureGuardError } from "@/lib/features/registry";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
 import { isSafeFetchUrl } from "@/lib/safe-fetch";
@@ -18,9 +18,7 @@ function cleanString(value: unknown): string {
 }
 
 function cleanFeatures(value: unknown): TenantFeature[] {
-  // Validate against the feature registry (single source of truth) + expand any set id
-  // (e.g. "wellness") into its member features. Replaces the old 3-value allow-list.
-  return expandSets(cleanFeatureIds(value)) as TenantFeature[];
+  return cleanTenantFeatureIds(value);
 }
 
 function cleanDesignTokens(value: unknown): DesignTokenScope[] | undefined {
@@ -195,7 +193,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
     try {
-      data.features = applyFeatureChange(currentTenant.features ?? [], data.features) as TenantFeature[];
+      data.features = cleanTenantFeatureIds(
+        applyFeatureChange(currentTenant.features ?? [], data.features),
+      );
     } catch (err) {
       if (err instanceof FeatureGuardError) {
         return NextResponse.json({ error: err.message }, { status: 400 });

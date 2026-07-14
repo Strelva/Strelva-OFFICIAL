@@ -127,9 +127,14 @@ export async function getServiceHealth(): Promise<HealthReport> {
   ]);
 
   const checks = { redis, supabase, stripe, gemini };
-  // Core = the live backbone (Redis + Supabase/Postgres). A non-core error is
-  // "degraded", not "down". not-configured counts as healthy.
-  const coreDown = redis.status === "error" || supabase.status === "error";
+  // Core = the live production backbone (Redis + Supabase/Postgres). Missing
+  // configuration is acceptable for local development, but in production it
+  // is an outage, not a healthy deployment. Non-core provider errors degrade
+  // the product without taking the control plane itself down.
+  const coreDown = [redis, supabase].some(
+    (check) => check.status === "error" ||
+      (process.env.NODE_ENV === "production" && check.status === "not configured"),
+  );
   const anyError = Object.values(checks).some((c) => c.status === "error");
   const status: HealthReport["status"] = coreDown ? "down" : anyError ? "degraded" : "healthy";
 

@@ -2,12 +2,13 @@
  * The feature registry — the single source of truth for what a tenant's dashboard
  * can contain, and how each feature is gated.
  *
- * A "feature" is the unit of the product. Three tiers:
+ * This registry describes dashboard capabilities, not the commercial product.
+ * The persisted column is still named `features[]` for compatibility. Three tiers:
  *  - `core`      — locked, on for everyone, never removable (Website, Analytics, …).
  *  - `conditional` — switched on by what the business IS (a physical location → Google
  *                    Business) or by a connection.
  *  - `set`       — a vertical "snapshot": a named bundle of features flipped on together
- *                  for a business type (Wellness = Schedule/Members/Packages/Roster).
+ *                  for a business type (Wellness = Schedule/Members/Roster today).
  *
  * This registry backs three things so they can't drift apart: the write-path validation
  * + core-lock guard (`src/app/api/admin/tenants/route.ts`), the nav resolver's set-surface
@@ -18,7 +19,7 @@
  */
 
 import { ALL_TENANT_FEATURES } from "../types";
-import type { IntegrationProvider } from "../types";
+import type { IntegrationProvider, TenantFeature } from "../types";
 // Type-only imports (erased at runtime) so the registry ↔ dashboard-surfaces edge is not a
 // runtime cycle: dashboard-surfaces imports getSetSurfaces() as a value; we import its types.
 import type { DashboardSurface, SurfaceId } from "../dashboard-surfaces";
@@ -27,12 +28,12 @@ export type FeatureTier = "core" | "conditional" | "set";
 
 export interface FeatureDef {
   /** Feature id. Stored in `tenants.features[]`; for surface-bearing features it matches a SurfaceId. */
-  id: string;
+  id: DashboardFeatureId;
   label: string;
   tier: FeatureTier;
   /** Core features are locked — always on, never removable. */
   locked?: boolean;
-  /** For `set` members: which set they belong to (also the SETS key). */
+  /** For `set` members: which feature set they belong to. */
   set?: string;
   /** Display label of the owning set (for grouping in the UI + nav). */
   setLabel?: string;
@@ -45,16 +46,37 @@ export interface FeatureDef {
 /** Locked, on-for-everyone. These can never be removed from a tenant (enforced server-side). */
 export const CORE_FEATURES = ["today", "ask-ai", "website", "analytics", "reports"] as const;
 export type CoreFeatureId = (typeof CORE_FEATURES)[number];
+export type ConditionalFeatureId = "google-business" | "reviews";
+export type DashboardFeatureId = CoreFeatureId | ConditionalFeatureId | TenantFeature;
+
+export interface FeatureSetDef {
+  label: string;
+  members: TenantFeature[];
+  /** Honest operator-facing boundary for what enabling the set actually means. */
+  scope: string;
+}
 
 /** Vertical sets: a set id → its member feature ids. Toggling a set flips all members together. */
-export const SETS: Record<string, { label: string; members: string[] }> = {
+export const FEATURE_SETS: Record<string, FeatureSetDef> = {
   // "packages" (class packs / memberships) is intentionally omitted until it's a
   // real surface — a nav item leading to "Coming soon" is worse than no item.
-  wellness: { label: "Wellness", members: ["schedule", "members", "roster"] },
+  wellness: {
+    label: "Wellness",
+    members: ["schedule", "members", "roster"],
+    scope: "Operational-lite: booking-backed schedule and roster, plus read-only member visibility.",
+  },
   // E-commerce reuses the existing storefront mechanism: `commerce` drives the Website ▸ Store
   // sub-tab via tenantHasStore(), so this set adds no new top-level surface.
-  ecommerce: { label: "E-commerce", members: ["commerce"] },
+  ecommerce: {
+    label: "E-commerce",
+    members: ["commerce"],
+    scope: "Store evidence: catalog visibility, orders, revenue, and best sellers.",
+  },
 };
+export type FeatureSetId = keyof typeof FEATURE_SETS;
+/** Compatibility export for existing callers. New domain language should use
+ * FEATURE_SETS so a bundle is not confused with an individual capability. */
+export const SETS = FEATURE_SETS;
 
 export const FEATURE_REGISTRY: FeatureDef[] = [
   // ── Core (locked) ──────────────────────────────────────────────────────────
@@ -87,9 +109,21 @@ const REGISTRY_BY_ID = new Map(FEATURE_REGISTRY.map((f) => [f.id, f]));
  */
 const VALID_FEATURE_IDS = new Set<string>([
   ...FEATURE_REGISTRY.map((f) => f.id),
-  ...Object.keys(SETS),
+  ...Object.keys(FEATURE_SETS),
   ...ALL_TENANT_FEATURES,
 ]);
+
+/** Legacy capability names accepted at read/API boundaries. They collapse to
+ * one persisted concept on the next feature write. Content section names are a
+ * separate compatibility concern and are not rewritten here. */
+export const TENANT_CAPABILITY_ALIASES: Readonly<Record<string, TenantFeature>> = {
+  shop: "commerce",
+  products: "commerce",
+};
+
+export function canonicalizeTenantCapability(id: string): string {
+  return TENANT_CAPABILITY_ALIASES[id] ?? id;
+}
 
 export function isCore(id: string): boolean {
   return (CORE_FEATURES as readonly string[]).includes(id);
@@ -105,12 +139,23 @@ export function cleanFeatureIds(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string" && VALID_FEATURE_IDS.has(v));
 }
 
+/** Persisted tenant capabilities only. Core surfaces are implicit and
+ * conditional surfaces are derived from presence/connections. */
+export function cleanTenantFeatureIds(value: unknown): TenantFeature[] {
+  const allowed = new Set<string>(ALL_TENANT_FEATURES);
+  return Array.from(new Set(
+    expandSets(cleanFeatureIds(value)).filter(
+      (id): id is TenantFeature => allowed.has(id),
+    ),
+  ));
+}
+
 /** Expand any set ids into their member feature ids; leave plain feature ids as-is; dedupe. */
 export function expandSets(ids: string[]): string[] {
   const out: string[] = [];
   for (const id of ids) {
-    if (SETS[id]) out.push(...SETS[id].members);
-    else out.push(id);
+    if (FEATURE_SETS[id]) out.push(...FEATURE_SETS[id].members);
+    else out.push(canonicalizeTenantCapability(id));
   }
   return Array.from(new Set(out));
 }
@@ -165,13 +210,14 @@ export function getSetSurfaces(features: string[], inspect = false): DashboardSu
 export function getToggleableRegistry(): {
   core: FeatureDef[];
   conditional: FeatureDef[];
-  sets: { id: string; label: string; members: FeatureDef[] }[];
+  sets: { id: string; label: string; scope: string; members: FeatureDef[] }[];
 } {
   const core = FEATURE_REGISTRY.filter((f) => f.tier === "core");
   const conditional = FEATURE_REGISTRY.filter((f) => f.tier === "conditional");
-  const sets = Object.entries(SETS).map(([id, def]) => ({
+  const sets = Object.entries(FEATURE_SETS).map(([id, def]) => ({
     id,
     label: def.label,
+    scope: def.scope,
     members: def.members.map((m) => REGISTRY_BY_ID.get(m)).filter((f): f is FeatureDef => Boolean(f)),
   }));
   return { core, conditional, sets };

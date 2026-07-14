@@ -44,7 +44,7 @@ const goodHtml = `<!doctype html>
     <ol><li>Call us</li><li>Book a time</li><li>Get results</li></ol>
     <img src="/a.jpg" alt="Our storefront" />
     <img src="/b.jpg" alt="Our team at work" />
-    <p>Ready to begin? <a href="/contact">Contact us</a> today to get started.</p>
+    <p>Ready to begin? <a href="/contact">Contact us</a> or <a href="tel:+17165550100">Call now</a>.</p>
   </main>
 </body>
 </html>`;

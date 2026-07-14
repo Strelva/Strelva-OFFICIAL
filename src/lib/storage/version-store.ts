@@ -2,9 +2,8 @@
  * Content versioning - track changes and enable rollback.
  *
  * When DATA_SOURCE=postgres, reads/writes the Postgres `content_versions` table;
- * otherwise the dev-file store is the source of truth. The Postgres repo helpers
- * are kept self-contained in this file (never throw — safe fallback) to avoid
- * colliding with parallel edits to repositories.ts.
+ * otherwise the dev-file store is the source of truth. Postgres-mode failures
+ * surface at the mutation/read boundary; there is no production dev-file fallback.
  */
 
 import type { ContentSection, ContentMap } from "../types";
@@ -23,7 +22,13 @@ export interface ContentVersion {
   changes?: { field: string; before: string; after: string }[];
 }
 
-// --- Postgres repo helpers (self-contained; never throw) -------------------
+// --- Authoritative Postgres helpers ---------------------------------------
+
+function versionDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[versions] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 function versionToInsert(v: ContentVersion, tenant: string): Insert<"content_versions"> {
   return {
@@ -51,13 +56,9 @@ function mapPgVersionRow(row: Row<"content_versions">): ContentVersion {
 }
 
 async function pgInsertVersion(v: ContentVersion, tenant: string): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db.from("content_versions").insert(versionToInsert(v, tenant));
-  } catch {
-    // never block the write path on a Postgres failure
-  }
+  const db = versionDb(`insert ${v.id}`);
+  const { error } = await db.from("content_versions").insert(versionToInsert(v, tenant));
+  if (error) throw error;
 }
 
 async function pgListVersions(
@@ -65,21 +66,16 @@ async function pgListVersions(
   tenant: string,
   limit = 50
 ): Promise<ContentVersion[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  try {
-    const { data, error } = await db
-      .from("content_versions")
-      .select("*")
-      .eq("tenant_id", tenant)
-      .eq("section", section)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-    if (error || !data) return [];
-    return data.map(mapPgVersionRow);
-  } catch {
-    return [];
-  }
+  const db = versionDb(`list ${tenant}/${section}`);
+  const { data, error } = await db
+    .from("content_versions")
+    .select("*")
+    .eq("tenant_id", tenant)
+    .eq("section", section)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(mapPgVersionRow);
 }
 
 // ---------------------------------------------------------------------------

@@ -30,6 +30,23 @@ Strelva should feel like a calm operating system for local businesses, not a gen
 - Typography: template-defined pairing. Current default uses Instrument Serif for editorial display and Inter for body.
 - Layout: strong first-viewport signal, visible next-section hint, mobile-first content order, and full-width sections rather than stacked decorative cards.
 
+## Template Expansion Rules
+
+- A Site Archetype supplies starting content and layout defaults; it is not the
+  live Site Capability contract and must not be used as a permission gate.
+- Reusable storefront behavior lands in `custom-repo-starter` first, then moves
+  into client repositories. Client-specific integrations stay local to that
+  Site Property.
+- A fetched capability manifest is authoritative and subtractive. Do not expose
+  an editor or agent action for a section the deployed repository omits.
+- Add an archetype only after repeated delivery work proves stable structural
+  reuse. Add a Feature Set only for a coherent capability bundle; do not create
+  one as a visual theme or Commercial Plan alias.
+- New Vertical operating depth is validation-gated. Wellness remains
+  operational-lite until paid workflows prove a deeper class/member model.
+- Preserve the additive `/api/v1` contract and legacy wire identifiers until a
+  coordinated versioned rollout changes every consumer.
+
 ## Token Inventory
 
 Tokens are defined in `src/app/globals.css`.

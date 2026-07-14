@@ -22,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const k of ENV_KEYS) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];
@@ -33,6 +34,15 @@ describe("getServiceHealth", () => {
     mockGetRedis.mockReturnValue(null);
     const report = await getServiceHealth();
     expect(report.status).toBe("healthy");
+    expect(report.checks.redis.status).toBe("not configured");
+    expect(report.checks.supabase.status).toBe("not configured");
+  });
+
+  it("fails production health when the core data services are not configured", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mockGetRedis.mockReturnValue(null);
+    const report = await getServiceHealth();
+    expect(report.status).toBe("down");
     expect(report.checks.redis.status).toBe("not configured");
     expect(report.checks.supabase.status).toBe("not configured");
   });

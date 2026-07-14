@@ -34,6 +34,7 @@ function fakeRedis() {
       return "OK";
     }),
     mget: vi.fn(async (...keys: string[]) => keys.map((k) => store.get(k) ?? null)),
+    zadd: vi.fn(async () => 1),
   };
 }
 
@@ -91,6 +92,27 @@ describe("setLeadWorkflowStatus", () => {
 
     const converted = await setLeadWorkflowStatus(TOKEN, "converted");
     expect(converted.status).toBe("converted");
+    expect((await getLeadWorkflow(TOKEN)).status).toBe("converted");
+  });
+
+  it("updates the canonical customer delivery lifecycle with the operator projection", async () => {
+    const redis = fakeRedis();
+    const lead = {
+      businessName: "Acme",
+      email: "owner@acme.test",
+      statusToken: TOKEN,
+      deliveryStatus: "received",
+      submittedAt: "2026-07-01T00:00:00.000Z",
+      statusUpdatedAt: "2026-07-01T00:00:00.000Z",
+    };
+    redis.store.set(`lead-status:${TOKEN}`, JSON.stringify(lead));
+    redis.store.set(`lead:${lead.email}`, JSON.stringify(lead));
+    mockGetRedis.mockReturnValue(redis);
+
+    await setLeadWorkflowStatus(TOKEN, "converted");
+
+    const stored = JSON.parse(String(redis.store.get(`lead-status:${TOKEN}`)));
+    expect(stored.deliveryStatus).toBe("launched");
     expect((await getLeadWorkflow(TOKEN)).status).toBe("converted");
   });
 

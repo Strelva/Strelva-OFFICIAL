@@ -25,15 +25,19 @@ describe("resolveEditableSections", () => {
   it("excludes a section the manifest forbids drafting", () => {
     const { agentEditableSections, sectionEnum } = resolveEditableSections(
       template,
-      manifest({ story: { allowedActions: ["read"] } }), // no "draft" → excluded
+      manifest({
+        hero: { allowedActions: ["read", "draft"] },
+        story: { allowedActions: ["read"] }, // no "draft" → excluded
+        contact: { allowedActions: ["read", "draft"] },
+      }),
     );
     expect(agentEditableSections).toEqual(["hero", "contact"]);
     expect(sectionEnum.options).toEqual(["hero", "contact"]);
   });
 
-  it("keeps sections whose manifest entry is absent (editable by default)", () => {
+  it("excludes sections absent from the authoritative manifest", () => {
     const { agentEditableSections } = resolveEditableSections(template, manifest({}));
-    expect(agentEditableSections).toEqual(["hero", "story", "contact"]);
+    expect(agentEditableSections).toEqual([]);
   });
 
   it("falls back to the full template list when the manifest forbids everything", () => {
@@ -46,17 +50,16 @@ describe("resolveEditableSections", () => {
     expect(sectionEnum.options).toEqual(template.contentSections);
   });
 
-  // ── B4: a custom repo can declare sections beyond the template ──────────────
-  it("makes a remote-declared section (not in the template) editable", () => {
+  // A custom repo may activate another registered content section, but a
+  // manifest cannot invent a storage/schema entity at runtime.
+  it("accepts registered extras and rejects unregistered manifest keys", () => {
     const withExtra = manifest({
       hero: { allowedActions: ["read", "draft"] },
-      // 'menu' is rendered by the live custom repo but isn't a template section.
+      faq: { allowedActions: ["read", "draft"] },
       menu: { allowedActions: ["read", "draft"] },
     });
     const { agentEditableSections } = resolveEditableSections(template, withExtra);
-    expect(agentEditableSections).toContain("menu");
-    // Template sections still present.
-    expect(agentEditableSections).toEqual(["hero", "story", "contact", "menu"]);
+    expect(agentEditableSections).toEqual(["hero", "faq"]);
   });
 
   it("excludes component render-keys, not just template sections", () => {
@@ -76,7 +79,7 @@ describe("resolveEditableSections", () => {
     );
     expect(agentEditableSections).not.toContain("Header");
     expect(agentEditableSections).not.toContain("Footer");
-    expect(agentEditableSections).toEqual(["hero", "story", "contact"]);
+    expect(agentEditableSections).toEqual(["hero"]);
   });
 });
 

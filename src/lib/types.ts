@@ -149,10 +149,14 @@ export interface SiteSettings {
   vagaro_embed_id?: string;
   logoUrl?: string;
   marqueeText?: string;
+  /** How Strelva should sound when writing for this business. */
+  brandVoice?: string;
   /** How the business is found — drives which presence surfaces show (a local
    *  business gets Google Business + Reviews; an online-only brand doesn't).
    *  Empty/unset = infer from the site template. */
-  businessModel?: string;
+  /** Persisted wire name retained for compatibility; semantically this is the
+   * business's presence profile, not its revenue/business model. */
+  businessModel?: PresenceProfile | "";
 }
 
 
@@ -234,22 +238,17 @@ export interface ThemeContent {
   fontBody: string;
 }
 
-export type ContentSection =
-  | "hero"
-  | "services"
-  | "story"
-  | "testimonials"
-  | "events"
-  | "providers"
-  | "contact"
-  | "settings"
-  | "faq"
-  | "shop"
-  | "products"
-  | "theme"
-  | "rewardsConfig"
-  | "navigation"
-  | "footer";
+export const CONTENT_SECTIONS = [
+  "hero", "services", "story", "testimonials", "events", "providers",
+  "contact", "settings", "faq", "shop", "products", "theme",
+  "rewardsConfig", "navigation", "footer",
+] as const;
+
+export type ContentSection = (typeof CONTENT_SECTIONS)[number];
+
+export function isContentSection(value: string): value is ContentSection {
+  return (CONTENT_SECTIONS as readonly string[]).includes(value);
+}
 
 export type ContentMap = {
   hero: HeroContent;
@@ -442,15 +441,26 @@ export type TemplateId = "wellness" | "food-brand" | "restaurant" | "trades" | "
  */
 export const ALL_TENANT_FEATURES = [
   "commerce", "booking", "newsletter", "blog", "video", "events",
+  // `shop` and `products` are accepted legacy wire aliases. Feature writes
+  // normalize both to the canonical `commerce` capability.
   "shop", "products", "rewards", "providers", "instagram", "reviews",
   "schedule", "members", "packages", "roster",
 ] as const;
 
-export type TenantFeature = (typeof ALL_TENANT_FEATURES)[number];
+/** A persisted capability flag in the legacy `tenants.features[]` column.
+ * New writes use `commerce`; `shop`/`products` remain input-compatible only. */
+export type TenantCapability = (typeof ALL_TENANT_FEATURES)[number];
+/** @deprecated Domain language is TenantCapability; keep this alias for the
+ * existing database/wire vocabulary until a coordinated migration. */
+export type TenantFeature = TenantCapability;
+
+export const PRESENCE_PROFILES = ["local", "online", "hybrid"] as const;
+export type PresenceProfile = (typeof PRESENCE_PROFILES)[number];
 
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 
 export type TenantDeliveryModel = "custom_repo" | "platform_template";
+export type CommercialPlanKey = "presence" | "growth" | "scale";
 
 export type CustomRepoRevalidationHealth =
   | "unknown"
@@ -563,9 +573,14 @@ export interface TenantConfig {
   subscriptionStatus?: "active" | "trialing" | "past_due" | "cancelled" | "none";
   /** Stripe subscription ID for the active recurring plan (set by the billing webhook). */
   stripeSubscriptionId?: string;
+  /** Commercial package selected in Stripe. Independent from dashboard capabilities. */
+  subscriptionPlan?: CommercialPlanKey;
+  /** Invoice amount captured at checkout/webhook time; authoritative for MRR. */
+  planMonthlyCents?: number;
+  planCurrency?: string;
   /** When the recurring subscription first started (ISO date). Set by the billing webhook. */
   subscriptionStartedAt?: string;
-  /** End of a contractual minimum commitment (ISO date), e.g. Door 2's 12-month minimum. Set manually/by admin. */
+  /** End of a legacy contractual minimum commitment (ISO date). */
   commitmentEndsAt?: string;
   /** Special billing presentation/access override for early customers or internal accounts. */
   planOverride?: "founder_comp";
@@ -688,7 +703,17 @@ export interface UnifiedEvent {
   title: string;
   body: string;
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> & {
+    execution?: {
+      state: "processing" | "completed" | "failed";
+      action: "approved" | "dismissed";
+      actor: string;
+      attemptId: string;
+      startedAt: string;
+      finishedAt?: string;
+      reason?: string;
+    };
+  };
   createdAt: string;
   resolvedAt?: string;
 }
@@ -726,62 +751,6 @@ export interface CustomChangeRequestMetadata {
   shippedAt?: string;
   notes?: string;
 }
-
-// --- Site Operation Types ---
-
-export type OperationSource = "user" | "agent" | "integration" | "system";
-export type OperationSurface = "site" | "assets" | "sources" | "review" | "newsletter" | "social";
-export type OperationStatus = "draft" | "pending_review" | "approved" | "published" | "dismissed" | "blocked";
-export type OperationRisk = "low" | "medium" | "high";
-
-export interface SiteOperation {
-  id: string;
-  tenantId: string;
-  source: OperationSource;
-  surface: OperationSurface;
-  status: OperationStatus;
-  title: string;
-  description?: string;
-  reason?: string;
-  risk?: OperationRisk;
-  affectedNodes?: string[];
-  before?: unknown;
-  after?: unknown;
-  createdAt: string;
-  resolvedAt?: string;
-  resolvedBy?: string;
-}
-
-export type ContentOperation = SiteOperation & {
-  surface: "site";
-  nodeType: "content";
-  section: string;
-  field?: string;
-};
-
-export type LayoutOperation = SiteOperation & {
-  surface: "site";
-  nodeType: "layout";
-  changes: Record<string, unknown>;
-};
-
-export type AssetOperation = SiteOperation & {
-  surface: "assets";
-  assetId: string;
-  action: "upload" | "replace" | "delete";
-};
-
-export type NewsletterOperation = SiteOperation & {
-  surface: "newsletter";
-  subject: string;
-  recipientCount: number;
-};
-
-export type SocialOperation = SiteOperation & {
-  surface: "social";
-  platform: string;
-  postContent: string;
-};
 
 // --- Weekly Brief Types ---
 

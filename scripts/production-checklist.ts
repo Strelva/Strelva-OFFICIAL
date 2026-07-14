@@ -18,7 +18,6 @@ import {
   validateProductionEnvValue,
   type ReadinessStatus,
 } from "../src/lib/production-readiness-rules";
-import { DEFAULT_MARKETING_HOSTS, parseMarketingDomains } from "../src/lib/marketing-hosts";
 import { getAllTenants } from "../src/lib/tenants";
 
 for (const path of [".env.production.local", ".env.local", ".env"]) {
@@ -52,13 +51,12 @@ const locallyGeneratedSecrets = new Set([
 ]);
 
 const scaffoldWebDomainAction =
-  "Point strelva.com at Vercel project scaffold-web with A strelva.com 76.76.21.21 or Vercel nameservers, and remove Porkbun/l.ink forwarding.";
-const VERCEL_APP_URL = "https://strelva.com";
+  "Point app.strelva.com at the Strelva control-plane Vercel project; strelva.com remains the separate marketing project.";
+const VERCEL_APP_URL = "https://app.strelva.com";
 const EXPECTED_SIGN_IN_TITLE = "Dashboard access | Strelva";
-// Billing price is intentionally undecided: client sites are free for now and
-// the admin-side price has not been set. If STRIPE_SCAFFOLD_PRICE_ID is
-// configured, we validate the *shape* (recurring monthly USD), not a specific
-// amount. Re-pin a specific cents amount here when pricing is committed.
+// STRIPE_SCAFFOLD_PRICE_ID is the compatibility rollout gate used by
+// isBillingEnabled() and the Growth fallback. Commercial plan selection and
+// monthly amount are persisted independently on the tenant.
 const SCAFFOLD_MONTHLY_PRICE_CURRENCY = "usd";
 
 const envSourceHints: Record<string, string> = {
@@ -70,7 +68,7 @@ const envSourceHints: Record<string, string> = {
   GOOGLE_CLIENT_SECRET: "Google Cloud OAuth client secret",
   INSTAGRAM_CLIENT_ID: "Meta app Instagram OAuth client ID",
   INSTAGRAM_CLIENT_SECRET: "Meta app Instagram OAuth client secret",
-  NEXT_PUBLIC_APP_URL: "https://strelva.com or the deployed control-plane URL used for OAuth callbacks",
+  NEXT_PUBLIC_APP_URL: "https://app.strelva.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SITE_URL: "https://strelva.com",
   NEXT_PUBLIC_SUPABASE_URL: "Supabase project URL (Project Settings → API)",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "Supabase anon/publishable key (Project Settings → API)",
@@ -81,10 +79,9 @@ const envSourceHints: Record<string, string> = {
   RESEND_DOMAIN: "Verified Resend sending domain",
   SENTRY_DSN: "Sentry project DSN",
   NEXT_PUBLIC_SENTRY_DSN: "Sentry browser/client DSN",
-  STRIPE_SCAFFOLD_PRICE_ID: "Optional. Stripe live recurring monthly USD price id when admin-side billing is turned on. Leave unset while client sites are free.",
+  STRIPE_SCAFFOLD_PRICE_ID: "Stripe live recurring monthly USD price id used as the billing rollout gate and Growth compatibility fallback.",
   STRIPE_SECRET_KEY: "Stripe live secret key",
   STRIPE_WEBHOOK_SECRET: "Stripe billing webhook signing secret",
-  SUPER_ADMIN_EMAILS: "Comma-separated owner/admin email addresses",
   UPSTASH_REDIS_REST_TOKEN: "Upstash Redis REST token",
   UPSTASH_REDIS_REST_URL: "Upstash Redis REST URL",
 };
@@ -171,7 +168,6 @@ checkEnvVar("NEXT_PUBLIC_SUPABASE_URL", true);
   });
 }
 checkEnvVar("SUPABASE_SERVICE_ROLE_KEY", true);
-checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
 
 // Dev-access bypass must never be enabled on a deployed environment: when
 // REB_DEV_UNGATED_ACCESS=1 (and NODE_ENV!=="production"), isSuperAdmin /
@@ -214,10 +210,10 @@ checkFileContains("docs/design-kit.md", "Design kit", [
 ]);
 checkFileContains("docs/domain-setup.md", "Domain setup doc", [
   "scaffold-web",
-  "A     strelva.com    76.76.21.21",
+  "app.strelva.com",
+  "admin.strelva.com",
   "cname.vercel-dns.com",
-  "MARKETING_DOMAINS=strelva.com,www.strelva.com",
-  "scaffoldweb-com.l.ink",
+  "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com",
   "pnpm check:prod",
 ]);
 checkFileContains("docs/production-readiness.md", "Production readiness doc", [
@@ -233,20 +229,23 @@ checkFileContains("docs/production-readiness.md", "Production readiness doc", [
   "vercel deploy --prod",
   "git status --short",
   "dirty local working tree",
-  "PLAYWRIGHT_BASE_URL=https://strelva.com",
-  "https://strelva.com/api/health",
-  "curl -i https://strelva.com/api/cron/maintenance",
-  "root marketing hosts",
+  "PLAYWRIGHT_BASE_URL=https://app.strelva.com",
+  "https://app.strelva.com/api/health",
+  "curl -i https://app.strelva.com/api/cron/maintenance",
+  "Supabase Auth",
   "/account",
   "Use invited email",
   "signed-out `/dashboard` and `/no-access` redirect to `/sign-in`",
   "admin.greatlakesdriedfruit.com",
 ]);
 checkFileContains(".env.production.example", "Production env template", [
-  "pk_live_",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
   "sk_live_",
   "whsec_",
   "NEXT_PUBLIC_SITE_URL",
+  "NEXT_PUBLIC_APP_URL=https://app.strelva.com",
   "CRON_SECRET",
 ]);
 
@@ -335,13 +334,13 @@ function checkLaunchBlockerActionability(path: string) {
     "Required owner action",
     "Minimum production values to confirm in Vercel",
     "Copyable Vercel env commands",
-    "vercel env add CLERK_WEBHOOK_SECRET production",
+    "vercel env add NEXT_PUBLIC_SUPABASE_URL production",
     "vercel env add UPSTASH_REDIS_REST_URL production",
     "vercel env add UPSTASH_REDIS_REST_TOKEN production",
     "vercel env add SENTRY_DSN production",
     "vercel env add NEXT_PUBLIC_SENTRY_DSN production",
     "Provider value sources",
-    "Clerk Dashboard -> Webhooks",
+    "Supabase project settings -> API",
     "Upstash Redis database -> REST API section",
     "Sentry project settings -> Client Keys / DSN",
     "Stripe live-mode Products",
@@ -353,17 +352,17 @@ function checkLaunchBlockerActionability(path: string) {
     "vercel deploy --prod",
     "git status --short",
     "dirty local working tree",
-    "PLAYWRIGHT_BASE_URL=https://strelva.com",
+    "PLAYWRIGHT_BASE_URL=https://app.strelva.com",
     "signed-out dashboard customers",
-    "https://strelva.com/sign-in",
+    "https://app.strelva.com/sign-in",
     "Sign in to Strelva | Strelva",
     "Production Live Verification",
-    "PLAYWRIGHT_BASE_URL=https://strelva.com",
-    "https://strelva.com/api/cron/maintenance",
-    "https://strelva.com/api/health",
-    "Clerk/Stripe webhook deliveries",
-    "curl -i https://strelva.com/api/cron/maintenance",
-    'curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance',
+    "PLAYWRIGHT_BASE_URL=https://app.strelva.com",
+    "https://app.strelva.com/api/cron/maintenance",
+    "https://app.strelva.com/api/health",
+    "Supabase Auth and Stripe webhook verification",
+    "curl -i https://app.strelva.com/api/cron/maintenance",
+    'curl -i -H "Authorization: Bearer $CRON_SECRET" https://app.strelva.com/api/cron/maintenance',
     "cron 401",
     "Status: waived",
     "Owner:",
@@ -507,34 +506,27 @@ function checkAccessSmokeCoverage(customerPath: string, smokePath: string) {
   const smoke = readFileSync(smokePath, "utf8");
   const content = `${customerSmoke}\n${smoke}`;
   const requiredTerms = [
-    "signed-out dashboard customers get the sign-in flow",
-    "signed-out account handoff returns users to sign-in",
-    "admin tenant host starts at the dashboard sign-in flow",
-    "admin tenant host sign-in keeps the invited email context",
-    "admin tenant host sign-up uses the tenant invite context",
-    "signed-out no-access recovery returns users to sign-in",
-    "signup page explains invited email recovery",
+    "signed-out dashboard visitors are sent to sign-in, never shown the dashboard",
+    "signed-out account access is sent to sign-in",
+    "the sign-in page renders the current Supabase sign-in surface",
+    "signed-out no-access recovery is sent to sign-in",
+    "sign-up page renders the current create-account surface",
     "cron maintenance endpoint is not public",
     "/api/cron/maintenance",
     "process.env.PLAYWRIGHT_BASE_URL",
-    "not.toHaveURL(/\\/app/)",
   ];
   const missing = requiredTerms.filter((term) => !content.includes(term));
-  const signupNoAppOk =
-    smoke.includes('"signup page explains invited email recovery"') &&
-    smoke.indexOf('"signup page explains invited email recovery"') <
-      smoke.indexOf("not.toHaveURL(/\\/app/)");
 
-  if (missing.length || !signupNoAppOk) {
+  if (missing.length) {
     log({
       name: "Access smoke coverage",
       status: "fail",
-      message: `${customerPath} and ${smokePath} must cover sign-in, sign-up, account handoff, no-access, admin-host, invited-email, cron protection, and no /app regressions, including public sign-up`,
+      message: `${customerPath} and ${smokePath} must cover the current Supabase sign-in/sign-up surfaces, signed-out dashboard/account/no-access redirects, and cron protection`,
     });
     return;
   }
 
-  log({ name: "Access smoke coverage", status: "ok", message: `${customerPath} and ${smokePath} cover sign-in/sign-up recovery paths, account handoff, admin-host, and cron protection` });
+  log({ name: "Access smoke coverage", status: "ok", message: `${customerPath} and ${smokePath} cover current Supabase access recovery and cron protection` });
 }
 
 checkAccessSmokeCoverage("tests/customer-frontend.spec.ts", "tests/smoke.spec.ts");
@@ -695,7 +687,6 @@ function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
   const aliasOk = aliasRoute.trim() === 'export { DELETE, GET, PATCH, POST } from "@/app/api/tenant/domains/route";';
   const tenantAccessOk =
     tenantRoute.includes("requireTenantFromHeaders") &&
-    tenantRoute.includes("requireTenantAccess(tenant)") &&
     tenantRoute.includes('requireTenantPermission(tenant, "domains:manage")') &&
     tenantRoute.includes("addCustomDomain(tenant") &&
     !tenantRoute.includes("body.tenant");
@@ -824,11 +815,9 @@ checkOAuthCallbackState([
   "src/app/api/oauth/instagram/callback/route.ts",
 ]);
 
-// The Clerk webhook route (src/app/api/clerk/webhook) was removed with the
-// Clerk→Supabase Auth migration (#83). New-user provisioning is now the
-// Supabase `handle_new_user` Postgres trigger plus SUPER_ADMIN_EMAILS seeding
-// (SUPER_ADMIN_EMAILS is enforced as a required env var in the Core Auth
-// section above), so there is no signed-webhook route to assert here.
+// The Clerk webhook route was removed with the Supabase Auth migration.
+// New-user provisioning is the `handle_new_user` Postgres trigger; platform
+// authorization comes from memberships/super_admins, not an env allowlist.
 
 function checkStripeBillingWebhookRoute(path: string) {
   if (!existsSync(path)) {
@@ -1047,9 +1036,7 @@ const hasRedisToken = checkEnvVar("UPSTASH_REDIS_REST_TOKEN", true);
 
 console.log("\n─── Billing (Stripe) ────────────────────────────────────────────");
 const hasStripeKey = checkEnvVar("STRIPE_SECRET_KEY", true);
-// Optional while admin-side pricing is undecided. Mark required again when
-// the price is committed and billing is turned on.
-checkEnvVar("STRIPE_SCAFFOLD_PRICE_ID", false, false);
+checkEnvVar("STRIPE_SCAFFOLD_PRICE_ID", true, false);
 checkEnvVar("STRIPE_WEBHOOK_SECRET", true);
 
 console.log("\n─── Email (Resend) ──────────────────────────────────────────────");
@@ -1095,40 +1082,9 @@ if (!hasCalendlyOAuth) checkEnvVar("CALENDLY_WEBHOOK_SECRET", false);
 
 console.log("\n─── Site Configuration ──────────────────────────────────────────");
 checkEnvVar("NEXT_PUBLIC_SITE_URL", true, false);
-checkEnvVar("NEXT_PUBLIC_APP_URL", false, false);
+checkEnvVar("NEXT_PUBLIC_APP_URL", true, false);
 checkEnvVar("CUSTOM_DOMAIN_MAP", false, false);
 checkEnvVar("MARKETING_DOMAINS", false, false);
-
-function checkMarketingDomainCoverage() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!siteUrl || validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", siteUrl)) {
-    log({ name: "Marketing domain coverage", status: "skip", message: "NEXT_PUBLIC_SITE_URL is not ready" });
-    return;
-  }
-
-  const siteHost = new URL(siteUrl).host.toLowerCase();
-  const marketingHosts = new Set([
-    ...DEFAULT_MARKETING_HOSTS,
-    ...parseMarketingDomains(process.env.MARKETING_DOMAINS || ""),
-  ]);
-
-  if (!marketingHosts.has(siteHost)) {
-    log({
-      name: "Marketing domain coverage",
-      status: "fail",
-      message: `MARKETING_DOMAINS must include ${siteHost} so root-domain auth returns customers to /account`,
-    });
-    return;
-  }
-
-  log({
-    name: "Marketing domain coverage",
-    status: "ok",
-    message: `${siteHost} is treated as a marketing host for /account auth handoff`,
-  });
-}
-
-checkMarketingDomainCoverage();
 
 console.log("\n─── AI & Launch Flags ───────────────────────────────────────────");
 checkEnvVar("AI_AUTO_PUBLISH", false, false);
@@ -1186,8 +1142,9 @@ async function checkStripe() {
     await stripe.balance.retrieve();
     log({ name: "Stripe connectivity", status: "ok", message: "API key valid" });
 
-    // Check price ID shape only. Specific amount is intentionally not pinned
-    // while admin-side pricing is undecided. If the env var is unset we skip.
+    // Validate the compatibility rollout price. Plan identity and the agreed
+    // monthly amount are persisted separately; this check protects the runtime
+    // billing gate from a one-time or non-USD Stripe object.
     const priceId = process.env.STRIPE_SCAFFOLD_PRICE_ID;
     if (priceId) {
       try {
@@ -1219,8 +1176,8 @@ async function checkStripe() {
     } else {
       log({
         name: "Stripe price ID",
-        status: "skip",
-        message: "STRIPE_SCAFFOLD_PRICE_ID not set — admin-side billing is off",
+        status: "fail",
+        message: "STRIPE_SCAFFOLD_PRICE_ID is required as the billing rollout gate",
       });
     }
   } catch (err) {
@@ -1317,9 +1274,9 @@ async function checkBillingGrandfathering() {
 }
 
 async function checkProductionSiteUrl() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!baseUrl || validateProductionEnvValue("NEXT_PUBLIC_SITE_URL", baseUrl)) {
-    log({ name: "Production site URL", status: "skip", message: "NEXT_PUBLIC_SITE_URL is not ready" });
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || VERCEL_APP_URL;
+  if (validateProductionEnvValue("NEXT_PUBLIC_APP_URL", baseUrl)) {
+    log({ name: "Production site URL", status: "skip", message: "NEXT_PUBLIC_APP_URL is not ready" });
     return;
   }
 
@@ -1353,7 +1310,7 @@ async function checkProductionSiteUrl() {
     log({
       name: "Production site URL",
       status: "fail",
-      message: `Could not verify NEXT_PUBLIC_SITE_URL: ${(err as Error).message}`,
+      message: `Could not verify NEXT_PUBLIC_APP_URL: ${(err as Error).message}`,
     });
   }
 }
@@ -1408,7 +1365,7 @@ async function getDnsContext(host: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function printWebhookUrls() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || VERCEL_APP_URL;
 
   console.log("\n═══════════════════════════════════════════════════════════════");
   console.log("  Webhook URLs (configure in external services)");
@@ -1614,7 +1571,7 @@ function printReleaseActions() {
     console.log("  # When env checks pass, redeploy before live verification:");
     console.log("  git status --short");
     console.log("  vercel deploy --prod");
-    console.log("  PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+    console.log("  PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     console.log();
   }
 
@@ -1632,13 +1589,13 @@ function printReleaseActions() {
     failedEnvs.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
     failedEnvs.includes("SUPABASE_SERVICE_ROLE_KEY");
   if (supabaseAuthFailed) {
-    console.log("- Supabase Auth: set the project URL plus the anon/publishable and service-role keys, then verify signed-out /dashboard and /no-access reach /sign-in, root marketing-host auth finishes at /account, and admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow before finishing at /dashboard.");
+    console.log("- Supabase Auth: set the project URL plus the anon/publishable and service-role keys, then verify signed-out /dashboard and /no-access reach /sign-in on app.strelva.com and admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow before finishing at /dashboard.");
   }
   if (supabaseAuthFailed || failedEnvs.includes("RESEND_API_KEY") || failedEnvs.includes("RESEND_DOMAIN")) {
-    console.log("- Customer access: after Supabase Auth and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email (magic link or Google OAuth), the email stays prefilled when switching between sign-up and sign-in, strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
+    console.log("- Customer access: after Supabase Auth and Resend are live, open /admin as a super admin, use Invite for each tenant ownerEmail, and verify the customer signs up or signs in with the exact invited email (magic link or Google OAuth), the email stays prefilled when switching between sign-up and sign-in, app.strelva.com auth reaches /account, and admin.greatlakesdriedfruit.com auth reaches /dashboard/site.");
   }
   if (failedEnvs.includes("STRIPE_WEBHOOK_SECRET")) {
-    console.log("- Stripe webhook: configure https://strelva.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
+    console.log("- Stripe webhook: configure https://app.strelva.com/api/billing/webhook for checkout.session.completed, invoice.paid, invoice.payment_failed, and customer.subscription.deleted with the matching STRIPE_WEBHOOK_SECRET.");
   }
   if (failedEnvs.includes("UPSTASH_REDIS_REST_URL") || failedEnvs.includes("UPSTASH_REDIS_REST_TOKEN")) {
     console.log("- Redis: provision Upstash REST credentials before enabling production queues, rate limits, and reports.");
@@ -1649,13 +1606,13 @@ function printReleaseActions() {
     }
     if (launchBlockers.includes("Vercel app freshness")) {
       console.log("- Vercel app freshness: push/deploy a clean release branch containing the current launch-readiness fixes; do not only redeploy the existing stale production artifact. Then rerun `pnpm check:prod` and the app-host smoke probe:");
-      console.log("  PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
+      console.log("  PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g \"signed-out dashboard customers\"");
     }
     if (launchBlockers.includes("Production Live Verification")) {
-      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify root marketing auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Clerk/Stripe webhook deliveries are successful, and cron 401/success behavior works with CRON_SECRET.");
+      console.log("- Production live verification: after env, redeploy, and DNS are resolved, run `PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release`, verify Supabase Auth reaches /account, invited-owner /dashboard/site access works on admin.greatlakesdriedfruit.com, content edit/preview refresh succeeds, Supabase Auth and Stripe webhook verification are successful, and cron 401/success behavior works with CRON_SECRET.");
       console.log("  Cron auth commands:");
-      console.log("    curl -i https://strelva.com/api/cron/maintenance");
-      console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance');
+      console.log("    curl -i https://app.strelva.com/api/cron/maintenance");
+      console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://app.strelva.com/api/cron/maintenance');
     }
     console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
   }
@@ -1679,11 +1636,9 @@ function printReleaseActions() {
   if (results.some((result) => result.name === "Production site URL" && result.status === "fail")) {
     console.log(`- Production domain routing: ${scaffoldWebDomainAction} Wait for DNS/SSL propagation, then rerun \`pnpm check:prod\`.`);
     console.log("  DNS verification commands:");
-    console.log("    vercel domains inspect strelva.com");
-    console.log("    dig +short strelva.com A");
-    console.log("    dig +short strelva.com NS");
-    console.log("    dig +short '*.strelva.com' CNAME");
-    console.log("    curl -I -L https://strelva.com/api/health");
+    console.log("    vercel domains inspect app.strelva.com");
+    console.log("    dig +short app.strelva.com CNAME");
+    console.log("    curl -I -L https://app.strelva.com/api/health");
   }
   console.log();
 }

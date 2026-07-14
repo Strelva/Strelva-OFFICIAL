@@ -92,6 +92,8 @@ export interface ProvidersContent {
 }
 
 export interface ContactContent {
+  headline?: string;
+  description?: string;
   email: string;
   phone?: string;
   address?: string;
@@ -110,6 +112,7 @@ export interface SiteSettings {
   siteKeywords?: string;
   ownerName?: string;
   ownerTitle?: string;
+  trustBadge?: string;
   footerTagline: string;
   copyrightText: string;
   bookingUrl?: string;
@@ -117,6 +120,8 @@ export interface SiteSettings {
   vagaro_embed_id?: string;
   logoUrl?: string;
   marqueeText?: string;
+  brandVoice?: string;
+  businessModel?: string;
 }
 
 export interface FaqContent {
@@ -278,6 +283,8 @@ export const defaultProviders: ProvidersContent = {
 };
 
 export const defaultContact: ContactContent = {
+  headline: "",
+  description: "",
   email: "",
   phone: "",
   address: "",
@@ -296,11 +303,16 @@ export const defaultSettings: SiteSettings = {
   siteKeywords: "",
   ownerName: "",
   ownerTitle: "",
+  trustBadge: "",
   footerTagline: "",
   copyrightText: "Your Business",
   bookingUrl: "",
   instagramHandle: "",
   vagaro_embed_id: "",
+  logoUrl: "",
+  marqueeText: "",
+  brandVoice: "",
+  businessModel: "",
 };
 
 export const defaultFaq: FaqContent = {

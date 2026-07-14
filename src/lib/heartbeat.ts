@@ -38,7 +38,9 @@ export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
   "maintenance-digest": 8 * 24 * 3600, // weekly (Mon)
   "weekly-report": 8 * 24 * 3600, // weekly (Mon)
   "review-nudge": 8 * 24 * 3600, // weekly (Mon)
+  "monthly-report": 33 * 24 * 3600, // monthly (1st)
   visibility: 8 * 24 * 3600, // weekly (Tue)
+  "order-review-request": 26 * 3600, // daily
   "revalidation-reconcile": 7 * 3600, // every 6h
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h

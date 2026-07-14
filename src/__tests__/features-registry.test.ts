@@ -5,6 +5,7 @@ import {
   isCore,
   isKnownFeature,
   cleanFeatureIds,
+  cleanTenantFeatureIds,
   expandSets,
   getSetSurfaces,
   getToggleableRegistry,
@@ -33,6 +34,16 @@ describe("feature registry — isKnownFeature / cleanFeatureIds", () => {
     expect(cleanFeatureIds("not-an-array")).toEqual([]);
   });
 
+  it("persists only tenant capabilities, never implicit core or derived conditional ids", () => {
+    expect(cleanTenantFeatureIds(["website", "google-business", "wellness", "reviews"]))
+      .toEqual(["schedule", "members", "roster", "reviews"]);
+  });
+
+  it("collapses legacy shop/product flags to the canonical commerce capability", () => {
+    expect(cleanTenantFeatureIds(["shop", "products", "commerce"]))
+      .toEqual(["commerce"]);
+  });
+
   it("never strips a valid TenantFeature — every union value round-trips (no drift possible)", () => {
     for (const f of ALL_TENANT_FEATURES) {
       expect(isKnownFeature(f)).toBe(true);
@@ -45,8 +56,11 @@ describe("feature registry — expandSets", () => {
   it("expands a set id into its member features", () => {
     expect(expandSets(["wellness"])).toEqual(["schedule", "members", "roster"]);
   });
-  it("expands e-commerce to the legacy store flag", () => {
+  it("expands e-commerce to the canonical commerce capability", () => {
     expect(expandSets(["ecommerce"])).toEqual(["commerce"]);
+  });
+  it("normalizes legacy store aliases while preserving their read compatibility", () => {
+    expect(expandSets(["shop", "products"])).toEqual(["commerce"]);
   });
   it("leaves plain feature ids as-is and dedupes", () => {
     expect(expandSets(["reviews", "wellness", "schedule"])).toEqual([
@@ -81,6 +95,7 @@ describe("feature registry — getToggleableRegistry", () => {
     expect(conditional.map((f) => f.id)).toEqual(["google-business", "reviews"]);
     const wellness = sets.find((s) => s.id === "wellness")!;
     expect(wellness.label).toBe("Wellness");
+    expect(wellness.scope).toMatch(/operational-lite/i);
     expect(wellness.members.map((m) => m.id)).toEqual(["schedule", "members", "roster"]);
   });
 });

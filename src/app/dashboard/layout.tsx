@@ -21,6 +21,7 @@ import { isInspecting } from "@/lib/inspect-mode";
 import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custom-repos";
 import { getLocalClientPreviewUrl } from "@/lib/preview-target";
 import { ConversationShell } from "@/components/dashboard/ConversationShell";
+import { planByKey } from "@/lib/billing-plans";
 
 export default async function DashboardLayout({
   children,
@@ -155,6 +156,7 @@ export default async function DashboardLayout({
   const accountName = rawAccount
     ? rawAccount.charAt(0).toUpperCase() + rawAccount.slice(1)
     : isAdmin ? "Admin" : "there";
+  const commercialPlan = planByKey(tenantConfig?.subscriptionPlan);
 
   return (
     <DashboardProvider
@@ -168,6 +170,8 @@ export default async function DashboardLayout({
       subscriptionStatus={subscriptionStatus}
       hasStripeCustomer={!!tenantConfig?.stripeCustomerId}
       planOverride={tenantConfig?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax" ? "founder_comp" : null}
+      commercialPlanLabel={commercialPlan.label}
+      commercialPlanMonthlyCents={tenantConfig?.planMonthlyCents ?? commercialPlan.monthly * 100}
       impersonation={{
         isActive: actor.isImpersonating,
         actorEmail: accountEmail,

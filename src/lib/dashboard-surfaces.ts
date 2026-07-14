@@ -11,21 +11,18 @@
  * layout and passed to the nav; no client fetch, no flash.
  */
 
-import type { Connection, TenantConfig } from "./types";
+import type { Connection, PresenceProfile, TenantConfig } from "./types";
 import { getSetSurfaces } from "./features/registry";
 
 /** The slice of tenant config the surface resolver actually reads. */
 export type SurfaceTenantConfig = Pick<TenantConfig, "template" | "reviewsConfig"> & {
   /** Raw `settings.businessModel` — `""`/unrecognized means infer from template. */
-  businessModel?: string;
+  businessModel?: PresenceProfile | "";
   features?: string[];
 };
 
 /** Feature flags that mean this tenant runs a storefront. */
 const COMMERCE_FEATURES = new Set(["commerce", "products", "shop"]);
-
-/** How the business shows up to customers — drives which presence tabs apply. */
-export type PresenceProfile = "local" | "online" | "hybrid";
 
 /**
  * - `shown`: connected/applicable — render as a normal tab.

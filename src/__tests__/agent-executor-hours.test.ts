@@ -73,6 +73,7 @@ vi.mock("@/lib/tenants", () => ({
 }));
 
 vi.mock("@/lib/capabilities", () => ({
+  assertAgentToolCatalog: () => undefined,
   capabilityPromptFragment: () => "",
   sanitizePromptValue: (v: unknown) => (typeof v === "string" ? v : ""),
 }));

@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
+import { CONTROL_PLANE_URL } from "./lib/brand";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
@@ -242,7 +243,7 @@ export function shouldUseFallbackAuthForAdminHost(host: string, isAdminSubdomain
 }
 
 function buildTenantFallbackUrl(req: NextRequest, tenantId: string, path: string): URL {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com";
+  const base = process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL;
   const url = new URL(`/client/${tenantId}${path}`, base);
   url.search = req.nextUrl.search;
   return url;
@@ -556,7 +557,7 @@ export default async function proxy(req: NextRequest) {
     // after the rewrite as defense-in-depth.
     if (!devAccessBypass && !(await requestIsSuperAdmin(req))) {
       const appBase =
-        process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://app.strelva.com";
+        process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL;
       const signInUrl = new URL("/sign-in", appBase);
       return applySecurityHeaders(NextResponse.redirect(signInUrl), req);
     }

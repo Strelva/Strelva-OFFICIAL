@@ -1,6 +1,9 @@
 # Strelva Operating Model + Solidification Roadmap
 
-> **2026-06-22 update — the stack moved underneath this doc.** On **2026-06-20**
+> **Status: historical roadmap, superseded 2026-07-14.** Use
+> `product-ontology.md`, `persistence-boundaries.md`, and `operations.md` for
+> current decisions. The dated progress and punch list below are preserved as
+> context, not current state. On **2026-06-20**
 > the auth + data backbone CUT OVER to **Supabase Auth + Postgres in
 > production** (`scaffoldweb.com` live + healthy). Where this doc (written
 > 2026-06-13) says **Sanity is the source of truth** / **Clerk** is the auth

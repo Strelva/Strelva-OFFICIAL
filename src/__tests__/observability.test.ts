@@ -30,6 +30,11 @@ afterEach(() => {
 });
 
 describe("cron heartbeat", () => {
+  it("monitors every scheduled business cron", () => {
+    expect(CRON_MAX_AGE_SECONDS).toHaveProperty("monthly-report");
+    expect(CRON_MAX_AGE_SECONDS).toHaveProperty("order-review-request");
+  });
+
   it("records a heartbeat under reb:heartbeat:{cron} with a TTL", async () => {
     mockRedis.set.mockResolvedValue("OK");
     await recordHeartbeat("weekly-report", { ok: true, processed: 3 });

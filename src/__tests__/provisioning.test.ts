@@ -88,9 +88,9 @@ describe("provisionTenant", () => {
     expect(result.manualNext.length).toBeGreaterThan(0);
 
     // The client-repo env is returned (incl. the secret) for the operator to paste,
-    // and points at the live control plane (scaffoldweb.com, not the marketing host).
+    // and points at the canonical control plane, not the marketing host.
     expect(result.clientEnv.REVALIDATION_SECRET).toMatch(/^[a-f0-9]{64}$/);
-    expect(result.clientEnv.SCAFFOLD_API_URL).toBe("https://scaffoldweb.com");
+    expect(result.clientEnv.SCAFFOLD_API_URL).toBe("https://app.strelva.com");
     expect(result.clientEnv.TENANT_ID).toBe("acme");
   });
 

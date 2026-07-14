@@ -12,12 +12,18 @@ const mockSourceIsPostgres = vi.hoisted(() => vi.fn(() => true));
 const mockGetTenant = vi.hoisted(() => vi.fn());
 const mockUpsertTenant = vi.hoisted(() => vi.fn());
 const mockListAllTenants = vi.hoisted(() => vi.fn(async () => []));
+const mockListAllDomainClaims = vi.hoisted(() => vi.fn(async () => []));
+const mockListDomainClaims = vi.hoisted(() => vi.fn(async () => []));
+const mockReplaceDomainClaims = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@/lib/db/source-flags", () => ({ tenantsSourceIsPostgres: mockSourceIsPostgres }));
 vi.mock("@/lib/db/repositories", () => ({
   getTenant: mockGetTenant,
   upsertTenant: mockUpsertTenant,
   listAllTenants: mockListAllTenants,
+  listAllDomainClaims: mockListAllDomainClaims,
+  listDomainClaims: mockListDomainClaims,
+  replaceDomainClaims: mockReplaceDomainClaims,
 }));
 vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
 // Sanity dual-write is best-effort; stub it so the test never touches a client.

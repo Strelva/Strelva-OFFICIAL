@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { tool } from "ai";
+import { isContentSection } from "./types";
 import type { TenantConfig, SiteCapabilityManifest, ContentSection } from "./types";
 
 /**
@@ -47,15 +48,13 @@ export async function resolveGbpWriteAllowed(
  *
  *  - the template's built-in `contentSections` (the platform default), and
  *  - the site capability manifest, which a custom repo can publish (B4) to declare
- *    the sections its LIVE site actually renders — including sections the template
- *    doesn't list.
+ *    the registered content sections its LIVE site actually renders.
  *
- * A section is editable unless the manifest explicitly disallows "draft". The base is
- * the template's content sections, PLUS any extra sections the manifest declares that
- * the template doesn't have — so the agent edits what the live custom site renders,
- * not just the template's built-in list. Component render-keys (Header/Footer/section
- * components) are NOT editable content sections and are excluded; and for a tenant with
- * no remote manifest the default manifest declares no extras, so this is a no-op there.
+ * A section is editable only when the resolved manifest declares it and does not
+ * disallow "draft". The base is the template's manifest-supported content sections,
+ * PLUS any registered content section the manifest declares that the template doesn't
+ * have. Render-component keys and arbitrary remote strings are capabilities, not
+ * writable content entities, and are excluded.
  * Falls back to the full template list when the filter would leave nothing. Lifted from
  * the streaming route so both agent paths constrain the model to the same sections.
  * (The manifest is also passed into `applySectionUpdate` to gate publish; this enum just
@@ -66,16 +65,21 @@ export function resolveEditableSections(
   siteManifest: SiteCapabilityManifest,
 ) {
   const draftable = (section: string) =>
-    siteManifest.sections[section]?.allowedActions?.includes("draft") !== false;
+    Boolean(siteManifest.sections[section]) &&
+    siteManifest.sections[section].allowedActions?.includes("draft") !== false;
 
   const templateSet = new Set(template.contentSections);
   const componentKeys = new Set(Object.keys(template.components ?? {}));
 
-  const fromTemplate = template.contentSections.filter(draftable);
+  const fromTemplate = template.contentSections.filter(isContentSection).filter(draftable);
   // Sections a custom repo declared via its remote manifest that the template
   // doesn't list. Component render-keys are excluded — they aren't content.
   const declaredExtras = Object.keys(siteManifest.sections).filter(
-    (section) => !templateSet.has(section) && !componentKeys.has(section) && draftable(section),
+    (section) =>
+      isContentSection(section) &&
+      !templateSet.has(section) &&
+      !componentKeys.has(section) &&
+      draftable(section),
   );
 
   const agentEditableSections = [...fromTemplate, ...declaredExtras];

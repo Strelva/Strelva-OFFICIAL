@@ -1,7 +1,11 @@
 # Strelva Migration Plan
 
-**Status:** Draft for approval — no code moved yet (this is the **domain/brand
-rebrand**, still parked)
+**Status: historical migration plan; partially executed and superseded.**
+Production `strelva.com` is served by the separate `strelva-marketing` repo;
+this control plane's canonical origin is `app.strelva.com`; Clerk is removed;
+and the repo-folder/package rename remains intentionally incomplete for
+compatibility. Use `docs/README.md` for current topology. The body below preserves
+the original proposal and is not a current checklist.
 **Author:** generated from a full read of `main` (post release-branch merge, commit `5967494`)
 **Date:** 2026-06-01
 

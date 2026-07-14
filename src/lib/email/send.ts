@@ -1,7 +1,14 @@
-import { customerEmailPaused, emailSendingPaused, operatorEmailsEnabled } from "@/lib/email-enabled";
+import {
+  customerEmailPaused,
+  emailSendingPaused,
+  operatorEmailsEnabled,
+  prospectEmailsEnabled,
+} from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/lib/email/layout";
 
-export type EmailAudience = "client" | "customer" | "operator";
+/** The four people Strelva can address. These are relationship roles, not
+ * interchangeable synonyms: each has an independent delivery policy. */
+export type EmailAudience = "client" | "customer" | "operator" | "prospect";
 
 type RenderedEmail =
   | { options: EmailOptions; html?: never; text?: never }
@@ -16,6 +23,7 @@ export type SendEmailInput = RenderedEmail & {
 
 function audienceEnabled(audience: EmailAudience): boolean {
   if (audience === "operator") return operatorEmailsEnabled();
+  if (audience === "prospect") return prospectEmailsEnabled();
   if (audience === "customer") return !customerEmailPaused();
   return !emailSendingPaused();
 }

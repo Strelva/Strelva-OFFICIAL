@@ -26,9 +26,15 @@ function generateId(): string {
   return `rev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// --- Postgres (reviews table) helpers — self-contained, never throw. When
+// --- Authoritative Postgres (reviews table) helpers. When
 // DATA_SOURCE=postgres the review id IS the Postgres row uuid, so getReviews and
 // replyToReview share one id space (the dashboard passes the id straight through).
+function reviewDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[reviews] ${operation} failed: Supabase is not configured`);
+  return db;
+}
+
 function rowToReview(r: Row<"reviews">): ReviewItem {
   return {
     id: r.id,
@@ -44,71 +50,63 @@ function rowToReview(r: Row<"reviews">): ReviewItem {
 }
 
 async function pgListReviews(tenant: string): Promise<ReviewItem[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  try {
-    const { data, error } = await db
+  const db = reviewDb(`list ${tenant}`);
+  const { data, error } = await db
+    .from("reviews")
+    .select("*")
+    .eq("tenant_id", tenant)
+    .order("review_date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(rowToReview);
+}
+
+async function pgInsertReview(tenant: string, review: Omit<ReviewItem, "id">): Promise<ReviewItem> {
+  const db = reviewDb(`insert ${tenant}`);
+  const insert: Insert<"reviews"> = {
+    tenant_id: tenant,
+    source: review.source,
+    author: review.author,
+    rating: review.rating,
+    text: review.text,
+    review_date: review.date,
+    reply: review.reply ?? null,
+    replied_at: review.repliedAt ?? null,
+    external_id: review.externalId ?? null,
+  };
+  // Ignore an already-mirrored provider review so a re-poll cannot overwrite a
+  // reply. When the conflict returns no row, read the existing canonical row.
+  const { data, error } = await db
+    .from("reviews")
+    .upsert(insert, { onConflict: "tenant_id,source,external_id", ignoreDuplicates: true })
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return rowToReview(data);
+  if (review.externalId) {
+    const { data: existing, error: existingError } = await db
       .from("reviews")
       .select("*")
       .eq("tenant_id", tenant)
-      .order("review_date", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(rowToReview);
-  } catch (err) {
-    console.error(`[db] pgListReviews ${tenant} failed:`, err instanceof Error ? err.message : err);
-    return [];
-  }
-}
-
-async function pgInsertReview(tenant: string, review: Omit<ReviewItem, "id">): Promise<ReviewItem | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const insert: Insert<"reviews"> = {
-      tenant_id: tenant,
-      source: review.source,
-      author: review.author,
-      rating: review.rating,
-      text: review.text,
-      review_date: review.date,
-      reply: review.reply ?? null,
-      replied_at: review.repliedAt ?? null,
-      external_id: review.externalId ?? null,
-    };
-    // Upsert on the provider id so a re-poll (e.g. after the 30-day Redis dedup
-    // cache expires) can't insert duplicate rows. ignoreDuplicates keeps the
-    // existing row, preserving any reply. Manual reviews have a null external_id
-    // (NULLs are distinct under the unique key), so they always insert, as before.
-    const { data, error } = await db
-      .from("reviews")
-      .upsert(insert, { onConflict: "tenant_id,source,external_id", ignoreDuplicates: true })
-      .select("*")
+      .eq("source", review.source)
+      .eq("external_id", review.externalId)
       .maybeSingle();
-    if (error) throw error;
-    return data ? rowToReview(data) : null;
-  } catch (err) {
-    console.error(`[db] pgInsertReview ${tenant} failed:`, err instanceof Error ? err.message : err);
-    return null;
+    if (existingError) throw existingError;
+    if (existing) return rowToReview(existing);
   }
+  throw new Error(`[reviews] insert ${tenant} returned no persisted row`);
 }
 
 async function pgReplyToReview(tenant: string, id: string, reply: string, repliedAt: string): Promise<ReviewItem | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const { data, error } = await db
-      .from("reviews")
-      .update({ reply, replied_at: repliedAt })
-      .eq("tenant_id", tenant)
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
-    if (error) throw error;
-    return data ? rowToReview(data) : null;
-  } catch (err) {
-    console.error(`[db] pgReplyToReview ${tenant}/${id} failed:`, err instanceof Error ? err.message : err);
-    return null;
-  }
+  const db = reviewDb(`reply ${tenant}/${id}`);
+  const { data, error } = await db
+    .from("reviews")
+    .update({ reply, replied_at: repliedAt })
+    .eq("tenant_id", tenant)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToReview(data) : null;
 }
 
 export async function getReviews(tenant: string): Promise<ReviewItem[]> {
@@ -128,9 +126,8 @@ export async function addReview(
 ): Promise<ReviewItem> {
   // Postgres is the id space when the flag is on (the row uuid). Insert there
   // first so the returned id matches what getReviews/replyToReview will use.
-  let result: ReviewItem | null = null;
   if (dataSourceIsPostgres()) {
-    result = await pgInsertReview(tenant, review);
+    return pgInsertReview(tenant, review);
   }
 
   if (!dataSourceIsPostgres()) {
@@ -142,7 +139,7 @@ export async function addReview(
     return newReview;
   }
 
-  return result ?? { ...review, id: generateId() };
+  throw new Error("Unreachable review persistence branch");
 }
 
 export async function replyToReview(

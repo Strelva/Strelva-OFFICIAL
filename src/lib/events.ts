@@ -12,6 +12,17 @@ import { dualWritePgEnabled, eventToInsert } from "./db/dual-write";
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
 
+/** Keep retention anchored to creation time. Updating an event must not turn a
+ *  90-day operational record into an immortal key or restart its retention
+ *  window. A record already beyond the window gets one final second so Redis
+ *  can remove it without accepting an invalid EX value. */
+function remainingEventTtlSeconds(event: Pick<UnifiedEvent, "createdAt">): number {
+  const createdAt = new Date(event.createdAt).getTime();
+  if (!Number.isFinite(createdAt)) return EVENT_TTL_SECONDS;
+  const expiresAt = createdAt + EVENT_TTL_SECONDS * 1000;
+  return Math.max(1, Math.ceil((expiresAt - Date.now()) / 1000));
+}
+
 export class EventPersistenceError extends Error {
   constructor(message: string) {
     super(message);
@@ -67,6 +78,85 @@ function memberToRef(item: unknown): { id: string | null; embedded: UnifiedEvent
  */
 function eventKey(eventId: string): string {
   return `event:${eventId}`;
+}
+
+function actionLockKey(eventId: string): string {
+  return `event-action:${eventId}`;
+}
+
+export async function claimEventAction(
+  id: string,
+  action: "approved" | "dismissed",
+  actor = "user",
+): Promise<{ acquired: true; attemptId: string } | { acquired: false; reason: string }> {
+  const redis = getRedis();
+  if (!redis) return { acquired: false, reason: "persistence_unavailable" };
+
+  const existing = await redis.get<UnifiedEvent>(eventKey(id));
+  if (!existing) return { acquired: false, reason: "not_found" };
+  if (existing.status !== "pending") return { acquired: false, reason: "already_resolved" };
+
+  const activeAttempt = await redis.get<string>(actionLockKey(id));
+  if (activeAttempt) return { acquired: false, reason: "action_in_progress" };
+
+  // A process can die after a provider accepts a non-idempotent write but
+  // before Strelva resolves the event. Never infer that an expired Redis lock
+  // means the provider write did not happen. A processing marker survives the
+  // lock and forces operator reconciliation instead of risking a duplicate.
+  if (existing.metadata?.execution?.state === "processing") {
+    return { acquired: false, reason: "action_reconciliation_required" };
+  }
+
+  const attemptId = `attempt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const acquired: unknown = await redis.set(actionLockKey(id), attemptId, { nx: true, ex: 15 * 60 });
+  if (acquired === null || acquired === undefined || acquired === false) {
+    return { acquired: false, reason: "action_in_progress" };
+  }
+
+  const startedAt = new Date().toISOString();
+  const marked = await updateEvent(id, (event) => ({
+    ...event,
+    metadata: {
+      ...event.metadata,
+      execution: { state: "processing", action, actor, attemptId, startedAt },
+    },
+  }));
+  if (!marked.changed || marked.event?.status !== "pending") {
+    await redis.del(actionLockKey(id));
+    return { acquired: false, reason: "action_in_progress" };
+  }
+
+  return { acquired: true, attemptId };
+}
+
+export async function finishEventAction(
+  id: string,
+  attemptId: string,
+  outcome: { state: "completed" | "failed"; reason?: string },
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await updateEvent(id, (event) => {
+      const execution = event.metadata?.execution;
+      if (!execution || execution.attemptId !== attemptId) return event;
+      return {
+        ...event,
+        metadata: {
+          ...event.metadata,
+          execution: {
+            ...execution,
+            state: outcome.state,
+            finishedAt: new Date().toISOString(),
+            ...(outcome.reason ? { reason: outcome.reason } : {}),
+          },
+        },
+      };
+    });
+  } finally {
+    const owner = await redis.get<string>(actionLockKey(id));
+    if (owner === attemptId) await redis.del(actionLockKey(id));
+  }
 }
 
 /**
@@ -246,7 +336,7 @@ export async function updateEvent(
     if (!existing) return { event: null, changed: false };
 
     const updated = updater(existing);
-    await redis.set(eventKey(id), updated);
+    await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
     return { event: updated, changed: true };
   } finally {
     await redis.del(lockKey);
@@ -311,6 +401,15 @@ async function resolveEventLocked(
     resolvedAt: new Date().toISOString(),
     metadata: {
       ...existing.metadata,
+      ...(existing.metadata?.execution
+        ? {
+            execution: {
+              ...existing.metadata.execution,
+              state: "completed" as const,
+              finishedAt: new Date().toISOString(),
+            },
+          }
+        : {}),
       resolutionHistory: [
         ...resolutionHistory,
         {
@@ -323,7 +422,7 @@ async function resolveEventLocked(
   };
 
   // The zset member is the stable id; only the event:{id} record changes.
-  await redis.set(eventKey(id), updated);
+  await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
 
   // Postgres shadow-write: mirror the status transition AND the updated metadata
   // (resolutionHistory) so the shadow row stays in parity, not status-frozen.

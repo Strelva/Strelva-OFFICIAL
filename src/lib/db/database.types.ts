@@ -1492,6 +1492,8 @@ export type Database = {
           owner_phone: string | null
           personality: string | null
           plan_override: string | null
+          plan_currency: string | null
+          plan_monthly_cents: number | null
           production_domain: string | null
           referred_by: string | null
           resend_domain: string | null
@@ -1506,6 +1508,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_past_due_since: string | null
+          subscription_plan: string | null
           subscription_started_at: string | null
           subscription_status: string
           template: string | null
@@ -1539,6 +1542,8 @@ export type Database = {
           owner_phone?: string | null
           personality?: string | null
           plan_override?: string | null
+          plan_currency?: string | null
+          plan_monthly_cents?: number | null
           production_domain?: string | null
           referred_by?: string | null
           resend_domain?: string | null
@@ -1553,6 +1558,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_past_due_since?: string | null
+          subscription_plan?: string | null
           subscription_started_at?: string | null
           subscription_status?: string
           template?: string | null
@@ -1586,6 +1592,8 @@ export type Database = {
           owner_phone?: string | null
           personality?: string | null
           plan_override?: string | null
+          plan_currency?: string | null
+          plan_monthly_cents?: number | null
           production_domain?: string | null
           referred_by?: string | null
           resend_domain?: string | null
@@ -1600,6 +1608,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_past_due_since?: string | null
+          subscription_plan?: string | null
           subscription_started_at?: string | null
           subscription_status?: string
           template?: string | null

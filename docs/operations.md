@@ -1,19 +1,11 @@
 # Strelva Operations — Where Things Live and the Rules That Keep It Clean
 
-> **2026-06-22 update:** the auth + data backbone CUT OVER to **Supabase Auth +
-> Postgres in production on 2026-06-20** (`scaffoldweb.com` live + healthy:
-> Supabase auth active, content served from Postgres, RLS + the
-> `handle_new_user` provisioning trigger live). Prod flags are ON
-> (`CONTENT_SOURCE=postgres`, `TENANTS_SOURCE=postgres`, `DATA_SOURCE=postgres`).
-> Sanity is still **dual-written** as a reversible rollback path but no migrated
-> store *reads* it while the flags are on; Clerk is dead-pathed behind
-> `isSupabaseAuthConfigured()` and pending teardown. The remaining destructive
-> teardown (remove Sanity reads, lock the Sanity dataset, unwrap
-> `clerkMiddleware` in `src/proxy.ts`) is a deliberate end-step and is NOT done
-> yet — `core.ts` still touches Sanity as the content-store fallback. Sections
-> below that still say "Sanity is the source of truth" describe the pre-cutover
-> world; treat Postgres as the source of truth now and Sanity as the rollback
-> mirror.
+> **Current-state note (2026-07-14):** Supabase Auth is the only auth path;
+> Postgres owns identity, tenant configuration, content, collections, drafts,
+> audit, and activity. Redis owns only the operational boundaries listed in
+> `persistence-boundaries.md`. Clerk and Sanity code teardown are complete;
+> only legacy Sanity image URL cleanup remains. The canonical control-plane
+> origin is `app.strelva.com`; `strelva.com` is the separate marketing repo.
 
 The architecture (org of per-client repos, one shared content store, one
 Vercel team) is correct for our size. What rots agency platforms is not the
@@ -25,8 +17,8 @@ site, 22 dead branches, canonical repos invisible to one founder).
 
 | Repo | What | Canonical location |
 | --- | --- | --- |
-| `REB` (this repo) | Control plane: multi-tenant platform, AI agent, dashboard, `/api/v1` contract | → moving to `Scaffold-Web` org |
-| `strelva-marketing` | strelva.com marketing site + `brand/` assets | → moving to `Scaffold-Web` org |
+| `REB` (this repo; legacy folder name) | Control plane: multi-tenant platform, AI agent, dashboard, `/api/v1` contract | canonical local control-plane workspace |
+| `strelva-marketing` | strelva.com marketing site + `brand/` assets | separate production marketing workspace |
 | `custom-repo-starter/` (in this repo) | The template every client storefront starts from | here |
 | `rhm-innovations` | Client storefront | `Scaffold-Web` org |
 | `greatlakesdriedfruits` | Client storefront | → moving to org |
@@ -54,8 +46,9 @@ starter.
 
 ## Client lifecycle
 
-**Onboarding:** clone starter → 4 env vars → tenant in control plane →
-Vercel project in the team → domain. No hand-built repos.
+**Onboarding:** start from the reusable starter foundation → tenant in control
+plane → hand-built client implementation → Vercel project → domain. Every paid
+site is bespoke; reusable behavior lands in the starter first.
 
 **Offboarding (do it the day they churn, not "later"):**
 1. Archive the GitHub repo
@@ -67,8 +60,7 @@ Vercel project in the team → domain. No hand-built repos.
 ## Access policy
 
 **Both founders are admin on everything: GitHub org, Vercel team,
-Cloudflare, Supabase, Stripe, Resend, Google Search Console** (plus Clerk +
-Sanity until they're decommissioned post-cutover). No
+Cloudflare, Supabase, Stripe, Resend, and Google Search Console.** No
 production surface lives under one person's personal account. This is not
 about trust — it's bus factor. The 2026-06-06 cleanup happened because the
 canonical marketing repo was invisible to half the company.
@@ -77,25 +69,27 @@ canonical marketing repo was invisible to half the company.
 
 - Branches: anything merged or >30 days stale gets deleted
 - Postgres: list tenants — does each map to a paying client or a named
-  experiment? Delete the rest. (Sanity holds the same data as the rollback
-  mirror until it's decommissioned.)
+  experiment? Archive or delete the rest through a reviewed operator flow.
 - Vercel: every project maps to a live client or core property? Delete the rest
 - This table: still accurate? Update it
 
 ## Database / content store
 
-**Supabase Postgres is the source of truth** for tenant config + content +
-operational data (flipped 2026-06-20; prod flags `CONTENT_SOURCE`,
-`TENANTS_SOURCE`, `DATA_SOURCE` = `postgres`). Tenant isolation is a DB
-guarantee via **RLS** (`supabase/migrations/*_rls.sql`). Upstash Redis remains
-the write-through cache + ephemeral operational store (rate limits, locks);
-operational data also dual-writes to Postgres. Sanity (`production` dataset) is
-still dual-written as a reversible rollback mirror but is no longer read while
-the flags are on — its teardown is the deliberate end-step (not done yet).
-The standing rule still holds: **every read/write is scoped by tenant id derived
-from auth or trusted config — never from request input** — and RLS now enforces
-it at the DB layer for any path carrying a user JWT. Any new route that touches
-tenant data gets that check in review.
+**Supabase Postgres is the source of truth** for identity, tenant configuration,
+domains, content, collections, drafts, audit, and activity (flipped
+2026-06-20; production flags `CONTENT_SOURCE`, `TENANTS_SOURCE`, and
+`DATA_SOURCE` are `postgres`). Upstash Redis is the cache for those domains and
+the authority for the explicitly operational domains in
+[`persistence-boundaries.md`](./persistence-boundaries.md), including locks,
+rate limits, queue indexes/bodies, and pre-tenant delivery state. A Postgres
+mirror does not become authoritative until its read path is deliberately cut
+over.
+
+Tenant isolation is enforced at the **application boundary**: derive tenant id
+from authenticated membership or trusted routing/configuration, then call the
+appropriate access or permission gate. The service-role control plane bypasses
+RLS, so RLS is defense in depth—not the live authorization boundary. Any new
+tenant-data route must demonstrate this scope explicitly.
 
 ## Observability (how we know it broke before a customer does)
 
@@ -109,35 +103,30 @@ tenant data gets that check in review.
   "why didn't tenant X get their report?". A run that fails >20% of attempted
   sends pages high.
 - **Dependency health.** `GET /api/health` (and `getServiceHealth()`) probe
-  Redis/Sanity/Clerk/Stripe/Gemini; the maintenance cron runs the same probe
-  daily and pages if a core dependency is down/degraded. Point an external
-  uptime monitor at `/api/health` (503 = core down).
+  Redis, Supabase, Stripe, and Gemini. In production, missing or failing Redis
+  or Supabase is `down`; provider failures are `degraded`. The maintenance cron
+  runs the same probe daily. Point an external uptime monitor at `/api/health`
+  (503 = core down).
 - **Alerts.** `alert()` is the sync path (Slack+Sentry on high/critical only).
   `alertOnce()` dedups high/critical and rolls medium/low into
   `reb:alert-count:*` counters instead of dropping them.
 
-## T004 — scaffoldweb.com → strelva.com rebrand (PARKED, needs go/no-go)
+## Brand, origin, and compatibility boundary
 
-> **Note:** the **data + auth cutover** (Clerk+Sanity → Supabase Auth +
-> Postgres) is DONE (2026-06-20) and is a separate thing from this rebrand. The
-> rebrand below — renaming the *domain/brand* from `scaffoldweb.com` to
-> `strelva.com` and splitting the repo — is still parked.
+The customer-facing brand and production origins are settled:
 
-The full rebrand + repo split (`scaffoldweb.com` → `strelva.com`,
-`strelva-marketing` + `strelva-app`) is specced in
-`docs/strelva-migration-plan.md` — ~518 references across proxy host matching,
-the tenant subdomain pattern, Resend domains, CSP, and copy. It is a
-rebrand, not a DNS change, and is **half-migrated** (production strelva.com
-marketing already serves from the separate repo; this control plane still
-matches `*.scaffoldweb.com` hosts).
+- `strelva.com` is the separate marketing repository.
+- `app.strelva.com` is this control plane and public API origin.
+- `admin.strelva.com` is the operator host.
+- Paid client Site Properties live in separate custom repositories/domains.
 
-**Status: parked pending a Noah+Jacob go/no-go.** Do not execute piecemeal —
-a partial host-matching change can break live tenant routing. When it's
-greenlit: pick a date, freeze content changes during the window, follow the
-migration-plan codemod order, and verify tenant + admin + custom-domain
-routing on a preview before flipping production DNS. Until then, new code uses
-`SCAFFOLD_*` env names (with `REB_*` fallbacks) and keeps `x-reb-*` wire
-headers + `reb:` Redis prefixes frozen.
+The repo folder (`REB`), package name (`scaffold-web`), `SCAFFOLD_*` variables,
+legacy `REB_*` aliases, `x-reb-*` headers, and `reb:` Redis keys are not product
+ontology. They are implementation or compatibility names. New internal code
+uses the canonical Strelva/domain vocabulary, while deployed wire and
+persistent names stay frozen until a coordinated versioned rollout. The old
+sequence is retained only as historical context in
+[`strelva-migration-plan.md`](./strelva-migration-plan.md).
 
 ## Scale model (batch now, queue later)
 
@@ -163,24 +152,25 @@ infra. Two ceilings remain and the move at each is known:
 
 Each dependency, what breaks, and the move.
 
-- **Redis (Upstash) down.** Public content reads fall through to Postgres (the
-  source of truth); custom-domain routing serves a stale in-memory map then the
-  `CUSTOM_DOMAIN_MAP` env map (`getTenantByDomain`). Rate limits and locks
-  fail-closed by design. *Move:* confirm via `/api/health`; Upstash status page;
-  rotate the REST URL/token in Vercel if the instance was recreated. No data
-  loss — Redis is a cache + operational store, not the source of truth.
+- **Redis (Upstash) down.** Public content reads fall through to Postgres;
+  custom-domain routing serves a stale in-memory map then the
+  `CUSTOM_DOMAIN_MAP` fallback. Redis-authoritative operational features are
+  unavailable or fail-soft according to their contract, and locks/rate limits
+  fail closed where safety requires it. *Move:* confirm via `/api/health`, check
+  Upstash status, and rotate credentials if the instance was recreated. Do not
+  claim zero data loss: queue/event bodies, locks, and other domains identified
+  as Redis-authoritative have their own retention/recovery semantics.
 - **Postgres (Supabase, source of truth) down.** Content/tenant/operational
-  reads serve the Redis cache while it lasts; writes fail. *Move:* Supabase
-  status page + `get_advisors`/`get_logs`; do NOT mass-retry writes (they'll
-  stack). Once back, the next cron/edit re-warms the cache. (Rollback lever if
-  Supabase itself is the problem: flip `*_SOURCE` flags back off + redeploy —
-  Sanity is kept current via dual-write — see `docs/rollback.md`.)
+  reads may serve an existing Redis cache where that domain explicitly supports
+  it; authoritative writes fail. *Move:* Supabase status page +
+  `get_advisors`/`get_logs`; do not mass-retry writes. Once back, normal reads
+  and edits re-warm caches. Rollback is forward-only—there is no Sanity source
+  to flip back to.
 - **Supabase Auth down = no dashboard login.** Public client sites are
   unaffected (they read `/api/v1/*`, no auth). *Move:* Supabase status page;
   there is no bypass by design (the dev-access path is local-only). An "auth
-  temporarily unavailable" message is better than a stack trace — surface it on
-  the sign-in route if this recurs. (Clerk is dead-pathed behind
-  `isSupabaseAuthConfigured()` and no longer the live login path.)
+  temporarily unavailable" message is better than a stack trace—surface it on
+  the sign-in route if this recurs.
 - **Resend down / domain-reputation block.** Weekly reports fail; the mail log
   records each failure and the >20% alert fires. *Move:* check
   `/api/admin/mail-logs`; re-send manually via `workflow_dispatch` on the cron
@@ -192,11 +182,11 @@ Each dependency, what breaks, and the move.
 - **What's backed up.** A daily full-site content snapshot per tenant
   (`createDailySiteSnapshot`, run by the maintenance cron) capturing all
   owner-editable sections. Since the 2026-06-20 cutover the source of truth is
-  Postgres, which carries its own Supabase backups; the durable mirror is now
-  the DB rather than Sanity. (Sanity also still receives dual-writes as the
-  rollback path until its teardown.)
-- **RPO ~24h** for content (daily snapshot). Operational Redis data
-  (events/bookings) is best-effort, not snapshotted.
+  Postgres, which also carries the configured Supabase backup policy. Sanity is
+  not a backup or rollback path.
+- **RPO ~24h** for the application-level content snapshot. Redis-authoritative
+  domains are governed by their documented TTL, mirror, and recovery contracts;
+  do not describe them collectively as durable backups.
 - **RTO minutes.** `restoreSiteSnapshot` is **crash-safe**: it captures current
   content before writing and rolls the site back to its pre-restore state if a
   mid-write fails, so a partial failure can't leave a half-restored site. A

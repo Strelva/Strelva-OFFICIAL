@@ -1,3 +1,6 @@
+// strelva.com is served by the separate marketing deployment. Keep the apex in
+// this classifier as a safe fallback if DNS/preview traffic ever reaches the
+// control plane: it must never be mistaken for a tenant custom domain.
 export const DEFAULT_MARKETING_HOSTS = [
   "strelva.com",
   "www.strelva.com",

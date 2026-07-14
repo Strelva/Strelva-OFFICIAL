@@ -1,6 +1,9 @@
 # Strelva Launch Blockers
 
-> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (`CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live, Google OAuth consent screen published). This doc is retained for historical/runbook reference. The Sanity code teardown is done (Sanity reads removed); the only remaining work is locking the Sanity dataset (an ops step) and the Clerk teardown (unwrap `clerkMiddleware` in `src/proxy.ts`).
+> **Status: current release gate (updated 2026-07-14).** Only `Current
+> Blockers` and `Waived Blockers` determine release status. The long evidence
+> record below is historical. Current architecture and commands live in
+> `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
 
 Last local audit: May 14, 2026.
 
@@ -10,7 +13,43 @@ This file tracks launch blockers that cannot be resolved by code changes alone. 
 
 _No current blockers — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated. Detail and release runbook retained below._
 
-## Release Verification Runbook
+## Current Release Verification Runbook
+
+- Required owner action: keep production values in Vercel aligned with
+  `.env.production.example`; do not perform a production deploy from a dirty local working tree.
+- Minimum production values to confirm in Vercel: Supabase project URL,
+  publishable key, service-role key, Postgres source flags, Upstash, Stripe,
+  Resend, Sentry, `CRON_SECRET`, `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`,
+  and `NEXT_PUBLIC_APP_URL=https://app.strelva.com`.
+- Copyable Vercel env commands: `vercel env add NEXT_PUBLIC_SUPABASE_URL production`,
+  `vercel env add UPSTASH_REDIS_REST_URL production`,
+  `vercel env add UPSTASH_REDIS_REST_TOKEN production`,
+  `vercel env add SENTRY_DSN production`,
+  `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and
+  `vercel env add NEXT_PUBLIC_APP_URL production`.
+- Provider value sources: Supabase project settings -> API, Upstash Redis
+  database -> REST API section, Sentry project settings -> Client Keys / DSN,
+  and Stripe live-mode Products/Webhooks.
+- Do not overwrite the values already passing the checker. Generate local
+  shared secrets with `openssl rand -hex 32`, then run
+  `vercel env pull .env.production.local --environment=production` and
+  `pnpm check:prod`.
+- After a clean `git status --short`, deploy with `vercel deploy --prod`, then run:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"
+PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+curl -I -L https://app.strelva.com/api/health
+curl -i https://app.strelva.com/api/cron/maintenance
+curl -i -H "Authorization: Bearer $CRON_SECRET" https://app.strelva.com/api/cron/maintenance
+```
+
+Production Live Verification requires `https://app.strelva.com/sign-in` to show
+`Sign in to Strelva | Strelva`, invited-owner access and content preview to work,
+Supabase Auth and Stripe webhook verification to succeed, and cron 401/success
+behavior to match the two commands above.
+
+## Historical Release Verification Record
 
 ### Rohlax Cloudflare DNS
 

@@ -16,6 +16,7 @@ import { setContent } from "./storage";
 import { setAnalyticsConfig, deriveScDomain } from "./analytics";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
+import { CONTROL_PLANE_URL } from "./brand";
 import type { ContentSection, ContentMap } from "./types";
 import {
   createVercelProject,
@@ -69,12 +70,11 @@ function initials(name: string): string {
 // so new clients now bake app.strelva.com (the canonical control plane). app.strelva.com
 // + scaffoldweb.com are the same Vercel project during the soak; strelva.com is the
 // marketing site and does NOT serve the v1 contract.
-// The literal default stays scaffoldweb.com on purpose: it is the operational wire-level
-// endpoint that already-deployed legacy client repos expect, and it keeps working until
-// scaffoldweb is decommissioned (post-soak). Wire-level REB_*/SCAFFOLD env *names* stay
-// frozen; only the value moves, via the env var above. Do NOT change this default literal.
+// Legacy repos keep their deployed REB_/SCAFFOLD env names and existing values;
+// newly provisioned repos use the canonical app host unless an operator supplies
+// an explicit compatibility endpoint.
 const CONTROL_PLANE_API =
-  process.env.CONTROL_PLANE_API_URL || "https://scaffoldweb.com";
+  process.env.CONTROL_PLANE_API_URL || CONTROL_PLANE_URL;
 
 // FAILURE / PARTIAL-PROVISION MODEL (read before adding auto-rollback):
 // Provisioning is forward-recovery, not transactional. Steps run sequentially

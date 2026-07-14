@@ -1,6 +1,8 @@
 # Mission Control — test checklist
 
-> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (`CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live). This doc is retained for historical/runbook reference. The only remaining work is the deliberate destructive Sanity/Clerk teardown (remove Sanity reads, lock the dataset, unwrap `clerkMiddleware` in `src/proxy.ts`).
+> **Status: historical QA record for PR #55.** Routes, navigation, providers,
+> and setup steps below are snapshots. Use `operator-command-center.md` and the
+> current smoke commands in `AGENTS.md`.
 
 QA script for the `feat/platform-solidify` branch (PR rhinehart514/REB#55). Work
 top to bottom; each item says what to do and what "right" looks like.

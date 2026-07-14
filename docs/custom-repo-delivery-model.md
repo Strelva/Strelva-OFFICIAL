@@ -80,7 +80,7 @@ The local Strelva workspace expects these sibling custom repos:
 
 | Tenant | Local repo | Public site | Capability manifest | Signed revalidation |
 | --- | --- | --- | --- | --- |
-| `gldf` | `../gldf` | `https://greatlakesdriedfruit.com` | `/api/reb-capabilities` | `/api/v1/revalidate` |
+| `gldf` | `../greatlakesdriedfruits` | `https://greatlakesdriedfruit.com` | `/api/reb-capabilities` | `/api/v1/revalidate` |
 | `rohlax` | `../rohlax-wellness` | `https://rohlaxwellness.com` | `/api/reb-capabilities` | `/api/v1/revalidate` |
 
 Strelva release metadata records both storefronts in `release-manifest.json`. Run

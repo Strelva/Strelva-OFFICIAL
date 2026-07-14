@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetEvent = vi.fn();
 const mockResolveEvent = vi.fn();
+const mockClaimEventAction = vi.fn();
+const mockFinishEventAction = vi.fn();
 const mockUpdateSuggestion = vi.fn();
 const mockExecuteAgentPrompt = vi.fn();
 const mockGetDraftContent = vi.fn();
@@ -18,6 +20,8 @@ const mockPublishReviewReply = vi.fn();
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
   resolveEvent: (...args: unknown[]) => mockResolveEvent(...args),
+  claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
+  finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
 }));
 
 vi.mock("../lib/suggestions", () => ({
@@ -67,6 +71,8 @@ import { resolveEventAction } from "../lib/event-actions";
 describe("resolveEventAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClaimEventAction.mockResolvedValue({ acquired: true, attemptId: "attempt_1" });
+    mockFinishEventAction.mockResolvedValue(undefined);
     mockRevalidateClientSite.mockResolvedValue(undefined);
   });
 
@@ -88,6 +94,7 @@ describe("resolveEventAction", () => {
     expect(result).toEqual({ changed: false, reason: "already_resolved" });
     expect(mockUpdateSuggestion).not.toHaveBeenCalled();
     expect(mockExecuteAgentPrompt).not.toHaveBeenCalled();
+    expect(mockClaimEventAction).not.toHaveBeenCalled();
   });
 
   it("rejects cross-tenant event resolution", async () => {
@@ -161,6 +168,50 @@ describe("resolveEventAction", () => {
       "tenant-a"
     );
     expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
+    expect(mockSetContent.mock.invocationCallOrder[0]).toBeLessThan(
+      mockResolveEvent.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not run an effect when another approver owns the action claim", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_busy",
+      tenantId: "tenant-a",
+      type: "newsletter_draft",
+      status: "pending",
+      metadata: { subject: "News", body: "Body" },
+    });
+    mockClaimEventAction.mockResolvedValue({ acquired: false, reason: "action_in_progress" });
+
+    const result = await resolveEventAction("tenant-a", "evt_busy", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "action_in_progress" });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps content pending when the authoritative live write fails", async () => {
+    mockGetEvent.mockResolvedValue({
+      id: "evt_write_fail",
+      tenantId: "tenant-a",
+      source: "ai",
+      type: "content_update",
+      status: "pending",
+      createdAt: "2026-07-01T00:00:00.000Z",
+      metadata: { kind: "agent_preview", section: "contact", proposedData: { email: "new@example.com" } },
+    });
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ email: "old@example.com" });
+    mockSetContent.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(resolveEventAction("tenant-a", "evt_write_fail", "approved")).rejects.toThrow(
+      "database unavailable",
+    );
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+    expect(mockFinishEventAction).toHaveBeenCalledWith(
+      "evt_write_fail",
+      "attempt_1",
+      expect.objectContaining({ state: "failed" }),
+    );
   });
 
   // GBP hours: governed — the real Google write happens on approval, never

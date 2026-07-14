@@ -163,6 +163,18 @@ describe("suggestions store postgres path", () => {
     expect(created.status).toBe("pending");
   });
 
+  it("surfaces an authoritative insert failure instead of reporting a created suggestion", async () => {
+    supa.result = { data: null, error: new Error("invalid input syntax") };
+    await expect(addSuggestion({
+      tenantId: "gldf",
+      type: "missing",
+      title: "Add an upcoming event",
+      description: "Events give people a reason to visit.",
+      action: "prompt:Help me create an event",
+      section: "events",
+    })).rejects.toThrow("invalid input syntax");
+  });
+
   it("addSuggestion returns the existing pending duplicate instead of inserting", async () => {
     // pgFindPendingDuplicate sees a matching pending row -> early return.
     supa.result = {

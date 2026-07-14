@@ -1,8 +1,7 @@
 /**
- * Lightweight operator workflow status for onboard-form leads. Layered ON TOP of
- * the migration-sensitive lead storage (Sanity / `access-request-delivery`) — this
- * store NEVER touches the lead record itself, it only tracks how the operator is
- * working the lead, keyed by the lead's stable `statusToken`.
+ * Operator projection of the canonical delivery-lead lifecycle. Status changes
+ * update the DeliveryLead first; this small Redis record retains operator notes
+ * and remains as a compatibility cache for leads created before the projection.
  *
  * One JSON blob per lead in Redis at `lead-workflow:{statusToken}` — same pattern
  * as the operator CRM (`tenant-crm.ts`), pay-links, and leads. No DB migration:
@@ -10,6 +9,11 @@
  * to a default `new` record when Redis is unconfigured.
  */
 import { getRedis } from "@/lib/redis";
+import {
+  getDeliveryLeadByToken,
+  updateDeliveryLeadStatus,
+  type DeliveryStatus,
+} from "@/lib/access-request-delivery";
 
 export type LeadWorkflowStatus = "new" | "contacted" | "converting" | "converted" | "dismissed";
 
@@ -47,6 +51,22 @@ function defaultWorkflow(token: string): LeadWorkflow {
   return { token, status: "new", updatedAt: null };
 }
 
+const DELIVERY_FROM_WORKFLOW: Record<LeadWorkflowStatus, DeliveryStatus> = {
+  new: "received",
+  contacted: "reviewing",
+  converting: "drafting",
+  converted: "launched",
+  dismissed: "paused",
+};
+
+export function workflowStatusFromDelivery(status: DeliveryStatus): LeadWorkflowStatus {
+  if (status === "received") return "new";
+  if (status === "reviewing") return "contacted";
+  if (status === "launched") return "converted";
+  if (status === "paused") return "dismissed";
+  return "converting";
+}
+
 function isStatus(value: unknown): value is LeadWorkflowStatus {
   return typeof value === "string" && LEAD_WORKFLOW_STATUSES.includes(value as LeadWorkflowStatus);
 }
@@ -74,23 +94,23 @@ function normalize(token: string, raw: unknown): LeadWorkflow {
 
 export async function getLeadWorkflow(token: string): Promise<LeadWorkflow> {
   const redis = getRedis();
-  if (!redis || !validToken(token)) return defaultWorkflow(token);
-  const raw = await redis.get(key(token));
-  return normalize(token, raw);
+  if (!validToken(token)) return defaultWorkflow(token);
+  const [lead, raw] = await Promise.all([
+    getDeliveryLeadByToken(token),
+    redis ? redis.get(key(token)) : Promise.resolve(null),
+  ]);
+  const cached = normalize(token, raw);
+  if (!lead) return cached;
+  return {
+    ...cached,
+    status: workflowStatusFromDelivery(lead.deliveryStatus),
+    updatedAt: lead.statusUpdatedAt,
+  };
 }
 
 export async function getAllLeadWorkflow(tokens: string[]): Promise<Record<string, LeadWorkflow>> {
-  const out: Record<string, LeadWorkflow> = {};
-  const redis = getRedis();
-  if (!redis || tokens.length === 0) {
-    for (const token of tokens) out[token] = defaultWorkflow(token);
-    return out;
-  }
-  const raws = await redis.mget<unknown[]>(...tokens.map(key));
-  tokens.forEach((token, i) => {
-    out[token] = normalize(token, raws?.[i]);
-  });
-  return out;
+  const workflows = await Promise.all(tokens.map((token) => getLeadWorkflow(token)));
+  return Object.fromEntries(workflows.map((workflow) => [workflow.token, workflow]));
 }
 
 export async function setLeadWorkflowStatus(
@@ -106,6 +126,10 @@ export async function setLeadWorkflowStatus(
     ...(cleanNote ? { note: cleanNote } : current.note ? { note: current.note } : {}),
     updatedAt: new Date().toISOString(),
   };
+  // DeliveryLead is the lifecycle source of truth. If the token belongs to a
+  // lead, update it before refreshing the operator projection/cache.
+  const canonical = await updateDeliveryLeadStatus(token, DELIVERY_FROM_WORKFLOW[next.status]);
+  if (canonical) next.updatedAt = canonical.statusUpdatedAt;
   const redis = getRedis();
   if (redis && validToken(token)) await redis.set(key(token), next);
   return next;

@@ -18,7 +18,7 @@ import {
   type RawTenantConnectionSettings,
 } from "@/lib/integration-registry";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
+import { assertAgentToolCatalog, capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilities";
 import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
@@ -1404,6 +1404,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
     if (GBP_WRITE_TOOLS.has(name) && !gbpWriteAllowed) continue;
     tools[name] = def;
   }
+  assertAgentToolCatalog(Object.keys(tools), "chat");
 
   // Primary/fallback model resilience: chat survives a Gemini outage by
   // retrying the whole turn on the configured fallback model — but only when

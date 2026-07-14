@@ -1,17 +1,17 @@
 /**
  * Prospect-facing "your site health report is ready" email. Sent when someone
  * runs the gated full audit on the marketing site. This is a PROSPECT send (no
- * tenant, no lifecycle), gated on its OWN `prospectEmailsEnabled()` switch —
- * separate from the client `emailSendingPaused()` gate so it flows to warm the
- * sending domain while client lifecycle email stays paused. The on-page "View
+ * tenant, no lifecycle), sent through the shared prospect audience boundary —
+ * separate from the client lifecycle gate so it can flow while lifecycle email
+ * stays paused. The on-page "View
  * full report" link also delivers the report, so the flow works either way.
  *
  * Deliberately a LINK, not a PDF attachment: the report lives at reportUrl
  * (the hosted one-pager), which the recipient views in-browser and prints to PDF.
  */
 
-import { prospectEmailsEnabled } from "./email-enabled";
-import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailHighlight } from "./email/layout";
+import { type EmailOptions, type EmailHighlight } from "./email/layout";
+import { sendEmail } from "./email/send";
 import { findingsFromCategories } from "./lead-audit";
 import type { AuditResult } from "./audit/types";
 
@@ -86,27 +86,15 @@ export async function sendAuditReportEmail(params: {
   result: AuditResult;
   reportUrl: string;
 }): Promise<boolean> {
-  if (!prospectEmailsEnabled()) return false;
-  if (!process.env.RESEND_API_KEY) return false;
-
   const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
     const host = displayHost(params.lead.url);
-
-    const result = await resend.emails.send({
-      from: `Strelva <hello@${fromDomain}>`,
+    return await sendEmail({
+      audience: "prospect",
       to: params.lead.email,
       subject: `Your site health report — ${host}`,
-      html: renderEmailHtml(opts),
-      text: renderEmailText(opts),
+      options: opts,
     });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message || "Resend did not return an email id.");
-    }
-    return true;
   } catch (err) {
     console.error("[audit-report-email] send failed:", err);
     return false;

@@ -217,6 +217,7 @@ export const siteSettingsSchema = z.object({
   siteKeywords: z.string().max(10000).optional().default(""),
   ownerName: z.string().max(10000).optional().default(""),
   ownerTitle: z.string().max(10000).optional().default(""),
+  trustBadge: z.string().max(10000).optional().default(""),
   footerTagline: z.string().max(10000),
   copyrightText: z.string().max(10000),
   bookingUrl: safeUrl.optional().default(""),
@@ -229,7 +230,7 @@ export const siteSettingsSchema = z.object({
   brandVoice: z.string().max(10000).optional().default(""),
   // How the business is found ("local" | "online" | "hybrid"); "" = infer from
   // template. Drives which presence surfaces (Google Business, Reviews) appear.
-  businessModel: z.string().max(20).optional().default(""),
+  businessModel: z.enum(["", "local", "online", "hybrid"]).optional().default(""),
 });
 
 export const themeSchema = z.object({

@@ -34,4 +34,9 @@ describe("applyFeatureChange — clean + expand + dedupe", () => {
     // Was fully wellness-enabled; next has none of them → result is empty (no core stored to protect).
     expect(applyFeatureChange(["schedule", "members", "roster"], [])).toEqual([]);
   });
+
+  it("canonicalizes legacy store flags on the next feature write", () => {
+    expect(applyFeatureChange(["products"], ["products", "shop"]))
+      .toEqual(["commerce"]);
+  });
 });

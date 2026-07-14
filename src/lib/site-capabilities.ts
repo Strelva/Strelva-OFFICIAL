@@ -9,6 +9,7 @@ import type {
   SiteCapabilityManifest,
   TenantConfig,
 } from "@/lib/types";
+import { isContentSection } from "@/lib/types";
 
 const DEFAULT_DESIGN_TOKENS = [
   "colors",
@@ -45,17 +46,21 @@ function sectionCapability(section: string): SectionCapability {
 
 function mergeManifest(
   base: SiteCapabilityManifest,
-  override: Partial<SiteCapabilityManifest> | undefined
+  override: Partial<SiteCapabilityManifest> | undefined,
+  options: { sectionAuthority?: "merge" | "replace" } = {},
 ): SiteCapabilityManifest {
   if (!override) return base;
 
   return {
     ...base,
     ...override,
-    sections: {
-      ...base.sections,
-      ...override.sections,
-    },
+    // Tenant-local config is a partial override. A fetched custom-repository
+    // manifest is the public site's authoritative declaration: omission means
+    // the live site does not render that section, so remote sections replace
+    // rather than silently inheriting template capabilities.
+    sections: options.sectionAuthority === "replace" && override.sections
+      ? override.sections
+      : { ...base.sections, ...override.sections },
     designTokens: override.designTokens ?? base.designTokens,
     customOnlyFeatures: override.customOnlyFeatures ?? base.customOnlyFeatures,
     customRequestEndpoint: override.customRequestEndpoint ?? base.customRequestEndpoint,
@@ -69,11 +74,7 @@ export async function buildDefaultCapabilityManifest(
 ): Promise<SiteCapabilityManifest> {
   const template = await getTemplateManifestForTenant(tenant);
   const customRepo = getCustomRepoMetadata(tenantConfig);
-  const contentSections = new Set<string>(template.contentSections);
-
-  for (const section of Object.keys(template.components ?? {})) {
-    contentSections.add(section);
-  }
+  const contentSections = new Set<string>(template.contentSections.filter(isContentSection));
 
   const sections = Object.fromEntries(
     Array.from(contentSections)
@@ -115,7 +116,7 @@ export async function getSiteCapabilityManifest(tenant: string): Promise<SiteCap
     if (!res.ok) return local;
     const parsed = siteCapabilityManifestSchema.safeParse(await res.json());
     if (!parsed.success) return local;
-    return mergeManifest(local, parsed.data);
+    return mergeManifest(local, parsed.data, { sectionAuthority: "replace" });
   } catch {
     return local;
   }
@@ -125,7 +126,7 @@ export function manifestSupportsSection(
   manifest: SiteCapabilityManifest,
   section: string
 ): boolean {
-  return !!manifest.sections[section];
+  return isContentSection(section) && !!manifest.sections[section];
 }
 
 export function manifestSupportsContentSection(
@@ -140,6 +141,8 @@ export function manifestAllowsAction(
   section: string,
   action: "read" | "draft" | "publish" | "request_custom"
 ): boolean {
-  const allowed = manifest.sections[section]?.allowedActions;
+  const capability = manifest.sections[section];
+  if (!capability) return false;
+  const allowed = capability.allowedActions;
   return !allowed || allowed.includes(action);
 }

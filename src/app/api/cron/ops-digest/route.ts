@@ -21,6 +21,7 @@ import { getAtRiskTenants } from "@/lib/churn";
 import { getAllTenants } from "@/lib/tenants";
 import { sendOpsDigestEmail } from "@/lib/delivery-email";
 import { requireCronRequest } from "@/lib/cron-auth";
+import { OPERATOR_URL } from "@/lib/brand";
 
 export const maxDuration = 300;
 
@@ -28,8 +29,7 @@ const SIGNUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Where the "Open the ops board" button points. */
 function opsBoardUrl(): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://app.strelva.com";
-  return new URL("/admin", base).toString();
+  return new URL("/", OPERATOR_URL).toString();
 }
 
 export async function GET(request: Request) {

@@ -22,6 +22,24 @@ const workspaceRoot = process.env.CUSTOM_REPO_WORKSPACE_ROOT
   : path.resolve(process.cwd(), "..");
 
 const results: CheckResult[] = [];
+const controlPlaneManifest = JSON.parse(
+  readFileSync(path.join(process.cwd(), "release-manifest.json"), "utf8"),
+) as {
+  compatibleGldf?: { commit?: string };
+  compatibleRohlax?: { commit?: string };
+  customRepoWorkspace?: { repos?: Array<{ tenant: string; localPath: string }> };
+};
+
+/** The release manifest is the single workspace topology contract. Keeping a
+ * second hard-coded directory map in this checker is what let the GLDF check
+ * silently point at an abandoned empty folder. */
+function manifestRepoDir(tenant: string): string {
+  const configured = controlPlaneManifest.customRepoWorkspace?.repos?.find(
+    (repo) => repo.tenant === tenant,
+  )?.localPath;
+  if (!configured) throw new Error(`release-manifest.json has no workspace path for ${tenant}`);
+  return path.relative(workspaceRoot, path.resolve(process.cwd(), configured));
+}
 
 function record(name: string, ok: boolean, detail?: string) {
   results.push({ name, ok, detail: ok ? undefined : detail });
@@ -71,10 +89,10 @@ function checkReleaseManifest(repo: RepoCheck) {
 const repos: RepoCheck[] = [
   {
     tenant: "gldf",
-    repoDir: "gldf",
+    repoDir: manifestRepoDir("gldf"),
     packageScripts: ["dev", "build", "typecheck", "test", "check", "check:prod"],
     requiredFiles: [
-      "AGENTS.md",
+      "CLAUDE.md",
       "README.md",
       ".env.example",
       "src/lib/reb-contracts.ts",
@@ -113,7 +131,7 @@ const repos: RepoCheck[] = [
   },
   {
     tenant: "rohlax",
-    repoDir: "rohlax-wellness",
+    repoDir: manifestRepoDir("rohlax"),
     packageScripts: ["dev", "build", "typecheck", "test", "check:scaffold", "check"],
     requiredFiles: [
       "AGENTS.md",
@@ -169,9 +187,8 @@ for (const repo of repos) {
   checkReleaseManifest(repo);
 }
 
-const rebManifest = JSON.parse(read(path.join(process.cwd(), "release-manifest.json")));
-record("reb:manifest:compatibleGldf", Boolean(rebManifest.compatibleGldf?.commit), "missing compatibleGldf commit");
-record("reb:manifest:compatibleRohlax", Boolean(rebManifest.compatibleRohlax?.commit), "missing compatibleRohlax commit");
+record("reb:manifest:compatibleGldf", Boolean(controlPlaneManifest.compatibleGldf?.commit), "missing compatibleGldf commit");
+record("reb:manifest:compatibleRohlax", Boolean(controlPlaneManifest.compatibleRohlax?.commit), "missing compatibleRohlax commit");
 
 for (const result of results) {
   const status = result.ok ? "PASS" : "FAIL";

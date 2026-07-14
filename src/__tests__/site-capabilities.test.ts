@@ -86,8 +86,33 @@ describe("site capability manifest", () => {
     const manifest = await getSiteCapabilityManifest("demo");
 
     expect(manifest.sections.hero.variants).toEqual(["default", "cinematic"]);
+    expect(manifest.sections.services).toBeUndefined();
     expect(manifest.supportsInlineEditing).toBe(false);
     expect(manifest.customOnlyFeatures).toEqual(["cart"]);
     expect(manifest.customRequestEndpoint).toBe("/api/reb-custom-request");
+  });
+
+  it("treats a remote manifest as the authoritative live section inventory", async () => {
+    mocks.tenantConfig.customRepo = {
+      ...mocks.tenantConfig.customRepo,
+      capabilityManifestUrl: "https://client.example.com/api/reb-capabilities",
+    };
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+      contractVersion: "v1",
+      sections: {},
+      designTokens: [],
+      supportsPageConfig: false,
+      supportsNavigationConfig: false,
+      supportsFooterConfig: false,
+      supportsDraftPreview: false,
+      supportsInlineEditing: false,
+      customOnlyFeatures: [],
+      customComponents: [],
+    }), { status: 200 }))));
+
+    const { getSiteCapabilityManifest, manifestAllowsAction } = await import("@/lib/site-capabilities");
+    const manifest = await getSiteCapabilityManifest("demo");
+    expect(manifest.sections).toEqual({});
+    expect(manifestAllowsAction(manifest, "hero", "draft")).toBe(false);
   });
 });

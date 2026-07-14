@@ -6,7 +6,9 @@
  * STRIPE_SCAFFOLD_PRICE_ID, the self-serve default). These are Strelva's own
  * Stripe price objects — stable, not secret.
  */
-export type PlanKey = "presence" | "growth" | "scale";
+import type { CommercialPlanKey } from "./types";
+
+export type PlanKey = CommercialPlanKey;
 
 export interface Plan {
   key: PlanKey;
@@ -44,6 +46,14 @@ export const PLANS: readonly Plan[] = [
 
 export const DEFAULT_PLAN: PlanKey = "growth";
 
+export function isPlanKey(value: unknown): value is PlanKey {
+  return typeof value === "string" && PLANS.some((plan) => plan.key === value);
+}
+
 export function planByKey(key: string | undefined): Plan {
   return PLANS.find((p) => p.key === key) ?? PLANS.find((p) => p.key === DEFAULT_PLAN)!;
+}
+
+export function planMonthlyCents(key: string | undefined): number {
+  return planByKey(key).monthly * 100;
 }

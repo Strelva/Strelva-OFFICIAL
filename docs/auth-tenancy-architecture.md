@@ -1,13 +1,14 @@
-# Strelva — Auth & Tenancy Architecture (long-term)
+# Strelva — Auth & Tenancy Architecture
 
-**Status:** decisions LOCKED 2026-06-19 (Noah). This is the durable architecture record the
-migration plan (`docs/supabase-migration-plan.md`, Phase 4) executes against. Goal: get the
-foundation right once so nothing here forces a rewrite as we grow from 3 → 50+ clients.
+**Current enforcement boundary (updated 2026-07-14):** Supabase Auth establishes identity;
+`memberships` and `super_admins` are the authorization source of truth. Server routes enforce
+tenant access in application code before calling the service-role Postgres client. That client
+bypasses RLS, so RLS is defense-in-depth today, not the live isolation boundary.
 
 > **2026-06-22 — SHIPPED; Clerk teardown COMPLETE 2026-07-11 (#146).** The Clerk →
 > Supabase Auth + Postgres swap **cut over in production on 2026-06-20**: Supabase Auth
 > is live (`auth.uid()`, Google OAuth + magic link), `memberships`/`super_admins` back
-> authorization, **RLS is enabled and enforcing tenant isolation**, and the
+> authorization, **RLS is enabled as defense-in-depth**, and the
 > `handle_new_user` trigger provisions users on first sign-in (replacing the
 > Clerk webhook). **The destructive Clerk teardown is now done (#146, deployed to prod):**
 > `src/proxy.ts` unwrapped `clerkMiddleware` for a plain `proxy()` export with a hand-rolled
@@ -28,7 +29,7 @@ Most multi-tenant auth pain comes from tangling these. Keep them separate and ea
 its own — changing one never forces changing the others.
 
 1. **Identity** — *who you are.* Supabase Auth, one host.
-2. **Authorization** — *what you can touch.* `memberships` / `super_admins` in Postgres, enforced by RLS.
+2. **Authorization** — *what you can touch.* `memberships` / `super_admins` in Postgres, enforced by application guards; RLS backs them up.
 3. **Routing** — *where you reach it.* Public sites on client domains; dashboard on `app.strelva.com`.
 
 ---
@@ -65,8 +66,8 @@ and removes proxy code rather than adding it.
 The `memberships` / `super_admins` schema (migration 0001) is the textbook Supabase
 multi-tenant pattern — keep it as-is.
 
-**Decision: authorization source of truth is the membership table, queried inside RLS
-(always fresh) — NOT JWT claims.** Baking `tenant_ids`/roles into the token via a Custom Access
+**Decision: authorization source of truth is the membership table, queried by application
+guards (always fresh) — NOT JWT claims.** Baking `tenant_ids`/roles into the token via a Custom Access
 Token Hook is faster (no per-request join) but **stale**: a revoked role keeps working until the
 token refreshes (~1h). For a trust-sensitive product where access is revoked on offboarding,
 fresh beats fast. The hook stays on the table as a *later read-path optimization* if RLS ever
@@ -96,13 +97,13 @@ The control-plane server code uses the **service-role client, which bypasses RLS
 RLS is only a hard floor for paths that carry a user JWT. So tenant isolation at scale depends
 on a discipline, written here so it survives team growth:
 
-- **User-facing request paths** (dashboard reads/writes, the AI agent acting for a tenant) →
-  use the **user-JWT client**, so RLS is an enforced backstop under any bug.
-- **Service-role** → restricted to genuinely cross-tenant work: crons, provisioning,
-  super-admin actions, the public `/api/v1/*` storefront contract. Every service-role query
-  scopes `tenant_id` by hand.
-- **Guardrail:** add a lint/test that flags service-role client use inside request handlers.
-  This is the single most likely way a "RLS-protected" system still leaks at 50 clients.
+- **Current:** user-facing routes derive tenant identity from trusted request/auth context,
+  call `requireTenantAccess` or a permission guard, then use tenant-scoped repositories through
+  the service-role client. Every repository call must carry the trusted tenant id.
+- **Target hardening:** request paths may move to the user-JWT client so RLS becomes an enforced
+  second boundary. Do not describe that target as shipped until the repositories actually use it.
+- **Service-role:** remains appropriate for crons, provisioning, super-admin actions, and the
+  public `/api/v1/*` contract, with explicit tenant scoping.
 
 ---
 

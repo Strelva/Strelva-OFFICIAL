@@ -14,6 +14,7 @@ import { alert } from "@/lib/monitoring";
 import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositories";
 import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
 import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
+import { OPERATOR_URL } from "@/lib/brand";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -119,8 +120,7 @@ async function markEventFailed(eventId: string, error: string): Promise<void> {
 
 /** Admin URL for a tenant, used in the operator notification emails. */
 function buildTenantAdminUrl(tenantId: string): string {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://strelva.com").replace(/\/$/, "");
-  return `${base}/admin/tenants/${tenantId}`;
+  return `${OPERATOR_URL}/admin/clients/${tenantId}`;
 }
 
 function extractTenantId(object: unknown): string | null {
@@ -449,6 +449,18 @@ export async function POST(req: Request) {
             tenantId,
             {
               subscriptionStatus,
+              ...(session.metadata?.planKey === "presence" ||
+              session.metadata?.planKey === "growth" ||
+              session.metadata?.planKey === "scale"
+                ? { subscriptionPlan: session.metadata.planKey }
+                : {}),
+              ...(Number.isInteger(Number(session.metadata?.planMonthlyCents)) &&
+              Number(session.metadata?.planMonthlyCents) >= 0
+                ? { planMonthlyCents: Number(session.metadata?.planMonthlyCents) }
+                : {}),
+              ...(session.metadata?.planCurrency
+                ? { planCurrency: session.metadata.planCurrency.toLowerCase() }
+                : {}),
               ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
               subscriptionStartedAt: new Date(event.created * 1000).toISOString(),
             },

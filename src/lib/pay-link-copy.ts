@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the pay-link "two-door" customer-facing copy.
+ * Single source of truth for customer-facing one-off invoice copy.
  *
  * This copy is rendered in THREE places — the server page (page.tsx), the
  * client form (PayLinkForm.tsx), and the Stripe product on the checkout route
@@ -26,10 +26,6 @@ export interface PayLinkCopyConfig {
 }
 
 /** Recurring management price after the build's included months ($/mo). */
-export const BUILD_INCLUDED_MONTHS = 3;
-export const BUILD_AFTER_MONTHLY_CENTS = 9_900; // $99/mo
-export const MANAGED_MONTHLY_CENTS = 19_900; // $199/mo
-export const MANAGED_MINIMUM_MONTHS = 12;
 
 /**
  * The headline charge figure for a door, derived from the config: the fixed
@@ -49,43 +45,39 @@ function startAmountLabel(config: PayLinkCopyConfig): string | null {
 
 /** Short badge shown in the top-right of the page. */
 export function payLinkDoorBadge(door: PayLinkDoorCopy): string {
-  return door === "build" ? "One-time build" : "Managed plan · start payment";
+  return door === "build" ? "One-time project" : "Legacy start payment";
 }
 
 /** The durable door terms shown above the form (page headline area). */
 export function payLinkDoorTerms(config: PayLinkCopyConfig): string {
-  const after = formatWholeDollarsUsd(BUILD_AFTER_MONTHLY_CENTS);
-  const monthly = formatWholeDollarsUsd(MANAGED_MONTHLY_CENTS);
   if (config.door === "build") {
-    return `This is the one-time payment to build your site. It includes your first ${BUILD_INCLUDED_MONTHS} months of management, then ${after}/mo.`;
+    return "This is a one-time project payment. It does not start or change a Strelva subscription.";
   }
   const start = startAmountLabel(config);
   const startPhrase = start ? `This is your ${start} start payment. ` : "This is your start payment. ";
-  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum, and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
+  return `${startPhrase}This legacy payment follows the terms agreed directly with you; it does not create a new subscription.`;
 }
 
 /** The shorter reassurance line shown inside the form, under the amount. */
 export function payLinkReassurance(config: PayLinkCopyConfig): string {
-  const monthly = formatWholeDollarsUsd(MANAGED_MONTHLY_CENTS);
   if (config.door === "build") {
-    return `A one-time payment to get your site built, and it includes your first ${BUILD_INCLUDED_MONTHS} months of management.`;
+    return "A one-time project payment, separate from recurring Strelva service.";
   }
   const start = startAmountLabel(config);
   const startPhrase = start ? `Your ${start} start payment. ` : "Your start payment. ";
-  return `${startPhrase}The managed plan is ${monthly}/mo with a ${MANAGED_MINIMUM_MONTHS}-month minimum, and after month ${MANAGED_MINIMUM_MONTHS} the site is yours.`;
+  return `${startPhrase}Your previously agreed terms remain unchanged.`;
 }
 
 /** Stripe product display name for the door. */
 export function payLinkProductName(config: PayLinkCopyConfig & { clientName: string }): string {
   return config.door === "build"
-    ? `Website build: ${config.clientName}`
-    : `Managed plan start: ${config.clientName}`;
+    ? `One-time project: ${config.clientName}`
+    : `Legacy start payment: ${config.clientName}`;
 }
 
 /** Stripe product description for the door. */
 export function payLinkProductDescription(config: PayLinkCopyConfig): string {
-  const monthly = formatWholeDollarsUsd(MANAGED_MONTHLY_CENTS);
   return config.door === "build"
-    ? `One-time build payment (includes your first ${BUILD_INCLUDED_MONTHS} months of management).`
-    : `Start payment for your managed plan (${monthly}/mo, ${MANAGED_MINIMUM_MONTHS}-month minimum).`;
+    ? "One-time project payment; no subscription is created."
+    : "Legacy start payment under separately agreed terms; no new subscription is created.";
 }

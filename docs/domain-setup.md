@@ -4,6 +4,10 @@
 > live in **Postgres** (`tenants` table) as the source of truth since the
 > 2026-06-20 cutover — not Sanity. The DNS/Vercel/Cloudflare steps below are
 > unaffected.
+>
+> **Scope note (2026-07-14):** client-domain ownership and DNS steps are current.
+> Any later example that treats `strelva.com` as this repo's `/api` origin is a
+> historical cutover artifact; use `app.strelva.com` for the control plane.
 
 ## Step 0 — The domain belongs to the client, from day one
 
@@ -43,38 +47,37 @@ This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the
    pnpm check:prod
    ```
 
-## strelva.com (platform + wildcard subdomains)
+## Strelva platform origins and wildcard subdomains
 
-1. Domain is already added to Vercel project `scaffold-web` with wildcard support:
-   ```
-   vercel domains add strelva.com
-   vercel domains add *.strelva.com
-   ```
-2. Configure DNS. With Porkbun-managed DNS, Vercel currently recommends:
-   ```
-   A     strelva.com    76.76.21.21
-   CNAME *.strelva.com  cname.vercel-dns.com
-   ```
-   Alternatively, switch nameservers to:
-   ```
-   ns1.vercel-dns.com
-   ns2.vercel-dns.com
-   ```
-3. Remove any Porkbun/l.ink forwarding. `strelva.com/api/health` must not redirect to `scaffoldweb-com.l.ink`.
-4. Update env var:
-   ```
-   MARKETING_DOMAINS=strelva.com,www.strelva.com
-   ```
-5. Wildcard enables `{tenant}.strelva.com` routing via proxy subdomain extraction.
-6. Verify:
-   ```
-   vercel domains inspect strelva.com
-   dig +short strelva.com A
-   dig +short strelva.com NS
-   dig +short '*.strelva.com' CNAME
-   curl -I -L https://strelva.com/api/health
-  pnpm check:prod
-  ```
+The production topology has separate ownership:
+
+- `strelva.com` and `www.strelva.com` → `strelva-marketing` project.
+- `app.strelva.com`, `admin.strelva.com`, and `*.strelva.com` tenant fallbacks →
+  the `scaffold-web` control-plane project.
+
+Configure the app/admin/wildcard records using the exact values Vercel shows for
+the control-plane project. `MARKETING_DOMAINS` on that project lists only legacy
+marketing hosts that still reach it:
+
+```
+MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com
+```
+
+The built-in `strelva.com` classification is a routing fail-safe if apex traffic
+ever reaches this deployment; it does not make this repository the production
+marketing owner.
+
+Verify:
+
+```
+vercel domains inspect app.strelva.com
+vercel domains inspect admin.strelva.com
+dig +short app.strelva.com CNAME
+dig +short admin.strelva.com CNAME
+dig +short '*.strelva.com' CNAME
+curl -I -L https://app.strelva.com/api/health
+pnpm check:prod
+```
 
 ## Rohlax Wellness Cloudflare DNS
 
@@ -112,7 +115,7 @@ pnpm check:prod
 - [ ] `yourbusiness.com` shows the tenant's public site
 - [ ] `admin.yourbusiness.com` redirects root traffic to `/dashboard`
 - [ ] `admin.yourbusiness.com/sign-in` and `/sign-up` render the tenant auth flow
-- [ ] `strelva.com` shows marketing page
-- [ ] `strelva.com/api/health` returns Vercel health JSON and does not redirect to `scaffoldweb-com.l.ink`
-- [ ] `strelva.com/access-request` shows the private-beta access request
+- [ ] `strelva.com` shows the separate marketing deployment
+- [ ] `app.strelva.com/api/health` returns control-plane health JSON
+- [ ] `app.strelva.com/access-request` reaches the control-plane acquisition flow
 - [ ] `tenantid.strelva.com` is treated only as a fallback/platform route, not the customer-facing URL

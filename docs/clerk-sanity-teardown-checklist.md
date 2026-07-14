@@ -1,5 +1,9 @@
 # Clerk + Sanity teardown — execution checklist (Phase A)
 
+> **Status: historical execution record with one ops-only tail.** Clerk and all
+> Sanity data reads/writes are removed. Only rewrite legacy content-image URLs,
+> lock/unset the dataset, then remove the residual image resolver.
+
 > **✅ CLERK TEARDOWN DONE (2026-07-11, #146).** Steps 1–4 for Clerk are executed and
 > shipped to prod (deploy `dpl_6RxJPpBckUJNwroaAy3NJQ3hCeMQ`): `auth.ts` is Supabase-only,
 > `proxy.ts` uses a hand-rolled fail-closed auth gate + `isPublicRoute`/`isCronRoute`

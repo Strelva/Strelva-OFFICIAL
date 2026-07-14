@@ -1,19 +1,30 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { TenantConfig, TemplateId, TenantFeature, IntegrationProvider, TenantDeliveryModel } from "./types";
+import type { DomainClaim, TenantConfig, TemplateId, TenantFeature, IntegrationProvider, TenantDeliveryModel } from "./types";
+import { ALL_TENANT_FEATURES } from "./types";
 import { getRedis } from "./redis";
 import { assignUserToTenant, findUserIdByEmail } from "./auth";
 import { isProductionEnv } from "./production-guard";
-import { getTenantPrimaryDomain, normalizeTenantDomain } from "./tenant-urls";
+import { buildTenantDomainMap } from "./tenant-domain-map";
 import { tenantsSourceIsPostgres } from "./db/source-flags";
-import { listAllTenants, getTenant as getTenantRow, upsertTenant } from "./db/repositories";
+import {
+  listAllTenants,
+  getTenant as getTenantRow,
+  upsertTenant,
+} from "./db/repositories";
+import {
+  domainClaimToRow,
+  listAllDomainClaims,
+  listDomainClaims,
+  replaceDomainClaims,
+  rowToDomainClaim,
+} from "./db/domain-claims";
 import type { Row, Insert } from "./db/client";
 
 /**
  * Postgres `tenants` row -> TenantConfig (the spine mapper). The Postgres table
- * is 45 individual snake_case columns. subdomain has no column (== id), and
- * domainClaims live in the separate `domain_claims` table (currently empty;
- * routing uses production_domain/custom_domains, so [] is correct).
+ * is 45 individual snake_case columns. subdomain has no column (== id).
+ * Domain claims are attached separately by loadTenants/getTenantWithClaims.
  */
 export function rowToTenant(r: Row<"tenants">): TenantConfig {
   return {
@@ -30,7 +41,10 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     deliveryModel: (r.delivery_model as TenantDeliveryModel) ?? undefined,
     customRepo: (r.custom_repo as TenantConfig["customRepo"]) ?? undefined,
     siteCapabilities: (r.site_capabilities as TenantConfig["siteCapabilities"]) ?? undefined,
-    features: (r.features as TenantFeature[]) ?? undefined,
+    features: r.features?.filter(
+      (feature): feature is TenantFeature =>
+        (ALL_TENANT_FEATURES as readonly string[]).includes(feature),
+    ) ?? undefined,
     integrations: (r.integrations as IntegrationProvider[]) ?? undefined,
     customDomains: r.custom_domains ?? undefined,
     domainClaims: [],
@@ -39,6 +53,9 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     stripeCustomerId: r.stripe_customer_id ?? undefined,
     subscriptionStatus: (r.subscription_status as TenantConfig["subscriptionStatus"]) ?? undefined,
     stripeSubscriptionId: r.stripe_subscription_id ?? undefined,
+    subscriptionPlan: (r.subscription_plan as TenantConfig["subscriptionPlan"]) ?? undefined,
+    planMonthlyCents: r.plan_monthly_cents ?? undefined,
+    planCurrency: r.plan_currency ?? undefined,
     subscriptionStartedAt: r.subscription_started_at ?? undefined,
     commitmentEndsAt: r.commitment_ends_at ?? undefined,
     planOverride: (r.plan_override as TenantConfig["planOverride"]) ?? undefined,
@@ -65,6 +82,12 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     branding: (r.branding as TenantConfig["branding"]) ?? undefined,
     visibility: (r.visibility as unknown as TenantConfig["visibility"]) ?? undefined,
   };
+}
+
+async function getTenantWithClaims(id: string): Promise<TenantConfig | null> {
+  const [row, claims] = await Promise.all([getTenantRow(id), listDomainClaims(id)]);
+  if (!row) return null;
+  return { ...rowToTenant(row), domainClaims: claims.map(rowToDomainClaim) };
 }
 
 /** TenantConfig -> Postgres insert/upsert row. Inverse of rowToTenant; only
@@ -101,6 +124,9 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.stripeCustomerId !== undefined) row.stripe_customer_id = t.stripeCustomerId;
   if (t.subscriptionStatus !== undefined) row.subscription_status = t.subscriptionStatus;
   if (t.stripeSubscriptionId !== undefined) row.stripe_subscription_id = t.stripeSubscriptionId;
+  if (t.subscriptionPlan !== undefined) row.subscription_plan = t.subscriptionPlan;
+  if (t.planMonthlyCents !== undefined) row.plan_monthly_cents = t.planMonthlyCents;
+  if (t.planCurrency !== undefined) row.plan_currency = t.planCurrency;
   if (t.subscriptionStartedAt !== undefined) row.subscription_started_at = t.subscriptionStartedAt;
   if (t.commitmentEndsAt !== undefined) row.commitment_ends_at = t.commitmentEndsAt;
   if (t.planOverride !== undefined) row.plan_override = t.planOverride;
@@ -160,8 +186,17 @@ async function loadTenants(): Promise<TenantConfig[]> {
   // Postgres is the source of truth when TENANTS_SOURCE=postgres; the dev-file
   // path is local-only.
   if (tenantsSourceIsPostgres()) {
-    const rows = await listAllTenants();
-    tenants = rows.map(rowToTenant);
+    const [rows, claims] = await Promise.all([listAllTenants(), listAllDomainClaims()]);
+    const claimsByTenant = new Map<string, DomainClaim[]>();
+    for (const row of claims) {
+      const current = claimsByTenant.get(row.tenant_id) ?? [];
+      current.push(rowToDomainClaim(row));
+      claimsByTenant.set(row.tenant_id, current);
+    }
+    tenants = rows.map((row) => ({
+      ...rowToTenant(row),
+      domainClaims: claimsByTenant.get(row.id) ?? [],
+    }));
   }
 
   if (!tenants) {
@@ -275,62 +310,9 @@ const DOMAIN_CACHE_TTL = 60;
 let _domainMapCache: Record<string, { tenantId: string; isAdmin: boolean }> | null = null;
 let _domainMapCacheTime = 0;
 
-/**
- * Build a domain -> tenant mapping from all tenants.
- * Includes productionDomain, adminDomain, and customDomains.
- */
+/** Build the trusted domain map from tenant configuration and verified claims. */
 async function buildDomainMap(): Promise<Record<string, { tenantId: string; isAdmin: boolean }>> {
-  const tenants = await loadTenants();
-  const map: Record<string, { tenantId: string; isAdmin: boolean }> = {};
-
-  for (const tenant of tenants) {
-    if (!isActiveTenant(tenant)) continue;
-
-    // Production domain
-    const primaryDomain = getTenantPrimaryDomain(tenant);
-    if (primaryDomain) {
-      const prod = primaryDomain.toLowerCase();
-      map[prod] = { tenantId: tenant.id, isAdmin: false };
-      map[`www.${prod}`] = { tenantId: tenant.id, isAdmin: false };
-    }
-
-    // Admin domain (explicit or derived from the tenant's real public domain)
-    const adminCustomDomain = tenant.customDomains
-      ?.map((domain) => normalizeTenantDomain(domain))
-      .find((domain): domain is string => !!domain && domain.startsWith("admin."));
-    const adminDomain = normalizeTenantDomain(tenant.adminDomain)
-      || adminCustomDomain
-      || (primaryDomain ? `admin.${primaryDomain}` : null);
-    if (adminDomain) {
-      map[adminDomain.toLowerCase()] = { tenantId: tenant.id, isAdmin: true };
-    }
-
-    // Legacy customDomains array (for backward compatibility)
-    for (const domain of tenant.customDomains ?? []) {
-      const d = normalizeTenantDomain(domain);
-      if (!d) continue;
-      if (!map[d]) {
-        const isAdmin = d.startsWith("admin.");
-        map[d] = { tenantId: tenant.id, isAdmin };
-      }
-    }
-
-    for (const claim of tenant.domainClaims ?? []) {
-      // Only route a domain whose ownership is VERIFIED. A self-service claim
-      // starts as "pending"; mapping it before verification would let a tenant
-      // claim someone else's domain (or a lapsed one) and receive that host's
-      // traffic/auth context on the control plane (domain takeover).
-      if (claim.status !== "verified") continue;
-      const d = normalizeTenantDomain(claim.domain);
-      if (!d) continue;
-      map[d] = { tenantId: tenant.id, isAdmin: claim.role === "admin" || d.startsWith("admin.") };
-      if (!d.startsWith("www.") && claim.role !== "admin") {
-        map[`www.${d}`] = { tenantId: tenant.id, isAdmin: false };
-      }
-    }
-  }
-
-  return map;
+  return buildTenantDomainMap(await loadTenants());
 }
 
 /**
@@ -491,6 +473,9 @@ export async function updateTenant(
     // business name / reset created_at (which feeds milestone.ts's 90-day
     // baseline). Backfill both from the existing row unless the update changes them.
     const existingConfig = rowToTenant(existing);
+    if (updates.domainClaims !== undefined) {
+      await replaceDomainClaims(id, updates.domainClaims.map(domainClaimToRow));
+    }
     await upsertTenant(
       tenantToRow({
         ...updates,
@@ -500,8 +485,7 @@ export async function updateTenant(
       }),
     );
     invalidateCache();
-    const merged = await getTenantRow(id);
-    return merged ? rowToTenant(merged) : null;
+    return getTenantWithClaims(id);
   }
 
   const tenants = await loadTenants();

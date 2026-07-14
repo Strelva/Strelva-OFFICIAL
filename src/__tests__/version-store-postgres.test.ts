@@ -141,12 +141,9 @@ describe("version-store Postgres dual-path", () => {
     expect(v.author).toBe("user");
   });
 
-  it("getVersions returns [] when Postgres errors (safe fallback, Sanity off)", async () => {
+  it("getVersions surfaces an authoritative Postgres failure", async () => {
     supa.result = { data: null, error: { message: "boom" } };
-
-    const versions = await getVersions("hero", "gldf");
-
-    expect(versions).toEqual([]);
+    await expect(getVersions("hero", "gldf")).rejects.toMatchObject({ message: "boom" });
   });
 
   it("appendVersion inserts snake_case columns into content_versions", async () => {

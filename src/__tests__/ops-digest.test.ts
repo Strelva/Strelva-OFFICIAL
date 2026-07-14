@@ -48,7 +48,7 @@ describe("sendOpsDigestEmail — recipients + content", () => {
         { name: "GLDF", reason: "No AI use in 7 days" },
       ],
       recentSignups: ["Acme HVAC"],
-      opsUrl: "https://app.strelva.com/admin",
+      opsUrl: "https://admin.strelva.com/",
     });
 
     expect(ok).toBe(true);
@@ -73,7 +73,7 @@ describe("sendOpsDigestEmail — recipients + content", () => {
       unworkedLeads: 0,
       atRisk: [],
       recentSignups: [],
-      opsUrl: "https://app.strelva.com/admin",
+      opsUrl: "https://admin.strelva.com/",
     });
     expect(sendMock.mock.calls[0][0].to).toEqual(["noah@strelva.com", "jacob@strelva.com"]);
   });
@@ -86,7 +86,7 @@ describe("sendOpsDigestEmail — recipients + content", () => {
       unworkedLeads: 1,
       atRisk: [],
       recentSignups: [],
-      opsUrl: "https://app.strelva.com/admin",
+      opsUrl: "https://admin.strelva.com/",
     });
     expect(ok).toBe(false);
     expect(sendMock).not.toHaveBeenCalled();

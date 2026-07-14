@@ -18,33 +18,30 @@ describe("payLinkStartAmountCents", () => {
 
 describe("door badge + product name", () => {
   it("maps each door to its badge", () => {
-    expect(payLinkDoorBadge("build")).toBe("One-time build");
-    expect(payLinkDoorBadge("managed_start")).toContain("Managed");
+    expect(payLinkDoorBadge("build")).toBe("One-time project");
+    expect(payLinkDoorBadge("managed_start")).toContain("Legacy");
   });
 
   it("builds the Stripe product name per door", () => {
-    expect(payLinkProductName({ door: "build", clientName: "Acme" })).toBe("Website build: Acme");
-    expect(payLinkProductName({ door: "managed_start", clientName: "Acme" })).toBe("Managed plan start: Acme");
+    expect(payLinkProductName({ door: "build", clientName: "Acme" })).toBe("One-time project: Acme");
+    expect(payLinkProductName({ door: "managed_start", clientName: "Acme" })).toBe("Legacy start payment: Acme");
   });
 });
 
 describe("offer terms copy carries the right facts", () => {
-  it("build door: one-time, 3 months included, then $99/mo", () => {
+  it("build door is explicitly separate from subscriptions", () => {
     const terms = payLinkDoorTerms({ door: "build", amountCents: 150_000 });
     expect(terms).toContain("one-time");
-    expect(terms).toContain("3 months");
-    expect(terms).toContain("$99");
-    expect(payLinkReassurance({ door: "build" })).toContain("first 3 months");
+    expect(terms).toContain("does not start or change");
+    expect(payLinkReassurance({ door: "build" })).toContain("separate from recurring");
   });
 
-  it("managed door: $199/mo, 12-month minimum, own-after, and the start amount", () => {
+  it("legacy managed-start links retain the amount without inventing current terms", () => {
     const cfg = { door: "managed_start" as const, amountCents: 49_900 };
     const terms = payLinkDoorTerms(cfg);
     expect(terms).toContain("$499"); // the start amount
-    expect(terms).toContain("$199");
-    expect(terms).toContain("12-month minimum");
-    expect(terms).toContain("the site is yours");
-    expect(payLinkProductDescription(cfg)).toContain("$199");
-    expect(payLinkProductDescription(cfg)).toContain("12-month");
+    expect(terms).toContain("agreed directly");
+    expect(terms).toContain("does not create a new subscription");
+    expect(payLinkProductDescription(cfg)).toContain("separately agreed terms");
   });
 });

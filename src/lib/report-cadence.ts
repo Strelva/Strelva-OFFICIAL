@@ -7,16 +7,12 @@
  * client but too noisy for most: a monthly proof-of-work email lands better and
  * doesn't train owners to ignore the send. So cadence is tier-aware.
  *
- * TIER SIGNAL (resolved 2026-07): Strelva's price tiers (Presence / Growth /
- * Scale) are packaging + build-scope ONLY — there is a single configured Stripe
- * price (`STRIPE_SCAFFOLD_PRICE_ID` = Growth) and NO per-tenant tier column in
- * the tenant config (see `src/lib/pricing.ts`; `tierThresholdSuper` is the
- * unrelated rewards program). There is therefore no clean tier signal to key
- * cadence off. Rather than invent a fake one, cadence is a per-tenant override
- * read from Redis, defaulting to "monthly". An operator flips a client to
- * "weekly" (e.g. a Scale-tier / done-with-you client) by setting the override.
- * If per-tier Stripe prices are ever added, derive the default from the tier
- * here and keep the override as the escape hatch.
+ * COMMERCIAL INDEPENDENCE (resolved 2026-07): Presence / Growth / Scale and the
+ * selected monthly amount are persisted on the tenant, but packaging does not
+ * implicitly control a product capability or communication cadence. Cadence is
+ * therefore an explicit per-tenant override in Redis, defaulting to monthly.
+ * A future Plan Inclusion policy may define a default, but it must remain an
+ * explicit policy rather than an inference from a price key.
  *
  * Persistence is null-safe: no Redis ⇒ default monthly + no last-sent memory
  * (so the monthly throttle can't be enforced, which only matters in local dev —

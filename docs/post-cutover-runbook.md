@@ -1,4 +1,9 @@
-# Post-cutover cleanup runbook
+# Post-cutover cleanup runbook (historical)
+
+> This records the 2026 migration sequence and is not a current source-of-truth map.
+> Several operational stores intentionally still read Redis and only mirror Postgres.
+> Use [persistence-boundaries.md](./persistence-boundaries.md) for current ownership and
+> `AGENTS.md` for current auth/Sanity status.
 
 **Status (updated 2026-06-25):** migration **FLIPPED + LIVE** (cutover 2026-06-20). Auth=Supabase, and `CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod — every store + the tenant spine read/write Postgres, verified live (health ok, real content/tenant resolution, full prod e2e green). Since cutover: **#82** (fixed the dead `classifySource` proof-signal + refreshed ~18 docs) and **#83** (Clerk LEAF teardown — webhook route deleted, sign-in/sign-up + `UseInvitedEmailButton` + `layout.tsx` Clerk branches stripped, `ClerkProvider` gone) merged to main. What's left is the **destructive teardown** (see bottom): residual Sanity reads in `core.ts`, locking the Sanity dataset, the `auth.ts` Clerk-branch collapse, and unwrapping `clerkMiddleware` in `proxy.ts` (`src/proxy.ts` + `src/lib/auth.ts` are the only two files still importing `@clerk`). Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback: [rollback.md](./rollback.md).
 

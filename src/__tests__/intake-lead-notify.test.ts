@@ -160,8 +160,8 @@ describe("intake route — team notification", () => {
       expect(sent.html).toContain(value);
       expect(sent.text).toContain(value);
     }
-    expect(sent.html).toContain("https://strelva.com/admin/leads");
-    expect(sent.text).toContain("https://strelva.com/admin/leads");
+    expect(sent.html).toContain("https://admin.strelva.com/admin/leads");
+    expect(sent.text).toContain("https://admin.strelva.com/admin/leads");
   });
 
   it("does NOT fire the team email on a repeat submission", async () => {

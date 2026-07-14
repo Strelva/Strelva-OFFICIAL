@@ -282,6 +282,7 @@ function FeaturesPanel({
                 <span className="text-sm font-medium text-warm-white">{s.label} set</span>
                 <Toggle checked={on} onChange={(v) => toggleSet(memberIds, v)} size="sm" label={`${s.label} set`} />
               </div>
+              <p className="text-xs leading-relaxed text-gray-faint">{s.scope}</p>
               {on && s.members.length > 1 && (
                 <div className="space-y-1.5 border-l border-glass-border pl-3">
                   {s.members.map((m) => (

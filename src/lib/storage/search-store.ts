@@ -14,6 +14,12 @@ import { getSupabase, type Row, type Insert } from "../db/client";
 
 // --- Postgres repo helpers (self-contained; do NOT move to repositories.ts) ---
 
+function searchDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[search] ${operation} failed: Supabase is not configured`);
+  return db;
+}
+
 function searchToInsert(tenant: string, data: SearchData): Insert<"search_console_data"> {
   return {
     tenant_id: tenant,
@@ -34,38 +40,27 @@ function mapPgSearchRow(row: Row<"search_console_data">): SearchData {
 }
 
 async function getSearchDataPg(tenant: string): Promise<SearchData | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const { data, error } = await db
-      .from("search_console_data")
-      .select("*")
-      .eq("tenant_id", tenant)
-      .maybeSingle();
-    if (error || !data) return null;
-    return mapPgSearchRow(data);
-  } catch {
-    return null;
-  }
+  const db = searchDb(`read ${tenant}`);
+  const { data, error } = await db
+    .from("search_console_data")
+    .select("*")
+    .eq("tenant_id", tenant)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapPgSearchRow(data) : null;
 }
 
 async function setSearchDataPg(tenant: string, data: SearchData): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db
-      .from("search_console_data")
-      .upsert(searchToInsert(tenant, data), { onConflict: "tenant_id" });
-  } catch {
-    // never throw: a Postgres write must not break the dev-file path
-  }
+  const db = searchDb(`write ${tenant}`);
+  const { error } = await db
+    .from("search_console_data")
+    .upsert(searchToInsert(tenant, data), { onConflict: "tenant_id" });
+  if (error) throw error;
 }
 
 export async function getSearchData(tenant: string): Promise<SearchData | null> {
   if (dataSourceIsPostgres()) {
-    const pg = await getSearchDataPg(tenant);
-    if (pg) return pg;
-    // fall through to the dev file only if Postgres is empty
+    return getSearchDataPg(tenant);
   }
 
   try {

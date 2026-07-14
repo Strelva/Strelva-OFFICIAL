@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
 import type { TenantConfig } from "./types";
+import type { CommercialPlanKey } from "./types";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -17,6 +18,9 @@ export interface TenantSubscriptionCheckoutInput {
   cancelUrl?: string;
   /** Override the recurring price. Defaults to STRIPE_SCAFFOLD_PRICE_ID. */
   priceId?: string;
+  planKey?: CommercialPlanKey;
+  planMonthlyCents?: number;
+  planCurrency?: string;
   /** Free trial length in days, wired to subscription_data.trial_period_days (e.g. Door 1's 3 months included). */
   trialPeriodDays?: number;
 }
@@ -72,9 +76,23 @@ export async function createTenantSubscriptionCheckout(
       input.successUrl || getTenantDashboardUrl(tenant, "/dashboard?checkout=success"),
     cancel_url:
       input.cancelUrl || getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled"),
-    metadata: { tenantId: tenant.id },
+    metadata: {
+      tenantId: tenant.id,
+      ...(input.planKey ? { planKey: input.planKey } : {}),
+      ...(input.planMonthlyCents !== undefined
+        ? { planMonthlyCents: String(input.planMonthlyCents) }
+        : {}),
+      planCurrency: input.planCurrency ?? "usd",
+    },
     subscription_data: {
-      metadata: { tenantId: tenant.id },
+      metadata: {
+        tenantId: tenant.id,
+        ...(input.planKey ? { planKey: input.planKey } : {}),
+        ...(input.planMonthlyCents !== undefined
+          ? { planMonthlyCents: String(input.planMonthlyCents) }
+          : {}),
+        planCurrency: input.planCurrency ?? "usd",
+      },
       ...(input.trialPeriodDays && input.trialPeriodDays > 0
         ? { trial_period_days: input.trialPeriodDays }
         : {}),

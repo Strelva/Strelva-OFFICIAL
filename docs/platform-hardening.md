@@ -1,6 +1,8 @@
 # Platform Hardening
 
-> **Status (2026-06-22): Production cutover completed 2026-06-20.** Strelva is live on Supabase Auth + Postgres (`CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE=postgres` on in prod, RLS + `handle_new_user` trigger live). This doc is retained for historical/runbook reference. The only remaining work is the deliberate destructive Sanity/Clerk teardown (remove Sanity reads, lock the dataset, unwrap `clerkMiddleware` in `src/proxy.ts`).
+> **Status: historical branch record.** Service lists, auth providers, and file
+> paths below describe the former hardening branch and are not current runbook
+> truth. Use `production-readiness.md`, `health.ts`, and `heartbeat.ts`.
 
 Production hardening for Strelva: observability, reliability, and security improvements.
 

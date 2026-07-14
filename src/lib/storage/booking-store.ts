@@ -21,7 +21,13 @@ import { getContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert, type Update } from "../db/client";
 
-// --- Postgres `bookings` repo helpers (self-contained; never throw) -----------
+// --- Authoritative Postgres `bookings` helpers -----------------------------
+
+function bookingDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[bookings] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 /** Map a Postgres bookings row to the store's camelCase Booking shape. */
 function mapPgBookingRow(row: Row<"bookings">): Booking {
@@ -66,46 +72,32 @@ async function pgListBookings(
   tenant: string,
   dateRange?: { from: string; to: string }
 ): Promise<Booking[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  try {
-    let q = db.from("bookings").select("*").eq("tenant_id", tenant);
-    if (dateRange) {
-      q = q.gte("date", dateRange.from).lte("date", dateRange.to);
-    }
-    const { data, error } = await q.order("date", { ascending: true });
-    if (error || !data) return [];
-    return (data as Row<"bookings">[]).map(mapPgBookingRow);
-  } catch {
-    return [];
+  const db = bookingDb(`list ${tenant}`);
+  let q = db.from("bookings").select("*").eq("tenant_id", tenant);
+  if (dateRange) {
+    q = q.gte("date", dateRange.from).lte("date", dateRange.to);
   }
+  const { data, error } = await q.order("date", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Row<"bookings">[]).map(mapPgBookingRow);
 }
 
 async function pgInsertBooking(booking: Booking, tenant: string): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db.from("bookings").insert(bookingToInsert(booking, tenant));
-  } catch {
-    // best-effort; Sanity/dev path remains the durable store while dual-writing
-  }
+  const db = bookingDb(`insert ${booking.id}`);
+  const { error } = await db.from("bookings").insert(bookingToInsert(booking, tenant));
+  if (error) throw error;
 }
 
 async function pgGetBooking(id: string, tenant: string): Promise<Booking | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const { data, error } = await db
-      .from("bookings")
-      .select("*")
-      .eq("tenant_id", tenant)
-      .eq("id", id)
-      .maybeSingle();
-    if (error || !data) return null;
-    return mapPgBookingRow(data as Row<"bookings">);
-  } catch {
-    return null;
-  }
+  const db = bookingDb(`read ${tenant}/${id}`);
+  const { data, error } = await db
+    .from("bookings")
+    .select("*")
+    .eq("tenant_id", tenant)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapPgBookingRow(data as Row<"bookings">) : null;
 }
 
 async function pgUpdateBooking(
@@ -113,17 +105,13 @@ async function pgUpdateBooking(
   tenant: string,
   updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>
 ): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    const patch: Update<"bookings"> = {};
-    if (updates.status !== undefined) patch.status = updates.status;
-    if (updates.notes !== undefined) patch.notes = updates.notes ?? null;
-    if (updates.cancelledAt !== undefined) patch.cancelled_at = updates.cancelledAt ?? null;
-    await db.from("bookings").update(patch).eq("tenant_id", tenant).eq("id", id);
-  } catch {
-    // best-effort
-  }
+  const db = bookingDb(`update ${tenant}/${id}`);
+  const patch: Update<"bookings"> = {};
+  if (updates.status !== undefined) patch.status = updates.status;
+  if (updates.notes !== undefined) patch.notes = updates.notes ?? null;
+  if (updates.cancelledAt !== undefined) patch.cancelled_at = updates.cancelledAt ?? null;
+  const { error } = await db.from("bookings").update(patch).eq("tenant_id", tenant).eq("id", id);
+  if (error) throw error;
 }
 
 const bookingConfigKey = (tenant: string) => `reb:booking:config:${tenant}`;

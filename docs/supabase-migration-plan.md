@@ -1,6 +1,10 @@
 # Strelva → Supabase Migration Plan
 
-**Status:** **FLIPPED + LIVE in prod (2026-06-20).** Auth = Supabase; content (`CONTENT_SOURCE`), tenants (`TENANTS_SOURCE`), and all operational stores (`DATA_SOURCE`) read/write Postgres, all flags `=postgres` in prod and verified live (health ok, real content + tenant resolution from Postgres, ~1,000 tests, full prod e2e green). No migrated store *reads* Sanity when the flags are on. **Remaining = the destructive teardown** (remove the residual Sanity reads in `blog.ts`/`core.ts`, lock the Sanity dataset, unwrap `clerkMiddleware` in `proxy.ts`) — its own careful session. Rollback = flag-flip + redeploy (Sanity kept current via dual-write).
+**Status: historical migration record.** The cutover and Clerk/Sanity code teardown
+are complete. Do not use the dated “today,” target-stack, rollback, or remaining-work
+statements below as current architecture. Use `persistence-boundaries.md`,
+`auth-tenancy-architecture.md`, and `AGENTS.md`. The only remaining Sanity task is
+ops-only legacy image URL rewrite/dataset lock cleanup.
 **Decision (Noah, 2026-06-18):** move the platform's data + auth backbone onto Supabase while it's cheap to do (3 clients, billing off).
 **Decision (Noah, 2026-06-19):** auth is **Supabase Auth** (Decision 2 LOCKED). The hedge to keep Clerk was entirely about user-migration risk; a live read of the Clerk instance settled it — **one user (Jacob), Google-OAuth only, no passwords, zero orgs** → re-onboarding risk is nil. RLS keys off `auth.uid()`; `rls-draft.sql` Variant B (Clerk-JWT) deleted. See "Auth swap" below.
 **Author:** mapped from a full read of `main` (the live control plane).

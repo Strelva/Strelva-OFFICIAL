@@ -6,7 +6,7 @@ import {
   BillingConfigurationError,
   createTenantSubscriptionCheckout,
 } from "@/lib/billing";
-import { planByKey } from "@/lib/billing-plans";
+import { isPlanKey, planByKey } from "@/lib/billing-plans";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -20,9 +20,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_SCAFFOLD_PRICE_ID) {
+  if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json(
-      { error: "Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_SCAFFOLD_PRICE_ID." },
+      { error: "Stripe not configured. Set STRIPE_SECRET_KEY." },
       { status: 500 }
     );
   }
@@ -33,6 +33,9 @@ export async function POST(req: Request) {
   }
 
   const { tenantId, customerEmail: rawCustomerEmail, customerName, plan: rawPlan } = body;
+  if (rawPlan !== undefined && !isPlanKey(rawPlan)) {
+    return NextResponse.json({ error: "Unknown subscription plan" }, { status: 400 });
+  }
   const plan = planByKey(typeof rawPlan === "string" ? rawPlan : undefined);
   const normalizedTenantId = typeof tenantId === "string" ? tenantId.trim() : "";
   const customerEmail = normalizeEmail(rawCustomerEmail);
@@ -62,6 +65,9 @@ export async function POST(req: Request) {
       customerEmail,
       customerName: normalizedCustomerName || undefined,
       priceId: plan.priceId,
+      planKey: plan.key,
+      planMonthlyCents: plan.monthly * 100,
+      planCurrency: "usd",
     });
 
     return NextResponse.json({

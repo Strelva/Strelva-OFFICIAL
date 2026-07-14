@@ -28,12 +28,18 @@ async function writeDevNewsletter(data: Record<string, NewsletterSubscriber[]>):
 }
 
 // ---------------------------------------------------------------------------
-// Postgres repo helpers (self-contained; never throw — mirror the safe() guard).
+// Authoritative Postgres helpers.
 //
 // The store's "active"/"unsubscribed" maps directly to the table's free-form
 // `status` text column. There is no id/PK column in the generated type — the
 // row is keyed by (tenant_id, email), so writes upsert on that pair.
 // ---------------------------------------------------------------------------
+
+function newsletterDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[newsletter] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 function subscriberToInsert(
   s: NewsletterSubscriber,
@@ -57,59 +63,45 @@ function mapPgSubscriberRow(row: Row<"newsletter_subscribers">): NewsletterSubsc
   };
 }
 
-/** Look up a single subscriber by tenant+email. Returns null on any failure. */
+/** Look up a single subscriber by tenant+email. */
 async function pgGetSubscriber(
   tenant: string,
   email: string
 ): Promise<NewsletterSubscriber | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const { data, error } = await db
-      .from("newsletter_subscribers")
-      .select("email, name, subscribed_at, status")
-      .eq("tenant_id", tenant)
-      .eq("email", email)
-      .maybeSingle();
-    if (error || !data) return null;
-    return mapPgSubscriberRow(data as Row<"newsletter_subscribers">);
-  } catch {
-    return null;
-  }
+  const db = newsletterDb(`read ${tenant}/${email}`);
+  const { data, error } = await db
+    .from("newsletter_subscribers")
+    .select("email, name, subscribed_at, status")
+    .eq("tenant_id", tenant)
+    .eq("email", email)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapPgSubscriberRow(data as Row<"newsletter_subscribers">) : null;
 }
 
-/** Upsert a subscriber on (tenant_id, email). No-op on any failure. */
+/** Upsert a subscriber on (tenant_id, email). */
 async function pgUpsertSubscriber(
   s: NewsletterSubscriber,
   tenant: string
 ): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db
-      .from("newsletter_subscribers")
-      .upsert(subscriberToInsert(s, tenant), { onConflict: "tenant_id,email" });
-  } catch {
-    // swallow — Postgres write failures must not break the request
-  }
+  const db = newsletterDb(`upsert ${tenant}/${s.email}`);
+  const { error } = await db
+    .from("newsletter_subscribers")
+    .upsert(subscriberToInsert(s, tenant), { onConflict: "tenant_id,email" });
+  if (error) throw error;
 }
 
-/** List active subscribers for a tenant, newest first. Returns [] on failure. */
+/** List active subscribers for a tenant, newest first. */
 async function pgListSubscribers(tenant: string): Promise<NewsletterSubscriber[]> {
-  const db = getSupabase();
-  if (!db) return [];
-  try {
-    const { data, error } = await db
-      .from("newsletter_subscribers")
-      .select("email, name, subscribed_at, status")
-      .eq("tenant_id", tenant)
-      .eq("status", "active")
-      .order("subscribed_at", { ascending: false });
-    if (error || !data) return [];
-    return (data as Row<"newsletter_subscribers">[]).map(mapPgSubscriberRow);
-  } catch {
-    return [];
-  }
+  const db = newsletterDb(`list ${tenant}`);
+  const { data, error } = await db
+    .from("newsletter_subscribers")
+    .select("email, name, subscribed_at, status")
+    .eq("tenant_id", tenant)
+    .eq("status", "active")
+    .order("subscribed_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as Row<"newsletter_subscribers">[]).map(mapPgSubscriberRow);
 }
 
 export async function addSubscriber(

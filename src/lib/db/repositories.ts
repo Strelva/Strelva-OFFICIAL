@@ -73,6 +73,8 @@ export async function upsertTenant(tenant: Insert<"tenants">): Promise<void> {
   });
 }
 
+export { listAllDomainClaims, listDomainClaims, replaceDomainClaims } from "./domain-claims";
+
 // ---------------------------------------------------------------------------
 // unified_events (the event log: reviews, bookings, AI actions, change requests)
 // ---------------------------------------------------------------------------
@@ -206,12 +208,12 @@ export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"m
 }
 
 // ---------------------------------------------------------------------------
-// IDENTITY & ACCESS — the Supabase-Auth target for src/lib/auth.ts.
-// Today these reads live in Clerk publicMetadata + the SUPER_ADMIN_EMAILS env
-// allowlist + Redis invites. These repos back the auth swap (Phase 4); they use
+// IDENTITY & ACCESS — the Supabase Auth persistence boundary for src/lib/auth.ts.
+// Users, memberships, super-admin grants, and invites are Postgres-authoritative.
+// These repositories use
 // the SERVICE_ROLE client deliberately — authorization computations (owner guard,
 // super-admin check) must see across tenants, and they run server-side only.
-// See docs/auth-tenancy-architecture.md (Plane 2) + docs/supabase-migration-plan.md.
+// See docs/auth-tenancy-architecture.md (Plane 2).
 // ---------------------------------------------------------------------------
 
 // users -----------------------------------------------------------------------
@@ -235,6 +237,7 @@ export async function getUserByEmail(email: string): Promise<Row<"users"> | null
   }, null);
 }
 
+/** Legacy identity lookup retained only for rows imported during the Clerk cutover. */
 export async function getUserByClerkId(clerkId: string): Promise<Row<"users"> | null> {
   const db = getSupabase();
   if (!db) return null;
@@ -273,8 +276,7 @@ export async function getMembershipRole(userId: string, tenantId: string): Promi
   }, null);
 }
 
-/** User ids that are OWNER of a tenant. Replaces the paginated Clerk user-list
- *  scan in getTenantOwnerUserIds — one indexed query (memberships_tenant_role_idx). */
+/** User ids that are OWNER of a tenant, resolved in one indexed membership query. */
 export async function listTenantOwnerIds(tenantId: string): Promise<string[]> {
   const db = getSupabase();
   if (!db) return [];
@@ -368,9 +370,9 @@ export async function markInviteClaimed(email: string, tenantId: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// CONTENT (Phase 3 — Postgres as the content source, replacing Sanity).
-// `section` is the stored Sanity _type (= SECTION_TO_TYPE[appSection]); `data` is
-// the section JSONB. Reads retain the migration fallback; writes are authoritative.
+// CONTENT — Postgres is the authoritative content source.
+// `section` retains the deployed compatibility identifier formerly used as a
+// document type; `data` is the canonical section JSONB.
 // ---------------------------------------------------------------------------
 
 export async function getContentData(
@@ -391,8 +393,8 @@ export async function getContentData(
   }, null);
 }
 
-/** Upsert a content section's data. Throws on failure so the content store can
- *  invalidate the cache and surface the error (matches the Sanity write path). */
+/** Upsert a content section's data. Throws so callers cannot report a rejected
+ *  authoritative write as success and can invalidate any stale cache. */
 export async function upsertContentData(
   tenant: string,
   section: string,

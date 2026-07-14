@@ -1,9 +1,8 @@
 /**
- * Phase-2 dual-write helpers — the Postgres shadow-write of operational data.
+ * Postgres mirror helpers for Redis-authoritative operational data.
  *
- * During the migration, Redis stays the source of truth and reads still come
- * from it; these helpers additionally write each record to Postgres so we can
- * validate parity before cutting reads over. Every repo call is null-safe (a
+ * Redis stays the source of truth for the stores that call these helpers; the
+ * mirror supports durability analysis and a future explicit cutover. Every repo call is null-safe (a
  * no-op when Supabase is unconfigured) and never throws, so a dual-write can
  * only ever ADD a row, never break the live Redis path.
  *

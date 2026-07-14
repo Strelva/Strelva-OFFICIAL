@@ -1,5 +1,5 @@
 import { executeAgentPrompt } from "./agent-executor";
-import { getEvent, resolveEvent, updateEvent } from "./events";
+import { claimEventAction, finishEventAction, getEvent, resolveEvent, updateEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
 import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
@@ -103,6 +103,7 @@ export async function resolveEventAction(
   const event = await getEvent(eventId);
   if (!event) return { changed: false, reason: "not_found" };
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
+  if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
 
   if (event.type === "change_request" && CUSTOM_WORKFLOW_ACTIONS.has(action)) {
     if (!isCustomChangeRequestMetadata(event.metadata)) {
@@ -137,6 +138,32 @@ export async function resolveEventAction(
   if (action !== "approved" && action !== "dismissed") {
     return { changed: false, reason: "invalid_action" };
   }
+
+  const claim = await claimEventAction(eventId, action, "user");
+  if (!claim.acquired) return { changed: false, reason: claim.reason };
+
+  try {
+    const result = await executeResolvedEventAction(tenantId, eventId, action, event);
+    await finishEventAction(eventId, claim.attemptId, {
+      state: result.changed ? "completed" : "failed",
+      reason: result.reason,
+    });
+    return result;
+  } catch (error) {
+    await finishEventAction(eventId, claim.attemptId, {
+      state: "failed",
+      reason: error instanceof Error ? error.message.slice(0, 200) : "action_failed",
+    });
+    throw error;
+  }
+}
+
+async function executeResolvedEventAction(
+  tenantId: string,
+  eventId: string,
+  action: "approved" | "dismissed",
+  event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
+): Promise<{ changed: boolean; reason?: string }> {
 
   // For approvals that actually do something external (post to Google, send an
   // email, publish content), validate + perform the effect BEFORE flipping the
@@ -263,10 +290,11 @@ export async function resolveEventAction(
       }
 
       const current = (await getContent(section, tenantId)) as unknown as Record<string, unknown>;
+      // The live write is the authoritative effect. Resolve only after it
+      // succeeds so a storage failure cannot produce a false "Made live" state.
+      await setContent(section, draft as ContentMap[typeof section], tenantId);
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
       if (!resolved.changed) return { changed: false, reason: "already_resolved" };
-
-      await setContent(section, draft as ContentMap[typeof section], tenantId);
       await appendVersion(
         section,
         draft,

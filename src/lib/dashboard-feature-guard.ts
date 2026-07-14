@@ -21,12 +21,13 @@ import { isInspecting } from "./inspect-mode";
  * any tenant, so `preview: true` must not be mistaken for a read-only sandbox.
  */
 export async function requireDashboardFeature(
-  featureId: string
+  featureId: string | readonly string[]
 ): Promise<{ tenant: string; preview?: boolean }> {
   const { tenant } = await requireDashboardView();
   const config = await getTenantConfig(tenant).catch(() => null);
   const features = (config?.features ?? []) as string[];
-  if (!features.includes(featureId)) {
+  const accepted = typeof featureId === "string" ? [featureId] : featureId;
+  if (!accepted.some((id) => features.includes(id))) {
     if (await isInspecting()) return { tenant, preview: true };
     notFound();
   }

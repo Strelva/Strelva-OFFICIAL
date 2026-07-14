@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { scoreAiVisibility, type ScoreInput } from "@/lib/ai-visibility/score";
+import { saveAiVisibilityResult } from "@/lib/ai-visibility/results";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
 
 /**
  * Public AI-visibility audit endpoint (sales lead-magnet front door).
@@ -13,7 +15,14 @@ import { scoreAiVisibility, type ScoreInput } from "@/lib/ai-visibility/score";
  * error here. This route only validates input and surfaces failures cleanly.
  */
 export async function POST(request: NextRequest) {
-  let body: { business?: string; url?: string; category?: string; city?: string };
+  if (await isRateLimitedWindowedAsync(rateLimitKey(request, "ai-visibility"), 10, 24 * 60 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "You've run several audits today. Please try again tomorrow." },
+      { status: 429 },
+    );
+  }
+
+  let body: { business?: string; url?: string; category?: string; city?: string; source?: string };
   try {
     body = await request.json();
   } catch {
@@ -48,7 +57,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await scoreAiVisibility(input);
-    return NextResponse.json(result);
+    const stored = await saveAiVisibilityResult(result, {
+      category: input.category,
+      location: input.location,
+    }, body.source);
+    const shareUrl = stored
+      ? new URL(`/ai-visibility/${stored.id}`, request.url).toString()
+      : null;
+    return NextResponse.json({ ...result, scanId: stored?.id ?? null, shareUrl });
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: "ai-visibility-audit" },

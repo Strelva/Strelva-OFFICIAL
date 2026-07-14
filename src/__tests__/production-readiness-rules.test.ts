@@ -323,7 +323,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("cleanString(rawSubdomain)");
     expect(source).toContain("cleanFeatures(features)");
     // Features are validated against the feature registry (was the inline TENANT_FEATURES set).
-    expect(source).toContain("cleanFeatureIds");
+    expect(source).toContain("cleanTenantFeatureIds");
     expect(source).toContain("normalizeTenantDomain(productionDomain)");
     expect(source).toContain("normalizeTenantDomain(adminDomain)");
   });
@@ -473,7 +473,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("no routable A record from resolve4/curl");
     expect(source).toContain("resolveNs");
     expect(source).toContain("checkReleaseManifestEnv");
-    expect(source).toContain("checkMarketingDomainCoverage");
     expect(source).toContain("checkReleaseWorkflow");
     expect(source).toContain("checkLaunchBlockerActionability");
     // Rohlax/jacobtest blocker names live in docs/launch-blockers.md and are
@@ -494,13 +493,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Customer Access Handoff");
     expect(source).toContain("vercel deploy --prod");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
     expect(source).toContain("signed-out dashboard customers");
-    expect(source).toContain("https://strelva.com/sign-in");
+    expect(source).toContain("https://app.strelva.com/sign-in");
     expect(source).toContain("Sign in to Strelva | Strelva");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(source).toContain("https://strelva.com/api/health");
-    expect(source).toContain("curl -i https://strelva.com/api/cron/maintenance");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
+    expect(source).toContain("https://app.strelva.com/api/health");
+    expect(source).toContain("curl -i https://app.strelva.com/api/cron/maintenance");
     expect(source).toContain("/api/admin/invites");
     expect(source).toContain("exact invited email");
     expect(source).toContain("signed-out `/dashboard` and `/no-access` redirect to `/sign-in`");
@@ -535,10 +534,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("has owner-ready blocker actions");
     expect(source).toContain("release gates are aligned");
     expect(source).toContain("runs launch-aligned checks");
-    expect(source).toContain("signed-out account handoff returns users to sign-in");
-    expect(source).toContain("signup page explains invited email recovery");
-    expect(source).toContain("admin tenant host sign-up uses the tenant invite context");
-    expect(source).toContain("admin tenant host sign-in keeps the invited email context");
+    expect(source).toContain("signed-out account access is sent to sign-in");
+    expect(source).toContain("sign-up page renders the current create-account surface");
+    expect(source).toContain("the sign-in page renders the current Supabase sign-in surface");
     expect(source).toContain("cron maintenance endpoint is not public");
     // The SignInClient.tsx assertions were dropped — the file was folded
     // back into sign-in/page.tsx and the UI now branches by invite/tenant
@@ -550,9 +548,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     // string from the sign-in UI; that copy now lives in no-access/account
     // pages instead. The negative assertion still holds.
     expect(customerFrontendSmoke).not.toContain("Use the email address from your invite");
-    expect(source).toContain("signupNoAppOk");
-    expect(source).toContain("including public sign-up");
-    expect(source).toContain("cover sign-in/sign-up recovery paths, account handoff, admin-host, and cron protection");
+    expect(source).toContain("cover current Supabase access recovery and cron protection");
     expect(source).toContain("route marketing-host auth through /account");
     expect(source).toContain("route tenant/admin auth to /dashboard");
     expect(source).toContain("host-aware redirects");
@@ -589,12 +585,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("Vercel cron route(s) are covered by proxy CRON_SECRET validation");
     expect(source).toContain("Dependency audit");
     expect(source).toContain("Production site URL");
-    expect(source).toContain("Marketing domain coverage");
-    expect(source).toContain("MARKETING_DOMAINS must include");
-    expect(source).toContain("root-domain auth returns customers to /account");
     expect(source).toContain("must resolve to the Vercel Next.js app");
-    expect(source).toContain("A strelva.com 76.76.21.21");
-    expect(source).toContain("remove Porkbun/l.ink forwarding");
+    expect(source).toContain("Point app.strelva.com at the Strelva control-plane Vercel project");
     expect(source).toContain("Production domain routing");
     expect(source).toContain("requiredEnv entries are covered by check:prod or storefront handoff docs");
     expect(source).toContain('"pnpm", ["audit", "--audit-level", "high"]');
@@ -620,13 +612,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(designKit).not.toContain("PLAYWRIGHT_BASE_URL=<deployment-url>");
     expect(designKit).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=<tenant-url>");
     expect(domainSetup).toContain("scaffold-web");
-    expect(domainSetup).toContain("A     strelva.com    76.76.21.21");
+    expect(domainSetup).toContain("app.strelva.com");
+    expect(domainSetup).toContain("admin.strelva.com");
     expect(domainSetup).toContain("cname.vercel-dns.com");
-    expect(domainSetup).toContain("MARKETING_DOMAINS=strelva.com,www.strelva.com");
-    expect(domainSetup).toContain("scaffoldweb-com.l.ink");
-    expect(domainSetup).toContain("vercel domains inspect strelva.com");
-    expect(domainSetup).toContain("dig +short strelva.com A");
-    expect(domainSetup).toContain("dig +short strelva.com NS");
+    expect(domainSetup).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
+    expect(domainSetup).toContain("vercel domains inspect app.strelva.com");
+    expect(domainSetup).toContain("vercel domains inspect admin.strelva.com");
+    expect(domainSetup).toContain("dig +short app.strelva.com CNAME");
+    expect(domainSetup).toContain("dig +short admin.strelva.com CNAME");
     expect(domainSetup).toContain("dig +short '*.strelva.com' CNAME");
     expect(domainSetup).toContain("Rohlax Wellness Cloudflare DNS");
     expect(domainSetup).toContain("dax.ns.cloudflare.com");
@@ -694,13 +687,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("vercel env pull .env.production.local --environment=production");
     expect(source).toContain("vercel deploy --prod");
     expect(source).toContain("git status --short");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
     expect(source).toContain("pnpm exec playwright test tests/customer-frontend.spec.ts -g");
     expect(source).toContain('\\"signed-out dashboard customers\\"');
     expect(source).toContain("dirty local working tree");
     expect(source).toContain("Production Live Verification");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(source).toContain("Clerk/Stripe webhook deliveries");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
+    expect(source).toContain("Supabase Auth and Stripe webhook verification");
     expect(source).toContain("cron 401");
     expect(source).toContain("production live-verification steps");
     expect(source).toContain('[".env.production.local", ".env.local", ".env"]');
@@ -711,13 +704,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(readinessRules).toContain("Owner:");
     expect(readinessRules).toContain("Reason:");
     expect(source).toContain("signed-out /dashboard and /no-access reach /sign-in");
-    expect(source).toContain("root marketing-host auth finishes at /account");
+    expect(source).toContain("on app.strelva.com");
     expect(source).toContain("admin.greatlakesdriedfruit.com reaches the same invited-email sign-in flow");
     expect(source).toContain("after Supabase Auth and Resend are live");
     expect(source).toContain("use Invite for each tenant ownerEmail");
     expect(source).toContain("signs up or signs in with the exact invited email");
     expect(source).toContain("email stays prefilled when switching between sign-up and sign-in");
-    expect(source).toContain("strelva.com auth reaches /account");
+    expect(source).toContain("app.strelva.com auth reaches /account");
     expect(source).toContain("admin.greatlakesdriedfruit.com auth reaches /dashboard/site");
     expect(source).toContain("checkout.session.completed");
     expect(source).toContain("invoice.paid");
@@ -729,18 +722,16 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb");
     expect(source).toContain("team_66XTGId41AJGh9vLvkiyXqkZ");
     expect(source).toContain("Production live verification");
-    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(source).toContain("root marketing auth reaches /account");
+    expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
+    expect(source).toContain("Supabase Auth reaches /account");
     expect(source).toContain("invited-owner /dashboard/site access");
-    expect(source).toContain("Clerk/Stripe webhook deliveries are successful");
+    expect(source).toContain("Supabase Auth and Stripe webhook verification are successful");
     expect(source).toContain("cron 401/success behavior works with CRON_SECRET");
     expect(source).toContain("clear docs/launch-blockers.md Current Blockers");
     expect(source).toContain("DNS verification commands:");
-    expect(source).toContain("vercel domains inspect strelva.com");
-    expect(source).toContain("dig +short strelva.com A");
-    expect(source).toContain("dig +short strelva.com NS");
-    expect(source).toContain("dig +short '*.strelva.com' CNAME");
-    expect(source).toContain("curl -I -L https://strelva.com/api/health");
+    expect(source).toContain("vercel domains inspect app.strelva.com");
+    expect(source).toContain("dig +short app.strelva.com CNAME");
+    expect(source).toContain("curl -I -L https://app.strelva.com/api/health");
     expect(launchBlockers).toContain("vercel whoami");
     expect(launchBlockers).toContain("scaffold-web");
     expect(launchBlockers).toContain("### Production Live Verification");
@@ -850,12 +841,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       );
     }
 
-    expect(template).toContain("same live Clerk instance");
-    expect(template).toContain("Mixed Clerk instances can make /sign-in loop");
+    expect(template).toContain("NEXT_PUBLIC_SUPABASE_URL=");
+    expect(template).toContain("SUPABASE_SERVICE_ROLE_KEY=");
+    expect(template).not.toContain("CLERK_SECRET_KEY");
     expect(template).toContain("server/project DSN");
     expect(template).toContain("browser/client DSN");
-    expect(localTemplate).toContain("same Clerk instance");
-    expect(localTemplate).toContain("Mixed Clerk instances can make /sign-in loop");
+    expect(localTemplate).toContain("NEXT_PUBLIC_SUPABASE_URL=");
+    expect(localTemplate).not.toContain("CLERK_SECRET_KEY");
     expect(localTemplate).toContain("server/project and browser/client DSNs");
   });
 
@@ -882,15 +874,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("exact invited email address");
     expect(productionReadiness).toContain("preloads that address on sign-up");
     expect(productionReadiness).toContain("sign-in/sign-up links preserve it");
-    expect(productionReadiness).toContain("same live Clerk instance");
-    expect(productionReadiness).toContain("make `/sign-in` loop");
-    expect(productionReadiness).toContain('*[_type == "tenant" && active != false]');
+    expect(productionReadiness).toContain("Supabase project URL, publishable key, and service-role key belong");
+    expect(productionReadiness).toContain("Authorization comes from `memberships` and `super_admins`");
     expect(productionReadiness).toContain("deactivate internal test tenants");
-    expect(productionReadiness).toContain("Every active launch tenant must have a customer-facing `productionDomain` or `customDomains` entry");
-    expect(productionReadiness).toContain("`pnpm check:prod` fails active tenants that are missing those fields");
+    expect(productionReadiness).toContain("Every active launch tenant must have a customer-facing `productionDomain`");
+    expect(productionReadiness).toContain("`pnpm check:prod` fails active tenants");
     expect(productionReadiness).toContain("Cloudflare-managed tenant domains");
     expect(productionReadiness).toContain("A admin.rohlaxwellness.com 76.76.21.21");
-    expect(productionReadiness).toContain("root marketing hosts");
+    expect(productionReadiness).toContain("On the app host");
     expect(productionReadiness).toContain("/account");
     expect(productionReadiness).toContain("no invited sites");
     expect(productionReadiness).toContain("Use invited email");
@@ -899,10 +890,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Owner:");
     expect(productionReadiness).toContain("Follow-up:");
     expect(productionReadiness).toContain("Reason:");
-    expect(productionReadiness).toContain("https://strelva.com/api/clerk/webhook");
-    expect(productionReadiness).toContain("user.created");
-    expect(productionReadiness).toContain("CLERK_WEBHOOK_SECRET");
-    expect(productionReadiness).toContain("https://strelva.com/api/billing/webhook");
+    expect(productionReadiness).not.toContain("/api/clerk/webhook");
+    expect(productionReadiness).not.toContain("CLERK_WEBHOOK_SECRET");
+    expect(productionReadiness).toContain("https://app.strelva.com/api/billing/webhook");
     expect(productionReadiness).toContain("checkout.session.completed");
     expect(productionReadiness).toContain("invoice.paid");
     expect(productionReadiness).toContain("invoice.payment_failed");
@@ -916,12 +906,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Production Live Verification");
     expect(productionReadiness).toContain("invited owner reaches `/dashboard/site`");
     expect(productionReadiness).toContain("content edit saves and refreshes preview");
-    expect(productionReadiness).toContain("Clerk/Stripe webhook deliveries");
+    expect(productionReadiness).toContain("Supabase Auth and Stripe webhook verification");
     expect(productionReadiness).toContain("cron 401/success behavior");
     expect(productionReadiness).toContain("Placeholder references");
     expect(launchBlockers).toContain("Placeholder references");
     expect(launchBlockers).toContain("exact invited email address");
-    expect(launchBlockers).toContain("same live Clerk instance");
+    expect(launchBlockers).toContain("Supabase project settings -> API");
     expect(launchBlockers).toContain("todo");
   });
 
@@ -961,11 +951,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(checklist).toContain("Google Cloud OAuth client secret");
     expect(checklist).toContain("Meta app Instagram OAuth client secret");
     expect(checklist).toContain("Calendly OAuth app client secret");
-    expect(productionReadiness).toContain("Set `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth connections are enabled.");
+    expect(productionReadiness).toContain("`NEXT_PUBLIC_APP_URL=https://app.strelva.com`");
     expect(productionReadiness).not.toContain("`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`, and tenant-specific revalidation secrets");
-    expect(template).toContain("Required only when Google, Instagram, or Calendly OAuth connections are enabled.");
-    expect(template).toContain("NEXT_PUBLIC_APP_URL=https://strelva.com");
-    expect(template).toContain("MARKETING_DOMAINS=strelva.com,www.strelva.com");
+    expect(template).toContain("Canonical control-plane origin");
+    expect(template).toContain("NEXT_PUBLIC_APP_URL=https://app.strelva.com");
+    expect(template).toContain("MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com");
   });
 
   it("uses signed OAuth state for integration callbacks", () => {

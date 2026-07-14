@@ -11,7 +11,6 @@ import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPane
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL } from "@/lib/pricing";
 import type { CustomRepoExternalDependency } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -1287,7 +1286,9 @@ function BillingSection() {
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[20px] font-medium text-warm-white">
-              {isFounderComp ? "Founder comp" : SCAFFOLD_PLAN_MONTHLY_PRICE_LABEL}
+              {isFounderComp
+                ? "Founder comp"
+                : `${dashboard?.commercialPlanLabel ?? "Growth"} · $${((dashboard?.commercialPlanMonthlyCents ?? 19_900) / 100).toLocaleString()}/mo`}
             </span>
             <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}

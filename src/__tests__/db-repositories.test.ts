@@ -22,6 +22,8 @@ describe("Supabase data layer — degrades gracefully when unconfigured", () => 
   it("reads return safe empty/null defaults (no throw)", async () => {
     await expect(repos.getTenant("gldf")).resolves.toBeNull();
     await expect(repos.listActiveTenants()).resolves.toEqual([]);
+    await expect(repos.listAllDomainClaims()).resolves.toEqual([]);
+    await expect(repos.listDomainClaims("gldf")).resolves.toEqual([]);
     await expect(repos.listEvents("gldf")).resolves.toEqual([]);
     await expect(repos.listLeads()).resolves.toEqual([]);
     await expect(repos.listBuildPayments()).resolves.toEqual([]);
@@ -48,6 +50,7 @@ describe("Supabase data layer — degrades gracefully when unconfigured", () => 
     await expect(
       repos.upsertTenant({ id: "gldf", site_name: "GLDF", created_at: "2026-01-01" })
     ).rejects.toThrow("Supabase is not configured");
+    await expect(repos.replaceDomainClaims("gldf", [])).rejects.toThrow("Supabase is not configured");
     await expect(
       repos.upsertMembership({
         user_id: "00000000-0000-0000-0000-000000000001",

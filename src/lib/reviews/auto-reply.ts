@@ -123,8 +123,9 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
       const due = new Date(at).getTime();
       if (Number.isNaN(due) || due > nowMs) continue; // still inside the window
       try {
-        await resolveEventAction(t.id, e.id, "approved");
-        posted += 1;
+        const result = await resolveEventAction(t.id, e.id, "approved");
+        if (result.changed) posted += 1;
+        else failed += 1;
       } catch {
         failed += 1;
       }

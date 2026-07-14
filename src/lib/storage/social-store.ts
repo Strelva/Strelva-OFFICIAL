@@ -23,9 +23,13 @@ async function writeDevSocial(tenant: string, posts: SocialPost[]): Promise<void
   return writeDevFile(DEV_SOCIAL_PATH(tenant), posts);
 }
 
-// --- Postgres helpers (self-contained; do not move to repositories.ts) ---
-// Each query is wrapped so it never throws — a misconfigured/unreachable
-// Supabase returns a safe fallback and lets the dev-file path take over.
+// --- Authoritative Postgres helpers (self-contained) -----------------------
+
+function socialDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[social] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 function makeSocialId(): string {
   return `social_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -59,33 +63,26 @@ function mapPgSocialRow(row: Row<"social_posts">): SocialPost {
 }
 
 async function pgListSocialPosts(tenant: string): Promise<SocialPost[]> {
-  try {
-    const db = getSupabase();
-    if (!db) return [];
-    const { data, error } = await db
-      .from("social_posts")
-      .select("*")
-      .eq("tenant_id", tenant)
-      .order("created_at", { ascending: false });
-    if (error || !data) return [];
-    return data.map(mapPgSocialRow);
-  } catch {
-    return [];
-  }
+  const db = socialDb(`list ${tenant}`);
+  const { data, error } = await db
+    .from("social_posts")
+    .select("*")
+    .eq("tenant_id", tenant)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapPgSocialRow);
 }
 
 async function pgReplaceSocialPosts(tenant: string, posts: SocialPost[]): Promise<void> {
-  try {
-    const db = getSupabase();
-    if (!db) return;
-    // Bulk-setter semantics: delete all for the tenant, recreate.
-    await db.from("social_posts").delete().eq("tenant_id", tenant);
-    if (posts.length === 0) return;
-    const rows = posts.map((p) => postToInsert(tenant, p));
-    await db.from("social_posts").insert(rows as unknown as Insert<"social_posts">[]);
-  } catch {
-    // Postgres write failure must not block the dev-file path.
-  }
+  const db = socialDb(`replace ${tenant}`);
+  const { error: deleteError } = await db.from("social_posts").delete().eq("tenant_id", tenant);
+  if (deleteError) throw deleteError;
+  if (posts.length === 0) return;
+  const rows = posts.map((p) => postToInsert(tenant, p));
+  const { error: insertError } = await db
+    .from("social_posts")
+    .insert(rows as unknown as Insert<"social_posts">[]);
+  if (insertError) throw insertError;
 }
 
 export async function getSocialPosts(tenant: string): Promise<SocialPost[]> {

@@ -4,7 +4,7 @@ import { getSectionTimestamps } from "@/lib/storage";
 import { getRedis } from "@/lib/redis";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
-import { capabilityPromptFragment } from "@/lib/capabilities";
+import { assertAgentToolCatalog, capabilityPromptFragment } from "@/lib/capabilities";
 import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { sendSlackNotification } from "@/lib/slack";
 import { detectStaleSections } from "@/lib/reports";
@@ -381,6 +381,7 @@ export async function executeAgentPromptDetailed(
     tools.update_business_hours = gbpTools.update_business_hours;
     tools.upload_gbp_photo = gbpTools.upload_gbp_photo;
   }
+  assertAgentToolCatalog(Object.keys(tools), "background");
 
   const primary = getPrimaryModel();
   const fallback = getFallbackModel();

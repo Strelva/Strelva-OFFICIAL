@@ -55,10 +55,15 @@ export function operatorSuggestions(list: Suggestion[]): Suggestion[] {
 // --- Postgres dual-path helpers (self-contained; do not move to repositories.ts) ---
 //
 // The `suggestions` table maps 1:1 to the Suggestion interface (camelCase ->
-// snake_case). `tenant_id` FKs tenants(id) (uuid) and is passed straight through
-// — tenant ids in this codebase are real uuids, unlike the Clerk-era user ids.
-// Every query is wrapped so it never throws; a failure degrades to the dev path
-// the caller already falls through to.
+// snake_case). `tenant_id` references the tenant's text slug. In Postgres mode
+// this is an authoritative store: reads and writes surface failures rather than
+// presenting unavailable data as an empty queue or a successful mutation.
+
+function suggestionDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[suggestions] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 function suggestionToInsert(s: Suggestion): Insert<"suggestions"> {
   return {
@@ -89,20 +94,15 @@ function mapPgSuggestionRow(row: Row<"suggestions">): Suggestion {
 }
 
 async function pgListPendingSuggestions(tenantId: string): Promise<Suggestion[]> {
-  try {
-    const db = getSupabase();
-    if (!db) return [];
-    const { data, error } = await db
-      .from("suggestions")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
-    if (error || !data) return [];
-    return data.map(mapPgSuggestionRow);
-  } catch {
-    return [];
-  }
+  const db = suggestionDb(`list ${tenantId}`);
+  const { data, error } = await db
+    .from("suggestions")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapPgSuggestionRow);
 }
 
 async function pgFindPendingDuplicate(
@@ -110,32 +110,24 @@ async function pgFindPendingDuplicate(
   type: string,
   section: string | null,
 ): Promise<Suggestion | null> {
-  try {
-    const db = getSupabase();
-    if (!db) return null;
-    let query = db
-      .from("suggestions")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .eq("type", type);
-    query = section === null ? query.is("section", null) : query.eq("section", section);
-    const { data, error } = await query.limit(1);
-    if (error || !data || data.length === 0) return null;
-    return mapPgSuggestionRow(data[0]);
-  } catch {
-    return null;
-  }
+  const db = suggestionDb(`find duplicate ${tenantId}`);
+  let query = db
+    .from("suggestions")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("status", "pending")
+    .eq("type", type);
+  query = section === null ? query.is("section", null) : query.eq("section", section);
+  const { data, error } = await query.limit(1);
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  return mapPgSuggestionRow(data[0]);
 }
 
 async function pgInsertSuggestion(suggestion: Suggestion): Promise<void> {
-  try {
-    const db = getSupabase();
-    if (!db) return;
-    await db.from("suggestions").insert(suggestionToInsert(suggestion));
-  } catch {
-    // swallow — the dev-file write still happens for reversibility
-  }
+  const db = suggestionDb(`insert ${suggestion.id}`);
+  const { error } = await db.from("suggestions").insert(suggestionToInsert(suggestion));
+  if (error) throw error;
 }
 
 async function pgUpdateSuggestionStatus(
@@ -143,21 +135,17 @@ async function pgUpdateSuggestionStatus(
   suggestionId: string,
   status: "accepted" | "dismissed",
 ): Promise<Suggestion | null> {
-  try {
-    const db = getSupabase();
-    if (!db) return null;
-    const { data, error } = await db
-      .from("suggestions")
-      .update({ status })
-      .eq("tenant_id", tenantId)
-      .eq("id", suggestionId)
-      .select("*")
-      .limit(1);
-    if (error || !data || data.length === 0) return null;
-    return mapPgSuggestionRow(data[0]);
-  } catch {
-    return null;
-  }
+  const db = suggestionDb(`update ${suggestionId}`);
+  const { data, error } = await db
+    .from("suggestions")
+    .update({ status })
+    .eq("tenant_id", tenantId)
+    .eq("id", suggestionId)
+    .select("*")
+    .limit(1);
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  return mapPgSuggestionRow(data[0]);
 }
 
 // --- Dev file fallback ---
@@ -202,19 +190,15 @@ function suggestionCopyDiffers(existing: Suggestion, entry: Suggestion): boolean
   );
 }
 
-/** Update the stored suggestion row's copy (Postgres). Best-effort. */
+/** Update the stored suggestion row's copy in the authoritative store. */
 async function pgUpdateSuggestionCopy(tenantId: string, id: string, entry: Suggestion): Promise<void> {
-  try {
-    const db = getSupabase();
-    if (!db) return;
-    await db
-      .from("suggestions")
-      .update({ title: entry.title, description: entry.description, action: entry.action })
-      .eq("tenant_id", tenantId)
-      .eq("id", id);
-  } catch {
-    // swallow — the dev-file path still keeps read-side consistent
-  }
+  const db = suggestionDb(`refresh ${id}`);
+  const { error } = await db
+    .from("suggestions")
+    .update({ title: entry.title, description: entry.description, action: entry.action })
+    .eq("tenant_id", tenantId)
+    .eq("id", id);
+  if (error) throw error;
 }
 
 /** Sync the "Needs you" queue card (its event) when a stored suggestion's copy is

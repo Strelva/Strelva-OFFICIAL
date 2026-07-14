@@ -121,6 +121,7 @@ vi.mock("@/lib/proof-signals", () => ({
 }));
 
 vi.mock("@/lib/capabilities", () => ({
+  assertAgentToolCatalog: () => undefined,
   capabilityPromptFragment: () => "",
   sanitizePromptValue: (v: unknown) => (typeof v === "string" ? v : ""),
 }));

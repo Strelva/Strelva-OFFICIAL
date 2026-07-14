@@ -23,10 +23,15 @@ import {
   setCachedPageConfig,
 } from "./content-cache";
 
-// --- Self-contained Postgres repo helpers (kept in this file to avoid colliding
-//     with parallel edits to repositories.ts). Each wrapped so it never throws. ---
+// --- Self-contained authoritative Postgres helpers. ---
 
 type PageConfigTable = "page_config" | "draft_page_config";
+
+function pageConfigDb(operation: string): NonNullable<ReturnType<typeof getSupabase>> {
+  const db = getSupabase();
+  if (!db) throw new Error(`[page-config] ${operation} failed: Supabase is not configured`);
+  return db;
+}
 
 /** Map a `SitePageConfig` blob into per-page insert rows for the given table. */
 function blobToRows(
@@ -55,56 +60,44 @@ function rowsToBlob(rows: Row<PageConfigTable>[]): SitePageConfig | null {
   return config;
 }
 
-/** Read all per-page rows for a tenant and reassemble into a blob. Safe. */
+/** Read all per-page rows for a tenant and reassemble into a blob. */
 async function getPgPageConfig(
   table: PageConfigTable,
   tenant: string
 ): Promise<SitePageConfig | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  try {
-    const { data, error } = await db
-      .from(table)
-      .select("*")
-      .eq("tenant_id", tenant);
-    if (error || !data) return null;
-    return rowsToBlob(data as Row<PageConfigTable>[]);
-  } catch {
-    return null;
-  }
+  const db = pageConfigDb(`read ${table}/${tenant}`);
+  const { data, error } = await db
+    .from(table)
+    .select("*")
+    .eq("tenant_id", tenant);
+  if (error) throw error;
+  return rowsToBlob((data ?? []) as Row<PageConfigTable>[]);
 }
 
-/** Replace a tenant's per-page rows with the given blob (delete-then-insert). Safe. */
+/** Replace a tenant's per-page rows with the given blob. */
 async function setPgPageConfig(
   table: PageConfigTable,
   tenant: string,
   config: SitePageConfig
 ): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db.from(table).delete().eq("tenant_id", tenant);
-    const rows = blobToRows(table, tenant, config);
-    if (rows.length > 0) {
-      await db.from(table).insert(rows);
-    }
-  } catch {
-    // never throw — the dev-file path remains the durable fallback
+  const db = pageConfigDb(`replace ${table}/${tenant}`);
+  const { error: deleteError } = await db.from(table).delete().eq("tenant_id", tenant);
+  if (deleteError) throw deleteError;
+  const rows = blobToRows(table, tenant, config);
+  if (rows.length > 0) {
+    const { error: insertError } = await db.from(table).insert(rows);
+    if (insertError) throw insertError;
   }
 }
 
-/** Delete all of a tenant's per-page rows for the given table. Safe. */
+/** Delete all of a tenant's per-page rows for the given table. */
 async function clearPgPageConfig(
   table: PageConfigTable,
   tenant: string
 ): Promise<void> {
-  const db = getSupabase();
-  if (!db) return;
-  try {
-    await db.from(table).delete().eq("tenant_id", tenant);
-  } catch {
-    // never throw
-  }
+  const db = pageConfigDb(`clear ${table}/${tenant}`);
+  const { error } = await db.from(table).delete().eq("tenant_id", tenant);
+  if (error) throw error;
 }
 
 export async function getPageConfig(
@@ -117,10 +110,7 @@ export async function getPageConfig(
 
   if (dataSourceIsPostgres()) {
     config = await getPgPageConfig("page_config", tenant);
-    // fall through to the dev store for a tenant not yet in Postgres
-  }
-
-  if (config === null) {
+  } else {
     const store = await readDevContent(tenant);
     config = (store.__pageConfig as SitePageConfig) ?? null;
   }
@@ -133,9 +123,7 @@ export async function getDraftPageConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<SitePageConfig | null> {
   if (dataSourceIsPostgres()) {
-    const pg = await getPgPageConfig("draft_page_config", tenant);
-    if (pg) return pg;
-    // fall through to dev for a draft not yet in Postgres
+    return getPgPageConfig("draft_page_config", tenant);
   }
 
   const store = await readDevContent(tenant);
