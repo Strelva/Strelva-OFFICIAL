@@ -4,7 +4,11 @@ import * as crypto from "crypto";
 
 const MAX_SIGNATURE_AGE_MS = 300_000;
 
-function verifySignature(body: string, secret: string, timestamp: string, signature: string): boolean {
+// Exported so the platform's conformance fixture can prove real interop: a body
+// the control plane signs (via `signRevalidationBody`) must verify here, in the
+// client repo's revalidation endpoint. This is the receiving half of the wire
+// contract, kept in lockstep with the platform signer.
+export function verifySignature(body: string, secret: string, timestamp: string, signature: string): boolean {
   const ts = Number(timestamp);
   if (Number.isNaN(ts) || Math.abs(Date.now() - ts) > MAX_SIGNATURE_AGE_MS) return false;
 
