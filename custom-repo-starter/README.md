@@ -13,9 +13,12 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
 | `ScaffoldGA4.tsx` | Fail-silent GA4 tag → sends pageviews to the client's GA4 property (auto-wires from one env var) |
 | `ScaffoldReviews.tsx` | Server-rendered review-showcase grid (stars + source badge) — puts the 4.9★ social proof ON the live site |
+| `ScaffoldFAQ.tsx` | Server-rendered FAQ block **+ FAQPage JSON-LD** — the audit's #1 recurring gap (AI-answer content). Renders visible `<details>` Q&A and emits the FAQPage schema AI assistants/Google quote. Returns null with no real pairs. |
+| `scaffold-headers.ts` | `scaffoldSecurityHeaders()` — the security headers the audit grades, for `next.config.ts`'s `headers()`. Five always-safe by default; CSP is opt-in (site-specific). |
+| `llms-route.template.tsx` | Drop-in for `app/llms.txt/route.ts` — serves an `llms.txt` (built via `buildLlmsTxt`) so AI assistants can read the site. Recurring gap across builds; keep it `force-static` and never-throw. |
 | `ScaffoldMap.tsx` | Server-rendered, keyless, lazy Google Maps embed (address / place query / lat-lng) |
 | `ScaffoldBooking.tsx` | Server-rendered, lazy booking iframe (Calendly inline or any iframe-embeddable scheduler) |
-| `scaffold-seo.ts` | Pure `buildMetadata` / `buildSitemap` / `buildRobots` mappers → Next.js `<head>` + sitemap + robots |
+| `scaffold-seo.ts` | Pure `buildMetadata` / `buildSitemap` / `buildRobots` / `buildLlmsTxt` mappers → Next.js `<head>` + sitemap + robots + llms.txt |
 | `revalidate-route.ts` | Next.js App Router POST handler with HMAC signature verification |
 | `content-defaults.ts` | Fallback content for all 15 section types + full type definitions |
 | `PageRenderer.tsx` | Config-driven section renderer — turns a page's `PageSectionConfig[]` into rendered sections so page layout is DATA, not code |

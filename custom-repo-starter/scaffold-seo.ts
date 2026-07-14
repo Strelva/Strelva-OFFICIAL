@@ -172,3 +172,66 @@ export function buildRobots(config: RobotsConfig | undefined | null): MetadataRo
   if (host) robots.host = host;
   return robots;
 }
+
+/** One link in an llms.txt section. */
+export interface LlmsTxtLink {
+  title: string;
+  url: string;
+  description?: string;
+}
+
+/** A titled group of links in the llms.txt (e.g. "Pages", "Products"). */
+export interface LlmsTxtSection {
+  title: string;
+  links: LlmsTxtLink[];
+}
+
+export interface LlmsTxtConfig {
+  /** Business/site name → the `# ` title line. */
+  siteName?: string;
+  /** One-line summary → the `> ` blockquote under the title. */
+  description?: string;
+  /** Optional longer context paragraph(s). */
+  details?: string;
+  /** Grouped link sections pointing AI assistants at the important pages. */
+  sections?: LlmsTxtSection[];
+}
+
+/**
+ * Build an llms.txt (llmstxt.org) — a plain-text guide at the site root that
+ * tells AI assistants (ChatGPT, Claude, Perplexity) what the site is and where
+ * the key pages are. Our audit engine credits sites that publish one, and it's a
+ * recurring gap across builds. Drop the output into an `app/llms.txt/route.ts`
+ * GET handler (see `llms-route.ts`). Pure; honesty rule applies — only what you
+ * pass is emitted, and empty/incomplete sections are skipped.
+ */
+export function buildLlmsTxt(config: LlmsTxtConfig | undefined | null): string {
+  const c = config ?? {};
+  const lines: string[] = [`# ${clean(c.siteName) ?? "Website"}`];
+
+  const description = clean(c.description);
+  if (description) lines.push("", `> ${description}`);
+
+  const details = clean(c.details);
+  if (details) lines.push("", details);
+
+  for (const section of c.sections ?? []) {
+    const title = clean(section?.title);
+    const links = (section?.links ?? [])
+      .map((l) => ({
+        title: clean(l?.title),
+        url: clean(l?.url),
+        description: clean(l?.description),
+      }))
+      .filter((l): l is { title: string; url: string; description: string | undefined } =>
+        Boolean(l.title && l.url),
+      );
+    if (!title || links.length === 0) continue;
+    lines.push("", `## ${title}`);
+    for (const l of links) {
+      lines.push(`- [${l.title}](${l.url})${l.description ? `: ${l.description}` : ""}`);
+    }
+  }
+
+  return lines.join("\n") + "\n";
+}
