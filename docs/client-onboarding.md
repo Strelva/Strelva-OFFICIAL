@@ -38,7 +38,7 @@ Every client is a separate hand-built repo (never a template). Reusable pieces g
 - [ ] Publish the capability manifest so the AI edits what the live site renders: `custom-repo-starter/site-capabilities-route.ts` at `app/api/capabilities/route.ts`, then set the tenant's `customRepo.capabilityManifestUrl` (`POST /api/admin/tenants/[id]/capability-manifest`, super-admin).
 - [ ] **Build-QA audit — `pnpm audit:full <the-vercel-build-url>`. Target grade A before launch.** The recurring gaps to close on every build (see the portfolio audit): an **FAQ section**, a working **`llms.txt`**, `sameAs` social profiles in the Org schema, a Team/About link, trust/credentials, security headers, labeled form fields. Fix these in `custom-repo-starter` once so future builds inherit them.
 
-**Verify:** the build's audit grade is A and the site renders real content server-side (not a JS shell).
+**Verify:** the build's audit grade is A and the site renders real content server-side (not a JS shell). If it's capped below A by genuinely-absent real data (no phone — some businesses just don't have one, no testimonials yet, no socials), that's a "go get the real data" item, NOT a "fabricate to pass" one — never invent a phone/social/testimonial to hit the grade.
 
 ---
 

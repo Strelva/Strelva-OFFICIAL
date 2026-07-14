@@ -50,6 +50,16 @@ If the client has reviews, render **`ScaffoldReviews.tsx`** with real ones. The 
 
 ---
 
+## What needs a human (agents: flag these, NEVER fabricate)
+
+Some audit items can only be fixed with real business data an agent cannot know or invent. **Do not guess, relabel, or manufacture these** — add them only when given a real value, otherwise leave them out and list them in your report as a gap for the human:
+
+- **Social profiles (`sameAs`)** — real Google Business / Facebook / Instagram / LinkedIn / X URLs. If the business has none, omit `sameAs` entirely.
+- **Testimonials / reviews** — real customer quotes only. A founder quote is not a testimonial; never relabel or invent one.
+- **Phone / click-to-call** — **many businesses legitimately have no phone number** (Strelva itself does not, and won't anytime soon). If there's no real number, **do NOT invent one** — leave click-to-call out and accept the small Trust-Signals score hit. Lead with email / the contact form instead.
+
+**Grade target, honestly stated:** aim for **A**, but a site can be legitimately capped below A when real data genuinely doesn't exist yet (no socials, no phone, no testimonials). That's a "the human must go create these" outcome, not a "fabricate to pass" one. Report the ceiling and exactly what real data would lift it, and stop there.
+
 ## Part C — Verify
 
 Self-checks you can run from inside the repo against the live/preview URL (`$U`):
@@ -75,4 +85,4 @@ curl -s "$U" | grep -oE '"sameAs":\[[^]]*\]' | head -1                      # wa
 - [ ] B4 LocalBusiness schema with real `sameAs`
 - [ ] B5 Reviews rendered (if any real ones)
 - [ ] B6 Team/About link · trust/credentials · full contact info · form labels · privacy/terms
-- [ ] C build passes, self-checks green, and the human's `pnpm audit:full` returns **A**
+- [ ] C build passes, self-checks green, and `pnpm audit:full` returns **A** — or the honest ceiling with every real-data gap (socials / phone / testimonials) reported to the human
