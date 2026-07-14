@@ -2,6 +2,7 @@ import { z } from "zod";
 import { tool } from "ai";
 import { isContentSection } from "./types";
 import type { TenantConfig, SiteCapabilityManifest, ContentSection } from "./types";
+import { GBP_OPERATIONS } from "./agent/gbp-operations";
 
 /**
  * Shared AI-agent gates. The agent runs through two entry points — the streaming chat
@@ -121,43 +122,6 @@ export interface GbpToolHooks {
   reviewAudience?: "operator" | "owner";
 }
 
-const GBP_DAY = z.enum([
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-  "SATURDAY",
-  "SUNDAY",
-]);
-
-const GBP_PHOTO_CATEGORY = z.enum([
-  "COVER",
-  "PROFILE",
-  "LOGO",
-  "EXTERIOR",
-  "INTERIOR",
-  "PRODUCT",
-  "AT_WORK",
-  "FOOD_AND_DRINK",
-  "MENU",
-  "ADDITIONAL",
-]);
-
-/**
- * An optional URL tool-input that validates a real value as a URL but treats
- * "" / whitespace — a common thing the model emits for "no value" — as absent
- * instead of a validation error that would reject the ENTIRE tool call (and
- * silently queue no draft). Strictly safer than a bare `.url().optional()`.
- */
-const optionalUrl = (description: string) =>
-  z
-    .preprocess(
-      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-      z.string().url().optional(),
-    )
-    .describe(description);
-
 export function buildGbpTools(hooks: GbpToolHooks) {
   const { tenantId } = hooks;
 
@@ -193,73 +157,20 @@ export function buildGbpTools(hooks: GbpToolHooks) {
     }
   }
 
-  return {
-    create_gbp_post: tool({
-      description:
-        "Draft a Google Business post (a 'What's new' update on the Google listing) for an offer, " +
-        "update, or announcement. Creates a draft the owner must APPROVE before it publishes to " +
-        "Google — never posts directly. Keep the summary under 1500 characters.",
-      inputSchema: z.object({
-        summary: z.string().max(1500).describe("The post text (up to 1500 characters)"),
-        ctaUrl: optionalUrl("Optional call-to-action link"),
-        photoUrl: optionalUrl("Optional public photo URL to include"),
+  // Generate the tools from the operation registry (ontology Phase 3): each op is
+  // defined ONCE in `agent/gbp-operations.ts` and its LLM tool is derived here, so
+  // the two agent paths can't drift and the definition can't diverge from the tool.
+  // The returned shape/keys are identical to the previous hand-written literals.
+  return Object.fromEntries(
+    GBP_OPERATIONS.map((op) => [
+      op.id,
+      tool({
+        description: op.description,
+        inputSchema: op.inputSchema,
+        execute: (args) => queueDraft(op.id, op.toDraft(args)),
       }),
-      execute: ({ summary, ctaUrl, photoUrl }) =>
-        queueDraft("create_gbp_post", {
-          title: "Google post draft",
-          body: summary,
-          metadata: { kind: "gbp_post_draft", summary, ctaUrl, photoUrl },
-          message: "Google post drafted. It will publish to your listing once approved.",
-        }),
-    }),
-
-    update_business_hours: tool({
-      description:
-        "Draft an update to the business hours on the Google listing. Creates a draft the owner must " +
-        "APPROVE before it publishes to Google — never updates directly. Give each open day's " +
-        "open/close in 24-hour HH:MM. Confirm the correct hours with the owner before calling this.",
-      inputSchema: z.object({
-        hours: z
-          .array(
-            z.object({
-              day: GBP_DAY,
-              open: z.string().describe("Opening time, 24h HH:MM, e.g. 09:00"),
-              close: z.string().describe("Closing time, 24h HH:MM, e.g. 17:00"),
-            }),
-          )
-          .describe("One entry per open day"),
-      }),
-      execute: ({ hours }) =>
-        queueDraft("update_business_hours", {
-          title: "Google hours update",
-          body: hours.map((h) => `${h.day}: ${h.open}-${h.close}`).join("\n"),
-          metadata: { kind: "gbp_hours_draft", hours },
-          message: "Hours update drafted. It will publish to Google once approved.",
-        }),
-    }),
-
-    upload_gbp_photo: tool({
-      description:
-        "Draft a photo to add to the Google Business listing (exterior, interior, product, cover, " +
-        "etc.). Creates a draft the owner must APPROVE before it publishes to Google — never uploads " +
-        "directly. Provide a hosted image URL (use upload_image first if the owner shared a file).",
-      inputSchema: z.object({
-        photoUrl: z.string().describe("Public URL of the image to add to the Google listing"),
-        category: GBP_PHOTO_CATEGORY.optional().describe(
-          "Which section of the Google profile the photo belongs in (default ADDITIONAL)",
-        ),
-      }),
-      execute: ({ photoUrl, category }) => {
-        const chosenCategory = category ?? "ADDITIONAL";
-        return queueDraft("upload_gbp_photo", {
-          title: "Google photo upload",
-          body: `Add photo to Google listing (${chosenCategory}): ${photoUrl}`,
-          metadata: { kind: "gbp_photo_draft", photoUrl, category: chosenCategory },
-          message: "Photo drafted. It will be added to your Google listing once approved.",
-        });
-      },
-    }),
-  };
+    ]),
+  );
 }
 
 /**
