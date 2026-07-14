@@ -3,6 +3,11 @@
 Use this folder as the contract scaffold for every paid-client custom site repo.
 Scaffold Web remains the control plane; the custom repo is the public website runtime.
 
+> **Onboarding an existing client site?** Point that repo's coding agent at
+> [`AGENT-PLAYBOOK.md`](./AGENT-PLAYBOOK.md) — the step-by-step to wire a client
+> repo to Strelva and get it to audit grade A. The operator-side journey
+> (provision → domain → billing) is in [`../docs/client-onboarding.md`](../docs/client-onboarding.md).
+
 ## Files
 
 | File | Purpose |
