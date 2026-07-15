@@ -33,6 +33,20 @@ export function governedWorkDualWriteEnabled(): boolean {
   return flag === "1" || flag === "true";
 }
 
+/**
+ * SEPARATE kill-switch for the governed-work READ flip (#8) — serve the dashboard
+ * governance queue's governed events from the proposals/decisions/execution_attempts/
+ * outcomes tables instead of Redis. Independent of both DUAL_WRITE_PG and
+ * GOVERNED_WORK_DUAL_WRITE. DEFAULTS OFF (same explicit "1"/"true" as the dual-write
+ * flag): flag OFF ⇒ zero new reads ⇒ getEvents/getEvent behave byte-identically to
+ * the Redis-only path. Only flip this AFTER the dual-write shadow has produced clean
+ * parity data; flipping it back is the instant rollback (Redis stays authoritative).
+ */
+export function governedWorkReadPgEnabled(): boolean {
+  const flag = process.env.GOVERNED_WORK_READ_PG;
+  return flag === "1" || flag === "true";
+}
+
 /** UnifiedEvent (camelCase, Redis) -> unified_events row (snake_case, Postgres). */
 export function eventToInsert(e: UnifiedEvent): Insert<"unified_events"> {
   return {

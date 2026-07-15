@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activity_log: {
@@ -409,100 +434,6 @@ export type Database = {
           },
         ]
       }
-      reviews: {
-        Row: {
-          author: string
-          created_at: string
-          external_id: string | null
-          id: string
-          rating: number | null
-          reply: string | null
-          replied_at: string | null
-          review_date: string | null
-          source: string
-          tenant_id: string
-          text: string
-        }
-        Insert: {
-          author?: string
-          created_at?: string
-          external_id?: string | null
-          id?: string
-          rating?: number | null
-          reply?: string | null
-          replied_at?: string | null
-          review_date?: string | null
-          source: string
-          tenant_id: string
-          text?: string
-        }
-        Update: {
-          author?: string
-          created_at?: string
-          external_id?: string | null
-          id?: string
-          rating?: number | null
-          reply?: string | null
-          replied_at?: string | null
-          review_date?: string | null
-          source?: string
-          tenant_id?: string
-          text?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reviews_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      suggestions: {
-        Row: {
-          action: string
-          created_at: string
-          description: string
-          id: string
-          section: string | null
-          status: string
-          tenant_id: string
-          title: string
-          type: string
-        }
-        Insert: {
-          action?: string
-          created_at?: string
-          description?: string
-          id?: string
-          section?: string | null
-          status?: string
-          tenant_id: string
-          title: string
-          type: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          description?: string
-          id?: string
-          section?: string | null
-          status?: string
-          tenant_id?: string
-          title?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "suggestions_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       content: {
         Row: {
           data: Json
@@ -572,6 +503,38 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decisions: {
+        Row: {
+          action: string
+          actor: string
+          decided_at: string
+          id: string
+          proposal_id: string
+        }
+        Insert: {
+          action: string
+          actor: string
+          decided_at?: string
+          id?: string
+          proposal_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string
+          decided_at?: string
+          id?: string
+          proposal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decisions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
         ]
@@ -737,6 +700,47 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      execution_attempts: {
+        Row: {
+          attempt_no: number
+          finished_at: string | null
+          id: string
+          idempotency_key: string | null
+          proposal_id: string
+          provider_receipt: Json | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempt_no?: number
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          proposal_id: string
+          provider_receipt?: Json | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          attempt_no?: number
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          proposal_id?: string
+          provider_receipt?: Json | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_attempts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
         ]
@@ -1005,6 +1009,41 @@ export type Database = {
           },
         ]
       }
+      outcomes: {
+        Row: {
+          created_at: string
+          detail: string | null
+          execution_attempt_id: string
+          id: string
+          success: boolean
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          execution_attempt_id: string
+          id?: string
+          success: boolean
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          execution_attempt_id?: string
+          id?: string
+          success?: boolean
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outcomes_execution_attempt_id_fkey"
+            columns: ["execution_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "execution_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       page_config: {
         Row: {
           page_name: string
@@ -1086,6 +1125,103 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "pay_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          body: string | null
+          created_at: string
+          entity_type: string
+          id: string
+          kind: string | null
+          payload: Json | null
+          source: string
+          status: string
+          tenant_id: string
+          title: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          entity_type: string
+          id: string
+          kind?: string | null
+          payload?: Json | null
+          source: string
+          status?: string
+          tenant_id: string
+          title?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          entity_type?: string
+          id?: string
+          kind?: string | null
+          payload?: Json | null
+          source?: string
+          status?: string
+          tenant_id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          author: string
+          created_at: string
+          external_id: string | null
+          id: string
+          rating: number | null
+          replied_at: string | null
+          reply: string | null
+          review_date: string | null
+          source: string
+          tenant_id: string
+          text: string
+        }
+        Insert: {
+          author?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          rating?: number | null
+          replied_at?: string | null
+          reply?: string | null
+          review_date?: string | null
+          source: string
+          tenant_id: string
+          text?: string
+        }
+        Update: {
+          author?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          rating?: number | null
+          replied_at?: string | null
+          reply?: string | null
+          review_date?: string | null
+          source?: string
+          tenant_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1425,6 +1561,62 @@ export type Database = {
           },
         ]
       }
+      suggestions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          id: string
+          section: string | null
+          status: string
+          tenant_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          description?: string
+          id: string
+          section?: string | null
+          status?: string
+          tenant_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          id?: string
+          section?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggestions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      super_admin_bootstrap: {
+        Row: {
+          email: string
+        }
+        Insert: {
+          email: string
+        }
+        Update: {
+          email?: string
+        }
+        Relationships: []
+      }
       super_admins: {
         Row: {
           email: string
@@ -1491,9 +1683,9 @@ export type Database = {
           owner_name: string | null
           owner_phone: string | null
           personality: string | null
-          plan_override: string | null
           plan_currency: string | null
           plan_monthly_cents: number | null
+          plan_override: string | null
           production_domain: string | null
           referred_by: string | null
           resend_domain: string | null
@@ -1505,6 +1697,7 @@ export type Database = {
           site_url: string | null
           slack_webhook_url: string | null
           social_config: Json | null
+          stable_id: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_past_due_since: string | null
@@ -1541,9 +1734,9 @@ export type Database = {
           owner_name?: string | null
           owner_phone?: string | null
           personality?: string | null
-          plan_override?: string | null
           plan_currency?: string | null
           plan_monthly_cents?: number | null
+          plan_override?: string | null
           production_domain?: string | null
           referred_by?: string | null
           resend_domain?: string | null
@@ -1555,6 +1748,7 @@ export type Database = {
           site_url?: string | null
           slack_webhook_url?: string | null
           social_config?: Json | null
+          stable_id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_past_due_since?: string | null
@@ -1591,9 +1785,9 @@ export type Database = {
           owner_name?: string | null
           owner_phone?: string | null
           personality?: string | null
-          plan_override?: string | null
           plan_currency?: string | null
           plan_monthly_cents?: number | null
+          plan_override?: string | null
           production_domain?: string | null
           referred_by?: string | null
           resend_domain?: string | null
@@ -1605,6 +1799,7 @@ export type Database = {
           site_url?: string | null
           slack_webhook_url?: string | null
           social_config?: Json | null
+          stable_id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_past_due_since?: string | null
@@ -1633,7 +1828,7 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
-          id?: string
+          id: string
           metadata?: Json | null
           resolved_at?: string | null
           source: string
@@ -1746,12 +1941,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      app_is_super_admin: { Args: never; Returns: boolean }
+      app_tenant_ids: { Args: never; Returns: string[] }
       increment_site_metric: {
-        Args: {
-          p_day: string
-          p_metric: string
-          p_tenant_id: string
-        }
+        Args: { p_day: string; p_metric: string; p_tenant_id: string }
         Returns: number
       }
     }
@@ -1882,6 +2075,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

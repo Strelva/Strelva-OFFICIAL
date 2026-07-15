@@ -32,7 +32,7 @@ describe("Supabase data layer — degrades gracefully when unconfigured", () => 
 
   it("best-effort migration mirrors remain no-ops and inserts return null id", async () => {
     await expect(
-      repos.insertEvent({ tenant_id: "gldf", source: "ai", type: "content_update" })
+      repos.insertEvent({ id: "evt_test_1", tenant_id: "gldf", source: "ai", type: "content_update" })
     ).resolves.toBeNull();
     await expect(repos.setEventStatus("evt_1", "approved")).resolves.toBeUndefined();
     await expect(

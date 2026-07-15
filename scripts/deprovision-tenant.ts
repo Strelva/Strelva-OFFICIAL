@@ -55,8 +55,10 @@ const TENANT_SCOPED_TABLES = [
   "integrations", "invites", "mail_log", "memberships", "newsletter_subscribers",
   "page_config", "pay_links", "reward_members", "reward_transactions",
   "scan_history", "scan_results", "search_console_data", "site_metrics",
-  "site_snapshots", "social_posts", "unified_events", "weekly_briefs",
+  "site_snapshots", "social_posts", "unified_events", "proposals", "weekly_briefs",
 ] as const;
+// Note: proposals' children (decisions/execution_attempts/outcomes) FK to it with
+// ON DELETE CASCADE, so purging proposals by tenant_id clears them too.
 
 // Global Redis caches that include this tenant; safe to bust (they rebuild).
 const GLOBAL_CACHE_KEYS = ["reb:tenants:all", "reb:domain-map", "reb:portfolio:summary"];

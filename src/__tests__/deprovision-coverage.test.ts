@@ -15,7 +15,11 @@ describe("deprovision-tenant table coverage", () => {
   const script = readFileSync(join(root, "scripts/deprovision-tenant.ts"), "utf8");
 
   // Tenant-scoped tables = every `Tables` entry whose Row block contains tenant_id.
-  const tablesBlock = types.slice(types.indexOf("Tables:"), types.indexOf("Views:"));
+  // Scan the whole file, not a Tables:..Views: slice: the multi-schema generated
+  // format (graphql_public) puts an empty Tables:/Views: pair first, which a naive
+  // indexOf slice would grab. Non-public schemas here have no tenant_id rows, so a
+  // whole-file scan is both correct and robust to that.
+  const tablesBlock = types;
   const tenantTables: string[] = [];
   const re = /\n {6}([a-z_]+): \{\n {8}Row: \{([\s\S]*?)\n {8}\}/g;
   for (let m = re.exec(tablesBlock); m; m = re.exec(tablesBlock)) {

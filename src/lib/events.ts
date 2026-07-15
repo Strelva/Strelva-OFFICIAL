@@ -7,8 +7,10 @@ import type { UnifiedEvent } from "./types";
 import { getRedis } from "./redis";
 import { DEFAULT_TENANT } from "./storage/core";
 import { insertEvent, setEventStatus } from "./db/repositories";
-import { dualWritePgEnabled, eventToInsert } from "./db/dual-write";
+import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "./db/dual-write";
 import { shadowDecisionFromResolve, shadowProposalFromEvent } from "./governed-work/shadow";
+import { getGovernedEventById, listGovernedEventsForTenant } from "./governed-work/repository";
+import { isGovernedScopeEvent } from "./governed-work/read";
 
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
@@ -268,13 +270,44 @@ export async function getEvents(
     }
   }
 
-  return events;
+  return hydrateGovernedFromPg(tenantId, events);
+}
+
+/**
+ * Governed-work READ flip (#8), flag-gated by GOVERNED_WORK_READ_PG (default OFF).
+ * Redis stays the index/ordering/membership authority — the set of events, their
+ * order, and the status filter are ALL computed from Redis above and unchanged.
+ * When the flag is on, each governed-scope event in that Redis-determined set is
+ * re-served from the proposals/decisions/execution_attempts/outcomes tables (the
+ * governance queue reading from Postgres), with a fail-soft fallback to the Redis
+ * event when Postgres has no twin. Non-governed observation events (bookings,
+ * reviews, payments…) are never in proposals, so they always come from Redis.
+ * Flag OFF ⇒ this returns `events` untouched ⇒ byte-identical to the old path.
+ */
+async function hydrateGovernedFromPg(
+  tenantId: string,
+  events: UnifiedEvent[],
+): Promise<UnifiedEvent[]> {
+  if (!governedWorkReadPgEnabled()) return events;
+  if (!events.some(isGovernedScopeEvent)) return events;
+  const pgEvents = await listGovernedEventsForTenant(tenantId, { limit: events.length });
+  const pgById = new Map(pgEvents.map((e) => [e.id, e]));
+  return events.map((e) => (isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e));
 }
 
 export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   const redis = getRedis();
   if (!redis) return null;
-  return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+  const event = (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+  if (!event) return null;
+  // Governed-work READ flip (see hydrateGovernedFromPg). Flag OFF ⇒ the Redis
+  // event is returned unchanged. Fail-soft: a missing/blipped Postgres twin
+  // falls back to the Redis event.
+  if (governedWorkReadPgEnabled() && isGovernedScopeEvent(event)) {
+    const pg = await getGovernedEventById(id);
+    if (pg) return pg;
+  }
+  return event;
 }
 
 /**
