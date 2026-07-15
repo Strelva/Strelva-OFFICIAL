@@ -50,6 +50,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/governed-work-reconcile",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/visibility",
       "schedule": "0 3 * * 2"
     },
