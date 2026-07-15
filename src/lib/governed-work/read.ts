@@ -52,6 +52,18 @@ export function isGovernedScopeEvent(e: UnifiedEvent): boolean {
   }
 }
 
+/**
+ * Which governed events are SAFE to read back from Postgres today. Everything in
+ * `isGovernedScopeEvent` EXCEPT `change_request`: a custom change-request's workflow
+ * state (triaged/quoted/shipped/declined) moves through `updateEvent`, which the
+ * shadow doesn't capture and `proposals.status`'s CHECK can't hold — so it would
+ * reconstruct as `pending`. Until that's shadowed, change_requests always read from
+ * Redis (the read flip skips them, falling back to the authoritative Redis event).
+ */
+export function isPgReadEligible(e: UnifiedEvent): boolean {
+  return isGovernedScopeEvent(e) && e.type !== "change_request";
+}
+
 /** attempt.status (running|succeeded|failed) → the Redis execution `state`. */
 function executionState(
   status: ExecutionAttempt["status"],

@@ -31,7 +31,7 @@ vi.mock("@/lib/governed-work/repository", () => ({
 
 import { getEvent, getEvents } from "@/lib/events";
 import { eventToProposal } from "@/lib/governed-work/shadow";
-import { proposalToEvent } from "@/lib/governed-work/read";
+import { proposalToEvent, isPgReadEligible, isGovernedScopeEvent } from "@/lib/governed-work/read";
 
 function evt(p: Partial<UnifiedEvent>): UnifiedEvent {
   return {
@@ -285,5 +285,25 @@ describe("proposalToEvent — resolved item reconstructs status + resolvedAt + e
     const back = proposalToEvent(proposal, decision, attempt, outcome);
     expect(back.metadata?.execution?.state).toBe("failed");
     expect(back.metadata?.execution?.reason).toBe("review_reply_failed");
+  });
+});
+
+describe("isPgReadEligible — the read flip skips change_request (fidelity gap #3)", () => {
+  const ev = (type: string): UnifiedEvent =>
+    ({ id: "e", tenantId: "t", source: "ai", type, title: "", body: "", status: "pending", createdAt: "", metadata: type === "review" ? { kind: "review_reply_draft" } : {} }) as unknown as UnifiedEvent;
+
+  it("hydrates content_update / suggestion / newsletter / review-reply from Postgres", () => {
+    for (const t of ["content_update", "suggestion", "newsletter_draft"]) expect(isPgReadEligible(ev(t))).toBe(true);
+    expect(isPgReadEligible(ev("review"))).toBe(true);
+  });
+
+  it("does NOT hydrate change_request (stays on Redis) though it IS governed-scope", () => {
+    const cr = ev("change_request");
+    expect(isGovernedScopeEvent(cr)).toBe(true); // still governed-scope...
+    expect(isPgReadEligible(cr)).toBe(false); // ...but not PG-read-eligible until gap #3 is closed
+  });
+
+  it("skips non-governed observations", () => {
+    for (const t of ["booking", "message", "build_payment"]) expect(isPgReadEligible(ev(t))).toBe(false);
   });
 });
