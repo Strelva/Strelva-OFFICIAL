@@ -31,7 +31,7 @@ vi.mock("@/lib/governed-work/repository", () => ({
 
 import { getEvent, getEvents } from "@/lib/events";
 import { eventToProposal } from "@/lib/governed-work/shadow";
-import { proposalToEvent, isPgReadEligible, isGovernedScopeEvent } from "@/lib/governed-work/read";
+import { proposalToEvent, isGovernedScopeEvent } from "@/lib/governed-work/read";
 
 function evt(p: Partial<UnifiedEvent>): UnifiedEvent {
   return {
@@ -288,22 +288,71 @@ describe("proposalToEvent — resolved item reconstructs status + resolvedAt + e
   });
 });
 
-describe("isPgReadEligible — the read flip skips change_request (fidelity gap #3)", () => {
+describe("isGovernedScopeEvent — the read flip includes change_request (gap #3 closed)", () => {
   const ev = (type: string): UnifiedEvent =>
     ({ id: "e", tenantId: "t", source: "ai", type, title: "", body: "", status: "pending", createdAt: "", metadata: type === "review" ? { kind: "review_reply_draft" } : {} }) as unknown as UnifiedEvent;
 
-  it("hydrates content_update / suggestion / newsletter / review-reply from Postgres", () => {
-    for (const t of ["content_update", "suggestion", "newsletter_draft"]) expect(isPgReadEligible(ev(t))).toBe(true);
-    expect(isPgReadEligible(ev("review"))).toBe(true);
-  });
-
-  it("does NOT hydrate change_request (stays on Redis) though it IS governed-scope", () => {
-    const cr = ev("change_request");
-    expect(isGovernedScopeEvent(cr)).toBe(true); // still governed-scope...
-    expect(isPgReadEligible(cr)).toBe(false); // ...but not PG-read-eligible until gap #3 is closed
+  it("hydrates content_update / suggestion / newsletter / review-reply / change_request from Postgres", () => {
+    for (const t of ["content_update", "suggestion", "newsletter_draft", "change_request"]) {
+      expect(isGovernedScopeEvent(ev(t))).toBe(true);
+    }
+    expect(isGovernedScopeEvent(ev("review"))).toBe(true);
   });
 
   it("skips non-governed observations", () => {
-    for (const t of ["booking", "message", "build_payment"]) expect(isPgReadEligible(ev(t))).toBe(false);
+    for (const t of ["booking", "message", "build_payment"]) expect(isGovernedScopeEvent(ev(t))).toBe(false);
+  });
+});
+
+describe("proposalToEvent — change_request workflow reconstructs from metadata.workflowStatus (gap #3)", () => {
+  const T = "2026-07-15T12:00:00.000Z";
+  const crProposal = (status: Proposal["status"], workflowStatus: string | null, extra?: Record<string, unknown>): Proposal => ({
+    id: "cr_1",
+    tenantId: "gldf",
+    source: "system",
+    kind: "custom_change_request",
+    entityType: "change_request",
+    title: "Add a booking widget",
+    body: "client wants online booking",
+    payload: workflowStatus
+      ? { workflowStatus, workflowUpdatedAt: T, ...extra }
+      : { ...extra },
+    status,
+    createdAt: "2026-07-14T00:00:00.000Z",
+  });
+
+  it("shipped -> approved (a real ship, NOT auto_approved) + resolvedAt from workflowUpdatedAt", () => {
+    const back = proposalToEvent(crProposal("approved", "shipped", { shippedAt: T }), null, null, null);
+    expect(back.status).toBe("approved");
+    expect(back.resolvedAt).toBe(T);
+    expect(back.metadata?.workflowStatus).toBe("shipped");
+    expect(back.metadata).not.toHaveProperty("resolutionHistory"); // workflow path never synthesizes one
+  });
+
+  it("declined -> dismissed + resolvedAt", () => {
+    const back = proposalToEvent(crProposal("dismissed", "declined"), null, null, null);
+    expect(back.status).toBe("dismissed");
+    expect(back.resolvedAt).toBe(T);
+    expect(back.metadata?.workflowStatus).toBe("declined");
+  });
+
+  it("quoted -> still pending, no resolvedAt, quoteRequired preserved", () => {
+    const back = proposalToEvent(crProposal("pending", "quoted", { quoteRequired: true }), null, null, null);
+    expect(back.status).toBe("pending");
+    expect(back.resolvedAt).toBeUndefined();
+    expect(back.metadata?.workflowStatus).toBe("quoted");
+    expect(back.metadata?.quoteRequired).toBe(true);
+  });
+
+  it("a pending change_request with no workflowStatus yet reconstructs as pending", () => {
+    const back = proposalToEvent(crProposal("pending", null), null, null, null);
+    expect(back.status).toBe("pending");
+    expect(back.resolvedAt).toBeUndefined();
+  });
+
+  it("a NON-change_request approved-with-no-decision still reads as auto_approved (unaffected)", () => {
+    const p: Proposal = { id: "s_1", tenantId: "gldf", source: "ai", kind: null, entityType: "suggestion", title: "", body: "", payload: { workflowStatus: "shipped" }, status: "approved", createdAt: "2026-07-14T00:00:00.000Z" };
+    // workflowStatus only drives change_request; a suggestion ignores it.
+    expect(proposalToEvent(p, null, null, null).status).toBe("auto_approved");
   });
 });

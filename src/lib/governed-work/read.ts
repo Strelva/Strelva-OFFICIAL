@@ -52,18 +52,6 @@ export function isGovernedScopeEvent(e: UnifiedEvent): boolean {
   }
 }
 
-/**
- * Which governed events are SAFE to read back from Postgres today. Everything in
- * `isGovernedScopeEvent` EXCEPT `change_request`: a custom change-request's workflow
- * state (triaged/quoted/shipped/declined) moves through `updateEvent`, which the
- * shadow doesn't capture and `proposals.status`'s CHECK can't hold — so it would
- * reconstruct as `pending`. Until that's shadowed, change_requests always read from
- * Redis (the read flip skips them, falling back to the authoritative Redis event).
- */
-export function isPgReadEligible(e: UnifiedEvent): boolean {
-  return isGovernedScopeEvent(e) && e.type !== "change_request";
-}
-
 /** attempt.status (running|succeeded|failed) → the Redis execution `state`. */
 function executionState(
   status: ExecutionAttempt["status"],
@@ -89,15 +77,37 @@ export function proposalToEvent(
   attempt: ExecutionAttempt | null,
   outcome: Outcome | null,
 ): UnifiedEvent {
+  // A custom change_request runs its OWN lifecycle (triaged/quoted/shipped/declined)
+  // carried in metadata.workflowStatus via resolveEventAction — NOT the decision
+  // path — so it never writes a decision row or a resolutionHistory. Its terminal
+  // event status derives from the workflow: shipped→approved (a genuine ship, not
+  // the "auto_approved" the plain proposal.status→status map would give), declined→
+  // dismissed. resolvedAt is the workflow's own timestamp (workflowUpdatedAt, which
+  // resolveEventAction sets to the SAME instant as event.resolvedAt). #8/gap-#3.
+  const payloadObj = (proposal.payload ?? null) as Record<string, unknown> | null;
+  const workflowStatus =
+    proposal.entityType === "change_request" && typeof payloadObj?.workflowStatus === "string"
+      ? payloadObj.workflowStatus
+      : null;
+  const workflowResolvedAt =
+    typeof payloadObj?.workflowUpdatedAt === "string" ? payloadObj.workflowUpdatedAt : undefined;
+
   // status + resolvedAt. A decision means the pending→resolved transition fired,
   // so its action IS the event status and its timestamp IS resolvedAt. Absent a
-  // decision the proposal's own status carries it: `approved` is a system
-  // auto_approval (never decided), `dismissed` stays dismissed, else pending.
+  // decision: a terminal change_request workflow drives it (above), else the
+  // proposal's own status carries it: `approved` is a system auto_approval (never
+  // decided), `dismissed` stays dismissed, else pending.
   let status: UnifiedEvent["status"];
   let resolvedAt: string | undefined;
   if (decision) {
     status = decision.action; // "approved" | "dismissed"
     resolvedAt = decision.decidedAt;
+  } else if (workflowStatus === "shipped") {
+    status = "approved";
+    resolvedAt = workflowResolvedAt;
+  } else if (workflowStatus === "declined") {
+    status = "dismissed";
+    resolvedAt = workflowResolvedAt;
   } else if (proposal.status === "approved") {
     status = "auto_approved";
   } else if (proposal.status === "dismissed") {

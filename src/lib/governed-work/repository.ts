@@ -158,6 +158,33 @@ export async function insertProposal(input: NewProposal): Promise<Proposal | nul
   }, null);
 }
 
+/**
+ * Update a proposal's mutable state (status + payload) in place. The change_request
+ * workflow (triaged/quoted/shipped/declined) mutates its Redis event AFTER creation
+ * — this re-syncs the shadow row so the reconstruction stays faithful (gap #3). A
+ * no-op if the row doesn't exist yet (0 rows updated); best-effort → null on error.
+ */
+export async function updateProposalState(
+  id: string,
+  input: { status: ProposalStatus; payload?: Record<string, unknown> | null },
+): Promise<Proposal | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return bestEffort(`updateProposalState ${id}`, async () => {
+    const { data, error } = await db
+      .from("proposals")
+      .update({
+        status: input.status,
+        payload: (input.payload ?? null) as Insert<"proposals">["payload"],
+      })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? toProposal(data) : null;
+  }, null);
+}
+
 export async function getProposal(id: string): Promise<Proposal | null> {
   const db = getSupabase();
   if (!db) return null;

@@ -24,7 +24,7 @@
  */
 
 import type { UnifiedEvent } from "../types";
-import type { DecisionAction } from "./types";
+import type { DecisionAction, ProposalStatus } from "./types";
 import { governedWorkDualWriteEnabled } from "../db/dual-write";
 import {
   finishExecutionAttempt,
@@ -32,6 +32,7 @@ import {
   recordDecision,
   recordOutcome,
   startExecutionAttempt,
+  updateProposalState,
   type NewProposal,
 } from "./repository";
 
@@ -117,6 +118,62 @@ export async function shadowDecisionFromResolve(
   if (!governedWorkDualWriteEnabled()) return;
   await bestEffort(`recordDecision ${proposalId}`, async () => {
     await recordDecision({ proposalId, action, actor });
+  });
+}
+
+/** UnifiedEvent.status → ProposalStatus (the proposals CHECK set). change_request
+ *  terminal states are genuine approved/dismissed; auto_approved collapses to
+ *  approved (the proposals table has no auto_approved value). */
+function eventStatusToProposalStatus(s: UnifiedEvent["status"]): ProposalStatus {
+  switch (s) {
+    case "approved":
+    case "auto_approved":
+      return "approved";
+    case "dismissed":
+      return "dismissed";
+    default:
+      return "pending";
+  }
+}
+
+/**
+ * Full NewProposal for a change_request at ANY workflow status. The pending-only
+ * `eventToProposal` skips shipped/declined CRs; the gap-#3 backfill uses this to
+ * INSERT the historical ones (so a re-sync can create a missing row, then the
+ * runtime shadow keeps it current). Pure — no I/O.
+ */
+export function changeRequestNewProposal(e: UnifiedEvent): NewProposal | null {
+  if (e.type !== "change_request") return null;
+  const kind = typeof e.metadata?.kind === "string" ? e.metadata.kind : null;
+  return {
+    id: e.id,
+    tenantId: e.tenantId,
+    source: e.source === "ai" ? "ai" : "system",
+    kind,
+    entityType: e.type,
+    title: e.title ?? null,
+    body: e.body ?? null,
+    payload: (e.metadata ?? null) as Record<string, unknown> | null,
+    status: eventStatusToProposalStatus(e.status),
+  };
+}
+
+/**
+ * change_request workflow hook: a custom change-request advanced through its
+ * lifecycle (triaged/quoted/shipped/declined) via resolveEventAction, which mutates
+ * the Redis event's status + metadata.workflowStatus WITHOUT a decision row. Re-sync
+ * the shadow proposal (status + payload) so the reconstruction reflects the new
+ * state (gap #3). Best-effort, flag-gated; a no-op if the proposal row doesn't exist
+ * yet. Only fires for change_request events (caller already gates on custom-CR).
+ */
+export async function shadowChangeRequestWorkflow(event: UnifiedEvent): Promise<void> {
+  if (!governedWorkDualWriteEnabled()) return;
+  if (event.type !== "change_request") return;
+  await bestEffort(`updateProposalState ${event.id}`, async () => {
+    await updateProposalState(event.id, {
+      status: eventStatusToProposalStatus(event.status),
+      payload: (event.metadata ?? null) as Record<string, unknown> | null,
+    });
   });
 }
 

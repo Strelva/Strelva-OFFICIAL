@@ -10,7 +10,7 @@ import { insertEvent, setEventStatus } from "./db/repositories";
 import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "./db/dual-write";
 import { shadowDecisionFromResolve, shadowProposalFromEvent } from "./governed-work/shadow";
 import { getGovernedEventById, listGovernedEventsForTenant } from "./governed-work/repository";
-import { isPgReadEligible } from "./governed-work/read";
+import { isGovernedScopeEvent } from "./governed-work/read";
 
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
@@ -289,10 +289,10 @@ async function hydrateGovernedFromPg(
   events: UnifiedEvent[],
 ): Promise<UnifiedEvent[]> {
   if (!governedWorkReadPgEnabled()) return events;
-  if (!events.some(isPgReadEligible)) return events;
+  if (!events.some(isGovernedScopeEvent)) return events;
   const pgEvents = await listGovernedEventsForTenant(tenantId, { limit: events.length });
   const pgById = new Map(pgEvents.map((e) => [e.id, e]));
-  return events.map((e) => (isPgReadEligible(e) ? pgById.get(e.id) ?? e : e));
+  return events.map((e) => (isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e));
 }
 
 export async function getEvent(id: string): Promise<UnifiedEvent | null> {
@@ -303,7 +303,7 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   // Governed-work READ flip (see hydrateGovernedFromPg). Flag OFF ⇒ the Redis
   // event is returned unchanged. Fail-soft: a missing/blipped Postgres twin
   // falls back to the Redis event.
-  if (governedWorkReadPgEnabled() && isPgReadEligible(event)) {
+  if (governedWorkReadPgEnabled() && isGovernedScopeEvent(event)) {
     const pg = await getGovernedEventById(id);
     if (pg) return pg;
   }

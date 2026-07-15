@@ -16,6 +16,7 @@ import { diffFields } from "./utils";
 import { recordApproval, recordRejection } from "./ai-auto-approve";
 import { GBP_OPERATIONS } from "./agent/gbp-operations";
 import {
+  shadowChangeRequestWorkflow,
   shadowFinishExecutionAttempt,
   shadowStartExecutionAttempt,
 } from "./governed-work/shadow";
@@ -112,20 +113,28 @@ export async function resolveEventAction(
       : workflowStatus === "declined"
         ? "dismissed"
         : event.status;
+    // ONE timestamp for resolvedAt + shippedAt + workflowUpdatedAt so the Postgres
+    // reconstruction can recover resolvedAt from workflowUpdatedAt exactly (gap #3).
+    const now = new Date().toISOString();
     const result = await updateEvent(eventId, (existing) => ({
       ...existing,
       status: terminalStatus,
       resolvedAt: terminalStatus === "approved" || terminalStatus === "dismissed"
-        ? new Date().toISOString()
+        ? now
         : existing.resolvedAt,
       metadata: {
         ...existing.metadata,
         workflowStatus,
         quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
-        shippedAt: workflowStatus === "shipped" ? new Date().toISOString() : existing.metadata?.shippedAt,
-        workflowUpdatedAt: new Date().toISOString(),
+        shippedAt: workflowStatus === "shipped" ? now : existing.metadata?.shippedAt,
+        workflowUpdatedAt: now,
       },
     }));
+    // Re-sync the governed-work shadow (gap #3): flag-gated + best-effort, never
+    // affects the Redis-authoritative result above.
+    if (result.changed && result.event) {
+      await shadowChangeRequestWorkflow(result.event);
+    }
     return { changed: result.changed };
   }
 
