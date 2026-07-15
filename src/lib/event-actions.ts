@@ -15,6 +15,10 @@ import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { diffFields } from "./utils";
 import { recordApproval, recordRejection } from "./ai-auto-approve";
 import { GBP_OPERATIONS } from "./agent/gbp-operations";
+import {
+  shadowFinishExecutionAttempt,
+  shadowStartExecutionAttempt,
+} from "./governed-work/shadow";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
 
@@ -132,18 +136,30 @@ export async function resolveEventAction(
   const claim = await claimEventAction(eventId, action, "user");
   if (!claim.acquired) return { changed: false, reason: claim.reason };
 
+  // Governed-work execution shadow (SEPARATE flag, default OFF, best-effort). Only
+  // an approval performs the external write, so only an approval opens an attempt;
+  // the Redis attemptId is the idempotency key. This is the attempt-owning
+  // chokepoint (it holds attemptId + the single success/fail result); it does not
+  // touch executeResolvedEventAction's branches. See shadow.ts. #7 migration must be
+  // applied before the flag is enabled.
+  const shadowAttemptId =
+    action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
+
   try {
     const result = await executeResolvedEventAction(tenantId, eventId, action, event);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",
       reason: result.reason,
     });
+    await shadowFinishExecutionAttempt(shadowAttemptId, {
+      success: result.changed,
+      detail: result.reason,
+    });
     return result;
   } catch (error) {
-    await finishEventAction(eventId, claim.attemptId, {
-      state: "failed",
-      reason: error instanceof Error ? error.message.slice(0, 200) : "action_failed",
-    });
+    const reason = error instanceof Error ? error.message.slice(0, 200) : "action_failed";
+    await finishEventAction(eventId, claim.attemptId, { state: "failed", reason });
+    await shadowFinishExecutionAttempt(shadowAttemptId, { success: false, detail: reason });
     throw error;
   }
 }
