@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import {
   buildReputationSummary,
   buildGoogleReviewLink,
@@ -13,6 +13,19 @@ import type { ReviewItem } from "@/lib/types";
 
 const NOW = new Date("2026-06-30T12:00:00Z").getTime();
 const daysAgo = (n: number) => new Date(NOW - n * 86400_000).toISOString();
+
+// Pin the clock to NOW. `buildReputationSummary`/`computeReviewVelocity` accept an
+// injected `now` (the non-render tests pass NOW), but `ReputationHeader` calls them
+// with the default `Date.now()`, so the render tests were date-brittle — they drifted
+// as real time advanced past the fixed review dates and flipped a copy branch. Faking
+// the Date clock (only Date, not timers) makes every path use NOW deterministically.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 function review(partial: Partial<ReviewItem> & { rating: number }): ReviewItem {
   return {
