@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
+import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
@@ -16,12 +17,6 @@ export { validateCronRequest } from "@/lib/cron-auth";
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   "gldf.strelva.com": "https://greatlakesdriedfruit.com",
 };
-
-// Reserved control-plane subdomains under strelva.com that are NOT tenants.
-// `app`/`api` matter for the scaffoldweb.com -> app.strelva.com cutover: without
-// this, app.strelva.com would resolve to a phantom tenant "app". `www`/`admin`
-// were already excluded inline; they live here now so there is one list.
-const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
 
 const cspBaseDirectives = [
   "default-src 'self'",
@@ -112,48 +107,11 @@ export function shouldResolveCustomDomain(host: string): boolean {
 }
 
 export function extractTenantFromHost(host: string): { tenant: string | null; isAdminSubdomain: boolean } {
-  const normalizedHost = host.toLowerCase();
-  const hostWithoutPort = normalizedHost.split(":")[0];
-
-  if (isMarketingHost(host)) {
-    return { tenant: null, isAdminSubdomain: false };
-  }
-
-  // Production: tenant.strelva.com
-  if (hostWithoutPort.endsWith(".strelva.com")) {
-    const subdomain = hostWithoutPort.replace(".strelva.com", "");
-    if (subdomain.startsWith("admin.")) {
-      const tenant = subdomain.replace(/^admin\./, "");
-      return tenant
-        ? { tenant, isAdminSubdomain: true }
-        : { tenant: null, isAdminSubdomain: false };
-    }
-    if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain)) {
-      return { tenant: subdomain, isAdminSubdomain: false };
-    }
-    return { tenant: null, isAdminSubdomain: false };
-  }
-
-  // Local dev: tenant.localhost (e.g., gldf.localhost:3000)
-  if (hostWithoutPort.endsWith(".localhost")) {
-    const subdomain = hostWithoutPort.replace(".localhost", "");
-    if (subdomain.startsWith("admin.")) {
-      const tenant = subdomain.replace(/^admin\./, "");
-      return tenant
-        ? { tenant, isAdminSubdomain: true }
-        : { tenant: null, isAdminSubdomain: false };
-    }
-    if (subdomain) {
-      return { tenant: subdomain, isAdminSubdomain: false };
-    }
-    return { tenant: null, isAdminSubdomain: false };
-  }
-
-  if (hostWithoutPort.endsWith(".vercel.app")) {
-    return { tenant: null, isAdminSubdomain: false };
-  }
-
-  return { tenant: null, isAdminSubdomain: false };
+  // Thin adapter over the shared Edge-safe parser (src/lib/tenant-host.ts) so the
+  // proxy edge and server components resolve hosts identically. Keeps the legacy
+  // `isAdminSubdomain` field name this function's callers/tests expect.
+  const { tenant, isAdmin } = parseTenantHost(host);
+  return { tenant, isAdminSubdomain: isAdmin };
 }
 
 // Custom domain → tenant mapping from env var (Edge-compatible fallback)

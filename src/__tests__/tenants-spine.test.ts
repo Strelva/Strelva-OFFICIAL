@@ -6,6 +6,7 @@ import type { Row } from "@/lib/db/client";
 // critical fields are what matter — a mapping slip here 500s the control plane).
 const gldfRow = {
   id: "gldf",
+  stable_id: "11111111-2222-3333-4444-555555555555",
   site_name: "Great Lakes Dried Fruit",
   owner_name: "Great Lakes Dried Fruit",
   owner_email: "greatlakesdriedfruit@gmail.com",
@@ -85,6 +86,13 @@ describe("tenants spine mapper (rowToTenant)", () => {
     expect(t.customRepo).toEqual({ repoUrl: "https://github.com/x/gldf" });
     expect(t.reviewsConfig).toEqual({ googlePlaceId: "place123" });
   });
+
+  it("hydrates the stable UUID identity separate from the mutable slug (#6)", () => {
+    // id/subdomain are the mutable routing slug; stableId is the immutable anchor.
+    expect(t.stableId).toBe("11111111-2222-3333-4444-555555555555");
+    expect(t.id).toBe("gldf");
+    expect(t.stableId).not.toBe(t.id);
+  });
 });
 
 describe("tenants spine round-trip (tenantToRow . rowToTenant)", () => {
@@ -97,6 +105,12 @@ describe("tenants spine round-trip (tenantToRow . rowToTenant)", () => {
     expect(row.revalidation_secret).toBe("secret-abc");
     expect(row.delivery_model).toBe("custom_repo");
     expect(row.active).toBe(true);
+    expect(row.stable_id).toBe("11111111-2222-3333-4444-555555555555");
+  });
+
+  it("never writes stable_id on a partial update that omits it (immutable)", () => {
+    const row = tenantToRow({ id: "gldf", siteName: "New Name" });
+    expect(row).not.toHaveProperty("stable_id");
   });
 
   it("a partial update only sets the changed columns (no clobber)", () => {

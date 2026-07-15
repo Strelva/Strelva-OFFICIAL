@@ -1,28 +1,11 @@
 import { headers } from "next/headers";
 import { DEFAULT_TENANT } from "./storage/core";
+import { parseTenantHost } from "./tenant-host";
 
+/** Server-component host->slug resolution. Delegates to the shared Edge-safe
+ *  parser so it can never drift from the proxy edge again (#6 identity seam). */
 export function getTenantFromHost(host: string): string | null {
-  const hostWithoutPort = host.toLowerCase().split(":")[0];
-
-  if (hostWithoutPort.endsWith(".localhost")) {
-    const subdomain = hostWithoutPort.replace(".localhost", "");
-    if (subdomain.startsWith("admin.")) {
-      return subdomain.replace(/^admin\./, "") || null;
-    }
-    return subdomain || null;
-  }
-
-  if (hostWithoutPort.endsWith(".strelva.com")) {
-    const subdomain = hostWithoutPort.replace(".strelva.com", "");
-    if (subdomain.startsWith("admin.")) {
-      return subdomain.replace(/^admin\./, "") || null;
-    }
-    if (subdomain && subdomain !== "www" && subdomain !== "admin") {
-      return subdomain;
-    }
-  }
-
-  return null;
+  return parseTenantHost(host).tenant;
 }
 
 export async function getTenantFromHeaders(): Promise<string> {

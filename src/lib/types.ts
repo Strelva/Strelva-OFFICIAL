@@ -552,6 +552,13 @@ export interface SocialPost {
 export interface TenantConfig {
   id: string;
   subdomain: string;
+  /**
+   * Immutable UUID identity (`tenants.stable_id`). `id`/`subdomain` are the same
+   * MUTABLE routing slug; `stableId` is the stable referential anchor the #6
+   * identity spine migrates onto. Optional while the seam is being introduced —
+   * hydrated by `rowToTenant`, present on every DB-sourced tenant.
+   */
+  stableId?: string;
   siteName: string;
   ownerName: string;
   ownerEmail?: string;

@@ -31,6 +31,7 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
   return {
     id: r.id,
     subdomain: r.id,
+    stableId: r.stable_id ?? undefined,
     siteName: r.site_name,
     ownerName: r.owner_name ?? "",
     ownerEmail: r.owner_email ?? undefined,
@@ -153,6 +154,9 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.revalidationSecret !== undefined) row.revalidation_secret = encryptSecret(t.revalidationSecret);
   if (t.branding !== undefined) row.branding = j(t.branding);
   if (t.visibility !== undefined) row.visibility = j(t.visibility);
+  // stable_id is immutable (DB default gen_random_uuid on insert); only ever
+  // written when a caller explicitly carries it (never mutated after mint).
+  if (t.stableId !== undefined) row.stable_id = t.stableId;
   return row;
 }
 
