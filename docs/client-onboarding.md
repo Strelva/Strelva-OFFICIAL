@@ -42,6 +42,17 @@ Every client is a separate hand-built repo (never a template). Reusable pieces g
 
 ---
 
+## Phase 2b — Workspace conformance (You)
+
+Every custom repo must satisfy the shared **baseline** so `pnpm check:custom-repos` stays green as clients are added. The inventory is manifest-driven — see [custom-repo-delivery-model.md](./custom-repo-delivery-model.md) "Adding a client repo".
+
+- [ ] Baseline package scripts present: `dev`, `build`, `typecheck`, `test`, `check`.
+- [ ] Baseline files present: `README.md`, `.env.example`, `src/lib/reb-contracts.ts`, `src/lib/storage.ts`, `src/app/api/reb-capabilities/route.ts`, `src/app/api/v1/revalidate/route.ts`, `release-manifest.json`.
+- [ ] The repo's own `release-manifest.json` sets `"contractVersion": "v1"` and lists env `REB_API_URL`.
+- [ ] Register the repo in the platform inventory — one entry in `release-manifest.json` → `customRepoWorkspace.repos`: `{ "tenant": "<slug>", "localPath": "../<repo-dir>", "compatibleCommit": "<git sha>" }`. Adding a repo is a manifest entry, never a checker edit.
+
+**Verify:** with the repo checked out next to `strelva-platform` (or `CUSTOM_REPO_WORKSPACE_ROOT` set), `pnpm check:custom-repos` is green for this tenant (no `FAIL`).
+
 ## Phase 3 — Activation (You for beacons, Client for grants)
 
 The two tracks that light up the dashboard. Full detail: [activation-runbook.md](./activation-runbook.md).
