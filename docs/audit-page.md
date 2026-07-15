@@ -144,6 +144,31 @@ Because it divides by the sum of the weights actually present, a category emitte
 - Per-tenant detail: `src/app/admin/tenants/[id]/SiteScan.tsx` shows the stored `ScanSummary` and can run a fresh in-session scan via `POST /api/admin/scan` (which also routes through `scanTenant`, writing the store), exposing the full per-check breakdown for that run.
 - Daily cron: `GET /api/cron/portfolio-scan` (scheduled `0 5 * * *` in `vercel.json`, `maxDuration: 300`, CRON_SECRET-gated at the proxy) runs `scanAllTenants`, records a heartbeat, and Slack-pings on failures. This is what keeps the overview grades and every tenant's trend history current without anyone clicking.
 
+### Public `strelva.com/audit` + quick-tool tabs + extensions (marketing repo)
+
+As of the **2026-07-14 consolidation**, the public marketing site has NO scoring engine of its own — `~/strelva-marketing` is a thin forwarder:
+
+- `strelva.com/audit` "Full Report" → `POST /api/audit-lead` → this repo's `POST /api/audit/lead` (runs `runAudit`, stores the shareable report, emails the prospect).
+- The quick single-tool tabs + the 4 Chrome extensions' deep-links (`?tool=seo-audit|schema|mobile|accessibility|security`) → marketing `POST /api/tools/scan` → this repo's `POST /api/audit/scan` (`src/lib/tools/canonical.ts`), which maps each tool to its canonical category (`schema`→`ai-readability`, `mobile`→`web-vitals`+`mobile`, …).
+- The old marketing `src/lib/tools/checks/*` shallow 5-check engine was **deleted**. There is no second scorer; the 4 extensions (`~/strelva-tools`) mirror this engine's per-category thresholds so the popup number and the full audit agree.
+
+### Agent / CLI batch audit (`pnpm audit:full`)
+
+`scripts/full-audit.ts` (run via `pnpm audit:full`) is a thin CLI over the SAME engine — for running audits from the terminal or an agent, with no server, no rate limit, no auth. It reuses `auditUrl` / `auditUrls` (`src/lib/lead-audit.ts`) → `runAudit`, so its numbers match the public tool, the client card, and the emailed report exactly.
+
+```bash
+pnpm audit:full <url>                       # one URL, pretty terminal output (grade, category bars, findings + fixes)
+pnpm audit:full <url> --html [--out=dir]    # also write a sendable one-pager (renderAuditReport → HTML)
+pnpm audit:full <url1> <url2> ...           # batch → table (or --json)
+pnpm audit:full --file=leads.txt --json     # batch from a file → compact JSON array (agent lead research)
+```
+
+- With `GOOGLE_PAGESPEED_API_KEY` in `.env.local` it includes Core Web Vitals + Mobile; without it those two categories are honestly excluded (weight 0) and the grade comes from the other six (local runs read a few points lower and drop the CWV/Mobile rows — expected).
+- `auditUrl` returns a `LeadAuditResult`: `{ url, grade, score, categories, findings, full }` — `findings` is every non-passing check worst-first with its exact issue + fix (`findingsFromCategories`); `full` is the complete `AuditResult` that `renderAuditReport` turns into the `--html` one-pager.
+- **No writes.** The CLI never touches `scan-store` — it's for ad-hoc audits / lead research, not tenant health history. To persist a tenant's health, go through `scanTenant`.
+
+**Running it on another machine (Jacob / an agent):** clone the repo → `pnpm install` → `pnpm audit:full <url>`. **No secrets required** — the engine only fetches the target URL (it runs with a completely empty env). The alias uses `--env-file-if-exists=.env.local`, so it works on a fresh clone with no `.env.local`; add `GOOGLE_PAGESPEED_API_KEY` there only for CWV/Mobile. (On Node < 20.18 that flag isn't recognized — run `npx tsx scripts/full-audit.ts <url>` directly instead.) For a one-off with **no clone at all**, hit the live engine: `curl -X POST https://app.strelva.com/api/audit/scan -H "Content-Type: application/json" -d '{"url":"https://site.com"}'` (rate-limited 3/day/IP).
+
 ---
 
 ## The guides blog (`/guides`)

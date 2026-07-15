@@ -25,7 +25,7 @@
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
     "check:custom-repos": "tsx scripts/custom-repo-workspace-check.ts",
     "check:ontology": "tsx scripts/check-ontology.ts",
-    "audit:full": "npx tsx --env-file=.env.local scripts/full-audit.ts",
+    "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "tsc --noEmit"
   },
