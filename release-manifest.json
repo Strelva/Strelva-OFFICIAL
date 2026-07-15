@@ -1,35 +1,51 @@
 {
   "app": "reb",
   "version": "reb-v2026.05.12.1",
-  "compatibleGldf": {
-    "tag": "gldf-v2026.05.02.1",
-    "commit": "fd088c507bcdaec82257c34ddff1b1f94c72fd34"
-  },
-  "compatibleRohlax": {
-    "tag": "rohlax-v2026.05.12.1",
-    "commit": "00e4323a9a93029070e802f9da0345cc441b6f59"
-  },
   "contractVersion": "v1",
   "customRepoWorkspace": {
     "root": "..",
+    "contractVersion": "v1",
+    "baseline": {
+      "packageScripts": ["dev", "build", "typecheck", "test", "check"],
+      "requiredFiles": [
+        "README.md",
+        ".env.example",
+        "src/lib/reb-contracts.ts",
+        "src/lib/storage.ts",
+        "src/app/api/reb-capabilities/route.ts",
+        "src/app/api/v1/revalidate/route.ts",
+        "release-manifest.json"
+      ],
+      "requiredEnv": ["REB_API_URL"]
+    },
     "repos": [
       {
         "tenant": "gldf",
         "localPath": "../greatlakesdriedfruits",
         "capabilityManifestPath": "/api/reb-capabilities",
-        "revalidatePath": "/api/v1/revalidate"
+        "revalidatePath": "/api/v1/revalidate",
+        "compatibleCommit": "fd088c507bcdaec82257c34ddff1b1f94c72fd34",
+        "compatibleTag": "gldf-v2026.05.02.1",
+        "packageScripts": ["check:prod"],
+        "requiredFiles": [
+          "CLAUDE.md",
+          "src/app/api/reb-custom-request/route.ts",
+          "scripts/production-checklist.ts"
+        ],
+        "requiredEnv": ["REB_CUSTOM_REQUEST_SECRET", "REVALIDATE_SECRET"]
       },
       {
         "tenant": "rohlax",
         "localPath": "../rohlax-wellness",
         "capabilityManifestPath": "/api/reb-capabilities",
-        "revalidatePath": "/api/v1/revalidate"
+        "revalidatePath": "/api/v1/revalidate",
+        "compatibleCommit": "00e4323a9a93029070e802f9da0345cc441b6f59",
+        "compatibleTag": "rohlax-v2026.05.12.1",
+        "packageScripts": ["check:scaffold"],
+        "requiredFiles": ["AGENTS.md", "src/lib/reb.ts", "scripts/scaffold-web-check.mjs"],
+        "requiredEnv": ["TENANT_ID", "REB_DASHBOARD_URL", "REVALIDATION_SECRET"]
       }
     ]
   },
-  "requiredEnv": [
-    "REVALIDATE_SECRET",
-    "SENTRY_DSN",
-    "NEXT_PUBLIC_SENTRY_DSN"
-  ]
+  "requiredEnv": ["REVALIDATE_SECRET", "SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"]
 }

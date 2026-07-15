@@ -109,3 +109,20 @@ GLDF also requires `REB_CUSTOM_REQUEST_SECRET`, `REWARDS_PROXY_SECRET`,
 `RECONCILE_SECRET`, Stripe, Supabase, and Blob env because it owns ecommerce,
 rewards, uploads, and admin proxy endpoints. Rohlax currently requires only the
 content, dashboard, site URL, and revalidation env for Strelva connectivity.
+
+## Adding a client repo to the workspace inventory (2026-07-15)
+
+The workspace inventory is **manifest-driven** — `release-manifest.json` → `customRepoWorkspace` is the single source of truth. Onboarding a new client repo is a manifest entry, **not** a code edit to `scripts/custom-repo-workspace-check.ts`.
+
+**Every custom repo must meet the shared `baseline`** (see `customRepoWorkspace.baseline`):
+- package scripts: `dev`, `build`, `typecheck`, `test`, `check`
+- files: `README.md`, `.env.example`, `src/lib/reb-contracts.ts`, `src/lib/storage.ts`, `src/app/api/reb-capabilities/route.ts`, `src/app/api/v1/revalidate/route.ts`, `release-manifest.json`
+- the repo's own `release-manifest.json` must set `"contractVersion": "v1"` and list env `REB_API_URL`
+
+**To add client #N**, append to `customRepoWorkspace.repos`:
+```json
+{ "tenant": "<slug>", "localPath": "../<repo-dir>", "compatibleCommit": "<git sha the platform is verified against>" }
+```
+That's it — a starter-based repo inherits the whole baseline. Only add `packageScripts` / `requiredFiles` / `requiredEnv` to the entry if the repo has extras BEYOND the baseline (the legacy gldf/rohlax repos do; new starter repos shouldn't).
+
+**Verify:** `pnpm check:custom-repos` (green when siblings aren't checked out — repos SKIP; run with the repos checked out next to `strelva-platform`, or set `CUSTOM_REPO_WORKSPACE_ROOT`, to run the structural checks). Merge logic is covered by `src/__tests__/custom-repo-workspace-inventory.test.ts`.
