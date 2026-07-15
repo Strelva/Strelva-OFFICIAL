@@ -14,6 +14,7 @@ import {
 import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { diffFields } from "./utils";
 import { recordApproval, recordRejection } from "./ai-auto-approve";
+import { GBP_OPERATIONS } from "./agent/gbp-operations";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
 
@@ -61,17 +62,6 @@ const CUSTOM_WORKFLOW_ACTIONS = new Set<EventWorkflowAction>([
 function workflowStatusFromAction(action: EventWorkflowAction): CustomChangeRequestStatus | null {
   if (action === "approved" || action === "dismissed") return null;
   return action;
-}
-
-/** Parse "HH:MM" into the GBP TimeOfDay shape, or null if malformed. */
-function parseHHMM(v: unknown): { hours: number; minutes: number } | null {
-  if (typeof v !== "string") return null;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
-  if (!m) return null;
-  const hours = Number(m[1]);
-  const minutes = Number(m[2]);
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-  return { hours, minutes };
 }
 
 /**
@@ -173,79 +163,31 @@ async function executeResolvedEventAction(
   if (event.type === "content_update") {
     const kind = event.metadata?.kind;
 
-    // GBP post draft (B1): on approve, actually post to the Google listing.
+    // GBP writes (post / hours / photo) dispatch through the operation registry
+    // (`GBP_OPERATIONS`), which owns the per-kind validate + external-write. The
+    // governance spine stays HERE and is identical across all three:
     //
     // We gate resolution on `success` (Google accepted the write), NOT on
-    // `verified` (the read-back confirmation). A GBP post is NON-IDEMPOTENT —
-    // once `success` is true the post already exists on Google, so keeping the
-    // event pending would let a re-approval create a DUPLICATE post. When the
-    // read-back can't confirm (success=true, verified=false), createGbpPost
+    // `verified` (the read-back confirmation). A GBP write is NON-IDEMPOTENT —
+    // once `success` is true the change already exists on Google, so keeping the
+    // event pending would let a re-approval create a DUPLICATE. When the
+    // read-back can't confirm (success=true, verified=false), the write function
     // already emits a separate `change_verify_failed` event to surface the gap;
-    // that's the right signal, not a stuck approval. Same rule for the hours +
-    // review-reply branches below.
-    if (kind === "gbp_post_draft") {
-      const summary = typeof event.metadata?.summary === "string" ? event.metadata.summary : "";
+    // that's the right signal, not a stuck approval. The external write happens
+    // ONLY on `approved` (a dismiss just resolves), and the `gbp-*` activity is
+    // logged ONLY after the event actually resolves.
+    const gbpOp = GBP_OPERATIONS.find((o) => o.kind === kind);
+    if (gbpOp?.execute) {
+      let activity: { type: "gbp-post" | "gbp-hours" | "gbp-photo"; detail: string } | undefined;
       if (action === "approved") {
-        if (!summary) return { changed: false, reason: "gbp_post_invalid" };
-        const { createGbpPost } = await import("./gbp-management");
-        const result = await createGbpPost(tenantId, {
-          summary,
-          ctaUrl: typeof event.metadata?.ctaUrl === "string" ? event.metadata.ctaUrl : undefined,
-          photoUrl: typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : undefined,
-        });
-        if (!result.success) return { changed: false, reason: "gbp_post_failed" };
+        const r = await gbpOp.execute({ tenantId, event });
+        if (!r.ok) return { changed: false, reason: r.reason };
+        activity = r.activity;
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
-      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-post", summary);
-      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
-    }
-
-    // GBP hours draft: on approve, push hours to the Google listing. Governed —
-    // routed through this approval queue, NEVER auto-published (the audit core-M3
-    // fix: the website-hours edit is reviewed the same way).
-    if (kind === "gbp_hours_draft") {
-      if (action === "approved") {
-        const raw = Array.isArray(event.metadata?.hours) ? event.metadata.hours : [];
-        const periods = raw.flatMap((p: unknown) => {
-          const row = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
-          const day = typeof row.day === "string" ? row.day.toUpperCase() : null;
-          const open = parseHHMM(row.open);
-          const close = parseHHMM(row.close);
-          if (!day || !open || !close) return [];
-          return [{ openDay: day, openTime: open, closeDay: day, closeTime: close }];
-        });
-        if (!periods.length) return { changed: false, reason: "gbp_hours_invalid" };
-        const { updateBusinessHours } = await import("./gbp-management");
-        const result = await updateBusinessHours(tenantId, {
-          regularHours: { periods } as Parameters<typeof updateBusinessHours>[1]["regularHours"],
-        });
-        if (!result.success) return { changed: false, reason: "gbp_hours_failed" };
+      if (resolved.changed && action === "approved" && activity) {
+        await logGbpActivity(tenantId, activity.type, activity.detail);
       }
-      const resolved = await resolveEvent(eventId, action, { actor: "user" });
-      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-hours", "");
-      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
-    }
-
-    // GBP photo draft: on approve, upload the photo to the Google listing.
-    // Governed the same way — queued, never auto-published. NON-IDEMPOTENT once
-    // the upload succeeds, so we resolve after a successful write (same rule as
-    // the post + hours branches above).
-    if (kind === "gbp_photo_draft") {
-      if (action === "approved") {
-        const photoUrl = typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : "";
-        if (!photoUrl) return { changed: false, reason: "gbp_photo_invalid" };
-        const category =
-          typeof event.metadata?.category === "string" ? event.metadata.category : "ADDITIONAL";
-        const { uploadGbpPhoto } = await import("./gbp-management");
-        const result = await uploadGbpPhoto(
-          tenantId,
-          photoUrl,
-          category as Parameters<typeof uploadGbpPhoto>[2],
-        );
-        if (!result.success) return { changed: false, reason: "gbp_photo_failed" };
-      }
-      const resolved = await resolveEvent(eventId, action, { actor: "user" });
-      if (resolved.changed && action === "approved") await logGbpActivity(tenantId, "gbp-photo", "");
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
