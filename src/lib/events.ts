@@ -8,6 +8,7 @@ import { getRedis } from "./redis";
 import { DEFAULT_TENANT } from "./storage/core";
 import { insertEvent, setEventStatus } from "./db/repositories";
 import { dualWritePgEnabled, eventToInsert } from "./db/dual-write";
+import { shadowDecisionFromResolve, shadowProposalFromEvent } from "./governed-work/shadow";
 
 const EVENT_RETENTION_DAYS = 90;
 const EVENT_TTL_SECONDS = EVENT_RETENTION_DAYS * 24 * 60 * 60;
@@ -214,6 +215,12 @@ export async function addEvent(
   if (dualWritePgEnabled()) {
     await insertEvent(eventToInsert(full));
   }
+
+  // Governed-work proposal shadow (Phase-2b ontology). SEPARATE flag
+  // (GOVERNED_WORK_DUAL_WRITE, default OFF) + best-effort; self-guarded so it can't
+  // perturb the Redis path above. No-op for non-governed events. #7 migration must
+  // be applied before the flag is enabled.
+  await shadowProposalFromEvent(full);
 
   return full;
 }
@@ -430,6 +437,11 @@ async function resolveEventLocked(
   if (dualWritePgEnabled()) {
     await setEventStatus(id, status, updated.metadata ?? null);
   }
+
+  // Governed-work decision shadow: this is the single durable approve/dismiss
+  // chokepoint (fires once, only on the pending→resolved transition), so it maps
+  // 1:1 to a `decisions` row. SEPARATE flag + best-effort (see shadow.ts).
+  await shadowDecisionFromResolve(id, status, opts?.actor || "system");
 
   return { event: updated, changed: true };
 }
