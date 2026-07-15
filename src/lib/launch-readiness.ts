@@ -1,6 +1,7 @@
 import type { ActivityEntry } from "@/lib/storage";
 import type { TenantReadinessResult } from "@/lib/production-readiness-rules";
 import type { TenantConfig } from "@/lib/types";
+import type { CommercialSnapshot } from "@/lib/tenant/models";
 import type { Thread } from "@/lib/threads";
 import { getTenantDeliveryModel } from "@/lib/custom-repos";
 
@@ -30,7 +31,7 @@ function item(
   return { id, label, status, detail };
 }
 
-function subscriptionReady(tenant: TenantConfig): boolean {
+function subscriptionReady(tenant: CommercialSnapshot): boolean {
   return (
     tenant.planOverride === "founder_comp" ||
     tenant.subscriptionStatus === "active" ||

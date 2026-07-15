@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type { SearchData, TenantConfig } from "./types";
+import type { AutomationPolicy } from "./tenant/models";
 
 export interface ServiceAccountKey {
   client_email: string;
@@ -9,7 +10,7 @@ export interface ServiceAccountKey {
 /** Read-only Search Console scope — the default for the shared JWT signer. */
 export const SCOPE_WEBMASTERS = "https://www.googleapis.com/auth/webmasters.readonly";
 
-function getSearchConsoleKey(tenantConfig?: TenantConfig | null): string | null {
+function getSearchConsoleKey(tenantConfig?: AutomationPolicy | null): string | null {
   // Tenant-level config takes priority
   if (tenantConfig?.googleSearchConsoleKey) {
     return tenantConfig.googleSearchConsoleKey;

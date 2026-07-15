@@ -1,4 +1,4 @@
-import type { TenantConfig } from "./types";
+import type { TenantIdentity, BusinessProfile } from "./tenant/models";
 import { DEFAULT_TENANT } from "./storage/core";
 
 const FALLBACK_TENANT_NAMES: Record<string, string> = {
@@ -15,7 +15,10 @@ function titleCaseTenantId(tenant: string): string {
     .join(" ");
 }
 
-export function getTenantSiteName(tenant: string, config: TenantConfig | undefined): string {
+export function getTenantSiteName(
+  tenant: string,
+  config: (TenantIdentity & BusinessProfile) | undefined
+): string {
   if (config?.siteName) return config.siteName;
   if (tenant === DEFAULT_TENANT) return "Strelva";
   if (FALLBACK_TENANT_NAMES[tenant]) return FALLBACK_TENANT_NAMES[tenant];

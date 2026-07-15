@@ -20,7 +20,7 @@ import { getRedis } from "./redis";
 import { getActivity } from "./storage";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "./tenants";
 import { getEffectiveSubscriptionStatus } from "./subscription";
-import type { TenantConfig } from "./types";
+import type { TenantIdentity, CommercialSnapshot } from "./tenant/models";
 
 export interface AtRiskSignal {
   tenantId: string;
@@ -146,7 +146,7 @@ function daysSince(iso: string | null | undefined): number | null {
   return Math.max(0, Math.floor((Date.now() - time) / DAY_MS));
 }
 
-async function computeAtRisk(tenant: TenantConfig): Promise<AtRiskSignal> {
+async function computeAtRisk(tenant: TenantIdentity & CommercialSnapshot): Promise<AtRiskSignal> {
   const [engagementWindow, activity, subscriptionStatus] = await Promise.all([
     readEngagementWindow(tenant.id),
     // Newest-first — activity[0] is the last activity, same signal the portfolio

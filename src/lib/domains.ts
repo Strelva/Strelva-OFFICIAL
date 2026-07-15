@@ -1,5 +1,6 @@
 import { getRedis } from "./redis";
 import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
+import type { SiteConfig } from "./tenant/models";
 import { getAllTenants, getTenantConfig, invalidateDomainMapCache, isActiveTenant, updateTenant } from "./tenants";
 import { normalizeTenantDomain } from "./tenant-urls";
 
@@ -67,7 +68,7 @@ function domainAliases(domain: string): string[] {
   return [normalized, `www.${normalized}`];
 }
 
-function domainsFromTenant(tenant: TenantConfig): Array<{ domain: string; role: DomainClaimRole }> {
+function domainsFromTenant(tenant: SiteConfig): Array<{ domain: string; role: DomainClaimRole }> {
   const domains: Array<{ domain: string; role: DomainClaimRole }> = [];
   const productionDomain = normalizeCustomDomain(tenant.productionDomain);
   const adminDomain = normalizeCustomDomain(tenant.adminDomain);

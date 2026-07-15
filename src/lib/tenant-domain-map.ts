@@ -1,11 +1,13 @@
 import { normalizeTenantDomain } from "./tenant-urls";
-import type { TenantConfig } from "./types";
+import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
 export type TenantDomainTarget = { tenantId: string; isAdmin: boolean };
 
 /** Build routing only from trusted explicit domains and verified claims. The
  * customDomains array is inventory, not proof of ownership. */
-export function buildTenantDomainMap(tenants: TenantConfig[]): Record<string, TenantDomainTarget> {
+export function buildTenantDomainMap(
+  tenants: (SiteConfig & TenantIdentity)[]
+): Record<string, TenantDomainTarget> {
   const map: Record<string, TenantDomainTarget> = {};
   for (const tenant of tenants) {
     if (tenant.active === false) continue;

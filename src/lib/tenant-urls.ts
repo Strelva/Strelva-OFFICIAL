@@ -1,4 +1,5 @@
 import type { TenantConfig } from "./types";
+import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
 function withoutProtocol(domain: string): string {
   return domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -62,7 +63,7 @@ export function getTenantPublicUrlFromDomainMap(
   return preferredDomain ? `https://${preferredDomain}` : "";
 }
 
-function getTenantPublicDomain(tenant: TenantConfig): string | null {
+function getTenantPublicDomain(tenant: SiteConfig): string | null {
   const productionDomain = normalizeTenantDomain(tenant.productionDomain);
   const siteUrlDomain = normalizeTenantDomain(tenant.siteUrl);
   const normalizedCustomDomains = tenant.customDomains
@@ -96,7 +97,7 @@ function getTenantPublicDomain(tenant: TenantConfig): string | null {
   return customDomain ?? null;
 }
 
-export function getTenantPrimaryDomain(tenant: TenantConfig): string | null {
+export function getTenantPrimaryDomain(tenant: SiteConfig): string | null {
   const productionDomain = getTenantPublicDomain(tenant);
   if (productionDomain) return withoutWww(productionDomain);
 
@@ -112,7 +113,7 @@ export function getTenantPrimaryDomain(tenant: TenantConfig): string | null {
   return customDomain ?? null;
 }
 
-export function getTenantDashboardHost(tenant: TenantConfig): string {
+export function getTenantDashboardHost(tenant: SiteConfig & TenantIdentity): string {
   const adminDomain = normalizeTenantDomain(tenant.adminDomain);
   if (adminDomain) return adminDomain;
 
