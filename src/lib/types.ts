@@ -525,7 +525,11 @@ export interface Connection {
   expiresAt?: string;
   apiKey?: string;
   lastSyncedAt?: string;
-  status: "connected" | "disconnected" | "error";
+  // `needs_reauth` is the authorization axis (refresh token revoked/expired — the
+  // owner must reconnect); `error` is the sync-health axis (a transient/API failure
+  // that may self-heal). Keeping them distinct is what lets the dashboard tell the
+  // owner "reconnect" vs "we'll retry" instead of collapsing both into a red error.
+  status: "connected" | "disconnected" | "error" | "needs_reauth";
   /** OAuth scopes granted at connection time. Used to detect missing write scopes. */
   scopes?: string[];
 }

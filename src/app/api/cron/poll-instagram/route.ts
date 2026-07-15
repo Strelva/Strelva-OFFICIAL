@@ -117,11 +117,13 @@ async function pollTenant(tenantId: string): Promise<number> {
   // Get valid access token (refresh if needed)
   const accessToken = await getValidAccessToken(connection);
   if (!accessToken) {
-    // Transition connected -> error; alert once so a client's Instagram sync
-    // can't die silently.
+    // Transition connected -> needs_reauth; a null token means the refresh token
+    // is dead, so this is an authorization failure the owner fixes by reconnecting
+    // (not a transient sync error) — the dashboard should show "reconnect", not
+    // "sync failed". Alert once so a client's Instagram sync can't die silently.
     await saveConnection({
       ...connection,
-      status: "error",
+      status: "needs_reauth",
     });
     alert("instagram_token_refresh_failed", "high", {
       tenantId,

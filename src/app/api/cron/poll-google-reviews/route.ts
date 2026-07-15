@@ -140,11 +140,15 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   // Get valid access token (refresh if needed)
   const accessToken = await getValidAccessToken(connection);
   if (!accessToken) {
-    // Transition from connected -> error (we only get here if it was connected).
-    // Alert once on the transition so a client's review sync can't die silently.
+    // Transition from connected -> needs_reauth (we only get here if it was
+    // connected). A null token here means the refresh token itself is dead, so
+    // this is an authorization failure the owner must fix by reconnecting — not a
+    // transient sync error. Recording `needs_reauth` makes the dashboard show
+    // "reconnect" rather than "sync failed". Alert once on the transition so a
+    // client's review sync can't die silently.
     await saveConnection({
       ...connection,
-      status: "error",
+      status: "needs_reauth",
     });
     alert("google_reviews_token_refresh_failed", "high", {
       tenantId,
