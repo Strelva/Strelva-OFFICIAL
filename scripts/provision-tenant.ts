@@ -37,6 +37,8 @@ const VALID_INDUSTRIES = [
   "trades",
   "professional",
   "fashion-stylist",
+  "medical",
+  "ecommerce",
 ] as const;
 
 const VALID_FEATURES = [

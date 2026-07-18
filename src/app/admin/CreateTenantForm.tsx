@@ -8,7 +8,9 @@ import { useRouter } from "next/navigation";
 // INDUSTRIES so both new-client entry points offer the same set. retail/services
 // were dropped — no template or page-config default exists for them.
 const TEMPLATES = ["wellness", "food-brand", "restaurant", "trades", "professional", "fashion-stylist"] as const;
-const INDUSTRIES = TEMPLATES;
+// Industry is the business VERTICAL (free-form downstream) and need not have a matching
+// template — medical/ecommerce are custom-repo verticals with no template/page-config default.
+const INDUSTRIES = [...TEMPLATES, "medical", "ecommerce"] as const;
 
 const inputCls =
   "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 transition-colors";
