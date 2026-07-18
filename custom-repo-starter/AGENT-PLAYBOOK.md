@@ -17,8 +17,9 @@ Most of these ship from the starter and are probably already here. **Verify each
 3. **Capability manifest** — `app/api/capabilities/route.ts` (from `site-capabilities-route.ts`) so the Strelva AI edits what the live site actually renders.
 4. **Env vars** set on the repo's Vercel project: `NEXT_PUBLIC_SCAFFOLD_API_URL` (`https://strelva.com`), `NEXT_PUBLIC_TENANT_ID` (the tenant subdomain), `NEXT_PUBLIC_GA4_MEASUREMENT_ID` (the client's GA4 id).
 5. **`revalidate-route.ts`** at `app/api/revalidate/route.ts` — signed HMAC revalidation so control-plane content edits push to the live site.
+6. **Forms → the owner's inbox (Formspree replacement).** If the site has a contact / quote / booking form and is NOT a full platform tenant, copy **`form-route.template.tsx`** → `app/api/contact/route.ts` and **`scaffold-forms.ts`** → `src/lib/scaffold-forms.ts`, point the form at `POST /api/contact`, and set `RESEND_API_KEY` (send-scoped key from the **Strelva** Resend account) + `SCAFFOLD_FORM_FROM` (`Business Name <forms@mail.strelva.com>`) + `SCAFFOLD_FORM_TO` (owner email) + `SCAFFOLD_SITE_NAME`. Never wire Formspree or a per-client sending domain — all client mail sends from the shared `mail.strelva.com`, branded by the from-name. (A full tenant uses `ScaffoldLeadForm.tsx` → `/api/v1/leads/{tenant}` instead — see README "Forms".)
 
-**Done when:** the site builds, the tracker + GA4 tags are in the rendered `<head>`/layout, and `/api/capabilities` returns a manifest.
+**Done when:** the site builds, the tracker + GA4 tags are in the rendered `<head>`/layout, `/api/capabilities` returns a manifest, and any form POSTs a real owner-notification email (or logs when the Resend env is unset).
 
 ---
 
@@ -78,7 +79,7 @@ curl -s "$U" | grep -oE '"sameAs":\[[^]]*\]' | head -1                      # wa
 
 ## Task checklist (work top to bottom)
 
-- [ ] A1 ScaffoldTracker mounted · A2 ScaffoldGA4 mounted · A3 `/api/capabilities` · A4 env vars · A5 revalidate route
+- [ ] A1 ScaffoldTracker mounted · A2 ScaffoldGA4 mounted · A3 `/api/capabilities` · A4 env vars · A5 revalidate route · A6 forms → owner email (if the site has a form)
 - [ ] B1 ScaffoldFAQ with real Q&A (FAQPage schema renders)
 - [ ] B2 `/llms.txt` route returns real content, 200
 - [ ] B3 security headers in `next.config.ts`
