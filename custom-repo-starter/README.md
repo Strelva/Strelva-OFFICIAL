@@ -14,7 +14,9 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 |------|---------|
 | `scaffold-client.ts` | Typed fetch client for Scaffold Web's `/api/v1/*` contract |
 | `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (page views, booking clicks, **phone-call taps**, orders — powers the weekly report) |
-| `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") |
+| `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") — the **platform-integrated** form path (Strelva tenants) |
+| `form-route.template.tsx` | Drop-in `app/api/contact/route.ts` — the **standalone Formspree replacement**: emails the owner every submission via Resend on the shared `mail.strelva.com` domain, clearly labeled (site + form + all fields). No platform tenant needed. Config: `RESEND_API_KEY` / `SCAFFOLD_FORM_FROM` / `SCAFFOLD_FORM_TO` / `SCAFFOLD_SITE_NAME` |
+| `scaffold-forms.ts` | Pure helpers behind `form-route.template.tsx` (`normalizeSubmission`, `renderFormEmailHtml/Text`, in-memory rate limit) — turn any form payload into a clean owner-notification email |
 | `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
 | `ScaffoldGA4.tsx` | Fail-silent GA4 tag → sends pageviews to the client's GA4 property (auto-wires from one env var) |
 | `ScaffoldReviews.tsx` | Server-rendered review-showcase grid (stars + source badge) — puts the 4.9★ social proof ON the live site |
@@ -30,6 +32,42 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `dynamic-page-route.template.tsx` | Template for `app/[...slug]/page.tsx` — renders ANY page from the platform's page config (new pages become a data op, no per-page code) |
 | `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
 | `README.md` | This file |
+
+## Forms (contact / quote / booking) — the Formspree replacement
+
+Two ways to handle form submissions; pick per site:
+
+1. **Platform-integrated** — `ScaffoldLeadForm.tsx` → `/api/v1/leads/{tenant}`. For a
+   full Strelva **tenant**: leads land in the dashboard "Who reached out" and the owner
+   gets the platform's lead email. Use when the site is on the platform.
+2. **Standalone email** — `form-route.template.tsx` + `scaffold-forms.ts`. The drop-in
+   **Formspree replacement** for ANY site (Studio sites, or any repo not wired as a
+   tenant): the form POSTs, the owner is emailed the submission directly via Resend.
+   No dashboard, no tenant.
+
+### Wiring the standalone handler
+1. Copy `form-route.template.tsx` → `src/app/api/contact/route.ts` and
+   `scaffold-forms.ts` → `src/lib/scaffold-forms.ts`.
+2. Point the site's form at `POST /api/contact` with JSON. Recommended body:
+   ```json
+   { "formName": "Contact", "email": "visitor@x.com", "website": "", "name": "…", "phone": "…", "message": "…" }
+   ```
+   - `website` = hidden honeypot (real people leave it empty).
+   - `email` becomes the **Reply-To** so the owner replies straight to the visitor.
+   - Every other field is rendered in the email, labeled and in submit order — one route
+     serves a contact form, a quote form, a booking inquiry, whatever the site posts.
+3. Set env on the site's Vercel project:
+   ```
+   RESEND_API_KEY=re_…                          # send-scoped key from the STRELVA Resend account
+   SCAFFOLD_FORM_FROM=McLear's Cottage <forms@mail.strelva.com>
+   SCAFFOLD_FORM_TO=owner@theirbiz.com          # comma-separated for multiple recipients
+   SCAFFOLD_SITE_NAME=McLear's Cottage
+   ```
+   With no `RESEND_API_KEY` the handler logs and returns success (safe for local/pre-launch).
+
+**Sending model:** every client site sends from the ONE shared `mail.strelva.com` domain,
+branded per-site by the `SCAFFOLD_FORM_FROM` display name + Reply-To. **No per-client sending
+domain, ever** — adding a client is a from-name + a recipient, zero new DNS.
 
 ## Dynamic pages (layout as data)
 
