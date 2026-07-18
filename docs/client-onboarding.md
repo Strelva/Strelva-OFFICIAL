@@ -8,6 +8,19 @@ The one master checklist for taking a new client from **signed lead → live man
 
 ---
 
+## Variant — onboarding an EXISTING live site (e.g. RHM, Jul 18)
+
+The phases below assume a **greenfield** build. When the site is already built + live (repo + Vercel project already exist), the flow diverges — don't run the greenfield steps blindly:
+
+- **Phase 1 provision still runs** — it only registers the tenant (record, subdomain, revalidation secret, analytics config). It does NOT touch the existing repo or domain; with `VERCEL_TOKEN` unset it just prints the env commands instead of creating a project (you already have one). **No email is sent.** Set `delivery_model=custom_repo`; if the vertical has no template, pass any real `--template` (unused for custom_repo).
+- **Skip Phase 2's "create client repo" + `seed-tenant`** — the site already exists and serves its own content; seeding fallback content is greenfield-only.
+- **Beacon wiring — check for an existing GA4 loader FIRST.** Drop in `ScaffoldTracker` (the control-plane beacon the site lacks). But many built sites already load GA4 via their own component/env — if so, **do NOT also add `ScaffoldGA4`** (double-tag). Strelva reads GA4 via the reporting service-account grant regardless of the client tag.
+- **Env + go-live:** set `NEXT_PUBLIC_SCAFFOLD_API_URL` + `NEXT_PUBLIC_TENANT_ID` + the revalidation secret on the existing Vercel project, then redeploy. If the custom-domain cutover is separate/pending, the redeploy is invisible to live visitors until DNS flips.
+- **Owner email:** if you're not ready to loop the owner in, provision with your own email as a placeholder (provision fires no mail regardless) and swap to the real owner via the tenant editor later — that doesn't email them either.
+- **Billing:** grandfather the tenant (add its id to `STRIPE_BILLING_GRANDFATHER_TENANTS` + redeploy) OR start a subscription, before the dashboard's subscription gate is hit.
+
+---
+
 ## Phase 0 — Sale & handoff (You)
 
 - [ ] Tier agreed and written down (Presence / Growth / Scale).
