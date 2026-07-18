@@ -19,6 +19,11 @@ export type SendEmailInput = RenderedEmail & {
   fromName?: string;
   subject: string;
   to: string | string[];
+  /** Where replies land. Defaults to the real hello@strelva.com inbox so a
+   * client replying to a report/receipt reaches a human, not the send-only
+   * updates.strelva.com domain (which has no inbox). Override per-send for
+   * e.g. sales replies. */
+  replyTo?: string;
 };
 
 function audienceEnabled(audience: EmailAudience): boolean {
@@ -50,9 +55,11 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   const html = input.options ? renderEmailHtml(input.options) : input.html;
   const text = input.options ? renderEmailText(input.options) : input.text;
   const fromName = input.fromName || "Strelva";
+  const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
 
   const result = await resend.emails.send({
     from: `${fromName} <hello@${fromDomain}>`,
+    replyTo,
     to: input.to,
     subject: input.subject,
     html,
