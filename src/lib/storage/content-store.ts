@@ -16,6 +16,7 @@ import {
 import { addSentryBreadcrumb } from "../sentry-context";
 import { getContentData, upsertContentData } from "../db/repositories";
 import { contentSourceIsPostgres } from "../db/source-flags";
+import { getTenantContentDefault } from "../tenant-content-defaults";
 
 export { DEFAULT_TENANT };
 
@@ -135,8 +136,14 @@ export async function getContent<K extends ContentSection>(
   if (pgRaw) {
     data = transformSanityImages(section, pgRaw);
   } else {
+    // No stored row: prefer a tenant-specific default (real brand content)
+    // over the generic template default, so a missing/cleared row never
+    // regresses to the "Your Business" placeholder.
     const store = await readDevContent(tenant);
-    data = (store[section] as ContentMap[K]) ?? defaults[section];
+    data =
+      (store[section] as ContentMap[K]) ??
+      getTenantContentDefault(tenant, section) ??
+      defaults[section];
   }
 
   // Populate cache on miss (skip in preview — drafts never enter the public
