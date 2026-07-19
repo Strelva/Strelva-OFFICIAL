@@ -45,6 +45,41 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Billing checkout link generator
+  const [linkEmail, setLinkEmail] = useState(tenant.ownerEmail || "");
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
+
+  async function generateBillingLink() {
+    setLinkNote(null);
+    setLinkUrl(null);
+    if (!linkEmail.trim()) {
+      setLinkNote("Enter the client's email first.");
+      return;
+    }
+    setLinkBusy(true);
+    try {
+      const res = await fetch("/api/billing/create-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenantId: form.id,
+          customerEmail: linkEmail.trim(),
+          customerName: form.ownerName || undefined,
+          plan: form.billingType === "tier" ? form.subscriptionPlan || "growth" : "growth",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setLinkUrl(data.checkoutUrl);
+    } catch (err) {
+      setLinkNote(err instanceof Error ? err.message : "Failed to generate link");
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
   // Assign-user form
   const [assignEmail, setAssignEmail] = useState("");
   const [assignRole, setAssignRole] = useState<"owner" | "admin" | "editor" | "viewer">("owner");
@@ -199,6 +234,45 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+          </div>
+
+          {/* Billing link — the Stripe subscription checkout URL to SEND the client. */}
+          <div className="pt-3 border-t border-glass-border space-y-2">
+            <p className="text-xs text-gray-muted">Billing link to send the client (recurring Stripe checkout)</p>
+            {form.billingType === "custom" && (
+              <p className="text-xs text-warning">
+                Custom amounts need a Stripe price of that amount. This link bills the Growth tier ($199) —
+                for a true custom amount, create a custom Stripe price or bill on a tier.
+              </p>
+            )}
+            <Field label="Client email (for the checkout)" value={linkEmail} onChange={setLinkEmail} placeholder="owner@business.com" />
+            <button
+              onClick={() => void generateBillingLink()}
+              disabled={linkBusy}
+              className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40"
+            >
+              {linkBusy ? "Generating…" : "Generate billing link"}
+            </button>
+            {linkNote && <p className="text-sm text-critical">{linkNote}</p>}
+            {linkUrl && (
+              <div className="space-y-1">
+                <p className="text-xs text-positive">Send this to the client — they pay and it activates:</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={linkUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="flex-1 rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-xs text-warm-white"
+                  />
+                  <button
+                    onClick={() => void navigator.clipboard?.writeText(linkUrl)}
+                    className="rounded-md border border-glass-border px-3 py-2 text-xs text-warm-white hover:bg-gray-bg"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-muted">
