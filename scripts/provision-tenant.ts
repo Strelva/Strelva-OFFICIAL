@@ -30,6 +30,10 @@ import * as readline from "readline";
 
 const TENANTS_FILE = path.join(__dirname, "..", "dev-tenants.json");
 
+// The business VERTICAL. Free-form downstream (no rigid type); drives the
+// visibility probe's trade and the template DEFAULT for template-model tenants
+// (custom_repo tenants ignore the template). Add verticals freely — a vertical
+// without a matching template is fine for custom repos.
 const VALID_INDUSTRIES = [
   "wellness",
   "food-brand",
@@ -37,6 +41,20 @@ const VALID_INDUSTRIES = [
   "trades",
   "professional",
   "fashion-stylist",
+  "medical",
+  "ecommerce",
+  "retail",
+  "home-services",
+  "automotive",
+  "beauty",
+  "fitness",
+  "legal",
+  "real-estate",
+  "financial",
+  "education",
+  "hospitality",
+  "pet-services",
+  "nonprofit",
 ] as const;
 
 const VALID_FEATURES = [
@@ -414,8 +432,8 @@ function printSummary(tenant: TenantConfig, flags: ProvisionFlags): void {
   console.log(`\n--- Next Steps ---\n`);
   console.log(`  [ ] Create client repo from custom-repo-starter/`);
   console.log(`  [ ] Set env vars on Vercel (see commands above)`);
-  console.log(`  [ ] Run: pnpm seed-tenant ${tenant.id}`);
-  console.log(`  [ ] Set Clerk publicMetadata: { tenants: ["${tenant.id}"] }`);
+  console.log(`  [ ] Content: pnpm seed-tenant ${tenant.id}  (greenfield only — a custom_repo tenant serves its own repo; skip)`);
+  console.log(`  [ ] Owner access: owner signs in with ${tenant.ownerEmail} via Supabase magic-link; memberships gate access (no Clerk)`);
   if (tenant.productionDomain) {
     console.log(`  [ ] Configure DNS for ${tenant.productionDomain}`);
     console.log(`  [ ] Configure DNS for ${tenant.adminDomain || `admin.${tenant.productionDomain}`}`);
