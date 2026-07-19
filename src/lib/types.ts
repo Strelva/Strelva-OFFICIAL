@@ -462,6 +462,18 @@ export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" |
 export type TenantDeliveryModel = "custom_repo" | "platform_template";
 export type CommercialPlanKey = "presence" | "growth" | "scale";
 
+/**
+ * How a managed client is billed — set explicitly by the operator in the admin
+ * editor. Drives billing readiness + MRR. The ONLY state that flags as an open
+ * item is `none` (not set up yet).
+ *   - `tier`       one of the 3 published tiers; `subscriptionPlan` holds which.
+ *   - `custom`     a negotiated monthly amount we bill; `planMonthlyCents` holds it.
+ *   - `case_study` free / comped (case study, grandfathered, beta). No charge.
+ *   - `none`       billing not configured yet = a real open item to resolve.
+ * Replaces the legacy `planOverride: "founder_comp"` free flag.
+ */
+export type BillingType = "tier" | "custom" | "case_study" | "none";
+
 export type CustomRepoRevalidationHealth =
   | "unknown"
   | "healthy"
@@ -593,7 +605,12 @@ export interface TenantConfig {
   subscriptionStartedAt?: string;
   /** End of a legacy contractual minimum commitment (ISO date). */
   commitmentEndsAt?: string;
-  /** Special billing presentation/access override for early customers or internal accounts. */
+  /**
+   * Explicit billing classification set by the operator (tier / custom / case_study / none).
+   * Source of truth for whether billing is configured. A missing value reads as "none".
+   */
+  billingType?: BillingType;
+  /** @deprecated Legacy free-access flag. Superseded by billingType="case_study"; read for back-compat only. */
   planOverride?: "founder_comp";
   /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation. */
   subscriptionPastDueSince?: string;

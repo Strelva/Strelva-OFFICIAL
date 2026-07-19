@@ -11,8 +11,14 @@ interface EditableTenant {
   ownerEmail: string;
   productionDomain: string;
   adminDomain: string;
+  /** Operator-set billing classification: "" (none) | tier | custom | case_study. */
+  billingType: string;
+  /** When billingType==="tier": presence | growth | scale. */
+  subscriptionPlan: string;
+  /** When billingType==="custom": the monthly amount in dollars (UI), stored as cents. */
+  customMonthlyDollars: string;
+  /** Stripe subscription status (secondary — informational, set by the billing webhook). */
   subscriptionStatus: string;
-  planOverride: string;
   active: boolean;
   revalidateUrl: string;
   hasRevalidationSecret: boolean;
@@ -21,6 +27,17 @@ interface EditableTenant {
 }
 
 const SUB_STATUSES = ["none", "active", "trialing", "past_due", "cancelled"];
+const BILLING_TYPES: { value: string; label: string; hint: string }[] = [
+  { value: "", label: "No plan set", hint: "Not configured yet — this flags as an open item." },
+  { value: "tier", label: "Tier (Presence / Growth / Scale)", hint: "On one of the 3 published plans." },
+  { value: "custom", label: "Custom amount", hint: "We bill a negotiated monthly amount." },
+  { value: "case_study", label: "Case study (free)", hint: "Comped — no charge." },
+];
+const TIERS: { value: string; label: string }[] = [
+  { value: "presence", label: "Presence · $99/mo" },
+  { value: "growth", label: "Growth · $199/mo" },
+  { value: "scale", label: "Scale · $499/mo" },
+];
 
 export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [form, setForm] = useState(tenant);
@@ -49,11 +66,14 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           ownerEmail: form.ownerEmail || undefined,
           productionDomain: form.productionDomain || undefined,
           adminDomain: form.adminDomain || undefined,
+          // Billing: send the raw billingType (incl. "" for none) so clearing it persists.
+          billingType: form.billingType,
+          subscriptionPlan: form.billingType === "tier" ? form.subscriptionPlan || "growth" : "",
+          planMonthlyCents:
+            form.billingType === "custom"
+              ? Math.max(0, Math.round(parseFloat(form.customMonthlyDollars || "0") * 100))
+              : null,
           subscriptionStatus: form.subscriptionStatus,
-          // Send the raw value (incl. "") so un-checking founder-comp actually
-          // clears it. `|| undefined` stripped the empty string from the body,
-          // so the row never got written back to "" and the comp never lifted.
-          planOverride: form.planOverride,
           active: form.active,
           features: form.features,
         }),
@@ -123,26 +143,64 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
         <Field label="Admin domain" value={form.adminDomain} onChange={(v) => setForm({ ...form, adminDomain: v })} />
-        <div>
-          <label className="block text-xs text-gray-muted mb-1">Subscription status</label>
-          <select
-            value={form.subscriptionStatus}
-            onChange={(e) => setForm({ ...form, subscriptionStatus: e.target.value })}
-            className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
-          >
-            {SUB_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+        <div className="rounded-lg border border-glass-border p-3 space-y-3">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-gray-faint">Billing</p>
+          <div>
+            <label className="block text-xs text-gray-muted mb-1">Plan</label>
+            <select
+              value={form.billingType}
+              onChange={(e) => setForm({ ...form, billingType: e.target.value })}
+              className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+            >
+              {BILLING_TYPES.map((b) => (
+                <option key={b.value || "none"} value={b.value}>{b.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-faint mt-1">
+              {BILLING_TYPES.find((b) => b.value === form.billingType)?.hint}
+            </p>
+          </div>
+          {form.billingType === "tier" && (
+            <div>
+              <label className="block text-xs text-gray-muted mb-1">Tier</label>
+              <select
+                value={form.subscriptionPlan || "growth"}
+                onChange={(e) => setForm({ ...form, subscriptionPlan: e.target.value })}
+                className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+              >
+                {TIERS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {form.billingType === "custom" && (
+            <div>
+              <label className="block text-xs text-gray-muted mb-1">Monthly amount (USD)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.customMonthlyDollars}
+                onChange={(e) => setForm({ ...form, customMonthlyDollars: e.target.value })}
+                placeholder="185"
+                className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs text-gray-muted mb-1">Stripe status (informational)</label>
+            <select
+              value={form.subscriptionStatus}
+              onChange={(e) => setForm({ ...form, subscriptionStatus: e.target.value })}
+              className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+            >
+              {SUB_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-muted">
-          <input
-            type="checkbox"
-            checked={form.planOverride === "founder_comp"}
-            onChange={(e) => setForm({ ...form, planOverride: e.target.checked ? "founder_comp" : "" })}
-          />
-          Founder-comp (free access)
-        </label>
         <label className="flex items-center gap-2 text-sm text-gray-muted">
           <input
             type="checkbox"

@@ -61,6 +61,9 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     subscriptionStartedAt: r.subscription_started_at ?? undefined,
     commitmentEndsAt: r.commitment_ends_at ?? undefined,
     planOverride: (r.plan_override as TenantConfig["planOverride"]) ?? undefined,
+    // billing_type is a newer column; cast so the mapper doesn't depend on a type regen.
+    billingType:
+      (((r as { billing_type?: string | null }).billing_type as TenantConfig["billingType"]) ?? undefined),
     subscriptionPastDueSince: r.subscription_past_due_since ?? undefined,
     bookingProvider: r.booking_provider ?? undefined,
     bookingUrl: r.booking_url ?? undefined,
@@ -132,6 +135,7 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.subscriptionStartedAt !== undefined) row.subscription_started_at = t.subscriptionStartedAt;
   if (t.commitmentEndsAt !== undefined) row.commitment_ends_at = t.commitmentEndsAt;
   if (t.planOverride !== undefined) row.plan_override = t.planOverride;
+  if (t.billingType !== undefined) (row as Record<string, unknown>).billing_type = t.billingType;
   if (t.subscriptionPastDueSince !== undefined) row.subscription_past_due_since = t.subscriptionPastDueSince;
   if (t.bookingProvider !== undefined) row.booking_provider = t.bookingProvider;
   if (t.bookingUrl !== undefined) row.booking_url = t.bookingUrl;

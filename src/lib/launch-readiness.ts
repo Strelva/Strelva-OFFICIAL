@@ -1,9 +1,9 @@
 import type { ActivityEntry } from "@/lib/storage";
 import type { TenantReadinessResult } from "@/lib/production-readiness-rules";
 import type { TenantConfig } from "@/lib/types";
-import type { CommercialSnapshot } from "@/lib/tenant/models";
 import type { Thread } from "@/lib/threads";
 import { getTenantDeliveryModel } from "@/lib/custom-repos";
+import { isBillingConfigured, billingLabel } from "@/lib/billing-type";
 
 export type LaunchReadinessStatus = "ready" | "watch" | "blocked";
 
@@ -29,14 +29,6 @@ function item(
   detail: string
 ): LaunchReadinessItem {
   return { id, label, status, detail };
-}
-
-function subscriptionReady(tenant: CommercialSnapshot): boolean {
-  return (
-    tenant.planOverride === "founder_comp" ||
-    tenant.subscriptionStatus === "active" ||
-    tenant.subscriptionStatus === "trialing"
-  );
 }
 
 function hasOwnerMessage(threads: Thread[]): boolean {
@@ -101,23 +93,25 @@ export function buildTenantLaunchReadiness(input: {
     ),
     item(
       "billing",
-      "Billing access",
-      subscriptionReady(tenant) ? "ready" : "blocked",
-      subscriptionReady(tenant)
-        ? tenant.planOverride === "founder_comp"
-          ? "Founder-comp access is active."
-          : `Subscription is ${tenant.subscriptionStatus}.`
-        : `Subscription is ${tenant.subscriptionStatus ?? "none"}; paid access is not launch-ready.`
+      "Billing set",
+      isBillingConfigured(tenant) ? "ready" : "blocked",
+      isBillingConfigured(tenant)
+        ? billingLabel(tenant)
+        : "No plan set — pick a tier, enter a custom monthly amount, or mark it a case study."
     ),
+    // Owner engagement is an ADOPTION signal, never a launch blocker. The whole
+    // value prop is that a managed client does NOT need to log in — they get
+    // auto-updates + talk to us over email. So "owner hasn't used the AI" is at
+    // most a "watch", never "blocked".
     item(
       "owner-ai-message",
-      "Owner asked AI",
-      ownerMessageSeen ? "ready" : threadCount > 0 ? "watch" : "blocked",
+      "Owner using the dashboard",
+      ownerMessageSeen ? "ready" : "watch",
       ownerMessageSeen
-        ? "At least one owner chat message is saved."
+        ? "Owner has chatted with the AI."
         : threadCount > 0
-          ? "Threads exist, but no saved owner message was found."
-          : "Owner has not used the AI yet."
+          ? "Threads exist, but no saved owner message yet — fine for a managed client."
+          : "Owner hasn't logged in yet — expected for a managed client (we handle it; they get auto-updates + email). Not required to launch."
     ),
     item(
       "ai-action",

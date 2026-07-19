@@ -15,6 +15,7 @@ import { getSuggestions, operatorSuggestions } from "@/lib/suggestions";
 import { getVercelProjectStatus } from "@/lib/vercel";
 import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
+import { resolveBillingType } from "@/lib/billing-type";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
@@ -228,8 +229,13 @@ export default async function ClientDetailPage({
           ownerEmail: tenant.ownerEmail ?? "",
           productionDomain: tenant.productionDomain ?? "",
           adminDomain: tenant.adminDomain ?? "",
+          billingType: resolveBillingType(tenant) === "none" ? "" : resolveBillingType(tenant),
+          subscriptionPlan: tenant.subscriptionPlan ?? "",
+          customMonthlyDollars:
+            resolveBillingType(tenant) === "custom" && tenant.planMonthlyCents
+              ? String(Math.round(tenant.planMonthlyCents / 100))
+              : "",
           subscriptionStatus: tenant.subscriptionStatus ?? "none",
-          planOverride: tenant.planOverride ?? "",
           active: tenant.active,
           revalidateUrl: tenant.revalidateUrl ?? "",
           hasRevalidationSecret: Boolean(tenant.revalidationSecret),

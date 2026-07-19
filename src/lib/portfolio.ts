@@ -14,7 +14,9 @@ import { mapPool } from "./concurrency";
 import { getActivity, listDrafts } from "./storage";
 import { listThreads } from "./threads";
 import { getWeeklyBrief } from "./weekly-brief";
-import { getEffectiveSubscriptionStatus, isGrandfathered } from "./subscription";
+import { getEffectiveSubscriptionStatus } from "./subscription";
+import { billingMonthlyCents } from "./billing-type";
+import type { CommercialPlanKey, BillingType } from "./types";
 import { getTenantLaunchReadinessResults } from "./production-readiness-rules";
 import {
   buildTenantLaunchReadiness,
@@ -22,38 +24,25 @@ import {
   type LaunchReadinessStatus,
 } from "./launch-readiness";
 import { getTenantDeliveryModel } from "./custom-repos";
-import { planMonthlyCents } from "./billing-plans";
 
 /**
- * Monthly recurring revenue in dollars. Counts only tenants on a real paid
- * subscription — excludes grandfathered ($0) and founder-comp ($0) — so the
- * overview card and the operator agent (both call this) always agree. Each
- * tenant contributes its captured Stripe amount, with its selected plan as the
- * compatibility fallback for records created before amount capture.
+ * Monthly recurring revenue in dollars, from the operator-set billing type.
+ * A tenant contributes real revenue when it's on a tier (the tier price) or a
+ * custom amount (the entered monthly $). Case studies and unset ("none") are $0.
+ * This intentionally does NOT require a live Stripe subscription — managed clients
+ * are commonly billed off-platform, so the billing type is the source of truth.
  */
 export function computeMrrDollars(
   tenants: Array<{
     id: string;
     subscriptionStatus?: string;
-    subscriptionPlan?: string;
+    subscriptionPlan?: CommercialPlanKey;
     planMonthlyCents?: number;
-    planOverride?: string | null;
+    planOverride?: "founder_comp";
+    billingType?: BillingType;
   }>,
 ): number {
-  return tenants.filter(
-    // Only "active" counts as revenue. A "trialing" sub has access but hasn't
-    // been charged yet (no MRR until its first invoice.paid flips it to active),
-    // so counting it here inflates the metric the operator agent reasons over.
-    (t) =>
-      t.subscriptionStatus === "active" &&
-      t.planOverride !== "founder_comp" &&
-      !isGrandfathered(t.id),
-  ).reduce((sum, tenant) => {
-    const cents = Number.isInteger(tenant.planMonthlyCents) && tenant.planMonthlyCents! >= 0
-      ? tenant.planMonthlyCents!
-      : planMonthlyCents(tenant.subscriptionPlan);
-    return sum + cents / 100;
-  }, 0);
+  return tenants.reduce((sum, tenant) => sum + billingMonthlyCents(tenant) / 100, 0);
 }
 import { buildOpsReport, type OpsReport } from "./ops";
 import { getRedis } from "./redis";

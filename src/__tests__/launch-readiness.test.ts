@@ -61,10 +61,34 @@ describe("tenant launch readiness", () => {
       hasWeeklyBrief: false,
     });
 
+    // Blocks because of the REAL go-live gates (owner access + billing), NOT
+    // because the owner hasn't used the AI — that's a managed-client adoption
+    // signal ("watch"), never a launch blocker.
     expect(result.status).toBe("blocked");
     expect(result.items.find((item) => item.id === "owner-access")?.status).toBe("blocked");
     expect(result.items.find((item) => item.id === "billing")?.status).toBe("blocked");
-    expect(result.items.find((item) => item.id === "owner-ai-message")?.status).toBe("blocked");
+    expect(result.items.find((item) => item.id === "owner-ai-message")?.status).toBe("watch");
+  });
+
+  it("does NOT block launch just because the owner hasn't used the dashboard", () => {
+    const result = buildTenantLaunchReadiness({
+      tenant: { ...baseTenant, billingType: "case_study" },
+      infrastructure: [
+        { name: "client domain", status: "ok", message: "client.com" },
+        { name: "admin domain", status: "ok", message: "admin.client.com" },
+        { name: "revalidation", status: "ok", message: "configured" },
+      ],
+      activity: [],
+      threadCount: 0,
+      hasOwnerMessage: false,
+      draftCount: 0,
+      hasWeeklyBrief: false,
+    });
+
+    // A live, billed managed site with no owner engagement is "watch", not "blocked".
+    expect(result.status).toBe("watch");
+    expect(result.items.find((item) => item.id === "owner-ai-message")?.status).toBe("watch");
+    expect(result.items.find((item) => item.id === "billing")?.status).toBe("ready");
   });
 
   it("treats platform-template delivery as watch, not a reason to build more templates", () => {

@@ -4,6 +4,8 @@ export interface TenantReadinessInput {
   id: string;
   active?: boolean;
   productionDomain?: string;
+  /** The live site URL. Used to detect a real client domain when productionDomain/customDomains aren't set. */
+  siteUrl?: string;
   adminDomain?: string;
   customDomains?: string[];
   revalidateUrl?: string;
@@ -168,13 +170,23 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
   const clientCustomDomains = tenant.customDomains?.map(normalizeReadinessDomain).filter((domain) =>
     domain && !domain.startsWith("admin.") && !domain.endsWith(".strelva.com") && !domain.endsWith(".vercel.app")
   );
+  // Fall back to the live siteUrl's host so an already-live client on its own
+  // domain is detected even when productionDomain/customDomains weren't filled in.
+  const siteUrlDomainRaw = normalizeReadinessDomain(tenant.siteUrl);
+  const siteUrlDomain =
+    siteUrlDomainRaw &&
+    !siteUrlDomainRaw.startsWith("admin.") &&
+    !siteUrlDomainRaw.endsWith(".strelva.com") &&
+    !siteUrlDomainRaw.endsWith(".vercel.app")
+      ? siteUrlDomainRaw
+      : "";
   const results: TenantReadinessResult[] = [];
-  const hasClientDomain = !!productionDomain || !!clientCustomDomains?.length;
+  const hasClientDomain = !!productionDomain || !!clientCustomDomains?.length || !!siteUrlDomain;
 
   results.push(hasClientDomain ? {
     name: `Tenant ${tenant.id} client domain`,
     status: "ok",
-    message: productionDomain || clientCustomDomains?.join(", ") || "Configured",
+    message: productionDomain || clientCustomDomains?.join(", ") || siteUrlDomain || "Configured",
   } : {
     name: `Tenant ${tenant.id} client domain`,
     status: tenantIsActive ? "fail" : "warn",
@@ -183,7 +195,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
       : "Inactive tenant has no customer-facing productionDomain/customDomains entry configured",
   });
 
-  const derivedAdminDomain = productionDomain ? `admin.${productionDomain}` : "";
+  const derivedAdminDomain = productionDomain || siteUrlDomain ? `admin.${productionDomain || siteUrlDomain}` : "";
   results.push(adminDomain || derivedAdminDomain ? {
     name: `Tenant ${tenant.id} admin domain`,
     status: "ok",
