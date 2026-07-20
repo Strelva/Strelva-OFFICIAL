@@ -94,45 +94,32 @@ describe("recordDailyEngagement + getEngagement7d", () => {
 });
 
 describe("getTenantAtRisk — each reason fires", () => {
-  it("flags long owner inactivity", async () => {
+  it("does NOT flag owner inactivity — it's expected for a managed service", async () => {
     const redis = fakeRedis();
-    redis.store.set(engagementKey("t", 0), 4); // has AI use, so only inactivity fires
     mockGetRedis.mockReturnValue(redis);
     mockGetTenantConfig.mockResolvedValue(tenant({ id: "t" }));
-    mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(24) }]);
-    mockGetEffectiveSubscriptionStatus.mockResolvedValue("active");
-
-    const s = await getTenantAtRisk("t");
-    expect(s.atRisk).toBe(true);
-    expect(s.reasons).toEqual(["No owner activity in 24 days"]);
-    expect(s.daysSinceActivity).toBe(24);
-    expect(s.engagement7d).toBe(4);
-  });
-
-  it("flags zero AI use for an active, subscribed tenant once history exists", async () => {
-    const redis = fakeRedis();
-    for (let i = 0; i < 6; i++) redis.store.set(engagementKey("t", i), 0); // 6 recorded 0-days
-    mockGetRedis.mockReturnValue(redis);
-    mockGetTenantConfig.mockResolvedValue(tenant({ id: "t" }));
-    mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(1) }]); // recent → no inactivity
-    mockGetEffectiveSubscriptionStatus.mockResolvedValue("active");
-
-    const s = await getTenantAtRisk("t");
-    expect(s.reasons).toEqual(["No AI use in 7 days"]);
-    expect(s.engagement7d).toBe(0);
-  });
-
-  it("does NOT flag zero AI use before enough history exists (cold start)", async () => {
-    const redis = fakeRedis();
-    redis.store.set(engagementKey("t", 0), 0); // only 1 recorded day — not enough
-    mockGetRedis.mockReturnValue(redis);
-    mockGetTenantConfig.mockResolvedValue(tenant({ id: "t" }));
-    mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(1) }]); // recent → no inactivity
+    mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(60) }]); // long silent owner
     mockGetEffectiveSubscriptionStatus.mockResolvedValue("active");
 
     const s = await getTenantAtRisk("t");
     expect(s.atRisk).toBe(false);
     expect(s.reasons).toEqual([]);
+    // still reported for display, just not a risk reason
+    expect(s.daysSinceActivity).toBe(60);
+  });
+
+  it("does NOT flag zero AI use — owners don't have to use the dashboard", async () => {
+    const redis = fakeRedis();
+    for (let i = 0; i < 6; i++) redis.store.set(engagementKey("t", i), 0); // 6 recorded 0-days
+    mockGetRedis.mockReturnValue(redis);
+    mockGetTenantConfig.mockResolvedValue(tenant({ id: "t" }));
+    mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(1) }]);
+    mockGetEffectiveSubscriptionStatus.mockResolvedValue("active");
+
+    const s = await getTenantAtRisk("t");
+    expect(s.atRisk).toBe(false);
+    expect(s.reasons).toEqual([]);
+    expect(s.engagement7d).toBe(0);
   });
 
   it("flags past_due subscriptions", async () => {
@@ -189,12 +176,8 @@ describe("getTenantAtRisk — each reason fires", () => {
 });
 
 describe("getAtRiskTenants", () => {
-  it("returns only at-risk tenants, worst first", async () => {
+  it("returns only tenants with a real churn signal (payment), excluding quiet-but-fine ones", async () => {
     const redis = fakeRedis();
-    redis.store.set(engagementKey("a", 0), 5); // healthy has AI use
-    redis.store.set(engagementKey("b", 0), 5); // cancelled has AI use → 1 reason
-    // c: 6 recorded 0-days → enough history to flag no-AI-use
-    for (let i = 0; i < 6; i++) redis.store.set(engagementKey("c", i), 0);
     mockGetRedis.mockReturnValue(redis);
 
     mockGetAllTenants.mockResolvedValue([
@@ -202,6 +185,7 @@ describe("getAtRiskTenants", () => {
       tenant({ id: "b", siteName: "Bravo" }),
       tenant({ id: "c", siteName: "Charlie" }),
     ]);
+    // c is silent + no AI use for 40 days — but that's NOT churn for a managed client.
     mockGetActivity.mockImplementation((id: string) =>
       Promise.resolve([{ time: id === "c" ? isoDaysAgo(40) : isoDaysAgo(2) }])
     );
@@ -210,15 +194,14 @@ describe("getAtRiskTenants", () => {
     );
 
     const result = await getAtRiskTenants();
-    // a is healthy (excluded); c has 2 reasons (inactivity + no AI), b has 1.
-    expect(result.map((s) => s.tenantId)).toEqual(["c", "b"]);
-    expect(result[0].reasons).toEqual(["No owner activity in 40 days", "No AI use in 7 days"]);
-    expect(result[1].reasons).toEqual(["Subscription cancelled"]);
+    // Only b (cancelled subscription) is a real churn risk. a + c are fine.
+    expect(result.map((s) => s.tenantId)).toEqual(["b"]);
+    expect(result[0].reasons).toEqual(["Subscription cancelled"]);
   });
 });
 
 describe("degrades without Redis", () => {
-  it("engagement7d reads 0 and inactivity still computes; no-AI is suppressed with no history", async () => {
+  it("engagement7d reads 0 and a quiet owner is still not at-risk", async () => {
     mockGetRedis.mockReturnValue(null);
     mockGetTenantConfig.mockResolvedValue(tenant({ id: "t" }));
     mockGetActivity.mockResolvedValue([{ time: isoDaysAgo(25) }]);
@@ -226,10 +209,9 @@ describe("degrades without Redis", () => {
 
     const s = await getTenantAtRisk("t");
     expect(s.engagement7d).toBe(0);
-    expect(s.atRisk).toBe(true);
-    // Without Redis there is no recorded history, so "no AI use" cannot fire —
-    // only the inactivity reason, computed from tenant data, remains.
-    expect(s.reasons).toEqual(["No owner activity in 25 days"]);
+    // Owner inactivity is not a churn signal for a managed service.
+    expect(s.atRisk).toBe(false);
+    expect(s.reasons).toEqual([]);
   });
 
   it("getEngagement7d returns 0 when Redis is unconfigured", async () => {

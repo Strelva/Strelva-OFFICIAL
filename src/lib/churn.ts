@@ -35,34 +35,14 @@ export interface AtRiskSignal {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/**
- * No owner activity in more than this many days is a churn flag. Matches the
- * "quiet tenant" threshold the Mission Control attention panel already uses
- * (STALE_TENANT_DAYS in attention.ts) so the two surfaces agree.
- */
-const INACTIVITY_DAYS = 21;
-
-/** Rolling window we sum owner engagement over. */
+/** Rolling window we sum owner engagement over (kept for the displayed engagement7d figure). */
 const ENGAGEMENT_WINDOW_DAYS = 7;
-
-/**
- * Minimum recorded days before "no AI use" can fire. Without this, the signal
- * cold-starts wrong: right after the feature ships (or Redis is wiped) there is
- * no engagement history yet, `engagement7d` reads 0, and every active client
- * looks idle. We only claim "no AI use in 7 days" once the daily cron has
- * actually recorded most of the window, so 0 means real inactivity, not "no
- * data yet".
- */
-const MIN_ENGAGEMENT_HISTORY_DAYS = 5;
 
 /**
  * Each daily count lives ~10 days — 3 days of slack past the 7-day window so a
  * late-running or re-run cron still finds every day it needs to sum.
  */
 const ENGAGEMENT_TTL_SECONDS = 10 * 24 * 60 * 60;
-
-/** Subscription states that count as an active paying (or trialing) relationship. */
-const SUBSCRIBED_STATES = new Set(["active", "trialing"]);
 
 /** YYYY-MM-DD in UTC — daily granularity, so UTC is fine (matches proof-signals). */
 function dayKeyFor(date: Date): string {
@@ -159,21 +139,13 @@ async function computeAtRisk(tenant: TenantIdentity & CommercialSnapshot): Promi
   const daysSinceActivity = daysSince(activity[0]?.time);
   const reasons: string[] = [];
 
-  if (daysSinceActivity !== null && daysSinceActivity > INACTIVITY_DAYS) {
-    reasons.push(`No owner activity in ${daysSinceActivity} days`);
-  }
-
-  // Only flag "no AI use" once we have enough recorded history for 0 to mean
-  // real inactivity rather than a cold start (see MIN_ENGAGEMENT_HISTORY_DAYS).
-  if (
-    engagement7d === 0 &&
-    engagementWindow.recordedDays >= MIN_ENGAGEMENT_HISTORY_DAYS &&
-    isActiveTenant(tenant) &&
-    subscriptionStatus !== null &&
-    SUBSCRIBED_STATES.has(subscriptionStatus)
-  ) {
-    reasons.push(`No AI use in ${ENGAGEMENT_WINDOW_DAYS} days`);
-  }
+  // NOTE: owner disengagement is NOT a churn signal for a managed service. The
+  // whole value prop is that the owner does NOT have to log in or use the AI —
+  // we run the site and they hear from us over email + auto-updates. So "no owner
+  // activity" / "no AI use" are expected steady-state, not risk. `daysSinceActivity`
+  // and `engagement7d` are still returned for display, but they do NOT flag at-risk.
+  // Real churn signals are payment problems (below); health regression is handled
+  // separately by the portfolio-scan alert.
 
   if (subscriptionStatus === "past_due") {
     reasons.push("Subscription past due");
