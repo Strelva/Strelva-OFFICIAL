@@ -17,7 +17,7 @@ import { setAnalyticsConfig, deriveScDomain } from "./analytics";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
 import { CONTROL_PLANE_URL } from "./brand";
-import type { ContentSection, ContentMap } from "./types";
+import type { ContentSection, ContentMap, BillingType, CommercialPlanKey, PresenceProfile } from "./types";
 import {
   createVercelProject,
   setVercelEnv,
@@ -34,6 +34,14 @@ export interface ProvisionInput {
   template?: string;
   productionDomain?: string;
   adminDomain?: string;
+  /** Operator-set billing classification. Undefined = not configured (born as "none"). */
+  billingType?: BillingType;
+  /** When billingType==="tier": which of the 3 published tiers. */
+  subscriptionPlan?: CommercialPlanKey;
+  /** When billingType==="custom": the negotiated monthly amount in cents. */
+  planMonthlyCents?: number;
+  /** How the business is found — drives which presence surfaces show on the dashboard. */
+  presence?: PresenceProfile;
 }
 
 export type StepStatus = "ok" | "failed" | "skipped";
@@ -135,6 +143,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       siteUrl,
       revalidateUrl,
       revalidationSecret,
+      // Billing — set at provision time so the tenant is never born with "No plan set"
+      // when the operator already knows how this client is billed.
+      billingType: input.billingType,
+      subscriptionPlan: input.subscriptionPlan,
+      planMonthlyCents: input.planMonthlyCents,
       customRepo: {
         repoName: subdomain,
         contractVersion: CUSTOM_REPO_CONTRACT_VERSION,
@@ -200,6 +213,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     ...defaults,
     hero: { ...defaults.hero, headline: "Your headline\ngoes here.", ctaText: "Get in touch" },
     providers: { ...defaults.providers, description: "People and partners you trust and recommend." },
+    // Bake the presence/businessModel into the seeded settings so the dashboard's
+    // "Tell us how customers find you" first-run checklist is pre-answered and the
+    // correct surfaces show (Google Business + Reviews for local, skipped for online).
+    settings: {
+      ...defaults.settings,
+      ...(input.presence ? { businessModel: input.presence } : {}),
+    },
   };
   // setContent is an idempotent upsert, so re-running provision to recover a
   // partial seed is safe (it overwrites, never duplicates). We capture the

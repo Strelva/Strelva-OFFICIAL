@@ -1,16 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
+interface PaidPayment {
+  amountCents: number;
+  customerEmail?: string;
+  paidAt: string;
+}
 
 interface PayLink {
   slug: string;
   clientName: string;
   /** Retained on existing records (build | managed_start), no longer operator-facing. */
   door?: string;
+  tenantId?: string;
   leadSlug?: string;
   amountCents?: number;
   minCents?: number;
   maxCents?: number;
+  customCopy?: string;
+  returnUrl?: string;
   createdAt?: string;
   createdBy?: string;
 }
@@ -20,7 +30,9 @@ type AmountMode = "fixed" | "range";
 const blankForm = {
   slug: "",
   clientName: "",
-  leadSlug: "",
+  tenantId: "",
+  returnUrl: "",
+  customCopy: "",
   mode: "fixed" as AmountMode,
   amountDollars: "",
   minDollars: "",
@@ -31,9 +43,25 @@ function dollars(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
+/** Format an ISO timestamp as "Mon D" or "Mon D, YYYY" if not current year. */
+function shortDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" }),
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function PayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
-  const [paidSlugs, setPaidSlugs] = useState<Set<string>>(new Set());
+  const [paidPayments, setPaidPayments] = useState<Record<string, PaidPayment>>({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(blankForm);
   const [submitting, setSubmitting] = useState(false);
@@ -41,20 +69,20 @@ export default function PayLinksPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
 
-  // Revenue roll-up across the pay-link book. A link's face amount counts as
-  // "collected" once a build payment converted it (its slug in paidSlugs), else
-  // "outstanding". Range links carry no single figure, so they're left out of
-  // the sum rather than guessed at.
+  // Revenue roll-up across the pay-link book. Fixed-amount paid links count as
+  // "collected". Fixed-amount unpaid links count as "outstanding". Range links
+  // carry no single figure and are excluded from both sums — the actual paid
+  // amount (if any) appears in the row detail instead.
   const rollup = useMemo(() => {
     let collected = 0;
     let outstanding = 0;
     for (const l of links) {
-      if (typeof l.amountCents !== "number") continue;
-      if (paidSlugs.has(l.slug)) collected += l.amountCents;
+      if (typeof l.amountCents !== "number") continue; // range link — excluded
+      if (paidPayments[l.slug]) collected += l.amountCents;
       else outstanding += l.amountCents;
     }
     return { collected, outstanding };
-  }, [links, paidSlugs]);
+  }, [links, paidPayments]);
 
   async function load() {
     setLoading(true);
@@ -62,7 +90,7 @@ export default function PayLinksPage() {
       const res = await fetch("/api/admin/pay-links");
       const data = await res.json();
       setLinks(data.payLinks ?? []);
-      setPaidSlugs(new Set<string>(data.paidSlugs ?? []));
+      setPaidPayments(data.paidPayments ?? {});
     } catch {
       setError("Failed to load pay links");
     } finally {
@@ -83,13 +111,17 @@ export default function PayLinksPage() {
 
     // The offer is "build" (a one-time charge) — the superseded managed-start
     // door is gone from the UI; the backend still keys its one-time payment
-    // purpose off door:"build".
+    // purpose off door:"build". leadSlug defaults server-side to the slug.
     const body: Record<string, unknown> = {
       slug: form.slug.trim(),
       clientName: form.clientName.trim(),
       door: "build",
-      leadSlug: form.leadSlug.trim() || form.slug.trim(),
+      // leadSlug intentionally omitted — lib defaults it to the slug
     };
+
+    if (form.tenantId.trim()) body.tenantId = form.tenantId.trim();
+    if (form.returnUrl.trim()) body.returnUrl = form.returnUrl.trim();
+    if (form.customCopy.trim()) body.customCopy = form.customCopy.trim();
 
     if (form.mode === "range") {
       const min = Number(form.minDollars);
@@ -156,8 +188,7 @@ export default function PayLinksPage() {
       <div>
         <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Pay links</h1>
         <p className="text-sm text-gray-muted mt-1">
-          Mint a payment link for a one-off charge: an occasional paid build or a one-time
-          invoice. Monthly plans bill separately through Stripe.
+          One-off charges (build, setup fee, deposit). Monthly plans are started from each client&apos;s page.
         </p>
       </div>
 
@@ -166,6 +197,15 @@ export default function PayLinksPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="acme-coffee" />
           <Field label="Client name" value={form.clientName} onChange={(v) => setForm({ ...form, clientName: v })} placeholder="Acme Coffee" />
+          <div className="sm:col-span-2">
+            <Field
+              label="Link to client (optional)"
+              value={form.tenantId}
+              onChange={(v) => setForm({ ...form, tenantId: v })}
+              placeholder="tenant-id"
+            />
+            <p className="text-[11px] text-gray-faint mt-1">Leave blank if the client has no Strelva account yet. Links the row to their client page.</p>
+          </div>
           <div>
             <label className="block text-xs text-gray-muted mb-1">Amount type</label>
             <select
@@ -183,13 +223,30 @@ export default function PayLinksPage() {
               <Field label="Maximum (USD)" value={form.maxDollars} onChange={(v) => setForm({ ...form, maxDollars: v })} placeholder="2500" type="number" />
               <p className="sm:col-span-2 text-xs text-gray-faint">
                 The client picks any amount in this range on a $50-step slider, so the span
-                (max − min) must be a whole multiple of $50.
+                (max &minus; min) must be a whole multiple of $50.
               </p>
             </>
           ) : (
             <Field label="Amount (USD)" value={form.amountDollars} onChange={(v) => setForm({ ...form, amountDollars: v })} placeholder="1500" type="number" />
           )}
-          <Field label="Lead slug (optional)" value={form.leadSlug} onChange={(v) => setForm({ ...form, leadSlug: v })} placeholder="defaults to slug" />
+          <div>
+            <Field
+              label="Client website URL (optional)"
+              value={form.returnUrl}
+              onChange={(v) => setForm({ ...form, returnUrl: v })}
+              placeholder="https://acmecoffee.com"
+            />
+            <p className="text-[11px] text-gray-faint mt-1">Back-link shown on the payment page.</p>
+          </div>
+          <div>
+            <Field
+              label="Note on payment page (optional)"
+              value={form.customCopy}
+              onChange={(v) => setForm({ ...form, customCopy: v })}
+              placeholder="Covers the initial site build and setup."
+            />
+            <p className="text-[11px] text-gray-faint mt-1">Extra copy shown under the payment description.</p>
+          </div>
         </div>
         {error && <p className="text-sm text-critical mt-3">{error}</p>}
         <button
@@ -204,13 +261,14 @@ export default function PayLinksPage() {
       <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
         <div className="px-5 py-4 border-b border-glass-border flex items-center justify-between gap-4">
           <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">
-            Outstanding links {links.length > 0 && <span className="text-gray-muted">({links.length})</span>}
+            Payment links {links.length > 0 && <span className="text-gray-muted">({links.length})</span>}
           </h2>
           {(rollup.collected > 0 || rollup.outstanding > 0) && (
             <p className="text-[13px] text-gray-muted shrink-0">
               <span className="text-positive">{dollars(rollup.collected)} collected</span>
               <span className="text-gray-faint"> · </span>
               <span className="text-warm-white">{dollars(rollup.outstanding)} outstanding</span>
+              <span className="text-gray-faint text-[11px]"> (fixed only)</span>
             </p>
           )}
         </div>
@@ -220,59 +278,76 @@ export default function PayLinksPage() {
           <p className="px-5 py-6 text-sm text-gray-muted">No payment links yet.</p>
         ) : (
           <ul className="divide-y divide-glass-border">
-            {links.map((l) => (
-              <li key={l.slug} className="px-5 py-3 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm text-warm-white truncate">
-                    {l.clientName}
-                    {paidSlugs.has(l.slug) && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-positive0/15 px-2 py-0.5 text-[11px] font-medium text-positive">
-                        Paid
-                      </span>
+            {links.map((l) => {
+              const paid = paidPayments[l.slug];
+              return (
+                <li key={l.slug} className="px-5 py-3 flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm text-warm-white flex items-center gap-2 flex-wrap">
+                      <span className="truncate">{l.clientName}</span>
+                      {l.tenantId ? (
+                        <Link
+                          href={`/admin/clients/${l.tenantId}`}
+                          className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-[-0.01em] text-accent bg-accent-dim hover:opacity-80 transition-opacity"
+                        >
+                          {l.tenantId}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-[-0.01em] text-gray-muted bg-gray-bg">
+                          Pre-tenant
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-muted truncate">
+                      /pay/{l.slug}
+                      {typeof l.amountCents === "number"
+                        ? ` · ${dollars(l.amountCents)}`
+                        : typeof l.minCents === "number" && typeof l.maxCents === "number"
+                          ? ` · ${dollars(l.minCents)}–${dollars(l.maxCents)}`
+                          : ""}
+                    </p>
+                    {paid && (
+                      <p className="text-xs text-positive">
+                        Paid {dollars(paid.amountCents)}
+                        {paid.customerEmail && <span className="text-gray-muted"> · {paid.customerEmail}</span>}
+                        {paid.paidAt && <span className="text-gray-faint"> · {shortDate(paid.paidAt)}</span>}
+                      </p>
                     )}
-                  </p>
-                  <p className="text-xs text-gray-muted truncate">
-                    /pay/{l.slug}
-                    {typeof l.amountCents === "number"
-                      ? ` · ${dollars(l.amountCents)}`
-                      : typeof l.minCents === "number" && typeof l.maxCents === "number"
-                        ? ` · ${dollars(l.minCents)}–${dollars(l.maxCents)}`
-                        : ""}
-                  </p>
-                </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <button
-                    onClick={() => copyLink(l.slug)}
-                    className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
-                  >
-                    {copied === l.slug ? "Copied" : "Copy URL"}
-                  </button>
-                  {confirmingRevoke === l.slug ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <button
-                        onClick={() => void revoke(l.slug)}
-                        className="rounded-md border border-critical0/25 bg-critical0/10 px-3 py-1 text-xs font-medium text-critical hover:bg-critical0/20"
-                      >
-                        Confirm revoke
-                      </button>
-                      <button
-                        onClick={() => setConfirmingRevoke(null)}
-                        className="rounded-md px-2 py-1 text-xs text-gray-muted hover:text-warm-white"
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 pt-0.5">
                     <button
-                      onClick={() => setConfirmingRevoke(l.slug)}
-                      className="rounded-md border border-critical0/25 px-3 py-1 text-xs text-critical hover:bg-critical0/10"
+                      onClick={() => copyLink(l.slug)}
+                      className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
                     >
-                      Revoke
+                      {copied === l.slug ? "Copied" : "Copy URL"}
                     </button>
-                  )}
-                </div>
-              </li>
-            ))}
+                    {confirmingRevoke === l.slug ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => void revoke(l.slug)}
+                          className="rounded-md border border-critical0/25 bg-critical0/10 px-3 py-1 text-xs font-medium text-critical hover:bg-critical0/20"
+                        >
+                          Confirm revoke
+                        </button>
+                        <button
+                          onClick={() => setConfirmingRevoke(null)}
+                          className="rounded-md px-2 py-1 text-xs text-gray-muted hover:text-warm-white"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmingRevoke(l.slug)}
+                        className="rounded-md border border-critical0/25 px-3 py-1 text-xs text-critical hover:bg-critical0/10"
+                      >
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

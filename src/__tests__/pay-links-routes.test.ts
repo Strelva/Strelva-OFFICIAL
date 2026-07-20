@@ -228,7 +228,11 @@ describe("GET /api/admin/pay-links", () => {
     ]);
     const { GET } = await import("@/app/api/admin/pay-links/route");
     const payload = await (await GET()).json();
-    expect(payload.paidSlugs).toEqual(["acme-coffee"]);
+    // The GET response now returns an enriched paidPayments map (amount/email/paidAt),
+    // not a bare slug list, so the admin list can show what was actually paid.
+    expect(Object.keys(payload.paidPayments)).toEqual(["acme-coffee"]);
+    expect(payload.paidPayments["acme-coffee"]).toMatchObject({ amountCents: 200_000 });
+    expect(payload.paidPayments.unpaid).toBeUndefined();
   });
 });
 

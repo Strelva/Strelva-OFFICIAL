@@ -37,6 +37,16 @@ export async function POST(req: Request) {
   const createdBy = (await getCurrentUserEmail()) || undefined;
   const overwrite = body.overwrite === true;
 
+  // The admin form no longer exposes leadSlug (it's internal attribution plumbing).
+  // When the operator doesn't link the pay link to an existing tenant, default the
+  // leadSlug to the slug so a pre-tenant link still validates (needs tenantId OR leadSlug).
+  const slugValue = typeof body.slug === "string" ? body.slug.trim() : "";
+  const hasTenant = typeof body.tenantId === "string" && body.tenantId.trim().length > 0;
+  const hasLeadSlug = typeof body.leadSlug === "string" && body.leadSlug.trim().length > 0;
+  if (!hasTenant && !hasLeadSlug && slugValue) {
+    body.leadSlug = slugValue;
+  }
+
   let config;
   try {
     config = buildPayLinkConfig({ ...body, createdBy });
@@ -103,11 +113,26 @@ export async function GET() {
   }
 
   // Cross-reference the build-payment money trail so the UI can show which links
-  // actually converted (a payment whose paySlug matches the link's slug).
+  // actually converted (a payment whose paySlug matches the link's slug), with
+  // enriched data (amount paid, customer email, when it happened).
   const payments = await listBuildPayments().catch(() => []);
-  const paidSlugs = [...new Set(payments.map((p) => p.paySlug).filter((s): s is string => Boolean(s)))];
 
-  return NextResponse.json({ payLinks, count: payLinks.length, paidSlugs });
+  // Build a map: slug -> most-recent payment detail (amountCents, customerEmail, paidAt).
+  // A slug can theoretically convert more than once; keep the most-recent by createdAt.
+  const paidPayments: Record<string, { amountCents: number; customerEmail?: string; paidAt: string }> = {};
+  for (const p of payments) {
+    if (!p.paySlug) continue;
+    const existing = paidPayments[p.paySlug];
+    if (!existing || p.createdAt > existing.paidAt) {
+      paidPayments[p.paySlug] = {
+        amountCents: p.amountCents,
+        customerEmail: p.customerEmail,
+        paidAt: p.createdAt,
+      };
+    }
+  }
+
+  return NextResponse.json({ payLinks, count: payLinks.length, paidPayments });
 }
 
 /**
