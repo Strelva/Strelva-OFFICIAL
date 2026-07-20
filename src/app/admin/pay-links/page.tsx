@@ -69,17 +69,20 @@ export default function PayLinksPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
 
-  // Revenue roll-up across the pay-link book. Fixed-amount paid links count as
-  // "collected". Fixed-amount unpaid links count as "outstanding". Range links
-  // carry no single figure and are excluded from both sums — the actual paid
-  // amount (if any) appears in the row detail instead.
+  // Revenue roll-up across the pay-link book. "Collected" = the ACTUAL amount
+  // charged (from the build-payment trail), so a paid range link counts for what
+  // the client really paid, not $0. "Outstanding" = the face amount of unpaid
+  // fixed links (range links have no single figure, so they can't be projected).
   const rollup = useMemo(() => {
     let collected = 0;
     let outstanding = 0;
     for (const l of links) {
-      if (typeof l.amountCents !== "number") continue; // range link — excluded
-      if (paidPayments[l.slug]) collected += l.amountCents;
-      else outstanding += l.amountCents;
+      const paid = paidPayments[l.slug];
+      if (paid) {
+        collected += paid.amountCents;
+      } else if (typeof l.amountCents === "number") {
+        outstanding += l.amountCents;
+      }
     }
     return { collected, outstanding };
   }, [links, paidPayments]);
@@ -268,7 +271,7 @@ export default function PayLinksPage() {
               <span className="text-positive">{dollars(rollup.collected)} collected</span>
               <span className="text-gray-faint"> · </span>
               <span className="text-warm-white">{dollars(rollup.outstanding)} outstanding</span>
-              <span className="text-gray-faint text-[11px]"> (fixed only)</span>
+              <span className="text-gray-faint text-[11px]"> (outstanding = fixed links only)</span>
             </p>
           )}
         </div>

@@ -153,7 +153,7 @@ function LeadCard({
   wf: LeadWorkflow;
   pending: boolean;
   notesByToken: Record<string, string>;
-  onStatusChange: (token: string, status: LeadWorkflowStatus) => Promise<void>;
+  onStatusChange: (token: string, status: LeadWorkflowStatus) => Promise<boolean>;
   onNoteChange: (token: string, note: string) => void;
   onConvert: (lead: DeliveryLead) => Promise<void>;
   receded: boolean;
@@ -326,6 +326,7 @@ export function LeadRows({
     return init;
   });
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [showDismissed, setShowDismissed] = useState(false);
 
@@ -337,8 +338,9 @@ export function LeadRows({
     return workflow[token]?.updatedAt ?? null;
   }
 
-  async function setStatus(token: string, status: LeadWorkflowStatus): Promise<void> {
+  async function setStatus(token: string, status: LeadWorkflowStatus): Promise<boolean> {
     setPending((p) => ({ ...p, [token]: true }));
+    setActionError(null);
     try {
       const note = notesByToken[token] ?? workflow[token]?.note ?? "";
       const res = await fetch(`/api/admin/leads/${token}/workflow`, {
@@ -346,16 +348,26 @@ export function LeadRows({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, note: note || undefined }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setActionError("Couldn't update that lead — try again.");
+        return false;
+      }
       const data = (await res.json()) as { workflow: LeadWorkflow };
       setWorkflow((w) => ({ ...w, [token]: data.workflow }));
+      return true;
+    } catch {
+      setActionError("Couldn't update that lead — check your connection.");
+      return false;
     } finally {
       setPending((p) => ({ ...p, [token]: false }));
     }
   }
 
   async function convert(lead: DeliveryLead): Promise<void> {
-    await setStatus(lead.statusToken, "converting");
+    // Only route to onboarding once the "converting" marker actually saved, so we
+    // don't leave the lead untouched while the operator lands on a fresh form.
+    const ok = await setStatus(lead.statusToken, "converting");
+    if (!ok) return;
     const q = new URLSearchParams({
       siteName: lead.businessName,
       ownerEmail: lead.email,
@@ -419,6 +431,11 @@ export function LeadRows({
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <p className="rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[12px] text-critical" role="alert">
+          {actionError}
+        </p>
+      )}
       {/* Filter strip — only shown when there are active leads */}
       {active.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

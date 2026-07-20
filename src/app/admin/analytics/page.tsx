@@ -135,10 +135,11 @@ export default async function AdminAnalyticsPage({
     })
   );
 
-  // Sort worst-trend-first: stalled/no-data → down → up
+  // Sort worst-trend-first. An ACTIVELY declining client needs attention more than
+  // a brand-new client with no data yet, so: down → no-data → stalled → up.
   function trendScore(row: PortfolioRow): number {
-    if (row.thisWeek === 0 && row.lastWeek === 0) return 0; // no data — worst
-    if (row.thisWeek < row.lastWeek) return 1;              // down
+    if (row.thisWeek < row.lastWeek) return 0;              // down — needs attention most
+    if (row.thisWeek === 0 && row.lastWeek === 0) return 1; // no data yet
     if (row.thisWeek === row.lastWeek) return 2;            // stalled
     return 3;                                               // up — best
   }

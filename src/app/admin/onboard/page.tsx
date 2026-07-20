@@ -129,6 +129,10 @@ function OnboardForm() {
       setError("Owner email is required.");
       return;
     }
+    if (form.billingType === "custom" && !(parseFloat(form.customMonthlyDollars) > 0)) {
+      setError("Enter the monthly amount for the custom plan.");
+      return;
+    }
     setRunning(true);
     try {
       const planMonthlyCents =

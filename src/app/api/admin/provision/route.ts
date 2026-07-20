@@ -72,6 +72,15 @@ export async function POST(req: Request) {
   const planMonthlyCents: number | undefined =
     billingType === "custom" ? cleanNumber(body.planMonthlyCents) : undefined;
 
+  // A custom plan MUST carry a positive amount — otherwise it silently stores $0,
+  // indistinguishable from a zeroed record.
+  if (billingType === "custom" && !(planMonthlyCents && planMonthlyCents > 0)) {
+    return NextResponse.json(
+      { error: "A custom plan needs a monthly amount above $0." },
+      { status: 400 }
+    );
+  }
+
   // Presence — defaults to "local" if not supplied or invalid.
   const rawPresence = clean(body.presence);
   const presence: PresenceProfile =
