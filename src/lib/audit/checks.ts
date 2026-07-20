@@ -219,7 +219,8 @@ async function checkWebVitals(
 async function checkMobile(
   _url: string,
   apiKey: string | undefined,
-  psData: PageSpeedResult | null
+  psData: PageSpeedResult | null,
+  html: string
 ): Promise<CategoryResult> {
   const checks: CheckResult[] = [];
 
@@ -242,38 +243,44 @@ async function checkMobile(
   try {
     const audits = psData.lighthouseResult?.audits ?? {};
 
-    const viewportAudit = audits["viewport"];
-    const hasViewport = viewportAudit?.score === 1;
+    // Viewport is checked DIRECTLY from the served HTML — Lighthouse deprecated the
+    // `viewport` audit id (PSI now emits `viewport-insight`), so reading
+    // audits["viewport"] false-failed every site even when the meta is present.
+    const hasViewport = /<meta[^>]+name=["']?viewport["']?[^>]*>/i.test(html);
     checks.push({
       name: "Viewport Meta Tag",
       status: hasViewport ? "pass" : "fail",
       score: hasViewport ? 100 : 0,
       message: hasViewport
         ? "Viewport meta tag is properly configured"
-        : "Missing or misconfigured viewport meta tag",
+        : "Missing viewport meta tag — the site won't scale on phones",
     });
 
+    // Legible fonts + tap targets: only score them when Lighthouse actually
+    // returns the audit. The classic `font-size` / `tap-targets` ids were removed
+    // in recent Lighthouse, so a missing audit means "not measured" — NOT a
+    // failure. Penalizing for data we don't have unfairly tanked mobile.
     const fontSizeAudit = audits["font-size"];
-    const fontOk = fontSizeAudit?.score === 1;
-    checks.push({
-      name: "Legible Font Sizes",
-      status: fontOk ? "pass" : "warn",
-      score: fontOk ? 100 : 40,
-      message: fontOk
-        ? "Text is legible on mobile devices"
-        : "Some text may be too small on mobile",
-    });
+    if (fontSizeAudit && typeof fontSizeAudit.score === "number") {
+      const fontOk = fontSizeAudit.score === 1;
+      checks.push({
+        name: "Legible Font Sizes",
+        status: fontOk ? "pass" : "warn",
+        score: fontOk ? 100 : 40,
+        message: fontOk ? "Text is legible on mobile devices" : "Some text may be too small on mobile",
+      });
+    }
 
     const tapAudit = audits["tap-targets"];
-    const tapOk = tapAudit?.score === 1;
-    checks.push({
-      name: "Tap Target Sizing",
-      status: tapOk ? "pass" : "warn",
-      score: tapOk ? 100 : 50,
-      message: tapOk
-        ? "Tap targets are appropriately sized"
-        : "Some tap targets may be too small or too close together",
-    });
+    if (tapAudit && typeof tapAudit.score === "number") {
+      const tapOk = tapAudit.score === 1;
+      checks.push({
+        name: "Tap Target Sizing",
+        status: tapOk ? "pass" : "warn",
+        score: tapOk ? 100 : 50,
+        message: tapOk ? "Tap targets are appropriately sized" : "Some tap targets may be too small or too close together",
+      });
+    }
 
     return {
       name: "Mobile Responsiveness",
@@ -382,7 +389,7 @@ export async function runAudit(
   const psData = await fetchPageSpeedData(fetchedUrl, apiKey);
   const [webVitals, mobile] = await Promise.all([
     checkWebVitals(fetchedUrl, apiKey, psData),
-    checkMobile(fetchedUrl, apiKey, psData),
+    checkMobile(fetchedUrl, apiKey, psData, ctx.html),
   ]);
 
   // The ported single-fetch modules run synchronously off the shared context.

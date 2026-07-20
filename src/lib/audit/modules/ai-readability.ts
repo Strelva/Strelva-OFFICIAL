@@ -270,7 +270,10 @@ function analyzeSameAs(sameAs: unknown): SameAsAnalysis {
     }
   }
 
-  let authorityScore = foundPlatforms.length * 10;
+  // 20 points per declared authority profile: a realistic local business is
+  // "complete" at ~4-5 (Google, Facebook, Instagram, Yelp) — that should read as
+  // strong, not half-marks. (Was 10/profile, which needed 8+ for full credit.)
+  let authorityScore = foundPlatforms.length * 20;
   if (hasKnowledgeGraphLinks) authorityScore += 20;
   authorityScore = Math.min(100, authorityScore);
 
