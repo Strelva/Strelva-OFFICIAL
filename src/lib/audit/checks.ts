@@ -47,14 +47,14 @@ export async function validateUrlSafety(url: string): Promise<{ address: string 
 // (weight 0), so a URL-only run with no PageSpeed key still grades honestly.
 // ---------------------------------------------------------------------------
 const WEIGHTS: Record<string, number> = {
+  seo: 0.2,
   "ai-readability": 0.2,
-  seo: 0.18,
-  "web-vitals": 0.15,
-  security: 0.12,
-  a11y: 0.1,
+  "web-vitals": 0.1,
   mobile: 0.1,
-  trust: 0.08,
-  content: 0.07,
+  security: 0.1,
+  a11y: 0.1,
+  content: 0.1,
+  trust: 0.1,
 };
 
 // ---------------------------------------------------------------------------

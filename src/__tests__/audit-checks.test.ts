@@ -299,9 +299,11 @@ describe("runAudit", () => {
   it("assigns the central weights to the ported modules", async () => {
     const results = await runAudit("https://example.com");
     const weightBySlug = Object.fromEntries(results.map((r) => [r.slug, r.weight]));
+    expect(weightBySlug["seo"]).toBeCloseTo(0.2);
     expect(weightBySlug["ai-readability"]).toBeCloseTo(0.2);
-    expect(weightBySlug["security"]).toBeCloseTo(0.12);
-    expect(weightBySlug["content"]).toBeCloseTo(0.07);
+    expect(weightBySlug["security"]).toBeCloseTo(0.1);
+    expect(weightBySlug["content"]).toBeCloseTo(0.1);
+    expect(weightBySlug["trust"]).toBeCloseTo(0.1);
   });
 
   it("excludes the PageSpeed categories from the grade when no API key is set", async () => {
