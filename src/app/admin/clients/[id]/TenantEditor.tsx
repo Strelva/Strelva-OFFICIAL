@@ -9,6 +9,10 @@ interface EditableTenant {
   siteName: string;
   ownerName: string;
   ownerEmail: string;
+  ownerPhone: string;
+  referredBy: string;
+  bookingProvider: string;
+  bookingUrl: string;
   productionDomain: string;
   adminDomain: string;
   /** Operator-set billing classification: "" (none) | tier | custom | case_study. */
@@ -99,6 +103,10 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           siteName: form.siteName,
           ownerName: form.ownerName,
           ownerEmail: form.ownerEmail || undefined,
+          ownerPhone: form.ownerPhone,
+          referredBy: form.referredBy,
+          bookingProvider: form.bookingProvider,
+          bookingUrl: form.bookingUrl,
           productionDomain: form.productionDomain || undefined,
           adminDomain: form.adminDomain || undefined,
           // Billing: send the raw billingType (incl. "" for none) so clearing it persists.
@@ -176,6 +184,10 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
         <Field label="Owner name" value={form.ownerName} onChange={(v) => setForm({ ...form, ownerName: v })} />
         <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
+        <Field label="Owner phone" value={form.ownerPhone} onChange={(v) => setForm({ ...form, ownerPhone: v })} />
+        <Field label="Referred by" value={form.referredBy} onChange={(v) => setForm({ ...form, referredBy: v })} />
+        <Field label="Booking provider" value={form.bookingProvider} onChange={(v) => setForm({ ...form, bookingProvider: v })} placeholder="Vagaro, Calendly…" />
+        <Field label="Booking URL" value={form.bookingUrl} onChange={(v) => setForm({ ...form, bookingUrl: v })} placeholder="https://…" />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
         <Field label="Admin domain" value={form.adminDomain} onChange={(v) => setForm({ ...form, adminDomain: v })} />
         <div className="rounded-lg border border-glass-border p-3 space-y-3">

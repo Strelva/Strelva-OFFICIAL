@@ -14,7 +14,7 @@ import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-
 import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import { billingLabel, isBillingConfigured } from "@/lib/billing-type";
+import { billingLabel, billingMonthlyCents, isBillingConfigured, resolveBillingType } from "@/lib/billing-type";
 
 /** The client's public domain (bare host), from productionDomain or siteUrl; null for
  *  a tenant not yet on its own domain (a *.strelva.com / *.vercel.app placeholder). */
@@ -92,7 +92,25 @@ export default async function AdminClientsPage() {
     };
   });
 
-  const activeCount = clients.filter((c) => c.active).length;
+  const activeClients = clients.filter((c) => c.active);
+  const activeCount = activeClients.length;
+
+  // MRR roll-up across active tenants only
+  const activeTenants = tenants.filter((t) => isActiveTenant(t));
+  const mrrCents = activeTenants.reduce((sum, t) => sum + billingMonthlyCents(t), 0);
+  const mrrDollars = Math.round(mrrCents / 100);
+  const mrrFormatted = `$${mrrDollars.toLocaleString("en-US")}/mo`;
+
+  // Billing breakdown counts
+  const payingCount = activeTenants.filter((t) => billingMonthlyCents(t) > 0).length;
+  const freeCount = activeTenants.filter((t) => resolveBillingType(t) === "case_study").length;
+  const noPlanCount = activeTenants.filter((t) => resolveBillingType(t) === "none").length;
+
+  const breakdownParts: string[] = [];
+  if (payingCount > 0) breakdownParts.push(`${payingCount} paying`);
+  if (freeCount > 0) breakdownParts.push(`${freeCount} free`);
+  if (noPlanCount > 0) breakdownParts.push(`${noPlanCount} no plan`);
+  const mrrBreakdown = breakdownParts.join(" · ");
 
   return (
     <div className="max-w-6xl">
@@ -104,6 +122,14 @@ export default async function AdminClientsPage() {
           <p className="mt-1.5 text-[13px] text-gray-muted">
             One list for every business you manage a site for <span className="text-gray-faint">·</span>{" "}
             <b className="font-semibold text-warm-white">{activeCount} active</b>
+          </p>
+          <p className="mt-1 flex items-baseline gap-2">
+            <span className="text-[20px] font-semibold tabular-nums tracking-[-0.02em] text-warm-white">
+              {mrrFormatted}
+            </span>
+            {mrrBreakdown && (
+              <span className="text-[12px] text-gray-muted">{mrrBreakdown}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2.5">

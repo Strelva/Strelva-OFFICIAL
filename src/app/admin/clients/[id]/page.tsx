@@ -16,6 +16,8 @@ import { getVercelProjectStatus } from "@/lib/vercel";
 import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { resolveBillingType } from "@/lib/billing-type";
+import { getGoal } from "@/lib/goals";
+import { GoalEditor } from "./GoalEditor";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { TenantEditor } from "./TenantEditor";
 import { SiteScan } from "./SiteScan";
@@ -77,7 +79,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -93,6 +95,7 @@ export default async function ClientDetailPage({
       getDailyMetrics(id, 14).catch(() => []),
       getSuggestions(id).catch(() => []),
       getVercelProjectStatus(`${id}-site`).catch(() => null),
+      getGoal(id).catch(() => null),
     ]);
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
@@ -211,6 +214,8 @@ export default async function ClientDetailPage({
 
       <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
 
+      <GoalEditor tenantId={tenant.id} initialGoal={goal} />
+
       <DeploymentStatus status={deployStatus} />
 
       <StartPlanPanel
@@ -227,6 +232,10 @@ export default async function ClientDetailPage({
           siteName: tenant.siteName ?? "",
           ownerName: tenant.ownerName ?? "",
           ownerEmail: tenant.ownerEmail ?? "",
+          ownerPhone: tenant.ownerPhone ?? "",
+          referredBy: tenant.referredBy ?? "",
+          bookingProvider: tenant.bookingProvider ?? "",
+          bookingUrl: tenant.bookingUrl ?? "",
           productionDomain: tenant.productionDomain ?? "",
           adminDomain: tenant.adminDomain ?? "",
           billingType: resolveBillingType(tenant) === "none" ? "" : resolveBillingType(tenant),

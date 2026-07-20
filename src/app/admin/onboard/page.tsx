@@ -72,9 +72,37 @@ const STATUS_MARK: Record<ProvisionStep["status"], string> = {
   skipped: "–",
 };
 
-// The beacon check item text — must match what provisioning.ts emits so we can
-// find it and elevate it as a critical alert.
-const BEACON_SENTINEL = "CRITICAL:";
+// Structured manualNext item format: "PHASE:key|Title|Detail"
+// PHASE prefixes: DEPLOY | ANALYTICS | CRITICAL | LAUNCH
+// The CRITICAL prefix means the item is load-bearing and gets a distinct callout row.
+const ITEM_RE = /^(DEPLOY|ANALYTICS|CRITICAL|LAUNCH):(\w+)\|([^|]+)\|(.+)$/;
+
+type ParsedItem = {
+  phase: "DEPLOY" | "ANALYTICS" | "CRITICAL" | "LAUNCH";
+  key: string;
+  title: string;
+  detail: string;
+  raw: string;
+};
+
+function parseItem(raw: string): ParsedItem | null {
+  const m = ITEM_RE.exec(raw);
+  if (!m) return null;
+  return {
+    phase: m[1] as ParsedItem["phase"],
+    key: m[2],
+    title: m[3],
+    detail: m[4],
+    raw,
+  };
+}
+
+const PHASE_META: Record<string, { label: string; order: number }> = {
+  DEPLOY:    { label: "1 · Deploy the site",              order: 0 },
+  CRITICAL:  { label: "2 · Wire up tracking & analytics", order: 1 },
+  ANALYTICS: { label: "2 · Wire up tracking & analytics", order: 1 },
+  LAUNCH:    { label: "3 · Launch",                       order: 2 },
+};
 
 export default function OnboardPage() {
   return (
@@ -169,9 +197,24 @@ function OnboardForm() {
     }
   }
 
-  // Split manualNext into the critical beacon item and everything else.
-  const beaconItem = result?.manualNext.find((n) => n.startsWith(BEACON_SENTINEL));
-  const otherItems = result?.manualNext.filter((n) => !n.startsWith(BEACON_SENTINEL)) ?? [];
+  // Parse and group manualNext items into ordered phases.
+  const parsedItems: ParsedItem[] = (result?.manualNext ?? [])
+    .map(parseItem)
+    .filter((x): x is ParsedItem => x !== null);
+
+  // Group into labelled phases, preserving order within each phase.
+  // Phase order: DEPLOY (0) → ANALYTICS/CRITICAL (1) → LAUNCH (2)
+  const phaseGroups: { label: string; order: number; items: ParsedItem[] }[] = [];
+  for (const item of parsedItems) {
+    const meta = PHASE_META[item.phase] ?? { label: item.phase, order: 99 };
+    const existing = phaseGroups.find((g) => g.label === meta.label);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      phaseGroups.push({ label: meta.label, order: meta.order, items: [item] });
+    }
+  }
+  phaseGroups.sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -311,78 +354,140 @@ function OnboardForm() {
       )}
 
       {result && (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-glass-border bg-glass p-5">
-            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-3">
-              {result.tenantId} · {result.siteUrl}
-            </h2>
-            <ul className="space-y-2">
-              {result.steps.map((s) => (
-                <li key={s.key} className="text-sm flex items-start gap-2">
-                  <span className={STATUS_DOT[s.status]}>{STATUS_MARK[s.status]}</span>
-                  <span className="text-warm-white">{s.label}</span>
-                  {s.detail && <span className="text-gray-muted">: {s.detail}</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Beacon critical alert — elevated above the general "still needs a human" list
-              because a site with no beacon = a permanently-dead dashboard. */}
-          {beaconItem && (
-            <div className="rounded-xl border border-critical0/40 bg-critical0/10 p-5">
-              <h2 className="text-[15px] font-semibold text-critical mb-1.5">Critical — do this before handing over the dashboard</h2>
-              <p className="text-sm text-critical/90">{beaconItem.replace(/^CRITICAL:\s*/i, "")}</p>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-warning0/25 bg-warning0/10 p-5">
-            <h2 className="text-[15px] font-medium text-warning mb-3">Still needs a human</h2>
-            <ul className="space-y-1.5">
-              {otherItems.map((n, i) => (
-                <li key={i} className="text-sm text-warning/90">• {n}</li>
-              ))}
-            </ul>
-          </div>
-
-          {Object.keys(result.clientEnv).length > 0 && (
-            <div className="rounded-2xl border border-glass-border bg-glass p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Client repo env</h2>
-                <button
-                  onClick={copyEnv}
-                  className="rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white"
+        <div className="space-y-4">
+          {/* Success header */}
+          <div className="rounded-2xl border border-glass-border bg-glass px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-positive mb-1">Provisioned</p>
+                <h2 className="font-display text-[20px] font-medium tracking-[-0.02em] text-warm-white leading-tight">
+                  {result.tenantId}
+                </h2>
+                <a
+                  href={result.siteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gray-muted hover:text-accent transition-colors"
                 >
-                  {copiedEnv ? "Copied" : "Copy all"}
-                </button>
+                  {result.siteUrl} ↗
+                </a>
               </div>
-              <pre className="text-xs text-gray-muted overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-surface-base p-3">
-                {envText(result.clientEnv)}
-              </pre>
-              <p className="text-xs text-gray-faint mt-2">
-                Paste into the hand-built {result.tenantId} repo. REVALIDATION_SECRET is the
-                load-bearing one. (Already set on the Vercel project too.)
-              </p>
+              <Link
+                href={`/admin/clients/${result.tenantId}`}
+                className="shrink-0 rounded-md bg-accent text-on-accent px-3.5 py-1.5 text-sm font-medium"
+              >
+                Open client
+              </Link>
+            </div>
+
+            {/* Completed steps — compact, secondary */}
+            <details className="mt-4 group">
+              <summary className="cursor-pointer text-xs text-gray-faint hover:text-gray-muted select-none list-none flex items-center gap-1.5">
+                <span className="group-open:hidden">▶</span>
+                <span className="hidden group-open:inline">▼</span>
+                What provisioning did ({result.steps.filter((s) => s.status === "ok").length}/{result.steps.length} steps ok)
+              </summary>
+              <ul className="mt-2.5 space-y-1.5 pl-4">
+                {result.steps.map((s) => (
+                  <li key={s.key} className="text-xs flex items-start gap-2">
+                    <span className={`${STATUS_DOT[s.status]} font-mono shrink-0`}>{STATUS_MARK[s.status]}</span>
+                    <span className="text-gray-muted">{s.label}</span>
+                    {s.detail && <span className="text-gray-faint">— {s.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </div>
+
+          {/* Phased manual checklist */}
+          {phaseGroups.length > 0 && (
+            <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
+              <div className="px-5 pt-4 pb-3 border-b border-glass-border">
+                <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">Your turn</h2>
+                <p className="text-xs text-gray-muted mt-0.5">Complete these before handing over the dashboard.</p>
+              </div>
+
+              <div className="divide-y divide-glass-border">
+                {phaseGroups.map((group) => (
+                  <div key={group.label} className="px-5 py-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-faint mb-2.5">{group.label}</p>
+                    <ul className="space-y-2.5">
+                      {group.items.map((item) => {
+                        const isCritical = item.phase === "CRITICAL";
+                        return (
+                          <li
+                            key={item.key}
+                            className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${
+                              isCritical
+                                ? "bg-critical/8 border border-critical/20"
+                                : "bg-white/[0.025]"
+                            }`}
+                          >
+                            {/* Checkbox affordance */}
+                            <span className={`mt-0.5 shrink-0 h-4 w-4 rounded border flex items-center justify-center ${
+                              isCritical ? "border-critical/50" : "border-glass-border"
+                            }`} aria-hidden="true" />
+                            <div className="min-w-0">
+                              <p className={`text-sm font-medium leading-snug ${isCritical ? "text-critical" : "text-warm-white"}`}>
+                                {isCritical && (
+                                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] mr-1.5 align-middle">Critical</span>
+                                )}
+                                {item.title}
+                              </p>
+                              <p className={`text-xs mt-0.5 leading-relaxed ${isCritical ? "text-critical/70" : "text-gray-muted"}`}>
+                                {item.detail}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          <div className="flex gap-3">
-            <Link
-              href={`/admin/clients/${result.tenantId}`}
-              className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium"
-            >
-              Open client
-            </Link>
-            <button
-              onClick={() => {
-                setResult(null);
-                setForm(blank);
-              }}
-              className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg"
-            >
-              Onboard another
-            </button>
-          </div>
+          {/* Env vars — collapsed by default, copy button inside */}
+          {Object.keys(result.clientEnv).length > 0 && (
+            <details className="rounded-2xl border border-glass-border bg-glass overflow-hidden group">
+              <summary className="flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-white/[0.02] transition-colors">
+                <span className="text-[13px] font-medium text-gray-muted group-open:text-warm-white transition-colors">
+                  Repo env vars — paste into the {result.tenantId} repo
+                </span>
+                <span className="text-[10px] font-mono text-gray-faint group-open:hidden">
+                  {Object.keys(result.clientEnv).length} vars ▶
+                </span>
+                <span className="text-[10px] font-mono text-gray-faint hidden group-open:inline">▼</span>
+              </summary>
+              <div className="border-t border-glass-border px-5 pb-4 pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-faint">
+                    REVALIDATION_SECRET is load-bearing. Already set on the Vercel project.
+                  </p>
+                  <button
+                    onClick={copyEnv}
+                    className="shrink-0 rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white transition-colors"
+                  >
+                    {copiedEnv ? "Copied" : "Copy all"}
+                  </button>
+                </div>
+                <pre className="text-xs text-gray-muted overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-surface-base p-3 mt-1">
+                  {envText(result.clientEnv)}
+                </pre>
+              </div>
+            </details>
+          )}
+
+          <button
+            onClick={() => {
+              setResult(null);
+              setForm(blank);
+            }}
+            className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg transition-colors"
+          >
+            Onboard another
+          </button>
         </div>
       )}
     </div>

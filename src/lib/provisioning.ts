@@ -346,24 +346,25 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   }
 
   const manualNext = [
+    // Phase: deploy — DNS + repo connect
     productionDomain
-      ? `Point ${productionDomain} DNS at Vercel (A 76.76.21.21, or CNAME cname.vercel-dns.com) and verify`
-      : `${subdomain}.strelva.com routes automatically once the control plane is live`,
-    `Connect the hand-built ${tenantId} repo to the "${tenantId}-site" Vercel project (git integration) and deploy`,
-    // The whole "proof it's working" value prop (dashboard stats + the weekly
-    // report's lead number) is downstream of this ONE signal. If the repo ships
-    // without ScaffoldTracker, the dashboard reads 0 forever and the weekly
-    // email says "no visits" every week — the client pays and the product looks
-    // dead, with no alert. Verify it BEFORE handing over the dashboard.
-    `CRITICAL: confirm the tracking beacon fires — load the live ${tenantId} site, then check /admin/tenants/${tenantId} shows a page-view (the repo must include ScaffoldTracker with NEXT_PUBLIC_SCAFFOLD_API_URL + NEXT_PUBLIC_TENANT_ID set)`,
-    // Search Console read access is a one-time manual grant on purpose — there is
-    // no safe public API to add another account as a *user* (auto-verification
-    // could mis-verify a property). Since we host, this is a single click.
-    `Grant Search Console reads: in the ${gscProperty ?? "client's"} property → Settings → Users and permissions, add strelva-reporting@strelva.iam.gserviceaccount.com as a Full/Restricted user (one-time; GA4: paste the Measurement ID + property id in /admin/tenants/${tenantId})`,
-    `Customize the seeded starter content in the dashboard or via the AI agent`,
+      ? `DEPLOY:dns|Point ${productionDomain} at Vercel|A 76.76.21.21 (root) or CNAME cname.vercel-dns.com (www). Verify in the Vercel dashboard.`
+      : `DEPLOY:dns|Subdomain routes automatically|${subdomain}.strelva.com is live once the control plane is up — no DNS step needed.`,
+    `DEPLOY:repo|Connect the repo to Vercel|Link the hand-built ${tenantId} repo to the "${tenantId}-site" project (git integration), then trigger a deploy.`,
+    // Phase: tracking & analytics — beacon (load-bearing) + GSC/GA4 grants
+    // The whole "proof it's working" value prop (dashboard stats + weekly report
+    // lead number) is downstream of this ONE signal. No beacon = dashboard reads 0
+    // forever. Verify before handing over.
+    `CRITICAL:beacon|Confirm the tracking beacon fires|Load the live site, then check /admin/clients/${tenantId} shows a page-view. The repo must include ScaffoldTracker with NEXT_PUBLIC_SCAFFOLD_API_URL + NEXT_PUBLIC_TENANT_ID set.`,
+    // Search Console read access is a one-time manual grant — no safe public API
+    // to add another account as a user.
+    `ANALYTICS:gsc|Grant Search Console access|In the ${gscProperty ?? "client's"} GSC property → Settings → Users and permissions, add strelva-reporting@strelva.iam.gserviceaccount.com as a Full/Restricted user (one-time).`,
+    `ANALYTICS:ga4|Connect GA4 (optional)|Paste the Measurement ID + property ID in /admin/clients/${tenantId} → Analytics config.`,
+    // Phase: launch — content + owner invite
+    `LAUNCH:content|Customize the seeded content|Update headline, services, story, and contact details via the dashboard or AI agent.`,
     input.ownerEmail
-      ? `Send the owner invite email from /admin/tenants/${tenantId}`
-      : `Add an owner email + invite from /admin/tenants/${tenantId}`,
+      ? `LAUNCH:invite|Send the owner invite|Fire the invite email from /admin/clients/${tenantId} when the site is ready to hand over.`
+      : `LAUNCH:invite|Add owner email + send invite|No email was set at provision — add it in /admin/clients/${tenantId} before sending the invite.`,
   ];
 
   return { tenantId, siteUrl, steps, manualNext, clientEnv };
