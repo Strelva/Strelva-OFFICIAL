@@ -257,9 +257,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("normalizes invite emails before access assignment", () => {
     const invite = readFileSync(path.join(process.cwd(), "src/app/api/admin/invites/route.ts"), "utf8");
     const assign = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/assign/route.ts"), "utf8");
-    // InviteButton lives on the single client detail page (/admin/clients/[id]),
-    // where the operator invites a tenant's owner.
-    const clientDetailPage = readFileSync(path.join(process.cwd(), "src/app/admin/clients/[id]/page.tsx"), "utf8");
+    // Owner invites are sent from the client detail page's TenantEditor access
+    // card (resendOwnerInvite → /api/admin/invites). The shared InviteButton
+    // component is still used on other admin surfaces.
+    const tenantEditor = readFileSync(path.join(process.cwd(), "src/app/admin/clients/[id]/TenantEditor.tsx"), "utf8");
     const inviteButton = readFileSync(path.join(process.cwd(), "src/app/admin/InviteButton.tsx"), "utf8");
 
     for (const source of [invite, assign]) {
@@ -296,8 +297,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
     expect(inviteEmail).toContain('heading: "Your dashboard is ready"');
     expect(inviteEmail).toContain('label: "Set up your login"');
-    expect(clientDetailPage).toContain("<InviteButton");
-    expect(clientDetailPage).toContain("ownerEmail={tenant.ownerEmail}");
+    // The operator can invite the owner from the client detail page's editor.
+    expect(tenantEditor).toContain("resendOwnerInvite");
+    expect(tenantEditor).toContain('fetch("/api/admin/invites"');
+    expect(tenantEditor).toContain('role: "owner"');
     expect(inviteButton).toContain('fetch("/api/admin/invites"');
     expect(inviteButton).toContain("Access is assigned to this exact email on signup");
     expect(inviteButton).toContain("signUpUrl?: string");

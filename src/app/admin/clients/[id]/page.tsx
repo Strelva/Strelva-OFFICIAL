@@ -27,8 +27,7 @@ import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
 import { DeploymentStatus } from "./DeploymentStatus";
-import { StartPlanPanel } from "./StartPlanPanel";
-import { InviteButton } from "../../InviteButton";
+import { BillingPanel } from "./BillingPanel";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { ClientLogo, Chip } from "../../console";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
@@ -47,6 +46,15 @@ function Pulse({ label, value, sub, series }: { label: string; value: string | n
         </div>
       )}
     </div>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3.5">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-gray-faint pt-1">{label}</p>
+      {children}
+    </section>
   );
 }
 
@@ -181,7 +189,6 @@ export default async function ClientDetailPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <InviteButton tenantId={tenant.id} siteName={tenant.siteName} ownerEmail={tenant.ownerEmail} />
           <a href={dashboardUrl} className={actionCls}><LayoutDashboard className="h-3.5 w-3.5" strokeWidth={1.7} /> Dashboard</a>
           <a href={inspectHref} className={actionCls} title="Open this client's dashboard as a read-only preview"><Eye className="h-3.5 w-3.5" strokeWidth={1.7} /> Inspect</a>
           <a href={publicUrl} target="_blank" rel="noopener noreferrer" className={actionCls}><ExternalLink className="h-3.5 w-3.5" strokeWidth={1.7} /> Site</a>
@@ -204,55 +211,58 @@ export default async function ClientDetailPage({
         <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
       </div>
 
-      <div id="site-health" className="scroll-mt-24">
-        <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
-      </div>
+      {/* ── How they're doing ── */}
+      <Section label="How they're doing">
+        <div id="site-health" className="scroll-mt-24">
+          <SiteScan tenantId={tenant.id} initialScan={lastScan} history={scanHistory.map((p) => p.overallScore)} />
+        </div>
+        <OperatorOpportunities suggestions={opportunities} />
+        <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
+        <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
+        <GoalEditor tenantId={tenant.id} initialGoal={goal} />
+      </Section>
 
-      <OperatorOpportunities suggestions={opportunities} />
+      {/* ── Billing & setup ── */}
+      <Section label="Billing & setup">
+        <BillingPanel
+          tenantId={tenant.id}
+          ownerEmail={tenant.ownerEmail ?? ""}
+          initial={{
+            billingType: resolveBillingType(tenant) === "none" ? "" : resolveBillingType(tenant),
+            subscriptionPlan: tenant.subscriptionPlan ?? "",
+            customMonthlyDollars:
+              resolveBillingType(tenant) === "custom" && tenant.planMonthlyCents
+                ? String(Math.round(tenant.planMonthlyCents / 100))
+                : "",
+            subscriptionStatus: tenant.subscriptionStatus ?? "none",
+          }}
+        />
+        <TenantEditor
+          tenant={{
+            id: tenant.id,
+            siteName: tenant.siteName ?? "",
+            ownerName: tenant.ownerName ?? "",
+            ownerEmail: tenant.ownerEmail ?? "",
+            ownerPhone: tenant.ownerPhone ?? "",
+            referredBy: tenant.referredBy ?? "",
+            bookingProvider: tenant.bookingProvider ?? "",
+            bookingUrl: tenant.bookingUrl ?? "",
+            productionDomain: tenant.productionDomain ?? "",
+            adminDomain: tenant.adminDomain ?? "",
+            active: tenant.active,
+            revalidateUrl: tenant.revalidateUrl ?? "",
+            hasRevalidationSecret: Boolean(tenant.revalidationSecret),
+            features: tenant.features ?? [],
+          }}
+        />
+        <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
+        <DeploymentStatus status={deployStatus} />
+      </Section>
 
-      <ReviewIntelPanel intel={reviewIntel} tenantId={tenant.id} />
-
-      <VisibilityPanel tenantId={tenant.id} summary={visSummary} findings={visFindings} diff={visDiff} />
-
-      <GoalEditor tenantId={tenant.id} initialGoal={goal} />
-
-      <DeploymentStatus status={deployStatus} />
-
-      <StartPlanPanel
-        tenantId={tenant.id}
-        ownerEmail={tenant.ownerEmail ?? ""}
-        subscriptionStatus={tenant.subscriptionStatus ?? "none"}
-      />
-
-      <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
-
-      <TenantEditor
-        tenant={{
-          id: tenant.id,
-          siteName: tenant.siteName ?? "",
-          ownerName: tenant.ownerName ?? "",
-          ownerEmail: tenant.ownerEmail ?? "",
-          ownerPhone: tenant.ownerPhone ?? "",
-          referredBy: tenant.referredBy ?? "",
-          bookingProvider: tenant.bookingProvider ?? "",
-          bookingUrl: tenant.bookingUrl ?? "",
-          productionDomain: tenant.productionDomain ?? "",
-          adminDomain: tenant.adminDomain ?? "",
-          billingType: resolveBillingType(tenant) === "none" ? "" : resolveBillingType(tenant),
-          subscriptionPlan: tenant.subscriptionPlan ?? "",
-          customMonthlyDollars:
-            resolveBillingType(tenant) === "custom" && tenant.planMonthlyCents
-              ? String(Math.round(tenant.planMonthlyCents / 100))
-              : "",
-          subscriptionStatus: tenant.subscriptionStatus ?? "none",
-          active: tenant.active,
-          revalidateUrl: tenant.revalidateUrl ?? "",
-          hasRevalidationSecret: Boolean(tenant.revalidationSecret),
-          features: tenant.features ?? [],
-        }}
-      />
-
-      <ClientCrmSections tenantId={tenant.id} ownerEmail={tenant.ownerEmail ?? null} initialCrm={crm} />
+      {/* ── CRM ── */}
+      <Section label="Notes & CRM">
+        <ClientCrmSections tenantId={tenant.id} ownerEmail={tenant.ownerEmail ?? null} initialCrm={crm} />
+      </Section>
 
       {activity.length > 0 && (
         <div className="rounded-2xl border border-glass-border bg-glass p-5">
