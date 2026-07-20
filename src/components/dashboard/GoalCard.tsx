@@ -2,18 +2,18 @@
 
 import { useState } from "react";
 import { Target, Check, X } from "lucide-react";
-import type { Goal } from "@/lib/goals";
+import type { Goal, GoalMetric } from "@/lib/goals";
 import { GOAL_METRIC_LABELS, currentGoalValue } from "@/lib/goals";
-import type { MetricKey } from "@/lib/proof";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface GoalCardProps {
   goal: Goal | null;
-  stats: { pageViews: number; bookingClicks: number; reviewsReceived: number };
+  stats: { pageViews: number; bookingClicks: number; reviewsReceived: number; phoneClicks?: number };
 }
 
-const METRIC_OPTIONS: { value: MetricKey; label: string }[] = [
+const METRIC_OPTIONS: { value: GoalMetric; label: string }[] = [
   { value: "visitors", label: "People finding you" },
+  { value: "calls", label: "Calls" },
   { value: "bookings", label: "Booking clicks" },
   { value: "reviews", label: "New reviews" },
 ];
@@ -28,7 +28,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
 
   const [goal, setGoal] = useState<Goal | null>(initialGoal);
   const [editing, setEditing] = useState(false);
-  const [metric, setMetric] = useState<MetricKey>(initialGoal?.metric ?? "visitors");
+  const [metric, setMetric] = useState<GoalMetric>(initialGoal?.metric ?? "visitors");
   const [target, setTarget] = useState<string>(initialGoal ? String(initialGoal.target) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -107,7 +107,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={metric}
-            onChange={(e) => setMetric(e.target.value as MetricKey)}
+            onChange={(e) => setMetric(e.target.value as GoalMetric)}
             className="rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[13px] text-warm-black outline-none focus:border-accent/40"
           >
             {METRIC_OPTIONS.map((o) => (

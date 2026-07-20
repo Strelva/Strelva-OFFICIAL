@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
-import { getGoal, setGoal, clearGoal } from "@/lib/goals";
-import type { MetricKey } from "@/lib/proof";
+import { getGoal, setGoal, clearGoal, type GoalMetric } from "@/lib/goals";
 
 /** GET the tenant's weekly goal (or null). */
 export async function GET() {
@@ -19,7 +18,7 @@ export async function PUT(req: Request) {
   if (blocked) return blocked;
 
   const body = await req.json().catch(() => null);
-  const goal = await setGoal(tenant, body?.metric as MetricKey, Number(body?.target));
+  const goal = await setGoal(tenant, body?.metric as GoalMetric, Number(body?.target));
   if (!goal) return NextResponse.json({ error: "Pick a metric and a target above zero." }, { status: 400 });
   return NextResponse.json({ goal });
 }

@@ -29,8 +29,8 @@ interface EditableTenant {
 const SUB_STATUSES = ["none", "active", "trialing", "past_due", "cancelled"];
 const BILLING_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "", label: "No plan set", hint: "Not configured yet — this flags as an open item." },
-  { value: "tier", label: "Tier (Presence / Growth / Scale)", hint: "On one of the 3 published plans." },
-  { value: "custom", label: "Custom amount", hint: "We bill a negotiated monthly amount." },
+  { value: "tier", label: "Tier — on Strelva Stripe (Presence / Growth / Scale)", hint: "On one of the 3 published plans. You can send them a Stripe checkout link below." },
+  { value: "custom", label: "Custom / legacy — billed off-platform", hint: "Not on Strelva Stripe (legacy client, your invoice, their own processor). Enter the monthly amount — it counts toward MRR. No Stripe link needed." },
   { value: "case_study", label: "Case study (free)", hint: "Comped — no charge." },
 ];
 const TIERS: { value: string; label: string }[] = [
@@ -236,15 +236,16 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             </select>
           </div>
 
-          {/* Billing link — the Stripe subscription checkout URL to SEND the client. */}
+          {form.billingType === "custom" && (
+            <p className="text-xs text-gray-faint">
+              Billed off-platform — no Strelva Stripe checkout. The amount above is recorded for MRR only.
+            </p>
+          )}
+
+          {/* Billing link — Stripe subscription checkout, ONLY for on-Stripe tier clients. */}
+          {form.billingType === "tier" && (
           <div className="pt-3 border-t border-glass-border space-y-2">
             <p className="text-xs text-gray-muted">Billing link to send the client (recurring Stripe checkout)</p>
-            {form.billingType === "custom" && (
-              <p className="text-xs text-warning">
-                Custom amounts need a Stripe price of that amount. This link bills the Growth tier ($199) —
-                for a true custom amount, create a custom Stripe price or bill on a tier.
-              </p>
-            )}
             <Field label="Client email (for the checkout)" value={linkEmail} onChange={setLinkEmail} placeholder="owner@business.com" />
             <button
               onClick={() => void generateBillingLink()}
@@ -274,6 +275,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
               </div>
             )}
           </div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-muted">
           <input
