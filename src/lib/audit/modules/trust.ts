@@ -162,8 +162,16 @@ function analyze(ctx: AuditContext): TrustAnalysis {
     /what (our )?customers (are )?say/i.test(bodyText) ||
     /customer review/i.test(bodyText);
 
+  // Match any "about"/team/story link or nav item — an /about page, an #about
+  // anchor on a one-pager, or "About Us"/"Our Story"/"Who We Are" text. (Was
+  // hyphen-specific "about-us" + "team"/"staff" only, so plain "About" sections
+  // — which most local sites use — didn't count.)
   const hasTeamPage =
-    $('a[href*="team"], a[href*="staff"], a[href*="about-us"], a:contains("Our Team"), a:contains("Meet")').length > 0;
+    $(
+      'a[href*="about"], a[href*="team"], a[href*="staff"], a[href*="story"], ' +
+        'a:contains("About"), a:contains("Our Team"), a:contains("Our Story"), ' +
+        'a:contains("Who We Are"), a:contains("Meet")'
+    ).length > 0;
 
   const hasPrivacyPolicy =
     $('a[href*="privacy"], a:contains("Privacy Policy"), a:contains("Privacy")').length > 0;

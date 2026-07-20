@@ -371,8 +371,10 @@ function calculateAIDiscoveryScore(
   entity: EntityClarity
 ): number {
   let score = 0;
-  // AI-answer content (40 max): FAQPage +15, HowTo +10, Article/Breadcrumb/WebSite +5 each
-  if (aiContent.hasFAQPage) score += 15;
+  // AI-answer content (40 max): FAQPage is THE signal AI assistants quote, so it
+  // carries most of the weight (a local business realistically won't also ship
+  // HowTo/Article schema). FAQPage +25, HowTo +10, Article/Breadcrumb/WebSite +5.
+  if (aiContent.hasFAQPage) score += 25;
   if (aiContent.hasHowTo) score += 10;
   if (aiContent.hasArticle) score += 5;
   if (aiContent.hasBreadcrumb) score += 5;
