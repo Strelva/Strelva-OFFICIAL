@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isSuperAdmin } from "@/lib/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
-import { getAllTenantCrm } from "@/lib/tenant-crm";
+
 import { getActivity, listDrafts } from "@/lib/storage";
 import { listThreads } from "@/lib/threads";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
@@ -14,6 +14,17 @@ import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-
 import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { billingLabel, isBillingConfigured } from "@/lib/billing-type";
+
+/** The client's public domain (bare host), from productionDomain or siteUrl; null for
+ *  a tenant not yet on its own domain (a *.strelva.com / *.vercel.app placeholder). */
+function clientDomain(t: { productionDomain?: string; siteUrl?: string }): string | null {
+  const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
+  if (!raw) return null;
+  const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  return host;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +36,8 @@ export default async function AdminClientsPage() {
 
   const tenants = await getAllTenants();
 
-  // The single client list carries the health signals that used to live in the
-  // Overview table (SEO grade, launch %, at-risk) alongside the CRM record.
-  const [crm, atRiskSignals, rows] = await Promise.all([
-    getAllTenantCrm(tenants.map((t) => t.id)),
+  // Per-client signals: health grade, launch status, at-risk.
+  const [atRiskSignals, rows] = await Promise.all([
     getAtRiskTenants().catch((): AtRiskSignal[] => []),
     Promise.all(
       tenants.map(async (t) => {
@@ -73,12 +82,13 @@ export default async function AdminClientsPage() {
       siteName: getTenantSiteName(t.id, t),
       ownerEmail: t.ownerEmail ?? null,
       ownerName: t.ownerName ?? null,
+      domain: clientDomain(t),
       active: isActiveTenant(t),
-      lastActivity: row?.lastActivity ?? null,
       atRiskReason: atRiskById.get(t.id)?.reasons[0] ?? null,
       seoGrade: row?.seoGrade ?? null,
-      launchScore: row?.launchScore ?? null,
       launchStatus: row?.launchStatus ?? null,
+      billingLabel: billingLabel(t),
+      billingConfigured: isBillingConfigured(t),
     };
   });
 
@@ -107,7 +117,7 @@ export default async function AdminClientsPage() {
         </div>
       </div>
 
-      <ClientsCrm clients={clients} initialCrm={crm} />
+      <ClientsCrm clients={clients} />
     </div>
   );
 }
