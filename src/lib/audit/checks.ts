@@ -119,7 +119,7 @@ async function checkWebVitals(
       status: "warn",
       score: 50,
       message: "Core Web Vitals not measured",
-      details: "Set GOOGLE_PAGESPEED_API_KEY to include real load-speed data.",
+      details: "Enable the PageSpeed Insights API on the Google Cloud project (the Google API key is already set) to include real load-speed data.",
     });
     return {
       name: "Core Web Vitals",
@@ -370,7 +370,11 @@ export async function runAudit(
   // SSRF protection — reject private/internal addresses before any fetch.
   await validateUrlSafety(url);
 
-  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
+  // PageSpeed Insights uses a standard Google Cloud API key. Reuse the existing
+  // Google key (the Generative-AI/Gemini key is a Cloud API key on the same
+  // project) if a dedicated PageSpeed key isn't set — just enable the PageSpeed
+  // Insights API on that Cloud project.
+  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
   const { ctx, fetchedUrl } = await buildAuditContext(url);
 
