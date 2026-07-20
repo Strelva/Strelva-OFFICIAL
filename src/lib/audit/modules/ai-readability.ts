@@ -373,17 +373,25 @@ function calculateAIDiscoveryScore(
   let score = 0;
   // AI-answer content (40 max): FAQPage is THE signal AI assistants quote, so it
   // carries most of the weight (a local business realistically won't also ship
-  // HowTo/Article schema). FAQPage +25, HowTo +10, Article/Breadcrumb/WebSite +5.
-  if (aiContent.hasFAQPage) score += 25;
+  // HowTo/Article schema). FAQPage +32, HowTo +10, Article/Breadcrumb/WebSite +4.
+  // Calibrated for the local-SMB ICP: FAQ alone is a strong answer signal, not a
+  // partial one that only counts once HowTo/Article are also present.
+  if (aiContent.hasFAQPage) score += 32;
   if (aiContent.hasHowTo) score += 10;
-  if (aiContent.hasArticle) score += 5;
-  if (aiContent.hasBreadcrumb) score += 5;
-  if (aiContent.hasWebSite) score += 5;
-  // Authority signals (35 max)
-  score += Math.min(25, sameAs.authorityScore / 4);
-  if (sameAs.hasKnowledgeGraphLinks) score += 10;
-  // Entity clarity (25 max)
-  score += Math.min(25, entity.clarityScore / 4);
+  if (aiContent.hasArticle) score += 4;
+  if (aiContent.hasBreadcrumb) score += 4;
+  if (aiContent.hasWebSite) score += 4;
+  // Authority signals (35 max): a healthy local footprint is Google + a couple
+  // socials (2-3 profiles), NOT the 5+ a national brand carries. Credit each
+  // declared profile at 12 (so 2 => 24, 3 => 35) instead of authorityScore/4,
+  // which only reached the cap at 5 profiles. Wikipedia/Wikidata still tops it.
+  score += Math.min(35, sameAs.platforms.length * 12);
+  if (sameAs.hasKnowledgeGraphLinks) score = Math.max(score, Math.min(100, score + 10));
+  // Entity clarity (25 max): the underlying signal set skews enterprise
+  // (numberOfEmployees, currenciesAccepted, foundingDate). A local business with
+  // a few real fields (areaServed, priceRange, founder) should get meaningful
+  // credit, so scale clarityScore/2 rather than /4.
+  score += Math.min(25, entity.clarityScore / 2);
   return Math.min(100, Math.round(score));
 }
 
@@ -563,9 +571,12 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
   // --- 3. AI-answer content (FAQ / HowTo) --------------------------------
   {
     let score = 0;
-    if (aiContent.hasFAQPage) score += 60;
-    if (aiContent.hasHowTo) score += 30;
-    if (aiContent.hasArticle) score += 10;
+    // FAQ schema is the answer-ready content AI assistants quote directly, and
+    // it's the realistic ceiling for a local business (they won't also publish
+    // HowTo/Article schema). So FAQPage alone is a pass, not a partial.
+    if (aiContent.hasFAQPage) score += 80;
+    if (aiContent.hasHowTo) score += 15;
+    if (aiContent.hasArticle) score += 5;
     score = Math.min(100, score);
     const parts: string[] = [];
     if (aiContent.hasFAQPage) parts.push(`FAQ (${aiContent.faqCount || "some"} Q&As)`);
@@ -598,11 +609,20 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
     const visible = visibleAuthorityPlatforms($);
     const visibleOnly = visible.filter((p) => !schemaPlatforms.includes(p));
     const allPlatforms = [...new Set([...schemaPlatforms, ...visible])];
-    let score = Math.min(100, sameAs.authorityScore + visibleOnly.length * 12);
-    // A local business that links its official profiles (Google + a couple
-    // socials) shouldn't read as a deep fail just because they aren't declared
-    // in structured data — floor it at warn. Full pass still requires schema sameAs.
-    if (allPlatforms.length >= 3) score = Math.max(score, 55);
+    // Calibrated for the local-SMB ICP: declaring Google + a couple of socials
+    // (2 profiles) is a normal, healthy footprint and should pass — requiring 3+
+    // was a national-brand bar. Schema-declared profiles are the strong signal;
+    // visible-but-undeclared links are credited at a lower rate.
+    const declared = schemaPlatforms.length;
+    let score: number;
+    if (declared >= 3) score = 100;
+    else if (declared === 2) score = 85;
+    else if (declared === 1) score = 65;
+    else score = 0;
+    // Socials linked in the page but not declared in schema still count, weaker.
+    score = Math.max(score, Math.min(80, allPlatforms.length * 28));
+    if (sameAs.hasKnowledgeGraphLinks) score = 100;
+    score = Math.min(100, score);
 
     let message: string;
     if (sameAs.hasKnowledgeGraphLinks) {
@@ -721,8 +741,12 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
   // authority/entity) with the flattened check scores so the new signals
   // (plain-text readability, name clarity, llms.txt) also move the number.
   // ---------------------------------------------------------------------
+  // The individual checks are the fair, per-signal view; the discovery score is
+  // a stricter composite that skews toward maximalist multi-schema/social-heavy
+  // sites. Weight the checks as the primary driver so a genuinely AI-ready local
+  // site scores well, with the discovery score as a secondary pull.
   const checkAvg = averageCheckScores(checks.map((c) => c.score));
-  const score = Math.round(0.5 * aiDiscoveryScore + 0.5 * checkAvg);
+  const score = Math.round(0.35 * aiDiscoveryScore + 0.65 * checkAvg);
 
   return {
     name: "AI Readability",

@@ -113,6 +113,61 @@ describe("checkAiReadability", () => {
     expect(result.score).toBeGreaterThanOrEqual(60);
   });
 
+  it("scores a normal local site (FAQ + 2 socials, no Wikipedia/HowTo) fairly", () => {
+    // The ICP case: a good local business declares a LocalBusiness + FAQPage and
+    // links two real profiles (Facebook + Instagram). It has no Wikipedia entry,
+    // no HowTo schema, and no 5-platform social footprint — signals it can never
+    // realistically have. Recalibrated ai-readability must credit this as strong,
+    // and 2 declared profiles must pass (not fail) the entity-authority check.
+    const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>McLear's Cottage Colony | Black Lake, NY</title>
+    <meta property="og:site_name" content="McLear's Cottage Colony" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LodgingBusiness",
+      "name": "McLear's Cottage Colony",
+      "telephone": "+1-315-375-6508",
+      "priceRange": "$$",
+      "areaServed": "Black Lake, NY",
+      "url": "https://example.com",
+      "image": "https://example.com/logo.png",
+      "sameAs": [
+        "https://www.facebook.com/mclears",
+        "https://www.instagram.com/mclears"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    { "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+      { "@type": "Question", "name": "What is check-in?", "acceptedAnswer": { "@type": "Answer", "text": "1 PM." } },
+      { "@type": "Question", "name": "Do you allow pets?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, leashed." } }
+    ] }
+    </script>
+  </head>
+  <body>
+    <footer><span>McLear's Cottage Colony</span></footer>
+    <main>
+      <h1>McLear's Cottage Colony</h1>
+      <p>${"A family-owned cottage colony on Black Lake since the 1920s, with lakefront cottages, boat rentals, and world-class bass fishing for every kind of trip. ".repeat(8)}</p>
+    </main>
+  </body>
+</html>`;
+
+    const result = checkAiReadability(makeContext(html));
+    const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
+
+    // FAQ schema is a pass on its own; 2 declared profiles pass entity authority.
+    expect(byName["AI-answer content (FAQ/HowTo)"].status).toBe("pass");
+    expect(byName["Entity authority (sameAs)"].status).not.toBe("fail");
+    // A genuinely AI-ready local site should not be stuck in the 60s (this
+    // minimal fixture, with no llms.txt and only 2 socials, lands in the mid-70s;
+    // the same site live with 3 profiles scores mid-80s).
+    expect(result.score).toBeGreaterThanOrEqual(72);
+  });
+
   it("scores a no-schema SPA shell with no llms.txt low", () => {
     const result = checkAiReadability(makeContext(BAD_HTML)); // llmsTxt null by default
 

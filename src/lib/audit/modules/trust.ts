@@ -58,12 +58,15 @@ const TRUST_BADGES: Record<string, TrustBadge> = {
       /established\s*(19|20)\d{2}/i,
     ],
     name: "Years in Business",
-    importance: "medium",
+    // For a local SMB, longevity ("since 1924", "25 years serving") is a top-tier
+    // credibility signal — as strong as any license, so treat it as high.
+    importance: "high",
   },
   familyOwned: {
     patterns: [/family[\s-]?owned/i, /family[\s-]?operated/i, /locally owned/i, /local business/i],
     name: "Family/Locally Owned",
-    importance: "low",
+    // A real, meaningful trust signal for local businesses, not a throwaway.
+    importance: "medium",
   },
   guarantees: {
     patterns: [/satisfaction\s*guarantee/i, /money[\s-]?back\s*guarantee/i, /100%\s*guarantee/i, /warranty/i],
@@ -73,7 +76,9 @@ const TRUST_BADGES: Record<string, TrustBadge> = {
   certifications: {
     patterns: [/certified/i, /certification/i, /accredited/i, /member of/i],
     name: "Certifications",
-    importance: "medium",
+    // A professional certification (QuickBooks/Ambrook certified, licensed
+    // practitioner, etc.) is a top credibility signal for the ICP.
+    importance: "high",
   },
   awards: {
     patterns: [/award[\s-]?winning/i, /voted\s*#?\d*\s*best/i, /best of/i, /top rated/i],
@@ -99,6 +104,9 @@ interface TrustAnalysis {
   hasBusinessHours: boolean;
   hasPaymentIcons: boolean;
   hasAssociations: boolean;
+  hasEmail: boolean;
+  hasContactForm: boolean;
+  hasContactMethod: boolean;
   isHttps: boolean;
 }
 
@@ -204,6 +212,18 @@ function analyze(ctx: AuditContext): TrustAnalysis {
 
   const hasAssociations = /member of|affiliated with|association|chamber of commerce/i.test(bodyText);
 
+  // Any real way to reach the business. An online-only brand that takes email or
+  // a contact form is legitimately reachable and shouldn't be scored as if it
+  // hides its contact info just because it has no storefront phone/address.
+  const hasEmail =
+    $('a[href^="mailto:"]').length > 0 ||
+    /[\w.+-]+@[\w-]+\.[\w.-]{2,}/.test(bodyText);
+  const hasContactForm =
+    $("form").length > 0 ||
+    $('a[href*="contact"], a:contains("Contact")').length > 0;
+  const hasContactMethod =
+    hasPhoneNumber || hasClickToCall || hasEmail || hasContactForm;
+
   const isHttps = ctx.url.startsWith("https://");
 
   return {
@@ -218,50 +238,70 @@ function analyze(ctx: AuditContext): TrustAnalysis {
     hasBusinessHours,
     hasPaymentIcons,
     hasAssociations,
+    hasEmail,
+    hasContactForm,
+    hasContactMethod,
     isHttps,
   };
 }
 
-/** OWSH's own /100 trust score. Mirrors trust-signals.js `calculateScore`. */
+/**
+ * Trust score /100, recalibrated for the local-SMB ICP. It still rewards real
+ * credibility and dings a bare site, but it no longer assumes a trades/ecom
+ * business: longevity, family-ownership and professional certifications count as
+ * strong credibility (not just BBB/license/insurance), any real contact method
+ * (phone, email, or a contact form) satisfies reachability so an online-only
+ * brand isn't tanked, and payment-card logos are a minor bonus rather than a
+ * transparency requirement.
+ */
 function calculateScore(a: TrustAnalysis): number {
   let score = 0;
 
   // HTTPS (15)
   if (a.isHttps) score += 15;
 
-  // Trust badges (up to 26)
+  // Credibility signals (up to 25). High = longevity, certifications, real
+  // reviews, licenses/insurance where they apply; each carries real weight so a
+  // couple of genuine signals reads as credible.
   const badges = Object.values(a.trustBadges);
   const high = badges.filter((b) => b.importance === "high").length;
   const medium = badges.filter((b) => b.importance === "medium").length;
   const low = badges.filter((b) => b.importance === "low").length;
-  score += Math.min(high * 6, 18);
-  score += Math.min(medium * 3, 6);
-  score += Math.min(low * 1, 2);
+  score += Math.min(
+    25,
+    Math.min(high * 7, 21) + Math.min(medium * 4, 12) + Math.min(low * 2, 6),
+  );
 
-  // Contact information (up to 15)
-  if (a.hasPhoneNumber) score += 5;
-  if (a.hasClickToCall) score += 3;
-  if (a.hasPhysicalAddress) score += 5;
-  if (a.hasBusinessHours) score += 2;
+  // Contact & reachability (up to 15). Any real contact method is the baseline;
+  // a full local contact block (phone + tap-to-call + address + hours) tops it.
+  let contact = 0;
+  if (a.hasContactMethod) contact += 6;
+  if (a.hasPhoneNumber) contact += 3;
+  if (a.hasClickToCall) contact += 2;
+  if (a.hasPhysicalAddress) contact += 3;
+  if (a.hasBusinessHours) contact += 1;
+  score += Math.min(15, contact);
 
-  // Legal pages (up to 10)
-  if (a.hasPrivacyPolicy) score += 5;
-  if (a.hasTerms) score += 5;
+  // Legal pages (up to 8)
+  if (a.hasPrivacyPolicy) score += 4;
+  if (a.hasTerms) score += 4;
 
-  // Social proof (up to 15)
-  if (a.hasTestimonials) score += 10;
+  // Social proof (up to 17)
+  if (a.hasTestimonials) score += 12;
   if (a.hasAssociations) score += 5;
 
-  // Transparency (up to 10)
-  if (a.hasTeamPage) score += 5;
-  if (a.hasPaymentIcons) score += 5;
+  // Transparency (up to 10). An about/team page is the real signal; payment-card
+  // logos are a minor ecom-only bonus, not a requirement.
+  if (a.hasTeamPage) score += 7;
+  if (a.hasPaymentIcons) score += 3;
 
   // Comprehensiveness bonus (up to 10)
   const totalSignals =
     Object.keys(a.trustBadges).length +
     (a.hasTestimonials ? 1 : 0) +
     (a.hasPrivacyPolicy ? 1 : 0) +
-    (a.hasPhysicalAddress ? 1 : 0);
+    (a.hasContactMethod ? 1 : 0) +
+    (a.hasTeamPage ? 1 : 0);
   if (totalSignals >= 6) score += 10;
   else if (totalSignals >= 4) score += 5;
 
@@ -293,23 +333,33 @@ export function checkTrust(ctx: AuditContext): CategoryResult {
         ),
   );
 
-  // Contact info visible
+  // Contact info visible — any real channel counts (an online-only brand reached
+  // by email or a contact form is legitimately contactable).
   {
     const bits: string[] = [];
     let s = 0;
     if (a.hasPhoneNumber) {
-      s += 55;
+      s += 45;
       bits.push("phone number");
     }
+    if (a.hasEmail) {
+      s += 40;
+      bits.push("email");
+    }
     if (a.hasPhysicalAddress) {
-      s += 35;
+      s += 25;
       bits.push("physical address");
     }
     if (a.hasBusinessHours) {
       s += 10;
       bits.push("business hours");
     }
-    const present = bits.length ? `Shows: ${bits.join(", ")}.` : "No phone number, address, or hours were found.";
+    if (a.hasContactForm) {
+      s += 15;
+      bits.push("contact form");
+    }
+    s = Math.min(100, s);
+    const present = bits.length ? `Shows: ${bits.join(", ")}.` : "No phone, email, address, or contact form was found.";
     checks.push(
       check(
         "Contact info visible",
@@ -324,15 +374,32 @@ export function checkTrust(ctx: AuditContext): CategoryResult {
     );
   }
 
-  // Click-to-call
+  // Click-to-call — only a real gap when a phone number is shown but isn't
+  // tappable. A business that intentionally has no public phone (online-only, or
+  // contact-by-email/form) is not penalized for lacking a tap-to-call link.
   checks.push(
     a.hasClickToCall
       ? check("Click-to-call", 100, "Your phone number is a tap-to-call link, which is easy for mobile visitors.")
-      : check(
-          "Click-to-call",
-          0,
-          "There is no tap-to-call link. Mobile visitors have to copy your number by hand to call you.",
-        ),
+      : a.hasPhoneNumber
+        ? check(
+            "Click-to-call",
+            35,
+            "Your phone number isn't a tap-to-call link, so mobile visitors have to copy it by hand.",
+            "Ask Strelva to make the number a tel: link so mobile visitors can call in one tap.",
+          )
+        : a.hasContactMethod
+          ? check(
+              "Click-to-call",
+              80,
+              "No public phone number, which is fine because you take contact by email or a form.",
+              "If you want calls, add a phone number as a tap-to-call link.",
+            )
+          : check(
+              "Click-to-call",
+              0,
+              "There is no phone number or other clear way to reach you on the page.",
+              "Add a phone number (as a tap-to-call link), an email, or a contact form so visitors can reach you.",
+            ),
   );
 
   // Trust badges & credentials
@@ -341,8 +408,11 @@ export function checkTrust(ctx: AuditContext): CategoryResult {
     const high = Object.values(a.trustBadges).filter((b) => b.importance === "high").length;
     const medium = Object.values(a.trustBadges).filter((b) => b.importance === "medium").length;
     const low = Object.values(a.trustBadges).filter((b) => b.importance === "low").length;
-    const raw = Math.min(high * 6, 18) + Math.min(medium * 3, 6) + Math.min(low, 2); // out of 26
-    const s = Math.round((raw / 26) * 100);
+    const raw = Math.min(
+      25,
+      Math.min(high * 7, 21) + Math.min(medium * 4, 12) + Math.min(low * 2, 6),
+    ); // out of 25
+    const s = Math.round((raw / 25) * 100);
     checks.push(
       check(
         "Trust badges & credentials",

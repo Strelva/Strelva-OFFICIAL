@@ -67,6 +67,42 @@ describe("checkTrust", () => {
     }
   });
 
+  it("credits an online-only local business fairly (email/form contact, longevity, no storefront phone)", () => {
+    // The ICP includes online-only brands (no public phone or street address)
+    // reached by email or a contact form. Recalibrated trust should not tank
+    // them, and longevity / family-ownership / certifications are real
+    // credibility — not just BBB/license/insurance.
+    const html = `
+      <!doctype html>
+      <html lang="en">
+        <head><title>Great Lakes Dried Fruit</title></head>
+        <body>
+          <p>Family owned. NYS grown &amp; certified. Serving customers since 1998.</p>
+          <section class="reviews">
+            <blockquote>"These are incredible." - A happy customer</blockquote>
+          </section>
+          <a href="mailto:hello@example.com">Email us</a>
+          <form action="/api/contact"><input name="email" /></form>
+          <footer>
+            <a href="/about">Our Story</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms</a>
+          </footer>
+        </body>
+      </html>
+    `;
+
+    const result = checkTrust(makeCtx({ url: "https://example.com", html }));
+    const byName = (n: string) => result.checks.find((c) => c.name === n);
+
+    // Not tanked: a legit online business clears the mid-band.
+    expect(result.score).toBeGreaterThanOrEqual(70);
+    // Email / contact form counts as reachable, not a contact-info fail.
+    expect(byName("Contact info visible")?.status).not.toBe("fail");
+    // No storefront phone is fine when there's another contact method.
+    expect(byName("Click-to-call")?.status).not.toBe("fail");
+  });
+
   it("scores an empty, insecure page low", () => {
     const html = `
       <!doctype html>
