@@ -31,6 +31,20 @@ function feedTime(iso: string): string {
   return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** Full human-readable date for hover tooltip, e.g. "Tuesday, July 15, 2026, 3:42 PM" */
+function feedTimeTitle(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  return new Date(then).toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 const KIND_ICON: Record<ActivityFeedKind, typeof Pencil> = {
   site: Pencil,
   post: FileText,
@@ -95,7 +109,10 @@ export function ActivityFeed({
                         ) : null}
                       </div>
                       {feedTime(item.time) ? (
-                        <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-gray-faint">
+                        <span
+                          className="mt-0.5 shrink-0 text-[11px] tabular-nums text-gray-faint"
+                          title={feedTimeTitle(item.time)}
+                        >
                           {feedTime(item.time)}
                         </span>
                       ) : null}

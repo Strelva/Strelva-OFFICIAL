@@ -151,6 +151,13 @@
   --color-positive: var(--positive, oklch(70% 0.14 145));
   --color-warning: var(--warning, #ca8a04);
   --color-critical: var(--critical, #ef4444);
+  /* `*0` aliases: 29 files use bg-/text-/border-{critical,positive,warning}0
+     (often with an /opacity for subtle tints). These were never defined, so
+     every such tint/border/text was silently rendering with no color. Alias
+     them to the base status color so the intended treatment shows. */
+  --color-positive0: var(--positive, oklch(70% 0.14 145));
+  --color-warning0: var(--warning, #ca8a04);
+  --color-critical0: var(--critical, #ef4444);
   --color-neutral: var(--neutral, #858585);
   --color-glass: var(--glass, rgba(255, 255, 255, 0.024));
   --color-glass-border: var(--glass-border, rgba(255, 255, 255, 0.04));

@@ -14,7 +14,7 @@ const REQUEST_KIND_OPTIONS: Array<{
 }> = [
   { value: "custom_design", label: "Design", icon: Palette },
   { value: "template", label: "Template", icon: LayoutTemplate },
-  { value: "infrastructure", label: "Infra", icon: Wrench },
+  { value: "infrastructure", label: "Feature", icon: Wrench },
 ];
 
 export function CustomChangeRequestPanel() {
@@ -73,7 +73,6 @@ export function CustomChangeRequestPanel() {
       }
       setPrompt("");
       setSent(true);
-      setTimeout(() => setSent(false), 3000);
     } catch {
       setError(true);
       setErrorMessage(null);
@@ -93,7 +92,7 @@ export function CustomChangeRequestPanel() {
           Code, animation, custom component, and deeper layout changes go to the Strelva team.
         </p>
         <p className="mt-2 text-[12px] leading-5 text-gray-muted">
-          Design, template, and code changes are quoted separately. They&apos;re not part of your care plan.
+          Design, template, and feature changes are quoted separately from your monthly plan.
         </p>
       </div>
 
@@ -152,10 +151,22 @@ export function CustomChangeRequestPanel() {
           </p>
         )}
         {sent && (
-          <p className="mt-2 flex items-center gap-1 text-[11px] text-positive">
-            <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Request sent to Strelva.
-          </p>
+          <div className="mt-3 rounded-lg border border-positive/25 bg-positive/10 px-3 py-3">
+            <p className="flex items-center gap-1.5 text-[12px] font-medium text-positive">
+              <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+              Request received
+            </p>
+            <p className="mt-1 text-[11px] leading-[1.55] text-gray-muted">
+              We&apos;ll review this and get back to you with a quote. You can track it under your approvals in the meantime.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSent(false)}
+              className="mt-2 text-[11px] text-accent hover:underline"
+            >
+              Send another request
+            </button>
+          </div>
         )}
       </div>
 
@@ -168,15 +179,17 @@ export function CustomChangeRequestPanel() {
             </Link>
           </p>
         ) : (
-          <button
-            type="button"
-            onClick={submitRequest}
-            disabled={submitting || !prompt.trim()}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
-            {submitting ? "Sending..." : "Send request"}
-          </button>
+          !sent && (
+            <button
+              type="button"
+              onClick={submitRequest}
+              disabled={submitting || !prompt.trim()}
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
+              {submitting ? "Sending..." : "Send request"}
+            </button>
+          )
         )}
       </div>
     </div>

@@ -46,6 +46,7 @@ export default async function ReportsPage({
     ]);
 
   const hasMonthly = !!monthlyRecap;
+  const hasWeekly = !!weeklyBrief;
   const view: "weekly" | "monthly" = viewParam === "monthly" && hasMonthly ? "monthly" : "weekly";
   const brief = view === "monthly" ? monthlyRecap : weeklyBrief;
   const history = view === "monthly" ? monthlyHistory : weeklyHistory;
@@ -72,15 +73,17 @@ export default async function ReportsPage({
     <>
       <EngagementTracker event="report-view" />
       <div className="flex h-full flex-col">
-        {(hasMonthly || milestone) && (
+        {(hasMonthly || hasWeekly || milestone) && (
           <div className="shrink-0 px-4 pt-5 sm:px-8 sm:pt-7">
             <div className="mx-auto w-full max-w-5xl space-y-5">
-              {hasMonthly && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Reports</p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Reports</p>
+                {hasMonthly ? (
                   <ReportsViewToggle current={view} />
-                </div>
-              )}
+                ) : hasWeekly ? (
+                  <p className="text-[12px] text-gray-muted">Your monthly recap will appear here after your first full month.</p>
+                ) : null}
+              </div>
               {milestone && (
                 <MilestonePanel milestone={milestone} visitorSeries={dailyMetrics.map((m) => m.pageViews)} />
               )}
@@ -105,21 +108,7 @@ export default async function ReportsPage({
             footerSlot={
               <div className="space-y-8">
                 <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
-                <details className="group rounded-2xl border border-glass-border bg-glass">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Site health</p>
-                      <p className="mt-1 text-[13px] text-gray-muted">
-                        The daily check of your live site: speed, security, SEO, accessibility.
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-[12px] font-medium text-accent group-open:hidden">Show</span>
-                    <span className="hidden shrink-0 text-[12px] font-medium text-accent group-open:inline">Hide</span>
-                  </summary>
-                  <div className="px-4 pb-4">
-                    <SiteHealthCard />
-                  </div>
-                </details>
+                <SiteHealthCard />
               </div>
             }
           />

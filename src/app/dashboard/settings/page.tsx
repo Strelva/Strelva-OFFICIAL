@@ -676,15 +676,23 @@ function UtilitiesSection() {
 // Site config section
 // ---------------------------------------------------------------------------
 
-const SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
+const ALL_SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
+type SiteConfigTab = (typeof ALL_SITE_CONFIG_TABS)[number];
 
 function SiteConfigSection() {
-  const [tab, setTab] = useState<(typeof SITE_CONFIG_TABS)[number]>("navigation");
+  const dashboard = useDashboardOptional();
+  const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
+
+  const tabs: SiteConfigTab[] = isAdmin
+    ? ["navigation", "capabilities", "components"]
+    : ["navigation"];
+
+  const [tab, setTab] = useState<SiteConfigTab>("navigation");
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
-        {SITE_CONFIG_TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item}
             type="button"
@@ -700,8 +708,8 @@ function SiteConfigSection() {
         ))}
       </div>
       {tab === "navigation" && <NavigationFooterSection />}
-      {tab === "capabilities" && <CapabilitiesSection />}
-      {tab === "components" && <CustomComponentsSection />}
+      {isAdmin && tab === "capabilities" && <CapabilitiesSection />}
+      {isAdmin && tab === "components" && <CustomComponentsSection />}
     </div>
   );
 }
@@ -1434,37 +1442,54 @@ function BusinessSettings({
   setSettings: (s: SettingsData) => void;
   readOnly: boolean;
 }) {
+  const profileMeta = BUSINESS_SECTION_META.find((s) => s.id === "profile")!;
+  const brandingMeta = BUSINESS_SECTION_META.find((s) => s.id === "branding")!;
+  const siteConfigMeta = BUSINESS_SECTION_META.find((s) => s.id === "site-config")!;
+  const dependenciesMeta = BUSINESS_SECTION_META.find((s) => s.id === "dependencies")!;
+  const utilitiesMeta = BUSINESS_SECTION_META.find((s) => s.id === "utilities")!;
+  const ownershipMeta = BUSINESS_SECTION_META.find((s) => s.id === "ownership")!;
+
   return (
     <div className="space-y-14">
-      {BUSINESS_SECTION_META.map((section) => (
-        <SettingsGroup
-          key={section.id}
-          id={section.id}
-          eyebrow={section.eyebrow}
-          description={section.description}
-        >
-          {section.id === "profile" &&
-            (settings ? (
-              <ProfileSection
-                settings={settings}
-                setSettings={setSettings}
-                fields={BUSINESS_FIELDS}
-                readOnly={readOnly}
-              />
-            ) : (
-              <div className="space-y-4 animate-pulse">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="h-12 bg-glass rounded-lg" />
-                ))}
-              </div>
+      <SettingsGroup id={profileMeta.id} eyebrow={profileMeta.eyebrow} description={profileMeta.description}>
+        {settings ? (
+          <ProfileSection
+            settings={settings}
+            setSettings={setSettings}
+            fields={BUSINESS_FIELDS}
+            readOnly={readOnly}
+          />
+        ) : (
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-12 bg-glass rounded-lg" />
             ))}
-          {section.id === "branding" && <BrandSection />}
-          {section.id === "site-config" && <SiteConfigSection />}
-          {section.id === "dependencies" && <DependencyHealthSection />}
-          {section.id === "utilities" && <UtilitiesSection />}
-          {section.id === "ownership" && <OwnershipSection />}
-        </SettingsGroup>
-      ))}
+          </div>
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup id={brandingMeta.id} eyebrow={brandingMeta.eyebrow} description={brandingMeta.description}>
+        <BrandSection />
+      </SettingsGroup>
+
+      {/* AI content autonomy control follows branding so clients see business info + branding first */}
+      <ContentAutonomyPanel />
+
+      <SettingsGroup id={siteConfigMeta.id} eyebrow={siteConfigMeta.eyebrow} description={siteConfigMeta.description}>
+        <SiteConfigSection />
+      </SettingsGroup>
+
+      <SettingsGroup id={dependenciesMeta.id} eyebrow={dependenciesMeta.eyebrow} description={dependenciesMeta.description}>
+        <DependencyHealthSection />
+      </SettingsGroup>
+
+      <SettingsGroup id={utilitiesMeta.id} eyebrow={utilitiesMeta.eyebrow} description={utilitiesMeta.description}>
+        <UtilitiesSection />
+      </SettingsGroup>
+
+      <SettingsGroup id={ownershipMeta.id} eyebrow={ownershipMeta.eyebrow} description={ownershipMeta.description}>
+        <OwnershipSection />
+      </SettingsGroup>
     </div>
   );
 }
@@ -1597,10 +1622,7 @@ export default function SettingsPage() {
 
           {/* Section content */}
           {activeSection === "business" && (
-            <div className="space-y-6">
-              <ContentAutonomyPanel />
-              <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
-            </div>
+            <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
           )}
           {activeSection === "account" && <AccountSection />}
           {activeSection === "domains" && <DomainsSection />}

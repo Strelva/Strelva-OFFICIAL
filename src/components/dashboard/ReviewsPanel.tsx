@@ -311,7 +311,7 @@ function ReviewCard({ review, gbpConnected, preDraft, voiceMode }: { review: Rev
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
-            className="w-full resize-y rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[13px] leading-relaxed text-warm-black outline-none transition-colors focus:border-accent"
+            className="w-full min-h-[96px] resize-y rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[13px] leading-relaxed text-warm-black outline-none transition-colors focus:border-accent"
             aria-label="Edit drafted reply"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -425,7 +425,7 @@ function ReviewCard({ review, gbpConnected, preDraft, voiceMode }: { review: Rev
         </div>
       )}
 
-      {error && <p className="mt-2 text-[12px] text-gray-muted">{error}</p>}
+      {error && <p className="mt-2 text-[12px] text-critical">{error}</p>}
     </div>
   );
 }

@@ -114,13 +114,14 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
                 isActive ? "text-warm-black" : "text-gray-muted"
               }`}
               aria-current={isActive ? "page" : undefined}
+              aria-label={showBadge ? `${item.label}, ${pendingCount} waiting for approval` : undefined}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" strokeWidth={1.5} />
                 {showBadge && (
                   <span
+                    aria-hidden="true"
                     className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-on-accent"
-                    aria-label={`${pendingCount} waiting for approval`}
                   >
                     {pendingCount > 9 ? "9+" : pendingCount}
                   </span>

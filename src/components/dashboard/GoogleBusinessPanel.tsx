@@ -122,7 +122,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           </ul>
         ) : (
           <p className="mt-2 text-[13px] text-gray-muted">
-            Hours haven&apos;t synced yet. Ask Strelva to set them and approve the change.
+            No business hours set yet. Ask Strelva to add them and approve the change.
           </p>
         )}
       </section>

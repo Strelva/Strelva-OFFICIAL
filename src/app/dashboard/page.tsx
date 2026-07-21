@@ -189,7 +189,11 @@ async function DashboardHome() {
           </div>
         </header>
 
-          <OnboardingWizard />
+          {/* Onboarding: on day one the inline checklist is the primary guide —
+              suppress the wizard modal so a brand-new client isn't hit by both.
+              Once the checklist is dismissed/complete the wizard may appear on a
+              return visit if businessModel is still unset. */}
+          {!isFresh && <OnboardingWizard />}
           {/* One contextual card, mutually exclusive: fresh owners get the setup
               checklist (self-hides once done/dismissed); everyone else gets the
               weekly-proof / retention panel. */}
@@ -250,8 +254,8 @@ async function DashboardHome() {
           ) : null}
 
           {pendingCount > 0 ? (
-            <section className="overflow-hidden rounded-2xl border border-accent/25 bg-glass">
-              <div className="h-[520px]">
+            <section className="rounded-2xl border border-accent/25 bg-glass">
+              <div className="max-h-[520px] overflow-y-auto">
                 <QueuePage
                   initialPending={needsYou.pending}
                   initialResolved={needsYou.resolved}
