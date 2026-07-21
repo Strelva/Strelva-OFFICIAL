@@ -170,6 +170,58 @@ export async function getVercelProjectStatus(
   }
 }
 
+/**
+ * Trigger a redeploy of the latest production deployment for a project.
+ * Uses the Vercel "create deployment" API with the source deployment's id,
+ * which is the supported way to retry/redeploy without a git push.
+ * Returns the new deployment's id + state, or an error result.
+ */
+export async function redeployVercelProject(
+  projectName: string
+): Promise<VercelResult<{ deploymentId: string; state: string }>> {
+  const token = vercelToken();
+  if (!token) return { ok: false, error: "VERCEL_API_TOKEN not set" };
+  const teamId = process.env.VERCEL_TEAM_ID;
+
+  try {
+    // First: fetch the project to get the latest deployment id.
+    const projRes = await fetch(
+      `${VERCEL_API}/v9/projects/${encodeURIComponent(projectName)}${teamQuery()}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    );
+    if (!projRes.ok) return { ok: false, error: await errorMessage(projRes) };
+
+    const proj = (await projRes.json()) as {
+      latestDeployments?: Array<{ uid?: string; id?: string }>;
+    };
+    const latestDeploymentId = proj.latestDeployments?.[0]?.uid ?? proj.latestDeployments?.[0]?.id;
+    if (!latestDeploymentId) {
+      return { ok: false, error: "No existing deployment found to redeploy" };
+    }
+
+    // Second: create a new deployment sourced from the existing one.
+    const body: Record<string, unknown> = { deploymentId: latestDeploymentId, target: "production" };
+    if (teamId) body.teamId = teamId;
+
+    const deployRes = await fetch(
+      `${VERCEL_API}/v13/deployments${teamQuery()}`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!deployRes.ok) return { ok: false, error: await errorMessage(deployRes) };
+
+    const d = (await deployRes.json()) as { id?: string; uid?: string; readyState?: string; status?: string };
+    const deploymentId = d.id ?? d.uid ?? "";
+    const state = d.readyState ?? d.status ?? "QUEUED";
+    return { ok: true, data: { deploymentId, state } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
+
 export async function addVercelDomain(
   projectId: string,
   domain: string

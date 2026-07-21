@@ -3,16 +3,18 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
 /**
- * Guards scripts/deprovision-tenant.ts against schema drift: every public table
- * that carries a tenant_id MUST be in the script's TENANT_SCOPED_TABLES sweep,
+ * Guards the deprovision table sweep against schema drift: every public table
+ * that carries a tenant_id MUST be in TENANT_SCOPED_TABLES in src/lib/deprovision.ts,
  * or a deprovisioned client's rows in a new table would be silently orphaned.
- * (We read both files as text rather than import the script — importing it runs
- * its main()/process.exit.)
+ *
+ * We read the lib file as text (rather than importing it) to avoid running any
+ * top-level side effects. The script (scripts/deprovision-tenant.ts) delegates
+ * to the lib for the actual sweep, so checking the lib is the correct gate.
  */
 describe("deprovision-tenant table coverage", () => {
   const root = process.cwd();
   const types = readFileSync(join(root, "src/lib/db/database.types.ts"), "utf8");
-  const script = readFileSync(join(root, "scripts/deprovision-tenant.ts"), "utf8");
+  const deprovisionLib = readFileSync(join(root, "src/lib/deprovision.ts"), "utf8");
 
   // Tenant-scoped tables = every `Tables` entry whose Row block contains tenant_id.
   // Scan the whole file, not a Tables:..Views: slice: the multi-schema generated
@@ -31,7 +33,7 @@ describe("deprovision-tenant table coverage", () => {
   });
 
   it("sweeps every tenant_id table (plus the tenants row itself)", () => {
-    const missing = tenantTables.filter((t) => !new RegExp(`"${t}"`).test(script));
-    expect(missing, `deprovision-tenant.ts is missing tenant_id tables: ${missing.join(", ")}`).toEqual([]);
+    const missing = tenantTables.filter((t) => !new RegExp(`"${t}"`).test(deprovisionLib));
+    expect(missing, `src/lib/deprovision.ts is missing tenant_id tables: ${missing.join(", ")}`).toEqual([]);
   });
 });

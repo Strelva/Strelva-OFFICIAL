@@ -28,6 +28,7 @@ import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
 import { DeploymentStatus } from "./DeploymentStatus";
 import { BillingPanel } from "./BillingPanel";
+import { IntegrationsPanel } from "./IntegrationsPanel";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { ClientLogo, Chip } from "../../console";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
@@ -236,6 +237,8 @@ export default async function ClientDetailPage({
                 : "",
             subscriptionStatus: tenant.subscriptionStatus ?? "none",
           }}
+          stripeCustomerId={tenant.stripeCustomerId}
+          stripeSubscriptionId={tenant.stripeSubscriptionId}
         />
         <TenantEditor
           tenant={{
@@ -256,12 +259,17 @@ export default async function ClientDetailPage({
           }}
         />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
-        <DeploymentStatus status={deployStatus} />
+        <IntegrationsPanel tenantId={tenant.id} />
+        <DeploymentStatus status={deployStatus} tenantId={tenant.id} />
       </Section>
 
       {/* ── CRM ── */}
       <Section label="Notes & CRM">
-        <ClientCrmSections tenantId={tenant.id} ownerEmail={tenant.ownerEmail ?? null} initialCrm={crm} />
+        <ClientCrmSections
+          tenantId={tenant.id}
+          ownerEmail={tenant.ownerEmail ?? null}
+          initialCrm={crm}
+        />
       </Section>
 
       {activity.length > 0 && (

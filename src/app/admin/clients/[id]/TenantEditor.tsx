@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useId } from "react";
+import { useRouter } from "next/navigation";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
 import { Field } from "@/app/admin/ui";
