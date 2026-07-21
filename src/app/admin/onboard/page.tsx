@@ -1,9 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { BillingType, CommercialPlanKey, PresenceProfile } from "@/lib/types";
+
+const PROVISION_STORAGE_KEY = "strelva:last-provision";
 
 interface ProvisionStep {
   key: string;
@@ -128,6 +130,30 @@ function OnboardForm() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionResult | null>(null);
   const [copiedEnv, setCopiedEnv] = useState(false);
+  // true when result was restored from localStorage (not freshly provisioned this session)
+  const [restoredFromStorage, setRestoredFromStorage] = useState(false);
+
+  // Restore last provision result from localStorage on mount (client-only).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PROVISION_STORAGE_KEY);
+      if (raw) {
+        const stored = JSON.parse(raw) as ProvisionResult;
+        if (stored?.tenantId) {
+          setResult(stored);
+          setRestoredFromStorage(true);
+        }
+      }
+    } catch {
+      // Corrupted entry — ignore.
+    }
+  }, []);
+
+  function clearStoredResult() {
+    try { localStorage.removeItem(PROVISION_STORAGE_KEY); } catch { /* ignore */ }
+    setResult(null);
+    setRestoredFromStorage(false);
+  }
 
   function envText(env: Record<string, string>): string {
     return Object.entries(env)
@@ -189,7 +215,14 @@ function OnboardForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      setResult(data as ProvisionResult);
+      const provisionResult = data as ProvisionResult;
+      setResult(provisionResult);
+      setRestoredFromStorage(false);
+      try {
+        localStorage.setItem(PROVISION_STORAGE_KEY, JSON.stringify(provisionResult));
+      } catch {
+        // Storage quota or private-mode — non-fatal.
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Provisioning failed");
     } finally {
@@ -355,6 +388,23 @@ function OnboardForm() {
 
       {result && (
         <div className="space-y-4">
+          {/* Restored-from-storage notice */}
+          {restoredFromStorage && (
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-glass-border bg-glass px-4 py-3">
+              <p className="text-xs text-gray-muted">
+                Showing the last provisioned client —{" "}
+                <span className="font-medium text-warm-white">{result.tenantId}</span>.
+                Reload safe: this was restored from your browser.
+              </p>
+              <button
+                onClick={clearStoredResult}
+                className="shrink-0 rounded-md border border-glass-border px-3 py-1 text-xs text-gray-muted hover:text-warm-white transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Success header */}
           <div className="rounded-2xl border border-glass-border bg-glass px-5 py-4">
             <div className="flex items-start justify-between gap-4">
@@ -481,7 +531,7 @@ function OnboardForm() {
 
           <button
             onClick={() => {
-              setResult(null);
+              clearStoredResult();
               setForm(blank);
             }}
             className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg transition-colors"

@@ -385,28 +385,25 @@ export function LeadRows({
     const activeList: DeliveryLead[] = [];
     const dismissedList: DeliveryLead[] = [];
     for (const lead of leads) {
-      if (statusOf(lead.statusToken) === "dismissed") dismissedList.push(lead);
+      if ((workflow[lead.statusToken]?.status ?? "new") === "dismissed") dismissedList.push(lead);
       else activeList.push(lead);
     }
     return { active: activeList, dismissed: dismissedList };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads, workflow]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return active;
-    return active.filter((l) => statusOf(l.statusToken) === filter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return active.filter((l) => (workflow[l.statusToken]?.status ?? "new") === filter);
   }, [active, filter, workflow]);
 
   // Summary counts for the filter strip
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: active.length };
     for (const l of active) {
-      const s = statusOf(l.statusToken);
+      const s = workflow[l.statusToken]?.status ?? "new";
       c[s] = (c[s] ?? 0) + 1;
     }
     return c;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, workflow]);
 
   function renderList(rows: DeliveryLead[], receded: boolean) {

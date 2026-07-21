@@ -6,7 +6,19 @@ import { Chip } from "../../console";
  *  operator sees it in-platform instead of opening the Vercel dashboard. Null status
  *  (token missing / never deployed) renders a calm "not connected yet" line. */
 export function DeploymentStatus({ status }: { status: VercelProjectStatus | null }) {
-  if (!status) return null;
+  if (!status) {
+    return (
+      <section className="rounded-2xl border border-glass-border bg-glass p-5">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-accent-dim text-accent">
+            <Rocket className="h-4 w-4" strokeWidth={1.9} />
+          </span>
+          <h2 className="text-[15px] font-medium text-warm-white">Deployment</h2>
+        </div>
+        <p className="mt-3 text-[12.5px] text-gray-muted">Vercel not connected — no project found or token not set.</p>
+      </section>
+    );
+  }
 
   const state = status.state;
   const tone = state === "READY" ? "good" : state === "ERROR" || state === "CANCELED" ? "crit" : state ? "warn" : "neutral";

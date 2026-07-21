@@ -43,6 +43,13 @@ const LIFECYCLE_EMAILS: { type: LifecycleEmailType; label: string }[] = [
   { type: "review-request", label: "Send review request" },
 ];
 
+/** Maps each lifecycle type to the summary string logged by delivery-email.ts. */
+const LIFECYCLE_EMAIL_SUMMARY: Record<LifecycleEmailType, string> = {
+  "welcome": "Sent: welcome email",
+  "site-live": "Sent: site-live email",
+  "review-request": "Sent: review-request email",
+};
+
 function formatUpdated(iso: string | null): string {
   if (!iso) return "never";
   const d = new Date(iso);
@@ -181,6 +188,22 @@ export function ClientCrmSections({
           setShowReviewInput(false);
           setReviewUrlDraft("");
         }
+        // Optimistically append the activity entry so "Sent {date}" appears
+        // immediately without a separate CRM fetch. The real log was written
+        // server-side by logSentEmailToCrm; this mirrors what it stored.
+        const now = new Date().toISOString();
+        const syntheticActivity = {
+          id: crypto.randomUUID(),
+          kind: "email" as CrmActivityKind,
+          summary: LIFECYCLE_EMAIL_SUMMARY[type],
+          author: "operator",
+          at: now,
+        };
+        setCrm((prev) => ({
+          ...prev,
+          activity: [syntheticActivity, ...prev.activity],
+          updatedAt: now,
+        }));
       } else {
         setEmailResult({ tone: "error", msg: "Send failed." });
       }
@@ -209,6 +232,21 @@ export function ClientCrmSections({
   }
 
   const sortedNotes = [...crm.notes].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  /** Most-recent send timestamp for each lifecycle email type, derived from CRM activity. */
+  const lifecycleSentAt: Record<LifecycleEmailType, string | null> = {
+    "welcome": null,
+    "site-live": null,
+    "review-request": null,
+  };
+  for (const a of crm.activity) {
+    if (a.kind !== "email") continue;
+    for (const type of Object.keys(LIFECYCLE_EMAIL_SUMMARY) as LifecycleEmailType[]) {
+      if (lifecycleSentAt[type] === null && a.summary === LIFECYCLE_EMAIL_SUMMARY[type]) {
+        lifecycleSentAt[type] = a.at;
+      }
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -456,22 +494,40 @@ export function ClientCrmSections({
         {!ownerEmail && (
           <p className="text-xs text-gray-faint">No owner email on file. Add one to send.</p>
         )}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-start gap-3">
           {LIFECYCLE_EMAILS.map(({ type, label }) => {
+            const sentAt = lifecycleSentAt[type];
+            const alreadySent = sentAt !== null;
             const pending = confirmType === type;
+            // For already-sent types the first click becomes "Send again?" and
+            // the second click confirms — making a re-send deliberately two-step.
+            let buttonLabel: string;
+            if (pending) {
+              buttonLabel = alreadySent ? "Confirm re-send" : "Click to confirm";
+            } else {
+              buttonLabel = alreadySent ? "Send again?" : label;
+            }
             return (
-              <button
-                key={type}
-                onClick={() => onEmailClick(type)}
-                disabled={emailBusy || !ownerEmail}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-                  pending
-                    ? "bg-accent border-accent text-on-accent hover:opacity-90"
-                    : "bg-surface-base border-glass-border text-warm-white hover:border-accent/50"
-                }`}
-              >
-                {pending ? "Click to confirm" : label}
-              </button>
+              <div key={type} className="flex flex-col items-start gap-0.5">
+                <button
+                  onClick={() => onEmailClick(type)}
+                  disabled={emailBusy || !ownerEmail}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                    pending
+                      ? "bg-accent border-accent text-on-accent hover:opacity-90"
+                      : alreadySent
+                        ? "bg-surface-base border-glass-border text-gray-muted hover:border-warning/50 hover:text-warning"
+                        : "bg-surface-base border-glass-border text-warm-white hover:border-accent/50"
+                  }`}
+                >
+                  {buttonLabel}
+                </button>
+                {sentAt && (
+                  <span className="text-[10px] text-gray-faint pl-0.5">
+                    Sent {formatUpdated(sentAt)}
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>

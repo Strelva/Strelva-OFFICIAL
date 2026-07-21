@@ -57,8 +57,8 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
         },
         {
           id: `scan-${t.id}`,
-          label: `Run a scan on ${t.siteName}`,
-          hint: "Action",
+          label: `Ask Strelva to scan ${t.siteName}`,
+          hint: "Mission Control",
           href: `/admin?ask=${encodeURIComponent(`Run a fresh site scan on ${t.id}`)}`,
         },
       ]),

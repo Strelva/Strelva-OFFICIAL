@@ -43,13 +43,28 @@ export interface DomainDriftItem {
   message: string;
 }
 
+export interface FailedAiWriteItem {
+  tenantId: string;
+  title: string;
+  error: string;
+}
+
+export interface StaleSmsItem {
+  tenantId: string;
+  sentAt: string;
+}
+
 export interface OpsMetrics {
   webhookFailures: number;
   revalidationFailures: number;
   staleSmsApprovals: number;
+  /** Tenants with stale SMS approvals, for the drilldown list. */
+  staleSmsItems?: StaleSmsItem[];
   pendingEvents: Record<string, number>;
   totalPendingEvents: number;
   failedAiWrites: number;
+  /** Failed AI write events, for the drilldown list. */
+  failedAiWriteItems?: FailedAiWriteItem[];
   /** Human-readable drift lines (kept for the count + attention feed). */
   tenantDomainDrift: string[];
   /** Same drift, structured so each row links into `/admin/clients/[id]`. Always
@@ -80,9 +95,11 @@ export async function buildOpsReport(): Promise<OpsReport> {
     webhookFailures: 0,
     revalidationFailures: 0,
     staleSmsApprovals: 0,
+    staleSmsItems: [],
     pendingEvents: {},
     totalPendingEvents: 0,
     failedAiWrites: 0,
+    failedAiWriteItems: [],
     tenantDomainDrift: [],
   };
 
@@ -100,6 +117,7 @@ export async function buildOpsReport(): Promise<OpsReport> {
         const sentAtMs = new Date(pending.sentAt).getTime();
         if (sentAtMs < staleCutoff) {
           metrics.staleSmsApprovals++;
+          metrics.staleSmsItems!.push({ tenantId: tenant.id, sentAt: pending.sentAt });
         }
       }
     }
@@ -117,6 +135,13 @@ export async function buildOpsReport(): Promise<OpsReport> {
       (e) => e.type === "content_update" && e.metadata?.error
     );
     metrics.failedAiWrites += failedWrites.length;
+    for (const e of failedWrites) {
+      metrics.failedAiWriteItems!.push({
+        tenantId: tenant.id,
+        title: e.title,
+        error: String(e.metadata!.error),
+      });
+    }
   }
 
   const envDomainMap: Record<string, string> = (() => {
