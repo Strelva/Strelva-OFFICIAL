@@ -9,6 +9,7 @@ import {
   sendSiteLiveEmail,
   sendReviewRequestEmail,
 } from "@/lib/delivery-email";
+import { buildGoogleReviewLink } from "@/lib/reviews/reputation";
 
 /**
  * Operator "send" actions for the three client lifecycle emails (welcome,
@@ -79,9 +80,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     sent = await sendSiteLiveEmail({ email, businessName, siteUrl, dashboardUrl, tenantId: id });
   } else {
-    const url = typeof reviewUrl === "string" ? reviewUrl.trim() : "";
+    // Prefer an explicit operator override; otherwise auto-resolve the review
+    // link from the client's own Google Place ID (the same link the client
+    // dashboard builds) so the operator doesn't have to look it up.
+    const override = typeof reviewUrl === "string" ? reviewUrl.trim() : "";
+    const url = override || buildGoogleReviewLink(config.reviewsConfig?.googlePlaceId) || "";
     if (!url) {
-      return NextResponse.json({ error: "A review URL is required." }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "No review link for this client. Add a Google Place ID to their reviews config, or paste a review URL.",
+        },
+        { status: 400 },
+      );
     }
     sent = await sendReviewRequestEmail({ email, businessName, reviewUrl: url, ownerName, tenantId: id });
   }

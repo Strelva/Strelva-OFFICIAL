@@ -100,7 +100,6 @@ export function ClientCrmSections({
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailResult, setEmailResult] = useState<{ tone: "ok" | "paused" | "error"; msg: string } | null>(null);
   const [reviewUrlDraft, setReviewUrlDraft] = useState("");
-  const [showReviewInput, setShowReviewInput] = useState(false);
   const [confirmType, setConfirmType] = useState<LifecycleEmailType | null>(null);
 
   async function write(body: {
@@ -185,7 +184,6 @@ export function ClientCrmSections({
       } else if (data.sent) {
         setEmailResult({ tone: "ok", msg: "Sent ✓" });
         if (type === "review-request") {
-          setShowReviewInput(false);
           setReviewUrlDraft("");
         }
         // Optimistically append the activity entry so "Sent {date}" appears
@@ -216,18 +214,14 @@ export function ClientCrmSections({
   }
 
   function onEmailClick(type: LifecycleEmailType) {
-    if (type === "review-request") {
-      if (!showReviewInput) {
-        setShowReviewInput(true);
-        return;
-      }
-      if (!reviewUrlDraft.trim()) return;
-    }
     if (confirmType !== type) {
       setConfirmType(type);
       return;
     }
-    const reviewUrl = type === "review-request" ? reviewUrlDraft.trim() : undefined;
+    // review-request auto-resolves the link from the client's Google Place ID
+    // server-side; an operator can still override via the optional URL field.
+    const reviewUrl =
+      type === "review-request" ? reviewUrlDraft.trim() || undefined : undefined;
     void sendEmail(type, reviewUrl);
   }
 
@@ -531,14 +525,12 @@ export function ClientCrmSections({
             );
           })}
         </div>
-        {showReviewInput && (
-          <input
-            value={reviewUrlDraft}
-            onChange={(e) => setReviewUrlDraft(e.target.value)}
-            placeholder="Review URL (e.g. https://g.page/r/…/review)"
-            className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
-          />
-        )}
+        <input
+          value={reviewUrlDraft}
+          onChange={(e) => setReviewUrlDraft(e.target.value)}
+          placeholder="Review URL — optional, auto-filled from the client's Google Place ID"
+          className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+        />
         {emailResult && (
           <p
             className={`text-xs ${

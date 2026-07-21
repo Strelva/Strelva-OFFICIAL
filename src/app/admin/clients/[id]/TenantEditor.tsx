@@ -32,6 +32,7 @@ interface TenantMember {
 }
 
 export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
+  const router = useRouter();
   const roleSelectId = useId();
   const [form, setForm] = useState(tenant);
   const [saving, setSaving] = useState(false);
@@ -52,6 +53,24 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [membersLoading, setMembersLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
+
+  // Rename slug
+  const [newSlug, setNewSlug] = useState("");
+  const [renameConfirm, setRenameConfirm] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  // Rotate revalidation secret
+  const [rotateConfirm, setRotateConfirm] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [rotateError, setRotateError] = useState<string | null>(null);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
+
+  // Deprovision
+  const [deprovisionSlug, setDeprovisionSlug] = useState("");
+  const [deprovisioning, setDeprovisioning] = useState(false);
+  const [deprovisionError, setDeprovisionError] = useState<string | null>(null);
 
   const membersUrl = `/api/admin/tenants/${tenant.id}/members`;
 
@@ -173,6 +192,66 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
     }
   }
 
+  async function rename() {
+    setRenameError(null);
+    setRenaming(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newSlug: newSlug.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      router.push(`/admin/clients/${newSlug.trim()}`);
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : "Rename failed");
+    } finally {
+      setRenaming(false);
+      setRenameConfirm(false);
+    }
+  }
+
+  async function rotateSecret() {
+    setRotateError(null);
+    setRotating(true);
+    setRevealedSecret(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}/deprovision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rotate-secret" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setRevealedSecret((data as { newSecret: string }).newSecret);
+      setRotateConfirm(false);
+    } catch (err) {
+      setRotateError(err instanceof Error ? err.message : "Rotate failed");
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  async function deprovision() {
+    setDeprovisionError(null);
+    setDeprovisioning(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}/deprovision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmSlug: tenant.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      router.push("/admin/clients");
+    } catch (err) {
+      setDeprovisionError(err instanceof Error ? err.message : "Deprovision failed");
+    } finally {
+      setDeprovisioning(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -236,6 +315,122 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           Revalidation secret: {form.hasRevalidationSecret ? "set" : "missing"}
           {form.revalidateUrl ? ` · ${form.revalidateUrl}` : ""}
         </p>
+
+        {/* Rotate revalidation secret */}
+        <div className="space-y-1.5">
+          {revealedSecret ? (
+            <div className="rounded-md border border-glass-border bg-surface-base/40 p-3 space-y-2">
+              <p className="text-xs text-gray-muted">
+                New secret — copy it now. It will not be shown again. Hand it to Jacob to update the client repo env.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded bg-surface-base px-2 py-1 text-xs font-mono text-warm-white break-all select-all">
+                  {revealedSecret}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(revealedSecret);
+                    setSecretCopied(true);
+                    setTimeout(() => setSecretCopied(false), 2000);
+                  }}
+                  className="shrink-0 rounded-md border border-glass-border px-2.5 py-1 text-[11px] text-warm-white hover:bg-gray-bg"
+                >
+                  {secretCopied ? "Copied ✓" : "Copy"}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRevealedSecret(null)}
+                className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : rotateConfirm ? (
+            <div className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 space-y-2">
+              <p className="text-xs text-warning leading-snug">
+                This invalidates the current revalidation secret immediately. The client site will stop accepting revalidation requests until Jacob updates its env var. Proceed?
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void rotateSecret()}
+                  disabled={rotating}
+                  className="rounded-md border border-warning/25 bg-warning/10 px-2.5 py-1 text-[11px] text-warning hover:bg-warning/20 disabled:opacity-40"
+                >
+                  {rotating ? "Rotating…" : "Yes, rotate"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRotateConfirm(false)}
+                  className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRotateConfirm(true)}
+              className="rounded-md border border-glass-border px-3 py-1.5 text-xs text-gray-muted hover:text-warm-white hover:bg-gray-bg"
+            >
+              Rotate revalidation secret
+            </button>
+          )}
+          {rotateError && <p className="text-xs text-critical">{rotateError}</p>}
+        </div>
+
+        {/* Rename slug */}
+        <div className="space-y-1.5 pt-1">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-gray-faint">Rename slug</p>
+          <Field
+            label="New slug"
+            value={newSlug}
+            onChange={(v) => {
+              setNewSlug(v);
+              setRenameConfirm(false);
+              setRenameError(null);
+            }}
+            placeholder={tenant.id}
+          />
+          {renameConfirm ? (
+            <div className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 space-y-2">
+              <p className="text-xs text-warning leading-snug">
+                Renaming cascades to all 35 child tables and rekeyes every authoritative Redis store. The tenant URL will change to <span className="font-mono">/admin/clients/{newSlug.trim() || "…"}</span>. This cannot be undone without another rename.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void rename()}
+                  disabled={renaming}
+                  className="rounded-md border border-warning/25 bg-warning/10 px-2.5 py-1 text-[11px] text-warning hover:bg-warning/20 disabled:opacity-40"
+                >
+                  {renaming ? "Renaming…" : "Yes, rename"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenameConfirm(false)}
+                  className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRenameConfirm(true)}
+              disabled={!newSlug.trim() || newSlug.trim() === tenant.id}
+              className="rounded-md border border-glass-border px-3 py-1.5 text-xs text-gray-muted hover:text-warm-white hover:bg-gray-bg disabled:opacity-40"
+            >
+              Rename
+            </button>
+          )}
+          {renameError && <p className="text-xs text-critical">{renameError}</p>}
+        </div>
+
         {error && <p className="text-sm text-critical">{error}</p>}
         <button
           onClick={() => void save()}
@@ -352,6 +547,42 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         saved={saved}
         error={error}
       />
+
+      {/* Danger zone */}
+      <div className="rounded-2xl border border-critical0/30 bg-critical0/5 p-5 space-y-4">
+        <div>
+          <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-critical">Danger zone — deprovision tenant</h2>
+          <p className="text-xs text-gray-muted mt-1 leading-relaxed">
+            Permanently purges all data across 35 Postgres tables, clears all Redis keys and domain claims, and deletes the Vercel project. This is irreversible. Protected tenants (gldf, rohlax) and tenants with an active subscription or build payments will be refused.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <label className="block text-xs text-gray-muted">
+            Type <span className="font-mono text-warm-white">{tenant.id}</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={deprovisionSlug}
+            onChange={(e) => {
+              setDeprovisionSlug(e.target.value);
+              setDeprovisionError(null);
+            }}
+            placeholder={tenant.id}
+            className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm font-mono text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-critical0/50"
+          />
+          {deprovisionError && (
+            <p className="text-xs text-critical leading-snug">{deprovisionError}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => void deprovision()}
+            disabled={deprovisionSlug !== tenant.id || deprovisioning}
+            className="rounded-md border border-critical0/40 bg-critical0/10 px-4 py-2 text-sm font-medium text-critical hover:bg-critical0/20 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {deprovisioning ? "Deprovisioning…" : "Permanently delete this tenant"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
