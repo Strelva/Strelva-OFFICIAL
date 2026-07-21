@@ -112,7 +112,7 @@ export function InviteButton({ tenantId, siteName, ownerEmail }: InviteButtonPro
                       setCopyFailed(true);
                     }
                   }}
-                  className="rounded-md bg-positive px-3 py-1.5 text-xs font-medium text-positive hover:bg-positive"
+                  className="rounded-md bg-positive px-3 py-1.5 text-xs font-medium text-on-accent transition-opacity hover:opacity-85"
                 >
                   {copied ? "Copied signup link" : "Copy signup link"}
                 </button>

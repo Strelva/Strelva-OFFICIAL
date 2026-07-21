@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
+import { Field } from "@/app/admin/ui";
 
 interface EditableTenant {
   id: string;
@@ -30,6 +31,7 @@ interface TenantMember {
 }
 
 export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
+  const roleSelectId = useId();
   const [form, setForm] = useState(tenant);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,6 +42,9 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [assignRole, setAssignRole] = useState<"owner" | "admin" | "editor" | "viewer">("owner");
   const [assigning, setAssigning] = useState(false);
   const [assignNote, setAssignNote] = useState<string | null>(null);
+
+  // Deactivate confirm
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   // Members list
   const [members, setMembers] = useState<TenantMember[]>([]);
@@ -181,14 +186,51 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <Field label="Booking URL" value={form.bookingUrl} onChange={(v) => setForm({ ...form, bookingUrl: v })} placeholder="https://…" />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
         <Field label="Admin domain" value={form.adminDomain} onChange={(v) => setForm({ ...form, adminDomain: v })} />
-        <label className="flex items-center gap-2 text-sm text-gray-muted">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-          />
-          Active
-        </label>
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-2 text-sm text-gray-muted">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(e) => {
+                const next = e.target.checked;
+                if (!next && form.active) {
+                  // turning off — require explicit confirm
+                  setConfirmDeactivate(true);
+                } else {
+                  setConfirmDeactivate(false);
+                  setForm({ ...form, active: next });
+                }
+              }}
+            />
+            Active
+          </label>
+          {confirmDeactivate && (
+            <div className="rounded-md border border-critical0/25 bg-critical0/10 px-3 py-2 space-y-2">
+              <p className="text-xs text-critical leading-snug">
+                Deactivating hides the client dashboard, removes them from the portfolio, and stops all report crons. Are you sure?
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({ ...form, active: false });
+                    setConfirmDeactivate(false);
+                  }}
+                  className="rounded-md border border-critical0/25 bg-critical0/10 px-2.5 py-1 text-[11px] text-critical hover:bg-critical0/20"
+                >
+                  Yes, deactivate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeactivate(false)}
+                  className="rounded-md px-2 py-1 text-[11px] text-gray-muted hover:text-warm-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <p className="text-xs text-gray-faint">
           Revalidation secret: {form.hasRevalidationSecret ? "set" : "missing"}
           {form.revalidateUrl ? ` · ${form.revalidateUrl}` : ""}
@@ -255,8 +297,9 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <div className="border-t border-glass-border pt-3">
         <Field label="Email" value={assignEmail} onChange={setAssignEmail} placeholder="owner@business.com" />
         <div>
-          <label className="block text-xs text-gray-muted mb-1">Role</label>
+          <label htmlFor={roleSelectId} className="block text-xs text-gray-muted mb-1">Role</label>
           <select
+            id={roleSelectId}
             value={assignRole}
             onChange={(e) => setAssignRole(e.target.value as typeof assignRole)}
             className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
@@ -401,26 +444,3 @@ function FeaturesPanel({
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-gray-muted mb-1">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
-      />
-    </div>
-  );
-}

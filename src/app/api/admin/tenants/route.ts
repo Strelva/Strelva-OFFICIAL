@@ -223,6 +223,20 @@ export async function PATCH(req: Request) {
   // Legacy: retire founder_comp — a case_study billingType supersedes it. Never re-set it.
   if (billingData.planOverride === "founder_comp") billingData.planOverride = "";
 
+  // Guard: a custom plan must carry a positive monthly amount. Without this,
+  // an operator could save billingType:"custom" with $0 and silently corrupt MRR.
+  // tier/case_study/none legitimately have zero/null cents, so the guard is
+  // scoped to "custom" only (matching the POST /provision path).
+  if (billingData.billingType === "custom") {
+    const cents = billingData.planMonthlyCents;
+    if (cents === undefined || cents === null || (typeof cents === "number" && cents <= 0)) {
+      return NextResponse.json(
+        { error: "A custom plan needs a monthly amount above $0." },
+        { status: 400 }
+      );
+    }
+  }
+
   const updated = await updateTenant(id, data as Partial<TenantConfig>);
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });

@@ -88,7 +88,10 @@ export async function POST(req: Request) {
       ? (rawPresence as PresenceProfile)
       : "local";
 
-  // Check subdomain uniqueness before provisioning.
+  // Check subdomain uniqueness before provisioning. getTenantConfig returns
+  // undefined when not found and only throws on real storage errors (Redis
+  // down, Postgres failure, etc.). A thrown error must fail closed — we cannot
+  // risk firing the irreversible Vercel/invite steps for a possible duplicate.
   try {
     const existing = await getTenantConfig(subdomain);
     if (existing) {
@@ -98,8 +101,10 @@ export async function POST(req: Request) {
       );
     }
   } catch {
-    // getTenantConfig throws on not found; that's the happy path. Other
-    // errors (Redis down, storage fail) will surface when provisionTenant runs.
+    return NextResponse.json(
+      { error: "Could not verify subdomain availability. Please try again." },
+      { status: 503 }
+    );
   }
 
   const result = await provisionTenant({

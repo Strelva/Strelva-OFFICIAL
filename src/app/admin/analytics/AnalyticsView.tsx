@@ -213,7 +213,7 @@ function Ga4Card({ perf }: { perf: GaPerf }) {
   }
   return (
     <CardShell title="Analytics (GA4)" subtitle="Who's on the site and where they land — last 28 days, via GA4.">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Users (GA4)" value={formatInt(perf.users)} sub="via GA4" />
         <StatTile label="Sessions (GA4)" value={formatInt(perf.sessions)} />
         <StatTile label="Pageviews (GA4)" value={formatInt(perf.pageviews)} sub="via GA4 — different from beacon" />
@@ -335,7 +335,7 @@ function BeaconCard({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-lg bg-surface-base/40 border border-glass-border px-4 py-3">
           <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Page views</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-warm-white">

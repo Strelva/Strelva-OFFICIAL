@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, ChevronDown, CircleAlert, Loader2 } from "lucide-react";
@@ -51,6 +51,21 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+
+  // Two-step confirm for "Approve all" — first click arms it, second fires.
+  const [confirmApproveAll, setConfirmApproveAll] = useState(false);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const armApproveAll = useCallback(() => {
+    setConfirmApproveAll(true);
+    confirmTimerRef.current = setTimeout(() => setConfirmApproveAll(false), 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimerRef.current !== null) clearTimeout(confirmTimerRef.current);
+    };
+  }, []);
 
   const toggleExpanded = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -123,10 +138,18 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
     [applyResults, router],
   );
 
-  const approveAll = useCallback(
-    () => resolve(groups.flatMap((g) => g.items)),
-    [groups, resolve],
-  );
+  const approveAll = useCallback(() => {
+    if (!confirmApproveAll) {
+      armApproveAll();
+      return;
+    }
+    if (confirmTimerRef.current !== null) {
+      clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setConfirmApproveAll(false);
+    resolve(groups.flatMap((g) => g.items));
+  }, [confirmApproveAll, armApproveAll, groups, resolve]);
 
   // "Ask the client" — hand a draft you're unsure about to the owner's queue for
   // their call. Drops it from this queue on success (it's now theirs to decide).
@@ -176,14 +199,20 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
             type="button"
             onClick={approveAll}
             disabled={anyProcessing}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
+            className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              confirmApproveAll
+                ? "bg-warning text-on-accent hover:bg-warning/90"
+                : "bg-accent text-on-accent hover:bg-accent/90"
+            }`}
           >
             {anyProcessing ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
             ) : (
               <Check className="h-4 w-4" strokeWidth={2} />
             )}
-            Approve all {totalItems}
+            {confirmApproveAll
+              ? `Confirm — publish ${totalItems} across all clients?`
+              : `Approve all ${totalItems}`}
           </button>
         )}
       </div>

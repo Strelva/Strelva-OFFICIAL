@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 interface Cmd {
@@ -43,6 +43,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const commands = useMemo<Cmd[]>(
     () => [
@@ -106,6 +107,36 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
     if (open) requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
 
+  // Focus trap: cycle Tab/Shift+Tab within the palette while open.
+  const trapFocus = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const el = containerRef.current;
+    if (!el) return;
+    const focusable = Array.from(
+      el.querySelectorAll<HTMLElement>(
+        'input, button, [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((n) => !n.hasAttribute("disabled"));
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, []);
+
   if (!open) return null;
 
   function go(cmd: Cmd | undefined) {
@@ -128,11 +159,13 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
       onClick={() => setOpen(false)}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
         className="w-full max-w-lg overflow-hidden rounded-xl border border-glass-border bg-surface-raised shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={trapFocus}
       >
         <input
           ref={inputRef}

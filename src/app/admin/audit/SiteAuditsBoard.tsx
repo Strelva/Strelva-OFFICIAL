@@ -175,7 +175,7 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
                     type="button"
                     onClick={() => scanOne(r.id)}
                     disabled={scanning || allRunning}
-                    title={`Re-scan ${r.siteName}`}
+                    aria-label={`Re-scan ${r.siteName}`}
                     className="inline-flex items-center gap-1.5 rounded-[8px] border border-glass-border px-2.5 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white disabled:opacity-50"
                   >
                     {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <RotateCw className="h-3.5 w-3.5" strokeWidth={1.9} />}
@@ -183,7 +183,7 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
                   </button>
                   <Link
                     href={`/admin/clients/${r.id}#site-health`}
-                    title="Full audit detail"
+                    aria-label={`Full audit detail for ${r.siteName}`}
                     className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white"
                   >
                     <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.9} />

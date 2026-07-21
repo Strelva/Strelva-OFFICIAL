@@ -71,7 +71,16 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-/** Sage→amber→red tone for a letter grade or a 0-100 score. */
+/**
+ * Sage→amber→red tone for a letter grade.
+ *
+ * Kept local intentionally: the canonical TONE_PILL in status-colors.ts groups
+ * A and B into a single "good" class using positive/10 opacity tokens, and has
+ * no per-grade accent treatment for B. This version gives B its own accent/blue
+ * pill and uses the positive0/warning0/critical0 shade tokens at /15 and /30
+ * opacities — swapping to TONE_PILL would visually flatten A and B and change
+ * the opacity values, which are meaningful at small pill scale.
+ */
 function gradeTone(grade: string): string {
   const g = grade.charAt(0).toUpperCase();
   if (g === "A") return "bg-positive0/15 text-positive border-positive0/30";
@@ -538,6 +547,7 @@ export function OperatorConsole() {
               void send();
             }
           }}
+          aria-label="Ask Mission Control"
           placeholder="Ask Mission Control…"
           disabled={busy}
           className="flex-1 rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
