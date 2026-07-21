@@ -302,6 +302,43 @@ export async function upsertMembership(membership: Insert<"memberships">): Promi
   });
 }
 
+export type TenantMemberRow = { userId: string; email: string; role: string; assignedAt: string };
+
+/** All memberships for a tenant, joined with the user email. */
+export async function listTenantMembers(tenantId: string): Promise<TenantMemberRow[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  return bestEffort(`listTenantMembers ${tenantId}`, async () => {
+    const { data, error } = await db
+      .from("memberships")
+      .select("user_id, role, assigned_at, users!memberships_user_id_fkey(email)")
+      .eq("tenant_id", tenantId)
+      .order("assigned_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      userId: row.user_id,
+      email: (row.users as { email: string } | null)?.email ?? "",
+      role: row.role,
+      assignedAt: row.assigned_at,
+    }));
+  }, []);
+}
+
+/** Remove a membership row (revoke access). Does not enforce the last-owner guard
+ *  here — callers must check before calling. */
+export async function deleteMembership(userId: string, tenantId: string): Promise<void> {
+  const label = `deleteMembership ${userId}/${tenantId}`;
+  const db = requiredDb(label);
+  await required(label, async () => {
+    const { error } = await db
+      .from("memberships")
+      .delete()
+      .eq("user_id", userId)
+      .eq("tenant_id", tenantId);
+    if (error) throw error;
+  });
+}
+
 // super_admins ----------------------------------------------------------------
 
 /** True if the user is an active super-admin (granted, not revoked). Replaces the

@@ -191,13 +191,26 @@ export default async function AdminPage() {
   // portfolio snapshot; at-risk from the churn signals; name via the shared resolver.
   const snapById = new Map((portfolio?.tenants ?? []).map((s) => [s.id, s]));
   const atRiskById = new Map(atRiskSignals.map((s) => [s.tenantId, s]));
-  const book = TENANTS.slice(0, 6).map((t) => ({
-    id: t.id,
-    name: getTenantSiteName(t.id, t),
-    launchScore: snapById.get(t.id)?.launchScore ?? null,
-    atRisk: atRiskById.has(t.id),
-    quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
-  }));
+
+  // Sort worst-first before slicing so the 6 shown are the ones most needing
+  // attention. Mirrors the rank() logic in ClientsCrm: crit (at-risk) → warn
+  // (low/missing launch score) → good (healthy, fully launched).
+  function bookRank(t: TenantConfig): number {
+    if (atRiskById.has(t.id)) return 0;
+    const score = snapById.get(t.id)?.launchScore ?? null;
+    if (score === null || score < 60) return 1;
+    return 2;
+  }
+  const book = TENANTS.slice()
+    .sort((a, b) => bookRank(a) - bookRank(b) || a.id.localeCompare(b.id))
+    .slice(0, 6)
+    .map((t) => ({
+      id: t.id,
+      name: getTenantSiteName(t.id, t),
+      launchScore: snapById.get(t.id)?.launchScore ?? null,
+      atRisk: atRiskById.has(t.id),
+      quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
+    }));
 
   const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length;
   const unavailableSources = Array.from(new Set([
@@ -247,6 +260,16 @@ export default async function AdminPage() {
           delta={launchBlockedCount ? `${launchBlockedCount} blocked` : undefined} deltaTone="warn"
           verdict={<>{launchWatchCount} watch · {launchBlockedCount} blocked</>} />
       </div>
+
+      {/* Mission Control — default open so it's immediately discoverable */}
+      <details open className="group mb-4 rounded-2xl border border-glass-border bg-glass">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
+          <span className="font-semibold">Mission Control</span>
+          <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
+          <span className="hidden text-[12px] text-gray-muted group-open:inline">Collapse</span>
+        </summary>
+        <div className="border-t border-glass-border p-4"><OperatorConsole /></div>
+      </details>
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -361,15 +384,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Secondary tools */}
-      <div className="mt-6 space-y-4">
-        <details className="group rounded-2xl border border-glass-border bg-glass">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
-            <span className="font-semibold">Mission Control</span>
-            <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
-            <span className="hidden text-[12px] text-gray-muted group-open:inline">Collapse</span>
-          </summary>
-          <div className="border-t border-glass-border p-4"><OperatorConsole /></div>
-        </details>
+      <div className="mt-6">
         <CreateTenantForm />
       </div>
 

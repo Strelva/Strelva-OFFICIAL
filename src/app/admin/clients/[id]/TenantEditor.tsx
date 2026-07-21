@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
 
@@ -22,6 +22,12 @@ interface EditableTenant {
   features: string[];
 }
 
+interface TenantMember {
+  userId: string;
+  email: string;
+  role: string;
+  assignedAt: string;
+}
 
 export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [form, setForm] = useState(tenant);
@@ -34,6 +40,33 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [assignRole, setAssignRole] = useState<"owner" | "admin" | "editor" | "viewer">("owner");
   const [assigning, setAssigning] = useState(false);
   const [assignNote, setAssignNote] = useState<string | null>(null);
+
+  // Members list
+  const [members, setMembers] = useState<TenantMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
+
+  const membersUrl = `/api/admin/tenants/${tenant.id}/members`;
+
+  const fetchMembers = useCallback(async () => {
+    setMembersLoading(true);
+    try {
+      const res = await fetch(membersUrl);
+      if (res.ok) {
+        const data = (await res.json()) as { members: TenantMember[] };
+        setMembers(data.members ?? []);
+      }
+    } catch {
+      // fail-soft: list stays empty, grant still works
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [membersUrl]);
+
+  useEffect(() => {
+    void fetchMembers();
+  }, [fetchMembers]);
 
   async function save() {
     setError(null);
@@ -83,10 +116,31 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       setAssignNote(`✓ ${assignEmail} assigned as ${assignRole}`);
       setAssignEmail("");
+      await fetchMembers();
     } catch (err) {
       setAssignNote(err instanceof Error ? err.message : "Assign failed");
     } finally {
       setAssigning(false);
+    }
+  }
+
+  async function revoke(userId: string) {
+    setRevokingId(userId);
+    setAssignNote(null);
+    try {
+      const res = await fetch(membersUrl, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setMembers((data as { members: TenantMember[] }).members ?? []);
+    } catch (err) {
+      setAssignNote(err instanceof Error ? err.message : "Revoke failed");
+    } finally {
+      setRevokingId(null);
+      setConfirmRevokeId(null);
     }
   }
 
@@ -151,6 +205,54 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
 
       <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3 self-start">
         <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Grant access</h2>
+
+        {/* Current members */}
+        <div className="space-y-1.5">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-gray-faint">Current members</p>
+          {membersLoading ? (
+            <p className="text-xs text-gray-faint">Loading…</p>
+          ) : members.length === 0 ? (
+            <p className="text-xs text-gray-faint">No members yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {members.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-2 rounded-md bg-surface-base/40 px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <span className="block truncate text-xs text-warm-white">{m.email}</span>
+                    <span className="text-[11px] text-gray-faint">{m.role}</span>
+                  </div>
+                  {confirmRevokeId === m.userId ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => void revoke(m.userId)}
+                        disabled={revokingId === m.userId}
+                        className="rounded-md border border-critical0/25 bg-critical0/10 px-2 py-0.5 text-[11px] text-critical hover:bg-critical0/20 disabled:opacity-40"
+                      >
+                        {revokingId === m.userId ? "…" : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRevokeId(null)}
+                        className="rounded-md px-1.5 py-0.5 text-[11px] text-gray-muted hover:text-warm-white"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRevokeId(m.userId)}
+                      disabled={revokingId !== null}
+                      className="shrink-0 rounded-md border border-critical0/25 px-2 py-0.5 text-[11px] text-critical hover:bg-critical0/10 disabled:opacity-40"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="border-t border-glass-border pt-3">
         <Field label="Email" value={assignEmail} onChange={setAssignEmail} placeholder="owner@business.com" />
         <div>
           <label className="block text-xs text-gray-muted mb-1">Role</label>
@@ -193,6 +295,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           >
             {assigning ? "Sending…" : "Resend owner invite"}
           </button>
+        </div>
         </div>
       </div>
       </div>

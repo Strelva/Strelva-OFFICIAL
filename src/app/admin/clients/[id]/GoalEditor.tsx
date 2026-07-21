@@ -53,10 +53,17 @@ export function GoalEditor({ tenantId, initialGoal }: { tenantId: string; initia
 
   async function clear() {
     setBusy(true);
+    setError("");
     try {
-      await fetch(`/api/admin/tenants/${tenantId}/goal`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/tenants/${tenantId}/goal`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || `Failed (${res.status})`);
+      }
       setGoal(null);
       setTarget("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clear failed");
     } finally {
       setBusy(false);
     }

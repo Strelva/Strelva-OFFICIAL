@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import type {
   TenantAnalyticsConfig,
   SearchPerf,
@@ -453,11 +454,23 @@ export function AnalyticsView({
   goal: Goal | null;
   dailyMetrics: DailyMetricRow[];
 }) {
+  const [tenantQuery, setTenantQuery] = useState("");
   const [gsc, setGsc] = useState(config.gscProperty ?? "");
   const [ga4, setGa4] = useState(config.ga4PropertyId ?? "");
   const [savedAt, setSavedAt] = useState<string | null>(config.updatedAt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const visibleTenants = useMemo(() => {
+    const q = tenantQuery.trim().toLowerCase();
+    if (!q) return tenants;
+    return tenants.filter(
+      (t) =>
+        t.id === selected ||
+        t.siteName.toLowerCase().includes(q) ||
+        t.id.toLowerCase().includes(q),
+    );
+  }, [tenants, tenantQuery, selected]);
 
   const dirty =
     (gsc.trim() || null) !== (config.gscProperty ?? null) ||
@@ -494,25 +507,42 @@ export function AnalyticsView({
   return (
     <div className="space-y-6">
       {/* Tenant switcher */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-glass-border bg-glass px-3 py-2.5">
-        <span className="mr-1 text-xs text-gray-muted">Client</span>
-        {tenants.map((t) => {
-          const active = t.id === selected;
-          return (
-            <Link
-              key={t.id}
-              href={`/admin/analytics?tenant=${t.id}`}
-              aria-current={active ? "page" : undefined}
-              className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
-                active
-                  ? "bg-glass text-warm-white border border-glass-border"
-                  : "text-gray-muted hover:text-warm-white"
-              }`}
-            >
-              {t.siteName}
-            </Link>
-          );
-        })}
+      <div className="rounded-2xl border border-glass-border bg-glass px-3 py-2.5 space-y-2">
+        {/* Search input — only shown when there are enough tenants to warrant filtering */}
+        {tenants.length > 8 && (
+          <div className="flex items-center gap-2 rounded-[8px] border border-glass-border bg-surface-base/40 px-2.5">
+            <Search className="h-[14px] w-[14px] shrink-0 text-gray-faint" strokeWidth={1.8} />
+            <input
+              value={tenantQuery}
+              onChange={(e) => setTenantQuery(e.target.value)}
+              placeholder="Filter clients…"
+              className="w-full bg-transparent py-2 text-[12px] text-warm-white placeholder:text-gray-faint focus:outline-none"
+            />
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs text-gray-muted">Client</span>
+          {visibleTenants.map((t) => {
+            const active = t.id === selected;
+            return (
+              <Link
+                key={t.id}
+                href={`/admin/analytics?tenant=${t.id}`}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
+                  active
+                    ? "bg-glass text-warm-white border border-glass-border"
+                    : "text-gray-muted hover:text-warm-white"
+                }`}
+              >
+                {t.siteName}
+              </Link>
+            );
+          })}
+          {visibleTenants.length === 0 && (
+            <span className="text-xs text-gray-faint">No clients match</span>
+          )}
+        </div>
       </div>
 
       {/* Beacon conversions + goal — leads the deep dive */}

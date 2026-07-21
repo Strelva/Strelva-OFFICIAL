@@ -73,89 +73,27 @@ export default async function AdminDraftsPage() {
               key={`${draft.tenantId}-${draft.section}`}
               className="rounded-2xl border border-glass-border bg-glass p-6"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-sm font-medium text-warm-white">
-                      {draft.tenantName}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-warm-white">
+                    {draft.tenantName}
+                  </span>
+                  <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-bg text-warm-white">
+                    {draft.section}
+                  </span>
+                  {typeof draft.data._updatedAt === "string" && (
+                    <span className="text-[11px] text-gray-faint ml-auto">
+                      {new Date(draft.data._updatedAt as string).toLocaleString()}
                     </span>
-                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-bg text-warm-white">
-                      {draft.section}
-                    </span>
-                  </div>
-                  <div className="rounded-lg bg-surface-base p-4 overflow-y-auto max-h-64 space-y-3">
-                    <div className="flex items-center gap-2 border-b border-glass-border pb-2 mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-warm-white">{draft.section}</span>
-                      {typeof draft.data._updatedAt === "string" && (
-                        <span className="text-[11px] text-gray-faint">{new Date(draft.data._updatedAt as string).toLocaleString()}</span>
-                      )}
-                    </div>
-                    {draft.diffs.length > 0 ? (
-                      draft.diffs.map((d) => (
-                        <div key={d.field} className="flex flex-col gap-0.5">
-                          <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-gray-muted">
-                            {d.field}
-                            <span className="ml-1 text-gray-faint normal-case tracking-normal">({d.type})</span>
-                          </span>
-                          {d.type !== "added" && d.before && (
-                            d.before.length > 200 ? (
-                              <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-critical/80 line-through break-words marker:content-none">
-                                  {d.before.slice(0, 200)}
-                                  <span className="ml-1 no-underline text-gray-faint group-open:hidden">[show full]</span>
-                                </summary>
-                                <span className="text-xs text-critical/80 line-through break-words">
-                                  {d.before}
-                                </span>
-                              </details>
-                            ) : (
-                              <span className="text-xs text-critical/80 line-through break-words">
-                                {d.before}
-                              </span>
-                            )
-                          )}
-                          {d.type !== "removed" && d.after && (
-                            d.after.length > 200 ? (
-                              <details className="group">
-                                <summary className="cursor-pointer list-none text-xs text-positive break-words marker:content-none">
-                                  {d.after.slice(0, 200)}
-                                  <span className="ml-1 text-gray-faint group-open:hidden">[show full]</span>
-                                </summary>
-                                <span className="text-xs text-positive break-words">
-                                  {d.after}
-                                </span>
-                              </details>
-                            ) : (
-                              <span className="text-xs text-positive break-words">
-                                {d.after}
-                              </span>
-                            )
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      Object.entries(draft.data)
-                        .filter(([key]) => !key.startsWith("_"))
-                        .map(([key, value]) => (
-                          <div key={key} className="flex flex-col gap-0.5">
-                            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-gray-muted">{key}</span>
-                            <span className="text-xs text-warm-white break-words">
-                              {typeof value === "string"
-                                ? value.length > 200 ? `${value.slice(0, 200)}...` : value
-                                : Array.isArray(value)
-                                  ? `${value.length} item${value.length === 1 ? "" : "s"}`
-                                  : value && typeof value === "object"
-                                    ? Object.keys(value as Record<string, unknown>).slice(0, 4).join(", ") + (Object.keys(value as Record<string, unknown>).length > 4 ? " ..." : "")
-                                    : String(value)}
-                            </span>
-                          </div>
-                        ))
-                    )}
-                  </div>
+                  )}
                 </div>
                 <DraftActions
                   tenant={draft.tenantId}
                   section={draft.section}
+                  preview={{
+                    type: "content_update",
+                    metadata: { ...draft.data, diffs: draft.diffs },
+                  }}
                 />
               </div>
             </div>

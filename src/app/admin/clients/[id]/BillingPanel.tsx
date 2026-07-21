@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CreditCard } from "lucide-react";
 
 /**
@@ -22,7 +22,6 @@ const TIERS = [
   { value: "growth", label: "Growth · $199/mo" },
   { value: "scale", label: "Scale · $499/mo" },
 ];
-const SUB_STATUSES = ["none", "active", "trialing", "past_due", "cancelled"];
 
 export function BillingPanel({
   tenantId,
@@ -49,6 +48,11 @@ export function BillingPanel({
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkNote, setLinkNote] = useState<string | null>(null);
 
+  // True while the generate fetch is in flight AND until any resulting state
+  // has settled. A separate ref lets the handler bail early on concurrent calls
+  // even if React has not yet re-rendered the disabled prop.
+  const linkBusyRef = useRef(false);
+
   async function save() {
     setError(null);
     setSaved(false);
@@ -65,7 +69,8 @@ export function BillingPanel({
             form.billingType === "custom"
               ? Math.max(0, Math.round(parseFloat(form.customMonthlyDollars || "0") * 100))
               : null,
-          subscriptionStatus: form.subscriptionStatus,
+          // subscriptionStatus intentionally omitted — it is Stripe-authoritative
+          // and must only be written by the billing webhook, never the admin UI.
         }),
       });
       const data = await res.json();
@@ -80,12 +85,17 @@ export function BillingPanel({
   }
 
   async function generateBillingLink() {
-    setLinkNote(null);
-    setLinkUrl(null);
+    // Concurrent-call guard: bail immediately if a request is already in flight.
+    if (linkBusyRef.current) return;
+    // If we already have a valid link, don't mint a second Stripe session — the
+    // button will be hidden in this state, but guard here too for safety.
+    if (linkUrl) return;
     if (!linkEmail.trim()) {
       setLinkNote("Enter the client's email first.");
       return;
     }
+    linkBusyRef.current = true;
+    setLinkNote(null);
     setLinkBusy(true);
     try {
       const res = await fetch("/api/billing/create-subscription", {
@@ -103,6 +113,9 @@ export function BillingPanel({
     } catch (err) {
       setLinkNote(err instanceof Error ? err.message : "Failed to generate link");
     } finally {
+      // Clear busy flag in finally so the button stays disabled for the entire
+      // async lifecycle, including error paths.
+      linkBusyRef.current = false;
       setLinkBusy(false);
     }
   }
@@ -143,10 +156,13 @@ export function BillingPanel({
       )}
 
       <div>
-        <label className="block text-xs text-gray-muted mb-1">Stripe status (informational)</label>
-        <select value={form.subscriptionStatus} onChange={(e) => setForm({ ...form, subscriptionStatus: e.target.value })} className={inputCls}>
-          {SUB_STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
-        </select>
+        <label className="block text-xs text-gray-muted mb-1">Stripe status</label>
+        {/* Read-only: this value is authoritative — it gates dashboard access,
+            report crons, and the active-subscription count. It is written only
+            by the Stripe webhook (invoice.paid / invoice.payment_failed /
+            customer.subscription.deleted). Hand-editing it would silently
+            diverge from Stripe and could block or grant access incorrectly. */}
+        <p className={`${inputCls} cursor-default select-text`}>{form.subscriptionStatus || "none"}</p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -168,9 +184,17 @@ export function BillingPanel({
             <input value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} placeholder="owner@business.com"
               className="w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50" />
           </div>
-          <button onClick={() => void generateBillingLink()} disabled={linkBusy} className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40">
-            {linkBusy ? "Generating…" : "Generate billing link"}
-          </button>
+          {/* Show generate button only when no link exists yet; once a link is
+              minted, show copy/reset instead to prevent duplicate Stripe sessions. */}
+          {!linkUrl ? (
+            <button
+              onClick={() => void generateBillingLink()}
+              disabled={linkBusy}
+              className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40"
+            >
+              {linkBusy ? "Generating…" : "Generate billing link"}
+            </button>
+          ) : null}
           {linkNote && <p className="text-sm text-critical">{linkNote}</p>}
           {linkUrl && (
             <div className="space-y-1">
@@ -179,6 +203,12 @@ export function BillingPanel({
                 <input readOnly value={linkUrl} onFocus={(e) => e.currentTarget.select()} className="flex-1 rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-xs text-warm-white" />
                 <button onClick={() => void navigator.clipboard?.writeText(linkUrl)} className="rounded-md border border-glass-border px-3 py-2 text-xs text-warm-white hover:bg-gray-bg">Copy</button>
               </div>
+              <button
+                onClick={() => { setLinkUrl(null); setLinkNote(null); }}
+                className="text-xs text-gray-muted hover:text-warm-white underline"
+              >
+                Generate a new link
+              </button>
             </div>
           )}
         </div>
