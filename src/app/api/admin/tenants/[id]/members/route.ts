@@ -43,10 +43,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: "userId is required" }, { status: 400 });
   }
 
-  // Last-owner guard: refuse to remove the sole owner.
+  // Last-owner guard: refuse to remove the sole owner. Fail closed — if the
+  // owner list can't be read (empty), refuse the revoke rather than risk
+  // orphaning the tenant (mirrors the canonical guard in auth.ts).
   const ownerIds = await getTenantOwnerUserIds(id);
   const isSoleOwner =
-    ownerIds.length === 1 && ownerIds[0] === userId;
+    ownerIds.length === 0 || (ownerIds.length === 1 && ownerIds[0] === userId);
   if (isSoleOwner) {
     return NextResponse.json(
       { error: "Cannot revoke the last owner of this tenant" },
