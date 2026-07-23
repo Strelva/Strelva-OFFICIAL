@@ -112,28 +112,40 @@ export async function resolveEventAction(
     const workflowStatus = workflowStatusFromAction(action);
     if (!workflowStatus) return { changed: false, reason: "invalid_action" };
 
-    const terminalStatus = workflowStatus === "shipped"
-      ? "approved"
-      : workflowStatus === "declined"
-        ? "dismissed"
-        : event.status;
     // ONE timestamp for resolvedAt + shippedAt + workflowUpdatedAt so the Postgres
     // reconstruction can recover resolvedAt from workflowUpdatedAt exactly (gap #3).
     const now = new Date().toISOString();
-    const result = await updateEvent(eventId, (existing) => ({
-      ...existing,
-      status: terminalStatus,
-      resolvedAt: terminalStatus === "approved" || terminalStatus === "dismissed"
-        ? now
-        : existing.resolvedAt,
-      metadata: {
-        ...existing.metadata,
-        workflowStatus,
-        quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
-        shippedAt: workflowStatus === "shipped" ? now : existing.metadata?.shippedAt,
-        workflowUpdatedAt: now,
-      },
-    }));
+    let noOp = false;
+    const result = await updateEvent(eventId, (existing) => {
+      // Re-check the CURRENT status under the lock — the pre-lock snapshot may be
+      // stale (a concurrent dismiss/approve committed, or READ_PG served a
+      // resolved event as pending). Never overwrite a resolved request back to
+      // pending or flip one terminal state to another.
+      if (existing.status !== "pending") {
+        noOp = true;
+        return existing;
+      }
+      const nextStatus = workflowStatus === "shipped"
+        ? "approved"
+        : workflowStatus === "declined"
+          ? "dismissed"
+          : existing.status; // a non-terminal step keeps it pending
+      return {
+        ...existing,
+        status: nextStatus,
+        resolvedAt: nextStatus === "approved" || nextStatus === "dismissed"
+          ? now
+          : existing.resolvedAt,
+        metadata: {
+          ...existing.metadata,
+          workflowStatus,
+          quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
+          shippedAt: workflowStatus === "shipped" ? now : existing.metadata?.shippedAt,
+          workflowUpdatedAt: now,
+        },
+      };
+    });
+    if (noOp) return { changed: false, reason: "already_resolved" };
     // Re-sync the governed-work shadow (gap #3): flag-gated + best-effort, never
     // affects the Redis-authoritative result above.
     if (result.changed && result.event) {

@@ -43,6 +43,13 @@ const authoritativePatterns = (t: string): string[] => [
   `reb:content-autonomy:${t}`,
   `reb:engagement:${t}:*`,
   `threads:${t}:*`,
+  // Operator/owner-set state with NO Postgres source to regenerate from — these
+  // were silently stranded under the old slug on a rename (audit #16):
+  `goal:${t}`, // owner's weekly goal
+  `analytics:cfg:${t}`, // GA4/GSC property config (ga4PropertyId has no PG recovery)
+  `reb:report-cadence:${t}`, // operator cadence override
+  `reb:report-sent:${t}`, // last-report throttle
+  `reb:scan:baseline:${t}`, // set-once day-0 health anchor for the 90-day milestone
 ];
 
 export type RenameResult = {

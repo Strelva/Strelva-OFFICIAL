@@ -15,7 +15,7 @@
 import { getEvents } from "../events";
 import { listAllTenants } from "../db/repositories";
 import { isGovernedScopeEvent } from "./read";
-import { eventToProposal, changeRequestNewProposal } from "./shadow";
+import { changeRequestNewProposal, governedEventToProposalAnyStatus } from "./shadow";
 import { getProposal, insertProposal, updateProposalState } from "./repository";
 
 export type GovernedReconcileResult = {
@@ -59,11 +59,23 @@ export async function reconcileGovernedWork(opts?: { tenants?: string[]; limit?:
         continue;
       }
 
-      // Other governed events: the create-time snapshot is immutable (decisions +
-      // executions are shadowed on their own paths), so only a MISSING row is drift.
-      if (existing) { out.current++; continue; }
-      const proposal = eventToProposal(event);
-      if (!proposal) { out.current++; continue; } // resolved past the pending gate — nothing to insert
+      // Other governed events. The create-time snapshot is immutable, but the
+      // STATUS advances (pending -> approved/dismissed) on resolve via a separate
+      // best-effort decision shadow. Reconcile BOTH a missing row (dropped create
+      // shadow, incl. resolved events the pending-only builder used to skip —
+      // audit #14) AND a stale-pending status (dropped decision shadow, which
+      // served a resolved item as phantom-pending under READ_PG — audit #15).
+      const proposal = governedEventToProposalAnyStatus(event);
+      if (existing) {
+        const desired = proposal.status ?? "pending";
+        if (existing.status !== desired) {
+          const row = await updateProposalState(event.id, { status: desired });
+          if (row) out.updated++;
+        } else {
+          out.current++;
+        }
+        continue;
+      }
       const row = await insertProposal(proposal);
       if (row) out.inserted++;
     }

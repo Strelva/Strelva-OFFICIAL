@@ -159,6 +159,29 @@ export function changeRequestNewProposal(e: UnifiedEvent): NewProposal | null {
 }
 
 /**
+ * NewProposal for a governed-scope event at ANY status (pending OR resolved).
+ * The pending-only `eventToProposal` returns null for resolved events, so the
+ * reconcile sweep uses this to recover a proposal whose create OR decision shadow
+ * was dropped — inserting a missing resolved row (audit #14) or re-syncing a
+ * stale-pending status (audit #15). The caller must already have confirmed the
+ * event is governed-scope. Pure — no I/O.
+ */
+export function governedEventToProposalAnyStatus(e: UnifiedEvent): NewProposal {
+  const kind = typeof e.metadata?.kind === "string" ? e.metadata.kind : null;
+  return {
+    id: e.id,
+    tenantId: e.tenantId,
+    source: e.source === "ai" ? "ai" : "system",
+    kind,
+    entityType: e.type,
+    title: e.title ?? null,
+    body: e.body ?? null,
+    payload: (e.metadata ?? null) as Record<string, unknown> | null,
+    status: eventStatusToProposalStatus(e.status),
+  };
+}
+
+/**
  * change_request workflow hook: a custom change-request advanced through its
  * lifecycle (triaged/quoted/shipped/declined) via resolveEventAction, which mutates
  * the Redis event's status + metadata.workflowStatus WITHOUT a decision row. Re-sync
