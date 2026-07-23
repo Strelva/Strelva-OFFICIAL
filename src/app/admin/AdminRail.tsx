@@ -111,7 +111,7 @@ export function NavList({
 export function RailFooter({ operatorName }: { operatorName: string }) {
   return (
     <div className="mt-3 flex items-center gap-2.5 border-t border-glass-border px-2 pt-[13px]">
-      <span className="grid h-[27px] w-[27px] shrink-0 place-items-center rounded-[8px] bg-[#242018] font-display text-[12px] font-semibold text-[#d6d0c0]">
+      <span className="grid h-[27px] w-[27px] shrink-0 place-items-center rounded-[8px] bg-glass-active font-display text-[12px] font-semibold text-warm-white">
         {operatorName.charAt(0).toUpperCase()}
       </span>
       <span className="leading-tight">

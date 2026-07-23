@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 /*  Button                                             */
 /* -------------------------------------------------- */
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "contrast";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -19,14 +19,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
+  // Sage is the ONE brand primary — the accent, not a white fill (which read as
+  // an off-brand second primary across the product). Use `contrast` only for the
+  // rare single highest-emphasis action where sage isn't enough separation.
   primary:
-    "bg-white text-black hover:bg-white/90 disabled:opacity-50",
+    "bg-accent text-on-accent hover:bg-accent/85 disabled:opacity-50",
   secondary:
     "bg-surface border border-gray-border text-warm-black hover:bg-gray-bg disabled:opacity-50",
   ghost:
     "text-gray-muted hover:text-warm-black hover:bg-gray-bg disabled:opacity-50",
   danger:
     "text-terra hover:text-white hover:bg-terra disabled:opacity-50",
+  contrast:
+    "bg-warm-white text-warm-black hover:bg-warm-white/90 disabled:opacity-50",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

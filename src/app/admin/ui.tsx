@@ -7,6 +7,7 @@
  */
 
 import { useId, type ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
 
 const inputClass =
   "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 transition-colors";
@@ -96,6 +97,9 @@ export function Checkbox({
 
 /** Primary action button — the system CTA. Sage fill with dark on-accent ink
  *  (the ONE primary style; secondary actions use GhostButton). */
+/** Admin primary CTA — now the SHARED Button (one button system, one sage
+ *  primary, one pill radius) instead of a duplicate. Kept as a thin alias so the
+ *  18+ admin call sites don't churn. */
 export function PrimaryButton({
   children,
   onClick,
@@ -108,14 +112,9 @@ export function PrimaryButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
-    >
+    <Button variant="primary" size="md" type={type} onClick={onClick} disabled={disabled}>
       {children}
-    </button>
+    </Button>
   );
 }
 
