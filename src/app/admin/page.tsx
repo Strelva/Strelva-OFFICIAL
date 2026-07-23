@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, CheckCircle2, Flag, UserPlus } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel, Meter } from "./console";
+import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel, Meter, faviconFor } from "./console";
 import type { TenantConfig } from "@/lib/types";
 import { getActivity, listDrafts } from "@/lib/storage";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
@@ -206,6 +206,7 @@ export default async function AdminPage() {
     .map((t) => ({
       id: t.id,
       name: getTenantSiteName(t.id, t),
+      favicon: faviconFor(t),
       launchScore: snapById.get(t.id)?.launchScore ?? null,
       atRisk: atRiskById.has(t.id),
       quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
@@ -352,7 +353,7 @@ export default async function AdminPage() {
           <Panel title="Your book" trailing={<PanelLink href="/admin/clients">All clients →</PanelLink>} bodyClassName="px-2 pb-2.5">
             {book.map((c) => (
               <Link key={c.id} href={`/admin/clients/${c.id}`} className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
-                <ClientLogo name={c.name} size={32} />
+                <ClientLogo name={c.name} logoUrl={c.favicon} size={32} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-warm-white"><span className="truncate">{c.name}</span>{c.atRisk && <Chip tone="crit">at risk</Chip>}</div>
                   <div className="mt-0.5 text-[11.5px] text-gray-muted">{c.quietDays != null ? `quiet ${c.quietDays}d` : "active"}</div>

@@ -94,7 +94,11 @@ export function buildTenantLaunchReadiness(input: {
     item(
       "billing",
       "Billing set",
-      isBillingConfigured(tenant) ? "ready" : "blocked",
+      // "Watch", not "blocked": a client mid-onboarding without billing yet is
+      // in progress, not an emergency. Treating it as blocked painted every new
+      // client red on the overview and spammed launch-blocked flags. Billing
+      // shows as a watch until set; real blockers are infra + no owner email.
+      isBillingConfigured(tenant) ? "ready" : "watch",
       isBillingConfigured(tenant)
         ? billingLabel(tenant)
         : "No plan set — pick a tier, enter a custom monthly amount, or mark it a case study."

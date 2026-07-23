@@ -61,12 +61,13 @@ describe("tenant launch readiness", () => {
       hasWeeklyBrief: false,
     });
 
-    // Blocks because of the REAL go-live gates (owner access + billing), NOT
-    // because the owner hasn't used the AI — that's a managed-client adoption
-    // signal ("watch"), never a launch blocker.
+    // Blocks on the REAL hard go-live gate (owner access). Billing-not-set is a
+    // "watch" (in-progress), not a blocker — a mid-onboarding client without
+    // billing yet shouldn't paint red on the overview. Owner-hasn't-used-AI is a
+    // managed-client adoption signal ("watch"), never a launch blocker.
     expect(result.status).toBe("blocked");
     expect(result.items.find((item) => item.id === "owner-access")?.status).toBe("blocked");
-    expect(result.items.find((item) => item.id === "billing")?.status).toBe("blocked");
+    expect(result.items.find((item) => item.id === "billing")?.status).toBe("watch");
     expect(result.items.find((item) => item.id === "owner-ai-message")?.status).toBe("watch");
   });
 

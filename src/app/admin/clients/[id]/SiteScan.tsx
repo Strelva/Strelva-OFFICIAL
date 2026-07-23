@@ -77,12 +77,6 @@ export function SiteScan({
     }
   }
 
-  function failingChecks(slug: string): string[] {
-    const cat = detail?.find((c) => c.slug === slug);
-    if (!cat) return [];
-    return cat.checks.filter((ch) => ch.status === "fail").map((ch) => ch.name);
-  }
-
   // The ranked "fix first" verdict. A live re-scan yields the fuller
   // PrioritizedActionList (true portfolio-wide counts); on initial load we
   // render the compact verdict the scan persisted, so the operator sees it
@@ -160,7 +154,6 @@ export function SiteScan({
 
           <div className="mt-5 space-y-3">
             {scan.categories.map((c) => {
-              const fails = failingChecks(c.slug);
               return (
                 <div key={c.slug}>
                   <div className="flex items-center justify-between text-xs">
@@ -173,11 +166,9 @@ export function SiteScan({
                       style={{ width: `${c.score}%` }}
                     />
                   </div>
-                  {fails.length > 0 && (
-                    <p className="mt-1 text-[11px] text-critical/80">
-                      {fails.slice(0, 2).join(" · ")}
-                    </p>
-                  )}
+                  {/* The per-category fail text was redundant with the ranked "Fix
+                      first" list below and made a new site read as a wall of
+                      problems — the bar color already flags a weak category. */}
                 </div>
               );
             })}
@@ -192,7 +183,7 @@ export function SiteScan({
                 </span>
               </div>
               <ol className="mt-2 space-y-1.5">
-                {fixList.slice(0, 8).map((issue, i) => (
+                {fixList.slice(0, 5).map((issue, i) => (
                   <li
                     key={`${issue.category}-${issue.message}-${i}`}
                     className="flex items-start gap-2.5 text-xs"
@@ -220,6 +211,9 @@ export function SiteScan({
                   </li>
                 ))}
               </ol>
+              {fixList.length > 5 && (
+                <p className="mt-2 text-[11px] text-gray-faint">+{fixList.length - 5} more in the full scan</p>
+              )}
             </div>
           )}
         </div>

@@ -30,7 +30,7 @@ import { DeploymentStatus } from "./DeploymentStatus";
 import { BillingPanel } from "./BillingPanel";
 import { IntegrationsPanel } from "./IntegrationsPanel";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import { ClientLogo, Chip } from "../../console";
+import { ClientLogo, Chip, faviconFor } from "../../console";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +127,18 @@ export default async function ClientDetailPage({
   const grade = lastScan?.grade ?? null;
   const needsReply = reviewIntel.needsResponse.length;
 
+  // A brand-new client has no traffic/activity/drafts yet, so leading the top row
+  // with weekly-engagement KPIs shows four zeros. For a fresh client, lead with
+  // the things that ARE knowable + relevant (health, reviews, setup, plan).
+  const isFreshClient =
+    pageViews.total === 0 && activity.length === 0 && Object.keys(drafts).length === 0;
+  const planPulse =
+    tenant.subscriptionStatus === "active"
+      ? "Active"
+      : tenant.subscriptionStatus === "past_due"
+        ? "Past due"
+        : "No plan yet";
+
   let verdict: { tone: "red" | "amber" | "emerald"; message: string };
   if (atRisk.atRisk && atRisk.reasons.length > 0) {
     const reason = atRisk.reasons[0];
@@ -177,7 +189,7 @@ export default async function ClientDetailPage({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <ClientLogo name={getTenantSiteName(tenant.id, tenant)} size={48} />
+          <ClientLogo name={getTenantSiteName(tenant.id, tenant)} logoUrl={faviconFor(tenant)} size={48} />
           <div>
             <h1 className="font-display text-[24px] font-medium tracking-[-0.02em] text-warm-white sm:text-[26px]">
               {getTenantSiteName(tenant.id, tenant)}
@@ -206,10 +218,21 @@ export default async function ClientDetailPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-        <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
-        <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
-        <Pulse label="Content drafts" value={Object.keys(drafts).length} sub="awaiting review" />
-        <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
+        {isFreshClient ? (
+          <>
+            <Pulse label="Site health" value={grade ?? "—"} sub={lastScan ? `${lastScan.overallScore}/100` : "not scanned yet"} />
+            <Pulse label="Reviews" value={reviews.length} sub={reviews.length === 1 ? "review" : "reviews"} />
+            <Pulse label="Setup" value={launchFails === 0 ? "Ready" : `${launchFails} left`} sub="to launch" />
+            <Pulse label="Plan" value={planPulse} sub="billing" />
+          </>
+        ) : (
+          <>
+            <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
+            <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
+            <Pulse label="Content drafts" value={Object.keys(drafts).length} sub="awaiting review" />
+            <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
+          </>
+        )}
       </div>
 
       {/* ── How they're doing ── */}

@@ -68,7 +68,7 @@ describe("buildAttentionFromSnapshot", () => {
     expect(b.items[0]).toMatchObject({ severity: "high", kind: "launch", tenant: "acme" });
   });
 
-  it("flags a tenant invisible in AI answers as a high visibility item", () => {
+  it("flags a tenant invisible in AI answers as a LOW visibility item (an opportunity, not urgent)", () => {
     const b = buildAttentionFromSnapshot(
       snapshot({
         tenants: [
@@ -89,9 +89,11 @@ describe("buildAttentionFromSnapshot", () => {
         ],
       })
     );
-    expect(b.counts.high).toBe(1);
-    expect(b.items[0]).toMatchObject({ severity: "high", kind: "visibility", tenant: "gldf" });
-    expect(b.items[0].message).toContain("Invisible in AI answers");
+    // Visibility gaps are growth opportunities, not urgent "needs you" alarms.
+    expect(b.counts.high).toBe(0);
+    const vis = b.items.find((i) => i.kind === "visibility");
+    expect(vis).toMatchObject({ severity: "low", kind: "visibility", tenant: "gldf" });
+    expect(vis?.message).toContain("Invisible in AI answers");
   });
 
   it("flags lesser visibility gaps as medium/low, and nothing when measured-clean", () => {
@@ -109,7 +111,7 @@ describe("buildAttentionFromSnapshot", () => {
         ],
       })
     );
-    expect(withGaps.items.find((i) => i.kind === "visibility")).toMatchObject({ severity: "medium" });
+    expect(withGaps.items.find((i) => i.kind === "visibility")).toMatchObject({ severity: "low" });
 
     const clean = buildAttentionFromSnapshot(
       snapshot({

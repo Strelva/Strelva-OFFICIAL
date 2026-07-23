@@ -165,6 +165,21 @@ export function Meter({ segments }: { segments: { value: number; tone: Tone; lab
  * A client's brand mark. Uses the real uploaded logo when present; otherwise a
  * calm monogram tile (initial on a neutral surface) — never a colored-initial dot.
  */
+/** A client's real custom host (null for strelva.com/vercel subdomains + none). */
+export function clientHost(t: { productionDomain?: string | null; siteUrl?: string | null }): string | null {
+  const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
+  if (!raw) return null;
+  const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  return host;
+}
+
+/** Favicon URL for a client's real domain — gives client rows life + scannability. */
+export function faviconFor(t: { productionDomain?: string | null; siteUrl?: string | null }): string | null {
+  const host = clientHost(t);
+  return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64` : null;
+}
+
 export function ClientLogo({
   name,
   logoUrl,

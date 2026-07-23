@@ -85,17 +85,20 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
     const v = t.visibility;
     if (!v) continue;
     if (v.aiProbed > 0 && v.aiPresent === 0) {
-      // Invisible in AI answers is the highest-stakes visibility gap.
+      // Invisible in AI answers is a growth OPPORTUNITY (the wedge), not an
+      // urgent "needs you" action — low severity so it lives on the "Ready to
+      // work" screen, not the operator's alarm feed.
       items.push({
-        severity: "high",
+        severity: "low",
         kind: "visibility",
         tenant: t.id,
         message: `Invisible in AI answers: ${t.siteName || t.ownerName || t.id} (cited 0/${v.aiProbed})`,
         href: `/admin/tenants/${t.id}`,
       });
     } else if (v.problemCount > 0) {
+      // Visibility gaps are opportunities too — keep them off the urgent feed.
       items.push({
-        severity: v.problemCount >= 3 ? "medium" : "low",
+        severity: "low",
         kind: "visibility",
         tenant: t.id,
         message: `${v.problemCount} visibility gap(s): ${t.siteName || t.ownerName || t.id}`,
