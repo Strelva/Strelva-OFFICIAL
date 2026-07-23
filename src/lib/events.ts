@@ -104,9 +104,12 @@ export async function claimEventAction(
 
   // A process can die after a provider accepts a non-idempotent write but
   // before Strelva resolves the event. Never infer that an expired Redis lock
-  // means the provider write did not happen. A processing marker survives the
-  // lock and forces operator reconciliation instead of risking a duplicate.
-  if (existing.metadata?.execution?.state === "processing") {
+  // means the provider write did not happen. Both the "processing" marker (the
+  // attempt is mid-flight) and the "external_accepted" marker (the write WAS
+  // accepted but the event didn't resolve) survive the lock and force operator
+  // reconciliation instead of risking a duplicate external write.
+  const execState = existing.metadata?.execution?.state;
+  if (execState === "processing" || execState === "external_accepted") {
     return { acquired: false, reason: "action_reconciliation_required" };
   }
 
@@ -132,6 +135,30 @@ export async function claimEventAction(
   return { acquired: true, attemptId };
 }
 
+/**
+ * Stamp a pending event's execution as "external_accepted" — call this the
+ * instant a NON-IDEMPOTENT external write (GBP post/hours/photo, review reply,
+ * newsletter) is accepted by the provider, BEFORE attempting to resolve the
+ * event. If the subsequent resolve loses its lock or the process dies, the
+ * marker survives so claimEventAction refuses a retry (which would duplicate the
+ * write). No-op if the execution attempt no longer matches (best-effort).
+ */
+export async function markExecutionExternalAccepted(id: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  await updateEvent(id, (event) => {
+    const execution = event.metadata?.execution;
+    if (!execution || execution.state !== "processing") return event;
+    return {
+      ...event,
+      metadata: {
+        ...event.metadata,
+        execution: { ...execution, state: "external_accepted" },
+      },
+    };
+  }).catch(() => {});
+}
+
 export async function finishEventAction(
   id: string,
   attemptId: string,
@@ -143,6 +170,12 @@ export async function finishEventAction(
     await updateEvent(id, (event) => {
       const execution = event.metadata?.execution;
       if (!execution || execution.attemptId !== attemptId) return event;
+      // Never downgrade an "external_accepted" marker to "failed": the provider
+      // write already went through, so unblocking the claim would let a retry
+      // duplicate it. Keep it blocking so an operator reconciles instead.
+      if (execution.state === "external_accepted" && outcome.state === "failed") {
+        return event;
+      }
       return {
         ...event,
         metadata: {

@@ -1,5 +1,5 @@
 import { executeAgentPrompt } from "./agent-executor";
-import { claimEventAction, finishEventAction, getEvent, getEventRaw, resolveEvent, updateEvent } from "./events";
+import { claimEventAction, finishEventAction, getEvent, getEventRaw, markExecutionExternalAccepted, resolveEvent, updateEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
 import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
@@ -212,6 +212,9 @@ async function executeResolvedEventAction(
         const r = await gbpOp.execute({ tenantId, event });
         if (!r.ok) return { changed: false, reason: r.reason };
         activity = r.activity;
+        // The write is live on Google — mark acceptance BEFORE resolving so a
+        // lost resolve-lock or crash can't let a retry duplicate the post.
+        await markExecutionExternalAccepted(eventId);
       }
       const resolved = await resolveEvent(eventId, action, { actor: "user" });
       if (resolved.changed && action === "approved" && activity) {
@@ -304,6 +307,9 @@ async function executeResolvedEventAction(
       // send doesn't re-deliver batches Resend already accepted.
       const result = await sendNewsletter(tenantId, { subject, body, idempotencyKeyPrefix: eventId });
       if (!result.success) return { changed: false, reason: result.reason || "newsletter_failed" };
+      // Mails accepted by Resend — mark acceptance before resolving (a retry is
+      // idempotency-keyed, but the marker also blocks a re-claim entirely).
+      await markExecutionExternalAccepted(eventId);
     }
     const resolved = await resolveEvent(eventId, action, { actor: "user" });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
@@ -328,6 +334,9 @@ async function executeResolvedEventAction(
       const { publishReviewReply } = await import("./gbp-replies");
       const result = await publishReviewReply(tenantId, reviewId, replyText);
       if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      // Reply accepted by Google — mark acceptance before resolving so a lost
+      // lock / crash can't let a retry re-post it.
+      await markExecutionExternalAccepted(eventId);
       // Mirror the published reply onto the review row (keyed by the Google
       // external id) so the auto-post backlog no longer treats the review as
       // unreplied and re-drafts + re-posts it in an endless loop.

@@ -735,7 +735,12 @@ export interface UnifiedEvent {
   status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';
   metadata?: Record<string, unknown> & {
     execution?: {
-      state: "processing" | "completed" | "failed";
+      // "external_accepted": the non-idempotent external write (GBP post/hours/
+      // photo, review reply, newsletter) was ACCEPTED by the provider but the
+      // event may not have resolved (lost lock / Redis blip). It is a BLOCKING
+      // state — claimEventAction refuses to re-grant so a retry can't duplicate
+      // the write; an operator reconciles instead.
+      state: "processing" | "external_accepted" | "completed" | "failed";
       action: "approved" | "dismissed";
       actor: string;
       attemptId: string;

@@ -13,7 +13,7 @@ const redis = {
 
 vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
 
-import { claimEventAction, finishEventAction } from "@/lib/events";
+import { claimEventAction, finishEventAction, markExecutionExternalAccepted } from "@/lib/events";
 
 describe("event action claim", () => {
   beforeEach(() => {
@@ -58,6 +58,30 @@ describe("event action claim", () => {
     // expires, but no completed/failed outcome was recorded.
     store.delete("event-action:evt_1");
 
+    await expect(claimEventAction("evt_1", "approved", "owner")).resolves.toEqual({
+      acquired: false,
+      reason: "action_reconciliation_required",
+    });
+  });
+
+  it("blocks a re-claim after an external write was accepted (no duplicate publish)", async () => {
+    const first = await claimEventAction("evt_1", "approved", "owner");
+    expect(first.acquired).toBe(true);
+
+    // The provider accepted the non-idempotent write; mark acceptance.
+    await markExecutionExternalAccepted("evt_1");
+    expect(
+      (store.get("event:evt_1") as { metadata: { execution: { state: string } } }).metadata.execution.state,
+    ).toBe("external_accepted");
+
+    // The subsequent resolve failed (lost lock / crash) — finish as failed.
+    if (first.acquired) await finishEventAction("evt_1", first.attemptId, { state: "failed" });
+    // The marker must NOT be downgraded to "failed" — it stays blocking.
+    expect(
+      (store.get("event:evt_1") as { metadata: { execution: { state: string } } }).metadata.execution.state,
+    ).toBe("external_accepted");
+
+    // A retry is refused with reconciliation, not granted a fresh attempt.
     await expect(claimEventAction("evt_1", "approved", "owner")).resolves.toEqual({
       acquired: false,
       reason: "action_reconciliation_required",

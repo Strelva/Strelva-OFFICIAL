@@ -25,6 +25,7 @@ vi.mock("../lib/events", () => ({
   resolveEvent: (...args: unknown[]) => mockResolveEvent(...args),
   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
+  markExecutionExternalAccepted: vi.fn(async () => {}),
 }));
 
 vi.mock("../lib/suggestions", () => ({
