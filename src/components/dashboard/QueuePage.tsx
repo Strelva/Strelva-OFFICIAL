@@ -26,9 +26,11 @@ interface QueuePageProps {
   pendingCount: number;
   staleSectionCount?: number;
   compact?: boolean;
+  /** Super-admin/operator view — surfaces the custom-request fulfillment controls. */
+  isOperator?: boolean;
 }
 
-export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0, compact = false }: QueuePageProps) {
+export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0, compact = false, isOperator = false }: QueuePageProps) {
   const dashboard = useDashboardOptional();
   const dashboardHref = useMemo(
     () => dashboard?.dashboardHref ?? ((path: string) => path),
@@ -244,6 +246,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
                         onDismiss={handleDismiss}
                         onWorkflowAction={handleWorkflowAction}
                         disabled={processingIds.has(event.id)}
+                        isOperator={isOperator}
                       />
                       <QueueEventDetail event={event} />
                     </>

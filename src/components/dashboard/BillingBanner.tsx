@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface BillingBannerProps {
@@ -68,10 +69,10 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
         </div>
         <button
           onClick={() => setDismissed(true)}
-          className="ml-4 shrink-0 text-lg leading-none opacity-60 hover:opacity-100"
+          className="ml-4 shrink-0 flex items-center justify-center opacity-60 hover:opacity-100"
           aria-label="Dismiss"
         >
-          x
+          <X className="h-4 w-4" strokeWidth={2} />
         </button>
       </div>
     );

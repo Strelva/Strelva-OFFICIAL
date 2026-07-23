@@ -89,7 +89,7 @@ export function ConversationShell({
           </button>
           <div className="min-w-0">
             <span className="block text-[13px] font-medium text-warm-black leading-tight truncate">{businessName || "Dashboard"}</span>
-            <span className="block text-[11px] text-gray-muted leading-tight truncate">Business OS</span>
+            <span className="block text-[11px] text-gray-muted leading-tight truncate">Strelva</span>
           </div>
         </header>
 

@@ -97,12 +97,14 @@ function NoteEditor({
 }) {
   const [value, setValue] = useState(initialNote ?? "");
   const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
   const lastSavedRef = useRef(initialNote ?? "");
 
   async function handleBlur() {
     const trimmed = value.trim();
     if (trimmed === lastSavedRef.current.trim()) return;
     setSaving(true);
+    setFailed(false);
     try {
       const res = await fetch(`/api/admin/leads/${token}/workflow`, {
         method: "POST",
@@ -112,7 +114,12 @@ function NoteEditor({
       if (res.ok) {
         lastSavedRef.current = trimmed;
         onSave(trimmed);
+      } else {
+        setFailed(true);
       }
+    } catch {
+      // Network/throw — surface it so the note isn't silently lost.
+      setFailed(true);
     } finally {
       setSaving(false);
     }
@@ -130,6 +137,9 @@ function NoteEditor({
       />
       {saving && (
         <span className="absolute right-2 bottom-2 text-[10px] text-gray-faint">saving…</span>
+      )}
+      {!saving && failed && (
+        <span className="absolute right-2 bottom-2 text-[10px] text-critical">not saved — blur to retry</span>
       )}
     </div>
   );

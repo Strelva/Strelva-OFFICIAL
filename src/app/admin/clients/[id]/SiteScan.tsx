@@ -60,7 +60,7 @@ export function SiteScan({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      const cats: FreshCategory[] = data.categories;
+      const cats: FreshCategory[] = Array.isArray(data.categories) ? data.categories : [];
       setScan({
         url: data.url,
         scannedAt: data.scannedAt,

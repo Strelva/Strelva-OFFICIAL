@@ -3,6 +3,7 @@ import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePo
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
+import { isSuperAdmin } from "@/lib/auth";
 import { getClickCounts, getActivity, getDailyMetrics } from "@/lib/storage";
 import { getNeedsYouData } from "@/lib/needs-you";
 import { QueuePage } from "@/components/dashboard/QueuePage";
@@ -24,6 +25,7 @@ import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 
 async function DashboardHome() {
   const { tenant, clientFallbackRoot } = await requireDashboardView();
+  const isOperator = await isSuperAdmin();
 
   const [
     pageViews,
@@ -261,6 +263,7 @@ async function DashboardHome() {
                   initialResolved={needsYou.resolved}
                   pendingCount={needsYou.pendingCount}
                   staleSectionCount={needsYou.staleSectionCount}
+                  isOperator={isOperator}
                   compact
                 />
               </div>

@@ -8,7 +8,7 @@ interface ClearSmsButtonProps {
 }
 
 export function ClearSmsButton({ tenantId }: ClearSmsButtonProps) {
-  const [step, setStep] = useState<"idle" | "confirm" | "loading" | "done" | "error">("idle");
+  const [step, setStep] = useState<"idle" | "confirm" | "loading" | "done" | "nothing" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   async function handleClear() {
@@ -26,7 +26,9 @@ export function ClearSmsButton({ tenantId }: ClearSmsButtonProps) {
         setStep("error");
         return;
       }
-      setStep("done");
+      // The route returns 200 { cleared: false } when there was no stale key to
+      // remove — report that honestly instead of claiming a clear happened.
+      setStep(data.cleared ? "done" : "nothing");
     } catch {
       setError("Network error");
       setStep("error");
@@ -35,6 +37,10 @@ export function ClearSmsButton({ tenantId }: ClearSmsButtonProps) {
 
   if (step === "done") {
     return <span className="text-xs text-positive">Cleared</span>;
+  }
+
+  if (step === "nothing") {
+    return <span className="text-xs text-gray-muted">Nothing to clear</span>;
   }
 
   if (step === "error") {

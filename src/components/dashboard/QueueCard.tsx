@@ -28,6 +28,22 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   instagram: <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />,
 };
 
+// Owner-facing label for an event's source — never the raw internal slug
+// ("vegaro", "website"). The owner reads where it came from, not our plumbing.
+const SOURCE_LABELS: Record<string, string> = {
+  google: "Google",
+  yelp: "Yelp",
+  instagram: "Instagram",
+  ai: "Strelva",
+  website: "Your website",
+  calendly: "Booking",
+  vegaro: "Booking",
+};
+
+function formatEventSource(source: string): string {
+  return SOURCE_LABELS[source] ?? source.charAt(0).toUpperCase() + source.slice(1);
+}
+
 function formatEventStatus(event: UnifiedEvent): string {
   if (event.status === "approved") {
     // Structural changes are handed to the builder, not auto-published — don't
@@ -63,6 +79,14 @@ interface QueueCardProps {
   onDismiss: (id: string) => void;
   onWorkflowAction?: (id: string, action: "triaged" | "quoted" | "accepted" | "in_progress" | "shipped" | "declined") => void;
   disabled?: boolean;
+  /**
+   * Operator (super-admin) view. The custom-change-request fulfillment controls
+   * (Triaged/Start/Shipped/Decline), the internal repo name, and the triage-due
+   * date are operator-only — a client only ever sees a plain-English status of
+   * their request, never the workflow buttons or the repo. Defaults to false so
+   * the client-facing queue can't leak operator internals.
+   */
+  isOperator?: boolean;
 }
 
 function metadataString(event: UnifiedEvent, key: string): string | null {
@@ -80,7 +104,18 @@ function formatWorkflowStatus(status: string | null): string {
   return "Requested";
 }
 
-export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled }: QueueCardProps) {
+// Client-facing status for a custom change request. The operator pipeline
+// (triaged/quoted/accepted) is internal — the owner just needs to know we have
+// it and we're on it, never the fulfillment stage or the repo.
+function formatClientRequestStatus(status: string | null): string {
+  if (status === "shipped") return "Done";
+  if (status === "declined") return "Declined";
+  if (status === "in_progress") return "In progress";
+  if (status === "requested" || status === null) return "Received";
+  return "In progress";
+}
+
+export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled, isOperator = false }: QueueCardProps) {
   const colors = SOURCE_COLORS[event.source] || SOURCE_COLORS.default;
   const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
   const isPending = event.status === "pending";
@@ -211,7 +246,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
-              {isCustomRequest ? "site change request" : event.source}
+              {isCustomRequest ? "site change request" : formatEventSource(event.source)}
             </span>
             <span className="text-[11px] text-gray-subtle">
               {formatTimestamp(event.createdAt)}
@@ -239,14 +274,14 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
           {isCustomRequest && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className="rounded-full bg-warning0/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-                {formatWorkflowStatus(workflowStatus)}
+                {isOperator ? formatWorkflowStatus(workflowStatus) : formatClientRequestStatus(workflowStatus)}
               </span>
-              {repoName && (
+              {isOperator && repoName && (
                 <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
                   Repo: {repoName}
                 </span>
               )}
-              {triageDueAt && workflowStatus === "requested" && (
+              {isOperator && triageDueAt && workflowStatus === "requested" && (
                 <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
                   Triage by {new Date(triageDueAt).toLocaleDateString()}
                 </span>
@@ -256,7 +291,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         </div>
 
         {/* Actions */}
-        {isPending && !disabled && isCustomRequest && onWorkflowAction && (
+        {isPending && !disabled && isCustomRequest && isOperator && onWorkflowAction && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
             {workflowStatus === "requested" && (
               <button
