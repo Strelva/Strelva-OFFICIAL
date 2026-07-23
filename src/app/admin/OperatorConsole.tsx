@@ -463,15 +463,11 @@ export function OperatorConsole() {
   }
 
   return (
-    <div ref={rootRef} id="mission-control" className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
-      <div className="px-5 py-4 border-b border-glass-border flex items-center gap-2">
-        <span className="text-sm font-semibold text-warm-white">Mission Control</span>
-        <span className="text-xs text-gray-muted">
-          Ask about the portfolio, or propose a pay link / access grant
-        </span>
-      </div>
-
-      <div ref={scrollRef} className="max-h-[360px] overflow-y-auto px-5 py-4 space-y-3">
+    // No inner border/header — the enclosing "Mission Control" details panel
+    // already labels and frames this (a second nested "Mission Control" header
+    // read as two components glued together).
+    <div ref={rootRef} id="mission-control">
+      <div ref={scrollRef} className="max-h-[360px] overflow-y-auto space-y-3">
         {messages.length === 0 && (
           <div className="text-sm text-gray-muted space-y-1">
             <p>Try:</p>
@@ -536,7 +532,7 @@ export function OperatorConsole() {
         })}
       </div>
 
-      <div className="px-5 py-3 border-t border-glass-border flex gap-2">
+      <div className="mt-3 pt-3 border-t border-glass-border flex gap-2">
         <input
           ref={inputRef}
           value={input}

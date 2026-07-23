@@ -194,8 +194,11 @@ describe("owner journey copy and links", () => {
 
     expect(sources).toContain("Connect your accounts");
     expect(sources).toContain("expands what we can see and update");
-    expect(sources).toContain("OAuth ready");
-    expect(sources).toContain("Manual Search Console setup");
+    // Plain-English setup status, no provider jargon ("OAuth ready" / "Manual
+    // Search Console setup" both leaked the mechanism).
+    expect(sources).toContain("Not connected yet");
+    expect(sources).toContain("Needs a quick manual step");
+    expect(sources).not.toContain("OAuth ready");
     expect(sources).not.toContain("Sources the AI can actually use");
     expect(detail).toContain("not OAuth");
     expect(badges).toContain("Setup needed");

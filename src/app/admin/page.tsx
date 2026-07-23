@@ -5,7 +5,6 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { Panel, PanelLink, PanelCount, Vital, ClientLogo, Chip, LaunchBar, GroupLabel, Meter } from "./console";
 import type { TenantConfig } from "@/lib/types";
 import { getActivity, listDrafts } from "@/lib/storage";
-import { CreateTenantForm } from "./CreateTenantForm";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getEffectiveSubscriptionStatus, isGrandfathered } from "@/lib/subscription";
@@ -248,8 +247,7 @@ export default async function AdminPage() {
       {/* Vitals */}
       <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <Vital label="Monthly revenue" value={`$${mrr.toLocaleString()}`}
-          verdict={<>{activeSubscriptions} paid{grandfatheredCount ? ` · ${grandfatheredCount} grandfathered` : ""}</>}
-          verdictTone={mrr === 0 ? "warn" : undefined} />
+          verdict={<>{activeSubscriptions} paid{grandfatheredCount ? ` · ${grandfatheredCount} grandfathered` : ""}</>} />
         <Vital label="Active clients" value={activeTenants}
           delta={todaySignups.length ? `+${todaySignups.length} wk` : undefined} deltaTone="good"
           verdict={todaySignups[0] ? <>{todaySignups[0].siteName} joined recently</> : "steady"} verdictTone={todaySignups[0] ? "good" : undefined} />
@@ -260,16 +258,6 @@ export default async function AdminPage() {
           delta={launchBlockedCount ? `${launchBlockedCount} blocked` : undefined} deltaTone="warn"
           verdict={<>{launchWatchCount} watch · {launchBlockedCount} blocked</>} />
       </div>
-
-      {/* Mission Control — default open so it's immediately discoverable */}
-      <details open className="group mb-4 rounded-2xl border border-glass-border bg-glass">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
-          <span className="font-semibold">Mission Control</span>
-          <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
-          <span className="hidden text-[12px] text-gray-muted group-open:inline">Collapse</span>
-        </summary>
-        <div className="border-t border-glass-border p-4"><OperatorConsole /></div>
-      </details>
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -369,24 +357,23 @@ export default async function AdminPage() {
             ))}
             {book.length === 0 && <div className="px-3 py-4 text-[12.5px] text-gray-faint">No active clients yet.</div>}
           </Panel>
-
-          {todaySignups.length > 0 && (
-            <Panel title="Recent signups" bodyClassName="px-2 pb-2.5">
-              {todaySignups.map((s) => (
-                <div key={s.tenantId} className="flex items-center gap-3 px-3 py-2.5">
-                  <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-positive/12"><UserPlus className="h-3.5 w-3.5 text-positive" strokeWidth={1.8} /></span>
-                  <div className="min-w-0 flex-1 text-[12.5px] text-warm-white"><b className="font-semibold">{s.siteName}</b> signed up</div>
-                </div>
-              ))}
-            </Panel>
-          )}
+          {/* "Recent signups" was a third copy of the same clients already in
+              "Your book" (and named on the Active-clients vital) — removed so no
+              entity is listed three times on one screen. */}
         </div>
       </div>
 
-      {/* Secondary tools */}
-      <div className="mt-6">
-        <CreateTenantForm />
-      </div>
+      {/* Mission Control sits BELOW the queue and is collapsed by default, so the
+          operator's real work ("Needs you") leads the page instead of an empty
+          prompt box. */}
+      <details className="group mt-6 rounded-2xl border border-glass-border bg-glass">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
+          <span className="font-semibold">Mission Control</span>
+          <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
+          <span className="hidden text-[12px] text-gray-muted group-open:inline">Collapse</span>
+        </summary>
+        <div className="border-t border-glass-border p-4"><OperatorConsole /></div>
+      </details>
 
       <div className="mt-6 rounded-2xl border border-warning/20 bg-warning/10 p-4 lg:hidden">
         <p className="text-[13px] font-medium text-warning">Admin works best on desktop</p>

@@ -57,18 +57,14 @@ function ConnectionRow({
   const canUseNow = connection.intelligenceStatus === "ai_using_it" ||
     connection.intelligenceStatus === "can_act_here" ||
     connection.intelligenceStatus === "signal_available";
+  // Plain-English status, no provider/connection-mechanism jargon. Search
+  // Console needs a manual grant, everything else is a one-click connect — say
+  // that, don't leak the mechanism.
   const setupCopy = connection.status === "connected"
-    ? "Connected account"
-    : connection.providerId === "google-business"
-      ? "OAuth ready"
-      : connection.providerId === "google-search-console"
-        ? "Manual Search Console setup"
-        : connection.connected
-          ? "Available"
-          : needsSetup
-            ? "Setup required"
-            : "Available";
-  const actionCopy = canUseNow ? "Ask Strelva" : "Connect first";
+    ? "Connected"
+    : connection.providerId === "google-search-console"
+      ? "Needs a quick manual step"
+      : "Not connected yet";
 
   return (
     <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-gray-border bg-surface-raised p-3.5 transition-colors hover:border-accent/25">
@@ -103,6 +99,9 @@ function ConnectionRow({
           {setupCopy}
         </p>
       </div>
+      {/* ONE action per row. When it's usable, the secondary "Ask Strelva" is a
+          live affordance; when it isn't, we don't render a dead disabled
+          "Connect first" button — the primary Set up IS the next step. */}
       <div className="mt-auto flex flex-wrap gap-2">
         <button
           type="button"
@@ -111,18 +110,15 @@ function ConnectionRow({
         >
           {needsSetup ? "Set up" : "Manage"}
         </button>
-        <button
-          type="button"
-          onClick={onRunAction}
-          disabled={!canUseNow}
-          className={`rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium transition-colors ${
-            canUseNow
-              ? "text-gray-muted hover:border-accent/35 hover:text-warm-black"
-              : "cursor-not-allowed text-gray-faint opacity-60"
-          }`}
-        >
-          {actionCopy}
-        </button>
+        {canUseNow && (
+          <button
+            type="button"
+            onClick={onRunAction}
+            className="rounded-lg border border-gray-border bg-surface-raised px-3 py-1.5 text-[11px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-black"
+          >
+            Ask Strelva
+          </button>
+        )}
       </div>
     </div>
   );
@@ -226,35 +222,29 @@ export function ConnectionsPage() {
     return searched;
   }, [allConnections, searchedConnectionIds, activeTab]);
 
+  const connectedCount = allConnections.filter((c) => c.connected).length;
+  const totalCount = allConnections.length;
+  // The single "do this first" integration — Google Business — shown ONCE as a
+  // hero and then excluded from the list below, so it never triple-lists
+  // (priorities grid + recommended banner + available row was the old bug).
+  const featured =
+    allConnections.find((connection) => connection.id === "google-business" && connection.status !== "connected") ??
+    allConnections.find((connection) => connection.id === "website-activity" && connection.status !== "connected");
+  const showHero = !query.trim() && !!featured;
+  const heroId = showHero ? featured?.id : undefined;
+
   const groupedConnections = useMemo(() => {
-    const connected = connections.filter((c) => c.connected);
-    const available = connections.filter((c) => !c.connected);
+    // The hero (Google Business, first-run) is pulled OUT of the list so one
+    // integration is never shown twice on this screen.
+    const listed = connections.filter((c) => c.id !== heroId);
+    const connected = listed.filter((c) => c.connected);
+    const available = listed.filter((c) => !c.connected);
     return [
       { key: "connected", label: "Connected", connections: connected },
       { key: "available", label: "Available", connections: available },
     ].filter((group) => group.connections.length > 0);
-  }, [connections]);
+  }, [connections, heroId]);
 
-  const usableNowCount = allConnections.filter((c) =>
-    c.intelligenceStatus === "ai_using_it" ||
-    c.intelligenceStatus === "can_act_here" ||
-    c.intelligenceStatus === "signal_available"
-  ).length;
-  const needsSetupCount = allConnections.filter((c) =>
-    c.status === "not_configured" || c.status === "needs_reauth" || c.status === "sync_failed"
-  ).length;
-  const featured =
-    allConnections.find((connection) => connection.id === "google-business" && connection.status !== "connected") ??
-    allConnections.find((connection) => connection.id === "website-activity") ??
-    allConnections[0];
-  const sourcePriorities = allConnections
-    .filter((connection) =>
-      connection.intelligenceStatus === "ai_using_it" ||
-      connection.intelligenceStatus === "can_act_here" ||
-      connection.intelligenceStatus === "signal_available" ||
-      connection.id === featured?.id
-    )
-    .slice(0, 4);
   const runConnectionPrompt = (connection: Connection) => {
     const prompt =
       connection.sourcePrompt ||
@@ -273,14 +263,9 @@ export function ConnectionsPage() {
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
             Integrations
           </p>
-          <div className="flex items-baseline gap-3">
-            <h1 className="font-display text-[24px] sm:text-[30px] font-normal text-warm-black tracking-[-0.01em]">
-              Connect your accounts
-            </h1>
-            <span className="text-[13px] text-gray-muted">
-              {usableNowCount} active
-            </span>
-          </div>
+          <h1 className="font-display text-[26px] sm:text-[32px] font-medium text-warm-black tracking-[-0.01em]">
+            Connect your accounts
+          </h1>
         </div>
         <div className="flex items-center gap-2 bg-surface-inset border border-glass-border rounded-xl px-3.5 py-2 w-full sm:w-fit">
           <Search className="w-4 h-4 text-gray-subtle" strokeWidth={1.5} />
@@ -292,63 +277,29 @@ export function ConnectionsPage() {
           />
         </div>
       </div>
-      <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-6 sm:mb-8">
+      <p className="text-[14px] text-gray-muted leading-relaxed max-w-[640px] mb-2">
         Connect the accounts Strelva manages for you: Google Business, reviews, booking, and more. Each one expands what we can see and update on your behalf.
       </p>
+      <p className="text-[13px] text-gray-faint mb-6 sm:mb-8">
+        {connectedCount} of {totalCount} connected
+      </p>
 
-      {!query.trim() && (
-        <div className="mb-6 rounded-2xl border border-glass-border bg-glass p-4">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Connected accounts</p>
-              <p className="mt-1 text-[13px] text-gray-muted">
-                {usableNowCount} active. {needsSetupCount} need setup before we can use them.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveTab("Needs attention")}
-              className="inline-flex min-h-[34px] w-full items-center justify-center rounded-lg border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:border-accent/35 hover:text-warm-black sm:w-auto"
-            >
-              Review setup
-            </button>
+      {showHero && featured && (
+        <button
+          type="button"
+          onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
+          className="mb-8 flex w-full items-center gap-4 rounded-2xl border border-accent/25 bg-accent-dim/60 p-4 text-left transition-colors hover:border-accent/45 sm:p-5"
+        >
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${featured.iconBg}`}>
+            <span className={`text-[15px] font-bold ${featured.iconColor}`}>{featured.icon}</span>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            {sourcePriorities.map((connection) => (
-              <button
-                key={`priority-${connection.id}`}
-                type="button"
-                onClick={() => router.push(dashboardHref(`/dashboard/sources/${connection.id}`))}
-                className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-gray-border bg-surface-raised px-3 py-2.5 text-left transition-colors hover:border-accent/30"
-              >
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${connection.iconBg}`}>
-                  <span className={`text-[11px] font-bold ${connection.iconColor}`}>{connection.icon}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-warm-black">{connection.name}</p>
-                  <p className="truncate text-[12px] text-gray-muted">{connection.addsIntelligence}</p>
-                </div>
-                <SourceHealthBadge
-                  status={connection.status}
-                  lastSync={connection.lastSyncedAt}
-                  compact
-                  className="hidden shrink-0 sm:inline-flex"
-                />
-              </button>
-            ))}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-accent-text">Recommended first</p>
+            <p className="mt-1 text-[15px] font-medium tracking-[-0.01em] text-warm-black">{featured.name}</p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-gray-muted">{featured.description}</p>
           </div>
-          {featured && (
-            <button
-              type="button"
-              onClick={() => router.push(dashboardHref(`/dashboard/sources/${featured.id}`))}
-              className="mt-3 w-full rounded-xl border border-accent/25 bg-accent-dim px-3 py-2.5 text-left transition-colors hover:border-accent/45"
-            >
-              <p className="text-[11px] uppercase tracking-[0.12em] text-accent">Recommended</p>
-              <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{featured.name}</p>
-              <p className="mt-1 text-[12px] text-gray-muted">{featured.description}</p>
-            </button>
-          )}
-        </div>
+          <ChevronRight className="hidden h-4 w-4 shrink-0 text-accent sm:block" strokeWidth={1.5} />
+        </button>
       )}
 
       {/* Filter tabs */}

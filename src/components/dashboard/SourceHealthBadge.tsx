@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   not_configured: {
     icon: RefreshCw,
-    label: "Not configured",
+    label: "Not connected yet",
     bg: "bg-gray-bg",
     text: "text-gray-muted",
     dot: "bg-gray-muted",
@@ -52,7 +52,7 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
   unknown: {
     icon: AlertCircle,
-    label: "Unknown",
+    label: "Not connected yet",
     bg: "bg-gray-bg",
     text: "text-gray-muted",
     dot: "bg-gray-muted",
