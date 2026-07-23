@@ -72,10 +72,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // 2. Order confirmation email (best-effort). Needs RESEND_API_KEY +
     //    ORDER_EMAIL_FROM (a verified Resend sender) + the customer's email.
+    //    KILL-SWITCH: gated behind SCAFFOLD_CUSTOMER_EMAIL_ENABLED="true" so a
+    //    client site can be launched with commerce live but customer email held
+    //    (mirrors the control-plane customer kill-switch). Unset/"" ⇒ no send.
+    const customerEmailEnabled = process.env.SCAFFOLD_CUSTOMER_EMAIL_ENABLED === "true";
     const customerEmail = session.customer_details?.email;
     const resendKey = process.env.RESEND_API_KEY;
     const from = process.env.ORDER_EMAIL_FROM;
-    if (resendKey && from && customerEmail && typeof amountCents === "number") {
+    if (customerEmailEnabled && resendKey && from && customerEmail && typeof amountCents === "number") {
       try {
         const { Resend } = await import("resend");
         const total = (amountCents / 100).toLocaleString("en-US", { style: "currency", currency });

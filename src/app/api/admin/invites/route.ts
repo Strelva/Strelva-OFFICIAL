@@ -12,10 +12,10 @@ import {
 import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
-import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
+import { sendEmail } from "@/lib/email/send";
 import { sendWelcomeEmail } from "@/lib/delivery-email";
 
 function normalizeEmail(value: unknown): string | null {
@@ -160,51 +160,33 @@ export async function POST(req: Request) {
   }
 
   if (process.env.RESEND_API_KEY) {
-    try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
+    // Route through the shared transport boundary (correct from-domain — never
+    // the root Google-Workspace domain — replyTo default, audience gate). We
+    // already returned above when email is paused, so a false here is a real
+    // send failure.
+    const sent = await sendEmail({
+      audience: "client",
+      to: email,
+      subject: `You're invited to manage ${siteNameText}`,
+      html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
+      text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
+    });
 
-      const result = await resend.emails.send({
-        from: `${BRAND_NAME} <hello@${process.env.RESEND_DOMAIN || ROOT_DOMAIN}>`,
-        to: email,
-        subject: `You're invited to manage ${siteNameText}`,
-        html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
-        text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
-      });
-      if (result.error || !result.data?.id) {
-        throw new Error(result.error?.message || "Resend did not return an email id.");
-      }
+    await logAuditEvent({
+      tenant: tenantId,
+      action: "invite.send",
+      targetType: "user",
+      targetId: email,
+      actor: await getActorContext(tenantId),
+      metadata: { role, emailSent: sent },
+    });
 
-      await logAuditEvent({
-        tenant: tenantId,
-        action: "invite.send",
-        targetType: "user",
-        targetId: email,
-        actor: await getActorContext(tenantId),
-        metadata: { role, emailSent: true },
-      });
-
-      return NextResponse.json({
-        success: true,
-        emailSent: true,
-        signUpUrl,
-        message: `Invite sent to ${email}`,
-      });
-    } catch (err) {
-      console.error("[invite] Email send failed:", err);
+    if (!sent) {
       await alertInviteEmailGap({
         email,
         tenantId,
         signUpUrl,
-        reason: err instanceof Error ? err.message : "Resend send failed",
-      });
-      await logAuditEvent({
-        tenant: tenantId,
-        action: "invite.send",
-        targetType: "user",
-        targetId: email,
-        actor: await getActorContext(tenantId),
-        metadata: { role, emailSent: false },
+        reason: "Resend send failed",
       });
       return NextResponse.json({
         success: true,
@@ -213,6 +195,13 @@ export async function POST(req: Request) {
         message: `Invite created but email failed. Share this link: ${signUpUrl}`,
       });
     }
+
+    return NextResponse.json({
+      success: true,
+      emailSent: true,
+      signUpUrl,
+      message: `Invite sent to ${email}`,
+    });
   }
 
   await alertInviteEmailGap({

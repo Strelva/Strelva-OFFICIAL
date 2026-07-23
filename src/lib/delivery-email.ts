@@ -850,7 +850,11 @@ export async function sendDeliveryStatusEmail(params: {
     const subjectBusinessName = cleanSubjectText(params.businessName);
 
     return await sendEmail({
-      audience: "client",
+      // A build-request confirmation goes to a PROSPECT (no tenant yet), same
+      // class as the audit-report scorecard — not the client lifecycle audience.
+      // Under "client" it was suppressed by the (default-off) client kill-switch
+      // while prospect mail flows, so prospects never got their confirmation.
+      audience: "prospect",
       to: params.email,
       subject: `We received ${subjectBusinessName}'s site request`,
       html: buildDeliveryStatusEmailHtml({

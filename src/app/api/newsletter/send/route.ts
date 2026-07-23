@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantPermission } from "@/lib/auth";
-import { getSubscribers, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
-import { EMAIL_DOMAIN } from "@/lib/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { sanitizeEmailHtml, htmlToPlainText } from "@/lib/email-html";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { sendNewsletter } from "@/lib/newsletter";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -47,75 +43,31 @@ export async function POST(req: Request) {
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 
-    const subscribers = await getSubscribers(tenant);
-    const activeSubscribers = subscribers.filter((s) => s.status === "active");
-
-    if (activeSubscribers.length === 0) {
-      return NextResponse.json(
-        { error: "No active subscribers to send to" },
-        { status: 400 }
-      );
-    }
-
-    const settings = await getContent("settings", tenant);
-    const fromName = sanitizeEmailSubjectText(settings.siteName || "Newsletter");
-
-    // Sanitize the editor-supplied HTML once before it fans out to every
-    // subscriber — strips <script>, event handlers, javascript:/data: URLs.
-    const safeHtml = sanitizeEmailHtml(body);
-    const safeText = htmlToPlainText(body);
-
-    // Use Resend if configured and sending isn't paused, else log (dev/paused).
-    if (process.env.RESEND_API_KEY && !emailSendingPaused()) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
-
-      const emailDomain = process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
-      const emails = activeSubscribers.map((s) => s.email);
-
-      // Send via Resend batch (up to 100 per batch)
-      const batchSize = 100;
-      for (let i = 0; i < emails.length; i += batchSize) {
-        const batch = emails.slice(i, i + batchSize);
-        await resend.batch.send(
-          batch.map((to) => ({
-            from: `${fromName} <newsletter@${emailDomain}>`,
-            to,
-            subject: sanitizeEmailSubjectText(subject),
-            html: safeHtml,
-            text: safeText,
-            // Bulk-sender requirement: every campaign email carries an
-            // unsubscribe affordance the mail client can surface.
-            headers: {
-              "List-Unsubscribe": `<mailto:unsubscribe@${emailDomain}?subject=unsubscribe%20${encodeURIComponent(
-                tenant
-              )}%20${encodeURIComponent(to)}>`,
-              ...(previewText ? { "X-Preview-Text": previewText } : {}),
-            },
-          }))
-        );
+    // One implementation for both the manual send and the approve-the-draft path
+    // (event-actions). sendNewsletter owns sanitize + batch + the Resend error
+    // check + per-batch idempotency; don't re-inline that here.
+    const result = await sendNewsletter(tenant, { subject, body, previewText });
+    if (!result.success) {
+      if (result.reason === "no_subscribers") {
+        return NextResponse.json({ error: "No active subscribers to send to" }, { status: 400 });
       }
-
-      return NextResponse.json({
-        success: true,
-        subscriberCount: activeSubscribers.length,
-        message: `Newsletter sent to ${activeSubscribers.length} subscribers`,
-      });
+      if (result.reason === "paused") {
+        return NextResponse.json({
+          success: true,
+          subscriberCount: 0,
+          message: "Newsletter recorded — sending is currently paused.",
+        });
+      }
+      return NextResponse.json({ error: "Failed to send newsletter" }, { status: 502 });
     }
-
-    // Dev mode — log to console
-    console.log("=== NEWSLETTER (dev mode — no RESEND_API_KEY) ===");
-    console.log(`From: ${fromName}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`To: ${activeSubscribers.length} subscribers`);
-    console.log(`Body: ${body.substring(0, 200)}...`);
-    console.log("================================================");
 
     return NextResponse.json({
       success: true,
-      subscriberCount: activeSubscribers.length,
-      message: `Newsletter logged to console (dev mode) — ${activeSubscribers.length} subscribers`,
-      devMode: true,
+      subscriberCount: result.subscriberCount,
+      message: result.devMode
+        ? `Newsletter logged to console (dev mode) — ${result.subscriberCount} subscribers`
+        : `Newsletter sent to ${result.subscriberCount} subscribers`,
+      ...(result.devMode ? { devMode: true } : {}),
     });
   } catch (err) {
     console.error("Newsletter send error:", err);
