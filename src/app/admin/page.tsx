@@ -211,7 +211,10 @@ export default async function AdminPage() {
       quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
     }));
 
-  const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length;
+  // Portfolio flags render INSIDE the "Needs you" panel, so they must count
+  // toward its "N open" header + the NEEDS YOU vital — otherwise the panel says
+  // "0 open" directly above five launch-blocked rows.
+  const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length + flags.length;
   const unavailableSources = Array.from(new Set([
     ...tenantData.flatMap((data) => data.unavailableSources),
     ...[deliveryLeadsRead, pendingDigestsRead, atRiskRead, leadWorkflowRead]
@@ -253,7 +256,7 @@ export default async function AdminPage() {
           verdict={todaySignups[0] ? <>{todaySignups[0].siteName} joined recently</> : "steady"} verdictTone={todaySignups[0] ? "good" : undefined} />
         <Vital label="Needs you" value={needsYouCount}
           delta={needsYouCount ? "act" : undefined} deltaTone="crit"
-          verdict={<>{todayAtRisk.length} at-risk · {todayApprovals.total} approvals</>} verdictTone={needsYouCount ? "crit" : undefined} />
+          verdict={<>{todayApprovals.total} approvals · {todayAtRisk.length} at-risk{flags.length ? ` · ${flags.length} flags` : ""}</>} verdictTone={needsYouCount ? "crit" : undefined} />
         <Vital label="Launch-ready" value={`${launchReadyCount}/${TENANTS.length}`}
           delta={launchBlockedCount ? `${launchBlockedCount} blocked` : undefined} deltaTone="warn"
           verdict={<>{launchWatchCount} watch · {launchBlockedCount} blocked</>} />
@@ -324,10 +327,12 @@ export default async function AdminPage() {
           <Panel title="Portfolio" trailing={<PanelLink href="/admin/clients">Details →</PanelLink>} bodyClassName="space-y-4 px-[18px] pb-[18px] pt-0.5">
             <div>
               <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Launch readiness</p>
+              {/* A not-yet-launched client is amber (in progress), NOT red — red is
+                  reserved for real regressions, so a healthy day-one portfolio of
+                  new clients doesn't paint the whole meter like an outage. */}
               <Meter segments={[
                 { value: launchReadyCount, tone: "good", label: "ready" },
-                { value: launchWatchCount, tone: "warn", label: "watch" },
-                { value: launchBlockedCount, tone: "crit", label: "blocked" },
+                { value: launchWatchCount + launchBlockedCount, tone: "warn", label: "in progress" },
               ]} />
             </div>
             <div className="h-px bg-glass-border" />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, ChevronDown, CircleAlert, Loader2 } from "lucide-react";
+import { AdminEmpty } from "@/app/admin/console";
 import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
 import { resolvePortfolioActions, escalatePortfolioActions } from "./actions";
 import type {
@@ -218,12 +219,13 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
       </div>
 
       {totalItems === 0 ? (
-        <div className="rounded-xl border border-glass-border bg-glass px-5 py-10 text-center">
-          <p className="text-sm text-positive">Portfolio is clear.</p>
-          <Link href="/admin" className="mt-2 inline-block text-xs text-accent hover:underline">
-            Back to overview →
-          </Link>
-        </div>
+        <AdminEmpty
+          tone="good"
+          icon={<Check className="h-5 w-5" strokeWidth={2} />}
+          title="Portfolio is clear"
+          description="Nothing across any client needs drafting or approval right now."
+          action={{ label: "Back to overview", href: "/admin" }}
+        />
       ) : (
         <div className="space-y-4">
           {groups.map((group) => {

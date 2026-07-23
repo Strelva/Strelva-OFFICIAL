@@ -53,18 +53,17 @@ function ConnectionRow({
   onClick: () => void;
   onRunAction: () => void;
 }) {
-  const needsSetup = connection.status === "not_configured" || connection.status === "needs_reauth" || connection.status === "sync_failed";
+  const isConnected = connection.status === "connected";
   const canUseNow = connection.intelligenceStatus === "ai_using_it" ||
     connection.intelligenceStatus === "can_act_here" ||
     connection.intelligenceStatus === "signal_available";
-  // Plain-English status, no provider/connection-mechanism jargon. Search
-  // Console needs a manual grant, everything else is a one-click connect — say
-  // that, don't leak the mechanism.
-  const setupCopy = connection.status === "connected"
-    ? "Connected"
-    : connection.providerId === "google-search-console"
-      ? "Needs a quick manual step"
-      : "Not connected yet";
+  // The status CHIP is the single state indicator ("Connected" / "Not connected
+  // yet"). The eyebrow line is reserved for DIFFERENTIATED detail only — Search
+  // Console's manual-grant note — so we don't stamp "Not connected yet" twice on
+  // the same card (chip + eyebrow).
+  const detailCopy = !isConnected && connection.providerId === "google-search-console"
+    ? "Needs a quick manual step"
+    : null;
 
   return (
     <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-gray-border bg-surface-raised p-3.5 transition-colors hover:border-accent/25">
@@ -80,7 +79,6 @@ function ConnectionRow({
         >
           {connection.name}
         </button>
-        <span className="text-[12px] text-gray-muted block mt-0.5 leading-relaxed">{connection.addsIntelligence}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SourceHealthBadge status={connection.status} lastSync={connection.lastSyncedAt} compact />
@@ -94,21 +92,27 @@ function ConnectionRow({
         </button>
       </div>
       </div>
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
-          {setupCopy}
-        </p>
-      </div>
-      {/* ONE action per row. When it's usable, the secondary "Ask Strelva" is a
-          live affordance; when it isn't, we don't render a dead disabled
-          "Connect first" button — the primary Set up IS the next step. */}
+      {/* Description spans the full card width (not the narrow middle column)
+          so a short sentence doesn't ragged-wrap to 4-6 lines on a phone. */}
+      <span className="block text-[12px] leading-relaxed text-gray-muted">{connection.addsIntelligence}</span>
+      {detailCopy && (
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
+            {detailCopy}
+          </p>
+        </div>
+      )}
+      {/* ONE action per row. "Manage" only for an actually-connected integration;
+          everything not connected (incl. the "unknown"-status GSC row) says
+          "Set up" so the verb never implies a connection that isn't there. When
+          it's usable, the secondary "Ask Strelva" is a live affordance. */}
       <div className="mt-auto flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onClick}
           className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-on-accent transition-colors hover:bg-accent/85"
         >
-          {needsSetup ? "Set up" : "Manage"}
+          {isConnected ? "Manage" : "Set up"}
         </button>
         {canUseNow && (
           <button
@@ -323,11 +327,11 @@ export function ConnectionsPage() {
         <div className="space-y-8">
           {groupedConnections.map((group) => (
             <section key={group.key}>
-              <div className="mb-3 flex items-center justify-between">
+              {/* No per-group count — the header already carries the one honest
+                  "N of M connected" tally; a second "4 accounts" here (the hero
+                  is pulled out of the list) read as a contradiction. */}
+              <div className="mb-3">
                 <h2 className="text-[14px] font-medium text-warm-black">{group.label}</h2>
-                <span className="text-[11px] text-gray-faint">
-                  {group.connections.length} {group.connections.length === 1 ? "account" : "accounts"}
-                </span>
               </div>
               <div className="grid gap-3 xl:grid-cols-2">
                 {group.connections.map((connection) => (

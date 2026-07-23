@@ -84,7 +84,7 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
               No one has reached out yet
             </h1>
           </div>
-          <div className="flex min-h-[54vh] flex-col items-center justify-center rounded-xl dashboard-panel p-6 text-center">
+          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl dashboard-panel p-8 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-dim text-accent">
               <MessageSquare className="h-5 w-5" strokeWidth={1.5} />
             </div>

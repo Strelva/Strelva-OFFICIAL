@@ -4,7 +4,7 @@ import { CheckCircle, MessageCircle, Pencil, ShieldCheck } from "lucide-react";
 
 export function EmptyQueue() {
   return (
-    <div className="flex min-h-[56vh] flex-col items-center justify-center rounded-2xl border border-glass-border bg-glass px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-glass-border bg-glass px-6 py-12 text-center">
       <div className="w-11 h-11 rounded-xl bg-success-dim flex items-center justify-center mb-4">
         <CheckCircle className="w-5 h-5 text-success" />
       </div>

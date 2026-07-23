@@ -449,7 +449,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voi
             </h1>
           </div>
           {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} connectHref={connectHref} />}
-          <div className="flex min-h-[58vh] flex-col items-center justify-center rounded-2xl dashboard-panel p-8 text-center">
+          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl dashboard-panel p-8 text-center">
             <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-glass-border bg-glass text-accent-text">
               <div
                 aria-hidden

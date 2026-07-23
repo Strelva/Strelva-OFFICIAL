@@ -43,7 +43,7 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
         severity: "high",
         kind: "launch",
         tenant: t.id,
-        message: `Launch blocked: ${t.siteName || t.ownerName || t.id} (readiness ${t.launchScore}/100)`,
+        message: `${t.siteName || t.ownerName || t.id} isn't ready to launch yet — ${t.launchScore}% there`,
         href: `/admin/tenants/${t.id}`,
       });
     }

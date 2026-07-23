@@ -1,4 +1,8 @@
-import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
+import { notFound } from "next/navigation";
+import { requireDashboardView } from "@/lib/dashboard-auth";
+import { getTenantConfig } from "@/lib/tenants";
+import { tenantHasStore } from "@/lib/dashboard-surfaces";
+import { isInspecting } from "@/lib/inspect-mode";
 import { getOrderSummary, getOrders } from "@/lib/orders";
 import { getProducts } from "@/lib/products";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
@@ -6,15 +10,31 @@ import { StorePanel } from "@/components/dashboard/StorePanel";
 import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 // Store is a sub-section inside Website (the shared Website sub-nav switches
-// Site <-> Store). Reaching this route means the tenant has a store.
+// Site <-> Store). It must be reachable EXACTLY when the nav shows the tab, so
+// this route gates on the SAME `tenantHasStore` signal the sidebar uses
+// (published products OR the commerce feature flag) — NOT the feature flag
+// alone. Otherwise a real ecom client with products but no flag (e.g. gldf) gets
+// a Store tab that 404s on click. A super-admin inspecting a non-store tenant
+// still gets the read-only preview instead of a 404.
 export default async function StorePage() {
-  const { tenant, preview } = await requireDashboardFeature(["commerce", "products", "shop"]);
+  const { tenant } = await requireDashboardView();
 
-  const [summary, orders, products] = await Promise.all([
+  const [config, summary, orders, products] = await Promise.all([
+    getTenantConfig(tenant).catch(() => null),
     getOrderSummary(tenant, 30).catch(() => null),
     getOrders(tenant, 20).catch(() => []),
     getProducts(tenant).catch(() => []),
   ]);
+
+  const hasStore = tenantHasStore({
+    tenantConfig: { features: config?.features },
+    hasCommerce: products.length > 0,
+  });
+  let preview = false;
+  if (!hasStore) {
+    if (await isInspecting()) preview = true;
+    else notFound();
+  }
 
   return (
     <div className="flex h-full flex-col">

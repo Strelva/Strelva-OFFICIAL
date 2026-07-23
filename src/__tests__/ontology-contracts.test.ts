@@ -68,12 +68,16 @@ describe("ontology contracts", () => {
     ])).toBe(598);
   });
 
-  it("guards the Store route with the same commerce capability family as navigation", () => {
+  it("guards the Store route with the same tenantHasStore signal as navigation", () => {
+    // The nav shows the Store tab on tenantHasStore (published products OR the
+    // commerce flag); the route MUST gate on the same predicate, or a client
+    // with products but no flag gets a nav tab that 404s. See store/page.tsx.
     const source = readFileSync(
       path.join(process.cwd(), "src/app/dashboard/store/page.tsx"),
       "utf8",
     );
-    expect(source).toContain('requireDashboardFeature(["commerce", "products", "shop"])');
+    expect(source).toContain("tenantHasStore(");
+    expect(source).toContain("hasCommerce: products.length > 0");
   });
 
   it("keeps presence profile, feature sets, and commercial plans as independent vocabularies", () => {

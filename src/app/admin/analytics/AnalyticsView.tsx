@@ -103,10 +103,15 @@ function ConnectPrompt({ service }: { service: string }) {
 }
 
 function UnavailableNote() {
+  // State-agnostic: "unavailable" covers both a transient API miss AND a tenant
+  // whose reporting access was never granted (the GSC property is auto-derived
+  // from siteUrl, so an unconfigured tenant also reads "unavailable"). Don't
+  // assert "the connection is set" — it contradicts the Connection setup row
+  // below when nothing was ever configured. Point at that row instead.
   return (
     <p className="rounded-lg border border-glass-border bg-surface-base/30 px-5 py-4 text-xs text-gray-muted">
-      Couldn&apos;t fetch this right now. The connection is set, but the API
-      didn&apos;t answer. Try again shortly.
+      No data came back. If this tenant is set up, Google just didn&apos;t answer &mdash; try again shortly.
+      Otherwise grant the reporting service account below.
     </p>
   );
 }

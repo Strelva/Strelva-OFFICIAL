@@ -163,7 +163,7 @@ export function SiteHealthCard() {
       <div className="rounded-xl border border-glass-border bg-glass px-5 py-8 text-center">
         <p className="text-sm font-medium text-warm-black">Site health is not available yet</p>
         <p className="mt-1 text-[13px] text-gray-muted">
-          Your health score appears here once your site is live.
+          Strelva checks your site once a day. Your health score appears here after the first check.
         </p>
       </div>
     );

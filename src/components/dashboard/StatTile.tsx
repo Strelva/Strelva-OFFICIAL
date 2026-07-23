@@ -72,7 +72,7 @@ export function StatTile({
         {icon}
         <span className="text-[11px] font-medium uppercase tracking-[0.14em]">{label}</span>
       </div>
-      <p className="text-[28px] font-semibold leading-none text-warm-black">
+      <p className="font-display text-[30px] font-medium leading-none text-warm-black">
         {countUp && typeof value === "number" ? <CountUp end={value} /> : value}
       </p>
       {detail && <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{detail}</p>}

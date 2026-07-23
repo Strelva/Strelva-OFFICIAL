@@ -42,7 +42,9 @@ const SURFACES: Array<[string, string]> = [
   // --- Operator / admin console ---
   ["/admin", "admin-overview"],
   ["/admin/clients", "admin-clients"],
-  ["/admin/clients/gldf", "admin-client-detail"],
+  // rhm-innovations exists in dev-tenants.json; gldf did not, so this shot 404'd
+  // and left the richest admin surface (the client cockpit) unaudited.
+  ["/admin/clients/rhm-innovations", "admin-client-detail"],
   ["/admin/leads", "admin-leads"],
   ["/admin/analytics", "admin-analytics"],
   ["/admin/actions", "admin-actions"],

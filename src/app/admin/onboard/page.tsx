@@ -254,8 +254,8 @@ function OnboardForm() {
       <div>
         <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Onboard a client</h1>
         <p className="text-sm text-gray-muted mt-1">
-          Automates the tenant record, revalidation secret, owner invite, and the Vercel
-          project/env/domain. The site itself stays a hand-built repo you connect after.
+          Sets up the client record, owner invite, and hosting in one step. The site
+          itself stays a hand-built repo you connect after.
         </p>
       </div>
 
@@ -391,7 +391,7 @@ function OnboardForm() {
             disabled={running}
             className="rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
           >
-            {running ? "Provisioning…" : "Provision tenant"}
+            {running ? "Creating…" : "Create client"}
           </button>
         </div>
       )}

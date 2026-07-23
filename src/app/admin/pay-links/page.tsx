@@ -205,7 +205,7 @@ export default function PayLinksPage() {
               label="Link to client (optional)"
               value={form.tenantId}
               onChange={(v) => setForm({ ...form, tenantId: v })}
-              placeholder="tenant-id"
+              placeholder="client-id"
             />
             <p className="text-[11px] text-gray-faint mt-1">Leave blank if the client has no Strelva account yet. Links the row to their client page.</p>
           </div>
@@ -257,7 +257,7 @@ export default function PayLinksPage() {
           disabled={submitting}
           className="mt-4 rounded-md bg-accent text-on-accent px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
-          {submitting ? "Minting…" : "Mint payment link"}
+          {submitting ? "Creating…" : "Create payment link"}
         </button>
       </div>
 

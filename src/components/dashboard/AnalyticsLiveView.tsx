@@ -127,10 +127,12 @@ export function AnalyticsLiveView({
 
           <TrendChart metrics={stats.series} label={stats.range.label} />
 
-          {!stats.hasData && (
+          {/* Only when Google IS connected — otherwise the unified connect card
+              below already carries the "connect" ask, and this line duplicated it
+              outside any card. When connected, this is the honest zero-traffic note. */}
+          {!stats.hasData && (searchPerf?.status === "ok" || gaPerf?.status === "ok") && (
             <p className="text-[14px] leading-relaxed text-gray-muted">
-              No traffic in this window yet. Getting found is job one. Connect Google Business and keep the site
-              fresh so you start showing up, and this fills in as people find you.
+              No traffic in this window yet. As more people find you, this fills in.
             </p>
           )}
 
