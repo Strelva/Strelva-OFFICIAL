@@ -88,3 +88,6 @@ outbound/
 # one-shot ops script (run via `!` then delete); never commit
 clear-stale-reval-failures.mjs
 .env*
+
+# Playwright UX-capture build output (disposable, never deploy)
+.next-playwright/
