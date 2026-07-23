@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supa = vi.hoisted(() => ({
   result: { data: null as unknown, error: null as unknown },
+  // site_metric_summary RPC result (audit #4 — reads now aggregate server-side).
+  summaryResult: [] as unknown,
   lastTable: "",
   lastRpc: undefined as unknown,
   lastInsert: undefined as unknown,
@@ -43,6 +45,7 @@ vi.mock("@/lib/db/client", async (orig) => ({
   getSupabase: () => ({
     rpc: (name: string, args: unknown) => {
       supa.lastRpc = { name, args };
+      if (name === "site_metric_summary") return Promise.resolve({ data: supa.summaryResult, error: null });
       return Promise.resolve({ data: 1, error: null });
     },
     from: (t: string) => {
@@ -83,6 +86,7 @@ beforeEach(() => {
   supa.lastUpsert = undefined;
   supa.lastRpc = undefined;
   supa.lastTable = "";
+  supa.summaryResult = [];
 });
 
 afterEach(() => {
@@ -91,32 +95,19 @@ afterEach(() => {
 });
 
 describe("analytics-store Postgres dual-path", () => {
-  it("getClickCounts maps site_metrics rows into total/today/thisWeek/lastWeek", async () => {
-    // snake_case rows exactly as `site_metrics` returns them (metric/day/count).
-    supa.result = {
-      data: [
-        { day: today, count: 3 },
-        { day: dayOffset(2), count: 2 }, // within this week
-        { day: dayOffset(8), count: 5 }, // last week
-      ],
-      error: null,
-    };
+  it("getClickCounts maps the site_metric_summary RPC row into total/today/thisWeek/lastWeek", async () => {
+    // Reads aggregate server-side now (audit #4): one summary row per metric.
+    supa.summaryResult = [{ metric: "booking-click", total: 10, today: 3, last7: 5, prev7: 5 }];
 
     const counts = await getClickCounts("booking-click", TENANT);
 
-    expect(supa.lastTable).toBe("site_metrics");
+    expect(supa.lastRpc).toMatchObject({ name: "site_metric_summary", args: { p_tenant_id: TENANT } });
     expect(counts).toEqual({ total: 10, today: 3, thisWeek: 5, lastWeek: 5 });
   });
 
-  it("getLastClickDate returns the newest day from site_metrics rows", async () => {
-    supa.result = {
-      data: [
-        { day: dayOffset(5), count: 1 },
-        { day: dayOffset(1), count: 1 },
-        { day: dayOffset(9), count: 1 },
-      ],
-      error: null,
-    };
+  it("getLastClickDate returns the latest day (order desc + limit 1, not a full scan)", async () => {
+    // The real query returns just the newest row; the mock returns whatever we set.
+    supa.result = { data: [{ day: dayOffset(1) }], error: null };
 
     const last = await getLastClickDate("page-view", TENANT);
 
@@ -148,20 +139,16 @@ describe("analytics-store Postgres dual-path", () => {
     }
   });
 
-  it("getClickCountsByPrefix groups matching metrics into { total, thisWeek }", async () => {
-    supa.result = {
-      data: [
-        { metric: "cta-hero", day: today, count: 2 },
-        { metric: "cta-hero", day: dayOffset(10), count: 3 }, // outside week
-        { metric: "cta-footer", day: today, count: 1 },
-        { metric: "nav-click", day: today, count: 9 }, // wrong prefix, excluded
-      ],
-      error: null,
-    };
+  it("getClickCountsByPrefix groups matching metrics into { total, thisWeek } from the summary", async () => {
+    supa.summaryResult = [
+      { metric: "cta-hero", total: 5, today: 2, last7: 2, prev7: 0 },
+      { metric: "cta-footer", total: 1, today: 1, last7: 1, prev7: 0 },
+      { metric: "nav-click", total: 9, today: 9, last7: 9, prev7: 0 }, // wrong prefix, excluded
+    ];
 
     const byPrefix = await getClickCountsByPrefix("cta-", TENANT);
 
-    expect(supa.lastTable).toBe("site_metrics");
+    expect(supa.lastRpc).toMatchObject({ name: "site_metric_summary" });
     expect(byPrefix).toEqual({
       "cta-hero": { total: 5, thisWeek: 2 },
       "cta-footer": { total: 1, thisWeek: 1 },

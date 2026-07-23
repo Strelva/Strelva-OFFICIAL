@@ -43,22 +43,79 @@ async function pgIncrementMetric(tenant: string, metric: string): Promise<void> 
   }
 }
 
-/** All (day,count) rows for a metric in a tenant. Returns [] on any failure. */
+/** (day,count) rows for a metric in a tenant, optionally bounded to `day >=
+ *  sinceDay`. Returns [] on any failure. Callers that only need a recent window
+ *  MUST pass sinceDay — an unbounded read silently truncates at PostgREST's
+ *  1,000-row cap (audit #4). */
 async function pgMetricRows(
   tenant: string,
-  metric: string
+  metric: string,
+  sinceDay?: string
 ): Promise<Array<{ day: string; count: number }>> {
   const db = getSupabase();
   if (!db) return [];
   try {
-    const { data } = await db
+    let q = db
       .from("site_metrics")
       .select("day, count")
       .eq("tenant_id", tenant)
       .eq("metric", metric);
+    if (sinceDay) q = q.gte("day", sinceDay);
+    const { data } = await q;
     return (data ?? []) as Array<{ day: string; count: number }>;
   } catch {
     return [];
+  }
+}
+
+type MetricSummary = { total: number; today: number; last7: number; prev7: number };
+
+/**
+ * Per-metric aggregates (all-time total + today / this-week / prior-week) for a
+ * tenant, computed SERVER-SIDE via the site_metric_summary RPC — one row per
+ * metric, so it can never hit the 1,000-row cap the raw scan did (audit #4). If
+ * the RPC isn't deployed yet it falls back to the client-side scan (correctness
+ * matches under the cap; the RPC is the fix above it) — deploy-before-migrate safe.
+ */
+async function pgMetricSummary(tenant: string): Promise<Map<string, MetricSummary>> {
+  const db = getSupabase();
+  const out = new Map<string, MetricSummary>();
+  if (!db) return out;
+  const today = isoDay();
+  try {
+    // site_metric_summary isn't in the generated RPC types yet (new migration),
+    // so call through a narrow cast; the row shape is asserted below.
+    type SummaryRow = { metric: string; total: number; today: number; last7: number; prev7: number };
+    const rpc = db.rpc as unknown as (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: SummaryRow[] | null; error: unknown }>;
+    const { data, error } = await rpc("site_metric_summary", { p_tenant_id: tenant, p_today: today });
+    if (error) throw error;
+    for (const r of (data ?? []) as SummaryRow[]) {
+      out.set(r.metric, {
+        total: Number(r.total) || 0,
+        today: Number(r.today) || 0,
+        last7: Number(r.last7) || 0,
+        prev7: Number(r.prev7) || 0,
+      });
+    }
+    return out;
+  } catch {
+    const rows = await pgAllRows(tenant);
+    const week = new Set<string>();
+    for (let i = 0; i < 7; i++) week.add(isoDay(i));
+    const prevWeek = new Set<string>();
+    for (let i = 7; i < 14; i++) prevWeek.add(isoDay(i));
+    for (const r of rows) {
+      const s = out.get(r.metric) ?? { total: 0, today: 0, last7: 0, prev7: 0 };
+      s.total += r.count;
+      if (r.day === today) s.today += r.count;
+      if (week.has(r.day)) s.last7 += r.count;
+      if (prevWeek.has(r.day)) s.prev7 += r.count;
+      out.set(r.metric, s);
+    }
+    return out;
   }
 }
 
@@ -106,19 +163,13 @@ export async function getClickCounts(
   const today = new Date().toISOString().slice(0, 10);
 
   if (dataSourceIsPostgres()) {
-    const rows = await pgMetricRows(tenant, event);
-    const byDay = new Map<string, number>();
-    let total = 0;
-    for (const r of rows) {
-      byDay.set(r.day, (byDay.get(r.day) || 0) + r.count);
-      total += r.count;
-    }
-    const todayCount = byDay.get(today) || 0;
-    let weekCount = 0;
-    let lastWeekCount = 0;
-    for (let i = 0; i < 7; i++) weekCount += byDay.get(isoDay(i)) || 0;
-    for (let i = 7; i < 14; i++) lastWeekCount += byDay.get(isoDay(i)) || 0;
-    return { total, today: todayCount, thisWeek: weekCount, lastWeek: lastWeekCount };
+    const s = (await pgMetricSummary(tenant)).get(event);
+    return {
+      total: s?.total ?? 0,
+      today: s?.today ?? 0,
+      thisWeek: s?.last7 ?? 0,
+      lastWeek: s?.prev7 ?? 0,
+    };
   }
 
   const store = await readDevContent(tenant);
@@ -159,13 +210,23 @@ export async function getLastClickDate(
   tenant: string = DEFAULT_TENANT
 ): Promise<string | null> {
   if (dataSourceIsPostgres()) {
-    const rows = await pgMetricRows(tenant, event);
-    let newest: string | null = null;
-    for (const r of rows) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.day)) continue;
-      if (!newest || r.day > newest) newest = r.day;
+    // Just the latest row (the (tenant_id, day desc) index makes this O(1)), not
+    // a full-history scan. audit #4.
+    const db = getSupabase();
+    if (!db) return null;
+    try {
+      const { data } = await db
+        .from("site_metrics")
+        .select("day")
+        .eq("tenant_id", tenant)
+        .eq("metric", event)
+        .order("day", { ascending: false })
+        .limit(1);
+      const day = (data?.[0] as { day?: string } | undefined)?.day;
+      return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+    } catch {
+      return null;
     }
-    return newest;
   }
 
   const store = await readDevContent(tenant);
@@ -190,9 +251,12 @@ export async function getDailyMetrics(
   const result: DailyMetric[] = [];
 
   if (dataSourceIsPostgres()) {
-    const pageRows = await pgMetricRows(tenant, "page-view");
-    const bookingRows = await pgMetricRows(tenant, "booking-click");
-    const phoneRows = await pgMetricRows(tenant, "phone-click");
+    // The series only needs the last `days` days — bound the read so it never
+    // scans full history (and never trips the 1,000-row cap). audit #4.
+    const since = isoDay(days - 1);
+    const pageRows = await pgMetricRows(tenant, "page-view", since);
+    const bookingRows = await pgMetricRows(tenant, "booking-click", since);
+    const phoneRows = await pgMetricRows(tenant, "phone-click", since);
     const pageByDay = new Map<string, number>();
     const bookByDay = new Map<string, number>();
     const phoneByDay = new Map<string, number>();
@@ -235,14 +299,9 @@ export async function getClickCountsByPrefix(
   const result: Record<string, { total: number; thisWeek: number }> = {};
 
   if (dataSourceIsPostgres()) {
-    const rows = await pgAllRows(tenant);
-    const week = new Set<string>();
-    for (let i = 0; i < 7; i++) week.add(isoDay(i));
-    for (const r of rows) {
-      if (!r.metric.startsWith(prefix)) continue;
-      const bucket = (result[r.metric] ??= { total: 0, thisWeek: 0 });
-      bucket.total += r.count;
-      if (week.has(r.day)) bucket.thisWeek += r.count;
+    for (const [metric, s] of await pgMetricSummary(tenant)) {
+      if (!metric.startsWith(prefix)) continue;
+      result[metric] = { total: s.total, thisWeek: s.last7 };
     }
     return result;
   }
