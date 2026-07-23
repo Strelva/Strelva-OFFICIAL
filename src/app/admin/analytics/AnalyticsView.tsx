@@ -562,7 +562,7 @@ export function AnalyticsView({
         <summary className="flex cursor-pointer items-center gap-2 rounded-2xl border border-glass-border bg-glass px-5 py-3 text-[13px] font-semibold text-warm-white list-none">
           <span className="flex-1">Connection setup</span>
           <span className="text-[11px] font-normal text-gray-faint">
-            saved {formatUpdated(savedAt)}
+            {savedAt ? `saved ${formatUpdated(savedAt)}` : "Not configured yet"}
           </span>
           <span className="ml-2 text-gray-muted text-xs group-open:hidden">Show</span>
           <span className="ml-2 text-gray-muted text-xs hidden group-open:inline">Hide</span>

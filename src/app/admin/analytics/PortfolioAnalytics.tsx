@@ -32,7 +32,7 @@ function trendTone(thisWeek: number, lastWeek: number): Tone {
 }
 
 function trendLabel(thisWeek: number, lastWeek: number): string {
-  if (thisWeek === 0 && lastWeek === 0) return "NO DATA";
+  if (thisWeek === 0 && lastWeek === 0) return "No data yet";
   if (thisWeek > lastWeek) return "UP";
   if (thisWeek < lastWeek) return "DOWN";
   return "STALLED";
@@ -40,6 +40,27 @@ function trendLabel(thisWeek: number, lastWeek: number): string {
 
 export function PortfolioAnalytics({ rows }: { rows: PortfolioRow[] }) {
   if (rows.length === 0) return null;
+
+  // When NOTHING is reporting yet, five identical zero-cards just waste the band
+  // on one fact (no tracker installed anywhere). Collapse to a single designed
+  // setup card instead of a wall of "NO DATA / is the tracker installed?".
+  const allNoData = rows.every((r) => r.thisWeek === 0 && r.lastWeek === 0);
+  if (allNoData) {
+    return (
+      <Panel title="Portfolio" bodyClassName="p-4">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-glass-border bg-surface-base/40 px-6 py-10 text-center">
+          <p className="text-[14px] font-medium text-warm-white">No site trackers reporting yet</p>
+          <p className="mt-1.5 max-w-md text-[12.5px] leading-relaxed text-gray-muted">
+            Install the site tracker in each client repo and their visitor and click
+            numbers start flowing here. Nothing is broken — there&apos;s just no data to show yet.
+          </p>
+          <span className="mt-3 text-[11.5px] text-gray-faint">
+            {rows.length} client{rows.length !== 1 ? "s" : ""} · tracker not installed
+          </span>
+        </div>
+      </Panel>
+    );
+  }
 
   return (
     <Panel title="Portfolio" bodyClassName="p-4">
@@ -102,7 +123,7 @@ export function PortfolioAnalytics({ rows }: { rows: PortfolioRow[] }) {
                 {row.sparkline.length > 1 && !noData ? (
                   <Sparkline series={row.sparkline} />
                 ) : (
-                  <p className="text-[10px] text-gray-faint">no beacon data — is the tracker installed?</p>
+                  <p className="text-[10px] text-gray-faint">Tracker not installed yet</p>
                 )}
               </div>
             </div>

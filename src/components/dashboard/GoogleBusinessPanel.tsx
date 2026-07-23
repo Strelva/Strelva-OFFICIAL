@@ -29,7 +29,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
 
   if (!connected) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-8">
+      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-8">
         <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
           <MapPin className="h-3.5 w-3.5" strokeWidth={1.7} />
           Google Business
