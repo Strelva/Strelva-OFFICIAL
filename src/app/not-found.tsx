@@ -18,7 +18,10 @@ export default function NotFound() {
         <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
           404 · Page not found
         </p>
-        <h1 className="font-display text-[34px] leading-[1.1] tracking-[-0.01em] text-warm-white sm:text-[40px]">
+        {/* Theme-aware ink (warm-black), NOT warm-white: this boundary can render
+            in a light marketing context as well as the dark app, and warm-white
+            went invisible on the light cream surface. warm-black reads on both. */}
+        <h1 className="font-display text-[34px] leading-[1.1] tracking-[-0.01em] text-warm-black sm:text-[40px]">
           This page wandered off.
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-[14px] leading-relaxed text-gray-muted">

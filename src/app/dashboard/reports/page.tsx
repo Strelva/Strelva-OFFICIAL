@@ -7,13 +7,9 @@ import { getLatestSnapshots } from "@/lib/visibility/snapshots";
 import { buildCompetitorBenchmark } from "@/lib/competitor-benchmark";
 import { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
 import { getSearchConsolePerf, getGa4Perf } from "@/lib/analytics";
-import { buildMilestone } from "@/lib/milestone";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
-import { MilestonePanel } from "@/components/dashboard/MilestonePanel";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 import { ReportsViewToggle } from "@/components/dashboard/ReportsViewToggle";
-import { SiteHealthCard } from "@/components/dashboard/SiteHealthCard";
-import { TrafficSourcesPanel } from "@/components/dashboard/TrafficSourcesPanel";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 
 // Reports = the written recaps (the anti-churn proof surface). A Weekly/Monthly
@@ -29,7 +25,7 @@ export default async function ReportsPage({
   const sp = await searchParams;
   const viewParam = typeof sp.view === "string" ? sp.view : "weekly";
 
-  const [weeklyBrief, weeklyHistory, monthlyRecap, monthlyHistory, dailyMetrics, activity, goal, snapshots, searchData, searchPerf, gaPerf, milestone] =
+  const [weeklyBrief, weeklyHistory, monthlyRecap, monthlyHistory, dailyMetrics, activity, goal, snapshots, searchData, searchPerf, gaPerf] =
     await Promise.all([
       getWeeklyBrief(tenant).catch(() => null),
       getWeeklyBriefs(tenant).catch(() => []),
@@ -42,7 +38,6 @@ export default async function ReportsPage({
       getSearchData(tenant).catch(() => null),
       getSearchConsolePerf(tenant).catch(() => null),
       getGa4Perf(tenant).catch(() => null),
-      buildMilestone(tenant).catch(() => null),
     ]);
 
   const hasMonthly = !!monthlyRecap;
@@ -73,7 +68,7 @@ export default async function ReportsPage({
     <>
       <EngagementTracker event="report-view" />
       <div className="flex h-full flex-col">
-        {(hasMonthly || hasWeekly || milestone) && (
+        {(hasMonthly || hasWeekly) && (
           <div className="shrink-0 px-4 pt-5 sm:px-8 sm:pt-7">
             <div className="mx-auto w-full max-w-5xl space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -84,9 +79,6 @@ export default async function ReportsPage({
                   <p className="text-[12px] text-gray-muted">Your monthly recap will appear here after your first full month.</p>
                 ) : null}
               </div>
-              {milestone && (
-                <MilestonePanel milestone={milestone} visitorSeries={dailyMetrics.map((m) => m.pageViews)} />
-              )}
             </div>
           </div>
         )}
@@ -105,12 +97,6 @@ export default async function ReportsPage({
             searchPerf={searchPerf}
             gaPerf={gaPerf}
             analyticsConnectHref={connectHref}
-            footerSlot={
-              <div className="space-y-8">
-                <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
-                <SiteHealthCard />
-              </div>
-            }
           />
         </div>
       </div>

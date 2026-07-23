@@ -208,7 +208,7 @@ async function DashboardHome() {
           {isFresh && (
             <section aria-label="What Strelva does for you" className="mt-1">
               <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
-                While you get set up, Strelva is already working
+                Already working for you
               </p>
               <div className="grid gap-3 md:grid-cols-3">
                 {[

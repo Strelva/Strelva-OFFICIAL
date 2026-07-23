@@ -720,7 +720,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           /* Empty state: greeting + chips */
           <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-16 sm:justify-center sm:px-8 sm:py-12"}`}>
             <h1
-              className={`${variant === "compact" ? "text-[22px]" : "text-[28px] sm:text-[38px]"} font-semibold text-warm-black tracking-[-0.03em] text-center`}
+              className={`${variant === "compact" ? "text-[22px]" : "text-[30px] sm:text-[40px]"} font-display font-medium text-warm-black tracking-[-0.01em] text-center`}
               suppressHydrationWarning
             >
               {getGreeting()}, {ownerName}

@@ -107,6 +107,7 @@ export function AnalyticsLiveView({
               value={stats.pageViews}
               delta={stats.pageViewsDelta}
               deltaLabel={stats.range.priorLabel}
+              detail="Searches and visits to your site"
               icon={<Users className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
@@ -170,7 +171,7 @@ export function AnalyticsLiveView({
           {aiVisibility && <AiVisibilityScorecard data={aiVisibility} />}
           {milestone && <MilestonePanel milestone={milestone} visitorSeries={visitorSeries} />}
 
-          <details className="group rounded-2xl border border-glass-border bg-glass">
+          <details id="site-health" open className="group scroll-mt-6 rounded-2xl border border-glass-border bg-glass">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Site health</p>

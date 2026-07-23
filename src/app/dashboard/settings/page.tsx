@@ -494,7 +494,7 @@ function BrandSection() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-[12px] text-gray-muted">Changes apply to your live site after publish.</p>
+        <p className="text-[12px] text-gray-muted">Changes save as you go and apply to your live site.</p>
         <SaveStatusPill status={saveStatus} />
       </div>
 

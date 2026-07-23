@@ -6,5 +6,7 @@ import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fall
 // the weekly report). Kept as an alias so old deep links still land.
 export default async function HealthRedirect() {
   const clientFallbackRoot = getClientFallbackRoot(await headers());
-  redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/analytics"));
+  // Land on the health section (expanded, #site-health) so a client who clicks
+  // "Health" sees their score, not the Analytics headline over a collapsed row.
+  redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/analytics#site-health"));
 }

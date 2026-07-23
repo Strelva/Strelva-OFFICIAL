@@ -127,13 +127,13 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
               Updates to approve
             </p>
-            <h1 className={`${compact ? "text-[22px]" : "text-[24px] sm:text-[30px]"} font-semibold text-warm-black tracking-[-0.02em]`}>
+            <h1 className={`${compact ? "text-[22px]" : "text-[26px] sm:text-[32px]"} font-display font-medium text-warm-black tracking-[-0.01em]`}>
               Needs You
             </h1>
             <p className="text-[13px] text-gray-muted mt-2">
               {pendingCount > 0
                 ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for your okay before going live`
-                : "Nothing needs you right now. Drafts, replies, and larger changes appear here before they go live."}
+                : "Everything Strelva wants your okay on, before it goes live."}
             </p>
           </div>
           {staleSectionCount > 0 && (

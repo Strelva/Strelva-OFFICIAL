@@ -286,10 +286,18 @@ export function HistorySidebar({
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                         <span className="flex-1 truncate">{item.label}</span>
-                        {isConnect && (
-                          <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
-                            Connect
-                          </span>
+                        {/* Connect status is a quiet sage dot, not a "Connect" pill —
+                            the pill (a) crowded the label into a "Google Busine…"
+                            truncation and (b) restamped the connect CTA in the nav.
+                            Google + Reviews resolve from ONE Google grant, so the
+                            dot rides only on Google Business (the canonical connect
+                            surface); Reviews doesn't get a second one. */}
+                        {isConnect && item.id !== "reviews" && (
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+                            aria-label="Not connected yet"
+                            title="Not connected yet"
+                          />
                         )}
                         {isPreview && (
                           <span className="shrink-0 rounded-full border border-warning/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-warning/90">

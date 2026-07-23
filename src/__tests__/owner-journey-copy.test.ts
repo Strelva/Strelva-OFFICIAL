@@ -233,6 +233,7 @@ describe("owner journey copy and links", () => {
   it("keeps internal platform language out of owner-facing review copy", () => {
     const ownerFiles = [
       "src/components/dashboard/QueuePage.tsx",
+      "src/components/dashboard/EmptyQueue.tsx",
       "src/components/dashboard/QueueCard.tsx",
       "src/components/dashboard/SuggestionCard.tsx",
       "src/app/dashboard/settings/page.tsx",

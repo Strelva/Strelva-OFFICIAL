@@ -127,7 +127,11 @@ export function MobileNav({ pendingCount = 0 }: { pendingCount?: number }) {
                   </span>
                 )}
               </div>
-              <span className="max-w-[54px] truncate text-[11px] font-medium">{item.label}</span>
+              {/* "Ask Strelva" ellipsizes to "Ask Str…" at 390px in a 5-tab bar —
+                  the drawer keeps the full name, but the tab shows a clean "Ask". */}
+              <span className="max-w-[54px] truncate text-[11px] font-medium">
+                {item.id === "ask-ai" ? "Ask" : item.label}
+              </span>
             </Link>
           );
         })}

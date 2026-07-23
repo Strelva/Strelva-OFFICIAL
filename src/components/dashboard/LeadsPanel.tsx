@@ -80,7 +80,7 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Leads
             </p>
-            <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-warm-black sm:text-[30px]">
+            <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-warm-black sm:text-[32px]">
               No one has reached out yet
             </h1>
           </div>

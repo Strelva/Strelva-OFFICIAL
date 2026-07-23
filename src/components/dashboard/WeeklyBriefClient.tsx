@@ -73,7 +73,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
         <div className="mx-auto w-full max-w-5xl">
           <div className="mb-5 max-w-2xl">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Analytics
+              Your weekly report
             </p>
             <h1 className="font-display text-[28px] sm:text-[32px] font-medium text-warm-black tracking-[-0.02em]">
               Your first weekly report is still warming up
@@ -139,11 +139,22 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             </a>
           </div>
 
-          {/* Search & Analytics stands on its own data (Google), so it shows even
-              before the first weekly report has warmed up. */}
-          <div className="mt-8">
-            <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
-          </div>
+          {/* Reports gets richer once Google is connected — but the connect ask
+              itself lives on Analytics / Google Business (one canonical place), so
+              here we only nudge quietly instead of restacking the same connect card.
+              Once Google IS connected, show the real search panel. */}
+          {searchPerf?.status === "ok" || gaPerf?.status === "ok" ? (
+            <div className="mt-8">
+              <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
+            </div>
+          ) : (
+            <Link
+              href={connectHref}
+              className="mt-8 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-colors hover:text-warm-black"
+            >
+              Connect Google to make your reports richer &rarr;
+            </Link>
+          )}
           {aiVisibility && (
             <div className="mt-8">
               <AiVisibilityScorecard data={aiVisibility} />
