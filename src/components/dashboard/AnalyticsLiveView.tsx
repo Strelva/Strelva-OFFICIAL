@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TrendingUp, TrendingDown, Users, MousePointerClick } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, MousePointerClick, BarChart3 } from "lucide-react";
 import { StatTile } from "./StatTile";
 import { TrendChart } from "./TrendChart";
 import { AnalyticsRangeSelector } from "./AnalyticsRangeSelector";
@@ -133,9 +133,40 @@ export function AnalyticsLiveView({
             </p>
           )}
 
-          {/* Search & Analytics stands on its own live Google data. */}
-          <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
-          <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
+          {/* Both search performance (GSC) and visitor sources (GA4) run off the
+              SAME Google connection. When neither is connected, show ONE unified
+              connect card instead of two near-identical "Connect Google" prompts
+              stacked; once either has data, show the real panels. */}
+          {searchPerf?.status !== "ok" && gaPerf?.status !== "ok" ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-glass-border bg-glass p-8 text-center">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-glass-border bg-glass text-accent-text">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 rounded-2xl opacity-60"
+                  style={{ background: "radial-gradient(circle at 50% 35%, var(--color-accent-dim), transparent 70%)" }}
+                />
+                <BarChart3 className="relative h-5 w-5" strokeWidth={1.5} />
+              </div>
+              <h3 className="font-display text-[19px] leading-tight text-warm-black">
+                Connect Google to unlock your analytics
+              </h3>
+              <p className="mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
+                One connection powers both your search performance (who finds you on Google) and where
+                your visitors come from. Strelva reads it for you — nothing to set up.
+              </p>
+              <Link
+                href={connectHref}
+                className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
+              >
+                Connect Google
+              </Link>
+            </div>
+          ) : (
+            <>
+              <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
+              <TrafficSourcesPanel ga={gaPerf} connectHref={connectHref} />
+            </>
+          )}
           {aiVisibility && <AiVisibilityScorecard data={aiVisibility} />}
           {milestone && <MilestonePanel milestone={milestone} visitorSeries={visitorSeries} />}
 
