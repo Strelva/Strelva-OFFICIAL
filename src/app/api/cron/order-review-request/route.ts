@@ -112,6 +112,11 @@ export async function GET(request: Request) {
 
       if (ok) {
         sent++;
+        // One review-request per tenant per run: the email is identical across a
+        // tenant's orders (same Google review link), so several orders maturing
+        // in the same window would spam the owner with near-duplicate emails.
+        // The per-order NX marker still prevents re-requesting THIS order later.
+        break;
       } else {
         // Suppressed (client pause) or failed — release the marker so it retries.
         skippedNotSent++;

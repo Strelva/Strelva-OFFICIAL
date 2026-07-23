@@ -181,9 +181,10 @@ describe("owner journey copy and links", () => {
     expect(properties).toContain("in the preview");
     expect(properties).toContain("Draft saved - preview updated");
     expect(publishBar).toContain("Publish live");
-    expect(publishBar).toContain("Publish to Strelva");
+    // Owner-facing copy uses outcome language, not the internal platform name.
+    expect(publishBar).toContain("Save changes");
     expect(publishBar).toContain("Live site refreshed");
-    expect(publishBar).toContain("Published to Strelva - live refresh failed");
+    expect(publishBar).toContain("Saved - live refresh failed");
   });
 
   it("keeps Integrations honest about setup and availability", () => {

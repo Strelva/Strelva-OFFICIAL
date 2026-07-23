@@ -148,15 +148,21 @@ describe("classifyOperation", () => {
 
 describe("generatePreviewDiffs", () => {
   it("reports added / removed / changed and skips unchanged", () => {
+    // field labels are humanized for the client (raw keys → "A"/"C"/"B").
     const diffs = generatePreviewDiffs({ a: "old", b: "keep" }, { b: "keep", c: "new" });
-    expect(diffs.find((d) => d.field === "a")?.type).toBe("removed");
-    expect(diffs.find((d) => d.field === "c")?.type).toBe("added");
-    expect(diffs.find((d) => d.field === "b")).toBeUndefined();
+    expect(diffs.find((d) => d.field === "A")?.type).toBe("removed");
+    expect(diffs.find((d) => d.field === "C")?.type).toBe("added");
+    expect(diffs.find((d) => d.field === "B")).toBeUndefined();
   });
 
-  it("formats a changed scalar field", () => {
+  it("formats a changed scalar field with a humanized label", () => {
     const [d] = generatePreviewDiffs({ x: "old" }, { x: "new" });
-    expect(d).toMatchObject({ field: "x", before: "old", after: "new", type: "changed" });
+    expect(d).toMatchObject({ field: "X", before: "old", after: "new", type: "changed" });
+  });
+
+  it("maps known schema keys to human labels", () => {
+    const [d] = generatePreviewDiffs({ ctaText: "old" }, { ctaText: "new" });
+    expect(d.field).toBe("Button text");
   });
 
   it("summarizes array values as item counts", () => {

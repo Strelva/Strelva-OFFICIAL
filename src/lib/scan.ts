@@ -127,7 +127,14 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
   // rather than resetting the 90-day clock to today.
   if (!(await getScanBaseline(tenantId))) {
     const history = await getScanHistory(tenantId); // oldest -> newest (incl. this scan)
-    await saveScanBaseline(tenantId, history[0] ?? point);
+    // pushScanHistory already stored `point` above, so a working read returns at
+    // least one element. An EMPTY result therefore means the read failed (it
+    // swallows errors as []) — skip the set-once seed rather than anchoring the
+    // 90-day baseline to a possibly-degraded current scan; a healthy later run
+    // seeds it from the true earliest point.
+    if (history.length > 0) {
+      await saveScanBaseline(tenantId, history[0]);
+    }
   }
 
   return { ...summary, detail };

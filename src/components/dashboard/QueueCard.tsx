@@ -38,10 +38,13 @@ const SOURCE_LABELS: Record<string, string> = {
   website: "Your website",
   calendly: "Booking",
   vegaro: "Booking",
+  stripe: "Payment",
 };
 
 function formatEventSource(source: string): string {
-  return SOURCE_LABELS[source] ?? source.charAt(0).toUpperCase() + source.slice(1);
+  // Never leak a raw integration slug to the owner — an unmapped source reads as
+  // a generic "Activity" rather than "Vegaro"/"Acuity"/etc.
+  return SOURCE_LABELS[source] ?? "Activity";
 }
 
 function formatEventStatus(event: UnifiedEvent): string {

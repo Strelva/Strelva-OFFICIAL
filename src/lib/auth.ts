@@ -235,6 +235,12 @@ async function assignUserToTenantSupabase(
           ownerLockKey = null;
           throw new LastOwnerError(normalizedTenant);
         }
+      } else if (process.env.NODE_ENV === "production") {
+        // Fail CLOSED in prod: without the lock we can't serialize concurrent
+        // demotions, so two racing demotions of a two-owner tenant could each
+        // see the other as a co-owner and both proceed, leaving it ownerless.
+        // (Dev/test without Redis proceeds to the DB owner check unlocked.)
+        throw new LastOwnerError(normalizedTenant);
       }
       const ownerIds = await listTenantOwnerIds(normalizedTenant);
       const isSoleOwner =

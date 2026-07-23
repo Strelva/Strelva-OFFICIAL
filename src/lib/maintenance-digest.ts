@@ -96,12 +96,18 @@ export async function buildMaintenanceDigest(tenant: string, siteName: string): 
 export async function saveMaintenanceDigest(digest: MaintenanceDigest): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
-  await redis.set(digestKey(digest.tenant), JSON.stringify(digest));
+  // One pipeline (single round-trip) so the blob write and the pending-set
+  // membership can't tear apart — a partial failure previously left the digest
+  // stored but absent from PENDING_SET, permanently invisible to the operator
+  // until the next weekly run.
+  const pipeline = redis.pipeline();
+  pipeline.set(digestKey(digest.tenant), JSON.stringify(digest));
   if (digest.status === "pending") {
-    await redis.sadd(PENDING_SET, digest.tenant);
+    pipeline.sadd(PENDING_SET, digest.tenant);
   } else {
-    await redis.srem(PENDING_SET, digest.tenant);
+    pipeline.srem(PENDING_SET, digest.tenant);
   }
+  await pipeline.exec();
 }
 
 export async function getMaintenanceDigest(tenant: string): Promise<MaintenanceDigest | null> {

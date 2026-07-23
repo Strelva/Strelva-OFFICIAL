@@ -43,8 +43,6 @@ export async function GET(request: Request) {
   const denied = requireCronRequest(request);
   if (denied) return denied;
 
-  await recordHeartbeat("monthly-report").catch(() => {});
-
   // The recap is GENERATED regardless (the on-screen Reports surface needs it);
   // only the EMAIL send is gated on the pause switch. So a paused run still
   // refreshes every tenant's monthly recap, it just doesn't email it.
@@ -122,6 +120,11 @@ export async function GET(request: Request) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "error"}`);
     }
   });
+
+  // Heartbeat at the END, keyed to whether the run actually succeeded — a
+  // heartbeat recorded before the work made a crashed/all-failed run look
+  // healthy to the watchdog for the full 33-day window.
+  await recordHeartbeat("monthly-report", { ok: errors.length === 0 }).catch(() => {});
 
   if (errors.length) {
     await alertOnce("monthly-report-errors", "medium", {

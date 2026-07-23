@@ -39,6 +39,9 @@ export async function GET(request: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[cron attention-digest] failed:", err);
+    // Record a failed heartbeat so the watchdog surfaces a crash on the next
+    // tick instead of showing the last success as fresh until the max-age window.
+    await recordHeartbeat("attention-digest", { ok: false }).catch(() => {});
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

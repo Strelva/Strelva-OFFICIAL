@@ -37,6 +37,9 @@ export async function GET(request: Request) {
         body: JSON.stringify({ text: `⚠ portfolio-snapshot cron failed: ${msg}` }),
       }).catch(() => {});
     }
+    // Record a failed heartbeat so the watchdog sees the crash on the next tick
+    // rather than the last success staying "fresh" for the full max-age window.
+    await recordHeartbeat("portfolio-snapshot", { ok: false }).catch(() => {});
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

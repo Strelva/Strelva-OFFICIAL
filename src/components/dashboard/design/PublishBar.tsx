@@ -37,15 +37,15 @@ export function PublishBar({
     liveStatus === "revalidated"
       ? "Live site refreshed"
       : liveStatus === "failed"
-        ? "Published to Strelva - live refresh failed"
-        : "Published to Strelva";
+        ? "Saved - live refresh failed"
+        : "Changes saved";
   const idleStatusLabel = liveSyncEnabled ? "Live sync ready" : "No draft changes";
   const publishedButtonLabel =
-    liveStatus === "revalidated" ? "Live refreshed" : liveStatus === "failed" ? "Refresh failed" : "Published";
-  const publishButtonLabel = liveSyncEnabled ? "Publish live" : "Publish to Strelva";
+    liveStatus === "revalidated" ? "Live refreshed" : liveStatus === "failed" ? "Refresh failed" : "Saved";
+  const publishButtonLabel = liveSyncEnabled ? "Publish live" : "Save changes";
   const publishTitle = liveSyncEnabled
-    ? "Publishes Strelva content and asks the connected live site to refresh."
-    : "Publishes Strelva content only; no live-site refresh is configured.";
+    ? "Publishes your changes and asks your live site to refresh."
+    : "Saves your changes; live-site refresh isn't configured yet.";
 
   const handlePublish = async () => {
     setPublishing(true);

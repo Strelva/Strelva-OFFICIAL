@@ -315,11 +315,18 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     const seenReviewIds = reviews
       .map((r) => r.reviewId)
       .filter((id) => !mirrorFailed.has(id));
-    await redis.set(
-      lastReviewsKey(tenantId),
-      seenReviewIds,
-      { ex: 60 * 60 * 24 * 30 } // 30 days TTL
-    );
+    // Guard the cursor write: if it throws unlogged, the next poll re-processes
+    // every review in this run as "new" — duplicate activity events, duplicate
+    // reply drafts, and duplicate owner alert emails. Surface the failure.
+    try {
+      await redis.set(
+        lastReviewsKey(tenantId),
+        seenReviewIds,
+        { ex: 60 * 60 * 24 * 30 } // 30 days TTL
+      );
+    } catch (err) {
+      console.error(`[poll-google-reviews] cursor write failed for ${tenantId} — next run may re-process:`, err);
+    }
   }
 
   // Update last synced timestamp

@@ -291,6 +291,34 @@ export interface PreviewDiff {
   type: "added" | "removed" | "changed";
 }
 
+// Human labels for the section schema keys so the client's approval-queue diff
+// reads "Headline" / "Button text", not the raw `heading` / `ctaText` keys.
+const FIELD_LABELS: Record<string, string> = {
+  heading: "Headline",
+  headline: "Headline",
+  subheading: "Subheading",
+  subheadline: "Subheading",
+  title: "Title",
+  body: "Body copy",
+  description: "Description",
+  text: "Text",
+  ctaText: "Button text",
+  ctaLabel: "Button text",
+  ctaUrl: "Button link",
+  ctaLink: "Button link",
+  items: "Items",
+  media: "Image",
+  image: "Image",
+  imageUrl: "Image",
+};
+
+function fieldLabel(key: string): string {
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  // Fallback: camelCase / snake_case → spaced, capitalized.
+  const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 export function generatePreviewDiffs(
   before: Record<string, unknown>,
   after: Record<string, unknown>
@@ -304,21 +332,21 @@ export function generatePreviewDiffs(
 
     if (beforeVal === undefined && afterVal !== undefined) {
       diffs.push({
-        field: key,
+        field: fieldLabel(key),
         before: "",
         after: formatValue(afterVal),
         type: "added",
       });
     } else if (beforeVal !== undefined && afterVal === undefined) {
       diffs.push({
-        field: key,
+        field: fieldLabel(key),
         before: formatValue(beforeVal),
         after: "",
         type: "removed",
       });
     } else if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
       diffs.push({
-        field: key,
+        field: fieldLabel(key),
         before: formatValue(beforeVal),
         after: formatValue(afterVal),
         type: "changed",
