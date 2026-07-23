@@ -1,0 +1,13 @@
+# Build + test artifacts that must never be part of a deploy upload. Vercel
+# builds from source on its side, so none of these are needed — and a stray
+# 2.6GB .next-playwright/ (the Playwright UX-capture dist) stalled the CLI
+# upload at 2.5GB. .gitignore was NOT honored for it by the deploy, so this
+# explicit ignore is the durable guard.
+node_modules
+.next
+.next-playwright
+.turbo
+coverage
+test-results
+playwright-report
+tests/ux-shots
