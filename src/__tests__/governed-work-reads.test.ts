@@ -120,7 +120,9 @@ describe("flag ON — governed events are served from Postgres, observations sta
 
     const result = await getEvents("gldf");
 
-    expect(mockListGovernedEventsForTenant).toHaveBeenCalledWith("gldf", { limit: 2 });
+    // Hydrates the EXACT governed ids in the page (only evt_gov is governed) so
+    // an old-but-selected event can't miss a newest-first window.
+    expect(mockListGovernedEventsForTenant).toHaveBeenCalledWith("gldf", { ids: ["evt_gov"] });
     expect(result[0]).toBe(pgGov); // governed → from PG
     expect(result[1]).toBe(obs); // observation → still Redis
   });

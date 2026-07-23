@@ -322,8 +322,11 @@ async function hydrateGovernedFromPg(
   events: UnifiedEvent[],
 ): Promise<UnifiedEvent[]> {
   if (!governedWorkReadPgEnabled()) return events;
-  if (!events.some(isGovernedScopeEvent)) return events;
-  const pgEvents = await listGovernedEventsForTenant(tenantId, { limit: events.length });
+  const governedIds = events.filter(isGovernedScopeEvent).map((e) => e.id);
+  if (governedIds.length === 0) return events;
+  // Hydrate the EXACT governed ids in this Redis page — a newest-first window
+  // could miss an old-but-selected event and serve a mixed Redis/PG view (#31).
+  const pgEvents = await listGovernedEventsForTenant(tenantId, { ids: governedIds });
   const pgById = new Map(pgEvents.map((e) => [e.id, e]));
   return events.map((e) => (isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e));
 }

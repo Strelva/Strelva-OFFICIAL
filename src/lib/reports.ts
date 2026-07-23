@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
+import { mapPool } from "./concurrency";
 import { detectTrafficAnomaly } from "./anomaly";
 import type { TrafficAnomaly } from "./anomaly";
 import { STALE_DAYS } from "./utils";
@@ -627,14 +628,18 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
   const reports: WeeklyReportData[] = [];
   const skipped: ReportSkip[] = [];
 
-  for (const tenant of tenants) {
+  // Parallelize the generation phase — each tenant's report fires a Gemini call,
+  // and a serial loop hit Vercel's 300s ceiling past ~30 tenants before the send
+  // loop (already mapPool'd) even started. Per-tenant isolated: one failure never
+  // aborts the pool. Array pushes are safe under single-threaded JS.
+  await mapPool(tenants, 6, async (tenant) => {
     if (!tenant.active) {
       skipped.push({ tenantId: tenant.id, reason: "inactive" });
-      continue;
+      return;
     }
     if (!tenant.ownerEmail) {
       skipped.push({ tenantId: tenant.id, reason: "missing_owner_email" });
-      continue;
+      return;
     }
 
     try {
@@ -649,7 +654,7 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
       console.error(`[reports] Report generation failed for tenant ${tenant.id}:`, err);
       skipped.push({ tenantId: tenant.id, reason: "generation_failed", detail });
     }
-  }
+  });
 
   return { reports, skipped };
 }

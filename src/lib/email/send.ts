@@ -17,6 +17,11 @@ type RenderedEmail =
 export type SendEmailInput = RenderedEmail & {
   audience: EmailAudience;
   fromName?: string;
+  /** Full from address override, e.g. "report@updates.strelva.com". Defaults to
+   * hello@{RESEND_DOMAIN}. For senders that need a distinct local-part or a
+   * per-tenant sending domain (weekly/monthly reports). Must be a verified
+   * Resend sender; never the root Google-Workspace domain. */
+  fromAddress?: string;
   subject: string;
   to: string | string[];
   /** Where replies land. Defaults to the real hello@strelva.com inbox so a
@@ -55,10 +60,11 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   const html = input.options ? renderEmailHtml(input.options) : input.html;
   const text = input.options ? renderEmailText(input.options) : input.text;
   const fromName = input.fromName || "Strelva";
+  const fromAddress = input.fromAddress || `hello@${fromDomain}`;
   const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
 
   const result = await resend.emails.send({
-    from: `${fromName} <hello@${fromDomain}>`,
+    from: `${fromName} <${fromAddress}>`,
     replyTo,
     to: input.to,
     subject: input.subject,

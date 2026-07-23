@@ -12,6 +12,7 @@ import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { getRedis } from "@/lib/redis";
 import { requireCronRequest } from "@/lib/cron-auth";
+import { sendEmail } from "@/lib/email/send";
 import type { WeeklyBrief } from "@/lib/types";
 
 // Iterates tenants; matches the platform function ceiling so it can't die
@@ -95,22 +96,31 @@ export async function GET(request: Request) {
       const text = renderEmailText({ heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
 
       if (process.env.RESEND_API_KEY) {
-        const { Resend } = await import("resend");
-        const resend = new Resend(process.env.RESEND_API_KEY);
         const domain = tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
-        const { data, error } = await resend.emails.send({
-          from: `${sanitizeEmailSubjectText(tenant.siteName)} <report@${domain}>`,
-          to: tenant.ownerEmail!,
-          subject: `Your ${monthName} recap`,
-          html,
-          text,
-        });
-        if (error) {
-          errors.push(`${tenant.id}: ${error.message ?? "send failed"}`);
-          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: error.message, to: tenant.ownerEmail! }).catch(() => {});
+        // Shared transport boundary; keeps the report@ from + per-tenant domain.
+        let ok = false;
+        try {
+          ok = await sendEmail({
+            audience: "client",
+            to: tenant.ownerEmail!,
+            subject: `Your ${monthName} recap`,
+            html,
+            text,
+            fromName: sanitizeEmailSubjectText(tenant.siteName),
+            fromAddress: `report@${domain}`,
+          });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "send failed";
+          errors.push(`${tenant.id}: ${reason}`);
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: tenant.ownerEmail! }).catch(() => {});
           return;
         }
-        await recordMailSend(tenant.id, "monthly_report", { ok: true, messageId: data?.id, to: tenant.ownerEmail! }).catch(() => {});
+        if (!ok) {
+          errors.push(`${tenant.id}: send suppressed or unconfigured`);
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: tenant.ownerEmail! }).catch(() => {});
+          return;
+        }
+        await recordMailSend(tenant.id, "monthly_report", { ok: true, to: tenant.ownerEmail! }).catch(() => {});
       }
 
       // Mark sent only after a confirmed send (or a dry run without a key).

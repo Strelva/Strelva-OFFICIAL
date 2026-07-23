@@ -13,6 +13,7 @@ import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import type { EmailRow } from "@/lib/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
+import { sendEmail } from "@/lib/email/send";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -140,29 +141,37 @@ await mapPool(reports, 8, async (report) => {
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {
-        const { Resend } = await import("resend");
-        const resend = new Resend(process.env.RESEND_API_KEY);
         const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
 
-        // Resend v6 returns { data, error } and does NOT throw on a failed send
-        // (e.g. unverified from-domain). Check error so failures aren't silently
-        // counted as successes.
-        const { data, error } = await resend.emails.send({
-          from: `${sanitizeEmailSubjectText(report.tenant.siteName)} <report@${domain}>`,
-          to: email,
-          subject,
-          html,
-          text,
-        });
-        if (error) {
-          const reason = error.message || error.name || "Unknown Resend error";
-          console.error(`[weekly-report] Resend rejected send for tenant ${report.tenant.id}:`, error);
+        // Route through the shared transport boundary (audience gate + the single
+        // Resend call). sendEmail throws on a provider error and returns false on
+        // an intentional suppression; the report keeps its distinct report@ from
+        // address + per-tenant sending domain via fromAddress.
+        let ok = false;
+        try {
+          ok = await sendEmail({
+            audience: "client",
+            to: email,
+            subject,
+            html,
+            text,
+            fromName: sanitizeEmailSubjectText(report.tenant.siteName),
+            fromAddress: `report@${domain}`,
+          });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Unknown Resend error";
+          console.error(`[weekly-report] send failed for tenant ${report.tenant.id}:`, err);
           errors.push(`${report.tenant.id}: ${reason}`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: reason, to: email });
           return;
         }
+        if (!ok) {
+          errors.push(`${report.tenant.id}: send suppressed or unconfigured`);
+          await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: "suppressed_or_unconfigured", to: email });
+          return;
+        }
         sent.push(report.tenant.id);
-        await recordMailSend(report.tenant.id, "weekly_report", { ok: true, messageId: data?.id, to: email });
+        await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
       } else {
         console.log(`[Weekly report dev] "${subject}" -> ${email}`);
         console.log(report.summary);

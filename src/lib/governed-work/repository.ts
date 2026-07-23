@@ -302,21 +302,24 @@ function latestByKey<T>(rows: T[], key: (row: T) => string): Map<string, T> {
  */
 export async function listGovernedEventsForTenant(
   tenantId: string,
-  opts?: { status?: string; limit?: number },
+  opts?: { status?: string; limit?: number; ids?: string[] },
 ): Promise<UnifiedEvent[]> {
   const db = getSupabase();
   if (!db) return [];
   const limit = opts?.limit ?? 50;
+  const byIds = opts?.ids && opts.ids.length > 0 ? opts.ids : null;
   return bestEffort(`listGovernedEventsForTenant ${tenantId}`, async () => {
-    // Over-fetch (like the Redis limit*2 window) so a status filter still has
-    // enough reconstructed rows to fill `limit`.
+    // When the caller knows the exact ids it wants hydrated (the Redis-selected
+    // set), fetch those directly — a newest-first window can MISS an old event
+    // that's in the Redis set but not among the newest N proposals, serving a
+    // mixed Redis/PG view. Otherwise over-fetch (like the Redis limit*2 window)
+    // so a status filter still has enough reconstructed rows to fill `limit`.
     const window = Math.max(limit * 2, limit);
-    const { data: proposalRows, error } = await db
-      .from("proposals")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
-      .limit(window);
+    const base = db.from("proposals").select("*").eq("tenant_id", tenantId);
+    const query = byIds
+      ? base.in("id", byIds)
+      : base.order("created_at", { ascending: false }).limit(window);
+    const { data: proposalRows, error } = await query;
     if (error) throw error;
     const proposals = proposalRows ?? [];
     if (proposals.length === 0) return [];
@@ -364,7 +367,8 @@ export async function listGovernedEventsForTenant(
       );
       if (!opts?.status || event.status === opts.status) {
         events.push(event);
-        if (events.length >= limit) break;
+        // When fetching an explicit id set, return all matches (no window cap).
+        if (!byIds && events.length >= limit) break;
       }
     }
     return events;

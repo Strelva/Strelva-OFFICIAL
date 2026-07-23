@@ -21,6 +21,12 @@ import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
 import { draftReviewReply, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
+import { mapPool } from "../concurrency";
+
+/** Tenant-level concurrency for the auto-reply crons. A serial per-tenant loop
+ *  with up-to-2 Gemini calls each blows Vercel's 300s budget past ~30 tenants;
+ *  the inner per-review work stays serial to avoid a burst on one tenant. */
+const AUTO_REPLY_CONCURRENCY = 6;
 
 /** The catch-window between "drafted" and "auto-posted" — long enough for the
  *  owner to veto a bad AI reply, short enough that the reply is still timely. */
@@ -50,10 +56,11 @@ export async function draftReplyBacklog(
   const tenants = await getAllTenants().catch(() => [] as TenantConfig[]);
   let drafted = 0;
 
-  for (const t of tenants) {
-    if (t.active === false) continue;
+  await mapPool(tenants, AUTO_REPLY_CONCURRENCY, async (t) => {
+   try {
+    if (t.active === false) return;
     const voice = await getReplyVoice(t.id).catch(() => null);
-    if (!voice || voice.mode === "off") continue;
+    if (!voice || voice.mode === "off") return;
 
     const [reviews, pending] = await Promise.all([
       getReviews(t.id).catch(() => []),
@@ -107,7 +114,10 @@ export async function draftReplyBacklog(
         // one review failing to draft must not stall the rest
       }
     }
-  }
+   } catch {
+     // per-tenant isolated — one tenant's failure never aborts the pool
+   }
+  });
 
   return { drafted };
 }
@@ -119,12 +129,13 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
   let posted = 0;
   let failed = 0;
 
-  for (const t of tenants) {
-    if (t.active === false) continue;
+  await mapPool(tenants, AUTO_REPLY_CONCURRENCY, async (t) => {
+   try {
+    if (t.active === false) return;
     // Re-check the live mode: a client who switched off "auto" after a draft was
     // stamped must NOT have it auto-post. The stale autoPostAt is ignored then.
     const mode = (await getReplyVoice(t.id).catch(() => null))?.mode;
-    if (mode !== "auto") continue;
+    if (mode !== "auto") return;
     const pending = await getEvents(t.id, { status: "pending", limit: 200 }).catch(
       () => [] as UnifiedEvent[],
     );
@@ -161,7 +172,10 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
         },
       })).catch(() => {});
     }
-  }
+   } catch {
+     // per-tenant isolated — one tenant's failure never aborts the pool
+   }
+  });
 
   return { posted, failed };
 }
