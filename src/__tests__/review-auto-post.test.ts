@@ -13,6 +13,11 @@ const mockGetEvents = vi.fn();
 const mockUpdateEvent = vi.fn();
 const mockResolveEventAction = vi.fn();
 const mockGetReplyVoice = vi.fn();
+const mockAddEvent = vi.fn();
+const mockGetReviews = vi.fn();
+const mockDraftReviewReply = vi.fn();
+const mockStoreRecentReply = vi.fn();
+const mockIsReviewReplyDeclined = vi.fn();
 
 vi.mock("@/lib/tenants", () => ({ getAllTenants: (...a: unknown[]) => mockGetAllTenants(...a) }));
 vi.mock("@/lib/events", () => ({
@@ -21,12 +26,18 @@ vi.mock("@/lib/events", () => ({
   // tests it returns the same fixtures as getEvents.
   getEventsRaw: (...a: unknown[]) => mockGetEvents(...a),
   updateEvent: (...a: unknown[]) => mockUpdateEvent(...a),
-  addEvent: (...a: unknown[]) => a,
+  addEvent: (...a: unknown[]) => mockAddEvent(...a),
 }));
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
 vi.mock("@/lib/reviews/reply-voice", () => ({ getReplyVoice: (...a: unknown[]) => mockGetReplyVoice(...a) }));
+vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
+vi.mock("@/lib/review-replies", () => ({
+  draftReviewReply: (...a: unknown[]) => mockDraftReviewReply(...a),
+  storeRecentReply: (...a: unknown[]) => mockStoreRecentReply(...a),
+  isReviewReplyDeclined: (...a: unknown[]) => mockIsReviewReplyDeclined(...a),
+}));
 
-import { runDueAutoPosts } from "@/lib/reviews/auto-reply";
+import { runDueAutoPosts, draftReplyBacklog } from "@/lib/reviews/auto-reply";
 
 const NOW = 1_800_000_000_000;
 
@@ -129,5 +140,66 @@ describe("runDueAutoPosts", () => {
     mockGetAllTenants.mockResolvedValue([{ id: "acme", active: false }]);
     await runDueAutoPosts(NOW);
     expect(mockGetReplyVoice).not.toHaveBeenCalled();
+  });
+});
+
+// draftReplyBacklog — drafts replies for reviews that predate the client turning
+// replies on. Guards under test (Deep Audit #2, #35): Google-only, respect a
+// durable dismissal, per-tenant cap, and the auto-mode autoPostAt stamp.
+function review(over: Record<string, unknown> = {}) {
+  return { id: "r1", externalId: "ext1", source: "google", author: "Sam", rating: 5, text: "great", reply: null, ...over };
+}
+
+describe("draftReplyBacklog", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAllTenants.mockResolvedValue([{ id: "acme", active: true }]);
+    mockGetReplyVoice.mockResolvedValue({ mode: "approve" });
+    mockGetEvents.mockResolvedValue([]); // no already-pending drafts
+    mockIsReviewReplyDeclined.mockResolvedValue(false);
+    mockDraftReviewReply.mockResolvedValue("thanks Sam");
+    mockAddEvent.mockResolvedValue(undefined);
+    mockStoreRecentReply.mockResolvedValue(undefined);
+  });
+
+  it("never drafts for non-Google reviews (an unresolvable id would fail every run)", async () => {
+    mockGetReviews.mockResolvedValue([review({ source: "yelp" }), review({ id: "r2", externalId: "ext2", source: "facebook" })]);
+    const res = await draftReplyBacklog(NOW);
+    expect(res.drafted).toBe(0);
+    expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("never re-drafts a review the owner already dismissed", async () => {
+    mockGetReviews.mockResolvedValue([review()]);
+    mockIsReviewReplyDeclined.mockResolvedValue(true);
+    const res = await draftReplyBacklog(NOW);
+    expect(res.drafted).toBe(0);
+    expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  it("honors the per-tenant cap", async () => {
+    mockGetReviews.mockResolvedValue(
+      Array.from({ length: 10 }, (_, i) => review({ id: `r${i}`, externalId: `ext${i}` })),
+    );
+    const res = await draftReplyBacklog(NOW, 3);
+    expect(res.drafted).toBe(3);
+    expect(mockAddEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it("stamps autoPostAt only in auto mode", async () => {
+    mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
+    mockGetReviews.mockResolvedValue([review()]);
+    await draftReplyBacklog(NOW);
+    const evt = mockAddEvent.mock.calls[0]?.[0];
+    expect(evt?.metadata?.kind).toBe("review_reply_draft");
+    expect(evt?.metadata?.autoPostAt).toBeTruthy();
+  });
+
+  it("does NOT stamp autoPostAt in approve mode", async () => {
+    mockGetReplyVoice.mockResolvedValue({ mode: "approve" });
+    mockGetReviews.mockResolvedValue([review()]);
+    await draftReplyBacklog(NOW);
+    const evt = mockAddEvent.mock.calls[0]?.[0];
+    expect(evt?.metadata?.autoPostAt).toBeUndefined();
   });
 });

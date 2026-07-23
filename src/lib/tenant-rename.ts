@@ -27,7 +27,9 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,40})$/;
  * (zset index + id-keyed blobs). CACHES (content/page-config/analytics/google-meta/
  * briefs/domain-map) are intentionally omitted — they regenerate from Postgres.
  */
-const authoritativePatterns = (t: string): string[] => [
+// Exported for the completeness unit test — a Redis-authoritative store missing
+// from this registry silently does NOT move on a tenant rename (audit #16/#25).
+export const authoritativePatterns = (t: string): string[] => [
   `connections:${t}:*`, // OAuth tokens / provider secrets — the critical one
   `crm:${t}`,
   `reb:crm-lock:${t}`,
