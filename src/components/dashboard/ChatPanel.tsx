@@ -1004,6 +1004,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             aria-label="Close Needs You"
           />
           <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Needs You"
             className="absolute inset-y-0 right-0 z-40 w-full max-w-[520px] border-l border-glass-border bg-surface-base shadow-[0_24px_80px_rgba(0,0,0,0.38)] animate-overlay-enter"
           >
             <div className="flex h-12 items-center justify-between border-b border-glass-border px-4">

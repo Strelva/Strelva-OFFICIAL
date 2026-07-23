@@ -182,7 +182,7 @@ function ReportOutput({ data }: { data: ReportData }) {
           </p>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {/* Visitors */}
             <div className="rounded-lg bg-glass border border-glass-border p-3">
               <div className="flex items-center gap-1.5 mb-2">
@@ -384,7 +384,7 @@ function PhotosOutput({ data }: { data: PhotoData }) {
         <div className="p-4 animate-fade-in-up">
           {displayPhotos.length > 0 ? (
             <>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {displayPhotos.map((photo) => (
                   <div
                     key={photo.id}

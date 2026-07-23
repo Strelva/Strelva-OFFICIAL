@@ -77,7 +77,7 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
 
       {headline && <p className="text-sm text-warm-white">{headline}</p>}
 
-      <div className="grid grid-cols-3 gap-3 text-center">
+      <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
         <div className="rounded-lg bg-glass border border-glass-border p-3">
           <p className="text-xs text-gray-muted">In AI answers</p>
           <p className="text-xl font-semibold text-warm-white">{summary.aiPresent}/{summary.aiProbed}</p>
