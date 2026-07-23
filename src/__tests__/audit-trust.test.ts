@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
 import { checkTrust } from "../lib/audit/modules/trust";
 import type { AuditContext } from "../lib/audit/context";
+import { computeVisibleText } from "../lib/audit/checks";
 
 // ---------------------------------------------------------------------------
 // Helper — build a minimal AuditContext from raw HTML (mirrors audit-security).
@@ -11,6 +12,8 @@ function makeCtx(opts: { url: string; html: string }): AuditContext {
     url: opts.url,
     html: opts.html,
     $: cheerio.load(opts.html),
+    visibleText: computeVisibleText(cheerio.load(opts.html)),
+    fetchOk: true,
     headers: new Headers(),
     robotsTxt: null,
     sitemapXml: null,

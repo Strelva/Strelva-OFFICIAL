@@ -151,13 +151,15 @@ function hasStructuredPostalAddress($: AuditContext["$"]): boolean {
 
 function analyze(ctx: AuditContext): TrustAnalysis {
   const $ = ctx.$;
-  const bodyText = ($("body").text() || "").toLowerCase();
-  const bodyHtml = $("body").html() || "";
+  // VISIBLE text only — matching trust signals (licensed/certified/warranty/
+  // testimonials/hours) against raw HTML granted credit from inline <script>
+  // bundle strings on CSR sites. visibleText has script/style stripped.
+  const bodyText = ctx.visibleText.toLowerCase();
 
   const trustBadges: Record<string, FoundBadge> = {};
   for (const [badgeId, badge] of Object.entries(TRUST_BADGES)) {
     for (const pattern of badge.patterns) {
-      if (pattern.test(bodyText) || pattern.test(bodyHtml)) {
+      if (pattern.test(bodyText)) {
         trustBadges[badgeId] = { name: badge.name, importance: badge.importance };
         break;
       }

@@ -17,6 +17,21 @@ export interface AuditContext {
   html: string;
   /** Pre-parsed cheerio handle (parsed once, shared across modules). */
   $: cheerio.CheerioAPI;
+  /**
+   * Visible body text with script/style/noscript/template REMOVED — computed
+   * once. Modules that measure "readable content" (ai-readability, seo, trust)
+   * must use this, NOT $("body").text(), which includes inline JSON/JS (e.g.
+   * __NEXT_DATA__) and would count kilobytes of state as readable prose on a CSR
+   * shell — false-passing exactly the SPA sites those checks exist to catch.
+   */
+  visibleText: string;
+  /**
+   * True when the homepage fetch returned a 2xx. When false (a Cloudflare/WAF
+   * challenge, a 5xx maintenance page, or an empty body), modules are auditing
+   * an error page, NOT the real site — callers must not grade or fire a
+   * "health regressed" alert off such a scan.
+   */
+  fetchOk: boolean;
   /** Response headers from the homepage fetch (security header checks). */
   headers: Headers;
   /** /robots.txt body, or null if missing/unreachable. */

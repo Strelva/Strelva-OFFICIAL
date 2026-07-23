@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
 import { checkAccessibility } from "../lib/audit/modules/accessibility";
 import type { AuditContext } from "../lib/audit/context";
+import { computeVisibleText } from "../lib/audit/checks";
 
 /** Build a minimal AuditContext from an HTML string (no network). */
 function ctxFromHtml(html: string): AuditContext {
@@ -10,6 +11,8 @@ function ctxFromHtml(html: string): AuditContext {
     url: "https://example.com",
     html,
     $,
+    visibleText: computeVisibleText($),
+    fetchOk: true,
     headers: new Headers(),
     robotsTxt: null,
     sitemapXml: null,

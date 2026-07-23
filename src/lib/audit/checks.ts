@@ -60,23 +60,50 @@ const WEIGHTS: Record<string, number> = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+// A real browser-ish User-Agent + Accept. Many hosts (Cloudflare bot-fight,
+// WAFs) 403 a UA-less undici request and return a challenge page — auditing that
+// as "the site" collapses the grade. Sending a UA gets the real homepage.
+const AUDIT_UA =
+  "Mozilla/5.0 (compatible; StrelvaAudit/1.0; +https://strelva.com/audit)";
+const AUDIT_FETCH_HEADERS: Record<string, string> = {
+  "User-Agent": AUDIT_UA,
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+};
+
 function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
-  return fetch(url, { signal: controller.signal }).finally(() =>
+  return fetch(url, { signal: controller.signal, headers: AUDIT_FETCH_HEADERS }).finally(() =>
     clearTimeout(timeout)
   );
 }
 
-/** Best-effort GET of a well-known file; null on any miss/error. */
+/** Best-effort GET of a well-known file (robots/sitemap/llms); null on any
+ *  miss/error. Rejects an HTML body: SPA catch-alls and soft-404s serve the
+ *  homepage with a 200 for /llms.txt etc., which would false-pass the "you
+ *  publish an llms.txt / robots.txt" checks on a site that publishes nothing. */
 async function fetchTextSafe(url: string, ms = 6000): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(url, ms);
     if (!res.ok) return null;
-    return await res.text();
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    const body = await res.text();
+    if (contentType.includes("text/html")) return null;
+    const head = body.trimStart().slice(0, 200).toLowerCase();
+    if (head.startsWith("<!doctype html") || head.startsWith("<html")) return null;
+    return body;
   } catch {
     return null;
   }
+}
+
+/** Visible page text with script/style/noscript/template stripped — the shared
+ *  "readable content" source (see AuditContext.visibleText). Exported for tests. */
+export function computeVisibleText($: cheerio.CheerioAPI): string {
+  const $clone = $.root().clone();
+  $clone.find("script, style, noscript, template").remove();
+  const $body = $clone.find("body");
+  return ($body.length ? $body.text() : $clone.text()).replace(/\s+/g, " ").trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +162,26 @@ async function checkWebVitals(
   try {
     const audits = psData.lighthouseResult?.audits ?? {};
     const perfScore = psData.lighthouseResult?.categories?.performance?.score;
+
+    // PSI can return HTTP 200 with a runtimeError (e.g. NO_FCP when the target
+    // blocks Lighthouse) — the metric audits exist but carry no numericValue.
+    // Defaulting to worst-case (8000ms/0.5/1000ms) would print fabricated "LCP
+    // is 8.0s (poor)" measurements and dock the grade on data that was never
+    // measured. Treat that exactly like a null PSI: weight-0, "not measured".
+    const runtimeError = Boolean(
+      (psData.lighthouseResult as { runtimeError?: { code?: string } } | undefined)?.runtimeError?.code,
+    );
+    const lcpNumeric = audits["largest-contentful-paint"]?.numericValue;
+    if (runtimeError || typeof lcpNumeric !== "number") {
+      checks.push({
+        name: "PageSpeed API",
+        status: "warn",
+        score: 50,
+        message: "Core Web Vitals not measured",
+        details: "PageSpeed Insights could not measure this page's load metrics on this run.",
+      });
+      return { name: "Core Web Vitals", slug: "web-vitals", weight: 0, score: 50, checks };
+    }
 
     const lcpMs = audits["largest-contentful-paint"]?.numericValue ?? 8000;
     const lcpScore = lcpMs <= 2500 ? 100 : lcpMs <= 4000 ? 60 : 20;
@@ -316,12 +363,14 @@ async function buildAuditContext(
   let html = "";
   let fetchedUrl = startUrl;
   let headers = new Headers();
+  let fetchOk = false;
 
   try {
     const res = await fetchWithTimeout(startUrl, 15_000);
     html = await res.text();
     fetchedUrl = res.url || startUrl;
     headers = res.headers;
+    fetchOk = res.ok;
   } catch {
     if (startUrl.startsWith("https://")) {
       try {
@@ -330,10 +379,16 @@ async function buildAuditContext(
         html = await res.text();
         fetchedUrl = res.url || httpUrl;
         headers = res.headers;
+        fetchOk = res.ok;
       } catch {
         // proceed with empty html — modules reflect missing data honestly
       }
     }
+  }
+  // A challenge/interstitial (Cloudflare "Attention Required", generic WAF block)
+  // can come back 200 — sniff the body so it's not mistaken for the real site.
+  if (fetchOk && /cf-chl|attention required|just a moment\.\.\.|checking your browser/i.test(html)) {
+    fetchOk = false;
   }
 
   // DNS-rebinding guard: if a redirect changed host, re-validate the final host.
@@ -352,10 +407,13 @@ async function buildAuditContext(
     fetchTextSafe(`${origin}/llms.txt`),
   ]);
 
+  const $ = cheerio.load(html);
   const ctx: AuditContext = {
     url: fetchedUrl,
     html,
-    $: cheerio.load(html),
+    $,
+    visibleText: computeVisibleText($),
+    fetchOk,
     headers,
     robotsTxt,
     sitemapXml,

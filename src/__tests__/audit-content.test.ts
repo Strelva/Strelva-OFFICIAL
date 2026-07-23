@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
 import { checkContent } from "../lib/audit/modules/content";
 import type { AuditContext } from "../lib/audit/context";
+import { computeVisibleText } from "../lib/audit/checks";
 
 function makeCtx(html: string, url = "https://example.com"): AuditContext {
   return {
     url,
     html,
     $: cheerio.load(html),
+    visibleText: computeVisibleText(cheerio.load(html)),
+    fetchOk: true,
     headers: new Headers(),
     robotsTxt: null,
     sitemapXml: null,

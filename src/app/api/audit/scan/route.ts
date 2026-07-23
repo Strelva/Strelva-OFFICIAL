@@ -4,7 +4,7 @@ import { getRedis } from "@/lib/redis";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
-import { findingsFromCategories } from "@/lib/lead-audit";
+import { findingsFromCategories, stripFabricatedEstimates } from "@/lib/lead-audit";
 import type { AuditResult } from "@/lib/audit/types";
 
 const MAX_SCANS_PER_DAY = 3;
@@ -93,7 +93,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const categories = await runAudit(normalizedUrl);
+    // Strip the generic-prior "~$X/mo (estimated)" figures — this anonymous route
+    // (marketing quick-tools + the extensions forward here) has no measured
+    // traffic, and the codebase promises the public audit never shows fabricated
+    // dollar precision. The lead/CLI path already strips; match it.
+    const categories = stripFabricatedEstimates(await runAudit(normalizedUrl));
     const overallScore = computeOverallScore(categories);
     const grade = scoreToGrade(overallScore);
 

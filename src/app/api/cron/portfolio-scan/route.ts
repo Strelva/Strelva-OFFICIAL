@@ -69,6 +69,14 @@ export async function GET(request: Request) {
     if (prevRank === undefined || curRank === undefined) continue;
     if (curRank <= prevRank) continue; // same or better — not a regression
 
+    // Hysteresis: a letter-grade drop caused by PSI availability/lab jitter (a
+    // Google API blip zeroes web-vitals+mobile and recomputes the overall a few
+    // points; lab metrics jitter across the 2500ms/0.1/200ms cliffs) must not
+    // email the owner "your health regressed" for a boundary flip on noise.
+    // Require a meaningful score drop alongside the letter change.
+    const HEALTH_REGRESSION_MIN_DROP = 5;
+    if (prior.overallScore - s.score < HEALTH_REGRESSION_MIN_DROP) continue;
+
     const tenant = tenantById.get(s.tenant);
     const email = tenant?.ownerEmail?.trim();
     if (!tenant || !email || !redis) continue;

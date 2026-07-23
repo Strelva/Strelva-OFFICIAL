@@ -219,11 +219,15 @@ function quantifiedFor(checkName: string, metrics: TrafficProfile = GENERIC_METR
   return undefined;
 }
 
-/** Fix priority from a check's status + how heavily its category counts. */
+/** Fix priority from a check's status + how heavily its category counts.
+ *  Threshold is 0.10: the 42cfb42 weight rebalance flattened all non-seo/ai
+ *  categories to 0.10, and a 0.12 gate made "high" unreachable for security,
+ *  web-vitals, mobile, a11y, trust, and content — so an HTTPS/mixed-content fail
+ *  ranked below a missing-meta warning. 0.10 restores reachable "high" for them. */
 function priorityFor(status: CheckResult["status"], categoryWeight: number): CheckResult["priority"] {
   if (status === "pass") return undefined;
-  if (status === "fail") return categoryWeight >= 0.12 ? "high" : "medium";
-  return categoryWeight >= 0.12 ? "medium" : "low";
+  if (status === "fail") return categoryWeight >= 0.1 ? "high" : "medium";
+  return categoryWeight >= 0.1 ? "medium" : "low";
 }
 
 /**

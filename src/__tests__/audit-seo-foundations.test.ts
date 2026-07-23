@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
 import { checkSeoFoundations } from "../lib/audit/modules/seo-foundations";
 import type { AuditContext } from "../lib/audit/context";
+import { computeVisibleText } from "../lib/audit/checks";
 
 // ---------------------------------------------------------------------------
 // Helper — build an AuditContext from HTML + optional well-known files
@@ -15,6 +16,8 @@ function makeContext(opts: {
     url: "https://example.com",
     html: opts.html,
     $: cheerio.load(opts.html),
+    visibleText: computeVisibleText(cheerio.load(opts.html)),
+    fetchOk: true,
     headers: new Headers(),
     robotsTxt: opts.robotsTxt ?? null,
     sitemapXml: opts.sitemapXml ?? null,

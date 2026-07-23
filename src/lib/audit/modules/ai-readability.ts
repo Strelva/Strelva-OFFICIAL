@@ -448,9 +448,11 @@ interface Accessibility {
   jsRenderingRisk: boolean;
 }
 
-function checkContentAccessibility($: AuditContext["$"]): Accessibility {
-  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
-  const wordCount = bodyText ? bodyText.split(" ").length : 0;
+function checkContentAccessibility($: AuditContext["$"], visibleText: string): Accessibility {
+  // visibleText has <script>/<style> stripped, so a CSR shell's inline JSON
+  // state (__NEXT_DATA__ etc.) no longer inflates the word count and false-passes
+  // this check on exactly the SPA sites it exists to catch.
+  const wordCount = visibleText ? visibleText.split(" ").length : 0;
   const spaRoot = $("#root, #app, #__next, [data-reactroot]").length > 0;
   const lowContent = wordCount < 100;
   return { wordCount, jsRenderingRisk: spaRoot && lowContent };
@@ -465,7 +467,7 @@ interface Ambiguity {
   placeholder: boolean;
 }
 
-function checkAmbiguity($: AuditContext["$"], schemas: CollectedSchemas): Ambiguity {
+function checkAmbiguity($: AuditContext["$"], schemas: CollectedSchemas, visibleText: string): Ambiguity {
   const ogName = $('meta[property="og:site_name"]').attr("content")?.trim();
   const titleName = $("title").text().split(/[|\-–—]/)[0].trim();
   const footerName = $('footer .logo, footer [class*="brand"]').first().text().trim();
@@ -476,9 +478,11 @@ function checkAmbiguity($: AuditContext["$"], schemas: CollectedSchemas): Ambigu
   );
   const distinctNames = [...new Set(names.map((n) => n.toLowerCase()))];
 
-  const bodyText = $("body").text().toLowerCase();
+  // visibleText (script/style stripped) — a "coming soon" string inside inline JS
+  // must not fail a real site 0/100 as under-construction.
+  const lowerVisible = visibleText.toLowerCase();
   const placeholder =
-    bodyText.includes("coming soon") || bodyText.includes("under construction");
+    lowerVisible.includes("coming soon") || lowerVisible.includes("under construction");
 
   return { distinctNames, placeholder };
 }
@@ -653,7 +657,7 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
 
   // --- 5. Plain-text readable by AI --------------------------------------
   {
-    const access = checkContentAccessibility($);
+    const access = checkContentAccessibility($, ctx.visibleText);
     if (access.jsRenderingRisk) {
       checks.push({
         name: "Plain-text readable by AI",
@@ -683,7 +687,7 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
 
   // --- 6. Single clear business name -------------------------------------
   {
-    const ambiguity = checkAmbiguity($, schemas);
+    const ambiguity = checkAmbiguity($, schemas, ctx.visibleText);
     if (ambiguity.placeholder) {
       checks.push({
         name: "Single clear business name",

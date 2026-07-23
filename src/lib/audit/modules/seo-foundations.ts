@@ -124,7 +124,12 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
   });
 
   // -------------------------------------------------------------------------
-  // Sitemap valid XML
+  // Sitemap valid XML. A MISSING sitemap is ALREADY fully penalized by the "XML
+  // sitemap" check above — so when there's none, this check is a neutral pass
+  // (score 100, no message impact) rather than a second score-0 fail. That was
+  // double-docking the SEO category (20% for one absent file) AND emitting a
+  // nonsense high-priority "Sitemap is valid: No sitemap to validate." action.
+  // (Kept in the array unconditionally — the category score is positional.)
   // -------------------------------------------------------------------------
   const sitemapValid =
     hasSitemap &&
@@ -134,14 +139,14 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     (sitemapXml.includes("<url>") || sitemapXml.includes("<sitemap>"));
   checks.push({
     name: "Sitemap is valid",
-    status: sitemapValid ? "pass" : hasSitemap ? "warn" : "fail",
-    score: sitemapValid ? 100 : 0,
-    message: sitemapValid
-      ? "The sitemap is valid XML with listed pages."
-      : hasSitemap
-        ? "The sitemap was found but does not look like valid XML with page entries."
-        : "No sitemap to validate.",
-    details: sitemapValid
+    status: !hasSitemap || sitemapValid ? "pass" : "warn",
+    score: !hasSitemap || sitemapValid ? 100 : 0,
+    message: !hasSitemap
+      ? "No sitemap yet — its format is checked once you add one."
+      : sitemapValid
+        ? "The sitemap is valid XML with listed pages."
+        : "The sitemap was found but does not look like valid XML with page entries.",
+    details: sitemapValid || !hasSitemap
       ? undefined
       : "The sitemap needs to list your page addresses in a format search engines can read. Ask Strelva to fix its format.",
   });
@@ -245,8 +250,10 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
   // -------------------------------------------------------------------------
   // Server-rendered content — SPA root with little server HTML is a risk
   // -------------------------------------------------------------------------
-  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
-  const hasSubstantialContent = bodyText.length > 500;
+  // visibleText (script/style stripped) — raw $("body").text() includes inline
+  // JSON/JS, so any SPA shipping kilobytes of inline state trivially cleared the
+  // 500-char bar and always "passed" server-rendered content.
+  const hasSubstantialContent = ctx.visibleText.length > 500;
   const hasSpaRoot =
     $("#root, #app, #__next, [data-reactroot]").length > 0;
   const jsRisk = hasSpaRoot && !hasSubstantialContent;

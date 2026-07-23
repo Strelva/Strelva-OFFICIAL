@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
 import { checkAiReadability } from "../lib/audit/modules/ai-readability";
 import type { AuditContext } from "../lib/audit/context";
+import { computeVisibleText } from "../lib/audit/checks";
 
 function makeContext(
   html: string,
@@ -11,6 +12,8 @@ function makeContext(
     url: "https://example.com",
     html,
     $: cheerio.load(html),
+    visibleText: computeVisibleText(cheerio.load(html)),
+    fetchOk: true,
     headers: new Headers(),
     robotsTxt: null,
     sitemapXml: null,

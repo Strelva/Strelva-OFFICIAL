@@ -73,6 +73,12 @@ export function prioritizeIssues(audit: AuditResult): PrioritizedActionList {
   const issues: PrioritizedIssue[] = [];
 
   for (const category of audit.categories) {
+    // Weight-0 categories are UNMEASURED (e.g. PSI unavailable → web-vitals/mobile
+    // become weight 0 with a "not measured" placeholder). Their placeholder warns
+    // must not leak into the admin fix-first list / persisted severity counts as
+    // phantom action items — the prospect path (findingsFromCategories) already
+    // filters these; mirror it here.
+    if (category.weight === 0) continue;
     for (const check of category.checks) {
       if (check.status === "pass") continue;
       issues.push({
