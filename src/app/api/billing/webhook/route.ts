@@ -501,9 +501,19 @@ export async function POST(req: Request) {
         // top level); resolve there first, then fall back to the stored Stripe ids
         // so a converted trial never fails to flip trialing -> active (lost MRR).
         const invoiceTenantId = await resolveInvoiceTenantId(invoice, tenantId);
+        // Stripe issues a $0 `subscription_create` invoice the instant a TRIAL
+        // sub is created and fires invoice.paid for it. Promoting trialing ->
+        // active on that would erase the trial state (and count an unpaid trial
+        // as active MRR). Only a real paid/cycle invoice promotes to active — but
+        // still stamp the sub id and clear any past-due streak.
+        const isTrialCreateInvoice =
+          invoice.billing_reason === "subscription_create" && (invoice.amount_paid ?? 0) === 0;
         await applyTenantSubscriptionStatus(invoiceTenantId, {
-          subscriptionStatus: "active",
-          subscriptionPastDueSince: undefined,
+          ...(isTrialCreateInvoice ? {} : { subscriptionStatus: "active" as const }),
+          // `null` (not `undefined`) so the mapper actually writes the clear —
+          // undefined is dropped, leaving a stale first-failure timestamp that
+          // would 402 a recovered client on their next single failure.
+          subscriptionPastDueSince: null,
           ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
         }, event);
         break;
@@ -576,10 +586,27 @@ export async function POST(req: Request) {
         break;
       }
 
-      case "customer.subscription.deleted":
-        await applyTenantSubscriptionStatus(tenantId, { subscriptionStatus: "cancelled" }, event);
-        alert("billing_subscription_cancelled", "high", { tenantId: tenantId ?? "unknown" });
+      case "customer.subscription.deleted": {
+        // Mirror the invoice fallback: a sub created outside our checkout (an
+        // operator making it in the Stripe dashboard) carries no tenantId
+        // metadata, so metadata-only resolution would leave the tenant "active"
+        // (free paid access) forever. Fall back to the stored sub/customer id.
+        const deletedSub = event.data.object as Stripe.Subscription;
+        const deletedCustomerId =
+          typeof deletedSub.customer === "string" ? deletedSub.customer : deletedSub.customer?.id;
+        const deletedTenantId =
+          tenantId ??
+          (deletedSub.id
+            ? (await getTenantByStripeSubscriptionId(deletedSub.id).catch(() => undefined))?.id
+            : undefined) ??
+          (deletedCustomerId
+            ? (await getTenantByStripeCustomerId(deletedCustomerId).catch(() => undefined))?.id
+            : undefined) ??
+          null;
+        await applyTenantSubscriptionStatus(deletedTenantId, { subscriptionStatus: "cancelled" }, event);
+        alert("billing_subscription_cancelled", "high", { tenantId: deletedTenantId ?? "unknown" });
         break;
+      }
 
       default:
         break;

@@ -77,7 +77,7 @@ export interface CommercialSnapshot {
   stripeSubscriptionId?: string;
   subscriptionStatus?: TenantConfig["subscriptionStatus"];
   subscriptionStartedAt?: string;
-  subscriptionPastDueSince?: string;
+  subscriptionPastDueSince?: string | null;
   commitmentEndsAt?: string;
   planOverride?: TenantConfig["planOverride"];
   subscriptionPlan?: CommercialPlanKey;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, getActorContext } from "@/lib/auth";
+import { requireTenantPermission, getActorContext } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import {
   BillingConfigurationError,
@@ -16,7 +16,9 @@ import {
  */
 export async function POST() {
   const tenant = await getTenantFromHeaders();
-  const denied = await requireTenantAccess(tenant);
+  // Starting the paid plan is an owner action (matches billing/portal +
+  // offboarding), not any-member — a viewer/editor must not mint a checkout.
+  const denied = await requireTenantPermission(tenant, "billing:manage");
   if (denied) return denied;
 
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_SCAFFOLD_PRICE_ID) {

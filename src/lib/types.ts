@@ -612,8 +612,10 @@ export interface TenantConfig {
   billingType?: BillingType;
   /** @deprecated Legacy free-access flag. Superseded by billingType="case_study"; read for back-compat only. */
   planOverride?: "founder_comp";
-  /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation. */
-  subscriptionPastDueSince?: string;
+  /** When subscriptionStatus changed to past_due (ISO date). Used for grace period calculation.
+   *  `null` explicitly clears the stored timestamp (the mapper only writes columns whose value is
+   *  not `undefined`, so a clear must pass `null`, not `undefined`). */
+  subscriptionPastDueSince?: string | null;
   bookingProvider?: string;
   bookingUrl?: string;
   resendDomain?: string;

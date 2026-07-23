@@ -370,10 +370,13 @@ export async function POST(req: Request) {
       execute: async ({ tenantId, founderComp, ...changes }) => {
         const fields = Object.entries(changes).filter(([, v]) => v !== undefined);
         const params: Record<string, unknown> = { id: tenantId, ...Object.fromEntries(fields) };
-        // founderComp maps to the tenant's planOverride field ("founder_comp" or
-        // "" to clear). Kept out of the Gemini schema as a boolean — an empty
-        // enum value is rejected by the model's function-calling validation.
-        if (founderComp !== undefined) params.planOverride = founderComp ? "founder_comp" : "";
+        // Free access = billingType "case_study" (the first-class replacement for
+        // the retired planOverride:"founder_comp" flag). Do NOT set planOverride
+        // here: the tenants PATCH coerces "founder_comp" -> "" (retirement rule),
+        // which would silently CLEAR access instead of granting it. case_study is
+        // honored by getEffectiveSubscriptionStatus. Kept out of the Gemini schema
+        // as a boolean since an empty enum value fails function-calling validation.
+        if (founderComp !== undefined) params.billingType = founderComp ? "case_study" : "none";
         const changedKeys = Object.keys(params).filter((k) => k !== "id");
         if (changedKeys.length === 0) {
           return { error: "No fields to change." };

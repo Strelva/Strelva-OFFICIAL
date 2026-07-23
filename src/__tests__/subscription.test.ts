@@ -97,6 +97,22 @@ describe("getEffectiveSubscriptionStatus", () => {
     const status = await getEffectiveSubscriptionStatus("ghost");
     expect(status).toBe("none");
   });
+
+  it("grants access to a case_study tenant with no subscription (comped, not 402'd)", async () => {
+    mockGetTenantConfig.mockResolvedValue(
+      makeTenantConfig({ billingType: "case_study", subscriptionStatus: undefined }),
+    );
+    const status = await getEffectiveSubscriptionStatus("test");
+    expect(status).toBe("active");
+  });
+
+  it("still grants access via the legacy founder_comp planOverride", async () => {
+    mockGetTenantConfig.mockResolvedValue(
+      makeTenantConfig({ planOverride: "founder_comp", subscriptionStatus: undefined }),
+    );
+    const status = await getEffectiveSubscriptionStatus("test");
+    expect(status).toBe("active");
+  });
 });
 
 describe("STRIPE_BILLING_GRANDFATHER_TENANTS (billing on)", () => {
@@ -277,13 +293,16 @@ describe("billing webhook event mapping", () => {
     mockUpdateTenant.mockResolvedValue(makeTenantConfig());
   });
 
-  it("invoice.paid maps to subscriptionStatus='active' and clears grace period", async () => {
+  it("invoice.paid maps to subscriptionStatus='active' and clears grace period with a null sentinel", async () => {
     const { updateTenant } = await import("../lib/tenants");
     const tenantId = "test-tenant";
-    await updateTenant(tenantId, { subscriptionStatus: "active", subscriptionPastDueSince: undefined });
+    // The clear must pass `null`, not `undefined` — the tenantToRow mapper only
+    // writes columns whose value is not undefined, so an undefined would silently
+    // leave a stale past-due timestamp in Postgres.
+    await updateTenant(tenantId, { subscriptionStatus: "active", subscriptionPastDueSince: null });
     expect(mockUpdateTenant).toHaveBeenCalledWith(tenantId, {
       subscriptionStatus: "active",
-      subscriptionPastDueSince: undefined,
+      subscriptionPastDueSince: null,
     });
   });
 

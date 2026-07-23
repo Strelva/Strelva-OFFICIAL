@@ -448,7 +448,9 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       "acme",
       expect.objectContaining({
         subscriptionStatus: "active",
-        subscriptionPastDueSince: undefined,
+        // Clear the past-due streak with an explicit null (not undefined) so the
+        // mapper actually writes the clear to Postgres.
+        subscriptionPastDueSince: null,
         stripeSubscriptionId: "sub_basil",
       }),
     );

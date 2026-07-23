@@ -44,6 +44,7 @@ export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
   "revalidation-reconcile": 7 * 3600, // every 6h
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h
+  "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
 };
 
 const HEARTBEAT_TTL_SECONDS = 14 * 24 * 3600; // keep two weeks of last-seen

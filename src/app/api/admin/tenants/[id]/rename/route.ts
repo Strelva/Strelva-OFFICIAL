@@ -3,6 +3,7 @@ import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
 import { renameTenantSlug } from "@/lib/tenant-rename";
+import { isGrandfathered } from "@/lib/subscription";
 
 /**
  * Rename a tenant's subdomain slug. `id` is the CURRENT slug; body `{ newSlug }`.
@@ -29,6 +30,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const newSlug = (body as { newSlug?: unknown })?.newSlug;
   if (typeof newSlug !== "string" || !newSlug.trim()) {
     return NextResponse.json({ error: "newSlug (string) is required." }, { status: 400 });
+  }
+
+  // Grandfathering is keyed on the mutable slug via an env list. Renaming a
+  // grandfathered tenant drops it off that list and 402s the client instantly,
+  // and the fix needs an env edit + a FRESH deploy (redeploy reuses the old env
+  // snapshot). Refuse unless the operator has already moved the env value and
+  // opts in explicitly.
+  const allowGrandfatheredRename =
+    (body as { allowGrandfatheredRename?: unknown })?.allowGrandfatheredRename === true;
+  if (isGrandfathered(id) && !allowGrandfatheredRename) {
+    return NextResponse.json(
+      {
+        error: `"${id}" is on STRIPE_BILLING_GRANDFATHER_TENANTS. Renaming it drops it off the list and 402s the client immediately. First update the env var to "${newSlug.trim()}" and ship a FRESH deploy (not \`vercel redeploy\` — it reuses the old env snapshot), then retry with { "allowGrandfatheredRename": true }.`,
+      },
+      { status: 409 },
+    );
   }
 
   const result = await renameTenantSlug(id, newSlug.trim());

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDevAccessBypassEnabled } from "./dev-access";
 import { getTenantConfig } from "./tenants";
+import { resolveBillingType } from "./billing-type";
 
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 
@@ -67,6 +68,14 @@ export async function getEffectiveSubscriptionStatus(tenant: string): Promise<Su
 
   const config = await getTenantConfig(tenant);
   if (config?.planOverride === "founder_comp") {
+    return "active";
+  }
+  // A comped case study is fully set up and must have access. This is the
+  // first-class replacement for the legacy founder_comp flag (both operator
+  // write surfaces set billingType, not planOverride) — the gate has to honor
+  // it or a deliberately-comped client 402s. resolveBillingType also maps a
+  // legacy founder_comp row to case_study, so this subsumes the check above.
+  if (config && resolveBillingType(config) === "case_study") {
     return "active";
   }
   return config?.subscriptionStatus ?? "none";
