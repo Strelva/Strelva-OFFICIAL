@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Circle, X } from "lucide-react";
+import { CheckCircle2, Circle, X, ChevronRight } from "lucide-react";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface Step {
@@ -99,6 +99,9 @@ export function OnboardingChecklist({
   }
 
   const doneCount = steps.filter((s) => s.done).length;
+  // The first not-yet-done step is THE next action — highlight it so a day-one
+  // owner knows exactly where to start, instead of four look-alike rows.
+  const nextIdx = steps.findIndex((s) => !s.done);
 
   return (
     <div className="rounded-xl border border-glass-border bg-glass p-5">
@@ -119,23 +122,35 @@ export function OnboardingChecklist({
       </div>
 
       <ul className="mt-4 space-y-1.5">
-        {steps.map((s) => (
-          <li key={s.key}>
-            <Link
-              href={s.href}
-              className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-gray-bg transition-colors"
-            >
-              {s.done ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-positive0" strokeWidth={2} />
-              ) : (
-                <Circle className="h-4 w-4 shrink-0 text-gray-muted" strokeWidth={1.5} />
-              )}
-              <span className={`text-[13px] ${s.done ? "text-gray-muted line-through" : "text-warm-black"}`}>
-                {s.label}
-              </span>
-            </Link>
-          </li>
-        ))}
+        {steps.map((s, i) => {
+          const isNext = i === nextIdx;
+          return (
+            <li key={s.key}>
+              <Link
+                href={s.href}
+                className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${
+                  isNext ? "border border-accent/25 bg-accent-dim/40 hover:bg-accent-dim/60" : "hover:bg-gray-bg"
+                }`}
+              >
+                {s.done ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-positive0" strokeWidth={2} />
+                ) : (
+                  <Circle className={`h-4 w-4 shrink-0 ${isNext ? "text-accent" : "text-gray-muted"}`} strokeWidth={1.5} />
+                )}
+                <span className={`flex-1 text-[13px] ${s.done ? "text-gray-muted line-through" : isNext ? "font-medium text-warm-black" : "text-warm-black"}`}>
+                  {s.label}
+                </span>
+                {isNext ? (
+                  <span className="flex shrink-0 items-center gap-1 text-[12px] font-medium text-accent-text">
+                    Start <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+                  </span>
+                ) : !s.done ? (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-faint opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.5} />
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
