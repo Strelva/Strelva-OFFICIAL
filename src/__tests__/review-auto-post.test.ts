@@ -10,11 +10,16 @@ import type { UnifiedEvent } from "@/lib/types";
 
 const mockGetAllTenants = vi.fn();
 const mockGetEvents = vi.fn();
+const mockUpdateEvent = vi.fn();
 const mockResolveEventAction = vi.fn();
 const mockGetReplyVoice = vi.fn();
 
 vi.mock("@/lib/tenants", () => ({ getAllTenants: (...a: unknown[]) => mockGetAllTenants(...a) }));
-vi.mock("@/lib/events", () => ({ getEvents: (...a: unknown[]) => mockGetEvents(...a) }));
+vi.mock("@/lib/events", () => ({
+  getEvents: (...a: unknown[]) => mockGetEvents(...a),
+  updateEvent: (...a: unknown[]) => mockUpdateEvent(...a),
+  addEvent: (...a: unknown[]) => a,
+}));
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
 vi.mock("@/lib/reviews/reply-voice", () => ({ getReplyVoice: (...a: unknown[]) => mockGetReplyVoice(...a) }));
 
@@ -48,6 +53,7 @@ describe("runDueAutoPosts", () => {
     mockGetAllTenants.mockResolvedValue([{ id: "acme", active: true }]);
     mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
     mockResolveEventAction.mockResolvedValue({ changed: true });
+    mockUpdateEvent.mockResolvedValue({ changed: true });
   });
 
   it("posts a draft whose window has elapsed", async () => {
@@ -62,6 +68,29 @@ describe("runDueAutoPosts", () => {
     mockResolveEventAction.mockResolvedValue({ changed: false, reason: "provider_failed" });
     const res = await runDueAutoPosts(NOW);
     expect(res).toEqual({ posted: 0, failed: 1 });
+  });
+
+  it("bumps the attempt counter on failure and gives up after the cap", async () => {
+    // A draft on its 3rd (final) failed attempt should be flagged autoPostFailed.
+    const failing = draft({ autoPostAt: new Date(NOW - 60_000).toISOString() });
+    failing.metadata = { ...failing.metadata, autoPostAttempts: 2 };
+    mockGetEvents.mockResolvedValue([failing]);
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "provider_failed" });
+    await runDueAutoPosts(NOW);
+    expect(mockUpdateEvent).toHaveBeenCalledTimes(1);
+    const updater = mockUpdateEvent.mock.calls[0][1] as (e: UnifiedEvent) => UnifiedEvent;
+    const next = updater(failing);
+    expect(next.metadata?.autoPostAttempts).toBe(3);
+    expect(next.metadata?.autoPostFailed).toBe(true);
+  });
+
+  it("skips a draft already flagged autoPostFailed", async () => {
+    const dead = draft({ autoPostAt: new Date(NOW - 60_000).toISOString() });
+    dead.metadata = { ...dead.metadata, autoPostFailed: true };
+    mockGetEvents.mockResolvedValue([dead]);
+    const res = await runDueAutoPosts(NOW);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    expect(res).toEqual({ posted: 0, failed: 0 });
   });
 
   it("does NOT post a draft still inside its window", async () => {

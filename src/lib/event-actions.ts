@@ -309,8 +309,9 @@ async function executeResolvedEventAction(
   // failed publish leaves the draft pending so the queue can't falsely show it
   // as handled.
   if (event.type === "review" && event.metadata?.kind === "review_reply_draft") {
+    const metaReviewId = typeof event.metadata?.reviewId === "string" ? event.metadata.reviewId : "";
     if (action === "approved") {
-      const reviewId = typeof event.metadata?.reviewId === "string" ? event.metadata.reviewId : "";
+      const reviewId = metaReviewId;
       const replyText =
         typeof event.metadata?.draftedReply === "string"
           ? event.metadata.draftedReply
@@ -321,8 +322,19 @@ async function executeResolvedEventAction(
       const { publishReviewReply } = await import("./gbp-replies");
       const result = await publishReviewReply(tenantId, reviewId, replyText);
       if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      // Mirror the published reply onto the review row (keyed by the Google
+      // external id) so the auto-post backlog no longer treats the review as
+      // unreplied and re-drafts + re-posts it in an endless loop.
+      const { replyToReviewByExternalId } = await import("./reviews");
+      await replyToReviewByExternalId(tenantId, reviewId, replyText).catch(() => {});
     }
     const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    if (resolved.changed && action === "dismissed" && metaReviewId) {
+      // A dismissal is a per-review veto: mark it durably so the backlog never
+      // re-drafts (and eventually auto-posts) a reply the owner rejected.
+      const { markReviewReplyDeclined } = await import("./review-replies");
+      await markReviewReplyDeclined(tenantId, metaReviewId).catch(() => {});
+    }
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 

@@ -15,16 +15,22 @@
  */
 
 import type { TenantConfig, UnifiedEvent } from "../types";
-import { getEvents, addEvent } from "../events";
+import { getEvents, addEvent, updateEvent } from "../events";
 import { resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
-import { draftReviewReply, storeRecentReply } from "../review-replies";
+import { draftReviewReply, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
 
 /** The catch-window between "drafted" and "auto-posted" — long enough for the
  *  owner to veto a bad AI reply, short enough that the reply is still timely. */
 export const AUTO_POST_DELAY_MS = 12 * 60 * 60 * 1000;
+
+/** Stop auto-posting a draft after this many failed publish attempts. Without a
+ *  cap, a draft with a broken publish precondition (dead GBP connection, or a
+ *  non-Google review that can never resolve) retries every cron run forever,
+ *  each failure emitting a new pending alert event + Slack ping. */
+export const MAX_AUTO_POST_ATTEMPTS = 3;
 
 function hasReply(reply: string | undefined | null): boolean {
   return typeof reply === "string" && reply.trim().length > 0;
@@ -63,8 +69,14 @@ export async function draftReplyBacklog(
     for (const r of reviews) {
       if (n >= capPerTenant) break;
       if (hasReply(r.reply)) continue;
+      // Only Google reviews can be published back through the GBP API. Drafting
+      // for Yelp/manual reviews queues a reply whose id can never resolve, so it
+      // fails every auto-post run forever (alert-event + Slack spam).
+      if (r.source !== "google") continue;
       const reviewId = r.externalId ?? r.id;
       if (alreadyDrafted.has(reviewId)) continue;
+      // A prior owner dismissal is a durable per-review veto — never re-draft it.
+      if (await isReviewReplyDeclined(t.id, reviewId)) continue;
       try {
         const reply = await draftReviewReply(
           { reviewId, reviewerName: r.author, rating: r.rating, comment: r.text },
@@ -118,17 +130,36 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
     );
     for (const e of pending) {
       if (e.metadata?.kind !== "review_reply_draft") continue;
+      if (e.metadata?.autoPostFailed === true) continue; // gave up after the cap
       const at = e.metadata?.autoPostAt;
       if (typeof at !== "string") continue; // approve-mode drafts carry no timer
       const due = new Date(at).getTime();
       if (Number.isNaN(due) || due > nowMs) continue; // still inside the window
+      let ok = false;
       try {
         const result = await resolveEventAction(t.id, e.id, "approved");
-        if (result.changed) posted += 1;
-        else failed += 1;
+        ok = result.changed;
       } catch {
-        failed += 1;
+        ok = false;
       }
+      if (ok) {
+        posted += 1;
+        continue;
+      }
+      failed += 1;
+      // Bound the retries: after MAX_AUTO_POST_ATTEMPTS, stop auto-posting this
+      // draft (it stays pending for manual handling) so a broken publish
+      // precondition can't spam the queue + Slack on every 3h run forever.
+      const attempts =
+        (typeof e.metadata?.autoPostAttempts === "number" ? e.metadata.autoPostAttempts : 0) + 1;
+      await updateEvent(e.id, (ev) => ({
+        ...ev,
+        metadata: {
+          ...ev.metadata,
+          autoPostAttempts: attempts,
+          ...(attempts >= MAX_AUTO_POST_ATTEMPTS ? { autoPostFailed: true } : {}),
+        },
+      })).catch(() => {});
     }
   }
 

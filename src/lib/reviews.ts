@@ -163,3 +163,39 @@ export async function replyToReview(
   await writeDevReviews(tenant, reviews);
   return reviews[idx];
 }
+
+/**
+ * Mirror a published reply onto the review row keyed by the provider's EXTERNAL
+ * id (the Google review resource id), not the internal row id. The governed
+ * publish path (auto-post + approve-from-queue) only knows the external id, and
+ * if the row's `reply` stays empty the auto-post backlog sees the review as
+ * unreplied and re-drafts it forever. Idempotent; returns null when no row
+ * matches (e.g. a review not yet ingested).
+ */
+export async function replyToReviewByExternalId(
+  tenant: string,
+  externalId: string,
+  replyText: string,
+): Promise<ReviewItem | null> {
+  const repliedAt = new Date().toISOString();
+
+  if (dataSourceIsPostgres()) {
+    const db = reviewDb(`reply-by-external ${tenant}/${externalId}`);
+    const { data, error } = await db
+      .from("reviews")
+      .update({ reply: replyText, replied_at: repliedAt })
+      .eq("tenant_id", tenant)
+      .eq("external_id", externalId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToReview(data) : null;
+  }
+
+  const reviews = await readDevReviews(tenant);
+  const idx = reviews.findIndex((r) => r.externalId === externalId);
+  if (idx === -1) return null;
+  reviews[idx] = { ...reviews[idx], reply: replyText, repliedAt };
+  await writeDevReviews(tenant, reviews);
+  return reviews[idx];
+}

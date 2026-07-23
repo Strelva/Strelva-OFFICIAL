@@ -167,6 +167,32 @@ export async function getRecentReplies(tenantId: string): Promise<string[]> {
 }
 
 /**
+ * Per-review "the owner declined a reply here" marker. When an owner dismisses a
+ * drafted reply it is a veto for that REVIEW, not just that draft event — without
+ * a durable marker the backlog would see the review still has no reply and
+ * re-draft it (then auto-post the reply the owner explicitly rejected). Durable
+ * (180d) so a dismissal survives the ~90-day event window.
+ */
+const REVIEW_REPLY_DECLINED_TTL_SEC = 180 * 24 * 60 * 60;
+function reviewReplyDeclinedKey(tenantId: string, reviewId: string): string {
+  return `reb:review-reply-declined:${tenantId}:${reviewId}`;
+}
+
+export async function markReviewReplyDeclined(tenantId: string, reviewId: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis || !reviewId) return;
+  await redis
+    .set(reviewReplyDeclinedKey(tenantId, reviewId), "1", { ex: REVIEW_REPLY_DECLINED_TTL_SEC })
+    .catch(() => {});
+}
+
+export async function isReviewReplyDeclined(tenantId: string, reviewId: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis || !reviewId) return false;
+  return Boolean(await redis.get(reviewReplyDeclinedKey(tenantId, reviewId)).catch(() => null));
+}
+
+/**
  * Naive word-overlap similarity ratio (Jaccard on word sets).
  * Scores 0–1; 1 = identical word sets.
  */
