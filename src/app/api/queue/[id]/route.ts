@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission, isSuperAdmin } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction, type EventWorkflowAction } from "@/lib/event-actions";
@@ -8,6 +8,19 @@ import { readJsonObject } from "@/lib/request-body";
 const ALLOWED_ACTIONS = new Set<EventWorkflowAction>([
   "approved",
   "dismissed",
+  "triaged",
+  "quoted",
+  "accepted",
+  "in_progress",
+  "shipped",
+  "declined",
+]);
+
+// The custom-change-request fulfillment transitions are OPERATOR work (Strelva
+// triages/quotes/ships a build). A client owner must not self-advance their own
+// request through the internal pipeline — the UI gates these to operators, but
+// the server has to enforce it too (the UI gate is bypassable via a direct call).
+const OPERATOR_ONLY_ACTIONS = new Set<EventWorkflowAction>([
   "triaged",
   "quoted",
   "accepted",
@@ -40,6 +53,12 @@ export async function PATCH(
 
   if (!ALLOWED_ACTIONS.has(action as EventWorkflowAction)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  }
+
+  // Operator-only fulfillment transitions require super-admin, even for the
+  // tenant owner (who otherwise holds publishing:manage).
+  if (OPERATOR_ONLY_ACTIONS.has(action as EventWorkflowAction) && !(await isSuperAdmin())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const result = await resolveEventAction(tenant, id, action as EventWorkflowAction);

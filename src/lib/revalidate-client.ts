@@ -147,6 +147,10 @@ export async function revalidateClientSite(
         method: "POST",
         headers: signed.headers,
         body: signed.body,
+        // Don't follow redirects: this carries the signed HMAC revalidation
+        // header, and a 3xx to an internal host would replay it past the
+        // literal-URL safety check. The client site must accept the POST directly.
+        redirect: "manual",
         // A hung client site must not block the (sequential) reconcile batch.
         signal: AbortSignal.timeout(5000),
       });

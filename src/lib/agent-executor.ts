@@ -15,7 +15,7 @@ import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/
 import { logger } from "@/lib/logger";
 import { addSentryBreadcrumb } from "@/lib/sentry-context";
 import { scheduleVerification } from "@/lib/verify-live";
-import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
+import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
 import { resolveGbpWriteAllowed, resolveEditableSections, buildGbpTools, buildUndoTool } from "@/lib/agent-shared";
 
 export interface AgentExecutionToolTrace {
@@ -165,6 +165,12 @@ export async function executeAgentPromptDetailed(
       description: "Read current content for a website section",
       inputSchema: z.object({ section: sectionEnum }),
       execute: async ({ section }) => {
+        // Mirror the streaming route's read-gate so the two agent paths can't
+        // diverge on read authorization (a section may be draftable but not
+        // readable per the capability manifest).
+        if (!manifestAllowsAction(siteManifest, section, "read")) {
+          return { error: `${section} is not readable for this site's capability manifest` };
+        }
         const { getContent } = await import("@/lib/storage");
         return await getContent(section as ContentSection, tenantId);
       },

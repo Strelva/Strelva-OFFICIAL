@@ -45,6 +45,11 @@ export async function postCustomChangeRequest(
         summary: input.summary,
         requestedBy: input.requestedBy ?? "Strelva AI agent",
       }),
+      // Never follow a redirect: this request carries the shared bearer secret,
+      // and isSafeFetchUrl only checked the literal URL — a 3xx to an internal
+      // host would leak the credential past the guard. Treat a redirect as a
+      // failure (the endpoint must accept the POST directly).
+      redirect: "manual",
     });
     if (!response.ok) {
       return { ok: false, reason: "http_error", status: response.status };

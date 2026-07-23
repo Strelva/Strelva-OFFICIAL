@@ -111,6 +111,11 @@ export async function getSiteCapabilityManifest(tenant: string): Promise<SiteCap
     const res = await fetch(manifestUrl, {
       headers: { Accept: "application/json" },
       cache: "no-store",
+      // Don't auto-follow redirects: isSafeFetchUrl only validated the literal
+      // URL, so a validated public host that 3xx-redirects to an internal /
+      // metadata address would bypass the SSRF guard. A manifest URL should
+      // resolve directly; treat any redirect as unsafe.
+      redirect: "manual",
       signal: AbortSignal.timeout(2500),
     });
     if (!res.ok) return local;

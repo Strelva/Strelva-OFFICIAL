@@ -102,7 +102,15 @@ function formatSourceDate(value?: string | null): string | null {
 function getCustomRequestUrl(productionUrl: string | undefined, endpoint: string | undefined): string | null {
   if (!productionUrl || !endpoint) return null;
   try {
-    return new URL(endpoint, productionUrl).toString();
+    const base = new URL(productionUrl);
+    const resolved = new URL(endpoint, base);
+    // SAME-ORIGIN ONLY. `endpoint` comes from the (editor-writable) capability
+    // manifest; an absolute value pointing off the client's own production
+    // origin would send the shared platform SCAFFOLD_CUSTOM_REQUEST_SECRET
+    // bearer to an arbitrary host, which could then forge requests against every
+    // other client's repo. Reject anything that isn't the client's own origin.
+    if (resolved.origin !== base.origin) return null;
+    return resolved.toString();
   } catch {
     return null;
   }
