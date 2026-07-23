@@ -32,8 +32,13 @@ type StatusTone = "good" | "warn" | "crit" | "neutral";
 function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
   if (!c.active) return { label: "Archived", tone: "neutral" };
   if (c.atRiskReason) return { label: "At risk", tone: "crit", detail: c.atRiskReason };
-  if (!c.billingConfigured) return { label: "No plan", tone: "warn", detail: "Set a billing plan" };
-  if (c.launchStatus === "blocked") return { label: "Needs setup", tone: "warn", detail: "Open the client to see what's missing" };
+  // A live client with no plan is a real revenue leak (amber). But a client still
+  // in onboarding without billing is the NORMAL state — show it as a calm neutral
+  // "In build", not an amber warning on every pre-launch row.
+  if (c.launchStatus === "ready" && !c.billingConfigured)
+    return { label: "No plan", tone: "warn", detail: "Live but no billing — set a plan" };
+  if (!c.billingConfigured || c.launchStatus === "blocked" || c.launchStatus === "watch")
+    return { label: "In build", tone: "neutral", detail: "Still in onboarding" };
   return { label: "Live", tone: "good" };
 }
 

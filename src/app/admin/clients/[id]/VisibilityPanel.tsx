@@ -56,8 +56,8 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
       <div role="status" className="rounded-2xl border border-glass-border bg-glass p-5">
         <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white mb-1">AI-search visibility</h2>
         <p className="text-sm text-gray-muted">
-          No visibility data yet. The weekly visibility cron measures this once the tenant has a
-          <code className="mx-1 text-gray-faint">visibility</code>config block and the SERP/AI keys are set.
+          Not tracking yet. Strelva checks weekly whether this client shows up in Google + AI answers
+          for their trade and town — it starts once the client&apos;s industry and town are set.
         </p>
       </div>
     );

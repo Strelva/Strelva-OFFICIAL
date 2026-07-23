@@ -157,7 +157,9 @@ describe("owner journey copy and links", () => {
     expect(weeklyBrief).toContain("buildVerdict");
     expect(trendChart).toContain("Last 30 days");
     expect(weeklyBrief).toContain("Your first weekly report is still warming up");
-    expect(weeklyBrief).toContain("Open dashboard");
+    // Links back to a real proof surface — "Go to Today" (the empty-report CTA;
+    // "Open dashboard" was misleading since the user is already in the dashboard).
+    expect(weeklyBrief).toContain("Go to Today");
   });
 
   it("keeps the site editor focused on direct editing instead of embedded chat", () => {

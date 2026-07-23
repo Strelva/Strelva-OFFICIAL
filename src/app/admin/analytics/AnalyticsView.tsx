@@ -392,7 +392,7 @@ function BeaconCard({
 
       {!goal && (
         <p className="mt-4 text-xs text-gray-faint">
-          No goal set for this client. Goals are set by the client in their dashboard settings.
+          No goal set for this client yet — set one on the client&apos;s page (Weekly goal).
         </p>
       )}
 

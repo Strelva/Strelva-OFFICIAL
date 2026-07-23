@@ -92,7 +92,7 @@ const BUSINESS_FIELDS: readonly IdentityField[] = [
   },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
   { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
-  { key: "bookingUrl", label: "Primary action URL", description: "Where visitors go next", mono: true },
+  { key: "bookingUrl", label: "Main button link", description: "Where your site's main button sends people", mono: true },
   { key: "footerTagline", label: "Footer tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
 ];
@@ -1391,7 +1391,7 @@ const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: s
   },
   {
     id: "site-config",
-    eyebrow: "Site config",
+    eyebrow: "Site basics",
     description: "Your site's colors and fonts, menu, footer, and the features it supports.",
   },
   {

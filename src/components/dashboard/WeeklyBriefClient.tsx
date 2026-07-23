@@ -79,7 +79,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               Your first weekly report is still warming up
             </h1>
             <p className="text-[14px] sm:text-[15px] text-gray-muted mt-3 leading-relaxed">
-              The Today view already shows the short version. Your first full report lands at the end of your first week, then a fresh one arrives every week. It builds once there is enough visitor, click, and site-change activity for a real summary.
+              Your first full report lands at the end of your first week, then a fresh one arrives every week. It builds once there is enough visitor, click, and site-change activity for a real summary.
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
             >
               <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
-              Open dashboard
+              Go to Today
             </Link>
             <Link
               href={dashboard?.dashboardHref("/dashboard/chat") || "/dashboard/chat"}

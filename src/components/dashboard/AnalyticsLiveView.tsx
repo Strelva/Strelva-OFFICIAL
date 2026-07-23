@@ -104,28 +104,32 @@ export function AnalyticsLiveView({
             <StatTile
               countUp
               label="People found you"
-              value={stats.pageViews}
-              delta={stats.pageViewsDelta}
+              value={stats.hasData ? stats.pageViews : "—"}
+              delta={stats.hasData ? stats.pageViewsDelta : undefined}
               deltaLabel={stats.range.priorLabel}
-              detail="Searches and visits to your site"
+              detail={stats.hasData ? "Searches and visits to your site" : "Starts filling in as people find you"}
               icon={<Users className="h-4 w-4" strokeWidth={1.5} />}
             />
             <StatTile
               countUp
               label="Customer actions"
-              value={stats.actions}
-              delta={stats.actionsDelta}
+              value={stats.hasData ? stats.actions : "—"}
+              delta={stats.hasData ? stats.actionsDelta : undefined}
               deltaLabel={stats.range.priorLabel}
               detail={
-                stats.phoneClicks > 0
-                  ? `${stats.bookingClicks} clicked to book · ${stats.phoneClicks} called`
-                  : "Clicked to book or called you"
+                !stats.hasData
+                  ? "Booked or called you"
+                  : stats.phoneClicks > 0
+                    ? `${stats.bookingClicks} clicked to book · ${stats.phoneClicks} called`
+                    : "Clicked to book or called you"
               }
               icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
           </div>
 
-          <TrendChart metrics={stats.series} label={stats.range.label} />
+          {/* Reconcile the "Live" pill with the window name so the chart title
+              doesn't read "LAST 7 DAYS" under a "Live" selection. */}
+          <TrendChart metrics={stats.series} label={stats.range.key === "live" ? "Live · last 7 days" : stats.range.label} />
 
           {/* Only when Google IS connected — otherwise the unified connect card
               below already carries the "connect" ask, and this line duplicated it

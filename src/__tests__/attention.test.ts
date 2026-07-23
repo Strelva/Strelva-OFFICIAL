@@ -60,12 +60,15 @@ describe("buildAttentionFromSnapshot", () => {
     expect(b.counts).toEqual({ high: 0, medium: 0, low: 0 });
   });
 
-  it("flags launch-blocked tenants as high", () => {
+  it("flags launch-progress as LOW (onboarding is normal, not an urgent needs-you item)", () => {
     const b = buildAttentionFromSnapshot(
       snapshot({ tenants: [tenant({ id: "acme", siteName: "Acme", launchStatus: "blocked", launchScore: 40 })] })
     );
-    expect(b.counts.high).toBe(1);
-    expect(b.items[0]).toMatchObject({ severity: "high", kind: "launch", tenant: "acme" });
+    // Launch progress lives in the Portfolio meter + Your-book bars, not the
+    // red "needs you" feed — so it must be low (drops out of the attention count).
+    expect(b.counts.high).toBe(0);
+    const launch = b.items.find((i) => i.kind === "launch");
+    expect(launch).toMatchObject({ severity: "low", kind: "launch", tenant: "acme" });
   });
 
   it("flags a tenant invisible in AI answers as a LOW visibility item (an opportunity, not urgent)", () => {

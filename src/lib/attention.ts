@@ -36,11 +36,16 @@ const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, 
 export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBriefing {
   const items: AttentionItem[] = [];
 
-  // Launch-blocked tenants — the highest-stakes "a client can't go live".
+  // Onboarding progress is NOT an urgent "needs you" item — a fresh client still
+  // in build is the normal state, and surfacing it here as high-severity made the
+  // overview cry wolf (5 identical red "launch" flags = the whole feed). Launch
+  // progress already lives in the Portfolio launch-readiness meter + each Your-book
+  // row's launch bar, so keep it LOW (drops out of the needs-you feed). A client
+  // that's genuinely stuck surfaces on its own detail page's "Next action" banner.
   for (const t of s.tenants) {
     if (t.launchStatus === "blocked") {
       items.push({
-        severity: "high",
+        severity: "low",
         kind: "launch",
         tenant: t.id,
         message: `${t.siteName || t.ownerName || t.id} isn't ready to launch yet — ${t.launchScore}% there`,

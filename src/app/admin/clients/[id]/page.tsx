@@ -118,12 +118,17 @@ export default async function ClientDetailPage({
   // Fuse the panels' self-verdicts into ONE ranked "next action for this client".
   // Priority: churn > launch-blocked > failing site health > reviews waiting.
   // Each signal is fail-soft — a missing one just drops out of the ranking.
-  let launchFails = 0;
+  // Capture the actual failing checks (their names), not just a count — the
+  // banner enumerates them so "before go-live" is actionable, not a mystery.
+  let launchFailItems: string[] = [];
   try {
-    launchFails = getTenantLaunchReadinessResults(tenant).filter((r) => r.status === "fail").length;
+    launchFailItems = getTenantLaunchReadinessResults(tenant)
+      .filter((r) => r.status === "fail")
+      .map((r) => r.name);
   } catch {
-    launchFails = 0;
+    launchFailItems = [];
   }
+  const launchFails = launchFailItems.length;
   const grade = lastScan?.grade ?? null;
   const needsReply = reviewIntel.needsResponse.length;
 
@@ -139,7 +144,7 @@ export default async function ClientDetailPage({
         ? "Past due"
         : "No plan yet";
 
-  let verdict: { tone: "red" | "amber" | "emerald"; message: string };
+  let verdict: { tone: "red" | "amber" | "emerald"; message: string; detail?: string };
   if (atRisk.atRisk && atRisk.reasons.length > 0) {
     const reason = atRisk.reasons[0];
     verdict = {
@@ -149,7 +154,8 @@ export default async function ClientDetailPage({
   } else if (launchFails > 0) {
     verdict = {
       tone: "amber",
-      message: `Launch blocked: ${launchFails} infrastructure ${launchFails === 1 ? "check" : "checks"} to fix before go-live.`,
+      message: `Before go-live: ${launchFails} ${launchFails === 1 ? "step" : "steps"} left.`,
+      detail: launchFailItems.join(" · "),
     };
   } else if (grade === "F" || grade === "D") {
     verdict = {
@@ -214,6 +220,7 @@ export default async function ClientDetailPage({
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-muted">Next action</p>
           <p className="mt-0.5 text-[13.5px] font-semibold text-warm-white">{verdict.message}</p>
+          {verdict.detail && <p className="mt-0.5 text-[12px] text-gray-muted">{verdict.detail}</p>}
         </div>
       </div>
 

@@ -115,8 +115,8 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
       {snapshots.length === 0 ? (
         <div className="mt-4">
           <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-            No saved versions yet. Save one now, and Strelva keeps a daily backup from here on so you
-            always have a good version to return to.
+            Strelva backs up your whole site every day automatically, so you always have a good version
+            to return to. Save one now if you want an extra restore point you name yourself.
           </p>
           {/* Ghosted example of a saved version, so the empty state previews what
               this list will look like (clearly a placeholder — muted, "Example"). */}

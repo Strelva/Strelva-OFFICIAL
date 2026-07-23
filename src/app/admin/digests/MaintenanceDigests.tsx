@@ -40,7 +40,7 @@ export function MaintenanceDigests({ initialDigests }: { initialDigests: Mainten
         tone="good"
         icon={<ClipboardCheck className="h-5 w-5" strokeWidth={1.6} />}
         title="Nothing needs review"
-        description="Every site is current, or this week's digests haven't generated yet."
+        description="Maintenance digests generate weekly (Mondays). Anything that needs your eyes shows up here."
       />
     );
   }
