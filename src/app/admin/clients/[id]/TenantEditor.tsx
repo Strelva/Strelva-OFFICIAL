@@ -311,6 +311,15 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             </div>
           )}
         </div>
+        {/* Wire-level / infrastructure controls (revalidation secret + slug
+            rename) live under a collapsed "Advanced" toggle so Business info
+            stays the everyday human-facts card, not a place a routine phone-number
+            edit scrolls past a destructive rename. */}
+        <details className="rounded-md border border-glass-border/60 bg-surface-base/20">
+          <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint [&::-webkit-details-marker]:hidden">
+            Advanced · infrastructure
+          </summary>
+          <div className="space-y-3 p-3 pt-0">
         <p className="text-xs text-gray-faint">
           Revalidation secret: {form.hasRevalidationSecret ? "set" : "missing"}
           {form.revalidateUrl ? ` · ${form.revalidateUrl}` : ""}
@@ -430,6 +439,8 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           )}
           {renameError && <p className="text-xs text-critical">{renameError}</p>}
         </div>
+          </div>
+        </details>
 
         {error && <p className="text-sm text-critical">{error}</p>}
         <button
@@ -457,7 +468,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
                 <li key={m.userId} className="flex items-center justify-between gap-2 rounded-md bg-surface-base/40 px-2.5 py-1.5">
                   <div className="min-w-0">
                     <span className="block truncate text-xs text-warm-white">{m.email}</span>
-                    <span className="text-[11px] text-gray-faint">{m.role}</span>
+                    <span className="text-[11px] text-gray-faint">{m.role.charAt(0).toUpperCase() + m.role.slice(1)}</span>
                   </div>
                   {confirmRevokeId === m.userId ? (
                     <div className="flex shrink-0 items-center gap-1">
@@ -501,7 +512,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
           >
             {(["owner", "admin", "editor", "viewer"] as const).map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
             ))}
           </select>
         </div>
@@ -518,21 +529,21 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           {assigning ? "Assigning…" : "Assign user"}
         </button>
         <p className="text-xs text-gray-faint">
-          The user must already have an account (signed up with this exact email). Use Resend owner invite below if they don&apos;t.
+          Use this only if the person already has an account (signed up with this exact email). Otherwise use <b className="font-medium text-gray-muted">Send owner invite</b> below.
         </p>
 
         <div className="pt-3 mt-1 border-t border-glass-border">
           <p className="text-xs text-gray-muted mb-2">
-            Or (re)send the owner invite to{" "}
+            Send the owner invite to{" "}
             <span className="text-warm-white">{form.ownerEmail || "—"}</span>. Works whether or
-            not they have an account yet.
+            not they have an account yet — safe to resend if they didn&apos;t get it.
           </p>
           <button
             onClick={() => void resendOwnerInvite()}
             disabled={assigning || !form.ownerEmail.trim()}
             className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40"
           >
-            {assigning ? "Sending…" : "Resend owner invite"}
+            {assigning ? "Sending…" : "Send owner invite"}
           </button>
         </div>
         </div>

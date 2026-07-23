@@ -61,6 +61,7 @@ function shortDate(iso: string): string {
 
 export default function PayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
+  const [clients, setClients] = useState<Array<{ id: string; siteName?: string }>>([]);
   const [paidPayments, setPaidPayments] = useState<Record<string, PaidPayment>>({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(blankForm);
@@ -103,6 +104,17 @@ export default function PayLinksPage() {
 
   useEffect(() => {
     void load();
+    // Client list for the "Link to client" picker — so the operator selects a
+    // real client instead of typing an internal slug (a typo silently minted an
+    // unlinked link).
+    void (async () => {
+      try {
+        const res = await fetch("/api/admin/tenants");
+        if (res.ok) setClients(await res.json());
+      } catch {
+        /* picker degrades to no options; the field stays usable */
+      }
+    })();
   }, []);
 
   async function submit() {
@@ -201,13 +213,23 @@ export default function PayLinksPage() {
           <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="acme-coffee" />
           <Field label="Client name" value={form.clientName} onChange={(v) => setForm({ ...form, clientName: v })} placeholder="Acme Coffee" />
           <div className="sm:col-span-2">
-            <Field
-              label="Link to client (optional)"
+            <label className="block text-xs text-gray-muted mb-1">Link to client (optional)</label>
+            <select
               value={form.tenantId}
-              onChange={(v) => setForm({ ...form, tenantId: v })}
-              placeholder="client-id"
-            />
-            <p className="text-[11px] text-gray-faint mt-1">Leave blank if the client has no Strelva account yet. Links the row to their client page.</p>
+              onChange={(e) => {
+                const id = e.target.value;
+                const picked = clients.find((c) => c.id === id);
+                // Prefill the client name from the picked client if it's still blank.
+                setForm((f) => ({ ...f, tenantId: id, clientName: f.clientName.trim() ? f.clientName : (picked?.siteName ?? f.clientName) }));
+              }}
+              className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus:border-accent/50"
+            >
+              <option value="">No account yet</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.siteName || c.id}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-faint mt-1">Pick the client so the link ties to their page. Leave as &ldquo;No account yet&rdquo; if they aren&apos;t a Strelva client.</p>
           </div>
           <div>
             <label className="block text-xs text-gray-muted mb-1">Amount type</label>
