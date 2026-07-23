@@ -28,7 +28,7 @@ import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getReviews, replyToReview } from "@/lib/reviews";
 import { getConnection } from "@/lib/connections";
-import { addEvent, getEvents, updateEvent } from "@/lib/events";
+import { addEvent, getEvent, getEvents, updateEvent } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { logActivity } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
@@ -58,11 +58,16 @@ async function publishReplyViaApproval(
 
   let eventId: string;
   if (existing) {
-    await updateEvent(existing.id, (event) => ({
+    const updated = await updateEvent(existing.id, (event) => ({
       ...event,
       body: reply,
       metadata: { ...event.metadata, draftedReply: reply },
     }));
+    // If the owner's final text didn't land (lost the write lock to a concurrent
+    // updater), resolving now would publish the STALE draft to Google. Bail so
+    // the caller surfaces a retryable failure instead of silently diverging the
+    // dashboard from the live listing.
+    if (!updated.changed) return false;
     eventId = existing.id;
   } else {
     const created = await addEvent({
@@ -84,10 +89,17 @@ async function publishReplyViaApproval(
   }
 
   const result = await resolveEventAction(tenant, eventId, "approved");
-  // "already_resolved" only occurs AFTER a successful publish in the
-  // review_reply_draft branch (a concurrent resolve won the claim), so the
-  // reply is live on Google either way.
-  return result.changed || result.reason === "already_resolved";
+  if (result.changed) return true;
+  // "already_resolved" is ambiguous: it fires for BOTH a concurrent approve
+  // (published to Google) AND a concurrent dismiss (nothing reached Google).
+  // Re-read the event and treat it as published ONLY when it actually resolved
+  // to "approved" — otherwise the card would falsely lock to "Your reply" with
+  // no reply live on the listing.
+  if (result.reason === "already_resolved") {
+    const latest = await getEvent(eventId);
+    return latest?.status === "approved";
+  }
+  return false;
 }
 
 export async function POST(req: Request) {

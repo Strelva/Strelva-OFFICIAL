@@ -8,13 +8,20 @@ export interface SendNewsletterInput {
   subject: string;
   body: string;
   previewText?: string;
+  /**
+   * Stable prefix for Resend idempotency keys (e.g. the approval event id). When
+   * set, each batch is sent with `Idempotency-Key: {prefix}:{batchOffset}` so a
+   * retry after a mid-send failure does NOT re-deliver batches Resend already
+   * accepted. Omit for a truly one-off send.
+   */
+  idempotencyKeyPrefix?: string;
 }
 
 export interface SendNewsletterResult {
   success: boolean;
   subscriberCount: number;
   devMode?: boolean;
-  reason?: "no_subscribers" | "paused";
+  reason?: "no_subscribers" | "paused" | "send_failed";
 }
 
 /**
@@ -26,7 +33,7 @@ export interface SendNewsletterResult {
  */
 export async function sendNewsletter(
   tenant: string,
-  { subject, body, previewText }: SendNewsletterInput,
+  { subject, body, previewText, idempotencyKeyPrefix }: SendNewsletterInput,
 ): Promise<SendNewsletterResult> {
   const subscribers = await getSubscribers(tenant);
   const activeSubscribers = subscribers.filter((s) => s.status === "active");
@@ -54,21 +61,38 @@ export async function sendNewsletter(
     const batchSize = 100;
     for (let i = 0; i < emails.length; i += batchSize) {
       const batch = emails.slice(i, i + batchSize);
-      await resend.batch.send(
-        batch.map((to) => ({
-          from: `${fromName} <newsletter@${emailDomain}>`,
-          to,
-          subject: safeSubject,
-          html: safeHtml,
-          text: safeText,
-          headers: {
-            "List-Unsubscribe": `<mailto:unsubscribe@${emailDomain}?subject=unsubscribe%20${encodeURIComponent(
-              tenant,
-            )}%20${encodeURIComponent(to)}>`,
-            ...(previewText ? { "X-Preview-Text": previewText } : {}),
-          },
-        })),
-      );
+      const payload = batch.map((to) => ({
+        from: `${fromName} <newsletter@${emailDomain}>`,
+        to,
+        subject: safeSubject,
+        html: safeHtml,
+        text: safeText,
+        headers: {
+          "List-Unsubscribe": `<mailto:unsubscribe@${emailDomain}?subject=unsubscribe%20${encodeURIComponent(
+            tenant,
+          )}%20${encodeURIComponent(to)}>`,
+          ...(previewText ? { "X-Preview-Text": previewText } : {}),
+        },
+      }));
+      // The Resend SDK returns API failures in `error` (it does NOT throw) — an
+      // unchecked call would report the newsletter "sent" when zero mails went
+      // out, and event-actions would resolve the approval. Check it. The
+      // idempotency key makes a retry after a mid-send failure skip batches
+      // Resend already accepted instead of double-delivering.
+      let result;
+      try {
+        result = await resend.batch.send(
+          payload,
+          idempotencyKeyPrefix ? { idempotencyKey: `${idempotencyKeyPrefix}:${i}` } : undefined,
+        );
+      } catch (err) {
+        console.error(`[newsletter] batch send threw for ${tenant} (offset ${i}):`, err);
+        return { success: false, subscriberCount: 0, reason: "send_failed" };
+      }
+      if (result.error) {
+        console.error(`[newsletter] batch send failed for ${tenant} (offset ${i}):`, result.error);
+        return { success: false, subscriberCount: 0, reason: "send_failed" };
+      }
     }
     return { success: true, subscriberCount: activeSubscribers.length };
   }

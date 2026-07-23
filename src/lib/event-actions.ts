@@ -1,5 +1,5 @@
 import { executeAgentPrompt } from "./agent-executor";
-import { claimEventAction, finishEventAction, getEvent, resolveEvent, updateEvent } from "./events";
+import { claimEventAction, finishEventAction, getEvent, getEventRaw, resolveEvent, updateEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
 import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
@@ -95,7 +95,11 @@ export async function resolveEventAction(
   eventId: string,
   action: EventWorkflowAction
 ): Promise<{ changed: boolean; reason?: string }> {
-  const event = await getEvent(eventId);
+  // Redis-authoritative read: this path EXECUTES the event's payload (the
+  // external write), so it must see live metadata — an owner-edited review reply,
+  // a refreshed suggestion prompt — not the add-time snapshot the READ_PG mirror
+  // would serve. (getEvent, used by read surfaces, can return the PG twin.)
+  const event = await getEventRaw(eventId);
   if (!event) return { changed: false, reason: "not_found" };
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
   if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
@@ -296,7 +300,9 @@ async function executeResolvedEventAction(
       const body = typeof event.metadata?.body === "string" ? event.metadata.body : "";
       if (!subject || !body) return { changed: false, reason: "newsletter_invalid" };
       const { sendNewsletter } = await import("./newsletter");
-      const result = await sendNewsletter(tenantId, { subject, body });
+      // Pass the event id as the idempotency prefix so a retry after a partial
+      // send doesn't re-deliver batches Resend already accepted.
+      const result = await sendNewsletter(tenantId, { subject, body, idempotencyKeyPrefix: eventId });
       if (!result.success) return { changed: false, reason: result.reason || "newsletter_failed" };
     }
     const resolved = await resolveEvent(eventId, action, { actor: "user" });

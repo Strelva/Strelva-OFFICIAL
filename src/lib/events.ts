@@ -311,6 +311,21 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
 }
 
 /**
+ * Redis-AUTHORITATIVE single-event read — never hydrates from the governed-work
+ * Postgres mirror. The PG reconstruction carries the ADD-TIME proposal payload,
+ * so a post-create metadata mutation (an owner editing a review-reply draft
+ * before approving, a refreshed suggestion prompt) is invisible to it. Any
+ * path that EXECUTES an event's payload (resolveEventAction → the external
+ * write) must read the live Redis metadata, or it would publish the stale
+ * original. Read surfaces (dashboard feeds) still use getEvent/getEvents.
+ */
+export async function getEventRaw(id: string): Promise<UnifiedEvent | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+}
+
+/**
  * Event kinds (metadata.kind) that are `change_request` events but are NOT
  * custom-build requests, so they must not trip the one-active-request gate.
  * Offboarding handoffs reuse the `change_request` type for the review queue

@@ -19,6 +19,9 @@ const mockPublishReviewReply = vi.fn();
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
+  // resolveEventAction now reads the Redis-authoritative event via getEventRaw;
+  // in tests it returns the same fixture as getEvent.
+  getEventRaw: (...args: unknown[]) => mockGetEvent(...args),
   resolveEvent: (...args: unknown[]) => mockResolveEvent(...args),
   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
