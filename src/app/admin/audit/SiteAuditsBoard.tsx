@@ -127,14 +127,14 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
           {rows.map((r) => {
             const scanning = busy.has(r.id);
             return (
-              <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto_150px_auto_auto] md:gap-5">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <ClientLogo name={r.siteName} size={34} />
-                  <div className="min-w-0">
-                    <Link href={`/admin/clients/${r.id}`} className="truncate text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white hover:text-accent">
+              <div key={r.id} className="flex items-center gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto_150px_auto_auto] md:gap-5">
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <ClientLogo name={r.siteName} size={34} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/admin/clients/${r.id}`} className="block truncate text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white hover:text-accent">
                       {r.siteName}
                     </Link>
-                    <p className="mt-0.5 text-[11px] text-gray-faint">{ago(r.scannedAt)}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-gray-faint">{ago(r.scannedAt)}</p>
                   </div>
                 </div>
 
@@ -170,7 +170,7 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
                   )}
                 </div>
 
-                <div className="flex w-[92px] items-center justify-end gap-1">
+                <div className="flex shrink-0 items-center justify-end gap-1 md:w-[92px]">
                   <button
                     type="button"
                     onClick={() => scanOne(r.id)}

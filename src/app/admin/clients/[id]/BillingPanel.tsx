@@ -65,6 +65,7 @@ export function BillingPanel({
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelNote, setCancelNote] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
 
   async function save() {
     setError(null);
@@ -163,9 +164,11 @@ export function BillingPanel({
         ? ` Access ends ${new Date(data.cancelAt as string).toLocaleDateString()}.`
         : "";
       setCancelNote(`Cancellation scheduled.${until}`);
+      setCancelSuccess(true);
       setCancelConfirm(false);
     } catch (err) {
       setCancelNote(err instanceof Error ? err.message : "Cancel failed");
+      setCancelSuccess(false);
     } finally {
       setCancelBusy(false);
     }
@@ -328,7 +331,7 @@ export function BillingPanel({
                 </div>
               )}
               {cancelNote && (
-                <p className={`text-xs ${cancelNote.startsWith("Cancellation") ? "text-positive" : "text-critical"}`}>
+                <p className={`text-xs ${cancelSuccess ? "text-positive" : "text-critical"}`}>
                   {cancelNote}
                 </p>
               )}

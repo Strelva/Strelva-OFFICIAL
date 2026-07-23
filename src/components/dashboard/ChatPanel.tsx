@@ -31,10 +31,10 @@ import type { EditableNode } from "@/lib/editor-types";
 import { formatEditablePathValue, getEditablePathValue } from "@/lib/editable-path";
 
 const SUGGESTION_CHIPS = [
-  { label: "Add this week's update", icon: Clock, description: "Turn a real business change into updated site copy" },
-  { label: "Write this week's customer update", icon: CalendarPlus, description: "Create timely content from what changed in the business" },
-  { label: "Email customers about it", icon: Mail, description: "Turn a site update into a customer-ready note", hideOnMobile: true },
-  { label: "What should I improve next?", icon: BarChart3, description: "Use traffic, product interest, and freshness to pick the next move" },
+  { label: "Add this week's update", icon: Clock, description: "Tell me what changed and I'll update the site for you" },
+  { label: "Write this week's customer update", icon: CalendarPlus, description: "I'll turn the change into something ready to share with customers" },
+  { label: "Email customers about it", icon: Mail, description: "I'll draft a short note your customers can receive", hideOnMobile: true },
+  { label: "What should I work on next?", icon: BarChart3, description: "I'll look at what's working and suggest the next thing to do" },
 ];
 
 const INPUT_QUICK_ACTIONS = [

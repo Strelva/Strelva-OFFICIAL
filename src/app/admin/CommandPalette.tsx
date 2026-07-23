@@ -23,7 +23,7 @@ const NAV: Cmd[] = [
   { id: "nav-drafts", label: "Drafts", hint: "Section", href: "/admin/drafts" },
   { id: "nav-maintenance", label: "Maintenance", hint: "Section", href: "/admin/digests" },
   { id: "nav-ops", label: "Ops", hint: "Section", href: "/admin/ops" },
-  { id: "nav-audit", label: "Audit trail", hint: "Section", href: "/admin/audit" },
+  { id: "nav-audit", label: "Audit", hint: "Section", href: "/admin/audit" },
 ];
 
 // Actions, not just jumps. Each routes to a surface that ALREADY performs the

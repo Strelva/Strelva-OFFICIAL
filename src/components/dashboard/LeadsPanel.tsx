@@ -1,4 +1,5 @@
-import { Inbox, Mail, MessageSquare } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Inbox, Mail, MessageSquare } from "lucide-react";
 import type { LeadRecord } from "@/lib/leads";
 
 interface LeadsPanelProps {
@@ -68,6 +69,13 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
     return (
       <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
         <div className="mx-auto w-full max-w-3xl">
+          <Link
+            href="/dashboard"
+            className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-gray-muted transition-colors hover:text-warm-black"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Back to Today
+          </Link>
           <div className="mb-5">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Leads
@@ -96,6 +104,13 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
   return (
     <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
       <div className="mx-auto w-full max-w-3xl">
+        <Link
+          href="/dashboard"
+          className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-gray-muted transition-colors hover:text-warm-black"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+          Back to Today
+        </Link>
         <div className="mb-5">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
             Leads

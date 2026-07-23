@@ -115,7 +115,11 @@ export function AnalyticsLiveView({
               value={stats.actions}
               delta={stats.actionsDelta}
               deltaLabel={stats.range.priorLabel}
-              detail="Booked or called you"
+              detail={
+                stats.phoneClicks > 0
+                  ? `${stats.bookingClicks} clicked to book · ${stats.phoneClicks} called`
+                  : "Clicked to book or called you"
+              }
               icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             />
           </div>

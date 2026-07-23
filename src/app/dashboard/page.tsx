@@ -221,7 +221,7 @@ async function DashboardHome() {
             detail={
               phoneActions.total > 0
                 ? `${customerActions.thisWeek} clicked to book · ${phoneActions.thisWeek} called in the last 7 days`
-                : `${customerActionsThisWeek} in the last 7 days`
+                : "Clicked to book or called you"
             }
             icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
             series={dailyMetrics.map((m) => m.bookingClicks + (m.phoneClicks ?? 0))}

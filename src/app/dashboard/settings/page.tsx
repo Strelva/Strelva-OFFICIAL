@@ -1607,6 +1607,23 @@ export default function SettingsPage() {
             label: item.label,
           }))}
         />
+        {/* Sub-section jump row — only shown when the Business section is active */}
+        {activeSection === "business" && (
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {BUSINESS_SECTION_META.map((sub) => (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => {
+                  document.getElementById(sub.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="shrink-0 rounded-full border border-glass-border bg-glass px-3 py-1 text-[11px] text-gray-muted whitespace-nowrap transition-colors hover:border-accent/35 hover:text-warm-white"
+              >
+                {sub.eyebrow}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content */}

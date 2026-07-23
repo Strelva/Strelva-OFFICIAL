@@ -72,6 +72,11 @@ function MetricTile({ metric, series }: { metric: MilestoneMetric; series?: numb
  */
 export function MilestonePanel({ milestone, visitorSeries }: { milestone: Milestone; visitorSeries?: number[] }) {
   if (milestone.state === "building") {
+    const daysIn = milestone.daysSinceStart;
+    const daysRemaining = Math.max(0, 90 - daysIn);
+    const daysInLabel = daysIn === 1 ? "1 day" : `${daysIn} days`;
+    const daysRemainingLabel = daysRemaining === 1 ? "around 1 more day" : `around ${daysRemaining} more days`;
+
     return (
       <section className="rounded-2xl border border-glass-border bg-glass p-5">
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
@@ -80,9 +85,13 @@ export function MilestonePanel({ milestone, visitorSeries }: { milestone: Milest
         <div className="mt-3 flex items-start gap-2.5">
           <Flag className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.6} />
           <div className="min-w-0">
-            <h2 className="text-[16px] font-semibold text-warm-black">Your recap is building</h2>
+            <h2 className="text-[16px] font-semibold text-warm-black">
+              {daysIn > 0 ? `You're ${daysInLabel} in` : "Your recap is building"}
+            </h2>
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-              {milestone.buildingNote}
+              {daysIn > 0
+                ? `In ${daysRemainingLabel}, this panel will show your full 90-day picture — traffic compared to day one, how your reviews have grown, and how your site health has held up. Everything we track from here becomes the proof.`
+                : "Once we've gathered a few weeks of data, this shows exactly what's changed since you started — traffic, reviews, and site health compared to day one."}
             </p>
           </div>
         </div>
