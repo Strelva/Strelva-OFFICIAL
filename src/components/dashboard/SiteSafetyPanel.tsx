@@ -113,10 +113,26 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
       </button>
 
       {snapshots.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-          No saved versions yet. Save one now, and Strelva keeps a daily backup from here on so you
-          always have a good version to return to.
-        </p>
+        <div className="mt-4">
+          <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
+            No saved versions yet. Save one now, and Strelva keeps a daily backup from here on so you
+            always have a good version to return to.
+          </p>
+          {/* Ghosted example of a saved version, so the empty state previews what
+              this list will look like (clearly a placeholder — muted, "Example"). */}
+          <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
+            Your saved versions will look like this
+          </p>
+          <div className="rounded-xl border border-dashed border-glass-border bg-surface-base/20 px-3 py-3" aria-hidden>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium text-gray-muted">Daily backup &middot; Example</p>
+                <p className="mt-0.5 text-[12px] text-gray-faint">Every section captured &middot; one-click restore</p>
+              </div>
+              <span className="shrink-0 rounded-lg border border-glass-border px-3 py-1.5 text-[12px] text-gray-faint">Restore</span>
+            </div>
+          </div>
+        </div>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {snapshots.map((snapshot) => {

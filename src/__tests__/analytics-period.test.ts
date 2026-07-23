@@ -108,7 +108,11 @@ describe("periodHeadline — range-aware verdict", () => {
   });
 
   it("honest empty state differs for live vs a dated window", () => {
-    expect(periodHeadline(stats({ range: range({ key: "live" }) }))).toContain("last 7 days");
+    // Live empty is forward-looking and does NOT name "last 7 days" (that clashed
+    // with the "Live" range pill); a dated window still references "this window".
+    const live = periodHeadline(stats({ range: range({ key: "live" }) }));
+    expect(live).toMatch(/fills in|finding you/i);
+    expect(live).not.toContain("last 7 days");
     expect(periodHeadline(stats({ range: range({ key: "month" }) }))).toContain("this window");
   });
 });

@@ -114,8 +114,11 @@ export interface PeriodStats {
 export function periodHeadline(stats: PeriodStats): string {
   const { pageViews, pageViewsDelta, range } = stats;
   if (pageViews === 0) {
+    // Don't name "last 7 days" here (it clashes with the "Live" range pill) and
+    // don't frame zero as under-performance for a brand-new/pre-live site — keep
+    // it forward-looking.
     return range.key === "live"
-      ? "A quiet stretch. No visitors in the last 7 days yet. Let's change that."
+      ? "No visitors yet. This fills in as people start finding you."
       : "No visitors in this window yet. Let's change that.";
   }
   const people = `${pageViews.toLocaleString()} ${pageViews === 1 ? "person" : "people"} found you`;

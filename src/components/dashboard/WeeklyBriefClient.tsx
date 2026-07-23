@@ -139,6 +139,37 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
             </a>
           </div>
 
+          {/* A ghosted preview of the report to come — composes the fold instead
+              of a dark void and shows what the first report will contain, without
+              inventing numbers (the values are dashes until real data lands). */}
+          <div className="mt-8">
+            <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+              What your first report will show
+            </p>
+            <div className="rounded-2xl border border-glass-border bg-glass p-5 sm:p-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: "People found you", icon: <TrendingUp className="h-4 w-4" strokeWidth={1.5} /> },
+                  { label: "Customer actions", icon: <MousePointerClick className="h-4 w-4" strokeWidth={1.5} /> },
+                  { label: "Reviews", icon: <Star className="h-4 w-4" strokeWidth={1.5} /> },
+                  { label: "Site updates", icon: <FileText className="h-4 w-4" strokeWidth={1.5} /> },
+                ].map((m) => (
+                  <div key={m.label} className="rounded-xl border border-glass-border bg-surface-base/40 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-gray-faint">
+                      {m.icon}
+                      <span className="text-[10px] font-medium uppercase tracking-[0.12em]">{m.label}</span>
+                    </div>
+                    <p className="font-display text-[26px] font-medium leading-none text-gray-faint">&ndash;</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 h-16 rounded-xl border border-dashed border-glass-border bg-surface-base/20" aria-hidden />
+              <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
+                Plus a plain-English summary of what changed and what to do next &mdash; written for you, sent every week.
+              </p>
+            </div>
+          </div>
+
           {/* Reports gets richer once Google is connected — but the connect ask
               itself lives on Analytics / Google Business (one canonical place), so
               here we only nudge quietly instead of restacking the same connect card.

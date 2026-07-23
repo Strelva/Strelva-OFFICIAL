@@ -243,6 +243,45 @@ async function DashboardHome() {
             </section>
           )}
 
+          {/* Second first-run band — composes the fold instead of a dark void,
+              and sets honest expectations (no fake data): what's happening now,
+              when the first report lands, how to ask for changes. */}
+          {isFresh && (
+            <section aria-label="What happens next" className="mt-6">
+              <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+                What happens next
+              </p>
+              <div className="rounded-2xl border border-glass-border bg-glass p-5 sm:p-6">
+                <ol className="grid gap-6 sm:grid-cols-3">
+                  {[
+                    {
+                      when: "This week",
+                      body: "Strelva keeps your site and Google listing healthy in the background. Nothing for you to do.",
+                    },
+                    {
+                      when: "Your first report",
+                      body: "In about a week your first weekly report lands here and by email — who found you, and what got handled.",
+                    },
+                    {
+                      when: "Anytime",
+                      body: "Need a change? Ask Strelva in plain words. Bigger changes wait in Needs You for your okay first.",
+                    },
+                  ].map((s, i) => (
+                    <li key={s.when} className="relative">
+                      <div className="flex items-center gap-2.5">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-dim text-[12px] font-semibold text-accent-text">
+                          {i + 1}
+                        </span>
+                        <span className="text-[13px] font-medium text-warm-black">{s.when}</span>
+                      </div>
+                      <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{s.body}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </section>
+          )}
+
           {/* Proof first. A returning owner should feel "look what's working /
               what got handled for me" before being asked to do anything, so the
               reassuring numbers and the managed-service receipt lead; the approval
