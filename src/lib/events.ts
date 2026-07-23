@@ -261,9 +261,14 @@ export async function addEvent(
 }
 
 /**
- * Get events for a tenant, optionally filtered by status.
+ * Redis-AUTHORITATIVE list read — the Redis index/body path with NO governed-work
+ * Postgres hydration. Use on EXECUTION / verification paths (the reconcile sweep,
+ * the auto-post retry cap, the reply-confirmation re-read) where post-create
+ * metadata mutations (autoPostAttempts, the owner's edited status) live only in
+ * Redis and the add-time PG snapshot would nullify the check. Read surfaces
+ * (dashboard feeds) use getEvents, which hydrates from PG when READ_PG is on.
  */
-export async function getEvents(
+export async function getEventsRaw(
   tenantId: string,
   opts?: { status?: string; limit?: number }
 ): Promise<UnifiedEvent[]> {
@@ -303,6 +308,19 @@ export async function getEvents(
     }
   }
 
+  return events;
+}
+
+/**
+ * Get events for a tenant, optionally filtered by status. Read-surface variant:
+ * under GOVERNED_WORK_READ_PG, governed events are re-served from the Postgres
+ * mirror (see hydrateGovernedFromPg). Execution paths must use getEventsRaw.
+ */
+export async function getEvents(
+  tenantId: string,
+  opts?: { status?: string; limit?: number }
+): Promise<UnifiedEvent[]> {
+  const events = await getEventsRaw(tenantId, opts);
   return hydrateGovernedFromPg(tenantId, events);
 }
 

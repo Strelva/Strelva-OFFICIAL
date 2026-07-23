@@ -12,7 +12,7 @@
  * `drift` (rows it had to insert/update) means the live shadow is missing writes —
  * the cron alerts on it. Redis stays authoritative; this only ever ADDS/updates PG.
  */
-import { getEvents } from "../events";
+import { getEventsRaw } from "../events";
 import { listAllTenants } from "../db/repositories";
 import { isGovernedScopeEvent } from "./read";
 import { changeRequestNewProposal, governedEventToProposalAnyStatus } from "./shadow";
@@ -35,7 +35,11 @@ export async function reconcileGovernedWork(opts?: { tenants?: string[]; limit?:
   for (const tenant of tenants) {
     let events;
     try {
-      events = await getEvents(tenant, { limit });
+      // MUST read Redis-authoritative: under GOVERNED_WORK_READ_PG, getEvents
+      // hydrates from the SAME proposals tables reconcile is verifying, so it
+      // would compare PG-to-PG and never detect the stale-pending drift it exists
+      // to repair (#17). getEventsRaw is the Redis truth.
+      events = await getEventsRaw(tenant, { limit });
     } catch (err) {
       out.errors.push(`${tenant}: getEvents ${err instanceof Error ? err.message : String(err)}`);
       continue;

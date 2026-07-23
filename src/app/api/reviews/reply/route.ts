@@ -28,7 +28,7 @@ import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getReviews, replyToReview } from "@/lib/reviews";
 import { getConnection } from "@/lib/connections";
-import { addEvent, getEvent, getEvents, updateEvent } from "@/lib/events";
+import { addEvent, getEventRaw, getEvents, updateEvent } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { logActivity } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
@@ -96,7 +96,9 @@ async function publishReplyViaApproval(
   // to "approved" — otherwise the card would falsely lock to "Your reply" with
   // no reply live on the listing.
   if (result.reason === "already_resolved") {
-    const latest = await getEvent(eventId);
+    // Redis-authoritative re-read: under READ_PG, getEvent could serve a
+    // stale-pending PG twin and misreport a live published reply as a failure.
+    const latest = await getEventRaw(eventId);
     return latest?.status === "approved";
   }
   return false;

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getSubscribers, getContent } from "./storage";
 import { EMAIL_DOMAIN } from "./brand";
 import { sanitizeEmailSubjectText } from "./invite-email";
@@ -78,12 +79,18 @@ export async function sendNewsletter(
       // unchecked call would report the newsletter "sent" when zero mails went
       // out, and event-actions would resolve the approval. Check it. The
       // idempotency key makes a retry after a mid-send failure skip batches
-      // Resend already accepted instead of double-delivering.
+      // Resend already accepted instead of double-delivering. Key by the batch's
+      // CONTENT (a hash of its sorted recipients), NOT the slice offset — a
+      // membership change between attempts shifts offsets, and an offset key with
+      // a different payload is REJECTED by Resend, wedging the send for 24h.
+      const batchKey = idempotencyKeyPrefix
+        ? `${idempotencyKeyPrefix}:${createHash("sha256").update([...batch].sort().join(",")).digest("hex").slice(0, 32)}`
+        : undefined;
       let result;
       try {
         result = await resend.batch.send(
           payload,
-          idempotencyKeyPrefix ? { idempotencyKey: `${idempotencyKeyPrefix}:${i}` } : undefined,
+          batchKey ? { idempotencyKey: batchKey } : undefined,
         );
       } catch (err) {
         console.error(`[newsletter] batch send threw for ${tenant} (offset ${i}):`, err);

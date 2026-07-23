@@ -104,6 +104,19 @@ export async function resolveEventAction(
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
   if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
 
+  // Recovery exit for a wedged "external_accepted" event: the non-idempotent
+  // external write already succeeded (that is what the marker means) but the
+  // resolve step lost its lock / hit a blip and left the event pending. Any
+  // later attempt (the cron retry, an operator click, bulk approve) COMPLETES
+  // the resolve only — it must NEVER re-run the external write. Without this the
+  // event was stuck pending until the 90-day TTL and every approve/dismiss on it
+  // failed opaquely. Resolve as "approved" (the marker is only ever set on an
+  // accepted approval); resolveEvent no-ops idempotently if already resolved.
+  if (event.metadata?.execution?.state === "external_accepted") {
+    const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
+    return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+  }
+
   if (event.type === "change_request" && CUSTOM_WORKFLOW_ACTIONS.has(action)) {
     if (!isCustomChangeRequestMetadata(event.metadata)) {
       return { changed: false, reason: "not_custom_change_request" };

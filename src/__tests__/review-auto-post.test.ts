@@ -17,6 +17,9 @@ const mockGetReplyVoice = vi.fn();
 vi.mock("@/lib/tenants", () => ({ getAllTenants: (...a: unknown[]) => mockGetAllTenants(...a) }));
 vi.mock("@/lib/events", () => ({
   getEvents: (...a: unknown[]) => mockGetEvents(...a),
+  // The crons read Redis-authoritative via getEventsRaw (execution path); in
+  // tests it returns the same fixtures as getEvents.
+  getEventsRaw: (...a: unknown[]) => mockGetEvents(...a),
   updateEvent: (...a: unknown[]) => mockUpdateEvent(...a),
   addEvent: (...a: unknown[]) => a,
 }));

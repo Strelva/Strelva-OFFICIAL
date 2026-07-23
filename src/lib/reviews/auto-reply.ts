@@ -15,7 +15,7 @@
  */
 
 import type { TenantConfig, UnifiedEvent } from "../types";
-import { getEvents, addEvent, updateEvent } from "../events";
+import { getEventsRaw, addEvent, updateEvent } from "../events";
 import { resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
@@ -64,7 +64,7 @@ export async function draftReplyBacklog(
 
     const [reviews, pending] = await Promise.all([
       getReviews(t.id).catch(() => []),
-      getEvents(t.id, { status: "pending", limit: 200 }).catch(() => [] as UnifiedEvent[]),
+      getEventsRaw(t.id, { status: "pending", limit: 200 }).catch(() => [] as UnifiedEvent[]),
     ]);
     const alreadyDrafted = new Set(
       pending
@@ -136,7 +136,7 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
     // stamped must NOT have it auto-post. The stale autoPostAt is ignored then.
     const mode = (await getReplyVoice(t.id).catch(() => null))?.mode;
     if (mode !== "auto") return;
-    const pending = await getEvents(t.id, { status: "pending", limit: 200 }).catch(
+    const pending = await getEventsRaw(t.id, { status: "pending", limit: 200 }).catch(
       () => [] as UnifiedEvent[],
     );
     for (const e of pending) {

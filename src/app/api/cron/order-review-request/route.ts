@@ -89,39 +89,47 @@ export async function GET(request: Request) {
     }
 
     const orders = await getOrders(tenant.id, 500);
-    for (const order of orders) {
-      const ageMs = now - new Date(order.createdAt).getTime();
-      const ageDays = ageMs / DAY_MS;
-      // Too fresh (still inside the delay) or too old (outside the window): skip.
-      if (ageDays < DELAY_DAYS || ageDays > DELAY_DAYS + WINDOW_DAYS) continue;
-      ordersScanned++;
+    // Every order currently inside the request window (aged past DELAY, within WINDOW).
+    const matureOrders = orders.filter((order) => {
+      const ageDays = (now - new Date(order.createdAt).getTime()) / DAY_MS;
+      return ageDays >= DELAY_DAYS && ageDays <= DELAY_DAYS + WINDOW_DAYS;
+    });
+    ordersScanned += matureOrders.length;
 
+    // Claim the first not-yet-requested mature order.
+    let claimed: { orderId: string; key: string } | null = null;
+    for (const order of matureOrders) {
       const key = orderReviewSentKey(tenant.id, order.id);
       const fresh = await redis.set(key, now, { nx: true, ex: SENT_TTL_SECONDS }).catch(() => null);
-      if (!fresh) continue; // already requested for this order
+      if (fresh) { claimed = { orderId: order.id, key }; break; }
+    }
+    if (!claimed) return; // every mature order already requested
 
-      const ok = await sendReviewRequestEmail({
-        email,
-        businessName: tenant.siteName,
-        reviewUrl,
-        ownerName: tenant.ownerName?.trim() || undefined,
-        // Opt in to the CRM comms log so a real send accrues on the tenant timeline.
-        tenantId: tenant.id,
-        logPrefix: "[cron order-review-request]",
-      });
+    const ok = await sendReviewRequestEmail({
+      email,
+      businessName: tenant.siteName,
+      reviewUrl,
+      ownerName: tenant.ownerName?.trim() || undefined,
+      // Opt in to the CRM comms log so a real send accrues on the tenant timeline.
+      tenantId: tenant.id,
+      logPrefix: "[cron order-review-request]",
+    });
 
-      if (ok) {
-        sent++;
-        // One review-request per tenant per run: the email is identical across a
-        // tenant's orders (same Google review link), so several orders maturing
-        // in the same window would spam the owner with near-duplicate emails.
-        // The per-order NX marker still prevents re-requesting THIS order later.
-        break;
-      } else {
-        // Suppressed (client pause) or failed — release the marker so it retries.
-        skippedNotSent++;
-        await redis.del(key).catch(() => {});
+    if (ok) {
+      sent++;
+      // The email is identical across a tenant's orders (same Google review
+      // link), so this ONE send satisfies ALL currently-mature orders. Mark the
+      // siblings too, or they would drip an identical email over the next days.
+      for (const order of matureOrders) {
+        if (order.id === claimed.orderId) continue;
+        await redis
+          .set(orderReviewSentKey(tenant.id, order.id), now, { nx: true, ex: SENT_TTL_SECONDS })
+          .catch(() => {});
       }
+    } else {
+      // Suppressed (client pause) or failed — release the marker so it retries.
+      skippedNotSent++;
+      await redis.del(claimed.key).catch(() => {});
     }
   });
 

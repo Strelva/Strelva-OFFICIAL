@@ -27,6 +27,7 @@ import { buildOpsReport } from "@/lib/ops";
 import { getServiceHealth } from "@/lib/health";
 import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
+import { resolveBillingType } from "@/lib/billing-type";
 import { listDrafts, getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
 import { buildRevenueSummary, listBuildPayments } from "@/lib/revenue";
@@ -376,7 +377,18 @@ export async function POST(req: Request) {
         // which would silently CLEAR access instead of granting it. case_study is
         // honored by getEffectiveSubscriptionStatus. Kept out of the Gemini schema
         // as a boolean since an empty enum value fails function-calling validation.
-        if (founderComp !== undefined) params.billingType = founderComp ? "case_study" : "none";
+        if (founderComp === true) {
+          params.billingType = "case_study";
+        } else if (founderComp === false) {
+          // Only CLEAR when the tenant is actually comped — Gemini routinely emits
+          // an explicit founderComp:false for a boolean the operator merely
+          // mentioned, and unconditionally writing "none" would wipe a paying
+          // tier/custom client out of MRR. Un-comp only a real case_study.
+          const current = await getTenantConfig(tenantId).catch(() => null);
+          if (current && resolveBillingType(current) === "case_study") {
+            params.billingType = "none";
+          }
+        }
         const changedKeys = Object.keys(params).filter((k) => k !== "id");
         if (changedKeys.length === 0) {
           return { error: "No fields to change." };

@@ -162,15 +162,24 @@ export async function POST(req: Request) {
   if (process.env.RESEND_API_KEY) {
     // Route through the shared transport boundary (correct from-domain — never
     // the root Google-Workspace domain — replyTo default, audience gate). We
-    // already returned above when email is paused, so a false here is a real
-    // send failure.
-    const sent = await sendEmail({
-      audience: "client",
-      to: email,
-      subject: `You're invited to manage ${siteNameText}`,
-      html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
-      text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
-    });
+    // already returned above when email is paused. sendEmail THROWS on a real
+    // provider failure (it only returns false for an intentional suppression /
+    // missing key), so catch it — a Resend error must yield the share-link
+    // fallback + alert + audit log, NOT an unhandled 500 with a dead invite.
+    let sent = false;
+    let sendError: string | null = null;
+    try {
+      sent = await sendEmail({
+        audience: "client",
+        to: email,
+        subject: `You're invited to manage ${siteNameText}`,
+        html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
+        text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
+      });
+    } catch (err) {
+      sendError = err instanceof Error ? err.message : "Resend send failed";
+      console.error("[invite] Email send failed:", err);
+    }
 
     await logAuditEvent({
       tenant: tenantId,
@@ -186,7 +195,7 @@ export async function POST(req: Request) {
         email,
         tenantId,
         signUpUrl,
-        reason: "Resend send failed",
+        reason: sendError ?? "Resend send failed",
       });
       return NextResponse.json({
         success: true,
