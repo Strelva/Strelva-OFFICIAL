@@ -85,6 +85,12 @@ const cfgKey = (tenantId: string) => `analytics:cfg:${tenantId}`;
  * on the next call rather than being pinned for the TTL.
  */
 const PERF_TTL_SECONDS = 900; // 15 min
+// A short negative-cache for "unavailable" (property configured but access not
+// yet granted — the steady state for every tenant until the manual service-
+// account grant). Without it, every analytics/reports render re-mints a Google
+// token and re-fails the API call. Short enough that a real grant shows within
+// ~2 min; long enough that a dashboard session doesn't hammer Google's OAuth.
+const PERF_UNAVAILABLE_TTL_SECONDS = 120;
 const perfKey = (surface: "gsc" | "ga4", tenantId: string, days: number) =>
   `analytics:${surface}:${tenantId}:${days}`;
 
@@ -106,12 +112,13 @@ async function writeCachedPerf<T>(
   surface: "gsc" | "ga4",
   tenantId: string,
   days: number,
-  value: T
+  value: T,
+  ttlSeconds: number = PERF_TTL_SECONDS
 ): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   try {
-    await redis.set(perfKey(surface, tenantId, days), value, { ex: PERF_TTL_SECONDS });
+    await redis.set(perfKey(surface, tenantId, days), value, { ex: ttlSeconds });
   } catch {
     // Best-effort: a failed cache write just means the next read re-fetches.
   }
@@ -251,15 +258,22 @@ export async function getSearchConsolePerf(tenantId: string, days = 28): Promise
   const cached = await readCachedPerf<SearchPerf>("gsc", tenantId, days);
   if (cached) return cached;
 
+  const unavailable: SearchPerf = { status: "unavailable", ...EMPTY_SEARCH };
   try {
     const token = await resolveGoogleToken(tenantId, "gsc");
-    if (!token) return { status: "unavailable", ...EMPTY_SEARCH };
+    if (!token) {
+      await writeCachedPerf("gsc", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+      return unavailable;
+    }
 
     const { startDate, endDate } = dateRange(days);
     // Shared two-request read (true property totals + top-20 query list) — see
     // queryGscTotals. Identical logic backs the search-console cron.
     const totals = await queryGscTotals(cfg.gscProperty, token, startDate, endDate);
-    if (!totals) return { status: "unavailable", ...EMPTY_SEARCH };
+    if (!totals) {
+      await writeCachedPerf("gsc", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+      return unavailable;
+    }
 
     const result: SearchPerf = {
       status: "ok",
@@ -272,7 +286,8 @@ export async function getSearchConsolePerf(tenantId: string, days = 28): Promise
     await writeCachedPerf("gsc", tenantId, days, result);
     return result;
   } catch {
-    return { status: "unavailable", ...EMPTY_SEARCH };
+    await writeCachedPerf("gsc", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+    return unavailable;
   }
 }
 
@@ -283,9 +298,13 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
   const cached = await readCachedPerf<GaPerf>("ga4", tenantId, days);
   if (cached) return cached;
 
+  const unavailable: GaPerf = { status: "unavailable", ...EMPTY_GA };
   try {
     const token = await resolveGoogleToken(tenantId, "ga4");
-    if (!token) return { status: "unavailable", ...EMPTY_GA };
+    if (!token) {
+      await writeCachedPerf("ga4", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+      return unavailable;
+    }
 
     const { startDate, endDate } = dateRange(days);
     const property = cfg.ga4PropertyId.startsWith("properties/")
@@ -325,7 +344,10 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
         }),
       }
     );
-    if (!res.ok) return { status: "unavailable", ...EMPTY_GA };
+    if (!res.ok) {
+      await writeCachedPerf("ga4", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+      return unavailable;
+    }
 
     const data = await res.json();
     const reports = data.reports || [];
@@ -354,7 +376,8 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
     await writeCachedPerf("ga4", tenantId, days, result);
     return result;
   } catch {
-    return { status: "unavailable", ...EMPTY_GA };
+    await writeCachedPerf("ga4", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+    return unavailable;
   }
 }
 
