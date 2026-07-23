@@ -131,14 +131,18 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
 
                   {/* Health grade */}
                   <div className="pointer-events-none relative z-[1] hidden w-[52px] justify-center md:flex">
-                    {c.seoGrade ? <Grade grade={c.seoGrade} /> : <span className="text-[12px] text-gray-faint">–</span>}
+                    {c.seoGrade ? <Grade grade={c.seoGrade} /> : <span className="text-[12px] text-gray-faint" title="Not scanned yet">&mdash;</span>}
                   </div>
 
-                  {/* Billing */}
+                  {/* Billing — the plan when set; a quiet dash otherwise (the Status
+                      chip already carries the "No plan" verdict, so we don't repeat
+                      "No plan set" as a second cell on the same row). */}
                   <div className="pointer-events-none relative z-[1] hidden md:block">
-                    <span className={`text-[12.5px] ${c.billingConfigured ? "text-warm-white" : "text-gray-faint"}`}>
-                      {c.billingLabel}
-                    </span>
+                    {c.billingConfigured ? (
+                      <span className="text-[12.5px] text-warm-white">{c.billingLabel}</span>
+                    ) : (
+                      <span className="text-[12.5px] text-gray-faint" title="No plan set">&mdash;</span>
+                    )}
                   </div>
 
                   {/* Status verdict */}

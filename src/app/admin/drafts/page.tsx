@@ -1,8 +1,10 @@
+import { FileCheck } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { listDrafts, getDraftContent, getContent } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
 import { generatePreviewDiffs, type PreviewDiff } from "@/lib/agent-risk";
 import { DraftActions } from "./DraftActions";
+import { AdminEmpty } from "@/app/admin/console";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +62,12 @@ export default async function AdminDraftsPage() {
       </div>
 
       {allDrafts.length === 0 ? (
-        <div className="rounded-2xl border border-glass-border bg-glass p-12 text-center">
-          <p className="text-gray-muted">No pending drafts across any clients.</p>
-          <p className="text-xs text-gray-faint mt-2">
-            Drafts appear here when the AI agent proposes content changes.
-          </p>
-        </div>
+        <AdminEmpty
+          tone="good"
+          icon={<FileCheck className="h-5 w-5" strokeWidth={1.6} />}
+          title="No pending drafts"
+          description="Nothing is waiting across any client. Drafts appear here when the AI agent proposes content changes."
+        />
       ) : (
         <div className="space-y-4">
           {allDrafts.map((draft) => (

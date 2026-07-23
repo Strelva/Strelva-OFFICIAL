@@ -94,10 +94,9 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-muted">
-          A health + SEO audit of each client&rsquo;s live site. Re-scan any one, or the whole book.
-        </p>
+      {/* No section intro line — the page subtitle already explains this surface;
+          the "Scan all sites" action sits on its own header row. */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           type="button"
           onClick={scanAll}

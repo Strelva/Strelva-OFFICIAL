@@ -314,8 +314,18 @@ function OnboardForm() {
                       value={opt.value}
                       checked={form.presence === opt.value}
                       onChange={() => setForm({ ...form, presence: opt.value })}
-                      className="accent-[var(--color-accent)]"
+                      className="sr-only"
                     />
+                    {/* Custom sage ring instead of the native OS radio dot, to
+                        match the styled inputs/selects on this form. */}
+                    <span
+                      aria-hidden
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        form.presence === opt.value ? "border-accent" : "border-gray-border"
+                      }`}
+                    >
+                      {form.presence === opt.value && <span className="h-2 w-2 rounded-full bg-accent" />}
+                    </span>
                     <span className="text-sm text-warm-white">{opt.label}</span>
                   </span>
                   <span className="text-xs text-gray-faint pl-5">{opt.description}</span>

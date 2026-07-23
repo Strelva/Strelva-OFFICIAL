@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, FileText, Activity } from "lucide-react";
+import { Check, X, FileText, Activity, ClipboardCheck } from "lucide-react";
 import type { MaintenanceDigest } from "@/lib/maintenance-digest";
+import { AdminEmpty } from "@/app/admin/console";
 
 export function MaintenanceDigests({ initialDigests }: { initialDigests: MaintenanceDigest[] }) {
   const [digests, setDigests] = useState(initialDigests);
@@ -35,12 +36,12 @@ export function MaintenanceDigests({ initialDigests }: { initialDigests: Mainten
 
   if (digests.length === 0) {
     return (
-      <div className="rounded-xl border border-glass-border bg-surface-raised p-8 text-center">
-        <p className="text-[14px] font-medium text-warm-white">Nothing needs review</p>
-        <p className="mt-1 text-[13px] text-gray-muted">
-          Every site is current, or this week&apos;s digests haven&apos;t generated yet.
-        </p>
-      </div>
+      <AdminEmpty
+        tone="good"
+        icon={<ClipboardCheck className="h-5 w-5" strokeWidth={1.6} />}
+        title="Nothing needs review"
+        description="Every site is current, or this week's digests haven't generated yet."
+      />
     );
   }
 

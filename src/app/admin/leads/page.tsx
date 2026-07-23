@@ -1,6 +1,8 @@
+import { UserPlus } from "lucide-react";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
 import { LeadRows } from "./LeadRows";
+import { AdminEmpty } from "@/app/admin/console";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +41,12 @@ export default async function AdminLeadsPage() {
       </div>
 
       {leads.length === 0 ? (
-        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
-          <p className="text-sm font-medium text-warm-white">No prospects yet</p>
-          <p className="mt-1 text-xs text-gray-muted">
-            Access requests from potential clients land here the moment they come in.
-          </p>
-        </div>
+        <AdminEmpty
+          icon={<UserPlus className="h-5 w-5" strokeWidth={1.6} />}
+          title="No prospects yet"
+          description="Access requests from potential clients land here the moment they come in. Share the free audit link to start filling this."
+          action={{ label: "Open the audit tool", href: "/audit" }}
+        />
       ) : (
         <LeadRows leads={leads} initialWorkflow={workflow} />
       )}

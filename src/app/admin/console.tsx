@@ -206,3 +206,48 @@ export function GroupLabel({ tone = "neutral", label, note }: { tone?: Tone; lab
     </div>
   );
 }
+
+/** The ONE designed empty state for the operator console — an icon tile (sage,
+ *  or positive for an "all clear" verdict), a title, a one-line body, and an
+ *  optional CTA. Replaces the bare centered-caption-in-a-void that three admin
+ *  surfaces each rolled by hand. */
+export function AdminEmpty({
+  icon,
+  title,
+  description,
+  action,
+  tone = "accent",
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  action?: { label: string; href: string };
+  tone?: "accent" | "good";
+}) {
+  const iconTint = tone === "good" ? "text-positive" : "text-accent";
+  const glow = tone === "good" ? "var(--color-positive)" : "var(--color-accent-dim)";
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-glass-border bg-glass px-6 py-12 text-center">
+      <div className={`relative mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-glass-border bg-surface-raised ${iconTint}`}>
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-2xl opacity-50"
+          style={{ background: `radial-gradient(circle at 50% 35%, ${glow}, transparent 70%)` }}
+        />
+        <span className="relative">{icon}</span>
+      </div>
+      <p className="text-[14px] font-semibold text-warm-white">{title}</p>
+      {description && (
+        <p className="mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-gray-muted">{description}</p>
+      )}
+      {action && (
+        <Link
+          href={action.href}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105"
+        >
+          {action.label}
+        </Link>
+      )}
+    </div>
+  );
+}
