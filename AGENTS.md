@@ -2,7 +2,7 @@
 
 Canonical repo guidance for all coding agents (Claude Code, Codex). `CLAUDE.md` imports this file so there is one source of truth.
 
-**Naming**: Product is "Strelva". Repo folder path is legacy lowercase `reb` (internal). Package name is `scaffold-web`.
+**Naming**: Product is "Strelva" (rebranded). Package name is now `strelva`. The Vercel team is `strelva` and the control-plane project is `strelva-admin` (deploy with `--scope strelva`). Wire-level / persistent-data names stay legacy ON PURPOSE (coordinated-rollout only): the `reb:` Redis key prefixes, `x-reb-*` HMAC headers, and `REB_*` / `SCAFFOLD_*` env + contract symbols that deployed client repos depend on. So brand + package = Strelva; wire = legacy `reb`. Don't call the product "scaffold-web".
 
 ## Commands
 
@@ -190,7 +190,7 @@ Pivoted 2026-06-26 from the two-door build-fee offer (`docs/strategy/website-off
 - **Tiers are packaging + build-scope, NOT code-enforced feature flags** — the platform serves whatever's built into the client's repo; the Stripe price just sets the charge. No engineering needed to "support tiers."
 - **Ownership is the positioning spine**: domain in the client's name from day one, content export anytime (see `docs/repo-transfer-runbook.md`, `docs/domain-setup.md`).
 - **Billing is LIVE (2026-06-26)** on the new standalone Strelva Stripe account (`acct_1Tmc5dA4gUnh4arE`). `isBillingEnabled()` (`src/lib/subscription.ts`) is true (`STRIPE_SCAFFOLD_PRICE_ID` = the Growth price). `STRIPE_BILLING_GRANDFATHER_TENANTS=gldf,rohlax` keeps existing clients active; `check:prod` enforces the grandfather-list-or-402 rule.
-- ⚠️ **To change any Stripe/billing env var you MUST do a fresh `vercel deploy --prod --yes --scope scaffold-web`. `vercel redeploy` REUSES the target deployment's env snapshot and will NOT apply env changes.**
+- ⚠️ **To change any Stripe/billing env var you MUST do a fresh `vercel deploy --prod --yes --scope strelva`. `vercel redeploy` REUSES the target deployment's env snapshot and will NOT apply env changes.**
 - **gldf + rohlax are grandfathered** (no subscription; protected via the list). New clients subscribe at a tier price.
 - **Offer hook = "free to build" (founder decision, 2026-06-26):** no build fee, no upfront/setup cost. We **build first**, the client approves, and the **monthly subscription starts at go-live** ("pay when you're happy"). This is a deliberate low-friction growth hook — we accept the risk of an occasional unpaid build as the cost of frictionless sign-on. Marketing says "free to build / pay when happy" on purpose; do NOT "correct" it to a pay-first framing.
 - Canonical pricing/Stripe-setup detail (account, live price IDs, branding): vault `1-projects/scaffold-web/pricing-and-billing.md`.
