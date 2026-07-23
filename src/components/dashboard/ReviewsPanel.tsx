@@ -444,17 +444,22 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voi
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
               Reviews
             </p>
-            <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-warm-black sm:text-[30px]">
-              No reviews yet
+            <h1 className="font-display text-[26px] leading-tight tracking-[-0.01em] text-warm-black sm:text-[32px]">
+              Let&apos;s get your reviews flowing.
             </h1>
           </div>
           {googlePlaceId && <ReviewRequestCard placeId={googlePlaceId} connectHref={connectHref} />}
-          <div className="rounded-xl dashboard-panel p-6 text-center">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
-              <MessageSquare className="h-5 w-5" strokeWidth={1.5} />
+          <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl dashboard-panel p-8 text-center">
+            <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-glass-border bg-glass text-accent-text">
+              <div
+                aria-hidden
+                className="absolute inset-0 rounded-2xl opacity-60"
+                style={{ background: "radial-gradient(circle at 50% 35%, var(--color-accent-dim), transparent 70%)" }}
+              />
+              <MessageSquare className="relative h-5 w-5" strokeWidth={1.5} />
             </div>
-            <p className="text-[14px] font-medium text-warm-black">
-              No reviews yet. Connect Google to pull them in
+            <p className="font-display text-[19px] leading-tight text-warm-black">
+              Connect Google to bring your reviews in
             </p>
             <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
               Once your Google Business Profile is connected, your reviews show up here and Strelva
