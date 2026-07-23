@@ -6,22 +6,37 @@ interface EmptyStateProps {
   title: string;
   description?: string;
   action?: ReactNode;
+  /** Fill the available canvas (centers vertically in a tall min-height) instead
+   *  of a short box. Use on PAGE-level empty states so they don't leave a void;
+   *  leave off inside a panel/card. */
+  fill?: boolean;
   className?: string;
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, fill, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center text-center px-6 py-12", className)}>
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center px-6 text-center",
+        fill ? "min-h-[58vh] py-16" : "py-14",
+        className,
+      )}
+    >
       {icon && (
-        <div className="w-10 h-10 rounded-2xl bg-surface flex items-center justify-center mb-4">
-          {icon}
+        <div className="relative mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-glass-border bg-glass text-accent-text">
+          <div
+            aria-hidden
+            className="absolute inset-0 rounded-2xl opacity-60"
+            style={{ background: "radial-gradient(circle at 50% 35%, var(--color-accent-dim), transparent 70%)" }}
+          />
+          <span className="relative">{icon}</span>
         </div>
       )}
-      <p className="text-[14px] font-normal text-warm-black mb-1.5">{title}</p>
+      <h3 className="font-display text-[21px] leading-tight tracking-[-0.01em] text-warm-black">{title}</h3>
       {description && (
-        <p className="text-[13px] text-gray-muted max-w-[280px] leading-relaxed">{description}</p>
+        <p className="mt-2.5 max-w-[360px] text-[14px] leading-relaxed text-gray-muted">{description}</p>
       )}
-      {action && <div className="mt-5">{action}</div>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   );
 }

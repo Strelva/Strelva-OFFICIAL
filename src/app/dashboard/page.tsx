@@ -201,6 +201,48 @@ async function DashboardHome() {
               weekly-proof / retention panel. */}
           <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
 
+          {/* First-run value section — a brand-new owner has no data yet, so
+              instead of leaving the canvas empty below the checklist, reassure
+              them what Strelva is quietly handling. Fills the space AND reinforces
+              the promise on day one. */}
+          {isFresh && (
+            <section aria-label="What Strelva does for you" className="mt-1">
+              <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
+                While you get set up, Strelva is already working
+              </p>
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  {
+                    icon: <TrendingUp className="h-4 w-4" strokeWidth={1.5} />,
+                    title: "We keep you found",
+                    body: "Strelva watches your site speed, SEO, and Google presence so customers can find you — nothing for you to babysit.",
+                  },
+                  {
+                    icon: <MessageCircle className="h-4 w-4" strokeWidth={1.5} />,
+                    title: "Change anything by asking",
+                    body: "New hours, a new service, a fresh headline? Tell Strelva in plain words and it's handled for you.",
+                  },
+                  {
+                    icon: <FileText className="h-4 w-4" strokeWidth={1.5} />,
+                    title: "Proof every week",
+                    body: "A short weekly report shows who found you and what got done — so you always know it's working.",
+                  },
+                ].map((c) => (
+                  <div
+                    key={c.title}
+                    className="rounded-2xl border border-glass-border bg-glass p-5 transition-colors hover:border-glass-active"
+                  >
+                    <div className="mb-3.5 flex h-9 w-9 items-center justify-center rounded-xl bg-accent-dim text-accent-text">
+                      {c.icon}
+                    </div>
+                    <h3 className="text-[14px] font-medium text-warm-black">{c.title}</h3>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">{c.body}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Proof first. A returning owner should feel "look what's working /
               what got handled for me" before being asked to do anything, so the
               reassuring numbers and the managed-service receipt lead; the approval
