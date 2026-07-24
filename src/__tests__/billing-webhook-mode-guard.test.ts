@@ -171,6 +171,33 @@ describe("billing webhook checkout.session.completed mode guard", () => {
     expect(mockAddEvent).not.toHaveBeenCalled();
   });
 
+  it("falls back to client_reference_id when a reusable Payment Link has no tenantId metadata", async () => {
+    const res = await postEvent({
+      id: "evt_sub_cref",
+      type: "checkout.session.completed",
+      created: 1_700_000_000,
+      data: {
+        object: {
+          id: "cs_sub_cref",
+          mode: "subscription",
+          subscription: "sub_cref",
+          // No metadata.tenantId — an emailed reusable link binds the tenant via
+          // ?client_reference_id=<tenant> instead.
+          client_reference_id: "cocard-anderson",
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "cocard-anderson",
+      expect.objectContaining({
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_cref",
+      })
+    );
+  });
+
   it("payment mode does NOT flip subscription status and records a build_payment event", async () => {
     const res = await postEvent({
       id: "evt_pay",

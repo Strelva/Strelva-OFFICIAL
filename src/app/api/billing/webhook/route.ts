@@ -428,6 +428,16 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        // A reusable Stripe Payment Link can't set per-customer metadata, so an
+        // emailed per-client link carries the tenant via ?client_reference_id=<tenant>.
+        // Fall back to it when the session/subscription metadata has no tenantId.
+        // Safe: an invalid id no-ops in updateTenant (unknown-tenant alert), same as
+        // a missing metadata.tenantId — it can't corrupt another tenant.
+        const sessionTenantId =
+          tenantId ??
+          (typeof session.client_reference_id === "string" && session.client_reference_id
+            ? session.client_reference_id
+            : null);
         if (session.mode === "subscription") {
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : undefined;
@@ -446,7 +456,7 @@ export async function POST(req: Request) {
             }
           }
           await applyTenantSubscriptionStatus(
-            tenantId,
+            sessionTenantId,
             {
               subscriptionStatus,
               ...(session.metadata?.planKey === "presence" ||
@@ -471,17 +481,17 @@ export async function POST(req: Request) {
           // invoice.paid, NOT here — so this fires on the first activation only
           // and never on a renewal. Best-effort: the sender fails soft, and this
           // try/catch guarantees a send failure can't affect the 200 response.
-          if (tenantId) {
+          if (sessionTenantId) {
             try {
-              const config = await getTenantConfig(tenantId).catch(() => null);
+              const config = await getTenantConfig(sessionTenantId).catch(() => null);
               await sendNewSignupEmail({
-                businessName: config?.siteName || tenantId,
+                businessName: config?.siteName || sessionTenantId,
                 ownerEmail: config?.ownerEmail,
-                tenantUrl: buildTenantAdminUrl(tenantId),
+                tenantUrl: buildTenantAdminUrl(sessionTenantId),
                 logPrefix: "[billing webhook]",
               });
             } catch (err) {
-              console.error(`[billing webhook] new-signup operator email failed for ${tenantId}:`, err);
+              console.error(`[billing webhook] new-signup operator email failed for ${sessionTenantId}:`, err);
             }
           }
         } else if (session.mode === "payment") {
@@ -489,7 +499,7 @@ export async function POST(req: Request) {
           // subscription status; record a build-payment trail. A mode:"setup"
           // session moves no money (amount_total is null), so it must NOT be
           // logged as a payment — skip it.
-          await recordBuildPayment(tenantId, session, event);
+          await recordBuildPayment(sessionTenantId, session, event);
         }
         break;
       }
