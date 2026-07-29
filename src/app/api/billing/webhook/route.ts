@@ -368,11 +368,18 @@ async function recordBuildPayment(
  * subscription onto the account so /admin/accounts shows the real $ split.
  * No-ops when the tenant has no account (a plain single-site subscription).
  */
+/** Map a Stripe subscription status to the tenant's subscriptionStatus field. */
+function tenantStatusFromStripe(s: string): "active" | "trialing" | "past_due" | "cancelled" {
+  if (s === "trialing") return "trialing";
+  if (s === "past_due" || s === "unpaid") return "past_due";
+  if (s === "canceled" || s === "incomplete_expired") return "cancelled";
+  return "active";
+}
+
 async function syncBundleSubscriptionToAccount(
   stripe: Stripe,
   subscriptionId: string | undefined,
   primaryTenantId: string | null,
-  subscriptionStatus: string,
 ) {
   if (!subscriptionId || !primaryTenantId) return;
   const account = await getAccountForTenant(primaryTenantId).catch(() => null);
@@ -387,7 +394,9 @@ async function syncBundleSubscriptionToAccount(
   }
 
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-  const flip = subscriptionStatus === "trialing" ? "trialing" : "active";
+  // Derive the per-site status from the LIVE sub status so this is correct on a
+  // renewal / failure / cancel, not just activation.
+  const flip = tenantStatusFromStripe(sub.status);
   const items: AccountSubscriptionItem[] = [];
 
   for (const item of sub.items?.data ?? []) {
@@ -571,7 +580,7 @@ export async function POST(req: Request) {
           // account. No-ops for a plain single-site subscription. Best-effort:
           // the try/catch keeps a sync hiccup from affecting the 200 response.
           try {
-            await syncBundleSubscriptionToAccount(stripe, subscriptionId, sessionTenantId, subscriptionStatus);
+            await syncBundleSubscriptionToAccount(stripe, subscriptionId, sessionTenantId);
           } catch (err) {
             console.error(`[billing webhook] bundle sync failed for ${sessionTenantId}:`, err);
           }
@@ -607,6 +616,13 @@ export async function POST(req: Request) {
           subscriptionPastDueSince: null,
           ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
         }, event);
+        // Refresh the account snapshot on renewal so a multi-site account's
+        // status/MRR stays current (best-effort; no-ops for a single-site sub).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, subscriptionId, invoiceTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (invoice.paid) failed:`, err);
+        }
         break;
       }
 
@@ -674,6 +690,12 @@ export async function POST(req: Request) {
             console.error(`[billing webhook] payment-past-due client email failed for ${invoiceTenantId}:`, err);
           }
         }
+        // Reflect past_due onto the account snapshot (drops its MRR).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, extractInvoiceSubscriptionId(invoice), invoiceTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (payment_failed) failed:`, err);
+        }
         break;
       }
 
@@ -696,6 +718,13 @@ export async function POST(req: Request) {
           null;
         await applyTenantSubscriptionStatus(deletedTenantId, { subscriptionStatus: "cancelled" }, event);
         alert("billing_subscription_cancelled", "high", { tenantId: deletedTenantId ?? "unknown" });
+        // Mark the account's bundled subscription canceled (zeroes its MRR, flips
+        // the other bundled sites to cancelled too).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, deletedSub.id, deletedTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (subscription.deleted) failed:`, err);
+        }
         break;
       }
 
