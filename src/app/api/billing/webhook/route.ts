@@ -15,6 +15,7 @@ import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositorie
 import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
 import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
+import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -358,6 +359,77 @@ async function recordBuildPayment(
   }
 }
 
+/**
+ * Bundle sync (org layer): when the paying tenant belongs to a multi-site
+ * ACCOUNT, a single subscription can cover several sites via line items whose
+ * price carries `metadata.tenantId`. Iterate the items, flip EACH mapped tenant
+ * active (best-effort — a not-yet-provisioned site like Vermont before its
+ * tenant exists is skipped, no unknown-tenant alert), and snapshot the bundled
+ * subscription onto the account so /admin/accounts shows the real $ split.
+ * No-ops when the tenant has no account (a plain single-site subscription).
+ */
+async function syncBundleSubscriptionToAccount(
+  stripe: Stripe,
+  subscriptionId: string | undefined,
+  primaryTenantId: string | null,
+  subscriptionStatus: string,
+) {
+  if (!subscriptionId || !primaryTenantId) return;
+  const account = await getAccountForTenant(primaryTenantId).catch(() => null);
+  if (!account) return; // single-site tenant — nothing to bundle-sync
+
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price"] });
+  } catch (err) {
+    console.error(`[billing webhook] bundle sync: retrieve ${subscriptionId} failed:`, err);
+    return;
+  }
+
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  const flip = subscriptionStatus === "trialing" ? "trialing" : "active";
+  const items: AccountSubscriptionItem[] = [];
+
+  for (const item of sub.items?.data ?? []) {
+    const price = item.price;
+    const itemTenantId =
+      price && typeof price.metadata?.tenantId === "string" ? price.metadata.tenantId : null;
+    const amountCents = typeof price?.unit_amount === "number" ? price.unit_amount * (item.quantity ?? 1) : 0;
+    let label = itemTenantId ?? price?.nickname ?? "Site";
+
+    if (itemTenantId) {
+      const cfg = await getTenantConfig(itemTenantId).catch(() => null);
+      if (cfg) {
+        label = cfg.siteName || itemTenantId;
+        // The primary tenant was already flipped via applyTenantSubscriptionStatus;
+        // flip the OTHER mapped sites here (best-effort, no alert on unknown).
+        if (itemTenantId !== primaryTenantId) {
+          await updateTenant(itemTenantId, {
+            subscriptionStatus: flip,
+            stripeSubscriptionId: subscriptionId,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    items.push({
+      tenantId: itemTenantId ?? "",
+      label,
+      amountCents,
+      stripePriceId: price?.id,
+      stripeItemId: item.id,
+    });
+  }
+
+  await setAccountSubscription(account.id, {
+    stripeSubscriptionId: subscriptionId,
+    stripeCustomerId: customerId,
+    status: sub.status,
+    items,
+    currency: sub.items?.data?.[0]?.price?.currency,
+  }).catch((err) => console.error(`[billing webhook] bundle sync: setAccountSubscription failed:`, err));
+}
+
 export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
@@ -493,6 +565,15 @@ export async function POST(req: Request) {
             } catch (err) {
               console.error(`[billing webhook] new-signup operator email failed for ${sessionTenantId}:`, err);
             }
+          }
+          // Bundle (org layer): if this tenant belongs to a multi-site account,
+          // flip the other bundled sites active + snapshot the $ split onto the
+          // account. No-ops for a plain single-site subscription. Best-effort:
+          // the try/catch keeps a sync hiccup from affecting the 200 response.
+          try {
+            await syncBundleSubscriptionToAccount(stripe, subscriptionId, sessionTenantId, subscriptionStatus);
+          } catch (err) {
+            console.error(`[billing webhook] bundle sync failed for ${sessionTenantId}:`, err);
           }
         } else if (session.mode === "payment") {
           // One-time charge, e.g. the Rohlax build payment. Do NOT flip
