@@ -538,7 +538,7 @@ async function resolveEventLocked(
   // (resolutionHistory) so the shadow row stays in parity, not status-frozen.
   // No-op if the row was created before dual-write was enabled. Never throws.
   if (dualWritePgEnabled()) {
-    await setEventStatus(id, status, updated.metadata ?? null);
+    await setEventStatus(id, status, updated.metadata ?? null, updated.tenantId);
   }
 
   // Governed-work decision shadow: this is the single durable approve/dismiss

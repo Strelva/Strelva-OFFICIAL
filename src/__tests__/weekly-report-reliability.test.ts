@@ -19,8 +19,14 @@ vi.mock("../lib/tenants", () => ({
 }));
 
 vi.mock("../lib/storage", () => ({
-  getClickCounts: vi.fn(async () => ({ total: 10, thisWeek: 4, lastWeek: 2 })),
-  getClickCountsByPrefix: vi.fn(async () => ({})),
+  getMetricsBatch: vi.fn(async () => ({
+    counts: {
+      "page-view": { total: 10, today: 1, thisWeek: 4, lastWeek: 2 },
+      "booking-click": { total: 10, today: 1, thisWeek: 4, lastWeek: 2 },
+      "phone-click": { total: 10, today: 1, thisWeek: 4, lastWeek: 2 },
+    },
+    byPrefix: {},
+  })),
   getActivity: vi.fn(async () => []),
   getSectionTimestamps: vi.fn(async () => ({})),
   getContent: vi.fn(async (section: string) => {

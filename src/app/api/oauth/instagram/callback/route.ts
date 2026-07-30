@@ -6,7 +6,8 @@
 
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
-import { verifyOAuthState } from "@/lib/oauth-state";
+import { consumeOAuthState } from "@/lib/oauth-state";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_LONG_LIVED_URL = "https://graph.instagram.com/access_token";
@@ -38,11 +39,24 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${appUrl}/dashboard/sources?error=missing_params`);
   }
 
-  const verifiedState = verifyOAuthState(state);
+  // Bind the code exchange to a live session so a stolen state token can't
+  // associate attacker tokens to a victim tenant.
+  const authed = await verifyAuth();
+  if (!authed) {
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=session_expired`);
+  }
+
+  // Single-use state (HMAC verify + nonce del).
+  const verifiedState = await consumeOAuthState(state);
   if (!verifiedState) {
     return NextResponse.redirect(`${appUrl}/dashboard/sources?error=invalid_state`);
   }
   const tenantId = verifiedState.tenantId;
+
+  const accessDenied = await requireTenantAccess(tenantId);
+  if (accessDenied) {
+    return NextResponse.redirect(`${appUrl}/dashboard/sources?error=access_denied`);
+  }
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
   const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;

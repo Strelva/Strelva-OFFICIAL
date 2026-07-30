@@ -69,13 +69,31 @@ async function findTenantByUserUri(userUri: string): Promise<string | null> {
   const redis = getRedis();
   if (!redis) return null;
 
-  const keys = await redis.keys("calendly-meta:*");
-  for (const key of keys) {
-    const meta = await redis.get<{ userUri: string; orgUri: string }>(key);
-    if (meta?.userUri === userUri) {
-      return key.replace("calendly-meta:", "");
+  // Fast path: O(1) reverse index written at connection time.
+  const indexed = await redis.get<string>(`calendly-user-uri:${userUri}`);
+  if (indexed) return indexed;
+
+  // Fallback for connections saved before the reverse index existed. Avoid the
+  // blocking KEYS command — SCAN the keyspace cursor-by-cursor instead. Backfill
+  // the reverse index on a hit so this scan doesn't recur for that user.
+  let cursor = "0";
+  do {
+    const [next, batch] = await redis.scan(cursor, {
+      match: "calendly-meta:*",
+      count: 100,
+    });
+    cursor = next;
+    for (const key of batch) {
+      const meta = await redis.get<{ userUri: string; orgUri: string }>(key);
+      if (meta?.userUri === userUri) {
+        const tenantId = key.replace("calendly-meta:", "");
+        await redis.set(`calendly-user-uri:${userUri}`, tenantId, {
+          ex: 60 * 60 * 24 * 365,
+        });
+        return tenantId;
+      }
     }
-  }
+  } while (cursor !== "0");
   return null;
 }
 

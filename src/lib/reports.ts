@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getAllTenants, getTenantConfig } from "./tenants";
-import { getClickCounts, getClickCountsByPrefix, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
+import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
 import { mapPool } from "./concurrency";
 import { detectTrafficAnomaly } from "./anomaly";
@@ -500,17 +500,17 @@ export async function generateWeeklyReport(
     "providers", "contact", "settings", "faq",
   ];
 
-  const [pageViews, bookingClicks, phoneClicks, timestamps, activity, settings, services, perServiceClicks, searchData, events, dailyMetrics, searchPerf, gaPerf] =
+  const [metricsBatch, timestamps, activity, settings, services, searchData, events, dailyMetrics, searchPerf, gaPerf] =
     await Promise.all([
-      getClickCounts("page-view", tenantId),
-      getClickCounts("booking-click", tenantId),
+      // One metric-summary round trip covers page-view, booking-click,
+      // phone-click, AND the per-service booking-click:* breakdown — previously
+      // four separate pgMetricSummary RPCs per tenant per report cycle.
       // Phone taps fold into the "booked or called" customer-actions total.
-      getClickCounts("phone-click", tenantId),
+      getMetricsBatch(tenantId, ["page-view", "booking-click", "phone-click"], "booking-click:"),
       getSectionTimestamps(tenantId),
       getActivity(tenantId),
       getContent("settings", tenantId),
       getContent("services", tenantId),
-      getClickCountsByPrefix("booking-click:", tenantId),
       getSearchData(tenantId),
       getEvents(tenantId, { limit: 200 }),
       getDailyMetrics(tenantId, 30),
@@ -519,6 +519,11 @@ export async function generateWeeklyReport(
       getSearchConsolePerf(tenantId),
       getGa4Perf(tenantId),
     ]);
+
+  const pageViews = metricsBatch.counts["page-view"];
+  const bookingClicks = metricsBatch.counts["booking-click"];
+  const phoneClicks = metricsBatch.counts["phone-click"];
+  const perServiceClicks = metricsBatch.byPrefix;
 
   const analyticsRows = buildAnalyticsRows(searchPerf, gaPerf);
 
