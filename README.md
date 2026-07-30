@@ -104,7 +104,8 @@ model and roadmap in [`docs/operating-model.md`](./docs/operating-model.md).
 
 The 2026-07-30 deep audit's confirmed findings have been remediated — 139+ fixes
 shipped and gated (typecheck + 1983 tests + build clean), `pnpm audit` down from
-24 vulns (14 high) to 2 (0 high). The Next bump, tenant-isolation, SSRF, OAuth,
+24 vulns (14 high) to 3 (1 high, 2 moderate) — the lone high is dev-only
+(eslint's minimatch), not in the production runtime. The Next bump, tenant-isolation, SSRF, OAuth,
 billing, and perf fixes are all landed. See the **Audit remediation status** in
 [`AGENTS.md`](./AGENTS.md) for the fixed-vs-remaining split and
 [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-07-30-deep-audit.md)

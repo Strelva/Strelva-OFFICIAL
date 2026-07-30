@@ -338,7 +338,7 @@ follow-ups) — 139+ fixes applied and gated (typecheck + 1983 tests + build all
 clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-07-30-deep-audit.md).
 
 ### FIXED (shipped 2026-07-30)
-- Next.js `16.2.6` → `16.2.12` (+ eslint-config-next); refreshed stale security-pin overrides → `pnpm audit` 24 vulns (14 high) → 2 (0 high, transitive OTel via Sentry).
+- Next.js `16.2.6` → `16.2.12` (+ eslint-config-next); refreshed stale security-pin overrides → `pnpm audit` 24 vulns (14 high) → 3 (1 high, 2 moderate). The remaining high (brace-expansion) is **dev-only** via eslint's pinned `minimatch@3.1.5` — it can't be forced to the patched 5.x line without breaking eslint's API, and it is NOT in the production bundle (0 high in the production runtime). The 2 moderate are OpenTelemetry, pinned transitively by Sentry.
 - SSRF guard on the AI-visibility scorer (`validateUrlSafety` before every fetch).
 - Proxy auth gate now covers subdomain-resolved tenants (`src/proxy.ts`).
 - Agent system prompt sanitizes `businessRules` / timezone / holidays; constant-time cron-secret compare.
