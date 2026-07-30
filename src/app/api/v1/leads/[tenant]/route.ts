@@ -14,6 +14,7 @@ import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { recordLead } from "@/lib/leads";
+import { scoreLeadSpam } from "@/lib/lead-spam";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +72,23 @@ export async function POST(
     const email = emailRaw && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw) ? emailRaw : undefined;
     const message = str(body.message, 5000);
     const source = str(body.source, 80);
+
+    // Spam gate: a hidden `website`/`company` honeypot (scaffold form leaves it
+    // empty) plus the content-gibberish score. Fake-success on a hit so bots
+    // can't adapt; real submissions never trip it.
+    const honeypot =
+      (typeof body.website === "string" ? body.website.trim() : "") ||
+      (typeof body.company === "string" ? body.company.trim() : "");
+    const spam = scoreLeadSpam({ businessName: name, description: message, email });
+    if (honeypot || spam.isSpam) {
+      console.warn("[v1 leads] dropped suspected spam", {
+        tenant,
+        honeypot: honeypot.length > 0,
+        score: spam.score,
+        signals: spam.signals,
+      });
+      return corsJson({ ok: true }, 200);
+    }
 
     const config = await getTenantConfig(tenant);
     if (!config || config.active === false) {

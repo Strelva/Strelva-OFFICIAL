@@ -10,6 +10,7 @@ import {
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
+import { scoreLeadSpam } from "@/lib/lead-spam";
 
 export async function POST(req: Request) {
   if (await isRateLimitedWindowedAsync(rateLimitKey(req, "access-request-intake"), 5, 3600_000)) {
@@ -40,6 +41,30 @@ export async function POST(req: Request) {
   const safeReferredBy = typeof referredBy === "string" ? referredBy.trim().slice(0, 200) : "";
   const planValue: DeliveryPlan | null = plan === "one-time" || plan === "monthly" ? plan : null;
   const planLabel = planValue === "one-time" ? "One-time build" : planValue === "monthly" ? "Monthly plan" : "Not sure";
+  // Spam gate. Public unauthenticated intake — bots POST gibberish straight to
+  // this endpoint (bypassing the marketing form's honeypot). Two zero-friction
+  // signals: an optional `company` honeypot (a real form leaves it empty) and a
+  // content score over the gibberish signature. Return a success shape on a hit
+  // so the bot can't tell it was dropped and adapt; a real submission never trips
+  // either (verified against the live spam sample + real leads).
+  const honeypot = typeof body.company === "string" ? body.company.trim() : "";
+  const spam = scoreLeadSpam({
+    businessName: normalizedBusinessName,
+    description: safeDescription,
+    location: safeLocation,
+    currentWebsite: safeCurrentWebsite,
+    email: normalizedEmail,
+  });
+  if (honeypot || spam.isSpam) {
+    console.warn("[access-request] dropped suspected spam", {
+      email: normalizedEmail,
+      honeypot: honeypot.length > 0,
+      score: spam.score,
+      signals: spam.signals,
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const now = new Date().toISOString();
   const existingStatusToken = await getExistingLeadToken(normalizedEmail);
   const statusToken = existingStatusToken || createDeliveryStatusToken();
