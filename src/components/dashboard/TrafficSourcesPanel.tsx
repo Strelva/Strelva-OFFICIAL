@@ -97,11 +97,11 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
     );
   }
 
-  // ga is guaranteed non-null here because ok === true implies ga?.status === "ok"
-  // which requires ga to be defined. Use a narrowed reference instead of !-assertion.
-  const gaData = ga as NonNullable<typeof ga>;
-  const sources = gaData.topSources.filter((s) => s.sessions > 0).slice(0, 6);
-  const pages = gaData.topPages.filter((p) => p.views > 0).slice(0, 5);
+  // ok === true implies ga?.status === "ok", so ga is defined here.
+  // Return early rather than casting so TypeScript narrows ga to GaPerf.
+  if (!ga) return null;
+  const sources = ga.topSources.filter((s) => s.sessions > 0).slice(0, 6);
+  const pages = ga.topPages.filter((p) => p.views > 0).slice(0, 5);
 
   // Connected, but nothing measured yet (fresh property, no sessions).
   if (sources.length === 0 && pages.length === 0) {

@@ -338,7 +338,12 @@ export const pageSectionConfigBaseSchema = z.object({
   type: z.string().max(10000),
   visible: z.boolean(),
   order: z.number(),
-  props: z.record(z.string().max(10000), z.unknown()).optional(),
+  // Restrict prop values to scalar primitives so arbitrary nested JSON blobs
+  // cannot be stored (audit finding: pageSectionConfig accepts arbitrary unknowns).
+  props: z.record(
+    z.string().max(10000),
+    z.union([z.string().max(10000), z.number(), z.boolean(), z.null()])
+  ).optional(),
   variant: z.string().max(10000).optional(),
   layout: z.object({
     gap: z.enum(["tight", "normal", "loose"]).optional(),

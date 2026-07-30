@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
-import { isSuperAdmin, requireTenantPermission } from "@/lib/auth";
+import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
@@ -126,7 +126,10 @@ export async function POST(req: Request) {
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
 
-  if (await isRateLimitedAsync(`agent:${tenant}`, 30)) {
+  // Rate-limit per user (not per tenant) so one user can't exhaust the quota
+  // for all other users sharing the same tenant.
+  const rateLimitUserId = (await getAuthUserId()) ?? "anonymous";
+  if (await isRateLimitedAsync(`agent:${tenant}:${rateLimitUserId}`, 30)) {
     return new Response(
       JSON.stringify({ error: "Too many requests. Try again in a minute." }),
       { status: 429, headers: { "Content-Type": "application/json" } }
@@ -206,6 +209,12 @@ export async function POST(req: Request) {
         : nodeContext.currentValue;
       const safeValue = sanitizePromptValue(truncated);
       contextBlock += `\n- Current value: "${safeValue}"`;
+    }
+    if (nodeContext.sectionData && Object.keys(nodeContext.sectionData).length > 0) {
+      // Cap the serialized section data to avoid bloating the system prompt.
+      const raw = JSON.stringify(nodeContext.sectionData);
+      const capped = raw.length > 1_000 ? raw.slice(0, 1_000) + "..." : raw;
+      contextBlock += `\n- Section data: ${capped}`;
     }
     contextBlock += `\n\nWhen the user says "this", "it", "make it", "change this", they are referring to the selected element above. Apply changes directly to this specific field.`;
     systemPrompt += contextBlock;
@@ -779,7 +788,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               eventIds: [event.id],
               agentResultStatus: "queued" as const,
               subscriberCount: active.length,
-              message: `I've drafted the newsletter "${subject}" for ${active.length} subscribers. It's in the review queue for Jacob to approve before sending.`,
+              message: `I've drafted the newsletter "${subject}" for ${active.length} subscribers. It's in the review queue for approval before sending.`,
               sourceProof: "Source: Subscriber list stored in dashboard",
             };
           } catch (err) {
@@ -961,7 +970,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               eventId: event.id,
               eventIds: [event.id],
               agentResultStatus: "queued" as const,
-              message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
+              message: "I sent that layout change to the review queue. Structural site changes require approval before they go live.",
               sourceProof: "Source: Page layout config and AI governance rules",
             };
           } catch (err) {
@@ -1022,7 +1031,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               eventId: event.id,
               eventIds: [event.id],
               agentResultStatus: "queued" as const,
-              message: "I sent that layout change to the review queue. Jacob needs to approve structural site changes before they go live.",
+              message: "I sent that layout change to the review queue. Structural site changes require approval before they go live.",
               sourceProof: "Source: Page layout config and AI governance rules",
             };
           } catch (err) {

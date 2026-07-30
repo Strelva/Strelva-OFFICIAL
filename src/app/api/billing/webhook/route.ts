@@ -16,12 +16,7 @@ import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
 import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
-  });
-}
+import { getStripe } from "@/lib/billing";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -536,19 +531,25 @@ export async function POST(req: Request) {
               // keep "active" — a paid checkout completed
             }
           }
+          const KNOWN_PLAN_KEYS = ["presence", "growth", "scale"] as const;
+          type KnownPlanKey = (typeof KNOWN_PLAN_KEYS)[number];
+          const rawPlanKey = session.metadata?.planKey;
+          const validatedPlanKey = KNOWN_PLAN_KEYS.includes(rawPlanKey as KnownPlanKey)
+            ? (rawPlanKey as KnownPlanKey)
+            : undefined;
+
+          const rawCents = Number(session.metadata?.planMonthlyCents);
+          // Require planMonthlyCents > 0: a zero value from Stripe metadata is
+          // indistinguishable from "not set" and must not overwrite a real amount.
+          const validatedCents =
+            Number.isInteger(rawCents) && rawCents > 0 ? rawCents : undefined;
+
           await applyTenantSubscriptionStatus(
             sessionTenantId,
             {
               subscriptionStatus,
-              ...(session.metadata?.planKey === "presence" ||
-              session.metadata?.planKey === "growth" ||
-              session.metadata?.planKey === "scale"
-                ? { subscriptionPlan: session.metadata.planKey }
-                : {}),
-              ...(Number.isInteger(Number(session.metadata?.planMonthlyCents)) &&
-              Number(session.metadata?.planMonthlyCents) >= 0
-                ? { planMonthlyCents: Number(session.metadata?.planMonthlyCents) }
-                : {}),
+              ...(validatedPlanKey ? { subscriptionPlan: validatedPlanKey } : {}),
+              ...(validatedCents !== undefined ? { planMonthlyCents: validatedCents } : {}),
               ...(session.metadata?.planCurrency
                 ? { planCurrency: session.metadata.planCurrency.toLowerCase() }
                 : {}),
@@ -738,6 +739,60 @@ export async function POST(req: Request) {
           await syncBundleSubscriptionToAccount(stripe, deletedSub.id, deletedTenantId);
         } catch (err) {
           console.error(`[billing webhook] account refresh (subscription.deleted) failed:`, err);
+        }
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        // A plan change, price change, or status update made directly in the
+        // Stripe dashboard lands here — it does NOT create a new checkout session,
+        // so checkout.session.completed never fires. Without this handler the
+        // tenant's subscriptionPlan / planMonthlyCents / subscriptionStatus would
+        // stay stale forever after a dashboard-initiated change.
+        const updatedSub = event.data.object as Stripe.Subscription;
+        const updatedCustomerId =
+          typeof updatedSub.customer === "string" ? updatedSub.customer : updatedSub.customer?.id;
+        const updatedTenantId =
+          tenantId ??
+          (updatedSub.id
+            ? (await getTenantByStripeSubscriptionId(updatedSub.id).catch(() => undefined))?.id
+            : undefined) ??
+          (updatedCustomerId
+            ? (await getTenantByStripeCustomerId(updatedCustomerId).catch(() => undefined))?.id
+            : undefined) ??
+          null;
+
+        const KNOWN_PLAN_KEYS_SUB = ["presence", "growth", "scale"] as const;
+        type KnownPlanKeySub = (typeof KNOWN_PLAN_KEYS_SUB)[number];
+        const subMeta = updatedSub.metadata ?? {};
+        const rawSubPlanKey = subMeta.planKey;
+        const validatedSubPlanKey = KNOWN_PLAN_KEYS_SUB.includes(rawSubPlanKey as KnownPlanKeySub)
+          ? (rawSubPlanKey as KnownPlanKeySub)
+          : undefined;
+
+        const rawSubCents = Number(subMeta.planMonthlyCents);
+        const validatedSubCents =
+          Number.isInteger(rawSubCents) && rawSubCents > 0 ? rawSubCents : undefined;
+
+        await applyTenantSubscriptionStatus(
+          updatedTenantId,
+          {
+            subscriptionStatus: tenantStatusFromStripe(updatedSub.status),
+            ...(validatedSubPlanKey ? { subscriptionPlan: validatedSubPlanKey } : {}),
+            ...(validatedSubCents !== undefined ? { planMonthlyCents: validatedSubCents } : {}),
+            ...(subMeta.planCurrency
+              ? { planCurrency: subMeta.planCurrency.toLowerCase() }
+              : {}),
+            stripeSubscriptionId: updatedSub.id,
+          },
+          event,
+        );
+        // Keep the account snapshot current on any sub update (plan change,
+        // pause, reactivation). Best-effort; a sync hiccup must not 500 the ack.
+        try {
+          await syncBundleSubscriptionToAccount(stripe, updatedSub.id, updatedTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (subscription.updated) failed:`, err);
         }
         break;
       }

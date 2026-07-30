@@ -21,10 +21,17 @@ export interface Heartbeat {
 
 /**
  * Max age (seconds) before a cron is considered stale = its schedule interval
- * plus generous grace. Keys MUST match the cron route's recordHeartbeat name.
- * Mirror of vercel.json schedules.
+ * plus generous grace. Keys MUST match the cron route's recordHeartbeat name
+ * AND the route path segment in vercel.json (e.g. /api/cron/weekly-report →
+ * "weekly-report"). Adding a new cron requires an entry here; the watchdog
+ * silently marks any key absent from this table as stale.
+ *
+ * Compile-time guard: CRON_MAX_AGE_SECONDS is declared as
+ * Record<KnownCron, number> so tsc catches a mis-spelled heartbeat name at
+ * the call site of recordHeartbeat. The union is derived from the object
+ * literal keys so the two stay in sync automatically.
  */
-export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
+const _CRON_SCHEDULE = {
   maintenance: 26 * 3600, // daily
   "portfolio-scan": 26 * 3600, // daily
   staleness: 26 * 3600, // daily
@@ -45,7 +52,15 @@ export const CRON_MAX_AGE_SECONDS: Record<string, number> = {
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
-};
+  heartbeat: 70 * 60, // every 30 min (schedule) + 40 min grace
+} as const satisfies Record<string, number>;
+
+/** Union of all known cron names — derived from the schedule table so the two
+ * stay in sync. Use this type as the first argument to recordHeartbeat to get
+ * a compile-time check that the name matches a registered cron. */
+export type KnownCron = keyof typeof _CRON_SCHEDULE;
+
+export const CRON_MAX_AGE_SECONDS: Record<KnownCron, number> = _CRON_SCHEDULE;
 
 const HEARTBEAT_TTL_SECONDS = 14 * 24 * 3600; // keep two weeks of last-seen
 
@@ -53,9 +68,11 @@ function heartbeatKey(cron: string): string {
   return `reb:heartbeat:${cron}`;
 }
 
-/** Record a cron's completion. Best-effort; never throws into the cron. */
+/** Record a cron's completion. Best-effort; never throws into the cron.
+ * The `cron` parameter is typed as `KnownCron` so a mis-spelled name is a
+ * compile error rather than a silently-unmonitored cron. */
 export async function recordHeartbeat(
-  cron: string,
+  cron: KnownCron,
   result: { ok: boolean; durationMs?: number; processed?: number; failed?: number } = { ok: true }
 ): Promise<void> {
   const redis = getRedis();
@@ -80,7 +97,8 @@ export interface HeartbeatStatus {
 /** Check every known cron's heartbeat; returns per-cron staleness. */
 export async function checkHeartbeats(now = Date.now()): Promise<HeartbeatStatus[]> {
   const redis = getRedis();
-  const crons = Object.keys(CRON_MAX_AGE_SECONDS);
+  // Object.keys returns string[], but every element is a KnownCron by construction.
+  const crons = Object.keys(CRON_MAX_AGE_SECONDS) as KnownCron[];
   if (!redis) {
     return crons.map((cron) => ({
       cron,

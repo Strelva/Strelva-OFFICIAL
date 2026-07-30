@@ -183,7 +183,7 @@ export function DomainsClient({ initialDomains }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch(domainsApi)
+    fetch(domainsApi, { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.domains) setDomains(data.domains);
@@ -196,7 +196,7 @@ export function DomainsClient({ initialDomains }: Props) {
   useEffect(() => {
     if (!domains.some((d) => d.status === "pending")) return;
     const id = setInterval(() => {
-      fetch(domainsApi)
+      fetch(domainsApi, { credentials: "same-origin" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.domains) setDomains(data.domains);

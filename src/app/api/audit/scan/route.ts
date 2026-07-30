@@ -92,8 +92,22 @@ export async function POST(request: NextRequest) {
     normalizedUrl = `https://${normalizedUrl}`;
   }
 
+  // Canonicalize the URL so that equivalent representations (different case
+  // hostname, trailing slash, default port) map to the same cache key.
+  // e.g. "HTTP://EXAMPLE.COM/", "example.com" and "https://example.com/"
+  // all become "https://example.com/".
   try {
-    new URL(normalizedUrl);
+    const parsed = new URL(normalizedUrl);
+    parsed.hostname = parsed.hostname.toLowerCase();
+    parsed.protocol = parsed.protocol.toLowerCase();
+    // Remove default ports to avoid https://example.com:443/ != https://example.com/
+    if (
+      (parsed.protocol === "https:" && parsed.port === "443") ||
+      (parsed.protocol === "http:" && parsed.port === "80")
+    ) {
+      parsed.port = "";
+    }
+    normalizedUrl = parsed.toString();
   } catch {
     return NextResponse.json(
       { error: "Invalid URL format." },

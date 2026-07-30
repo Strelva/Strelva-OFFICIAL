@@ -120,6 +120,26 @@ export async function getReviews(tenant: string): Promise<ReviewItem[]> {
   return reviews;
 }
 
+/**
+ * Single review by id, tenant-scoped — a targeted fetch instead of listing every
+ * review and filtering in memory (the reply path only needs one row).
+ */
+export async function getReviewById(tenant: string, id: string): Promise<ReviewItem | null> {
+  if (dataSourceIsPostgres()) {
+    const db = reviewDb(`get ${tenant}/${id}`);
+    const { data, error } = await db
+      .from("reviews")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToReview(data) : null;
+  }
+  const reviews = await readDevReviews(tenant);
+  return reviews.find((r) => r.id === id) ?? null;
+}
+
 export async function addReview(
   tenant: string,
   review: Omit<ReviewItem, "id">,

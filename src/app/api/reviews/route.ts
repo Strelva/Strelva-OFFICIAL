@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getReviews, addReview, replyToReview } from "@/lib/reviews";
+import { getReviews, getReviewById, addReview, replyToReview } from "@/lib/reviews";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 
@@ -101,8 +101,7 @@ export async function PATCH(req: Request) {
     // reply through the governed review_reply_draft → GBP publish path. Bypassing
     // it via PATCH would persist a reply locally without publishing to Google, and
     // permanently suppress the auto-reply backlog for this review.
-    const allReviews = await getReviews(tenant);
-    const target = allReviews.find((r) => r.id === reviewId);
+    const target = await getReviewById(tenant, reviewId);
     if (target?.source === "google") {
       return NextResponse.json(
         { error: "Google reviews must be replied to via POST /api/reviews/reply" },

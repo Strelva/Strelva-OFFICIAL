@@ -37,6 +37,8 @@ vi.mock("@/lib/events", () => ({
 
 vi.mock("@/lib/tenants", () => ({
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+  getTenantByStripeSubscriptionId: vi.fn(async () => null),
+  getTenantByStripeCustomerId: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/redis", () => ({
