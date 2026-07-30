@@ -118,7 +118,7 @@ describe("scanTenant", () => {
 
     // Persisted summary is slim: url/scannedAt/overallScore/grade/categories only.
     expect(mockSaveScanSummary).toHaveBeenCalledTimes(1);
-    const [savedTenant, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    const [savedTenant, savedSummary] = mockSaveScanSummary.mock.calls[0]!;
     expect(savedTenant).toBe("gldf");
     expect(savedSummary).toEqual({
       url: "https://greatlakesdriedfruit.com",
@@ -149,7 +149,7 @@ describe("scanTenant", () => {
 
     await scanTenant("gldf");
 
-    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0]!;
     expect(savedSummary.prioritizedIssues).toBeTruthy();
     expect(savedSummary.prioritizedIssues.length).toBeGreaterThan(0);
     expect(savedSummary.prioritizedIssues[0]).toMatchObject({
@@ -171,7 +171,7 @@ describe("scanTenant", () => {
 
     await scanTenant("gldf");
 
-    const [, savedSummary] = mockSaveScanSummary.mock.calls[0];
+    const [, savedSummary] = mockSaveScanSummary.mock.calls[0]!;
     expect(savedSummary).not.toHaveProperty("prioritizedIssues");
   });
 

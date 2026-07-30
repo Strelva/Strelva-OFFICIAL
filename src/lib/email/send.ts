@@ -4,6 +4,7 @@ import {
   operatorEmailsEnabled,
   prospectEmailsEnabled,
 } from "@/lib/email-enabled";
+import { getClientEmailOverride } from "@/lib/client-email-override";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/lib/email/layout";
 
 /** The four people Strelva can address. These are relationship roles, not
@@ -16,6 +17,12 @@ type RenderedEmail =
 
 export type SendEmailInput = RenderedEmail & {
   audience: EmailAudience;
+  /** The tenant this send belongs to, when known. ONLY the "client" audience is
+   * tenant-aware: a per-tenant override can ARM client email for one verified
+   * client while the global switch stays paused, or force it off for one client.
+   * Absent (or any other audience) ⇒ behavior is unchanged (follow the global
+   * switch). */
+  tenantId?: string;
   fromName?: string;
   /** Full from address override, e.g. "report@updates.strelva.com". Defaults to
    * hello@{RESEND_DOMAIN}. For senders that need a distinct local-part or a
@@ -31,10 +38,20 @@ export type SendEmailInput = RenderedEmail & {
   replyTo?: string;
 };
 
-function audienceEnabled(audience: EmailAudience): boolean {
+async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
+  const { audience } = input;
   if (audience === "operator") return operatorEmailsEnabled();
   if (audience === "prospect") return prospectEmailsEnabled();
   if (audience === "customer") return !customerEmailPaused();
+
+  // client — tenant-aware. A per-tenant override lets the operator arm one
+  // verified client ("on") or block one client ("off") independent of the
+  // global switch. No tenantId / "inherit" ⇒ follow the global switch (unchanged).
+  if (input.tenantId) {
+    const override = await getClientEmailOverride(input.tenantId);
+    if (override === "on") return true;
+    if (override === "off") return false;
+  }
   return !emailSendingPaused();
 }
 
@@ -46,7 +63,7 @@ function audienceEnabled(audience: EmailAudience): boolean {
  * caller's fail-soft logging boundary.
  */
 export async function sendEmail(input: SendEmailInput): Promise<boolean> {
-  if (!audienceEnabled(input.audience)) {
+  if (!(await audienceEnabled(input))) {
     console.warn(`[email] ${input.audience} email disabled — skipped send`);
     return false;
   }

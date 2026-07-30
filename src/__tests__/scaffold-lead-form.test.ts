@@ -54,7 +54,7 @@ describe("submitLead", () => {
 
     expect(result).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://app.strelva.com/api/v1/leads/gldf");
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("omit");

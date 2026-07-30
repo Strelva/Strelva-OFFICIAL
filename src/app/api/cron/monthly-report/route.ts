@@ -102,6 +102,7 @@ export async function GET(request: Request) {
         try {
           ok = await sendEmail({
             audience: "client",
+            tenantId: tenant.id,
             to: tenant.ownerEmail!,
             subject: `Your ${monthName} recap`,
             html,

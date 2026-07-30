@@ -30,7 +30,7 @@ describe("postCustomChangeRequest", () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     const res = await postCustomChangeRequest(input);
     expect(res).toEqual({ ok: true, status: 200 });
-    const [url, opts] = fetchMock.mock.calls[0];
+    const [url, opts] = fetchMock.mock.calls[0]!;
     expect(url).toBe(input.url);
     expect(opts.method).toBe("POST");
     expect(opts.headers.Authorization).toBe("Bearer s");

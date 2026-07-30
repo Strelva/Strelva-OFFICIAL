@@ -181,6 +181,37 @@ export async function PATCH(req: Request) {
       planOverride: z.enum(["", "founder_comp"]),
       // The enabled dashboard features. Validated + core-guarded below (not billing).
       features: z.array(z.string()).max(64),
+      // Operator-settable TenantConfig fields (super-admin gated). These flow
+      // straight through updateTenant() → tenantToRow (industry / auto_publish /
+      // auto_approve_threshold / reviews_config / visibility columns). For the
+      // JSON columns (reviewsConfig / visibility) the UI sends the FULL object,
+      // so a save REPLACES the stored value — intentional.
+      industry: z.string().max(120),
+      autoPublish: z.boolean(),
+      autoApproveThreshold: z.number().int().min(0).max(50).nullable(),
+      reviewsConfig: z
+        .object({
+          googlePlaceId: z.string().max(200).optional(),
+          yelpBusinessId: z.string().max(200).optional(),
+        })
+        .strict(),
+      visibility: z
+        .object({
+          trade: z.string().max(120).optional(),
+          towns: z.array(z.string().max(120)).max(52).optional(),
+          competitors: z
+            .array(
+              z.object({
+                name: z.string().max(200),
+                domain: z.string().max(253).optional(),
+              }),
+            )
+            .max(3)
+            .optional(),
+          queriesPerWeek: z.number().int().min(1).max(52).optional(),
+          enabled: z.boolean().optional(),
+        })
+        .partial(),
     })
     .partial();
   // Non-strict: unknown keys are stripped (not rejected) so this can't break a

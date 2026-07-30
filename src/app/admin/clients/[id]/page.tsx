@@ -20,7 +20,13 @@ import { resolveBillingType } from "@/lib/billing-type";
 import { getGoal } from "@/lib/goals";
 import { GoalEditor } from "./GoalEditor";
 import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
+import { getReportCadence } from "@/lib/report-cadence";
+import { getReplyVoice } from "@/lib/reviews/reply-voice";
+import { getContentAutonomy } from "@/lib/content-autonomy";
+import { getClientEmailOverride } from "@/lib/client-email-override";
+import { emailSendingPaused } from "@/lib/email-enabled";
 import { TenantEditor } from "./TenantEditor";
+import { OperatorControlsPanel } from "./OperatorControlsPanel";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
@@ -94,7 +100,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -112,6 +118,10 @@ export default async function ClientDetailPage({
       getVercelProjectStatus(`${id}-site`).catch(() => null),
       getGoal(id).catch(() => null),
       getAccountForTenant(id).catch(() => null),
+      getReportCadence(id).catch(() => "monthly" as const),
+      getReplyVoice(id).catch(() => ({ mode: "approve" as const, guidance: "", templates: [], updatedAt: null })),
+      getContentAutonomy(id).catch(() => "approve" as const),
+      getClientEmailOverride(id).catch(() => "inherit" as const),
     ]);
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
@@ -301,6 +311,21 @@ export default async function ClientDetailPage({
             revalidateUrl: tenant.revalidateUrl ?? "",
             hasRevalidationSecret: Boolean(tenant.revalidationSecret),
             features: tenant.features ?? [],
+          }}
+        />
+        <OperatorControlsPanel
+          tenantId={tenant.id}
+          globalClientEmailPaused={emailSendingPaused()}
+          initial={{
+            reportCadence,
+            replyMode: replyVoice.mode,
+            contentAutonomy,
+            clientEmail: clientEmailOverride,
+            autoApproveThreshold: tenant.autoApproveThreshold ?? null,
+            googlePlaceId: tenant.reviewsConfig?.googlePlaceId ?? "",
+            yelpBusinessId: tenant.reviewsConfig?.yelpBusinessId ?? "",
+            visibilityTrade: tenant.visibility?.trade ?? "",
+            visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />

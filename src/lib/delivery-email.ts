@@ -102,6 +102,7 @@ export async function sendUpdateLiveEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject,
       html: buildUpdateLiveEmailHtml({
@@ -226,6 +227,7 @@ export async function sendPaymentPastDueEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: `Action needed: your payment for ${cleanSubjectText(params.businessName)} didn't go through`,
       options: opts,
@@ -563,6 +565,7 @@ export async function sendWelcomeEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: "Welcome to Strelva",
       options: opts,
@@ -614,6 +617,7 @@ export async function sendSiteLiveEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: `${cleanSubjectText(params.businessName)} is live`,
       options: opts,
@@ -668,6 +672,7 @@ export async function sendReviewRequestEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: `A few reviews go a long way for ${cleanSubjectText(params.businessName)}`,
       options: opts,
@@ -755,6 +760,7 @@ export async function sendReviewNeedsReplyEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: `New ${params.review.rating}-star review for ${cleanSubjectText(params.businessName)}`,
       options: opts,
@@ -824,6 +830,7 @@ export async function sendHealthRegressionEmail(params: {
 
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: `${cleanSubjectText(params.businessName)}'s site health dropped to ${params.currentGrade}`,
       options: opts,

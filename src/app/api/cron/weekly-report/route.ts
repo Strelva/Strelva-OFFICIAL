@@ -151,6 +151,7 @@ await mapPool(reports, 8, async (report) => {
         try {
           ok = await sendEmail({
             audience: "client",
+            tenantId: report.tenant.id,
             to: email,
             subject,
             html,

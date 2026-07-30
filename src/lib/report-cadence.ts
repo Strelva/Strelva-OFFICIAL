@@ -79,6 +79,17 @@ export async function getReportCadence(tenant: string): Promise<ReportCadence> {
   }
 }
 
+/** Set a tenant's cadence override. Best-effort; no-op without Redis. */
+export async function setReportCadence(
+  tenant: string,
+  cadence: ReportCadence,
+): Promise<ReportCadence> {
+  const value: ReportCadence = cadence === "weekly" ? "weekly" : "monthly";
+  const redis = getRedis();
+  if (redis) await redis.set(cadenceKey(tenant), value);
+  return value;
+}
+
 /** When a tenant was last emailed a report (epoch ms), or null. Null-safe. */
 export async function getLastReportSentAt(tenant: string): Promise<number | null> {
   const redis = getRedis();

@@ -628,7 +628,7 @@ describe("saveVisibilitySnapshot", () => {
     const snapshot = makeSnapshot();
     await saveVisibilitySnapshot(snapshot);
     expect(mockAddEvent).toHaveBeenCalledTimes(1);
-    const [payload] = mockAddEvent.mock.calls[0];
+    const [payload] = mockAddEvent.mock.calls[0]!;
     expect(payload.type).toBe("visibility_snapshot");
     expect(payload.status).toBe("auto_approved");
     expect(payload.metadata?.snapshot).toEqual(snapshot);
