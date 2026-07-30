@@ -67,6 +67,23 @@ export const deliverySteps: Array<{
   },
 ];
 
+/** Every delivery stage the operator can set, in customer-facing order. The six
+ *  `deliverySteps` plus the off-track `paused` state. */
+export const DELIVERY_STATUSES: DeliveryStatus[] = [
+  ...deliverySteps.map((s) => s.id),
+  "paused",
+];
+
+/** The customer-facing label for a delivery stage (matches the tracker page). */
+export function deliveryStatusLabel(status: DeliveryStatus): string {
+  if (status === "paused") return "Paused";
+  return deliverySteps.find((s) => s.id === status)?.label ?? "Request received";
+}
+
+export function isDeliveryStatus(value: unknown): value is DeliveryStatus {
+  return typeof value === "string" && (DELIVERY_STATUSES as string[]).includes(value);
+}
+
 export function createDeliveryStatusToken(): string {
   return randomBytes(18).toString("hex");
 }

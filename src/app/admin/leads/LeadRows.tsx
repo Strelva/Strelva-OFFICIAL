@@ -2,7 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DeliveryLead } from "@/lib/access-request-delivery";
+import {
+  type DeliveryLead,
+  type DeliveryStatus,
+  DELIVERY_STATUSES,
+  deliveryStatusLabel,
+} from "@/lib/access-request-delivery";
 import type { LeadWorkflow, LeadWorkflowStatus } from "@/lib/lead-workflow";
 import { Chip } from "@/app/admin/console";
 
@@ -154,7 +159,8 @@ function LeadCard({
   wf,
   pending,
   notesByToken,
-  onStatusChange,
+  stage,
+  onStageChange,
   onNoteChange,
   onConvert,
   receded,
@@ -163,7 +169,8 @@ function LeadCard({
   wf: LeadWorkflow;
   pending: boolean;
   notesByToken: Record<string, string>;
-  onStatusChange: (token: string, status: LeadWorkflowStatus) => Promise<boolean>;
+  stage: DeliveryStatus;
+  onStageChange: (token: string, stage: DeliveryStatus) => Promise<boolean>;
   onNoteChange: (token: string, note: string) => void;
   onConvert: (lead: DeliveryLead) => Promise<void>;
   receded: boolean;
@@ -275,41 +282,32 @@ function LeadCard({
         />
       </div>
 
-      {/* Row 6: actions */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {status === "dismissed" ? (
-          <button
-            onClick={() => void onStatusChange(lead.statusToken, "new")}
-            disabled={pending}
-            className="rounded-md border border-glass-border px-2.5 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg disabled:opacity-40"
-          >
-            Restore
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={() => void onStatusChange(lead.statusToken, "contacted")}
-              disabled={pending || status === "contacted"}
-              className="rounded-md border border-glass-border px-2.5 py-1 text-xs text-warm-white transition-colors hover:bg-gray-bg disabled:opacity-40"
-            >
-              Mark contacted
-            </button>
-            <button
-              onClick={() => void onConvert(lead)}
-              disabled={pending}
-              className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              Convert
-            </button>
-            <button
-              onClick={() => void onStatusChange(lead.statusToken, "dismissed")}
-              disabled={pending}
-              className="rounded-md border border-glass-border px-2.5 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white disabled:opacity-40"
-            >
-              Dismiss
-            </button>
-          </>
-        )}
+      {/* Row 6: stage control — what the lead sees on their tracker link — + convert. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label htmlFor={`stage-${lead.statusToken}`} className="text-[11px] text-gray-faint">
+          Customer sees
+        </label>
+        <select
+          id={`stage-${lead.statusToken}`}
+          value={stage}
+          disabled={pending}
+          onChange={(e) => void onStageChange(lead.statusToken, e.target.value as DeliveryStatus)}
+          className="rounded-md border border-glass-border bg-gray-bg px-2 py-1 text-xs text-warm-white disabled:opacity-40"
+        >
+          {DELIVERY_STATUSES.map((st) => (
+            <option key={st} value={st}>
+              {deliveryStatusLabel(st)}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => void onConvert(lead)}
+          disabled={pending}
+          title="Provision the site and take the lead live"
+          className="ml-auto rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          Convert
+        </button>
       </div>
     </div>
   );
@@ -336,6 +334,11 @@ export function LeadRows({
     return init;
   });
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [stageByToken, setStageByToken] = useState<Record<string, DeliveryStatus>>(() => {
+    const init: Record<string, DeliveryStatus> = {};
+    for (const l of leads) init[l.statusToken] = l.deliveryStatus;
+    return init;
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [showDismissed, setShowDismissed] = useState(false);
@@ -367,6 +370,36 @@ export function LeadRows({
       return true;
     } catch {
       setActionError("Couldn't update that lead — check your connection.");
+      return false;
+    } finally {
+      setPending((p) => ({ ...p, [token]: false }));
+    }
+  }
+
+  // Set the customer-facing delivery stage directly (the tracker link updates).
+  async function setDeliveryStage(token: string, stage: DeliveryStatus): Promise<boolean> {
+    const prev = stageByToken[token];
+    setStageByToken((s) => ({ ...s, [token]: stage })); // optimistic
+    setPending((p) => ({ ...p, [token]: true }));
+    setActionError(null);
+    try {
+      const note = notesByToken[token] ?? workflow[token]?.note ?? "";
+      const res = await fetch(`/api/admin/leads/${token}/workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, note: note || undefined }),
+      });
+      if (!res.ok) {
+        setActionError("Couldn't update that lead — try again.");
+        if (prev) setStageByToken((s) => ({ ...s, [token]: prev }));
+        return false;
+      }
+      const data = (await res.json()) as { workflow: LeadWorkflow };
+      setWorkflow((w) => ({ ...w, [token]: data.workflow }));
+      return true;
+    } catch {
+      setActionError("Couldn't update that lead — check your connection.");
+      if (prev) setStageByToken((s) => ({ ...s, [token]: prev }));
       return false;
     } finally {
       setPending((p) => ({ ...p, [token]: false }));
@@ -426,7 +459,8 @@ export function LeadRows({
             wf={workflow[lead.statusToken] ?? { token: lead.statusToken, status: "new", updatedAt: null }}
             pending={Boolean(pending[lead.statusToken])}
             notesByToken={notesByToken}
-            onStatusChange={setStatus}
+            stage={stageByToken[lead.statusToken] ?? lead.deliveryStatus}
+            onStageChange={setDeliveryStage}
             onNoteChange={handleNoteChange}
             onConvert={convert}
             receded={receded}

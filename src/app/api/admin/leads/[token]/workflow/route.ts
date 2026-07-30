@@ -3,10 +3,15 @@ import { isSuperAdmin, getActorContext } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/storage";
 import {
   setLeadWorkflowStatus,
+  setLeadDeliveryStage,
   LEAD_WORKFLOW_STATUSES,
   type LeadWorkflowStatus,
 } from "@/lib/lead-workflow";
-import { getDeliveryLeadByToken } from "@/lib/access-request-delivery";
+import {
+  getDeliveryLeadByToken,
+  isDeliveryStatus,
+  DELIVERY_STATUSES,
+} from "@/lib/access-request-delivery";
 import { getRedis } from "@/lib/redis";
 
 /**
@@ -15,7 +20,9 @@ import { getRedis } from "@/lib/redis";
  * lead's stable `statusToken`. Layered ON TOP of the lead record; never touches
  * the Sanity / delivery-lead storage. Super-admin only. Audit-logged.
  *
- * POST { status, note? } — set the workflow status, return the final state.
+ * POST { stage, note? } — set the customer-facing delivery stage directly (all
+ * six stages + paused), OR { status, note? } — set the coarse workflow bucket.
+ * Returns the final workflow state.
  */
 
 const TOKEN_RE = /^[a-f0-9]{36}$/;
@@ -54,20 +61,36 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { status, note } = (body ?? {}) as { status?: unknown; note?: unknown };
+  const { status, stage, note } = (body ?? {}) as {
+    status?: unknown;
+    stage?: unknown;
+    note?: unknown;
+  };
+  const cleanNote = typeof note === "string" ? note : undefined;
 
-  if (!isStatus(status)) {
-    return NextResponse.json(
-      { error: `status must be one of: ${LEAD_WORKFLOW_STATUSES.join(", ")}.` },
-      { status: 400 },
-    );
+  // A `stage` sets the fine-grained customer-facing delivery stage; a `status`
+  // sets the coarse operator bucket. Exactly one is required.
+  let workflow;
+  let auditValue: string;
+  if (stage !== undefined) {
+    if (!isDeliveryStatus(stage)) {
+      return NextResponse.json(
+        { error: `stage must be one of: ${DELIVERY_STATUSES.join(", ")}.` },
+        { status: 400 },
+      );
+    }
+    workflow = await setLeadDeliveryStage(token, stage, cleanNote);
+    auditValue = stage;
+  } else {
+    if (!isStatus(status)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${LEAD_WORKFLOW_STATUSES.join(", ")}.` },
+        { status: 400 },
+      );
+    }
+    workflow = await setLeadWorkflowStatus(token, status, cleanNote);
+    auditValue = status;
   }
-
-  const workflow = await setLeadWorkflowStatus(
-    token,
-    status,
-    typeof note === "string" ? note : undefined,
-  );
 
   await logAuditEvent({
     // Leads are pre-tenant; logAuditEvent defaults an empty tenant to the
@@ -77,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     targetType: "lead",
     targetId: token,
     actor: await getActorContext(),
-    metadata: { status },
+    metadata: { status: auditValue },
   }).catch(() => {});
 
   return NextResponse.json({ workflow });

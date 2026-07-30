@@ -134,3 +134,28 @@ export async function setLeadWorkflowStatus(
   if (redis && validToken(token)) await redis.set(key(token), next);
   return next;
 }
+
+/**
+ * Set the customer-facing delivery STAGE directly (all six stages + paused),
+ * for granular control of what the lead sees on their tracker link. The coarse
+ * operator workflow status is derived from the stage, so the pipeline
+ * board/metrics stay coherent. Preserves the operator note.
+ */
+export async function setLeadDeliveryStage(
+  token: string,
+  stage: DeliveryStatus,
+  note?: string,
+): Promise<LeadWorkflow> {
+  const current = await getLeadWorkflow(token);
+  const cleanNote = typeof note === "string" ? note.trim().slice(0, MAX_NOTE_LEN) : undefined;
+  const canonical = await updateDeliveryLeadStatus(token, stage);
+  const next: LeadWorkflow = {
+    token,
+    status: workflowStatusFromDelivery(stage),
+    ...(cleanNote ? { note: cleanNote } : current.note ? { note: current.note } : {}),
+    updatedAt: canonical?.statusUpdatedAt ?? new Date().toISOString(),
+  };
+  const redis = getRedis();
+  if (redis && validToken(token)) await redis.set(key(token), next);
+  return next;
+}

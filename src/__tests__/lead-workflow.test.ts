@@ -18,7 +18,13 @@ import {
   getLeadWorkflow,
   getAllLeadWorkflow,
   setLeadWorkflowStatus,
+  setLeadDeliveryStage,
 } from "@/lib/lead-workflow";
+import {
+  DELIVERY_STATUSES,
+  deliveryStatusLabel,
+  isDeliveryStatus,
+} from "@/lib/access-request-delivery";
 
 const TOKEN = "a".repeat(36); // 36 hex chars, matches the lead statusToken shape
 const TOKEN_B = "b".repeat(36);
@@ -125,6 +131,80 @@ describe("setLeadWorkflowStatus", () => {
   });
 });
 
+describe("setLeadDeliveryStage", () => {
+  function seedDeliveryLead(redis: ReturnType<typeof fakeRedis>) {
+    const lead = {
+      businessName: "Acme",
+      email: "owner@acme.test",
+      statusToken: TOKEN,
+      deliveryStatus: "received",
+      submittedAt: "2026-07-01T00:00:00.000Z",
+      statusUpdatedAt: "2026-07-01T00:00:00.000Z",
+    };
+    redis.store.set(`lead-status:${TOKEN}`, JSON.stringify(lead));
+    redis.store.set(`lead:${lead.email}`, JSON.stringify(lead));
+  }
+
+  it("sets a middle stage and derives the coarse workflow bucket", async () => {
+    const redis = fakeRedis();
+    seedDeliveryLead(redis);
+    mockGetRedis.mockReturnValue(redis);
+
+    const wf = await setLeadDeliveryStage(TOKEN, "drafting");
+    // "Site draft" is a build-in-progress stage -> coarse bucket "converting".
+    expect(wf.status).toBe("converting");
+    const stored = JSON.parse(String(redis.store.get(`lead-status:${TOKEN}`)));
+    expect(stored.deliveryStatus).toBe("drafting");
+  });
+
+  it("maps each stage to the right coarse bucket (customer link ↔ pipeline)", async () => {
+    const cases: Array<[string, string]> = [
+      ["received", "new"],
+      ["reviewing", "contacted"],
+      ["drafting", "converting"],
+      ["owner_review", "converting"],
+      ["launch_ready", "converting"],
+      ["launched", "converted"],
+      ["paused", "dismissed"],
+    ];
+    for (const [stage, bucket] of cases) {
+      const redis = fakeRedis();
+      seedDeliveryLead(redis);
+      mockGetRedis.mockReturnValue(redis);
+      const wf = await setLeadDeliveryStage(TOKEN, stage as never);
+      expect(wf.status, `${stage} → ${bucket}`).toBe(bucket);
+    }
+  });
+
+  it("preserves the operator note when it isn't re-supplied", async () => {
+    const redis = fakeRedis();
+    seedDeliveryLead(redis);
+    mockGetRedis.mockReturnValue(redis);
+    await setLeadDeliveryStage(TOKEN, "reviewing", "spoke with owner");
+    const wf = await setLeadDeliveryStage(TOKEN, "drafting");
+    expect(wf.note).toBe("spoke with owner");
+  });
+});
+
+describe("delivery stage helpers", () => {
+  it("DELIVERY_STATUSES covers all six customer stages plus paused", () => {
+    expect(DELIVERY_STATUSES).toEqual([
+      "received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused",
+    ]);
+  });
+  it("labels match the customer tracker page", () => {
+    expect(deliveryStatusLabel("received")).toBe("Request received");
+    expect(deliveryStatusLabel("drafting")).toBe("Site draft");
+    expect(deliveryStatusLabel("launched")).toBe("Live");
+    expect(deliveryStatusLabel("paused")).toBe("Paused");
+  });
+  it("isDeliveryStatus validates the stage vocabulary", () => {
+    expect(isDeliveryStatus("owner_review")).toBe(true);
+    expect(isDeliveryStatus("contacted")).toBe(false);
+    expect(isDeliveryStatus(42)).toBe(false);
+  });
+});
+
 describe("getAllLeadWorkflow", () => {
   it("returns stored records and fills `new` defaults for the rest", async () => {
     mockGetRedis.mockReturnValue(fakeRedis());
@@ -191,6 +271,34 @@ describe("POST /api/admin/leads/[token]/workflow", () => {
     expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
     const [entry] = mockLogAuditEvent.mock.calls[0] as [Record<string, unknown>];
     expect(entry).toMatchObject({ action: "lead.workflow", targetType: "lead", targetId: TOKEN });
+  });
+
+  it("sets the customer delivery stage via { stage } and returns the record", async () => {
+    const redis = fakeRedis();
+    seedLead(redis);
+    mockGetRedis.mockReturnValue(redis);
+    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
+    const res = await POST(workflowReq({ stage: "drafting" }), {
+      params: Promise.resolve({ token: TOKEN }),
+    });
+    expect(res.status).toBe(200);
+    const payload = await res.json();
+    // "Site draft" maps to the coarse "converting" bucket for the board.
+    expect(payload.workflow).toMatchObject({ token: TOKEN, status: "converting" });
+    const stored = JSON.parse(String(redis.store.get(`lead-status:${TOKEN}`)));
+    expect(stored.deliveryStatus).toBe("drafting");
+  });
+
+  it("rejects an invalid stage with 400", async () => {
+    const redis = fakeRedis();
+    seedLead(redis);
+    mockGetRedis.mockReturnValue(redis);
+    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
+    const res = await POST(workflowReq({ stage: "shipped" }), {
+      params: Promise.resolve({ token: TOKEN }),
+    });
+    expect(res.status).toBe(400);
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid status with 400", async () => {

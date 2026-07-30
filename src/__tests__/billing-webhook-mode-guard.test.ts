@@ -224,7 +224,7 @@ describe("billing webhook checkout.session.completed mode guard", () => {
     expect(mockUpdateTenant).not.toHaveBeenCalled();
 
     expect(mockAddEvent).toHaveBeenCalledTimes(1);
-    const [eventArg] = mockAddEvent.mock.calls[0];
+    const [eventArg] = mockAddEvent.mock.calls[0]!;
     expect(eventArg).toMatchObject({
       tenantId: "rohlax",
       source: "stripe",
@@ -339,7 +339,7 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       ([key]) => typeof key === "string" && key.startsWith("reb:build-payment:")
     );
     expect(buildPaymentWrites).toHaveLength(1);
-    const [key, value, opts] = buildPaymentWrites[0];
+    const [key, value, opts] = buildPaymentWrites[0]!;
     expect(key).toBe("reb:build-payment:cs_pay_durable");
     // No TTL: the durable record must outlive the 90-day event prune.
     expect(opts).toBeUndefined();
@@ -381,7 +381,7 @@ describe("billing webhook checkout.session.completed mode guard", () => {
       ([key]) => typeof key === "string" && key.startsWith("reb:build-payment:")
     );
     expect(buildPaymentWrites).toHaveLength(1);
-    const [key, value] = buildPaymentWrites[0];
+    const [key, value] = buildPaymentWrites[0]!;
     expect(key).toBe("reb:build-payment:cs_pay_lead");
     expect(value).toMatchObject({
       sessionId: "cs_pay_lead",
