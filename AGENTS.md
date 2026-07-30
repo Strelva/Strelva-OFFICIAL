@@ -347,15 +347,14 @@ clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-0
 - Fractional star delta rejected; Calendly webhook `addEvent` guarded + O(1) reverse-index lookup; Invalid-Date guard; `buildOpsReport` N+1 → `mapPool`; weekly report one `getMetricsBatch` instead of 4 RPCs.
 - Newsletter sanitizer drops `style`; SECRETS_ENC_KEY / SUPABASE_URL / SUPER_ADMIN_EMAILS / APPROVE_LINK_SECRET documented + validated in `check:prod`.
 - `sectionSchemas` typed per-key; `buildSectionData` de-any'd; billing + at-rest-encryption test coverage added.
+- **Low sweep (2026-07-30, batch 2):** DB types now carry `billing_type` + `account_id` (shadow casts removed); `DATA_SOURCE` prod hard-fail guard (mirrors `CONTENT_SOURCE` — closes the split-brain); `customer.subscription.updated` webhook handler + `planMonthlyCents>0` / plan-key allow-list guards; `getReviewById` targeted fetch; heartbeat self-monitored + compile-time cron-name check; agent per-user rate-limit key + operator-neutral tool copy. 19 low fixes total (the other 70 lows were already fixed, false-positives, or by-design — each verified).
 
 ### REMAINING — needs live infra (do on next deploy)
 - **Orphaned Vercel env vars:** `vercel env rm` the 9 Clerk/Sanity secrets (+ unused TURBO_*/CORS_ORIGINS/REVALIDATION_SECRET) across production/preview/development — no code reads them.
-- **`database.types.ts` stale:** `billing_type` + `account_id` missing from generated Row types. Run `supabase gen types typescript` and commit (removes the shadow casts in `tenants.ts`).
+- **`database.types.ts` full regen (optional hygiene):** the two audited columns were added manually and the shadow casts removed, so this is no longer blocking — but a full `supabase gen types typescript` is still worth running to catch any other drift.
 - **Deploy:** a fresh `vercel deploy --prod --scope strelva` is required to apply the `next` bump + any env changes (`vercel redeploy` reuses the old env snapshot).
 
 ### REMAINING — backlog (deliberate, low risk)
 - `reb:tenants:all` Redis cache holds decrypted secrets (60s TTL, defense-in-depth only).
-- `CONTENT_SOURCE` vs `DATA_SOURCE` two-flag split — unify or add a prod mismatch guard.
-- Newsletter still uses `resend.batch` directly (not the single-recipient `sendEmail` boundary).
-- Billing lows: no `customer.subscription.updated` handler; plan-key not allow-list-validated; portal `return_url` from forwarded headers.
-- `getReviewById` single-row fetch (reviews reply path still scans); Sentry `withSentryConfig` wrap (needs org/project/auth-token decision); `noUncheckedIndexedAccess` (widespread, staged).
+- Newsletter uses `resend.batch` directly (correct for bulk; it already gates on `emailSendingPaused()` before Resend, so the audience gate is honored).
+- Sentry `withSentryConfig` wrap (needs org/project/auth-token decision); `noUncheckedIndexedAccess` (widespread, staged).
