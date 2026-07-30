@@ -18,7 +18,12 @@ export default function DashboardError({
     // Surface the failure — this boundary catches every thrown error across all
     // dashboard routes; swallowing it left a paying client with a blank screen
     // and us with zero signal. digest correlates to the server-side log.
-    console.error("[dashboard] route error", { message: error.message, digest: error.digest });
+    // Truncate the message so internal stack details are not exposed verbatim
+    // in the browser console (the digest is the safe correlator to the server log).
+    const safeMessage = typeof error.message === "string"
+      ? error.message.slice(0, 200)
+      : "(no message)";
+    console.error("[dashboard] route error", { message: safeMessage, digest: error.digest });
   }, [error]);
 
   return (

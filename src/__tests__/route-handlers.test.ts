@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// next/cache's unstable_cache requires Next.js incrementalCache infrastructure
+// that is not available in Vitest. Mock it as a transparent pass-through so the
+// wrapped function behaves identically to the unwrapped one in tests.
+vi.mock("next/cache", () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+  revalidatePath: vi.fn(),
+}));
+
 const mockUpdateTenant = vi.fn();
 const mockCreateTenant = vi.fn();
 const mockGetTenantConfig = vi.fn((_tenant?: string): Promise<unknown> =>

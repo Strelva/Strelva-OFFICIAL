@@ -15,7 +15,10 @@ async function checkRateLimit(
   const key = `audit-scan:${ip}`;
   const redis = getRedis();
   if (!redis) {
-    return { allowed: true, remaining: MAX_SCANS_PER_DAY };
+    // Fail closed: without Redis the rate limit cannot be enforced across
+    // serverless instances. Return a 503 so the caller surfaces the error
+    // rather than silently allowing unlimited throughput.
+    throw new Error("[PRODUCTION] Redis required for audit rate limiting but not configured");
   }
   const limited = await isRateLimitedWindowedAsync(key, MAX_SCANS_PER_DAY, 86400000); // 24 hours in ms
   let remaining = MAX_SCANS_PER_DAY;
@@ -36,9 +39,29 @@ export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
-    "unknown";
+    null;
 
-  const { allowed, remaining } = await checkRateLimit(ip);
+  // Reject requests where no IP can be derived. On Vercel, x-forwarded-for is
+  // always set by the edge network; a missing IP only occurs in direct-to-origin
+  // or test calls. Falling back to a shared "unknown" key would collapse all
+  // such requests into one rate-limit bucket, defeating the per-IP limit.
+  if (!ip) {
+    return NextResponse.json(
+      { error: "Request could not be attributed to an IP address." },
+      { status: 400 }
+    );
+  }
+
+  let allowed: boolean;
+  let remaining: number;
+  try {
+    ({ allowed, remaining } = await checkRateLimit(ip));
+  } catch {
+    return NextResponse.json(
+      { error: "Rate limiting service unavailable. Please try again shortly." },
+      { status: 503 }
+    );
+  }
   if (!allowed) {
     return NextResponse.json(
       { error: "Rate limited. You can scan up to 3 sites per day." },

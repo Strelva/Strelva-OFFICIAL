@@ -261,6 +261,23 @@ export interface GoogleReviewForReply {
   comment?: string;
 }
 
+// ─── Prompt sanitization ──────────────────────────────────────────────────────
+
+/**
+ * Strip characters that enable prompt injection from reviewer-supplied strings
+ * before they are interpolated into the Gemini prompt. Removes ASCII control
+ * characters (including newlines that could inject new instruction lines) and
+ * caps length so the prompt can't balloon. Newlines in the comment are replaced
+ * with a space so multi-paragraph reviews still read sensibly.
+ */
+function sanitizeForPrompt(value: string, maxLength = 500): string {
+  return value
+    .replace(/[\x00-\x1F\x7F]/g, " ") // strip control chars (incl. \n, \r, \t)
+    .replace(/\s{2,}/g, " ")           // collapse runs of whitespace
+    .trim()
+    .slice(0, maxLength);
+}
+
 // ─── Draft generation ─────────────────────────────────────────────────────────
 
 const DRAFT_PROMPT = (
@@ -299,14 +316,19 @@ export async function draftReviewReply(
   tenantConfig: Pick<TenantConfig, "id" | "siteName">
 ): Promise<string> {
   const businessName = tenantConfig.siteName || tenantConfig.id;
-  const comment = review.comment?.trim() || "(no comment left)";
+  // Sanitize reviewer-supplied strings before prompt interpolation to strip
+  // control characters (including newlines) that could be used to inject new
+  // instruction lines into the Gemini prompt.
+  const safeReviewerName = sanitizeForPrompt(review.reviewerName, 100);
+  const rawComment = review.comment?.trim() || "(no comment left)";
+  const comment = sanitizeForPrompt(rawComment, 500);
   const contextHint = buildReplyContextHint(review.rating, review.comment?.trim() || "");
   // The client's own voice — how they sound + an example reply to mirror. Empty
   // string when they haven't tuned it, so the base behaviour is unchanged.
   const voice = await getReplyVoice(tenantConfig.id).catch(() => defaultReplyVoice());
   const voiceSection = buildVoicePromptSection(voice, review.rating);
   const basePrompt =
-    DRAFT_PROMPT(review.reviewerName, review.rating, comment, businessName) +
+    DRAFT_PROMPT(safeReviewerName, review.rating, comment, businessName) +
     (contextHint ? `\n\n8. ${contextHint}` : "") +
     voiceSection;
 

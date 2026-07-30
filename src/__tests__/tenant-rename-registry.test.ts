@@ -42,6 +42,13 @@ describe("tenant-rename authoritative-store registry", () => {
       `reb:report-cadence:${SLUG}`,
       `reb:report-sent:${SLUG}`,
       `reb:scan:baseline:${SLUG}`,
+      // GBP / review keys — audit #15 (google-meta is Redis-only, no Postgres recovery)
+      `google-meta:${SLUG}`,
+      `review-replies:recent:${SLUG}`,
+      `reb:review-nudge-sent:${SLUG}`,
+      `reb:review-alert-sent:${SLUG}:`,
+      `reb:order-review-request-sent:${SLUG}:`,
+      `reb:review-reply-declined:${SLUG}:`,
     ];
     for (const stem of required) {
       expect(

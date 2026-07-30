@@ -180,6 +180,11 @@ function startOfDay(d: Date): number {
 /**
  * Build the grouped owner-facing feed from the raw AI activity log.
  * Empty groups are dropped; an all-empty result signals the empty state.
+ *
+ * Performance: entries are translated and filtered eagerly until `maxItems`
+ * translated items are collected, then the remainder of the list is skipped.
+ * This avoids translating + sorting the full log (up to the caller's fetch
+ * limit) when only a handful of items will be shown.
  */
 export function buildActivityFeed(
   entries: ActivityEntry[],
@@ -188,12 +193,17 @@ export function buildActivityFeed(
   const now = opts.now ?? new Date();
   const maxItems = opts.maxItems ?? 8;
 
-  const items = entries
-    .map(translateActivityEntry)
-    .filter((item): item is ActivityFeedItem => item !== null)
-    // Newest first; entries arrive time-desc already, but a stable sort keeps it honest.
-    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-    .slice(0, maxItems);
+  // Translate entries in order (entries arrive newest-first from the store) and
+  // stop once we have collected enough translated items. A stable sort is still
+  // applied on the collected window so any out-of-order entries within it are
+  // correctly sequenced.
+  const items: ActivityFeedItem[] = [];
+  for (const entry of entries) {
+    if (items.length >= maxItems) break;
+    const item = translateActivityEntry(entry);
+    if (item !== null) items.push(item);
+  }
+  items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
   const todayStart = startOfDay(now);
   const weekStart = todayStart - 6 * 24 * 60 * 60 * 1000;

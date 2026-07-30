@@ -137,11 +137,15 @@ export function generateSlots(
 
   // Check lead time — filter out slots that are too soon
   const leadTimeMs = config.bookingLeadTime * 60 * 60 * 1000;
-  const minBookingTime = zonedNowAsUtcTimestamp(config.timezone) + leadTimeMs;
+  const nowTs = zonedNowAsUtcTimestamp(config.timezone);
+  const minBookingTime = nowTs + leadTimeMs;
+
+  // Enforce maxAdvanceBooking ceiling — filter out slots too far in the future
+  const maxBookingTime = nowTs + config.maxAdvanceBooking * 24 * 60 * 60 * 1000;
 
   return slots.filter((slot) => {
     const slotTime = localSlotAsUtcTimestamp(date, slot);
-    return slotTime > minBookingTime;
+    return slotTime > minBookingTime && slotTime <= maxBookingTime;
   });
 }
 

@@ -90,21 +90,34 @@ export function verifyRevalidationSignature(
 // Public v1 reads expose PUBLISHED content. `?preview=true` returns drafts, so
 // it must be authorized — otherwise anyone who knows a tenant slug could read
 // that tenant's unpublished content. A preview request proves itself with an
-// HMAC over `${timestamp}.preview.${tenant}` using the tenant's revalidationSecret
-// (the same per-tenant shared secret the client repo already holds for
-// revalidation). Bound to the tenant + a 5-minute window like the revalidation
-// signature. Header names are x-scaffold-* (new contract surface, additive).
+// HMAC over `${timestamp}.preview.${tenant}` using a DOMAIN-SEPARATED key
+// derived from the tenant's revalidationSecret. Even though the same underlying
+// secret is used, we derive a distinct key for the preview surface by appending a
+// well-known context label via a secondary HMAC pass — so a valid revalidation
+// signature can never be replayed as a preview token and vice-versa.
+// Header names are x-scaffold-* (new contract surface, additive).
 
 export const PREVIEW_TIMESTAMP_HEADER = "x-scaffold-preview-ts";
 export const PREVIEW_SIGNATURE_HEADER = "x-scaffold-preview-sig";
+
+/**
+ * Derive the domain-separated preview signing key from the per-tenant
+ * revalidationSecret. Appending a fixed context label via a secondary HMAC pass
+ * ensures the preview-token key is cryptographically distinct from the
+ * revalidation-HMAC key, even when both start from the same shared secret.
+ */
+function derivePreviewKey(secret: string): string {
+  return crypto.createHmac("sha256", secret).update("preview-token-v1").digest("hex");
+}
 
 export function signPreviewToken(
   tenant: string,
   secret: string,
   timestamp: string = Date.now().toString()
 ): { timestamp: string; signature: string } {
+  const previewKey = derivePreviewKey(secret);
   const signature = crypto
-    .createHmac("sha256", secret)
+    .createHmac("sha256", previewKey)
     .update(`${timestamp}.preview.${tenant}`)
     .digest("hex");
   return { timestamp, signature };
@@ -121,8 +134,9 @@ export function verifyPreviewToken(
   const ts = Number(timestamp);
   // Same 5-minute replay window as the revalidation signature.
   if (Number.isNaN(ts) || Math.abs(nowMs - ts) > 300_000) return false;
+  const previewKey = derivePreviewKey(secret);
   const expected = crypto
-    .createHmac("sha256", secret)
+    .createHmac("sha256", previewKey)
     .update(`${timestamp}.preview.${tenant}`)
     .digest("hex");
   let provided: Buffer;

@@ -6,7 +6,10 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 // and model are never reached on the 403/400 paths. Stub the heavy deps so the
 // module imports cleanly in the test environment.
 vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
-vi.mock("@/lib/ai-models", () => ({ getPrimaryModel: () => ({ model: {}, label: "test" }) }));
+vi.mock("@/lib/ai-models", () => ({
+  getPrimaryModel: () => ({ model: {}, label: "test" }),
+  getFallbackModel: () => null,
+}));
 vi.mock("@/lib/portfolio", () => ({
   buildPortfolioSnapshot: vi.fn(),
   getPortfolioSummary: vi.fn(),

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDailyMetrics, getClickCounts } from "@/lib/storage";
-import { getTenantFromHeaders } from "@/lib/tenant";
+import { requireTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
-    const tenant = await getTenantFromHeaders();
+    const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
 

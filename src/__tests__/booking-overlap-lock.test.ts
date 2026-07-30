@@ -59,7 +59,24 @@ vi.mock("@/lib/storage/content-store", () => ({
 }));
 
 const TENANT = "demo";
-const DATE = "2099-01-07"; // Wednesday (day 3, enabled in DEFAULT_BOOKING_CONFIG), far future
+
+/**
+ * Find the next Wednesday (UTC day 3) that is at least 3 days from now.
+ * Wednesday maps to weeklySchedule day 3 (10:00-16:00) in DEFAULT_BOOKING_CONFIG.
+ * The date must be > bookingLeadTime (24h) away AND within maxAdvanceBooking (60d),
+ * so a fixed far-future date like "2099-01-07" fails the maxAdvanceBooking filter
+ * that generateSlots enforces.
+ */
+function nextWednesdayDate(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 3); // skip at least 3 days (> 24h lead time)
+  while (d.getUTCDay() !== 3) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+const DATE = nextWednesdayDate();
 
 async function loadStore() {
   return import("@/lib/storage/booking-store");

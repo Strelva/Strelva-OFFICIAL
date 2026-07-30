@@ -148,7 +148,10 @@ export function HistorySidebar({
         );
       })
       .catch(() => setThreads([]));
-  }, [dashboardHref, pathname]);
+    // Intentionally omits pathname — the thread list does not need to reload on
+    // every navigation. It refreshes once per dashboardHref identity (i.e. once
+    // per tenant mount) and is updated optimistically by deleteThread.
+  }, [dashboardHref]);
 
   async function deleteThread(threadId: string) {
     if (deletingThreadId) return;

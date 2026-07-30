@@ -73,8 +73,13 @@ export default async function ClientDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Defense in depth: mirror the layout's super-admin gate.
-  if (!(await isSuperAdmin())) redirect("/");
+  // Defense in depth: re-check super-admin here even though the layout already
+  // checked. The layout gate does NOT protect a page's data-fetching path if
+  // the layout's redirect is somehow bypassed (e.g. direct RSC fetch, test
+  // harness). This guard is not redundant — it is necessary. Redirect to
+  // /sign-in rather than "/" to avoid a loop on the bare admin host where "/"
+  // rewrites back to /admin.
+  if (!(await isSuperAdmin())) redirect("/sign-in");
 
   const { id } = await params;
   const tenant = await getTenantConfig(id);

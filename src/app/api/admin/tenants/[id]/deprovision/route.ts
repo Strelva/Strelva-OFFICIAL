@@ -8,30 +8,30 @@ import { runDeprovision } from "@/lib/deprovision";
 /**
  * POST /api/admin/tenants/[id]/deprovision
  *
+ * This single endpoint handles two distinct super-admin operations, selected by
+ * the `action` field in the request body. Both require super-admin and an
+ * existing tenant; they are co-located because both are destructive/sensitive
+ * tenant-lifecycle operations exposed only on this route.
+ *
+ * --- action: "rotate-secret" (body: { action: "rotate-secret" }) ---
+ * Generates a new revalidation secret server-side, persists it via updateTenant,
+ * and returns it ONCE so the operator can hand it to Jacob for the client repo.
+ * Audit-logged. The secret is NOT returned on any subsequent read — the stored
+ * value is encrypted at rest (AES-256-GCM via secrets.ts).
+ * Success: 200 { newSecret: string }
+ *
+ * --- deprovision (body: { confirmSlug: string }) ---
  * Permanently tears down a tenant: purges all Postgres rows across 35 tables,
  * clears Redis keys and domain claims, and deletes the Vercel project.
- * Super-admin only. Two layers of confirmation:
+ * Two layers of confirmation:
  *   1. The UI requires the operator to type the exact slug before the button
  *      enables (client-side guard).
  *   2. This route re-checks confirmSlug === id server-side (belt-and-suspenders).
  * Safety guards inside runDeprovision:
  *   - PROTECTED_TENANTS denylist (gldf, rohlax)
  *   - Active-subscription refusal (active/trialing/past_due + any build_payments)
- *
- * Body: { confirmSlug: string }
  * Success: 200 { ok: true, tenantId, summary, pgRowTotal }
  * Refused: 403/404/400 with { error }
- *
- * ---
- * POST /api/admin/tenants/[id]/deprovision (action: "rotate-secret")
- *
- * Generates a new revalidation secret server-side, persists it via updateTenant,
- * and returns it ONCE so the operator can hand it to Jacob for the client repo.
- * Super-admin only, audit-logged. The secret is NOT returned on any subsequent
- * read — the stored value is encrypted at rest (AES-256-GCM via secrets.ts).
- *
- * Body: { action: "rotate-secret" }
- * Success: 200 { newSecret: string }
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isSuperAdmin())) {

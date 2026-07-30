@@ -411,7 +411,7 @@ function AccountSection() {
 // Brand section
 // ---------------------------------------------------------------------------
 
-function BrandSection() {
+function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
   const [theme, setTheme] = useState<ThemeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -494,7 +494,11 @@ function BrandSection() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-[12px] text-gray-muted">Changes save as you go and apply to your live site.</p>
+        {readOnly ? (
+          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+        ) : (
+          <p className="text-[12px] text-gray-muted">Changes save as you go and apply to your live site.</p>
+        )}
         <SaveStatusPill status={saveStatus} />
       </div>
 
@@ -542,6 +546,7 @@ function BrandSection() {
                   setTheme(updated);
                   saveTheme(updated);
                 }}
+                disabled={readOnly}
                 options={[
                   ...(current && !FONT_OPTIONS.some((o) => o.value === current)
                     ? [{ value: current, label: current }]
@@ -572,7 +577,8 @@ function BrandSection() {
                   value={hex}
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
                   onBlur={handleBlurSave}
-                  className="h-8 w-8 rounded-lg border border-glass-border bg-surface-base p-0.5 cursor-pointer shrink-0"
+                  disabled={readOnly}
+                  className="h-8 w-8 rounded-lg border border-glass-border bg-surface-base p-0.5 cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-default"
                 />
                 <input
                   type="text"
@@ -582,7 +588,8 @@ function BrandSection() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLElement).blur();
                   }}
-                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-white outline-none focus:border-accent/40 transition-colors"
+                  disabled={readOnly}
+                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-white outline-none focus:border-accent/40 transition-colors disabled:opacity-60"
                 />
               </div>
             </FormRow>
@@ -679,7 +686,7 @@ function UtilitiesSection() {
 const ALL_SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
 type SiteConfigTab = (typeof ALL_SITE_CONFIG_TABS)[number];
 
-function SiteConfigSection() {
+function SiteConfigSection({ readOnly = false }: { readOnly?: boolean }) {
   const dashboard = useDashboardOptional();
   const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
 
@@ -707,14 +714,14 @@ function SiteConfigSection() {
           </button>
         ))}
       </div>
-      {tab === "navigation" && <NavigationFooterSection />}
+      {tab === "navigation" && <NavigationFooterSection readOnly={readOnly} />}
       {isAdmin && tab === "capabilities" && <CapabilitiesSection />}
       {isAdmin && tab === "components" && <CustomComponentsSection />}
     </div>
   );
 }
 
-function NavigationFooterSection() {
+function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
   const apiPath = useDashboardApiPath();
   const [navigation, setNavigation] = useState<NavigationData | null>(null);
   const [footer, setFooter] = useState<FooterData | null>(null);
@@ -774,7 +781,10 @@ function NavigationFooterSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {readOnly && (
+          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+        )}
         <SaveStatusPill status={saveStatus} />
       </div>
       <div className="rounded-lg border border-glass-border overflow-hidden">
@@ -787,13 +797,15 @@ function NavigationFooterSection() {
               value={item.label}
               onChange={(event) => updateNavItem(index, "label", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+              disabled={readOnly}
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
             />
             <input
               value={item.href}
               onChange={(event) => updateNavItem(index, "href", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
+              disabled={readOnly}
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none disabled:opacity-60"
             />
             <button
               type="button"
@@ -802,7 +814,8 @@ function NavigationFooterSection() {
                 setNavigation(next);
                 saveContent("navigation", next);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical"
+              disabled={readOnly}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical disabled:opacity-60 disabled:cursor-not-allowed"
               aria-label="Remove navigation item"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -817,7 +830,8 @@ function NavigationFooterSection() {
               setNavigation(next);
               saveContent("navigation", next);
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+            disabled={readOnly}
+            className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             Add link
@@ -831,8 +845,9 @@ function NavigationFooterSection() {
                 setSaveStatus("dirty");
               }}
               onBlur={() => saveContent("navigation", navigation)}
+              disabled={readOnly}
               placeholder="CTA label"
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
             />
             <input
               value={navigation.ctaHref}
@@ -842,8 +857,9 @@ function NavigationFooterSection() {
                 setSaveStatus("dirty");
               }}
               onBlur={() => saveContent("navigation", navigation)}
+              disabled={readOnly}
               placeholder="CTA href"
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
+              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none disabled:opacity-60"
             />
           </div>
         </div>
@@ -858,8 +874,9 @@ function NavigationFooterSection() {
               setSaveStatus("dirty");
             }}
             onBlur={() => saveContent("footer", footer)}
+            disabled={readOnly}
             rows={2}
-            className="w-full resize-none rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            className="w-full resize-none rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
           />
         </FormRow>
         <FormRow label="Copyright" description="Bottom legal line" last>
@@ -870,7 +887,8 @@ function NavigationFooterSection() {
               setSaveStatus("dirty");
             }}
             onBlur={() => saveContent("footer", footer)}
-            className="w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+            disabled={readOnly}
+            className="w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
           />
         </FormRow>
       </div>
@@ -1469,14 +1487,14 @@ function BusinessSettings({
       </SettingsGroup>
 
       <SettingsGroup id={brandingMeta.id} eyebrow={brandingMeta.eyebrow} description={brandingMeta.description}>
-        <BrandSection />
+        <BrandSection readOnly={readOnly} />
       </SettingsGroup>
 
       {/* AI content autonomy control follows branding so clients see business info + branding first */}
       <ContentAutonomyPanel />
 
       <SettingsGroup id={siteConfigMeta.id} eyebrow={siteConfigMeta.eyebrow} description={siteConfigMeta.description}>
-        <SiteConfigSection />
+        <SiteConfigSection readOnly={readOnly} />
       </SettingsGroup>
 
       <SettingsGroup id={dependenciesMeta.id} eyebrow={dependenciesMeta.eyebrow} description={dependenciesMeta.description}>

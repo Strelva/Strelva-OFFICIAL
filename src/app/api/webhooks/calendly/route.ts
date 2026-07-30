@@ -32,6 +32,8 @@ interface CalendlyWebhookPayload {
   };
 }
 
+const SIGNATURE_MAX_AGE_SECONDS = 300;
+
 function verifySignature(payload: string, signature: string, secret: string): boolean {
   const [, sigValue] = signature.split(",").find((p) => p.startsWith("v1="))?.split("=") ?? [];
   if (!sigValue) return false;
@@ -40,6 +42,12 @@ function verifySignature(payload: string, signature: string, secret: string): bo
   const timestamp = timestampPart ? signature.split(",")[0].split("=")[1] : null;
 
   if (!timestamp) return false;
+
+  // Replay-prevention: reject any webhook older than 5 minutes.
+  const tsSeconds = parseInt(timestamp, 10);
+  if (isNaN(tsSeconds) || Math.abs(Date.now() / 1000 - tsSeconds) > SIGNATURE_MAX_AGE_SECONDS) {
+    return false;
+  }
 
   const signedPayload = `${timestamp}.${payload}`;
   const expectedSig = crypto
@@ -119,24 +127,36 @@ export async function POST(req: Request) {
   }
 
   const eventName = scheduled_event?.name || "Booking";
-  const startTime = scheduled_event?.start_time || payload.payload.event?.start_time;
+  const startTime: string | undefined =
+    typeof scheduled_event?.start_time === "string"
+      ? scheduled_event.start_time
+      : typeof payload.payload.event?.start_time === "string"
+      ? payload.payload.event.start_time
+      : undefined;
+  const startTimeStr = startTime ? new Date(startTime).toLocaleString() : "time TBD";
 
-  await addEvent({
-    tenantId,
-    source: "calendly",
-    type: "booking",
-    title: `New booking: ${invitee.name}`,
-    body: `${eventName} scheduled for ${new Date(startTime).toLocaleString()}`,
-    status: "pending",
-    metadata: {
-      inviteeName: invitee.name,
-      inviteeEmail: invitee.email,
-      eventType: eventName,
-      scheduledTime: startTime,
-      endTime: scheduled_event?.end_time,
-      timezone: invitee.timezone,
-    },
-  });
+  try {
+    await addEvent({
+      tenantId,
+      source: "calendly",
+      type: "booking",
+      title: `New booking: ${invitee.name}`,
+      body: `${eventName} scheduled for ${startTimeStr}`,
+      status: "pending",
+      metadata: {
+        inviteeName: invitee.name,
+        inviteeEmail: invitee.email,
+        eventType: eventName,
+        scheduledTime: startTime ?? null,
+        endTime: scheduled_event?.end_time,
+        timezone: invitee.timezone,
+      },
+    });
+  } catch (err) {
+    // Log and return 200 so Calendly does not retry — a transient Redis/Postgres
+    // failure here would otherwise cause a retry storm that duplicates events.
+    console.error("[calendly webhook] addEvent failed — acknowledging to prevent retry:", err);
+  }
 
   return NextResponse.json({ received: true });
 }

@@ -4,7 +4,6 @@ import {
   isSuperAdmin,
   getCurrentUserEmail,
   assignUserToTenant,
-  requireTenantPermission,
   getActorContext,
   findUserIdByEmail,
   type ClientRole,
@@ -83,9 +82,14 @@ export async function POST(req: Request) {
       ? (requestedRole as ClientRole)
       : "owner";
 
+  // This route lives under /api/admin and is super-admin-only. The tenantId
+  // is taken from the request body, which makes a non-super-admin fallback
+  // unsafe (a caller could supply an arbitrary tenantId). Tenant-owner
+  // invite flows belong on a tenant-scoped route such as /api/dashboard/team/*
+  // where the tenant comes from the authenticated session, not from
+  // caller-supplied input.
   if (!(await isSuperAdmin())) {
-    const denied = await requireTenantPermission(tenantId, "team:manage");
-    if (denied) return denied;
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const tenantConfig = await getTenantConfig(tenantId);
@@ -127,23 +131,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // A brand-new OWNER is being granted dashboard access here (the existing-user
-  // branch above returned already, so this only runs for a not-yet-registered
-  // owner — never a re-invite/re-assign, which is why we don't double-send). The
-  // welcome sets the "we manage, you ask, you get a monthly report" expectation.
-  // Best-effort and gated on the client emailSendingPaused() switch inside the
-  // sender, so it stays silent during the test-tenant phase and can never block
-  // the invite.
-  if (role === "owner") {
-    await sendWelcomeEmail({
-      email,
-      businessName: tenantConfig.siteName,
-      ownerName: tenantConfig.ownerName?.trim() || undefined,
-      dashboardUrl: getTenantDashboardUrl(tenantConfig, "/dashboard", "production"),
-      logPrefix: "[invite]",
-    }).catch(() => false);
-  }
-
   const signUpUrl = getInviteSignUpUrl(
     getTenantDashboardUrl(tenantConfig, "/sign-up", "production"),
     email,
@@ -166,6 +153,22 @@ export async function POST(req: Request) {
     // provider failure (it only returns false for an intentional suppression /
     // missing key), so catch it — a Resend error must yield the share-link
     // fallback + alert + audit log, NOT an unhandled 500 with a dead invite.
+
+    // A brand-new OWNER is being granted dashboard access. The welcome email
+    // sets the "we manage, you ask, you get a monthly report" expectation.
+    // Sent here — after emailSendingPaused() returned false — so the welcome
+    // never fires during the test-tenant phase. Best-effort; failure does not
+    // block the invite email that follows.
+    if (role === "owner") {
+      await sendWelcomeEmail({
+        email,
+        businessName: tenantConfig.siteName,
+        ownerName: tenantConfig.ownerName?.trim() || undefined,
+        dashboardUrl: getTenantDashboardUrl(tenantConfig, "/dashboard", "production"),
+        logPrefix: "[invite]",
+      }).catch(() => false);
+    }
+
     let sent = false;
     let sendError: string | null = null;
     try {

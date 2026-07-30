@@ -133,7 +133,9 @@ export async function getRateLimitStatusAsync(
 }
 
 /** Like isRateLimited but accepts a custom window (in ms) instead of the default 60s.
- *  Use for routes that need longer windows, e.g. 5 per hour. */
+ *  NOTE: in-memory only — does not scale across serverless instances. Prefer
+ *  isRateLimitedWindowedAsync for any production route. Use this only in
+ *  environments where Redis is unavailable (e.g., test helpers). */
 export function isRateLimitedWindowed(
   key: string,
   max: number,

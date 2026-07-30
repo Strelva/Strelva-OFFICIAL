@@ -135,6 +135,8 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.subscriptionStartedAt !== undefined) row.subscription_started_at = t.subscriptionStartedAt;
   if (t.commitmentEndsAt !== undefined) row.commitment_ends_at = t.commitmentEndsAt;
   if (t.planOverride !== undefined) row.plan_override = t.planOverride;
+  // TODO: remove this cast once database.types.ts is regenerated after the
+  // billing_type migration lands in the generated Insert<'tenants'> type.
   if (t.billingType !== undefined) (row as Record<string, unknown>).billing_type = t.billingType;
   if (t.subscriptionPastDueSince !== undefined) row.subscription_past_due_since = t.subscriptionPastDueSince;
   if (t.bookingProvider !== undefined) row.booking_provider = t.bookingProvider;
@@ -202,10 +204,24 @@ async function loadTenants(): Promise<TenantConfig[]> {
       current.push(rowToDomainClaim(row));
       claimsByTenant.set(row.tenant_id, current);
     }
-    tenants = rows.map((row) => ({
-      ...rowToTenant(row),
-      domainClaims: claimsByTenant.get(row.id) ?? [],
-    }));
+    const mapped: TenantConfig[] = [];
+    for (const row of rows) {
+      try {
+        mapped.push({
+          ...rowToTenant(row),
+          domainClaims: claimsByTenant.get(row.id) ?? [],
+        });
+      } catch (err) {
+        // A decrypt failure (e.g. SECRETS_ENC_KEY removed/rotated incorrectly)
+        // on one row must not crash the entire platform. Skip the bad row and
+        // alert so the operator knows which tenant is affected.
+        console.error(
+          `[tenants] rowToTenant failed for tenant "${row.id}" — skipping row. ` +
+          `Check SECRETS_ENC_KEY. Error: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+    tenants = mapped;
   }
 
   if (!tenants) {

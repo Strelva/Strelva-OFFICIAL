@@ -399,9 +399,40 @@ Only use tools for manifest-supported sections and actions. If the user requests
           // Care-plan rule: one active custom request at a time. If the owner
           // already has a request in flight, don't stack a second — tell them
           // what's pending and let them choose to fold this in or wait.
+          //
+          // Atomic NX lock around check-and-create to close the TOCTOU race:
+          // two concurrent submits could both read "no open request" before
+          // either writes, creating two pending events and breaking the
+          // one-active-request invariant. Whoever loses the lock returns the
+          // same "already has a request" response the reader-path returns.
+          const { getRedis } = await import("@/lib/redis");
+          const redis = getRedis();
+          const customRequestLockKey = `reb:custom-request-lock:${tenant}`;
+          if (redis) {
+            const acquired = await redis.set(customRequestLockKey, "1", { nx: true, ex: 10 });
+            if (!acquired) {
+              const message =
+                "You already have a custom request in progress, " +
+                "and we keep it to one at a time so nothing falls through the cracks. " +
+                "Want me to add this to that one, or hold it until the first wraps up?";
+              recordActionResult({ status: "blocked", message });
+              return { success: false, blocked: true, reason: "active_request_exists", message, agentResultStatus: "blocked" as const };
+            }
+          }
+
+          let customRequestLockReleased = false;
+          const releaseCustomRequestLock = async () => {
+            if (redis && !customRequestLockReleased) {
+              customRequestLockReleased = true;
+              try { await redis.del(customRequestLockKey); } catch {}
+            }
+          };
+
+          try {
           const { getOpenChangeRequest } = await import("@/lib/events");
           const openRequest = await getOpenChangeRequest(tenant);
           if (openRequest) {
+            await releaseCustomRequestLock();
             const requestedAt =
               (openRequest.metadata?.requestedAt as string | undefined) ?? openRequest.createdAt;
             const message =
@@ -433,6 +464,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             process.env.SCAFFOLD_CUSTOM_REQUEST_SECRET ??
             process.env.REB_CUSTOM_REQUEST_SECRET;
           if (!requestUrl || !secret) {
+            await releaseCustomRequestLock();
             const message = "Custom requests are not fully configured for this site yet.";
             recordActionResult({ status: "blocked", message });
             return { success: false, blocked: true, message, agentResultStatus: "blocked" as const };
@@ -445,6 +477,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               summary: cleanSummary,
             });
             if (!postResult.ok) {
+              await releaseCustomRequestLock();
               if (postResult.reason === "unsafe_url") {
                 const message = "Custom request endpoint is not a safe external URL.";
                 recordActionResult({ status: "blocked", message });
@@ -506,6 +539,10 @@ Only use tools for manifest-supported sections and actions. If the user requests
               });
             }
 
+            // Lock is released after addEvent so no second submit can race into
+            // addEvent before the first event is written.
+            await releaseCustomRequestLock();
+
             const message = `Custom ${normalizedFeature} request sent for review.`;
             recordActionResult({
               status: "queued",
@@ -522,9 +559,15 @@ Only use tools for manifest-supported sections and actions. If the user requests
               message,
             };
           } catch (err) {
+            await releaseCustomRequestLock();
             const error = `Failed to send custom request: ${err instanceof Error ? err.message : "Unknown error"}`;
             recordActionResult({ status: "failed", error });
             return { success: false, error, agentResultStatus: "failed" as const };
+          }
+          } finally {
+            // Ensure the lock is always released even if an unexpected return path
+            // (e.g. a thrown error from getOpenChangeRequest) skips the above.
+            await releaseCustomRequestLock();
           }
         },
       }),
@@ -563,11 +606,9 @@ Only use tools for manifest-supported sections and actions. If the user requests
 
             const ext = match[1].split("/")[1] || "png";
             const finalFilename = filename || `upload-${Date.now()}.${ext}`;
-            const blob = new Blob([buffer], { type: match[1] });
-            const file = new File([blob], finalFilename, { type: match[1] });
-            const { uploadFile } = await import("@/lib/storage");
-            const { url } = await uploadFile(file);
-            return { success: true, url, filename: finalFilename };
+            const { uploadTenantMedia } = await import("@/lib/media-store");
+            const asset = await uploadTenantMedia(tenant, buffer, finalFilename, sniffed);
+            return { success: true, url: asset.url, filename: finalFilename };
           } catch (err) {
             return { success: false, error: `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}` };
           }
@@ -1115,11 +1156,14 @@ Only use tools for manifest-supported sections and actions. If the user requests
 
           // Calculate site score (sections with content / total sections * 100)
           const templateDef = await getTemplateManifestForTenant(tenant);
-          const sectionsWithContent = await Promise.all(
-            templateDef.contentSections.map(async (s) => {
+          const { mapPool } = await import("@/lib/concurrency");
+          const sectionsWithContent = await mapPool(
+            templateDef.contentSections,
+            3,
+            async (s) => {
               const data = await getContent(s, tenant);
               return data && Object.keys(data).length > 0 ? 1 : 0;
-            })
+            }
           );
           const siteScore = Math.round((sectionsWithContent.reduce<number>((a, b) => a + b, 0) / templateDef.contentSections.length) * 100);
 

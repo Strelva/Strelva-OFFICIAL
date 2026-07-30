@@ -48,7 +48,12 @@ async function publishReplyViaApproval(
   gbpReviewId: string,
   reply: string,
 ): Promise<boolean> {
-  const pending = await getEvents(tenant, { status: "pending", limit: 1000 });
+  // Use a large limit so the scan window covers the full 90-day event retention
+  // depth. getEventsRaw scans `limit * 2` raw zset entries before filtering to
+  // `limit`, so 5 000 here covers 10 000 raw entries — well beyond what any
+  // single tenant can accumulate within the TTL window. Without a wide enough
+  // window the existing draft falls outside the scan and we create a duplicate.
+  const pending = await getEvents(tenant, { status: "pending", limit: 5000 });
   const existing = pending.find(
     (e) =>
       e.type === "review" &&

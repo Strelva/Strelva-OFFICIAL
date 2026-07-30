@@ -98,7 +98,18 @@ function AccessRequestForm() {
 
       const body = await response.json().catch(() => null);
       setState("success");
-      setStatusUrl(typeof body?.statusUrl === "string" ? body.statusUrl : "");
+      const rawStatusUrl = typeof body?.statusUrl === "string" ? body.statusUrl : "";
+      // Only accept relative paths (starting with '/') or same-origin URLs to
+      // prevent an open-redirect if the API response is ever tampered with.
+      const isSafeStatusUrl = rawStatusUrl.startsWith("/") ||
+        (rawStatusUrl.startsWith("http") && (() => {
+          try {
+            return new URL(rawStatusUrl).origin === window.location.origin;
+          } catch {
+            return false;
+          }
+        })());
+      setStatusUrl(isSafeStatusUrl ? rawStatusUrl : "");
       if (body?.repeatSubmission) {
         setMessage(
           body?.emailSent

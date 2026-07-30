@@ -206,10 +206,17 @@ async function withAccountLock<T>(id: string, fn: () => Promise<T>): Promise<T> 
     }
     await new Promise((r) => setTimeout(r, LOCK_RETRY_MS));
   }
+  // If the lock could not be acquired after all attempts, reject the operation
+  // rather than proceeding unlocked (silent last-write-wins on concurrent webhook
+  // hits). Throwing here lets Stripe retry the webhook when Redis is momentarily
+  // contended, rather than silently overwriting a concurrent update.
+  if (!acquired) {
+    throw new Error(`[accounts] Could not acquire lock for account ${id} after ${LOCK_MAX_ATTEMPTS} attempts`);
+  }
   try {
     return await fn();
   } finally {
-    if (acquired) await redis.del(lockKey).catch(() => {});
+    await redis.del(lockKey).catch(() => {});
   }
 }
 

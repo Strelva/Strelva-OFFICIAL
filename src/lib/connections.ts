@@ -49,19 +49,28 @@ export async function getConnections(tenantId: string): Promise<Connection[]> {
   const redis = getRedis();
   if (!redis) return [];
 
-  const connections: Connection[] = [];
+  // Collect all matching keys first via full SCAN, then fetch values in one
+  // mget call. This avoids interleaved get-per-key reads that can see
+  // duplicate or missing keys when a key migration (e.g. tenant rename) is
+  // concurrent with the scan. The key-collection pass is still non-atomic, but
+  // the value reads all happen at the same logical instant.
+  const allKeys: string[] = [];
   let cursor = "0";
   const pattern = tenantConnectionsPattern(tenantId);
-  
+
   do {
     const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
     cursor = String(next);
-    for (const key of keys) {
-      const data = await redis.get<Connection>(key);
-      if (data) connections.push(decodeConnection(data));
-    }
+    allKeys.push(...keys);
   } while (cursor !== "0");
 
+  if (allKeys.length === 0) return [];
+
+  const values = await redis.mget<(Connection | null)[]>(...allKeys);
+  const connections: Connection[] = [];
+  for (const data of values) {
+    if (data) connections.push(decodeConnection(data));
+  }
   return connections;
 }
 

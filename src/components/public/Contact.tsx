@@ -166,8 +166,11 @@ export function Contact({ contact }: { contact: ContactContent }) {
                 )}
               </div>
 
-              {/* Google Maps embed */}
-              {contact.googleMapsUrl && (
+              {/* Google Maps embed — only render for known-safe embed URLs */}
+              {contact.googleMapsUrl &&
+                /^https:\/\/(www\.google\.com\/maps\/embed|maps\.google\.com\/maps)/.test(
+                  contact.googleMapsUrl
+                ) && (
                 <div className="aspect-[4/3] w-full">
                   <iframe
                     src={contact.googleMapsUrl}

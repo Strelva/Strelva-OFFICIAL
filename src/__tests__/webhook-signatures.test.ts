@@ -166,7 +166,7 @@ describe("billing webhook signature verification", () => {
 describe("calendly webhook signature verification", () => {
   const SECRET = "calendly_test_secret";
 
-  function calendlySignatureHeader(payload: string, secret = SECRET, timestamp = 1700000000): string {
+  function calendlySignatureHeader(payload: string, secret = SECRET, timestamp = Math.floor(Date.now() / 1000)): string {
     const sig = crypto
       .createHmac("sha256", secret)
       .update(`${timestamp}.${payload}`)

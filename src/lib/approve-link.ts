@@ -59,7 +59,13 @@ export function signApproveToken(claims: ApproveLinkClaims, now = Date.now()): s
 
 /** Verify a token, returning its claims or null when tampered/expired/malformed. */
 export function verifyApproveToken(token: string, now = Date.now()): ApproveLinkClaims | null {
-  const [encoded, signature] = token.split(".");
+  // Split on the first '.' only, so a base64url payload that somehow contains
+  // a '.' (e.g. from a future encoding change) doesn't silently truncate the
+  // signature portion.
+  const dotIdx = token.indexOf(".");
+  if (dotIdx === -1) return null;
+  const encoded = token.slice(0, dotIdx);
+  const signature = token.slice(dotIdx + 1);
   if (!encoded || !signature) return null;
 
   const expected = sign(encoded);

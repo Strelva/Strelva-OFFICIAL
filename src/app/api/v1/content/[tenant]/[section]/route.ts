@@ -7,10 +7,25 @@
  * object is returned UNWRAPPED) and the per-section field set.
  */
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import type { ContentMap, ContentSection } from "@/lib/types";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { isAuthorizedPreview } from "@/lib/preview-auth";
+
+// Cache the tenant-active check at the Next.js server layer (60 s, matching
+// the existing Redis TTL in getTenantConfig) so repeated requests within the
+// revalidation window skip the Redis round-trip for this simple guard. Only
+// the non-sensitive active flag is cached here; the full config (including
+// revalidationSecret) is still fetched live via getTenantConfig below.
+const getTenantActive = unstable_cache(
+  async (tenant: string): Promise<boolean> => {
+    const config = await getTenantConfig(tenant);
+    return !!(config && config.active !== false);
+  },
+  ["v1-tenant-active"],
+  { revalidate: 60 }
+);
 
 // Per-tenant content is tenant-private: a shared/CDN cache must never store one
 // tenant's response and serve it to another. No CDN sits in front today, but
@@ -28,8 +43,10 @@ export async function GET(
   }
 
   try {
-    const config = await getTenantConfig(tenant);
-    if (!config || config.active === false) {
+    // Fast path: check tenant-active from the Next.js segment cache (60 s TTL)
+    // before the more expensive full-config fetch that preview-auth needs.
+    const active = await getTenantActive(tenant);
+    if (!active) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
@@ -41,6 +58,14 @@ export async function GET(
     // silently wipe live content from the client's site.
     if (!(section in SECTION_TO_TYPE)) {
       return NextResponse.json({ error: "Invalid section" }, { status: 400 });
+    }
+
+    // Fetch the full config for preview-auth (needs revalidationSecret). This
+    // still hits the 60 s Redis cache in getTenantConfig; we accept that
+    // round-trip here because the secret cannot be stored in the segment cache.
+    const config = await getTenantConfig(tenant);
+    if (!config) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
     // Drafts require a signed preview token (tenant revalidationSecret); an

@@ -15,10 +15,10 @@ export default defineConfig({
       // against regression without going red today. Raise as the spine gains
       // tests — never lower these to make a PR pass.
       thresholds: {
-        statements: 48,
-        branches: 40,
-        functions: 45,
-        lines: 50,
+        statements: 52,
+        branches: 44,
+        functions: 50,
+        lines: 54,
       },
       exclude: [
         "node_modules/**",

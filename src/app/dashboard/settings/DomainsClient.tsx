@@ -216,6 +216,7 @@ export function DomainsClient({ initialDomains }: Props) {
       const res = await fetch(domainsApi, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ domain }),
       });
       const data = await res.json();
@@ -239,7 +240,7 @@ export function DomainsClient({ initialDomains }: Props) {
     try {
       const res = await fetch(
         `${domainsApi}?domain=${encodeURIComponent(domain)}`,
-        { method: "DELETE" }
+        { method: "DELETE", credentials: "same-origin" }
       );
       const data = await res.json();
       if (!res.ok) {

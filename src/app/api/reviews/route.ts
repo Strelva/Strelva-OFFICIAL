@@ -97,6 +97,19 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // Guard: Google reviews must go through /api/reviews/reply which routes the
+    // reply through the governed review_reply_draft → GBP publish path. Bypassing
+    // it via PATCH would persist a reply locally without publishing to Google, and
+    // permanently suppress the auto-reply backlog for this review.
+    const allReviews = await getReviews(tenant);
+    const target = allReviews.find((r) => r.id === reviewId);
+    if (target?.source === "google") {
+      return NextResponse.json(
+        { error: "Google reviews must be replied to via POST /api/reviews/reply" },
+        { status: 409 },
+      );
+    }
+
     const updated = await replyToReview(tenant, reviewId, replyText);
     if (!updated) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });

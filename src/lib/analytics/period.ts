@@ -73,8 +73,12 @@ export function resolveRange(key?: string, fromStr?: string, toStr?: string): Re
 
   if (key === "custom" && fromStr && toStr) {
     const from = new Date(`${fromStr}T00:00:00`);
-    const to = new Date(`${toStr}T00:00:00`);
-    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from <= to) {
+    // Clamp `to` to today so a future end date doesn't produce empty series rows
+    // or misleading "days remaining" counts. A custom range ending tomorrow shows
+    // the same data as one ending today.
+    const toParsed = new Date(`${toStr}T00:00:00`);
+    const to = !Number.isNaN(toParsed.getTime()) && toParsed < today ? toParsed : today;
+    if (!Number.isNaN(from.getTime()) && from <= to) {
       const len = Math.round((to.getTime() - from.getTime()) / DAY_MS) + 1;
       const priorTo = new Date(from.getTime() - DAY_MS);
       const priorFrom = new Date(priorTo.getTime() - (len - 1) * DAY_MS);

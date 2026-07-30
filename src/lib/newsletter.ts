@@ -4,6 +4,7 @@ import { EMAIL_DOMAIN } from "./brand";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
 import { emailSendingPaused } from "./email-enabled";
+import { getTenantConfig } from "./tenants";
 
 export interface SendNewsletterInput {
   subject: string;
@@ -48,6 +49,9 @@ export async function sendNewsletter(
   const safeText = htmlToPlainText(body);
   const safeSubject = sanitizeEmailSubjectText(subject);
 
+  // Audience gate: check BEFORE touching Resend so that "paused" is surfaced
+  // consistently — sendEmail() enforces it internally, but we check here to
+  // keep the early-return reason code explicit.
   if (emailSendingPaused()) {
     console.warn("[newsletter] sending paused (EMAIL_SENDING_ENABLED != true) — not sent");
     return { success: false, subscriberCount: 0, reason: "paused" };
@@ -56,7 +60,19 @@ export async function sendNewsletter(
   if (process.env.RESEND_API_KEY) {
     const { Resend } = await import("resend");
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const emailDomain = process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+
+    // Resolve per-tenant sending domain (matches the weekly-report pattern).
+    // getTenantConfig is cache-backed so this is a cheap read.
+    const tenantConfig = await getTenantConfig(tenant).catch(() => undefined);
+    const emailDomain =
+      tenantConfig?.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+
+    // Reply-To: route subscriber replies to the real human inbox, not the
+    // send-only newsletter@ address. sendEmail() applies this same default for
+    // transactional mail; we mirror it here for the batch path.
+    const replyTo =
+      process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+
     const emails = activeSubscribers.map((s) => s.email);
 
     const batchSize = 100;
@@ -64,6 +80,7 @@ export async function sendNewsletter(
       const batch = emails.slice(i, i + batchSize);
       const payload = batch.map((to) => ({
         from: `${fromName} <newsletter@${emailDomain}>`,
+        replyTo,
         to,
         subject: safeSubject,
         html: safeHtml,

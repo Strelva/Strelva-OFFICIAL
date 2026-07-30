@@ -171,7 +171,11 @@ export async function POST(
     // window is dropped) and fail-open on a Redis hiccup.
     const redis = getRedis();
     if (redis) {
-      const ipPart = rateLimitKey(req, "x").split(":").pop() || "?";
+      // Extract the IP directly from x-forwarded-for to avoid splitting on ':'
+      // which produces incorrect results for IPv6 addresses (e.g. '2001:db8::1'
+      // split on ':' and pop() would yield '1' instead of the full address).
+      const forwarded = req.headers.get("x-forwarded-for");
+      const ipPart = forwarded?.split(",")[0]?.trim() || "?";
       const dedupKey = `track:dedup:${tenant}:${event}:${serviceId ?? ""}:${ipPart}`;
       try {
         const fresh = await redis.set(dedupKey, "1", { nx: true, ex: 10 });

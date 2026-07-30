@@ -176,7 +176,8 @@ describe("version-store Postgres dual-path", () => {
     expect(insert).not.toHaveProperty("tenant");
 
     // The returned ContentVersion carries the generated id + live status.
-    expect(version.id).toMatch(/^v_\d+_[a-z0-9]+$/);
+    // id format is v_<uuid> (crypto.randomUUID(), collision-safe).
+    expect(version.id).toMatch(/^v_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(version.status).toBe("live");
     expect(version.section).toBe("hero");
   });

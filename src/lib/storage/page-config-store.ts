@@ -74,19 +74,41 @@ async function getPgPageConfig(
   return rowsToBlob((data ?? []) as Row<PageConfigTable>[]);
 }
 
-/** Replace a tenant's per-page rows with the given blob. */
+/** Replace a tenant's per-page rows with the given blob.
+ *
+ * Uses an upsert-then-delete-obsolete pattern (same as replaceDomainClaims in
+ * domain-claims.ts) instead of delete-then-insert, eliminating the read window
+ * between the two operations where a concurrent reader would see no rows.
+ */
 async function setPgPageConfig(
   table: PageConfigTable,
   tenant: string,
   config: SitePageConfig
 ): Promise<void> {
   const db = pageConfigDb(`replace ${table}/${tenant}`);
-  const { error: deleteError } = await db.from(table).delete().eq("tenant_id", tenant);
-  if (deleteError) throw deleteError;
   const rows = blobToRows(table, tenant, config);
+  const incomingPageNames = new Set(Object.keys(config));
+
+  // 1. Upsert all new/updated rows first — readers always see at least the old data.
   if (rows.length > 0) {
-    const { error: insertError } = await db.from(table).insert(rows);
-    if (insertError) throw insertError;
+    const { error: upsertError } = await db
+      .from(table)
+      .upsert(rows, { onConflict: "tenant_id,page_name" });
+    if (upsertError) throw upsertError;
+  }
+
+  // 2. Delete rows for pages no longer in the config (the obsolete set).
+  //    If the new config is empty, delete all rows for the tenant.
+  if (incomingPageNames.size === 0) {
+    const { error: deleteError } = await db.from(table).delete().eq("tenant_id", tenant);
+    if (deleteError) throw deleteError;
+  } else {
+    const { error: deleteError } = await db
+      .from(table)
+      .delete()
+      .eq("tenant_id", tenant)
+      .not("page_name", "in", `(${[...incomingPageNames].map((n) => `"${n}"`).join(",")})`);
+    if (deleteError) throw deleteError;
   }
 }
 

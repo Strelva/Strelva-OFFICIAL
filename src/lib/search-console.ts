@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { SearchData, TenantConfig } from "./types";
 import type { AutomationPolicy } from "./tenant/models";
+import { getRedis } from "./redis";
 
 export interface ServiceAccountKey {
   client_email: string;
@@ -48,10 +49,44 @@ function base64url(input: Buffer | string): string {
  * Mint a short-lived Google OAuth access token from a service-account key via a
  * signed RS256 JWT. Exported + scope-parameterized so GSC and GA4 share one
  * signer (GA4 passes the analytics.readonly scope). Defaults to the GSC scope.
+ *
+ * Tokens are cached in Redis (key: `reb:gcp-token:{hash(client_email)}:{hash(scope)}`,
+ * TTL: 3500s) to avoid a token-exchange round trip on every analytics read. A
+ * cache miss mints and stores; a hit returns immediately. The 3500s TTL leaves a
+ * 100-second buffer before Google's 3600s expiry. Since the service-account
+ * credential is platform-wide (one GOOGLE_SEARCH_CONSOLE_KEY), a single cached
+ * token serves all tenants that fall back to the service account.
  */
 export async function getAccessToken(
   key: ServiceAccountKey,
   scope: string = SCOPE_WEBMASTERS
+): Promise<string> {
+  // Redis cache look-up (best-effort — a miss or Redis-down just mints fresh).
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const emailHash = crypto.createHash("sha256").update(key.client_email).digest("hex").slice(0, 16);
+      const scopeHash = crypto.createHash("sha256").update(scope).digest("hex").slice(0, 8);
+      const cacheKey = `reb:gcp-token:${emailHash}:${scopeHash}`;
+      const cached = await redis.get<string>(cacheKey);
+      if (cached) return cached;
+
+      const token = await mintAccessToken(key, scope);
+      // TTL: 3500s (100s buffer before Google's 3600s expiry).
+      await redis.set(cacheKey, token, { ex: 3500 });
+      return token;
+    } catch {
+      // Redis unavailable or cache write failed — fall through to a fresh mint.
+    }
+  }
+
+  return mintAccessToken(key, scope);
+}
+
+/** Internal: mint a Google OAuth access token via RS256 JWT assertion. */
+async function mintAccessToken(
+  key: ServiceAccountKey,
+  scope: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));

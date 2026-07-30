@@ -355,9 +355,15 @@ export async function hasTenantPermission(
   return roleHasPermission(role, permission);
 }
 
-/** Guard for API routes — returns a 403 Response if the user lacks tenant access.
+/** Guard for API routes — returns a 401 when unauthenticated, 403 when the
+ *  authenticated user lacks tenant membership.
  *  Usage: const denied = await requireTenantAccess(tenant); if (denied) return denied; */
 export async function requireTenantAccess(tenant: string): Promise<NextResponse | null> {
+  if (isDevAccessBypassEnabled()) return null;
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const allowed = await hasTenantAccess(tenant);
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden: no access to this tenant" }, { status: 403 });
@@ -372,11 +378,17 @@ export async function requireTenantPermission(
   return requireTenantPermissions(tenant, [permission]);
 }
 
-/** Require every listed permission while resolving the current tenant role once. */
+/** Require every listed permission while resolving the current tenant role once.
+ *  Returns 401 when unauthenticated, 403 when the role is missing or insufficient. */
 export async function requireTenantPermissions(
   tenant: string,
   permissions: Iterable<TenantPermission>
 ): Promise<NextResponse | null> {
+  if (isDevAccessBypassEnabled()) return null;
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const role = await getTenantRole(tenant);
   if (!role) {
     return NextResponse.json({ error: "Forbidden: no access to this tenant" }, { status: 403 });

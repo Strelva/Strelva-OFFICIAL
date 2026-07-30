@@ -1,6 +1,6 @@
 {
-  "app": "reb",
-  "version": "reb-v2026.05.12.1",
+  "app": "strelva",
+  "version": "strelva-v2026.07.30.1",
   "contractVersion": "v1",
   "customRepoWorkspace": {
     "root": "..",

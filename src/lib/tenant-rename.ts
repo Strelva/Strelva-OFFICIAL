@@ -52,6 +52,13 @@ export const authoritativePatterns = (t: string): string[] => [
   `reb:report-cadence:${t}`, // operator cadence override
   `reb:report-sent:${t}`, // last-report throttle
   `reb:scan:baseline:${t}`, // set-once day-0 health anchor for the 90-day milestone
+  // GBP / review keys that are Redis-only (no Postgres recovery path) — audit #15:
+  `google-meta:${t}`, // GBP accountId+locationId from OAuth callback (1-yr TTL); sole source for all GBP writes
+  `review-replies:recent:${t}`, // near-duplicate detection ring buffer for drafted replies
+  `reb:review-nudge-sent:${t}`, // per-tenant nudge-once dedup marker
+  `reb:review-alert-sent:${t}:*`, // per-review new-review alert dedup markers
+  `reb:order-review-request-sent:${t}:*`, // per-order review-request dedup markers
+  `reb:review-reply-declined:${t}:*`, // 180-day per-review decline veto (prevents re-draft after owner dismissal)
 ];
 
 export type RenameResult = {

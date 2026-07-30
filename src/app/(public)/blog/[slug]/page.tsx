@@ -55,6 +55,8 @@ export default async function BlogPostPage({
 
   if (!post) notFound();
 
+  // Split on blank lines to get paragraphs; within each paragraph preserve
+  // single newlines as line breaks so the author's line wrapping is respected.
   const paragraphs = post.content.split("\n\n").filter(Boolean);
 
   return (
@@ -109,7 +111,12 @@ export default async function BlogPostPage({
           <div className="space-y-5" style={{ color: "var(--color-body, #5a6b5c)" }}>
             {paragraphs.map((p, i) => (
               <p key={i} className="text-lg leading-relaxed">
-                {p}
+                {p.split("\n").map((line, j, arr) => (
+                  <span key={j}>
+                    {line}
+                    {j < arr.length - 1 && <br />}
+                  </span>
+                ))}
               </p>
             ))}
           </div>

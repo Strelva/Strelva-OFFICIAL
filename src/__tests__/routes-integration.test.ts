@@ -17,11 +17,49 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // 1. Content API Write Path Tests
 // ============================================================================
 
-// Mock tenants module
+// Mock tenants module (named reference required for webhook ordering tests below)
 const mockGetTenantConfig = vi.fn();
+const mockUpdateTenant = vi.fn();
 vi.mock("../lib/tenants", () => ({
   getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args),
-  updateTenant: vi.fn(),
+  updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+  getTenantByStripeSubscriptionId: vi.fn(),
+  getTenantByStripeCustomerId: vi.fn(),
+}));
+
+// Additional mocks needed by the billing webhook route (used in the Event
+// Ordering real-route test below; no-ops for all other describe blocks).
+const mockOrderingRedisSet = vi.fn();
+const mockOrderingRedisGet = vi.fn();
+let orderingRedisHandle: unknown = null;
+vi.mock("../lib/redis", () => ({
+  getRedis: () => orderingRedisHandle,
+}));
+vi.mock("../lib/production-guard", () => ({
+  isProductionEnv: () => false,
+}));
+const mockStripeConstructEvent = vi.fn();
+vi.mock("stripe", () => {
+  class FakeStripe {
+    webhooks = { constructEvent: (...args: unknown[]) => mockStripeConstructEvent(...args) };
+    subscriptions = { retrieve: vi.fn().mockResolvedValue({ status: "active" }) };
+  }
+  return { default: FakeStripe };
+});
+vi.mock("../lib/monitoring", () => ({ alert: vi.fn() }));
+vi.mock("../lib/events", () => ({ addEvent: vi.fn() }));
+vi.mock("../lib/delivery-email", () => ({
+  sendNewSignupEmail: vi.fn(),
+  sendPaymentFailedEmail: vi.fn(),
+  sendPaymentPastDueEmail: vi.fn(),
+}));
+vi.mock("../lib/db/dual-write", () => ({
+  dualWritePgEnabled: () => false,
+  buildPaymentToInsert: vi.fn(),
+}));
+vi.mock("../lib/accounts", () => ({
+  getAccountForTenant: vi.fn().mockResolvedValue(null),
+  setAccountSubscription: vi.fn(),
 }));
 
 
@@ -42,6 +80,8 @@ vi.mock("../lib/db/repositories", () => ({
   getPendingInvite: vi.fn(() => Promise.resolve(null)),
   markInviteClaimed: vi.fn(() => Promise.resolve(undefined)),
   getUserByEmail: vi.fn(() => Promise.resolve(null)),
+  // Used by billing webhook route (build payment trail, dual-write path)
+  recordBuildPayment: vi.fn(() => Promise.resolve(undefined)),
 }));
 
 const VERIFIED_USER = { id: "user_123", email: "user@example.com", email_confirmed_at: "2026-01-01T00:00:00Z" };
@@ -292,14 +332,14 @@ describe("Tenant Access Denial (403)", () => {
     mockIsSuperAdminUser.mockResolvedValue(false);
   });
 
-  it("returns 403 when user is not authenticated", async () => {
+  it("returns 401 when user is not authenticated", async () => {
     mockGetSessionUser.mockResolvedValue(null);
 
     const { requireTenantAccess } = await import("../lib/auth");
     const result = await requireTenantAccess("test-tenant");
 
     expect(result).not.toBeNull();
-    expect(result!.status).toBe(403);
+    expect(result!.status).toBe(401);
   });
 
   it("returns 403 for a tenant the user has no membership in", async () => {
@@ -621,5 +661,78 @@ describe("Stripe Event Ordering", () => {
     expect(shouldProcess("tenant2", 500)).toBe(true); // Different tenant, should process
     expect(shouldProcess("tenant1", 900)).toBe(false); // Out of order for tenant1
     expect(shouldProcess("tenant2", 600)).toBe(true); // In order for tenant2
+  });
+
+  // ------------------------------------------------------------------
+  // Real-route guard: exercises applyTenantSubscriptionStatus via the
+  // actual webhook POST handler (not hand-rolled logic). Redis returns a
+  // stored last_event timestamp LARGER than event.created, so the guard
+  // in applyTenantSubscriptionStatus must skip the updateTenant call.
+  // ------------------------------------------------------------------
+  describe("applyTenantSubscriptionStatus real-route ordering guard", () => {
+    const STORED_LAST_CREATED = 2_000_000_000; // stored timestamp: far in the future
+    const INCOMING_CREATED    = 1_000_000_000; // incoming event: older → out-of-order
+
+    const ORIGINAL_SECRET = process.env.STRIPE_SECRET_KEY;
+    const ORIGINAL_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      process.env.STRIPE_SECRET_KEY = "sk_test_ordering";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_ordering";
+      mockUpdateTenant.mockResolvedValue({ id: "acme" });
+      mockGetTenantConfig.mockResolvedValue(null);
+
+      // Redis returns the stored last_event for the tenant ordering key,
+      // and "OK" for the idempotency claim (NX set succeeds).
+      mockOrderingRedisGet.mockImplementation((key: string) => {
+        if (key.startsWith("stripe:tenant:last_event:")) return Promise.resolve(STORED_LAST_CREATED);
+        return Promise.resolve(null);
+      });
+      mockOrderingRedisSet.mockResolvedValue("OK");
+      orderingRedisHandle = {
+        set: (...args: unknown[]) => mockOrderingRedisSet(...args),
+        get: (...args: unknown[]) => mockOrderingRedisGet(...args),
+        del: vi.fn().mockResolvedValue(1),
+      };
+    });
+
+    afterEach(() => {
+      orderingRedisHandle = null;
+      if (ORIGINAL_SECRET === undefined) delete process.env.STRIPE_SECRET_KEY;
+      else process.env.STRIPE_SECRET_KEY = ORIGINAL_SECRET;
+      if (ORIGINAL_WEBHOOK === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
+      else process.env.STRIPE_WEBHOOK_SECRET = ORIGINAL_WEBHOOK;
+    });
+
+    it("does NOT call updateTenant when the incoming event is older than the stored last_event", async () => {
+      const event = {
+        id: "evt_ordering_test",
+        type: "invoice.paid",
+        livemode: false,
+        created: INCOMING_CREATED,
+        data: {
+          object: {
+            id: "in_ordering",
+            metadata: { tenantId: "acme" },
+          },
+        },
+      };
+      // constructEvent just returns the event object (signature bypass)
+      mockStripeConstructEvent.mockReturnValue(event);
+
+      const { POST } = await import("@/app/api/billing/webhook/route");
+      const req = new Request("https://admin.strelva.com/api/billing/webhook", {
+        method: "POST",
+        headers: { "stripe-signature": "t=1,v1=fake" },
+        body: JSON.stringify(event),
+      });
+      const res = await POST(req);
+
+      // The route must ack 200 (not throw) — Stripe must not retry.
+      expect(res.status).toBe(200);
+      // The ordering guard must have fired and skipped the tenant update.
+      expect(mockUpdateTenant).not.toHaveBeenCalled();
+    });
   });
 });

@@ -4,7 +4,15 @@ import { clientRevalidationTargetForSections } from "@/lib/content-revalidation"
 describe("content revalidation targeting", () => {
   it("revalidates only the homepage for ordinary section edits", () => {
     expect(clientRevalidationTargetForSections(["hero"])).toEqual(["/"]);
-    expect(clientRevalidationTargetForSections(["services", "story"])).toEqual(["/"]);
+  });
+
+  it("revalidates the homepage plus the section's own page for sections with a dedicated route", () => {
+    // services → /services, story → /about
+    expect(clientRevalidationTargetForSections(["services", "story"])).toEqual([
+      "/",
+      "/services",
+      "/about",
+    ]);
   });
 
   it("revalidates the full site for settings and other site-wide sections", () => {

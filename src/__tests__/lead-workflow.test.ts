@@ -152,6 +152,19 @@ function workflowReq(body: unknown) {
   });
 }
 
+/** Seed a minimal delivery-lead record so the route's existence-check passes. */
+function seedLead(redis: ReturnType<typeof fakeRedis>) {
+  const lead = {
+    businessName: "Test Co",
+    email: "owner@test.com",
+    statusToken: TOKEN,
+    deliveryStatus: "received",
+    submittedAt: new Date().toISOString(),
+    statusUpdatedAt: new Date().toISOString(),
+  };
+  redis.store.set(`lead-status:${TOKEN}`, JSON.stringify(lead));
+}
+
 describe("POST /api/admin/leads/[token]/workflow", () => {
   it("rejects a non-super-admin with 403", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
@@ -165,7 +178,9 @@ describe("POST /api/admin/leads/[token]/workflow", () => {
   });
 
   it("sets the workflow status, audits it, and returns the record", async () => {
-    mockGetRedis.mockReturnValue(fakeRedis());
+    const redis = fakeRedis();
+    seedLead(redis);
+    mockGetRedis.mockReturnValue(redis);
     const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
     const res = await POST(workflowReq({ status: "contacted" }), {
       params: Promise.resolve({ token: TOKEN }),
@@ -179,7 +194,9 @@ describe("POST /api/admin/leads/[token]/workflow", () => {
   });
 
   it("rejects an invalid status with 400", async () => {
-    mockGetRedis.mockReturnValue(fakeRedis());
+    const redis = fakeRedis();
+    seedLead(redis);
+    mockGetRedis.mockReturnValue(redis);
     const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
     const res = await POST(workflowReq({ status: "won" }), {
       params: Promise.resolve({ token: TOKEN }),

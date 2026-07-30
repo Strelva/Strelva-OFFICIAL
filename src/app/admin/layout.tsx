@@ -11,7 +11,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const isAdmin = await isSuperAdmin();
-  if (!isAdmin) redirect("/");
+  // Redirect to /sign-in rather than "/" so that a non-super-admin who reaches
+  // this layout directly (e.g. via a stale link on the bare admin host) does not
+  // trigger an infinite loop. On the bare admin host, "/" is rewritten to /admin
+  // by the proxy, which would immediately re-enter this layout. /sign-in is an
+  // exempt path that passes through the rewrite, so it terminates the redirect.
+  if (!isAdmin) redirect("/sign-in");
 
   const [allTenants, actor] = await Promise.all([
     getAllTenants().catch(() => []),

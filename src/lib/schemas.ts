@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ContentSection } from "./types";
+import type { ContentSection, ContentMap } from "./types";
 
 const SAFE_URL_PROTOCOLS = ["http:", "https:", "mailto:", "tel:"];
 
@@ -178,7 +178,10 @@ export const shopSchema = z.object({
 export const contactSchema = z.object({
   headline: z.string().max(10000).optional().default(""),
   description: z.string().max(10000).optional().default(""),
-  email: z.string().max(10000).email(),
+  // Accept an empty string (the initial/unset state) or a valid email address.
+  // z.string().email() alone rejects "" on first use, causing every new tenant's
+  // first PUT to fail before they've entered a contact email.
+  email: z.union([z.literal(""), z.string().email()]),
   phone: z.string().max(10000).optional().default(""),
   address: z.string().max(10000).optional().default(""),
   hours: z.string().max(10000).optional().default(""),
@@ -287,12 +290,12 @@ export const dateOverridesSchema = z
   .max(366);
 
 export const rewardsConfigSchema = z.object({
-  starsPerBag: z.number(),
-  starsToRedeem: z.number(),
-  redemptionValue: z.number(),
-  newsletterBonus: z.number(),
-  subscriptionBonus: z.number(),
-  tierThresholdSuper: z.number(),
+  starsPerBag: z.number().int().min(1).max(100000),
+  starsToRedeem: z.number().int().min(1).max(100000),
+  redemptionValue: z.number().min(0.01).max(10000),
+  newsletterBonus: z.number().int().min(0).max(10000),
+  subscriptionBonus: z.number().int().min(0).max(10000),
+  tierThresholdSuper: z.number().int().min(1).max(1000000),
 });
 
 // Every href is safeUrl-validated so a `javascript:`/`data:` scheme can't be
@@ -398,7 +401,17 @@ export const siteCapabilityManifestSchema = z.object({
   customComponents: z.array(customComponentCapabilitySchema),
 });
 
-export const sectionSchemas: Record<ContentSection, z.ZodType> = {
+/**
+ * Per-section Zod schema map, typed so each entry's output matches its
+ * `ContentMap[K]` type. Without the per-key discriminated annotation the
+ * container was `Record<ContentSection, z.ZodType>` (i.e. ZodType<unknown>),
+ * making `sectionSchemas[s].safeParse(data).data` type `unknown` — callers then
+ * had to re-assert the type they already knew, hiding schema/type drift from the
+ * compiler. With `SectionSchemaMap` the output type is inferred correctly.
+ */
+type SectionSchemaMap = { [K in ContentSection]: z.ZodType<ContentMap[K]> };
+
+export const sectionSchemas: SectionSchemaMap = {
   hero: heroSchema,
   services: servicesSchema,
   story: storySchema,

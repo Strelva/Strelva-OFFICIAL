@@ -16,7 +16,7 @@ import { streamText, tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { isSuperAdmin } from "@/lib/auth";
-import { getPrimaryModel } from "@/lib/ai-models";
+import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
 import {
   buildPortfolioSnapshot,
   getPortfolioSummary,
@@ -28,7 +28,7 @@ import { getServiceHealth } from "@/lib/health";
 import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
 import { resolveBillingType } from "@/lib/billing-type";
-import { listDrafts, getAllAuditEvents } from "@/lib/storage";
+import { getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
 import { buildRevenueSummary, listBuildPayments } from "@/lib/revenue";
 import { getScanSummary, getScanSummaries } from "@/lib/scan-store";
@@ -47,17 +47,19 @@ interface IncomingMessage {
   content: string;
 }
 
+const MAX_MESSAGES = 50;
+const MAX_CONTENT_LENGTH = 8000;
+
 function isIncomingMessages(value: unknown): value is IncomingMessage[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (m) =>
-        m &&
-        typeof m === "object" &&
-        (m as IncomingMessage).role !== undefined &&
-        typeof (m as IncomingMessage).content === "string"
-    )
-  );
+  if (!Array.isArray(value) || value.length > MAX_MESSAGES) return false;
+  return value.every((m) => {
+    if (!m || typeof m !== "object") return false;
+    const msg = m as IncomingMessage;
+    if (msg.role !== "user" && msg.role !== "assistant") return false;
+    if (typeof msg.content !== "string") return false;
+    if (msg.content.length > MAX_CONTENT_LENGTH) return false;
+    return true;
+  });
 }
 
 /** A consequential action the operator must confirm before it commits. */
@@ -193,7 +195,6 @@ export async function POST(req: Request) {
           id: config.id,
           siteName: config.siteName,
           ownerName: config.ownerName,
-          ownerEmail: config.ownerEmail,
           active: config.active,
           deliveryModel: config.deliveryModel,
           subscriptionStatus: config.subscriptionStatus,
@@ -216,9 +217,11 @@ export async function POST(req: Request) {
         const tenants = await getAllTenants();
         const summaries = await getScanSummaries(tenants.map((t) => t.id));
         const scanned = tenants
-          .map((t) => ({ tenant: t.id, siteName: t.siteName, scan: summaries[t.id] }))
-          .filter((r) => r.scan)
-          .map((r) => ({ tenant: r.tenant, siteName: r.siteName, grade: r.scan!.grade, overallScore: r.scan!.overallScore, scannedAt: r.scan!.scannedAt }))
+          .flatMap((t) => {
+            const scan = summaries[t.id];
+            if (!scan) return [];
+            return [{ tenant: t.id, siteName: t.siteName, grade: scan.grade, overallScore: scan.overallScore, scannedAt: scan.scannedAt }];
+          })
           .sort((a, b) => a.overallScore - b.overallScore);
         const notScanned = tenants.filter((t) => !summaries[t.id]).map((t) => t.id);
         return { scanned, notScanned, worst: scanned[0] ?? null };
@@ -228,14 +231,14 @@ export async function POST(req: Request) {
       description: "List pending AI drafts across all tenants waiting on review.",
       inputSchema: z.object({}),
       execute: async () => {
-        const tenants = await getAllTenants();
-        const out: { tenant: string; sections: string[] }[] = [];
-        for (const t of tenants) {
-          const drafts = await listDrafts(t.id).catch(() => ({} as Record<string, boolean>));
-          const sections = Object.keys(drafts);
-          if (sections.length) out.push({ tenant: t.id, sections });
-        }
-        return { tenantsWithDrafts: out, total: out.reduce((n, d) => n + d.sections.length, 0) };
+        // Use the cached portfolio snapshot's draftCount per tenant rather than
+        // issuing one Postgres query per tenant — avoids the N+1 at portfolio scale
+        // and keeps the answer consistent with the agent's primary data source.
+        const snapshot = (await getPortfolioSummary()) ?? (await buildPortfolioSnapshot());
+        const out = snapshot.tenants
+          .filter((t) => t.draftCount > 0)
+          .map((t) => ({ tenant: t.id, draftCount: t.draftCount }));
+        return { tenantsWithDrafts: out, total: out.reduce((n, d) => n + d.draftCount, 0) };
       },
     }),
     read_audit: tool({
@@ -455,12 +458,16 @@ export async function POST(req: Request) {
   };
 
   const encoder = new TextEncoder();
-  const model = getPrimaryModel().model;
+  const primaryModel = getPrimaryModel();
+  const fallbackModel = getFallbackModel();
 
   const readable = new ReadableStream({
     async start(controller) {
-      let emitted = false;
-      try {
+      // Tracks whether anything visible was emitted so the fallback only fires
+      // when retrying is still safe (no partial output sent to the client).
+      let emittedToClient = false;
+
+      const runModel = async (model: typeof primaryModel.model): Promise<void> => {
         const result = streamText({
           model,
           system: SYSTEM_PROMPT,
@@ -512,14 +519,29 @@ export async function POST(req: Request) {
           } else if (part.type === "text-delta") {
             const text = "text" in part ? part.text : "";
             if (text) {
-              emitted = true;
+              emittedToClient = true;
               controller.enqueue(encoder.encode(text));
             }
           }
         }
+      };
+
+      try {
+        try {
+          await runModel(primaryModel.model);
+        } catch (primaryErr) {
+          // Retry on the fallback model only when it's safe (nothing streamed yet)
+          // and the failure looks transient (outage / rate limit / 5xx).
+          if (fallbackModel && !emittedToClient && isTransientModelError(primaryErr)) {
+            console.warn("[operator-agent] Primary model failed, trying fallback:", primaryErr instanceof Error ? primaryErr.message : primaryErr);
+            await runModel(fallbackModel.model);
+          } else {
+            throw primaryErr;
+          }
+        }
       } catch (err) {
         console.error("[operator-agent] turn failed:", err);
-        if (!emitted) {
+        if (!emittedToClient) {
           try {
             controller.enqueue(
               encoder.encode(

@@ -11,44 +11,17 @@
  * that as an error event + Slack ping rather than silently failing.
  */
 
-import { getConnection } from "./connections";
+import { getConnection, saveConnection } from "./connections";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { getRedis } from "./redis";
-
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+import { refreshAccessToken } from "./google-token";
 
 // The GBP write scope. New connections via /api/oauth/google already request
 // business.manage; this constant is used for detection only.
 export const GBP_WRITE_SCOPE = "https://www.googleapis.com/auth/business.manage";
 
-// ─── Token helpers (mirrors poll-google-reviews cron) ────────────────────────
-
-async function refreshAccessToken(
-  refreshToken: string
-): Promise<string | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  try {
-    const res = await fetch(GOOGLE_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.access_token as string;
-  } catch {
-    return null;
-  }
-}
+// ─── Token helpers ────────────────────────────────────────────────────────────
 
 async function getValidToken(tenantId: string): Promise<string | null> {
   const connection = await getConnection(tenantId, "google");
@@ -58,7 +31,17 @@ async function getValidToken(tenantId: string): Promise<string | null> {
     const buf = 5 * 60 * 1000;
     if (Date.now() + buf > new Date(connection.expiresAt).getTime()) {
       if (!connection.refreshToken) return null;
-      return refreshAccessToken(connection.refreshToken);
+      const newToken = await refreshAccessToken(connection.refreshToken);
+      if (newToken) {
+        // Persist the refreshed token so subsequent operations within the
+        // same connection's lifetime reuse it instead of re-refreshing.
+        await saveConnection({
+          ...connection,
+          accessToken: newToken,
+          expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+        }).catch(() => {});
+      }
+      return newToken;
     }
   }
   return connection.accessToken;

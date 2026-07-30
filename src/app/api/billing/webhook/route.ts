@@ -19,7 +19,7 @@ import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionIt
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-03-31.basil" as Stripe.LatestApiVersion,
+    apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
   });
 }
 
@@ -208,7 +208,7 @@ async function applyTenantSubscriptionStatus(
         console.warn(`[billing webhook] Ignoring out-of-order ${event.type} for ${tenantId}`);
         return;
       }
-      await redis.set(key, event.created);
+      await redis.set(key, event.created, { ex: PROCESSED_EVENT_TTL_SECONDS });
     } catch (err) {
       // The ordering guard is best-effort and must not block Stripe processing,
       // but a Redis failure on the money path should never be silent. (Double-
@@ -673,17 +673,31 @@ export async function POST(req: Request) {
           try {
             const redis = getRedis();
             const dedupeKey = `reb:past-due-email-sent:${invoiceTenantId}:${pastDueSince}`;
+            // NOTE: dunning email goes to the owner's inbox and is payment-critical;
+            // it is not blocked by the client lifecycle email pause (sendPaymentPastDueEmail
+            // uses operator/billing audience). Document: this path won't fire until
+            // EMAIL_SENDING_ENABLED=true because sendPaymentPastDueEmail routes through
+            // sendEmail which owns the audience→switch mapping.
             const fresh = redis
               ? await redis.set(dedupeKey, "1", { nx: true, ex: 60 * 60 * 24 * 30 }).catch(() => null)
               : "ok";
             if (fresh) {
-              const ok = await sendPaymentPastDueEmail({
-                email: existing.ownerEmail,
-                businessName: existing.siteName || invoiceTenantId,
-                dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
-                tenantId: invoiceTenantId,
-                logPrefix: "[billing webhook]",
-              });
+              let ok = false;
+              try {
+                ok = await sendPaymentPastDueEmail({
+                  email: existing.ownerEmail,
+                  businessName: existing.siteName || invoiceTenantId,
+                  dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
+                  tenantId: invoiceTenantId,
+                  logPrefix: "[billing webhook]",
+                });
+              } catch (sendErr) {
+                // Roll back the dedup key so the next webhook delivery retries the
+                // send rather than silently losing it. The dedup key was set before
+                // the send, so a throw here leaves the key orphaned without this.
+                if (redis) await redis.del(dedupeKey).catch(() => {});
+                throw sendErr;
+              }
               if (!ok && redis) await redis.del(dedupeKey).catch(() => {});
             }
           } catch (err) {

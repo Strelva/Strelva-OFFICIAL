@@ -365,11 +365,24 @@ export async function getGa4Perf(tenantId: string, days = 28): Promise<GaPerf> {
       })
     );
 
+    const users = num(totals[0]?.value);
+    const sessions = num(totals[1]?.value);
+    const pageviews = num(totals[2]?.value);
+
+    // Guard: if the API returned ok but all metrics are zero and there is no
+    // page/source breakdown, the property is likely mis-configured or not yet
+    // receiving data. Cache as unavailable (short TTL) so the next call re-checks
+    // rather than pinning empty data at the full 15-minute TTL.
+    if (users === 0 && sessions === 0 && pageviews === 0 && topPages.length === 0 && topSources.length === 0) {
+      await writeCachedPerf("ga4", tenantId, days, unavailable, PERF_UNAVAILABLE_TTL_SECONDS);
+      return unavailable;
+    }
+
     const result: GaPerf = {
       status: "ok",
-      users: num(totals[0]?.value),
-      sessions: num(totals[1]?.value),
-      pageviews: num(totals[2]?.value),
+      users,
+      sessions,
+      pageviews,
       topPages,
       topSources,
     };

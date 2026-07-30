@@ -313,9 +313,13 @@ async function getSnapshotForRestore(
   snapshotId: string,
 ): Promise<SiteSnapshot | null> {
   if (dataSourceIsPostgres()) {
-    const pg = await pgGetSnapshot(tenantId, snapshotId);
-    if (pg) return pg;
-    // fall through to the dev store for a snapshot not yet in Postgres
+    // In Postgres mode, only look in Postgres — never fall through to the
+    // dev-file. The dev-file is a local-only store keyed by DEFAULT_TENANT;
+    // falling through in mixed mode (CONTENT_SOURCE=postgres but DATA_SOURCE
+    // unset, or during the prod → dev-file fallback window) could return a
+    // snapshot belonging to a different tenant whose id happens to match the
+    // requested snapshotId (cross-tenant data leak via the shared dev-file).
+    return pgGetSnapshot(tenantId, snapshotId);
   }
 
   const store = await readDevContent(tenantId);

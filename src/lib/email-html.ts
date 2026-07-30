@@ -20,16 +20,28 @@ const ALLOWED_TAGS = [
   "span", "div",
 ];
 
-const ALLOWED_ATTR = ["href", "src", "alt", "title", "width", "height", "align", "style"];
+// "style" is intentionally omitted: DOMPurify's ALLOWED_URI_REGEXP applies only
+// to href/src/action/xlink:href — it does NOT sanitize inline style values.
+// Allowing style lets a content:write editor embed CSS expressions
+// (expression(alert(1))) or url(javascript:…) background-image beacons that
+// exfiltrate subscriber addresses. Email clients that need inline styles should
+// receive them from the hard-coded renderEmailHtml layout, never from
+// tenant-supplied newsletter bodies.
+const ALLOWED_ATTR = ["href", "src", "alt", "title", "width", "height", "align"];
 
 export function sanitizeEmailHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     // Only http(s) and mailto links/images — blocks javascript:, data:, etc.
+    // Note: this regexp governs href/src/action/xlink:href only (DOMPurify
+    // v2 behaviour); inline style values are protected by omitting "style"
+    // from ALLOWED_ATTR above.
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input"],
-    FORBID_ATTR: ["onerror", "onload", "onclick"],
+    // DOMPurify strips ALL event-handler attributes (on*) by default; no
+    // explicit FORBID_ATTR list is needed and a partial list gives a false
+    // sense of completeness. The real gap was the style attribute (above).
   });
 }
 

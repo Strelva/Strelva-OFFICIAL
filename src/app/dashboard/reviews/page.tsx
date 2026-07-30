@@ -16,7 +16,12 @@ export default async function ReviewsPage() {
     getTenantConfig(tenant).catch(() => null),
     getConnection(tenant, "google").catch(() => null),
     getReplyVoice(tenant).catch(() => defaultReplyVoice()),
-    getEvents(tenant, { status: "pending", limit: 200 }).catch(() => []),
+    // Fetch only review_reply_draft events. The kind filter is applied post-fetch
+    // inside this component, so use a generous limit here. The governed-work
+    // migration caps event retention at 90 days; at most one draft per incoming
+    // review per day, so 1 000 covers the realistic maximum queue depth while
+    // keeping the scan bounded.
+    getEvents(tenant, { status: "pending", limit: 1000 }).catch(() => []),
   ]);
 
   // The AI-drafted reply already waiting for each review, keyed by review id, so

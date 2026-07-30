@@ -118,18 +118,28 @@ async function fetchGoogleReviews(
   accountId: string,
   locationId: string
 ): Promise<GoogleReview[]> {
-  const url = `https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locationId}/reviews`;
+  const baseUrl = `https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locationId}/reviews`;
+  const allReviews: GoogleReview[] = [];
+  let pageToken: string | undefined;
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  // Paginate through all pages of reviews. The API returns up to 200 reviews per
+  // page; without pagination reviews beyond the first page are never seen.
+  do {
+    const url = pageToken ? `${baseUrl}?pageToken=${encodeURIComponent(pageToken)}` : baseUrl;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-  if (!res.ok) {
-    throw new Error(`Google API error: ${res.status} ${await res.text()}`);
-  }
+    if (!res.ok) {
+      throw new Error(`Google API error: ${res.status} ${await res.text()}`);
+    }
 
-  const data = (await res.json()) as GoogleReviewsResponse;
-  return data.reviews ?? [];
+    const data = (await res.json()) as GoogleReviewsResponse;
+    allReviews.push(...(data.reviews ?? []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return allReviews;
 }
 
 async function pollTenant(tenant: TenantConfig): Promise<number> {
@@ -322,7 +332,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
       await redis.set(
         lastReviewsKey(tenantId),
         seenReviewIds,
-        { ex: 60 * 60 * 24 * 30 } // 30 days TTL
+        { ex: 60 * 60 * 24 * 90 } // 90 days TTL — matches event retention so expiry means re-check, not silent loss
       );
     } catch (err) {
       console.error(`[poll-google-reviews] cursor write failed for ${tenantId} — next run may re-process:`, err);

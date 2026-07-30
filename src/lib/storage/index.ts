@@ -32,7 +32,7 @@ export type { AuditLogEntry } from "./audit-store";
 export { saveChatMessages, loadChatMessages } from "./chat-store";
 
 // Uploads
-export { uploadFile } from "./upload-store";
+export { uploadFile, uploadTenantFile } from "./upload-store";
 
 // Analytics
 export {
@@ -41,6 +41,7 @@ export {
   getDailyMetrics,
   getLastClickDate,
   getClickCountsByPrefix,
+  getMetricsBatch,
   recordSectionUpdate,
   getSectionTimestamps,
 } from "./analytics-store";
