@@ -37,7 +37,8 @@ export const TENANT_SCOPED_TABLES = [
   "integrations", "invites", "mail_log", "memberships", "newsletter_subscribers",
   "page_config", "pay_links", "reward_members", "reward_transactions",
   "scan_history", "scan_results", "search_console_data", "site_metrics",
-  "site_snapshots", "social_posts", "unified_events", "proposals", "weekly_briefs",
+  "site_snapshots", "social_posts", "subscription_items", "unified_events",
+  "proposals", "weekly_briefs",
 ] as const;
 
 // Global Redis caches that include this tenant; safe to bust (they rebuild).

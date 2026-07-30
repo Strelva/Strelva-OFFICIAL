@@ -12,33 +12,99 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      account_memberships: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: number
+          role: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          role: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_memberships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts: {
+        Row: {
+          billing_email: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          primary_contact_email: string | null
+          primary_contact_name: string | null
+          status: string
+          stripe_customer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_email?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          primary_contact_email?: string | null
+          primary_contact_name?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_email?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          primary_contact_email?: string | null
+          primary_contact_name?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       activity_log: {
         Row: {
           actor: string | null
@@ -1881,6 +1947,101 @@ export type Database = {
           },
         ]
       }
+      subscription_items: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          id: number
+          stripe_item_id: string | null
+          stripe_price_id: string | null
+          subscription_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          id?: number
+          stripe_item_id?: string | null
+          stripe_price_id?: string | null
+          subscription_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          id?: number
+          stripe_item_id?: string | null
+          stripe_price_id?: string | null
+          subscription_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_items_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          account_id: string
+          amount_cents: number | null
+          created_at: string
+          currency: string | null
+          current_period_end: string | null
+          id: string
+          plan: string | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount_cents?: number | null
+          created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
+          id?: string
+          plan?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount_cents?: number | null
+          created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
+          id?: string
+          plan?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suggestions: {
         Row: {
           action: string
@@ -1989,12 +2150,12 @@ export type Database = {
       tenants: {
         Row: {
           account_id: string | null
-          billing_type: string | null
           active: boolean
           admin_domain: string | null
           auto_approve_threshold: number | null
           auto_publish: boolean
           behold_feed_id: string | null
+          billing_type: string | null
           booking_provider: string | null
           booking_url: string | null
           branding: Json | null
@@ -2042,12 +2203,12 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
-          billing_type?: string | null
           active?: boolean
           admin_domain?: string | null
           auto_approve_threshold?: number | null
           auto_publish?: boolean
           behold_feed_id?: string | null
+          billing_type?: string | null
           booking_provider?: string | null
           booking_url?: string | null
           branding?: Json | null
@@ -2095,12 +2256,12 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
-          billing_type?: string | null
           active?: boolean
           admin_domain?: string | null
           auto_approve_threshold?: number | null
           auto_publish?: boolean
           behold_feed_id?: string | null
+          billing_type?: string | null
           booking_provider?: string | null
           booking_url?: string | null
           branding?: Json | null
@@ -2146,7 +2307,15 @@ export type Database = {
           updated_at?: string
           visibility?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tenants_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       unified_events: {
         Row: {
@@ -2304,6 +2473,16 @@ export type Database = {
         Args: { p_day: string; p_metric: string; p_tenant_id: string }
         Returns: number
       }
+      site_metric_summary: {
+        Args: { p_tenant_id: string; p_today: string }
+        Returns: {
+          last7: number
+          metric: string
+          prev7: number
+          today: number
+          total: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -2432,9 +2611,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
