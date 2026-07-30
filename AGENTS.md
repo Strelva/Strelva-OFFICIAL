@@ -349,12 +349,12 @@ clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-0
 - `sectionSchemas` typed per-key; `buildSectionData` de-any'd; billing + at-rest-encryption test coverage added.
 - **Low sweep (2026-07-30, batch 2):** DB types now carry `billing_type` + `account_id` (shadow casts removed); `DATA_SOURCE` prod hard-fail guard (mirrors `CONTENT_SOURCE` — closes the split-brain); `customer.subscription.updated` webhook handler + `planMonthlyCents>0` / plan-key allow-list guards; `getReviewById` targeted fetch; heartbeat self-monitored + compile-time cron-name check; agent per-user rate-limit key + operator-neutral tool copy. 19 low fixes total (the other 70 lows were already fixed, false-positives, or by-design — each verified).
 
-### REMAINING — needs live infra (do on next deploy)
-- **Orphaned Vercel env vars:** `vercel env rm` the 9 Clerk/Sanity secrets (+ unused TURBO_*/CORS_ORIGINS/REVALIDATION_SECRET) across production/preview/development — no code reads them.
-- **`database.types.ts` full regen (optional hygiene):** the two audited columns were added manually and the shadow casts removed, so this is no longer blocking — but a full `supabase gen types typescript` is still worth running to catch any other drift.
-- **Deploy:** a fresh `vercel deploy --prod --scope strelva` is required to apply the `next` bump + any env changes (`vercel redeploy` reuses the old env snapshot).
+### DONE — infra + backlog (2026-07-30, batch 3)
+- **Orphaned Vercel env vars removed:** 11 vars (`CLERK_*` ×7, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`) removed from production + preview + development. `NEXT_PUBLIC_SANITY_*` kept (legacy image-URL resolution). Each verified unread by code first.
+- **Sentry build wrap:** `next.config.ts` wrapped with `withSentryConfig` (source maps + release/cron instrumentation; no-op without `SENTRY_AUTH_TOKEN`).
+- **`reb:tenants:all` cache:** the 4 provider-secret fields are re-enveloped on the Redis write and decrypted on read — no plaintext secret outside the Postgres at-rest boundary. In-memory cache stays decrypted; no-op without `SECRETS_ENC_KEY`.
 
-### REMAINING — backlog (deliberate, low risk)
-- `reb:tenants:all` Redis cache holds decrypted secrets (60s TTL, defense-in-depth only).
-- Newsletter uses `resend.batch` directly (correct for bulk; it already gates on `emailSendingPaused()` before Resend, so the audience gate is honored).
-- Sentry `withSentryConfig` wrap (needs org/project/auth-token decision); `noUncheckedIndexedAccess` (widespread, staged).
+### REMAINING
+- **Prod deploy:** a fresh `vercel deploy --prod --scope strelva` applies the `next` bump. NOTE: main is ahead of the deployed prod by the org-layer phase-0 work — the first deploy after this lands org-layer in prod (its migration must be applied first, or its dormant reads guarded). Vercel does NOT auto-deploy on push (all deploys are CLI), so merging to main ships nothing on its own.
+- **`database.types.ts` full regen:** blocked until the org-layer `accounts`/`account_id` migration is applied to prod (a regen today would drop those and break org-layer). The two audited columns were added by hand in the meantime.
+- **`noUncheckedIndexedAccess`:** 637 sites — its own dedicated refactor.
