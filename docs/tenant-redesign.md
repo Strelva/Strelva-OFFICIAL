@@ -99,13 +99,11 @@ site sage-and-cairn.
 
 ## Known issues / TODO (2026-07-30)
 
+- **FIXED** `buildOpsReport` serial N+1 loop — `buildOpsReport` now uses `mapPool` for
+  concurrent per-tenant fetches (`src/lib/ops.ts`).
+
 - **[MEDIUM][security] Rohlax `/api/pay/rohlax` origin built from spoofable
   `x-forwarded-*` headers** (`src/app/api/pay/rohlax/route.ts:21-24`). The success/cancel
   URLs are constructed from the forwarded protocol/host, which can be spoofed in requests
   not proxied by Vercel. Fix: use a hard-coded origin from env/brand config instead of
   trusting forwarded headers for URL construction.
-
-- **[HIGH][perf] `buildOpsReport` has a fully serial N+1 loop** (`src/lib/ops.ts:113-157`).
-  Three sequential `for...of` loops with `await` per tenant, no concurrency cap. Fix:
-  collapse into a single `mapPool(active, 8, async (tenant) => { ... })` that fetches SMS
-  state, queue count, auto-approved events, and tenant config in parallel per tenant.

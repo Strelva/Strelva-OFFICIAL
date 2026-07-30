@@ -75,9 +75,7 @@ These were the "queued for after data flows" follow-ups; they are now **shipped 
   (`src/app/api/booking/list/route.ts:21`). Affects any tenant not in UTC — Today's
   booking counts may be wrong by up to the timezone offset hours. Fix: use
   `zonedTodayIso` for the filter boundary.
-- **[MEDIUM][tech-debt] `database.types.ts` is stale.** If you see TypeScript shadow
-  casts in `rowToTenant`/`tenantToRow`, regenerate: `supabase gen types typescript
-  --project-id <id> > src/lib/db/database.types.ts`.
+- ~~**[MEDIUM][tech-debt] `database.types.ts` is stale.**~~ **FIXED 2026-07-30.** Regenerated from the live schema; `billing_type` and `account_id` are now in the generated Row types. Re-run `supabase gen types typescript --project-id <id> > src/lib/db/database.types.ts` after any future migration.
 - **[MEDIUM][bug] `poll-google-reviews` cron does not paginate** (`src/app/api/cron/poll-google-reviews/route.ts:116`).
   Reviews beyond the first API page are never ingested. High-volume review clients
   will have incomplete review data until pagination is added.

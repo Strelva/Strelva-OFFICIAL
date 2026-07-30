@@ -91,7 +91,7 @@ target an arbitrary endpoint or mutate state on its own.
 pnpm install
 pnpm dev            # local dev (localhost:3000); gldf.localhost:3000 routes a tenant
 pnpm typecheck      # tsc --noEmit
-pnpm test           # vitest (700+ tests)
+pnpm test           # vitest (~1983 tests)
 pnpm build          # production build
 pnpm check:prod     # production-readiness checklist
 pnpm provision-tenant   # CLI tenant provisioning
@@ -111,7 +111,8 @@ billing, and perf fixes are all landed. See the **Audit remediation status** in
 [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-07-30-deep-audit.md)
 for every finding with evidence.
 
-Two items still need live infra (do on the next deploy): `vercel env rm` the
-orphaned Clerk/Sanity secrets, and regenerate `src/lib/db/database.types.ts`
-(`supabase gen types typescript`) to drop the `billing_type`/`account_id` shadow
-casts. A fresh `vercel deploy --prod --scope strelva` applies the `next` bump.
+All infra items from this audit are complete: orphaned Clerk/Sanity env vars
+removed, `database.types.ts` regenerated from the live schema, and the
+`noUncheckedIndexedAccess` strictness branch merged to `main`. The org-layer
+phase-0 migration is applied to prod (tables live, dormant at the read level).
+Next prod deploy picks up any pending branch work; no blocking ops items remain.

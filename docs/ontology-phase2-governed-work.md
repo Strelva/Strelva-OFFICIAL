@@ -143,3 +143,7 @@ Postgres is a verified durable mirror.**
   Fix: add all four patterns to `authoritativePatterns` and update the completeness unit test.
 - **Audit finding [MEDIUM][tech-debt]**: `database.types.ts` may drift from applied migrations.
   A CI check (`find supabase/migrations -newer src/lib/db/database.types.ts`) would catch this.
+  Note: `database.types.ts` was regenerated again 2026-07-30 after the org-layer phase-0
+  migration was applied (`accounts`, `account_memberships`, `subscriptions`, `subscription_items`,
+  `tenants.account_id`). The standing CI gap remains — no automated check enforces regen after
+  each migration.

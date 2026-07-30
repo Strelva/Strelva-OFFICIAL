@@ -185,41 +185,29 @@ repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* 
 
 ## Known issues / TODO (2026-07-30)
 
-- **[LOW][security] Subdomain-resolved tenant requests skip the proxy auth gate**
-  (`src/proxy.ts` line ~636). The `needsAuth` condition covers `isAdminSubdomain`,
-  `tenantFromQueryParam`, and `tenantFromClientPath`, but NOT `tenantFromSubdomain`
-  (non-admin tenant subdomains like `gldf.strelva.com`). Requests resolved by subdomain
-  pass through to per-route guards only; the proxy is not a first line of defense for
-  this common access pattern. Fix: add `tenantFromSubdomain` as a fourth condition or
-  restructure to `needsAuth = !devAccessBypass && !isDemoTenant && !routeIsPublic`.
+All items from this section that were open before 2026-07-30 have been resolved. The
+audit remediation shipped 2026-07-30 — see `AGENTS.md` "Audit remediation status" for
+the authoritative record.
 
-- **[MEDIUM][security] `businessRules` injected unsanitized into the agent system prompt**
-  (`src/lib/agent-prompt-shared.ts` line ~344). The `personality` field already runs through
-  `sanitizePromptValue` at line 338, but `businessRules` is interpolated directly. Fix:
-  wrap `tenantConfig.businessRules` in `sanitizePromptValue` before interpolation and add a
-  max-length cap (e.g. 1000 chars) in the TenantEditor validator.
+Items resolved as of 2026-07-30:
 
-- **[HIGH][tenant-isolation] `upload_image` tool uses unscoped `uploadFile()` instead of
-  `uploadTenantMedia()`** (`src/app/api/agent/route.ts` line ~568-569). Files are stored in
-  the shared flat Blob namespace without a tenant prefix. Fix: replace with `uploadTenantMedia`
-  which takes a Buffer directly and accepts any MIME type `sniffImageType` returns.
-
-- **[HIGH][security] Seven orphaned Clerk and Sanity secrets still live in Vercel
-  environment** after both teardowns. Run `vercel env rm` for each of:
-  any remaining `CLERK_*` / `NEXT_PUBLIC_CLERK_*`, `SANITY_PROJECT_ID`, `SANITY_DATASET`,
-  `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET` (superseded by
-  per-tenant `revalidationSecret`), `CORS_ORIGINS` (no code reference), and Turborepo
-  vars (`NX_DAEMON`, `TURBO_*`). Verify via `vercel env ls` before removal.
-
-- **[HIGH][bug] Missing `SECRETS_ENC_KEY` causes full platform outage** if removed after
-  activation (`src/lib/tenants.ts` load path, `src/lib/crypto/secrets.ts:62`). `decryptSecret`
-  throws on an `enc:v1:` prefixed value when the key is absent, and that throw in `rowToTenant`
-  propagates through `loadTenants` to kill all tenant resolution. Add `SECRETS_ENC_KEY` to the
-  production readiness checklist and wrap `rowToTenant` in a per-row try/catch in `loadTenants`
-  so one bad row cannot take down the entire platform.
-
-- **[MEDIUM][security] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets**
-  (`src/lib/tenants.ts` line ~206-210). The in-memory and Redis tenant-list cache contains
-  the decrypted values of `slackWebhookUrl`, `googleSearchConsoleKey`, etc. This is correct
-  for reads but expands the at-rest-encryption boundary. Optional defense-in-depth: re-encrypt
-  before caching.
+- **FIXED** Subdomain-resolved tenant requests skip the proxy auth gate — proxy auth
+  gate now covers subdomain-resolved tenants (`src/proxy.ts`).
+- **FIXED** `businessRules` injected unsanitized into the agent system prompt — agent
+  system prompt now sanitizes `businessRules` / timezone / holidays
+  (`src/lib/agent-prompt-shared.ts`).
+- **FIXED** `upload_image` tool uses unscoped `uploadFile()` — agent `upload_image`
+  now uses `uploadTenantMedia()` with a tenant-prefixed Blob path
+  (`src/app/api/agent/route.ts`).
+- **FIXED** Orphaned Clerk and Sanity secrets in Vercel environment — 11 vars removed
+  from production + preview + development: `CLERK_*` (×7), `SANITY_API_TOKEN`,
+  `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. `NEXT_PUBLIC_SANITY_*`
+  kept for legacy image-URL resolution. Each verified unread by code before removal.
+- **FIXED** `SECRETS_ENC_KEY` absent from production checklist — now documented and
+  validated in `scripts/production-checklist.ts`; `SUPABASE_URL`,
+  `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` also added to the checklist and env
+  examples.
+- **FIXED** `reb:tenants:all` Redis cache stores plaintext secrets — the 4
+  provider-secret fields are now re-enveloped (AES-256-GCM) on the Redis write and
+  decrypted on read; no plaintext secret outside the Postgres at-rest boundary
+  (`src/lib/tenants.ts`). In-memory cache stays decrypted (process boundary).

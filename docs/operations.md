@@ -239,10 +239,7 @@ Each dependency, what breaks, and the move.
 - **[MEDIUM][tenant-isolation] `setEventStatus` Postgres shadow-write has no tenant filter**
   (`src/lib/db/repositories.ts:125`). It can update any event row by id. Add a
   `tenant = $2` WHERE clause.
-- **[MEDIUM][bug] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets**
-  (`src/lib/tenants.ts:206-210`). The 60s TTL cache holds the fully-decrypted tenant
-  list. Consider encrypting secrets again before writing to the cache, or accept the
-  60s window as the defense-in-depth boundary.
+- ~~**[MEDIUM][bug] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets.**~~ **FIXED 2026-07-30.** The 4 provider-secret fields are now re-enveloped on the Redis write and decrypted on read. No plaintext secret lives outside the Postgres at-rest boundary. In-memory cache remains decrypted (no-op without `SECRETS_ENC_KEY`).
 - **[MEDIUM][security] Prompt injection via unsanitized `businessRules` and `personality`
   fields** (`src/lib/agent-prompt-shared.ts:342-339`). Wrap both in
   `sanitizePromptValue()` before interpolation. Also enforce a max-length cap on

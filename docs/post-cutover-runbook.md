@@ -103,6 +103,6 @@ until their copy of `scaffold-client.ts` is updated and redeployed. Low urgency
 2. ~~Rotate leaked keys.~~ See [secret-rotation.md](./secret-rotation.md) for current state.
 3. ~~Send clients sign-in info.~~ Clients should be active; verify per `/admin/clients`.
 4. ~~Prod sign-in smoke test before proxy unwrap.~~ Proxy unwrap is done (#146).
-5. **Remaining Sanity ops work:** rewrite legacy `cdn.sanity.io` image URLs stored in Postgres content rows, then lock the Sanity dataset and remove `@sanity/image-url` + `sanityImageUrl`. Until this is done, `NEXT_PUBLIC_SANITY_PROJECT_ID` / `NEXT_PUBLIC_SANITY_DATASET` and the `cdn.sanity.io` CSP entry must stay set.
+5. **Remaining Sanity ops work:** rewrite legacy `cdn.sanity.io` image URLs stored in Postgres content rows, then lock the Sanity dataset and remove `@sanity/image-url` + `sanityImageUrl`. Until this is done, `NEXT_PUBLIC_SANITY_PROJECT_ID` / `NEXT_PUBLIC_SANITY_DATASET` and the `cdn.sanity.io` CSP entry must stay set. (The `SANITY_API_TOKEN` + `SANITY_WEBHOOK_SECRET` write secrets were removed from Vercel 2026-07-30 — only the two public vars remain.)
 
 > For current open issues see `production-readiness.md` Known issues and `rollback.md` Known issues.

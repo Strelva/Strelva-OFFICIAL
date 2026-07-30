@@ -31,6 +31,7 @@ not make Postgres authoritative; authority changes only when the production read
 | Site health scans and portfolio snapshots | Redis scan/portfolio stores | Recomputed by cron | Degrade to last-known or empty state; never invent health. |
 | Email delivery | Resend/provider acceptance | Postgres/Redis mail log and CRM activity where enabled | Four audiences—client, operator, prospect, customer—have independent policy switches behind one transport boundary. |
 | Legacy Sanity images | Original asset URL/CDN | `sanityImageUrl` resolver | Read-only compatibility only; no content store reads or writes Sanity. |
+| Org-layer accounts, memberships, subscriptions (phase 0) | Postgres `accounts`, `account_memberships`, `subscriptions`, `subscription_items`; `tenants.account_id` (nullable FK) | None | Migration `20260729180000_org_layer_phase0_accounts` applied to prod 2026-07-30. RLS enabled deny-by-default; service-role bypasses. **Dormant at the read level** — nothing reads these tables yet. `tenants.subscription_*` remains authoritative for billing. `NULL account_id` = standalone/solo tenant. `subscription_items` carries `tenant_id` and is in `deprovision.ts` `TENANT_SCOPED_TABLES`. |
 
 Schema presence alone does not establish authority. In particular,
 `integrations`, `reward_members`, `reward_transactions`, normalized dashboard
@@ -61,6 +62,23 @@ caches) are intentionally NOT rekeyed — they regenerate from Postgres.
 
 ## Known issues / TODO (2026-07-30)
 
+Items resolved as of 2026-07-30:
+
+- **FIXED** Missing `Cache-Control: private` on collections v1 routes — collections list
+  and single-entry routes now send `Cache-Control: private`
+  (`src/app/api/v1/collections/[tenant]/[type]/route.ts`).
+- **FIXED** Split-brain between content and draft/version stores — `DATA_SOURCE` now has
+  a prod hard-fail guard mirroring `CONTENT_SOURCE`
+  (`src/lib/storage/draft-store.ts`).
+- **FIXED** `SUPABASE_URL` missing from env examples and production checklist — added to
+  `.env.production.example` and `scripts/production-checklist.ts`.
+- **FIXED** `SECRETS_ENC_KEY` absent from env examples and production checklist — added
+  to `.env.production.example` (with `openssl rand -hex 32` generation note) and
+  `scripts/production-checklist.ts`. `SUPER_ADMIN_EMAILS` and `APPROVE_LINK_SECRET` also
+  added.
+
+Items still open:
+
 - **[HIGH][bug] `google-meta:*`, `review-replies:recent:*`, `reb:review-nudge-sent:*`,
   `reb:order-review-request-sent:*`, and `reb:review-reply-declined:*` are NOT in the
   `authoritativePatterns` registry** (`src/lib/tenant-rename.ts` line ~32-55). These
@@ -69,20 +87,6 @@ caches) are intentionally NOT rekeyed — they regenerate from Postgres.
   completeness unit test assertions to cover them. The `google-meta:${t}` key is a plain
   JSON object; the blob rewriter handles embedded `tenant`/`tenantId` fields but the key
   itself must be SCAN-moved.
-
-- **[HIGH][tenant-isolation] Missing `Cache-Control: private` on collections list and
-  single-entry v1 routes** (`src/app/api/v1/collections/[tenant]/[type]/route.ts` and the
-  `[slug]` sibling). Neither route sets any cache headers; a CDN or shared cache can serve
-  one tenant's content to another. Fix: add `Cache-Control: private, max-age=0,
-  must-revalidate` to every successful `NextResponse.json()` response in both routes,
-  matching the pattern already used in content, page-config, and site-capabilities routes.
-
-- **[MEDIUM][bug] Split-brain between content and draft/version stores** due to two
-  independent source flags (`CONTENT_SOURCE` in `src/lib/storage/content-store.ts:133` vs
-  `DATA_SOURCE` in `src/lib/storage/draft-store.ts:22`). Either unify on one flag or add a
-  runtime guard that fails loudly in production when the flags diverge. Document the
-  intended relationship between the two flags explicitly and confirm both are set in the
-  Vercel deployment env vars.
 
 - **[MEDIUM][security] `INTERNAL_API_SECRET` is overloaded** — it serves as the domain-map
   auth key, the OAuth state secret fallback, and the approve-link signing fallback
@@ -94,16 +98,3 @@ caches) are intentionally NOT rekeyed — they regenerate from Postgres.
   unset or empty, the domain-map route and proxy can be reached unauthenticated
   (`src/proxy.ts:341`). Ensure `INTERNAL_API_SECRET` is set in production and add it to
   `scripts/production-checklist.ts`.
-
-- **[HIGH][security] `SUPABASE_URL` (private, service-role) missing from `.env.example`
-  and production checklist** (`src/lib/db/client.ts:29`). Add `SUPABASE_URL` to
-  `.env.example` and `.env.production.example` with a note that it is the same URL as
-  `NEXT_PUBLIC_SUPABASE_URL` but server-only, and add `checkEnvVar('SUPABASE_URL', true)`
-  to `scripts/production-checklist.ts`.
-
-- **[HIGH][security] `SECRETS_ENC_KEY` absent from env examples and production
-  checklist** (`src/lib/crypto/secrets.ts`). Add to `.env.production.example` with a
-  generation instruction (`openssl rand -hex 32`) and mark it required. Add
-  `checkEnvVar('SECRETS_ENC_KEY', true)` to the production checklist. Consider adding a
-  startup assertion in `secrets.ts` that warns when the key is unset and the DB already
-  contains `enc:v1:` prefixed values.

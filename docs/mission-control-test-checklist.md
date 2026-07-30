@@ -26,7 +26,7 @@ top to bottom; each item says what to do and what "right" looks like.
 3. `vercel env pull .env.local --scope strelva` — needed for real data.
 4. `pnpm dev` → open `http://localhost:3000`. Sign in as a super-admin email
    (one in `SUPER_ADMIN_EMAILS`).
-5. `pnpm typecheck`, `pnpm test`, `pnpm build` all green (test count has grown beyond 688).
+5. `pnpm typecheck`, `pnpm test`, `pnpm build` all green (~1983 passing tests as of 2026-07-30).
 
 ## Setup (HISTORICAL — stale, for reference only)
 1. `cd ~/strelva-platform && git checkout feat/platform-solidify && git pull`
@@ -117,7 +117,7 @@ Type these into the command bar:
 - [ ] `VERCEL_API_TOKEN` set (confirmed) → provisioning Vercel steps run for real.
 - [ ] `SECRETS_ENC_KEY` set in Vercel prod (at-rest AES-256-GCM secret encryption active since 2026-07-15; missing = full platform outage on tenant load when encrypted rows exist). **NOT yet in `pnpm check:prod` — see production-readiness.md Known issues.**
 - [ ] `SUPABASE_URL` (private, server-side) set — distinct from `NEXT_PUBLIC_SUPABASE_URL`; checked in `src/lib/db/client.ts:29` but NOT yet in the production checklist script or env examples. **See production-readiness.md Known issues.**
-- [ ] No orphaned Clerk or Sanity secrets in Vercel env — Clerk is fully removed (#146, 2026-07-11); Sanity removed 2026-07-10. Presence of Clerk env vars causes Supabase auth failures. Verify with `vercel env ls --scope strelva` and remove any `CLERK_*` or `SANITY_*` vars.
+- [x] No orphaned Clerk or Sanity secrets in Vercel env — DONE 2026-07-30. All 11 orphaned vars removed (CLERK_* x7, SANITY_API_TOKEN, SANITY_WEBHOOK_SECRET, REVALIDATION_SECRET, CORS_ORIGINS). NEXT_PUBLIC_SANITY_* kept for legacy image-URL resolution. If re-checking: `vercel env ls --scope strelva` and confirm no CLERK_* remain.
 
 ## Known not-done (don't flag as bugs)
 - app.strelva.com cutover (T004) — still Jacob's dashboard work.
@@ -146,4 +146,4 @@ Type these into the command bar:
 - Provisioning Vercel steps "skipped" → `VERCEL_API_TOKEN` missing in the pulled env.
 - Operator agent errors on every message → `GOOGLE_GENERATIVE_AI_API_KEY` missing.
 - 403 on `/admin/*` → your signed-in email isn't in `SUPER_ADMIN_EMAILS`.
-- Auth loops / sign-in broken → confirm no Clerk env vars are present in Vercel (Clerk is fully removed as of #146; presence of any `CLERK_*` var causes Supabase auth failures). Run `vercel env ls --scope strelva` and remove any `CLERK_*` vars. Also remove orphaned Sanity secrets (`SANITY_*`).
+- Auth loops / sign-in broken → confirm no Clerk env vars are present in Vercel (Clerk is fully removed as of #146; all CLERK_* and orphaned Sanity secrets were removed 2026-07-30 — verify with `vercel env ls --scope strelva` if regression suspected).

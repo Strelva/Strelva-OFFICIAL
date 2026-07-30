@@ -83,14 +83,17 @@ Right shape for a 2-person team: serve many verticals off one codebase, spend bu
 These are open bugs and security gaps in the platform that the wellness build sits on. Fold fixes into the wellness sprint or track separately — do not inherit them as "known good."
 
 - **[HIGH] `maxAdvanceBooking` config field is never enforced at booking creation** (`src/lib/booking.ts` line 17 defines it; no call site reads it in slot generation). Any booking date is accepted regardless of the advance limit. Fix before Cove go-live.
-- **[HIGH] `upload_image` agent tool uses unscoped `uploadFile()` instead of `uploadTenantMedia()`** (`src/app/api/agent/route.ts:568`). Images are stored in a shared flat Blob namespace with no tenant prefix. A rename or cross-tenant leak is possible. Fix: replace `uploadFile` with `uploadTenantMedia(tenant, buffer, filename, mimeType)`.
-- **[MEDIUM] `businessRules` injected unsanitized into the agent system prompt** (`src/lib/agent-prompt-shared.ts:343`). `personality` is sanitized; `businessRules` is not. Wrap with `sanitizePromptValue` and add a max-length cap in the TenantEditor validator.
 - **[HIGH] GBP writes silently fail after tenant rename** — `google-meta` key is missing from the rename registry (`src/lib/tenant-rename.ts:32`). If a studio tenant is ever renamed, their GBP integration breaks silently.
-- **[HIGH] Calendly webhook: `redis.keys()` full-keyspace scan in the webhook handler** (`src/app/api/webhooks/calendly/route.ts:64`). Degrades under load. Replace with a reverse-index O(1) lookup.
-- **[MEDIUM] Calendly webhook: `addEvent` call is unguarded** — any failure returns 500 and triggers a Calendly retry storm (`src/app/api/webhooks/calendly/route.ts:124`). Wrap in try/catch, return 200 on error.
-- **[MEDIUM] `new Date(undefined)` in Calendly webhook** produces 'Invalid Date' string in stored event body (`route.ts:129`). Guard `startTime` before use.
-- **[CRITICAL] Next.js is on 16.2.6 with four HIGH + three MODERATE unpatched CVEs** (`package.json:49`). Bump to 16.2.12 before wellness launch.
-- **[MEDIUM] Fractional star delta causes uncaught Redis error in `adjustStars`** (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Validate `Number.isInteger(delta)` before the `hincrby` call.
+
+Items below were open at initial writing and are now FIXED (shipped 2026-07-30):
+
+- ~~[CRITICAL] Next.js is on 16.2.6 with unpatched CVEs.~~ **FIXED** — bumped to 16.2.12; `pnpm audit` now 0 high in the production runtime.
+- ~~[HIGH] `upload_image` agent tool uses unscoped `uploadFile()`.~~ **FIXED** — `uploadTenantMedia(tenant, buffer, filename, mimeType)` used in `src/app/api/agent/route.ts` (tenant-prefixed Blob path).
+- ~~[MEDIUM] `businessRules` injected unsanitized into the agent system prompt.~~ **FIXED** — sanitized in `src/lib/agent-prompt-shared.ts` (C0 strip + whitespace collapse + 1000-char cap).
+- ~~[HIGH] Calendly webhook: `redis.keys()` full-keyspace scan.~~ **FIXED** — O(1) reverse-index lookup used; `redis.keys()` is a fallback only for legacy connections and back-fills the index on a hit.
+- ~~[MEDIUM] Calendly webhook: `addEvent` call is unguarded.~~ **FIXED** — wrapped in try/catch, returns 200 on error so Calendly does not retry.
+- ~~[MEDIUM] `new Date(undefined)` in Calendly webhook.~~ **FIXED** — `startTime` guarded before use.
+- ~~[MEDIUM] Fractional star delta causes uncaught Redis error in `adjustStars`.~~ **FIXED** — `Number.isInteger(delta)` guard added at `src/app/api/rewards/members/[email]/adjust/route.ts:35`.
 
 ---
 

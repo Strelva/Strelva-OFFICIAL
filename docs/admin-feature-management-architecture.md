@@ -105,15 +105,10 @@ Grouped by tier:
 
 ### Known issues / TODO
 
-- **Audit finding [MEDIUM][security]**: `businessRules` field in the agent system prompt
+- ~~**Audit finding [MEDIUM][security]**: `businessRules` field in the agent system prompt
   (`src/lib/agent-prompt-shared.ts:342`) is interpolated without being wrapped in
-  `sanitizePromptValue`, unlike every other tenant-supplied field in the same prompt. This
-  opens a prompt-injection vector. Fix: wrap in `sanitizePromptValue(tenantConfig.businessRules)`
-  and add a max-length cap at write time (e.g. 1000 chars in the TenantEditor PATCH validator).
-  `personality` is already sanitized; `businessRules` is not.
-- **Audit finding [MEDIUM][bug]**: `upload_image` tool in `src/app/api/agent/route.ts:568`
-  calls unscoped `uploadFile()` instead of `uploadTenantMedia()` — uploaded images land in a
-  shared flat Blob namespace rather than under the tenant's prefix. Fix: replace with
-  `uploadTenantMedia(tenant, buffer, finalFilename, mimeType)`.
+  `sanitizePromptValue`.~~ **FIXED 2026-07-30** — `businessRules` is now wrapped in `sanitizePromptValue` and a max-length cap is enforced in the TenantEditor PATCH validator.
+- ~~**Audit finding [MEDIUM][bug]**: `upload_image` tool in `src/app/api/agent/route.ts:568`
+  calls unscoped `uploadFile()` instead of `uploadTenantMedia()`.~~ **FIXED 2026-07-30** — agent `upload_image` now writes to a tenant-prefixed Blob path via `uploadTenantMedia()`.
 - Soft-disable data warning (warn when toggling off a feature with existing data) was deferred —
   currently toggling off a feature hides its surface but no warning fires if data exists.

@@ -1,9 +1,9 @@
 # Secret Rotation Runbook
 
-> **Updated 2026-07-14:** Supabase Auth + Postgres are the live identity/data
-> path. Clerk secrets no longer exist. Sanity has no API/write secret in the
-> application; only public project/dataset values may remain temporarily for
-> legacy image references.
+> **Updated 2026-07-30:** Supabase Auth + Postgres are the live identity/data
+> path. Clerk secrets removed from Vercel 2026-07-30. Sanity API/write secrets
+> removed from Vercel 2026-07-30; only `NEXT_PUBLIC_SANITY_DATASET` +
+> `NEXT_PUBLIC_SANITY_PROJECT_ID` remain for legacy image-URL resolution.
 
 How to rotate each production secret without taking the platform (or a live
 client site) down. Setup of first-time secrets is a different doc
@@ -84,13 +84,8 @@ before a production deploy — run it after rotating.
 
 ## Known issues / TODO
 
-- **`SECRETS_ENC_KEY` is not validated by `pnpm check:prod`** — the checker will
-  not catch it missing. Add `checkEnvVar('SECRETS_ENC_KEY', true)` to
-  `scripts/production-checklist.ts`. See `production-readiness.md` Known issues.
+- ~~**`SECRETS_ENC_KEY` is not validated by `pnpm check:prod`.**~~ **FIXED 2026-07-30.** `checkEnvVar('SECRETS_ENC_KEY', true)` is in `scripts/production-checklist.ts`.
 - **`INTERNAL_API_SECRET` serves three roles** (domain-map auth, `OAUTH_STATE_SECRET`
   fallback, approve-link fallback). Prefer setting `APPROVE_LINK_SECRET` and
   `OAUTH_STATE_SECRET` as dedicated secrets so each is scoped to one role.
-- **Orphaned Clerk + Sanity secrets** may still be set in Vercel (teardowns done in
-  code but env vars may not have been removed). Audit with `vercel env ls` and
-  remove any `CLERK_*`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`,
-  and `TURBO_*` / `NX_DAEMON` vars.
+- ~~**Orphaned Clerk + Sanity secrets still set in Vercel.**~~ **FIXED 2026-07-30.** 11 vars removed (`CLERK_*` ×7, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`) from all three environments.

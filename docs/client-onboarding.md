@@ -151,7 +151,7 @@ Copy a row per new client. (The activation-only version lives in [activation-run
 
 ## Known issues / TODO
 
-- **Env example gaps:** `.env.example` is missing `SUPABASE_URL` (private service-role URL) and `SECRETS_ENC_KEY` (at-rest encryption key). Both are required in production. `SECRETS_ENC_KEY` missing from a live deployment causes a full platform outage. Add both to `.env.example` and `.env.production.example`, and add `checkEnvVar` calls in `scripts/production-checklist.ts`. (Audit [HIGH])
-- **Orphaned Vercel secrets:** Clerk (`CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `NEXT_PUBLIC_CLERK_*`) and Sanity (`SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`) secrets are still set in Vercel env despite both teardowns being complete. Also stale: `REVALIDATION_SECRET`, `CORS_ORIGINS`, `NX_DAEMON`, `TURBO_*`. Run `vercel env rm` for each. (Audit [HIGH])
-- **Upload tenant isolation:** the `upload_image` agent tool calls `uploadFile()` (shared flat Blob namespace) instead of `uploadTenantMedia()`. Images uploaded via the AI agent are not namespaced to the tenant. Fix in `src/app/api/agent/route.ts:568`. (Audit [HIGH])
-- **Prompt injection:** `businessRules` in the agent system prompt is not wrapped in `sanitizePromptValue`. Enforce a 1000-char max at write time in the TenantEditor validator. (Audit [MEDIUM])
+- **Env example gaps (DONE 2026-07-30):** `SUPABASE_URL`, `SECRETS_ENC_KEY`, `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` are all documented in `.env.example` and validated in `scripts/production-checklist.ts`. No outstanding env gaps.
+- **Orphaned Vercel secrets (DONE 2026-07-30):** All 11 orphaned vars removed from prod + preview + dev: `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. Kept: `NEXT_PUBLIC_SANITY_DATASET` + `NEXT_PUBLIC_SANITY_PROJECT_ID` (legacy image-URL resolution).
+- **Upload tenant isolation (DONE 2026-07-30):** `upload_image` now calls `uploadTenantMedia()` with a tenant-prefixed Blob path. Fixed in `src/app/api/agent/route.ts`.
+- **Prompt injection (DONE 2026-07-30):** `businessRules` is now wrapped in `sanitizePromptValue` in `src/lib/agent-prompt-shared.ts` (same path as `personality`).

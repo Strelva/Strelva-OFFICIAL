@@ -26,8 +26,10 @@ Both a Postgres branch and a dev-file branch back each store; the dev file is th
 truth for local/tests. **Source flag split (verified 2026-07-30):** `content-store.ts` gates
 on `CONTENT_SOURCE=postgres` (`contentSourceIsPostgres()`), while `draft-store.ts` and
 `version-store.ts` gate on `DATA_SOURCE=postgres` (`dataSourceIsPostgres()`). Both flags
-must be set in production. There is no runtime guard on `dataSourceIsPostgres()` — a missing
-`DATA_SOURCE` in prod silently falls back to the dev-file path (see Known issues below).
+must be set in production. `dataSourceIsPostgres()` now has a production hard-fail guard
+matching the pattern in `contentSourceIsPostgres()` — a missing `DATA_SOURCE` in
+`VERCEL_ENV=production` throws rather than silently falling back to the dev-file path
+(shipped 2026-07-30; see Known issues for the remaining cosmetic gap).
 
 ## Semantics (verified)
 
@@ -78,19 +80,15 @@ done and live; see `AGENTS.md` (Multi-tenant architecture) and
 
 ## Known issues / TODO (as of 2026-07-30)
 
-- [LOW/bug] **Split-brain source flags:** `content-store.ts` uses `CONTENT_SOURCE`, while
-  `draft-store.ts` and `version-store.ts` use `DATA_SOURCE`. Both must be set in production;
-  there is no runtime guard on `dataSourceIsPostgres()` that fails loudly when unset in
-  `VERCEL_ENV=production`, unlike `contentSourceIsPostgres()` which throws. Risk: if
-  `DATA_SOURCE` is unset in prod, drafts and version history silently serve the dev-file
-  (empty). Fix: add a production guard to `dataSourceIsPostgres()` matching the pattern in
-  `contentSourceIsPostgres()`, or unify on a single flag. Either way, document the intended
-  relationship between the two flags explicitly. (`src/lib/db/source-flags.ts:39-41`)
-- [MEDIUM/tech-debt] `sectionSchemas` is typed as `Record<ContentSection, z.ZodType>` which
-  erases output types — every downstream `setContent` call is an unchecked `as` cast
-  (`src/lib/schemas.ts:401` / `src/lib/apply-section-update.ts:107-170`). Fixing:
-  declare as `type SectionSchemaMap = { [K in ContentSection]: z.ZodType<ContentMap[K]> }`;
-  the individual schema objects already parse to the correct shapes.
+- [DONE/2026-07-30] **Split-brain source flags:** `content-store.ts` uses `CONTENT_SOURCE`,
+  `draft-store.ts` and `version-store.ts` use `DATA_SOURCE`. A production hard-fail guard was
+  added to `dataSourceIsPostgres()` matching the `contentSourceIsPostgres()` pattern — an
+  unset `DATA_SOURCE` in `VERCEL_ENV=production` now throws rather than silently falling back
+  to the dev-file path. The two-flag split is intentional and now documented; unifying on a
+  single flag is a separate future decision. (`src/lib/db/source-flags.ts`)
+- [DONE/2026-07-30] `sectionSchemas` is now typed per-key (`SectionSchemaMap` shape) and
+  `buildSectionData` is de-any'd — the unchecked `as` casts in `src/lib/schemas.ts` and
+  `src/lib/apply-section-update.ts` are removed. typecheck clean.
 
 ## One cosmetic inconsistency (left as-is, not a bug)
 

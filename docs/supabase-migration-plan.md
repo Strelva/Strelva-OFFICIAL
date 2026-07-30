@@ -7,6 +7,14 @@ Supabase Postgres replaced Sanity and is the source of truth for identity, tenan
 content, collections, drafts, audit, and activity (Sanity data-source code removed 2026-07-10).
 The Clerk dual-path in `auth.ts` and `proxy.ts` is gone; `@clerk/nextjs` is not in `package.json`.
 
+**Org-layer phase-0 (2026-07-30):** migration `20260729180000_org_layer_phase0_accounts`
+applied to prod. Live tables: `accounts`, `account_memberships`, `subscriptions`,
+`subscription_items`, `tenants.account_id` (nullable). RLS is enabled deny-by-default
+(service-role bypasses). Still DORMANT at the read level — nothing reads these tables yet;
+`tenants.subscription_*` stays authoritative; `NULL account_id` = standalone/solo.
+`subscription_items` carries `tenant_id` and is in `deprovision.ts` `TENANT_SCOPED_TABLES`.
+`database.types.ts` was regenerated from the live schema post-migration.
+
 Do not use the dated “today,” “NOT yet done,” or rollback statements below as current state.
 Current architecture is in `AGENTS.md`, `persistence-boundaries.md`, and
 `auth-tenancy-architecture.md`.
@@ -27,19 +35,20 @@ Remaining ops-only tail (not a migration blocker):
   `loadTenants` (`src/lib/tenants.ts:205-208`). The key removal risk is unguarded. Add
   `SECRETS_ENC_KEY` to the production readiness checklist and add per-row try/catch in
   `loadTenants` so one bad row does not kill all tenants.
-- [MEDIUM/tech-debt] `database.types.ts` is stale — `billing_type` and `account_id` columns
-  are missing from generated Row types (`src/lib/tenants.ts:65-66` casts around it). Run
-  `supabase gen types typescript --project-id <id>` and commit; add a CI staleness check.
-- [MEDIUM/security] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets
-  (`src/lib/tenants.ts:206-210`). The `SECRETS_ENC_KEY` at-rest boundary is the 60s
-  window; acceptable, but document explicitly.
-- [HIGH/security] `SECRETS_ENC_KEY` and `SUPABASE_URL` (private service-role URL, not the
-  same as `NEXT_PUBLIC_SUPABASE_URL`) are both missing from `.env.example`,
-  `.env.production.example`, and the production checklist. Add both.
-- [LOW/bug] Two independent source flags (`CONTENT_SOURCE` for content-store, `DATA_SOURCE`
-  for draft-store and operational stores) with no documented relationship. Add a runtime
-  guard to `dataSourceIsPostgres()` that fails loudly in `VERCEL_ENV=production` when unset,
-  matching the `contentSourceIsPostgres()` guard. Document the intended relationship.
+- [DONE/2026-07-30] `database.types.ts` regenerated from the live schema — `billing_type`
+  and `account_id` are now present in generated Row types; the hand-maintained casts in
+  `src/lib/tenants.ts` are removed. Also surfaced `subscription_items.tenant_id` → added to
+  `deprovision.ts` `TENANT_SCOPED_TABLES`. CI staleness check still not added (low priority).
+- [DONE/2026-07-30] `reb:tenants:all` Redis cache now re-encrypts the 4 provider-secret
+  fields on write and decrypts on read — no plaintext secret outside the Postgres at-rest
+  boundary. In-memory usage within the request stays decrypted; no-op without `SECRETS_ENC_KEY`.
+- [DONE/2026-07-30] `SECRETS_ENC_KEY`, `SUPABASE_URL`, `SUPER_ADMIN_EMAILS`, and
+  `APPROVE_LINK_SECRET` are now in `.env.example`, `.env.production.example`, and validated
+  by `scripts/production-checklist.ts` (`check:prod`).
+- [DONE/2026-07-30] Two independent source flags (`CONTENT_SOURCE` / `DATA_SOURCE`): a
+  production hard-fail guard was added to `dataSourceIsPostgres()` (mirrors
+  `contentSourceIsPostgres()`), closing the silent fallback to dev-file in prod. The intended
+  relationship is now documented in `docs/ontology-phase4-content-spine.md`.
 
 ---
 

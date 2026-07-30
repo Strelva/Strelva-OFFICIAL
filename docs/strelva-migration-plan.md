@@ -200,9 +200,13 @@ Each references the domain and/or brand and must be re-pointed:
   `authoritativePatterns` (`src/lib/tenant-rename.ts`) — silently not moved on a tenant rename.
   Any rebrand that also renames a tenant slug will lose GBP metadata and review dedup state.
   See `supabase-migration-plan.md` Known issues for the full list.
-- [MEDIUM/security] Seven orphaned Clerk and Sanity secrets may still be present in the Vercel
-  environment after both teardowns. Also check for `REVALIDATION_SECRET`, `CORS_ORIGINS`, and
-  stale Turborepo vars. Remove via `vercel env rm <name> <environment>` or the dashboard.
+- [DONE/2026-07-30] 11 orphaned Vercel env vars removed from production + preview + development:
+  `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`,
+  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`,
+  `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`,
+  `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`.
+  `NEXT_PUBLIC_SANITY_DATASET` and `NEXT_PUBLIC_SANITY_PROJECT_ID` are kept (legacy
+  image-URL resolution). Each var was verified unread by code before removal.
 - [MEDIUM/tech-debt] `STRIPE_SCAFFOLD_PRICE_ID` is still the env var name; should be renamed
   to `STRIPE_STRELVA_PRICE_ID` as part of the rebrand (requires the coordinated deployment
   noted in AGENTS.md — redeploy, not `vercel redeploy`).

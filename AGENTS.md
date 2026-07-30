@@ -108,8 +108,8 @@ Strelva is the **control plane**. Each paid client site is a separate **custom r
 - The assistant's persona is **"Strelva"** — the system prompt in `src/app/api/agent/route.ts` opens "You are Strelva, the assistant that manages the website for …" and instructs it to refer to itself as Strelva. The client nav labels the chat "Ask Strelva".
 - The system prompt is cached per tenant keyed on section timestamps (`buildSystemPrompt` in `agent-executor.ts`) — prevents thundering-herd Redis reads on concurrent chat turns.
 - Changes trigger Slack notifications and signed revalidation to the client site.
-- **Known issue:** the `upload_image` tool (`src/app/api/agent/route.ts:568`) uses the unscoped `uploadFile()` from `@/lib/storage` instead of `uploadTenantMedia()`. Files land in a flat shared Blob namespace with no tenant prefix. Fix: replace with `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMime)` and remove the intermediate `File`/`Blob` construction.
-- **Known issue:** the `businessRules` tenant field is interpolated into the agent system prompt without sanitization (`src/lib/agent-prompt-shared.ts:342`), even though `personality` on line 338 is already wrapped in `sanitizePromptValue()`. Fix: wrap `tenantConfig.businessRules` in `sanitizePromptValue()` and enforce a max-length cap at the TenantEditor write path.
+- `upload_image` uses `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMime)` — tenant-prefixed Blob path (fixed 2026-07-30).
+- Agent system prompt sanitizes `businessRules` via `sanitizePromptValue()` (fixed 2026-07-30; matches the `personality` path).
 
 ## Operating conventions
 

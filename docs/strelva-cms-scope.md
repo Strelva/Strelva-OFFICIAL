@@ -35,8 +35,8 @@ All three types shipped in the same foundation step. The blog proved the pattern
   - `GET /api/v1/collections/[tenant]/[type]` — list published entries (source: `src/app/api/v1/collections/[tenant]/[type]/route.ts`)
   - `GET /api/v1/collections/[tenant]/[type]/[slug]` — single entry by slug (source: `src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts`)
   - Both support `?preview=true` with a signed `revalidationSecret` token for draft previews.
-  - **Known issue / TODO:** Neither route sets `Cache-Control: private` on responses. Shared CDN caches could serve one tenant's entries to another. Fix: add `Cache-Control: private, max-age=0, must-revalidate` to every successful `NextResponse.json()` in both routes. (Audit finding [HIGH])
-  - **Known issue / TODO:** The slug URL parameter in the single-entry route is passed to the DB without an ID-format guard. Add a slug allowlist regex check (`/^[a-z0-9-]+$/`) before the DB call. (Audit finding [MEDIUM])
+  - Both routes send `Cache-Control: private, max-age=0, must-revalidate` via the shared `TENANT_PRIVATE_CACHE` constant. Fixed 2026-07-30.
+  - The slug URL parameter in the single-entry route is validated against `/^[a-z0-9-]+$/` before the DB call. Fixed 2026-07-30.
 - **Authoring** (LIVE):
   - Agent tools in `src/app/api/agent/route.ts`: `list_entries` (list by type + optional status) and `save_entry` (create or update; always drafts, never auto-publishes). Agent-created entries are `status:"draft"` — the owner publishes from the client editor.
   - Client editor: `src/components/dashboard/CollectionsManager.tsx` at `/dashboard/collections`. Form-driven off the type schema. Drafts/publish controlled from the editor.
@@ -69,9 +69,11 @@ Sanity fallback was not kept during soak — Sanity teardown is done (2026-07-10
 
 ## Known issues / TODO
 
-- [HIGH] `Cache-Control: private` missing on both v1 collections routes — see Architecture section above.
-- [MEDIUM] Slug parameter unsanitized in single-entry route before DB pass — add format guard.
-- The `database.types.ts` generated types are stale and do not include `collection_entries` columns accurately. Run `supabase gen types typescript` and commit the result; add a CI staleness check. (Audit finding [MEDIUM])
+All previously-tracked issues for this subsystem closed as of 2026-07-30:
+
+- `Cache-Control: private` now set on both v1 collections routes. (DONE 2026-07-30)
+- Slug parameter in single-entry route validated against `/^[a-z0-9-]+$/`. (DONE 2026-07-30)
+- `database.types.ts` regenerated from live schema — `collection_entries` columns are accurate. (DONE 2026-07-30)
 
 ## Relationship to reviews
 

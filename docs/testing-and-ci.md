@@ -4,7 +4,7 @@ Two test layers, and two Playwright "smoke" modes that differ by the dev-access 
 
 ## Vitest (unit + integration)
 
-`pnpm test` (`vitest run`) — the bulk of coverage (~1943 passing tests across `src/__tests__/` as of 2026-07-30).
+`pnpm test` (`vitest run`) — the bulk of coverage (~1983 passing tests across `src/__tests__/` as of 2026-07-30).
 Runs in CI as the "Test (with coverage gate)" step. Mock at module boundaries
 (`vi.mock`), not the function under test — e.g. `tenant-access-enforcement.test.ts`
 exercises the REAL `hasTenantAccess` with the auth primitives (`getSessionUser`,
@@ -18,6 +18,10 @@ exercises the REAL `hasTenantAccess` with the auth primitives (`getSessionUser`,
 - `tenant-access-enforcement.test.ts` — the guard **logic** returns the right allow/deny
   (member of A can't reach B, verified-email gate). An inverted membership check would
   pass the other two while silently opening cross-tenant access; this catches it.
+
+### TypeScript strictness
+
+`noUncheckedIndexedAccess` is ON in `tsconfig.json` (enabled 2026-07-30). Every array index and record key access is typed `T | undefined` — guard or provide a default. All 637 existing sites were fixed when the flag landed; keep it green. A new `arr[i]` or `record[key]` without a guard will fail typecheck.
 
 ## Playwright (`tests/*.spec.ts`) — two modes
 

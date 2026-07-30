@@ -104,11 +104,12 @@ original error/reauth normalization cases.
   the duplicate and delegate to the shared `getValidAccessToken` from `src/lib/google-token.ts`
   (which already persists the refreshed token).
 
-- **Audit finding [MEDIUM][security]**: Google OAuth callback (`src/app/api/oauth/google/callback/route.ts:93`)
-  stores the connection without re-verifying the caller's session. A nonce bound to the session
-  at `state` creation time and verified on callback would close this gap.
+- ~~**Audit finding [MEDIUM][security]**: Google OAuth callback (`src/app/api/oauth/google/callback/route.ts:93`)
+  stores the connection without re-verifying the caller's session.~~ **FIXED 2026-07-30** — Google, Instagram, and Calendly OAuth callbacks now verify session and consume single-use state before writing.
 
 - **Credential at-rest encryption** (AES-256-GCM via `src/lib/crypto/secrets.ts`) covers
   `accessToken`/`refreshToken`/`apiKey` at the `saveConnection` boundary. The `reb:tenants:all`
-  Redis list cache holds decrypted copies (60s TTL) — correct for reads but outside the at-rest
-  boundary. See `AGENTS.md` "Credential at-rest security" for the full picture.
+  Redis list cache now re-envelopes the 4 provider-secret fields on the Redis write and decrypts
+  on read (shipped 2026-07-30) — no plaintext secret exists outside the Postgres at-rest boundary.
+  The in-memory cache stays decrypted for the request lifetime; no-op without `SECRETS_ENC_KEY`.
+  See `AGENTS.md` "Credential at-rest security" for the full picture.

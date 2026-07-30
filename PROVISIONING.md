@@ -299,25 +299,15 @@ pnpm seed-tenant acme-hvac
   `adjustStars` itself before the first `hincrby` call.
 - **[HIGH][bug] Missing `SECRETS_ENC_KEY` causes full platform outage via `loadTenants`**
   (`src/lib/tenants.ts:205-208`). Wrap the `rowToTenant` call in a per-row
-  try/catch so one bad/unreadable row does not kill all tenant loads. Add
-  `SECRETS_ENC_KEY` to `scripts/production-checklist.ts`.
-- **[MEDIUM][tech-debt] `database.types.ts` is stale** — `billing_type` and
-  `account_id` missing from generated Row types, causing shadow casts in
-  `rowToTenant`/`tenantToRow`. Run `supabase gen types typescript --project-id <id>
-  > src/lib/db/database.types.ts` and add a CI staleness check.
-- **[HIGH][tenant-isolation] `upload_image` agent tool uses unscoped `uploadFile()`**
-  (`src/app/api/agent/route.ts:568`). Replace with `uploadTenantMedia(tenant, buffer,
-  filename, mimeType)` to namespace uploads under the tenant slug. This also fixes
-  the AVIF rejection bug — `uploadTenantMedia` accepts any MIME type that
-  `sniffImageType` returns.
+  try/catch so one bad/unreadable row does not kill all tenant loads.
+  (`SECRETS_ENC_KEY` is now in `scripts/production-checklist.ts` — FIXED 2026-07-30.)
+- ~~**[MEDIUM][tech-debt] `database.types.ts` is stale.**~~ **FIXED 2026-07-30.** Regenerated from the live schema; `billing_type` and `account_id` now in Row types. Add a CI staleness check: `find supabase/migrations -newer src/lib/db/database.types.ts | grep -q .`.
+- ~~**[HIGH][tenant-isolation] `upload_image` agent tool uses unscoped `uploadFile()`.**~~ **FIXED 2026-07-30.** Replaced with `uploadTenantMedia(tenant, buffer, filename, mimeType)`.
 - **[MEDIUM][tenant-isolation] Upload route stores files in shared flat Blob namespace**
   (`src/lib/storage/upload-store.ts:45`). Replace `uploadFile(file)` in
   `src/app/api/upload/route.ts` with a tenant-prefixed wrapper, matching the pattern
   in `src/lib/storage/media-store.ts`.
-- **[MEDIUM][security] Google OAuth callback stores connection without re-verifying session**
-  (`src/app/api/oauth/google/callback/route.ts:93`). Add `verifyAuth()` and
-  `requireTenantAccess(tenantId)` at the start of the GET handler, before
-  `saveConnection`.
+- ~~**[MEDIUM][security] Google OAuth callback stores connection without re-verifying session.**~~ **FIXED 2026-07-30.** `verifyAuth()` and `requireTenantAccess(tenantId)` added at the start of the GET handler. Same fix applied to Instagram and Calendly OAuth callbacks.
 
 ## Troubleshooting
 

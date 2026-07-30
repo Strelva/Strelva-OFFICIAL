@@ -12,8 +12,8 @@
 >   tenant isolation; `handle_new_user` trigger provisions users.
 > - **Clerk teardown: DONE (2026-07-11, PR #146).** `@clerk/nextjs` dep removed,
 >   `auth.ts` is Supabase-only, `proxy.ts` uses hand-rolled `gateRequest` (fail-
->   closed). No `@clerk` imports remain. Any remaining Clerk env vars in Vercel are
->   orphaned and should be removed via `vercel env rm`.
+>   closed). No `@clerk` imports remain. Orphaned Clerk env vars (`CLERK_*` ×7)
+>   removed from Vercel prod+preview+dev on 2026-07-30.
 > - **Sanity teardown: DONE (2026-07-10).** All data-source reads/writes removed;
 >   `@sanity/client`/`next-sanity`/`sanity` deps dropped. The only residual is
 >   `sanityImageUrl` (+ `@sanity/image-url` + `cdn.sanity.io` in CSP) for legacy
@@ -100,7 +100,7 @@ Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-
 ## Progress (updated 2026-06-14)
 
 **Mission Control — the operator layer — is built** on `feat/platform-solidify`
-(typecheck + prod build green, 725 tests, PR rhinehart514/REB#55). New since this
+(typecheck + prod build green, 725 tests at the time — now ~1983; PR rhinehart514/REB#55). New since this
 doc was written:
 
 - **Operator agent** (`/api/admin/agent`) — super-admin-gated, reads the whole

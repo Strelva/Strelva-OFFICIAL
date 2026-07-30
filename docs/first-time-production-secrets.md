@@ -110,11 +110,12 @@ vercel env add INTERNAL_API_SECRET production      # domain-map auth + fallback
 vercel env add OAUTH_STATE_SECRET production       # OAuth CSRF state signing
 vercel env add APPROVE_LINK_SECRET production      # approve-from-email HMAC (falls back to OAUTH_STATE_SECRET → INTERNAL_API_SECRET if absent)
 vercel env add SCAFFOLD_CUSTOM_REQUEST_SECRET production  # agent custom-change HMAC
+vercel env add SUPER_ADMIN_EMAILS production       # comma-separated super-admin emails; validated by check:prod
 ```
 
 Keep `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`, and `APPROVE_LINK_SECRET` as
-distinct values. They currently share a fallback chain but serve different
-purposes — a single compromise has wider blast radius than needed.
+distinct values. They share a fallback chain but serve different purposes — a
+single compromise has wider blast radius than needed.
 
 ## 5. Sentry
 
@@ -148,6 +149,7 @@ Required events:
 checkout.session.completed
 invoice.paid
 invoice.payment_failed
+customer.subscription.updated
 customer.subscription.deleted
 ```
 
@@ -275,6 +277,7 @@ vercel env add INTERNAL_API_SECRET production
 vercel env add OAUTH_STATE_SECRET production
 vercel env add APPROVE_LINK_SECRET production
 vercel env add SCAFFOLD_CUSTOM_REQUEST_SECRET production
+vercel env add SUPER_ADMIN_EMAILS production
 vercel env add SENTRY_DSN production
 vercel env add NEXT_PUBLIC_SENTRY_DSN production
 vercel env add STRIPE_SECRET_KEY production
@@ -304,5 +307,5 @@ pnpm check:prod
 
 ## Known issues / TODO
 
-- **`SECRETS_ENC_KEY` and `SUPABASE_URL` are not yet in `pnpm check:prod`** — the checker will not catch a missing key. Track in `production-readiness.md` Known issues. Add `checkEnvVar('SECRETS_ENC_KEY', true)` and `checkEnvVar('SUPABASE_URL', true)` to `scripts/production-checklist.ts`.
-- **Seven orphaned Clerk + Sanity env vars may still be set in Vercel** from before the teardowns. Run `vercel env ls` to audit and `vercel env rm <name> <env>` to remove any of: `CLERK_WEBHOOK_SECRET`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `SANITY_WEBHOOK_SECRET`, `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`, `REVALIDATION_SECRET` (superseded), `CORS_ORIGINS` (no code reference), and any `TURBO_*` / `NX_DAEMON` vars.
+- ~~**`SECRETS_ENC_KEY` and `SUPABASE_URL` are not yet in `pnpm check:prod`.**~~ **FIXED 2026-07-30.** Both are validated by `scripts/production-checklist.ts` and present in both env example files.
+- ~~**Orphaned Clerk + Sanity env vars.**~~ **FIXED 2026-07-30.** The following 11 vars were removed from production + preview + development: `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. `NEXT_PUBLIC_SANITY_DATASET` and `NEXT_PUBLIC_SANITY_PROJECT_ID` are intentionally kept for legacy image-URL resolution.

@@ -473,14 +473,9 @@ If any item is missing, the repo may still be a good website, but it is not yet 
 
 ## Known issues / TODO (as of 2026-07-30)
 
-**[HIGH][tenant-isolation] v1 collections routes missing `Cache-Control: private`.**
-`GET /api/v1/collections/[tenant]/[type]` and `.../[slug]` return no `Cache-Control` header on success. Other v1 routes (content, page-config, site-capabilities) already set `private, max-age=0, must-revalidate`. A shared or CDN cache could serve one tenant's collection data to another. Fix both routes to match the pattern.
+All items from the 2026-07-30 audit have been resolved and shipped to prod. No open items remain in this cluster as of 2026-07-30:
 
-**[MEDIUM][security] `SECRETS_ENC_KEY` and private `SUPABASE_URL` missing from production checklist.**
-`SECRETS_ENC_KEY` (at-rest AES-256-GCM for provider secrets) is not in `scripts/production-checklist.ts` or `.env.production.example`. A removed key causes a full platform outage via an unguarded throw in `loadTenants` (`src/lib/tenants.ts:205`). The private server-only `SUPABASE_URL` (separate from `NEXT_PUBLIC_SUPABASE_URL`) is also missing from both files. Fix: add `checkEnvVar('SECRETS_ENC_KEY', true)` and `checkEnvVar('SUPABASE_URL', true)` to the checklist, and document both in `.env.production.example`.
-
-**[MEDIUM][security] Orphaned Clerk and Sanity secrets in Vercel environment.**
-Several secrets from the Clerk and Sanity teardowns (both complete as of mid-2026) remain set in the Vercel project environment. Remove them with `vercel env rm` across all environments. Also remove unused Turborepo vars (`NX_DAEMON`, `TURBO_*`) and `CORS_ORIGINS` (no code reference). See the audit for the full list.
-
-**[CRITICAL][security] Next.js version has unpatched CVEs.**
-Check `package.json` for the current Next.js version and run `pnpm audit`. Bump to the latest 16.x patch to clear known HIGH/MODERATE advisories. Run `pnpm install` and redeploy after the bump.
+- v1 collections routes now send `Cache-Control: private` on all success responses (both `[type]` and `[slug]` routes).
+- `SECRETS_ENC_KEY`, `SUPABASE_URL`, `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` are documented and validated in `scripts/production-checklist.ts` and `.env.production.example`.
+- Orphaned Vercel env vars removed: `CLERK_*` (7), `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. `NEXT_PUBLIC_SANITY_*` kept for legacy image-URL resolution.
+- Next.js bumped from 16.2.6 to 16.2.12; `pnpm audit` now reports 0 high in the production runtime (1 high is dev-only via eslint's pinned minimatch, 2 moderate are OpenTelemetry pinned by Sentry).

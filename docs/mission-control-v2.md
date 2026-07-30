@@ -60,4 +60,4 @@ for the `feat/platform-solidify` sprint. For the current operator surface map, s
 
 **[MEDIUM] `OperatorConsole` proposals accumulate across turns** (`src/app/admin/OperatorConsole.tsx:423`): `setProposals(result.proposals)` replaces the proposals array on each response, but stale confirmed or in-flight proposals from previous turns can remain visible and clickable if the new response returns a different set. A user approving a stale card from a prior turn may trigger an unintended action.
 
-**[HIGH] `buildOpsReport` is a fully serial N+1 loop** (`src/lib/ops.ts:113-157`): three `for...of` loops over all active tenants with sequential `await` calls per tenant. At portfolio scale this blocks the ops-digest cron handler for O(n*3) sequential round-trips. Fix: collapse into a single `mapPool(active, 8, ...)` that fetches SMS state, queue count, and auto-approved events per tenant in parallel.
+~~**[HIGH] `buildOpsReport` is a fully serial N+1 loop**~~ **FIXED 2026-07-30** — `buildOpsReport` (`src/lib/ops.ts`) now uses `mapPool` to fetch per-tenant state in parallel.

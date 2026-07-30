@@ -1,6 +1,6 @@
 # Feature Management — Build Plan
 
-> **STATUS: MERGED + LIVE (Jul 8 2026) → commit `f144c4c` on main.** All 5 steps built and merged. Green: typecheck + 1573 tests + lint + prod build, plus a live DB test on the `summit` demo tenant (toggle Wellness → persisted → 4 tabs appeared additively → core-lock guard fired → restored). Adversarial review found + fixed one real bug (TenantFeature now derived from a single array, so the validation list can't drift). **Next: the studio module** (the actual class/member/pack content behind the tabs) is the separate, validation-gated build.
+> **STATUS: MERGED + LIVE (Jul 8 2026) → commit `f144c4c` on main.** All 5 steps built and merged. Green: typecheck + 1573 tests (suite is now ~1983 as of 2026-07-30) + lint + prod build, plus a live DB test on the `summit` demo tenant (toggle Wellness → persisted → 4 tabs appeared additively → core-lock guard fired → restored). Adversarial review found + fixed one real bug (TenantFeature now derived from a single array, so the validation list can't drift). **Next: the studio module** (the actual class/member/pack content behind the tabs) is the separate, validation-gated build.
 
 **Date:** Jul 8 2026 · **Scope:** turn the demo's model (core-locked / conditional / vertical-set features + an operator toggle) into working code. Grounded in the real files. Demo: `strelva-feature-toggle` artifact.
 
@@ -132,9 +132,8 @@ This is clean, satisfying, foundational infra and it's the backbone of the verti
 - **Deferred: soft-disable data warning** — toggling a feature off hides the surface but does
   not warn if data exists under it (e.g. a members list). The data is preserved (not deleted)
   but no confirmation prompt fires.
-- **Audit finding [MEDIUM][security]**: `businessRules` injected unsanitized into the agent
-  system prompt (`src/lib/agent-prompt-shared.ts:342`). Fix: `sanitizePromptValue(businessRules)`
-  + max-length cap in the TenantEditor PATCH validator.
+- ~~**Audit finding [MEDIUM][security]**: `businessRules` injected unsanitized into the agent
+  system prompt (`src/lib/agent-prompt-shared.ts:342`).~~ **FIXED 2026-07-30** — `businessRules` is now wrapped in `sanitizePromptValue` and a max-length cap is enforced in the TenantEditor PATCH validator.
 
 ## Related
 - `admin-feature-management-architecture.md` — the architecture this implements

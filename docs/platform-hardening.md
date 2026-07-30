@@ -69,10 +69,16 @@ Point UptimeRobot or Better Stack at `https://app.strelva.com/api/health`. Alert
 
 ## 2. Sentry Integration
 
+> **Updated 2026-07-30:** `next.config.ts` is now wrapped with `withSentryConfig`
+> (build-time source maps, release tagging, and cron instrumentation). The wrap
+> is a no-op when `SENTRY_AUTH_TOKEN` is not set; it does not break builds without
+> Sentry credentials.
+
 ### Setup files
 
 | File | Purpose |
 |------|---------|
+| `next.config.ts` | Wrapped with `withSentryConfig` (source maps + release/cron instrumentation; no-op without `SENTRY_AUTH_TOKEN`). |
 | `sentry.server.config.ts` | Server-side init. DSN from `SENTRY_DSN`. Traces sample rate: 10% prod, 100% dev. |
 | `sentry.edge.config.ts` | Edge runtime init. Same config as server. |
 | `sentry.client.config.ts` | Browser init. DSN from `NEXT_PUBLIC_SENTRY_DSN`. Traces sample rate: 5% prod, 100% dev. |
@@ -235,11 +241,11 @@ Detects custom-repo client sites that are out of sync with the control plane. Th
 
 ## Known issues / TODO
 
-- **[CRITICAL][security] Next.js 16.2.6 has unpatched CVEs.** `package.json` pins `"next": "16.2.6"`. Bump to `16.2.12` and match `eslint-config-next`. Run `pnpm audit` to verify advisories clear. After bumping, do a full `vercel deploy --prod --yes --scope strelva` (redeploy reuses old env snapshot, not a fresh build). See `package.json:49`.
-- **[HIGH][security] Five security-pin overrides frozen at still-vulnerable versions** (`package.json:73-97`): `brace-expansion@<2` (pinned 1.1.13, need 1.1.16+), `brace-expansion@>=4 <5.0.5` (need 5.0.8), `fast-uri` (need 3.1.4), `postcss` (need 8.5.18), `dompurify` (need 3.4.12+). Update each, run `pnpm install && pnpm audit` to confirm advisory count drops.
-- **[MEDIUM][security] Newsletter HTML sanitizer allows CSS expressions and `javascript:` URLs in style attributes** (`src/lib/email-html.ts:23-33`). Remove `'style'` from `ALLOWED_ATTR` in `sanitizeEmailHtml`, or add a post-sanitization step stripping CSS `url()` and `expression()` patterns from surviving style attributes. Simplest fix: strip `style` entirely from tenant-supplied newsletter body content.
+- ~~**[CRITICAL][security] Next.js 16.2.6 has unpatched CVEs.**~~ **FIXED 2026-07-30.** Bumped to `16.2.12` + matching `eslint-config-next`. `pnpm audit`: 3 remaining (1 high dev-only via eslint/minimatch, not in production bundle; 2 moderate OpenTelemetry pinned by Sentry).
+- ~~**[HIGH][security] Five security-pin overrides frozen at vulnerable versions.**~~ **FIXED 2026-07-30.** Updated: `dompurify` → `3.4.12`, `postcss` → `8.5.25`, `fast-uri` → `3.1.4`, `sharp` → `0.35.3`, `js-yaml` → `4.3.0`, `@babel/core` pinned. The remaining `brace-expansion` advisory is dev-only (via eslint's pinned `minimatch@3.1.5` — cannot force to 5.x without breaking eslint's API) and is not in the production bundle.
+- ~~**[MEDIUM][security] Newsletter HTML sanitizer allows CSS in style attributes.**~~ **FIXED 2026-07-30.** `style` dropped from `ALLOWED_ATTR`.
 - **[MEDIUM][security] Partial `FORBID_ATTR` blocklist in newsletter sanitizer** (`src/lib/email-html.ts:32`): only three of many event handlers are blocked; use `FORBID_TAGS` + `FORCE_BODY` instead of a per-handler blocklist.
-- **[LOW][security] Subdomain-resolved tenant requests skip the proxy auth gate** (`src/proxy.ts:636-647`). The `needsAuth` check covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath` but not the raw subdomain resolution path. Add `tenantFromSubdomain` as a fourth condition in `needsAuth`. Per-route guards remain defense-in-depth.
+- **[LOW][security] Subdomain-resolved tenant requests skip the proxy auth gate** (`src/proxy.ts`). The `needsAuth` check covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath` but not the raw subdomain resolution path. Add `tenantFromSubdomain` as a fourth condition. Per-route guards remain defense-in-depth.
 
 ## Files changed on this branch
 

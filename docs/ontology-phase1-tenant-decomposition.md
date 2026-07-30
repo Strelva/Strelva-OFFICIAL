@@ -81,7 +81,7 @@ Every `TenantConfig` field is assigned to exactly one sub-model (disjoint + comp
 | `subscriptionPlan` | `CommercialPlanKey?` |
 | `planMonthlyCents` | `number?` |
 | `planCurrency` | `string?` |
-| `billingType` | `TenantConfig["billingType"]?` (newer column; shadow-cast in `rowToTenant`) |
+| `billingType` | `TenantConfig["billingType"]?` (now in generated `database.types.ts`; shadow-cast in `rowToTenant` is removable) |
 
 ### `AutomationPolicy` — automation + integration knobs
 | Field | Type |
@@ -159,16 +159,10 @@ step is a big-bang cutover.
   be updated to include it (currently a gap between the decomposition doc and the live
   source).
 
-- **`billingType` field is a newer column** (`billing_type`) that `rowToTenant` shadow-casts
-  because `database.types.ts` is stale. The field is included in `CommercialSnapshot` above
-  but only once `database.types.ts` is regenerated via `supabase gen types typescript` will
-  the shadow cast in `rowToTenant` be removable. Add a CI check that fails if
+- **`billingType` field** (`billing_type`) — `database.types.ts` was regenerated 2026-07-30
+  from the live schema; `billing_type` and `account_id` are now in the generated `Row` types.
+  The shadow cast in `rowToTenant` is removable. Add a CI check that fails if
   `database.types.ts` is older than the newest migration file.
-
-- **`database.types.ts` is stale** — `billing_type` and `account_id` are missing from the
-  generated `Row` types (`src/lib/db/database.types.ts`). Run
-  `supabase gen types typescript --project-id <id> > src/lib/db/database.types.ts` and commit
-  to eliminate the shadow casts in `rowToTenant`/`tenantToRow`.
 
 - **`sectionSchemas` typed as `Record<ContentSection, z.ZodType>` erases output types**
   (`src/lib/schemas.ts` line ~401). Every downstream `setContent` call is an unchecked cast.

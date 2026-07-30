@@ -150,19 +150,16 @@ production `content` rows — those images will 403 for any user. Rewrite first,
   (enumerate the other two first — only the `sbp_` PAT is recorded); set
   `VERCEL_API_TOKEN` + `VERCEL_TEAM_ID` in the strelva Vercel project.
 - **Audit findings that belong here:**
-  - Seven orphaned Clerk and Sanity secrets may still live in Vercel environment
-    (run `vercel env ls --scope strelva` to confirm). Also check for
-    `REVALIDATION_SECRET` (superseded by per-tenant `revalidationSecret`),
-    `CORS_ORIGINS`, and stale Turborepo vars (`NX_DAEMON`, `TURBO_*`). Safe to
-    remove from the Vercel dashboard or via `vercel env rm <name> <environment>`.
-  - `SECRETS_ENC_KEY` is missing from `.env.example`, `.env.production.example`,
-    and the production readiness checklist (`production-readiness-rules.ts` /
-    `scripts/production-checklist.ts`). It is set and active in prod since 2026-07-15;
-    a future key removal would cause a hard outage via an unguarded throw in
-    `loadTenants`. Add `checkEnvVar('SECRETS_ENC_KEY', true)` to the checklist.
-  - `SUPABASE_URL` (the private service-role URL, distinct from
-    `NEXT_PUBLIC_SUPABASE_URL`) is missing from `.env.example` — should be added
-    as a comment alongside `NEXT_PUBLIC_SUPABASE_URL` explaining it is server-only.
+  - **DONE (2026-07-30):** 11 orphaned vars removed from Vercel prod + preview + dev:
+    `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`,
+    `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`,
+    `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`,
+    `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`.
+    `NEXT_PUBLIC_SANITY_DATASET` + `NEXT_PUBLIC_SANITY_PROJECT_ID` kept (legacy image resolver).
+  - **DONE (2026-07-30):** `SECRETS_ENC_KEY`, `SUPABASE_URL`, `SUPER_ADMIN_EMAILS`, and
+    `APPROVE_LINK_SECRET` added to `.env.example`, `.env.production.example`, and validated
+    by `scripts/production-checklist.ts` (`check:prod`). The unguarded-throw risk in
+    `loadTenants` is still present — per-row try/catch is a separate follow-up.
 
 ## Known issues / TODO (open as of 2026-07-30)
 
@@ -176,5 +173,5 @@ production `content` rows — those images will 403 for any user. Rewrite first,
 | 6 | Ops | Content-image URL rewrite not yet run (Sanity CDN refs still in Postgres content rows) | `src/lib/storage/content-store.ts`, `src/lib/sanity.ts` |
 | 7 | Ops | Sanity dataset not yet locked (closes public-CDN read of historical lead data) | Sanity dashboard |
 | 8 | Ops | `@sanity/image-url` dep + `cdn.sanity.io` CSP/remotePatterns alive until URL rewrite | `package.json:36`, `src/proxy.ts:29`, `next.config.ts:32` |
-| 9 | Ops | `SECRETS_ENC_KEY` missing from `.env.example` + production checklist | `.env.example`, `scripts/production-checklist.ts` |
-| 10 | Ops | Orphaned Clerk/Sanity secrets may still be live in Vercel env | Vercel dashboard |
+| 9 | ~~Ops~~ DONE | `SECRETS_ENC_KEY` added to `.env.example` + production checklist (2026-07-30) | `.env.example`, `scripts/production-checklist.ts` |
+| 10 | ~~Ops~~ DONE | 11 orphaned Clerk/Sanity/misc env vars removed from Vercel prod+preview+dev (2026-07-30) | Vercel dashboard |

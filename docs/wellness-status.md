@@ -61,11 +61,14 @@ Market validation (5-agent, verdict build-but-narrow) · competitive/feature tea
 
 Before any wellness V1 code lands, these open platform issues need to be addressed or tracked:
 
-- **[CRITICAL]** Next.js on 16.2.6 has unpatched CVEs. Bump to 16.2.12 before Cove goes live.
 - **[HIGH]** `maxAdvanceBooking` config field is declared (`src/lib/booking.ts:17`) but never enforced in slot generation. Any date is accepted regardless of the limit. Must fix before Cove production use.
-- **[HIGH]** `upload_image` agent tool uses a shared flat Blob namespace (no tenant prefix). Fix: use `uploadTenantMedia()` in `src/app/api/agent/route.ts:568`.
-- **[MEDIUM]** `businessRules` injected unsanitized into the agent system prompt (`src/lib/agent-prompt-shared.ts:343`). Wrap with `sanitizePromptValue`.
-- **[MEDIUM]** Fractional star delta causes uncaught Redis error in `adjustStars` (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Add `Number.isInteger(delta)` guard.
+
+Items below were open at initial writing and are now FIXED (shipped 2026-07-30):
+
+- ~~[CRITICAL] Next.js on 16.2.6 has unpatched CVEs.~~ **FIXED** — bumped to 16.2.12; `pnpm audit` now 0 high in the production runtime.
+- ~~[HIGH] `upload_image` agent tool uses a shared flat Blob namespace.~~ **FIXED** — `uploadTenantMedia()` used in `src/app/api/agent/route.ts` (tenant-prefixed Blob path).
+- ~~[MEDIUM] `businessRules` injected unsanitized into the agent system prompt.~~ **FIXED** — sanitized in `src/lib/agent-prompt-shared.ts` (C0 strip + whitespace collapse + 1000-char cap).
+- ~~[MEDIUM] Fractional star delta causes uncaught Redis error in `adjustStars`.~~ **FIXED** — `Number.isInteger(delta)` guard added.
 
 Full audit findings with remediation detail are in `docs/wellness-vertical-brief.md` under "Known issues / TODO."
 

@@ -37,6 +37,11 @@ provider writes, Stripe events, emails, or schema migrations.
   at the record level, with owner approval and an explicit recovery timestamp.
 - Reconcile Redis mirrors/caches from the restored authority afterward. A mirror
   is not promoted to authority merely because Postgres was unavailable.
+- **Org-layer tables** (`accounts`, `account_memberships`, `subscriptions`,
+  `subscription_items`, `tenants.account_id`) are live in prod as of 2026-07-30
+  (migration `20260729180000_org_layer_phase0_accounts` applied). Nothing reads them
+  yet — `tenants.subscription_*` remains authoritative. Rollback of org-layer work
+  is a forward corrective migration, not a revert of the applied migration.
 
 ## Redis recovery
 

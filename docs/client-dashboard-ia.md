@@ -191,7 +191,7 @@ editable business fields including the `businessModel` that drives the presence 
 
 **[MEDIUM] `BrandSection` and `NavigationFooterSection` ignore `readOnly` in demo mode** (`src/app/dashboard/settings/page.tsx:414,717`): these two settings sections allow editing even when `readOnly` is true (i.e. when a super-admin is inspecting a demo tenant). The other settings sections respect `readOnly` correctly.
 
-**[MEDIUM] Google OAuth callback stores connection without re-verifying caller session** (`src/app/api/oauth/google/callback/route.ts:93`): the GET handler calls `saveConnection` before verifying the authenticated session and tenant access. A forged state parameter that passes the HMAC check could write a connection for an arbitrary tenant. Fix: call `verifyAuth()` + `requireTenantAccess(tenantId)` at the start of the callback handler, before writing.
+~~**[MEDIUM] Google OAuth callback stores connection without re-verifying caller session**~~ **FIXED 2026-07-30** — Google, Instagram, and Calendly OAuth callbacks now verify session and consume single-use state before writing.
 
 **[MEDIUM] Google review poll does not paginate** (`src/app/api/cron/poll-google-reviews/route.ts:116`): only the first page of reviews from the Google API is ingested. Reviews beyond the first page are never stored and never trigger reply drafts or alerts.
 
