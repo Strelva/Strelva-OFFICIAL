@@ -359,5 +359,7 @@ clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-0
 - **`database.types.ts` regenerated** from the now-current live schema (replaced the hand-maintained stubs). The regen surfaced `subscription_items.tenant_id` → added it to `deprovision.ts` `TENANT_SCOPED_TABLES`.
 - **Merged to `main` + deployed to production** (`vercel deploy --prod --scope strelva`). Deployment holds the `app.strelva.com` + `admin.strelva.com` aliases; both health-check 200, `next` 16.2.12 live, no runtime errors. Org-layer stays dormant (nothing reads the new tables yet).
 
+- **`noUncheckedIndexedAccess` enabled** (2026-07-30, batch 4): the flag is ON in `tsconfig.json`; all 637 indexed-access sites across 156 files fixed with real guards/defaults/narrowing (non-null assertions only where provably valid). typecheck 0 · 1983 tests · build · lint clean. Keep it green — new `arr[i]`/`record[key]` reads are `T | undefined`, so guard or default them.
+
 ### REMAINING
-- **`noUncheckedIndexedAccess`:** 637 sites — its own dedicated refactor. Everything else from the 2026-07-30 audit is shipped.
+- Nothing outstanding from the 2026-07-30 audit. (The `harden-indexed-access` branch merges to `main`; a prod deploy picks it up on the next `vercel deploy --prod --scope strelva` — no runtime behavior change, so deploy at your convenience.)
