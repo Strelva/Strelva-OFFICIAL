@@ -162,12 +162,12 @@ describe("generatePreviewDiffs", () => {
 
   it("maps known schema keys to human labels", () => {
     const [d] = generatePreviewDiffs({ ctaText: "old" }, { ctaText: "new" });
-    expect(d.field).toBe("Button text");
+    expect(d!.field).toBe("Button text");
   });
 
   it("summarizes array values as item counts", () => {
     const [d] = generatePreviewDiffs({ items: [1, 2, 3] }, { items: [1, 2] });
-    expect(d.before).toBe("[3 items]");
-    expect(d.after).toBe("[2 items]");
+    expect(d!.before).toBe("[3 items]");
+    expect(d!.after).toBe("[2 items]");
   });
 });

@@ -111,7 +111,7 @@ describe("site snapshots", () => {
       reason: "manual",
       status: "available",
     });
-    expect("data" in summaries[0]).toBe(false);
+    expect("data" in summaries[0]!).toBe(false);
   });
 
   it("restores a snapshot and saves a pre-restore backup", async () => {

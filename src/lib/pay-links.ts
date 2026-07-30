@@ -377,7 +377,7 @@ export async function listPayLinks(): Promise<PayLinkConfig[]> {
   const stale: string[] = [];
   records.forEach((record, i) => {
     if (record) links.push(record);
-    else stale.push(slugs[i]);
+    else stale.push(slugs[i]!);
   });
 
   if (stale.length > 0) {

@@ -84,7 +84,7 @@ describe("ontology contracts", () => {
     expect(PRESENCE_PROFILES).toEqual(["local", "online", "hybrid"]);
     expect(Object.keys(FEATURE_SETS).sort()).toEqual(["ecommerce", "wellness"]);
     expect(Object.keys(FEATURE_SETS)).not.toContain("growth");
-    expect(FEATURE_SETS.wellness.scope).toMatch(/operational-lite/i);
+    expect(FEATURE_SETS.wellness!.scope).toMatch(/operational-lite/i);
   });
 
   it("keeps live Analytics and interpreted Reports as distinct surfaces", () => {

@@ -152,7 +152,7 @@ function setNestedValue(
   const next: Record<string, unknown> = { ...obj };
   let cursor: Record<string, unknown> = next;
   for (let i = 0; i < parts.length - 1; i++) {
-    const k = parts[i];
+    const k = parts[i]!;
     const existing = cursor[k];
     const cloned: Record<string, unknown> =
       existing && typeof existing === "object" && !Array.isArray(existing)
@@ -161,7 +161,7 @@ function setNestedValue(
     cursor[k] = cloned;
     cursor = cloned;
   }
-  cursor[parts[parts.length - 1]] = value;
+  cursor[parts[parts.length - 1]!] = value;
   return next;
 }
 
@@ -1139,7 +1139,7 @@ const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string 
 };
 
 function DependencyStatusPill({ status }: { status: string }) {
-  const copy = DEPENDENCY_STATUS_COPY[status] || DEPENDENCY_STATUS_COPY.unknown;
+  const copy = DEPENDENCY_STATUS_COPY[status] ?? DEPENDENCY_STATUS_COPY["unknown"]!;
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${copy.className}`}>
       {copy.label}

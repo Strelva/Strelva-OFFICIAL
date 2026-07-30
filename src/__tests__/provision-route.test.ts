@@ -72,7 +72,7 @@ describe("POST /api/admin/provision", () => {
   it("lowercases the subdomain and provisions + audits on success", async () => {
     const res = await POST(req(valid));
     expect(res.status).toBe(200);
-    const arg = mockProvisionTenant.mock.calls[0][0];
+    const arg = mockProvisionTenant.mock.calls[0]![0];
     expect(arg.subdomain).toBe("acme-hvac");
     expect(arg.ownerEmail).toBe("jane@acme.com");
     expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);

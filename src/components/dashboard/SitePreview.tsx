@@ -127,7 +127,7 @@ export function SitePreview({
   onToggleEdit?: () => void;
 } = {}) {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(
-    BREAKPOINTS[2]
+    BREAKPOINTS[2]!
   );
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
   const [previewSource, setPreviewSource] = useState<PreviewSource>("editable");

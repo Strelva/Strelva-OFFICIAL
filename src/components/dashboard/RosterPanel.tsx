@@ -5,8 +5,10 @@ import { CalendarCheck, Check, Clock, Phone } from "lucide-react";
 import type { Booking } from "@/lib/types";
 
 function formatTime(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  if (Number.isNaN(h)) return hhmm;
+  const parts = hhmm.split(":").map(Number);
+  const h = parts[0];
+  const m = parts[1];
+  if (h === undefined || Number.isNaN(h)) return hhmm;
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;

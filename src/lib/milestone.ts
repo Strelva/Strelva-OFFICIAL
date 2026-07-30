@@ -254,13 +254,13 @@ function buildHealth(
   if (scanHistory.length === 0) return null;
 
   // getScanHistory returns oldest -> newest.
-  const latest = scanHistory[scanHistory.length - 1];
+  const latest = scanHistory[scanHistory.length - 1]!;
   const latestValue = `${latest.grade} · ${latest.overallScore}`;
 
   // Prefer the durable day-0 anchor as "then"; fall back to the earliest scan
   // still in the ring buffer. The anchor gives a true 90-day baseline where the
   // ring buffer (12 points / 30-day TTL) only ever reaches back ~12 days.
-  const then = baseline ?? scanHistory[0];
+  const then = baseline ?? scanHistory[0]!;
 
   // "Then" and "now" are the same measurement = no real earlier baseline yet.
   // Honest "tracking since", not a fabricated move.
@@ -299,7 +299,7 @@ function buildHealth(
 }
 
 function capitalize(text: string): string {
-  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
+  return text.length === 0 ? text : (text[0] ?? "").toUpperCase() + text.slice(1);
 }
 
 /**
@@ -333,7 +333,7 @@ function buildHeadline(metrics: MilestoneMetric[], periodLabel: string): string 
 
   const health = metrics.find((m) => m.key === "health");
   if (health && health.direction === "up" && clauses.length < 2) {
-    const grade = health.now.split("·")[0].trim();
+    const grade = (health.now.split("·")[0] ?? "").trim();
     clauses.push(`your site health rose to ${grade}`);
   }
 
@@ -341,7 +341,7 @@ function buildHeadline(metrics: MilestoneMetric[], periodLabel: string): string 
   if (picked.length === 0) {
     return `Here's what's changed since you started, ${periodLabel} in.`;
   }
-  const joined = picked.length === 2 ? `${picked[0]} and ${picked[1]}` : picked[0];
+  const joined = picked.length === 2 ? `${picked[0]!} and ${picked[1]!}` : picked[0]!;
   return `In your ${periodLabel}, ${capitalize(joined)}.`;
 }
 

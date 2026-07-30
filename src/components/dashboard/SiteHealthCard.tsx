@@ -57,8 +57,8 @@ type TrendPoint = { overallScore: number; scannedAt: string };
 function TrendBand({ history }: { history: TrendPoint[] }) {
   const ordered = [...history].reverse(); // oldest -> newest for the sparkline
   const scores = ordered.map((p) => p.overallScore);
-  const latest = scores[scores.length - 1];
-  const prev = scores[scores.length - 2];
+  const latest = scores[scores.length - 1] ?? 0;
+  const prev = scores[scores.length - 2] ?? 0;
   const delta = latest - prev;
   const max = Math.max(100, ...scores);
 

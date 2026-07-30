@@ -75,7 +75,7 @@ describe("provisionTenant", () => {
     expect(stepStatus(result.steps, "vercel_domain")).toBe("ok");
 
     // Generated a 64-char hex revalidation secret passed to createTenant.
-    const tenantArg = mockCreateTenant.mock.calls[0][0];
+    const tenantArg = mockCreateTenant.mock.calls[0]![0];
     expect(tenantArg.revalidationSecret).toMatch(/^[a-f0-9]{64}$/);
     expect(tenantArg.deliveryModel).toBe("custom_repo");
     expect(tenantArg.siteUrl).toBe("https://acmehvac.com");
@@ -166,7 +166,7 @@ describe("provisionTenant", () => {
 
   it("uses the subdomain URL when no production domain is given", async () => {
     await provisionTenant({ ...baseInput, productionDomain: undefined });
-    const tenantArg = mockCreateTenant.mock.calls[0][0];
+    const tenantArg = mockCreateTenant.mock.calls[0]![0];
     expect(tenantArg.siteUrl).toBe("https://acme.strelva.com");
   });
 });

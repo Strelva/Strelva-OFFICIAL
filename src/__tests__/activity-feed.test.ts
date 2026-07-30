@@ -153,7 +153,7 @@ describe("translateActivityEntry — Google Business posts (B5.5)", () => {
     ];
     const selected = selectStrelvaWork(entries);
     expect(selected).toHaveLength(1);
-    expect(selected[0].type).toBe("gbp-post");
+    expect(selected[0]!.type).toBe("gbp-post");
   });
 });
 
@@ -170,8 +170,8 @@ describe("buildActivityFeed — grouping & empty state", () => {
       { now: NOW }
     );
     expect(groups.map((g) => g.label)).toEqual(["Today", "This week", "Earlier"]);
-    expect(groups[0].items).toHaveLength(1);
-    expect(groups[0].items[0].label).toBe("Refreshed your homepage");
+    expect(groups[0]!.items).toHaveLength(1);
+    expect(groups[0]!.items[0]!.label).toBe("Refreshed your homepage");
   });
 
   it("drops empty groups", () => {
@@ -180,7 +180,7 @@ describe("buildActivityFeed — grouping & empty state", () => {
       { now: NOW }
     );
     expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe("Today");
+    expect(groups[0]!.label).toBe("Today");
   });
 
   it("returns an empty array (empty state) when nothing is owner-meaningful", () => {
@@ -211,8 +211,8 @@ describe("buildActivityFeed — grouping & empty state", () => {
       ],
       { now: NOW }
     );
-    expect(groups[0].items[0].label).toBe("Refreshed your homepage");
-    expect(groups[0].items[1].label).toBe("Updated your FAQ");
+    expect(groups[0]!.items[0]!.label).toBe("Refreshed your homepage");
+    expect(groups[0]!.items[1]!.label).toBe("Updated your FAQ");
   });
 });
 

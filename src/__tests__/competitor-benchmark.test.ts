@@ -63,7 +63,7 @@ describe("buildCompetitorBenchmark", () => {
     const r = result("massage buffalo", null, "Rival", null);
     r.tenantInLocalPack = true; // you're in the map pack, they're nowhere
     const b = buildCompetitorBenchmark(snap([r]));
-    expect(b!.rows[0].youLead).toBe(true);
+    expect(b!.rows[0]!.youLead).toBe(true);
   });
 
   it("returns null without competitor data", () => {
@@ -95,12 +95,12 @@ describe("buildCompetitorBenchmark", () => {
   it("reports null AI presence when the answer wasn't probed or has no data", () => {
     // No aiResults at all → null (no claim).
     const none = buildCompetitorBenchmark(snap([result("yoga buffalo", 2, "Zen Studio", 5)]));
-    expect(none!.rows[0].aiAnswerMentioned).toBeNull();
+    expect(none!.rows[0]!.aiAnswerMentioned).toBeNull();
 
     // Unprobed answer (no key / error) is ignored → still null.
     const unprobed = buildCompetitorBenchmark(
       snap([result("yoga buffalo", 2, "Zen Studio", 5)], [aiResult("yoga buffalo", false, false)]),
     );
-    expect(unprobed!.rows[0].aiAnswerMentioned).toBeNull();
+    expect(unprobed!.rows[0]!.aiAnswerMentioned).toBeNull();
   });
 });

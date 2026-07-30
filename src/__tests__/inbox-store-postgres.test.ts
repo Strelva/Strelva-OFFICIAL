@@ -133,10 +133,10 @@ describe("inbox-store Postgres dual-path", () => {
 
     const items = await getInboxItems("gldf");
 
-    expect(items[0].detail).toBeUndefined();
-    expect(items[0].section).toBeUndefined();
-    expect(items[0].actions).toBeUndefined();
-    expect(items[0].read).toBe(true);
+    expect(items[0]!.detail).toBeUndefined();
+    expect(items[0]!.section).toBeUndefined();
+    expect(items[0]!.actions).toBeUndefined();
+    expect(items[0]!.read).toBe(true);
   });
 
   it("addInboxItem writes camelCase fields to the inbox_items table as snake_case columns", async () => {

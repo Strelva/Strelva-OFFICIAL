@@ -469,7 +469,7 @@ interface Ambiguity {
 
 function checkAmbiguity($: AuditContext["$"], schemas: CollectedSchemas, visibleText: string): Ambiguity {
   const ogName = $('meta[property="og:site_name"]').attr("content")?.trim();
-  const titleName = $("title").text().split(/[|\-–—]/)[0].trim();
+  const titleName = ($("title").text().split(/[|\-–—]/)[0] ?? "").trim();
   const footerName = $('footer .logo, footer [class*="brand"]').first().text().trim();
   const schemaName = asString(schemas.all.find((s) => asString(s.raw.name))?.raw.name);
 

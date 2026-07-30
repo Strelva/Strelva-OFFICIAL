@@ -27,6 +27,6 @@ export const MARKETING_HOSTS = new Set([
 
 export function isMarketingHost(host: string): boolean {
   const normalizedHost = host.toLowerCase();
-  const hostWithoutPort = normalizedHost.split(":")[0];
+  const hostWithoutPort = normalizedHost.split(":")[0]!;
   return MARKETING_HOSTS.has(normalizedHost) || MARKETING_HOSTS.has(hostWithoutPort);
 }

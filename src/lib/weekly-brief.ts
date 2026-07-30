@@ -39,8 +39,8 @@ function getWeekBounds(date: Date = new Date()): { weekStart: string; weekEnd: s
   sunday.setUTCHours(23, 59, 59, 999);
 
   return {
-    weekStart: monday.toISOString().split("T")[0],
-    weekEnd: sunday.toISOString().split("T")[0],
+    weekStart: monday.toISOString().split("T")[0]!,
+    weekEnd: sunday.toISOString().split("T")[0]!,
   };
 }
 

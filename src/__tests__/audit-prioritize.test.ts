@@ -61,8 +61,9 @@ describe("prioritizeIssues", () => {
 
   it("ranks the high-priority failing check first", () => {
     const list = prioritizeIssues(audit());
-    expect(list.issues[0].check).toBe("Meta description");
-    expect(list.issues[0].priority).toBe("high");
+    // The fixture always produces at least one issue; ! is safe for the test assertion.
+    expect(list.issues[0]!.check).toBe("Meta description");
+    expect(list.issues[0]!.priority).toBe("high");
   });
 
   it("orders strictly by descending score", () => {
@@ -78,13 +79,15 @@ describe("prioritizeIssues", () => {
   });
 
   it("carries the impact narrative through", () => {
-    const top = prioritizeIssues(audit()).issues[0];
+    // issues[0] always exists given the fixture — ! is safe here.
+    const top = prioritizeIssues(audit()).issues[0]!;
     expect(top.impact).toContain("Search engines");
   });
 
   it("derives priority from status when a check omits it", () => {
     const a = audit();
-    a.categories[0].checks[1].priority = undefined;
+    // categories[0] and checks[1] are always present in the fixture.
+    a.categories[0]!.checks[1]!.priority = undefined;
     const top = prioritizeIssues(a).issues.find((i) => i.check === "Meta description")!;
     expect(top.priority).toBe("high"); // fail -> high
   });

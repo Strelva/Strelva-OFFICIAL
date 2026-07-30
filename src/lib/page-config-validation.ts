@@ -33,7 +33,7 @@ export async function parseAndValidatePageConfig(
           error: `${section.type} is not available for this site's capability manifest`,
         };
       }
-      const capability = manifest.sections[section.type];
+      const capability = manifest.sections[section.type]!;
       if (section.variant && !capability.variants.includes(section.variant)) {
         return {
           error: `${section.variant} is not an available variant for ${section.type}`,

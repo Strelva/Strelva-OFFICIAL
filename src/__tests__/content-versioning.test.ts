@@ -57,7 +57,7 @@ describe("content versioning — append / get / restore", () => {
     // History untouched — still exactly the one real version.
     const versions = await getVersions("hero", TEST_TENANT);
     expect(versions).toHaveLength(1);
-    expect(versions[0].data).toEqual({ headline: "only" });
+    expect(versions[0]!.data).toEqual({ headline: "only" });
   });
 
   it("appends N versions and returns them newest-first", async () => {
@@ -73,11 +73,11 @@ describe("content versioning — append / get / restore", () => {
       "v2",
       "v1",
     ]);
-    expect(versions[0].author).toBe("admin");
+    expect(versions[0]!.author).toBe("admin");
     // Only the head is "live"; earlier ones are marked rolled-back on the dev path.
-    expect(versions[0].status).toBe("live");
-    expect(versions[1].status).toBe("rolled-back");
-    expect(versions[2].status).toBe("rolled-back");
+    expect(versions[0]!.status).toBe("live");
+    expect(versions[1]!.status).toBe("rolled-back");
+    expect(versions[2]!.status).toBe("rolled-back");
   });
 
   it("records field-level changes on a version", async () => {
@@ -85,7 +85,7 @@ describe("content versioning — append / get / restore", () => {
     await appendVersion("hero", { headline: "New" }, "ai", TEST_TENANT, changes);
 
     const [head] = await getVersions("hero", TEST_TENANT);
-    expect(head.changes).toEqual(changes);
+    expect(head!.changes).toEqual(changes);
   });
 
   it("restores an older version: appends a new head equal to it AND preserves the prior head", async () => {
@@ -96,7 +96,7 @@ describe("content versioning — append / get / restore", () => {
 
     // Sanity: v2 is the current head before the restore.
     let versions = await getVersions("hero", TEST_TENANT);
-    expect((versions[0].data as { headline: string }).headline).toBe("v2-latest");
+    expect((versions[0]!.data as { headline: string }).headline).toBe("v2-latest");
 
     const restored = await restoreVersion("hero", v1.id, TEST_TENANT);
     expect(restored).not.toBeNull();
@@ -105,10 +105,10 @@ describe("content versioning — append / get / restore", () => {
     // A restore is an append, not a rewind: history grew to 3 entries.
     expect(versions).toHaveLength(3);
     // New head equals the restored target's data.
-    expect(versions[0].data).toEqual(v1Data);
-    expect(versions[0].id).toBe(restored!.id);
+    expect(versions[0]!.data).toEqual(v1Data);
+    expect(versions[0]!.id).toBe(restored!.id);
     // NO DATA LOSS: the pre-restore head (v2) is still present in history.
-    expect((versions[1].data as { headline: string }).headline).toBe("v2-latest");
+    expect((versions[1]!.data as { headline: string }).headline).toBe("v2-latest");
     // The original v1 entry is also still there (history is append-only).
     expect(versions.some((v) => v.id === v1.id)).toBe(true);
     // The live published content now reflects the restored version.
@@ -129,7 +129,7 @@ describe("content versioning — append / get / restore", () => {
     expect(restored).not.toBeNull();
     const versions = await getVersions("hero", TEST_TENANT);
     expect(versions).toHaveLength(2);
-    expect(versions[0].data).toEqual({ headline: "solo" });
+    expect(versions[0]!.data).toEqual({ headline: "solo" });
     expect(versions.some((v) => v.id === only.id)).toBe(true);
   });
 });

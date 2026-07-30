@@ -23,7 +23,7 @@ const TAG_PALETTE = [
 function tagColor(tag: string): string {
   let hash = 0;
   for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) | 0;
-  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length]!;
 }
 
 const ACTIVITY_KINDS: { value: CrmActivityKind; label: string; icon: string }[] = [

@@ -66,7 +66,7 @@ describe("draftReviewReplyForReview", () => {
     const res = await draftReviewReplyForReview("gldf", "r1");
     expect(res).toEqual({ ok: true, drafted: true });
     expect(mockAddEvent).toHaveBeenCalledTimes(1);
-    const event = mockAddEvent.mock.calls[0][0];
+    const event = mockAddEvent.mock.calls[0]![0];
     expect(event.status).toBe("pending");
     expect(event.type).toBe("review");
     expect(event.metadata.kind).toBe("review_reply_draft");

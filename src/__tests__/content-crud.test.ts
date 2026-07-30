@@ -169,8 +169,8 @@ describe("content CRUD — storage round-trips", () => {
 
     expect(read.headline).toBe("What We Do");
     expect(read.services).toHaveLength(1);
-    expect(read.services[0].name).toBe("Stretch");
-    expect(read.services[0].price).toBe("50");
+    expect(read.services[0]!.name).toBe("Stretch");
+    expect(read.services[0]!.price).toBe("50");
   });
 
   it("round-trips contact content", async () => {

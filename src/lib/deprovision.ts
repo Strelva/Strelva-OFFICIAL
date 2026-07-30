@@ -195,7 +195,7 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     pgTotal += n;
     if (n === 0) continue;
     if (executed) await deleteRows(table, tenantId);
-    summary.postgres.push({ target: table, found: n, deleted: executed });
+    summary.postgres!.push({ target: table, found: n, deleted: executed });
   }
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.
@@ -204,18 +204,18 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined),
   );
   if (executed && redis && tenantKeys.length) await redis.del(...tenantKeys);
-  for (const k of tenantKeys) summary.redis.push({ target: k, found: 1, deleted: executed });
+  for (const k of tenantKeys) summary.redis!.push({ target: k, found: 1, deleted: executed });
 
   // Domain claims live in one shared map — clear just this tenant's entries.
   if (tenant) {
     const claimed = await clearTenantDomainClaims(tenant, executed);
     for (const d of claimed) {
-      summary.redis.push({ target: `domain-claim ${d}`, found: 1, deleted: executed });
+      summary.redis!.push({ target: `domain-claim ${d}`, found: 1, deleted: executed });
     }
   }
   if (executed && redis) await redis.del(...GLOBAL_CACHE_KEYS);
   for (const k of GLOBAL_CACHE_KEYS) {
-    summary.redis.push({
+    summary.redis!.push({
       target: k,
       found: "cache",
       deleted: executed,
@@ -225,14 +225,14 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
 
   // Vercel: the {tenantId}-site project (env + domains go with it).
   if (keepVercel) {
-    summary.vercel.push({
+    summary.vercel!.push({
       target: `${tenantId}-site`,
       found: "?",
       deleted: false,
       detail: "skipped (keepVercel)",
     });
   } else if (!isVercelConfigured()) {
-    summary.vercel.push({
+    summary.vercel!.push({
       target: `${tenantId}-site`,
       found: "?",
       deleted: false,
@@ -240,14 +240,14 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     });
   } else if (executed) {
     const r = await deleteVercelProject(`${tenantId}-site`);
-    summary.vercel.push({
+    summary.vercel!.push({
       target: `${tenantId}-site`,
       found: "?",
       deleted: r.ok,
       detail: r.ok ? "deleted (or already absent)" : r.error,
     });
   } else {
-    summary.vercel.push({
+    summary.vercel!.push({
       target: `${tenantId}-site`,
       found: "?",
       deleted: false,

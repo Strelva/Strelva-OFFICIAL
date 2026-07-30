@@ -378,7 +378,7 @@ describe("OAuth-first token selection", () => {
     return fetchMock;
   }
   const authOf = (fetchMock: ReturnType<typeof vi.fn>) =>
-    (fetchMock.mock.calls[0][1] as { headers: Record<string, string> }).headers
+    (fetchMock.mock.calls[0]![1] as { headers: Record<string, string> }).headers
       .Authorization;
 
   it("GSC: uses the tenant OAuth token when the GSC scope was granted", async () => {

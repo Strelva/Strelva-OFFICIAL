@@ -77,12 +77,12 @@ describe("checkAccessibility", () => {
 
     // Core good-state checks should pass.
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
-    expect(byName["Document Language"].status).toBe("pass");
-    expect(byName["Page Title"].status).toBe("pass");
-    expect(byName["Image Alt Text"].status).toBe("pass");
-    expect(byName["Form Labels"].status).toBe("pass");
-    expect(byName["Heading Structure"].status).toBe("pass");
-    expect(byName["Landmark Regions"].status).toBe("pass");
+    expect(byName["Document Language"]!.status).toBe("pass");
+    expect(byName["Page Title"]!.status).toBe("pass");
+    expect(byName["Image Alt Text"]!.status).toBe("pass");
+    expect(byName["Form Labels"]!.status).toBe("pass");
+    expect(byName["Heading Structure"]!.status).toBe("pass");
+    expect(byName["Landmark Regions"]!.status).toBe("pass");
   });
 
   it("scores a broken page low and applies the critical cap", () => {
@@ -96,24 +96,24 @@ describe("checkAccessibility", () => {
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
 
     // Missing lang attribute -> critical fail.
-    expect(byName["Document Language"].status).toBe("fail");
-    expect(byName["Document Language"].score).toBe(0);
+    expect(byName["Document Language"]!.status).toBe("fail");
+    expect(byName["Document Language"]!.score).toBe(0);
 
     // Two images with no alt -> fail with details.
-    expect(byName["Image Alt Text"].status).toBe("fail");
-    expect(byName["Image Alt Text"].details).toBeTruthy();
+    expect(byName["Image Alt Text"]!.status).toBe("fail");
+    expect(byName["Image Alt Text"]!.details).toBeTruthy();
 
     // "click here" / "read here" -> generic link warning.
-    expect(byName["Link Text"].status).toBe("warn");
+    expect(byName["Link Text"]!.status).toBe("warn");
 
     // h1 -> h4 skip -> heading structure warning.
-    expect(byName["Heading Structure"].status).toBe("warn");
+    expect(byName["Heading Structure"]!.status).toBe("warn");
 
     // Unlabeled input -> critical fail.
-    expect(byName["Form Labels"].status).toBe("fail");
+    expect(byName["Form Labels"]!.status).toBe("fail");
 
     // Empty button -> critical fail.
-    expect(byName["Button and Control Names"].status).toBe("fail");
+    expect(byName["Button and Control Names"]!.status).toBe("fail");
 
     // At least one critical (score-0) check must be present to drive the cap.
     expect(result.checks.some((c) => c.status === "fail" && c.score === 0)).toBe(

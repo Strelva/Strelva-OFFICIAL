@@ -45,7 +45,7 @@ vi.mock("ai", () => ({
   streamText: (opts: { tools: AgentTools }) => {
     return {
       fullStream: (async function* () {
-        const execute = opts.tools.request_custom_change.execute;
+        const execute = opts.tools.request_custom_change!.execute;
         const output = await execute({ feature: "rewards", summary: "Add a punch-card rewards widget" });
         yield { type: "tool-call", toolName: "request_custom_change", input: { feature: "rewards" } };
         yield { type: "tool-result", output };

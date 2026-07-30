@@ -44,7 +44,7 @@ export default async function AccountPage() {
   }
 
   if (tenants.length === 1) {
-    const tenantId = tenants[0];
+    const tenantId = tenants[0]!;
     const config = await getTenantConfig(tenantId);
 
     if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));

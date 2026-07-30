@@ -19,8 +19,9 @@ export const DEFAULT_BOOKING_CONFIG: BookingConfig = {
 };
 
 function timeToMinutes(time: string): number {
+  // time is always a valid "HH:MM" string from schedule/override config.
   const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
+  return h! * 60 + m!;
 }
 
 function minutesToTime(minutes: number): string {
@@ -51,14 +52,17 @@ function zonedNowAsUtcTimestamp(timezone: string): number {
       .map((part) => [part.type, Number(part.value)])
   );
 
-  const hour = values.hour === 24 ? 0 : values.hour;
+  // Intl.DateTimeFormat.formatToParts always returns the requested part types;
+  // the entries are always present. Use ! to satisfy noUncheckedIndexedAccess.
+  const rawHour = values["hour"]!;
+  const hour = rawHour === 24 ? 0 : rawHour;
   return Date.UTC(
-    values.year,
-    values.month - 1,
-    values.day,
+    values["year"]!,
+    values["month"]! - 1,
+    values["day"]!,
     hour,
-    values.minute,
-    values.second
+    values["minute"]!,
+    values["second"]!
   );
 }
 
@@ -74,9 +78,10 @@ export function zonedTodayIso(timezone: string, now: Date = new Date()): string 
 }
 
 function localSlotAsUtcTimestamp(date: string, time: string): number {
+  // date is always "YYYY-MM-DD" and time is always "HH:MM" — splits are safe.
   const [year, month, day] = date.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
-  return Date.UTC(year, month - 1, day, hour, minute, 0);
+  return Date.UTC(year!, month! - 1, day!, hour!, minute!, 0);
 }
 
 export function generateSlots(

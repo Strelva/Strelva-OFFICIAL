@@ -35,7 +35,7 @@ export async function mapPool<T, R>(
       const i = next++;
       if (i >= items.length) return;
       try {
-        results[i] = await fn(items[i], i);
+        results[i] = await fn(items[i]!, i);
       } catch (err) {
         // Capture the first error but keep draining so in-flight work finishes
         // and we don't leave unhandled rejections behind.

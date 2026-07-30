@@ -154,8 +154,8 @@ describe("buildAttentionFromSnapshot", () => {
     // high: webhook + revalidation = 2; medium: failedAiWrites + domainDrift = 2
     expect(b.counts.high).toBe(2);
     expect(b.counts.medium).toBe(2);
-    expect(b.items[0].severity).toBe("high");
-    expect(b.items[b.items.length - 1].severity).toBe("medium");
+    expect(b.items[0]!.severity).toBe("high");
+    expect(b.items[b.items.length - 1]!.severity).toBe("medium");
   });
 
   it("flags a tenant with no recent activity as low (stale)", () => {

@@ -51,8 +51,8 @@ describe("site capability manifest", () => {
     const manifest = await getSiteCapabilityManifest("demo");
 
     expect(manifest.designTokens).toEqual(["colors", "fonts"]);
-    expect(manifest.sections.hero.variants).toContain("editorial");
-    expect(manifest.sections.services.variants).toContain("compact");
+    expect(manifest.sections.hero!.variants).toContain("editorial");
+    expect(manifest.sections.services!.variants).toContain("compact");
     expect(manifest.supportsDraftPreview).toBe(true);
   });
 
@@ -85,7 +85,7 @@ describe("site capability manifest", () => {
 
     const manifest = await getSiteCapabilityManifest("demo");
 
-    expect(manifest.sections.hero.variants).toEqual(["default", "cinematic"]);
+    expect(manifest.sections.hero!.variants).toEqual(["default", "cinematic"]);
     expect(manifest.sections.services).toBeUndefined();
     expect(manifest.supportsInlineEditing).toBe(false);
     expect(manifest.customOnlyFeatures).toEqual(["cart"]);

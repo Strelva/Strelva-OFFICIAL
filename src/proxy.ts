@@ -97,7 +97,7 @@ export function isCronRoute(req: NextRequest): boolean {
 }
 
 export function shouldResolveCustomDomain(host: string): boolean {
-  const hostWithoutPort = host.toLowerCase().split(":")[0];
+  const hostWithoutPort = host.toLowerCase().split(":")[0]!;
   return (
     !isMarketingHost(host) &&
     !hostWithoutPort.endsWith(".localhost") &&
@@ -148,7 +148,7 @@ const ADMIN_HOST_ROOT_SUFFIXES = [".strelva.com", ".localhost"] as const;
 // admin dashboard (subdomain "admin.<tenant>"), handled by the isAdminSubdomain
 // flow in extractTenantFromHost and left untouched here.
 export function isBareAdminHost(host: string): boolean {
-  const hostWithoutPort = host.toLowerCase().split(":")[0];
+  const hostWithoutPort = host.toLowerCase().split(":")[0]!;
   for (const suffix of ADMIN_HOST_ROOT_SUFFIXES) {
     if (hostWithoutPort.endsWith(suffix)) {
       return hostWithoutPort.slice(0, -suffix.length) === "admin";
@@ -175,8 +175,8 @@ export function bareAdminConsoleRewritePath(pathname: string): string {
 }
 
 export function getLegacyPublicSiteRedirect(host: string): string | null {
-  const normalizedHost = host.toLowerCase().split(":")[0];
-  return LEGACY_PUBLIC_SITE_REDIRECTS[normalizedHost] || null;
+  const normalizedHost = host.toLowerCase().split(":")[0]!;
+  return LEGACY_PUBLIC_SITE_REDIRECTS[normalizedHost] ?? null;
 }
 
 export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: string): boolean {
@@ -217,8 +217,8 @@ export function extractTenantFromClientPath(pathname: string): {
     return { tenant: null, targetPath: pathname, shouldRedirectToDashboard: false };
   }
 
-  const tenant = match[1];
-  const rest = match[2] || "";
+  const tenant = match[1]!;
+  const rest = match[2] ?? "";
   if (!rest || rest === "/") {
     return { tenant, targetPath: "/dashboard", shouldRedirectToDashboard: true };
   }
@@ -278,7 +278,7 @@ export function buildContentSecurityPolicy(params: {
     ].join("; ");
   }
 
-  const host = params.host.split(":")[0].toLowerCase();
+  const host = params.host.split(":")[0]!.toLowerCase();
   const frameAncestors = params.isPreview
     ? getPreviewFrameAncestors(host, params.protocol).join(" ")
     : "'none'";
@@ -466,7 +466,7 @@ export default async function proxy(req: NextRequest) {
   if (ownershipSettingsRedirectPath) {
     const url = req.nextUrl.clone();
     const [nextPathname, hash] = ownershipSettingsRedirectPath.split("#");
-    url.pathname = nextPathname;
+    url.pathname = nextPathname!;
     url.hash = hash || "";
     return applySecurityHeaders(NextResponse.redirect(url), req);
   }
@@ -496,7 +496,7 @@ export default async function proxy(req: NextRequest) {
   }
 
   // Rewrite marketing host root to /home to avoid route conflict with tenant pages
-  const hostWithoutPort = host.split(":")[0];
+  const hostWithoutPort = host.split(":")[0]!;
   if (!devPreviewRequest && shouldRewriteMarketingRoot(host, pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/home";

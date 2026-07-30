@@ -92,7 +92,7 @@ function cityFromUrl(url: string): string {
   const parts = url.split("/");
   const idx = parts.indexOf("ny");
   if (idx !== -1 && parts[idx + 1]) {
-    return parts[idx + 1]
+    return parts[idx + 1]!
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
@@ -241,9 +241,9 @@ async function scrapeCategory(
         return {
           name: name.trim(),
           href,
-          year: yearMatch ? parseInt(yearMatch[1], 10) : null,
-          rating: ratingMatch ? parseFloat(ratingMatch[1]) : null,
-          reviewCount: reviewMatch ? parseInt(reviewMatch[1], 10) : null,
+          year: yearMatch ? parseInt(yearMatch[1]!, 10) : null,
+          rating: ratingMatch ? parseFloat(ratingMatch[1]!) : null,
+          reviewCount: reviewMatch ? parseInt(reviewMatch[1]!, 10) : null,
         };
       })
     );

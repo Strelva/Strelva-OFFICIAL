@@ -108,12 +108,14 @@ describe("addTenantNote", () => {
     const crm = await addTenantNote("acme", "  second note  ", "jacob@strelva.com");
 
     expect(crm.notes).toHaveLength(2);
-    expect(crm.notes[0].text).toBe("second note"); // newest first
-    expect(crm.notes[1].text).toBe("first note");
-    expect(crm.notes[0].id).toBeTruthy();
-    expect(crm.notes[0].author).toBe("jacob@strelva.com");
-    expect(() => new Date(crm.notes[0].createdAt).toISOString()).not.toThrow();
-    expect(crm.notes[0].id).not.toBe(crm.notes[1].id);
+    const note0 = crm.notes[0]!;
+    const note1 = crm.notes[1]!;
+    expect(note0.text).toBe("second note"); // newest first
+    expect(note1.text).toBe("first note");
+    expect(note0.id).toBeTruthy();
+    expect(note0.author).toBe("jacob@strelva.com");
+    expect(() => new Date(note0.createdAt).toISOString()).not.toThrow();
+    expect(note0.id).not.toBe(note1.id);
   });
 });
 
@@ -128,16 +130,18 @@ describe("addTenantContact / removeTenantContact", () => {
     let crm = await addTenantContact("acme", { name: "Sam Ops" });
 
     expect(crm.contacts).toHaveLength(2);
-    expect(crm.contacts[0].name).toBe("Dana Owner"); // trimmed
-    expect(crm.contacts[0].email).toBe("dana@acme.com");
-    expect(crm.contacts[0].id).toBeTruthy();
-    expect(crm.contacts[1].id).not.toBe(crm.contacts[0].id);
+    const contact0 = crm.contacts[0]!;
+    const contact1 = crm.contacts[1]!;
+    expect(contact0.name).toBe("Dana Owner"); // trimmed
+    expect(contact0.email).toBe("dana@acme.com");
+    expect(contact0.id).toBeTruthy();
+    expect(contact1.id).not.toBe(contact0.id);
     // optional fields absent when not provided
-    expect(crm.contacts[1].email).toBeUndefined();
+    expect(contact1.email).toBeUndefined();
 
-    crm = await removeTenantContact("acme", crm.contacts[0].id);
+    crm = await removeTenantContact("acme", contact0.id);
     expect(crm.contacts).toHaveLength(1);
-    expect(crm.contacts[0].name).toBe("Sam Ops");
+    expect(crm.contacts[0]!.name).toBe("Sam Ops");
   });
 
   it("caps contacts at 20", async () => {
@@ -165,11 +169,13 @@ describe("addTenantActivity", () => {
     });
 
     expect(crm.activity).toHaveLength(2);
-    expect(crm.activity[0].kind).toBe("email"); // newest first
-    expect(crm.activity[0].summary).toBe("Sent proposal"); // trimmed
-    expect(crm.activity[1].summary).toBe("Kickoff call");
-    expect(crm.activity[0].author).toBe("jacob@strelva.com");
-    expect(() => new Date(crm.activity[0].at).toISOString()).not.toThrow();
+    const act0 = crm.activity[0]!;
+    const act1 = crm.activity[1]!;
+    expect(act0.kind).toBe("email"); // newest first
+    expect(act0.summary).toBe("Sent proposal"); // trimmed
+    expect(act1.summary).toBe("Kickoff call");
+    expect(act0.author).toBe("jacob@strelva.com");
+    expect(() => new Date(act0.at).toISOString()).not.toThrow();
   });
 
   it("caps activity at 200", async () => {
@@ -183,7 +189,7 @@ describe("addTenantActivity", () => {
       });
     }
     expect(crm.activity).toHaveLength(200);
-    expect(crm.activity[0].summary).toBe("touch 204"); // newest kept
+    expect(crm.activity[0]!.summary).toBe("touch 204"); // newest kept
   });
 });
 
@@ -236,7 +242,7 @@ describe("concurrent mutators", () => {
     const crm = await getTenantCrm("acme");
     expect(crm.tags).toEqual(["vip"]);
     expect(crm.activity).toHaveLength(1);
-    expect(crm.activity[0].summary).toBe("Auto-logged email send");
+    expect(crm.activity[0]!.summary).toBe("Auto-logged email send");
   });
 
   it("still writes when Redis is unconfigured (no lock, runs directly)", async () => {
@@ -254,7 +260,7 @@ describe("getAllTenantCrm", () => {
     await setTenantStage("live-co", "live");
 
     const all = await getAllTenantCrm(["live-co", "empty-co"]);
-    expect(all["live-co"].stage).toBe("live");
+    expect(all["live-co"]!.stage).toBe("live");
     expect(all["empty-co"]).toEqual({
       tenantId: "empty-co",
       tags: [],
@@ -270,6 +276,6 @@ describe("getAllTenantCrm", () => {
     mockGetRedis.mockReturnValue(null);
     const all = await getAllTenantCrm(["a", "b"]);
     expect(Object.keys(all)).toEqual(["a", "b"]);
-    expect(all.a.updatedAt).toBeNull();
+    expect(all.a!.updatedAt).toBeNull();
   });
 });

@@ -124,7 +124,7 @@ function aiCrawlersBlocked(robots: string): { blocked: boolean; who: string[] } 
   let sawRule = false; // seen a directive since the last User-agent line?
 
   for (const raw of robots.split(/\r?\n/)) {
-    const line = raw.split("#")[0].trim();
+    const line = raw.split("#")[0]!.trim();
     const idx = line.indexOf(":");
     if (idx === -1) continue;
     const key = line.slice(0, idx).trim().toLowerCase();
@@ -365,7 +365,7 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
   }
 
   const failing = signals.filter((s) => !s.pass).sort((a, b) => b.weight - a.weight);
-  const topFix = failing.length ? failing[0].detail : "Maintain structured data and AI-crawler access.";
+  const topFix = failing.length ? failing[0]!.detail : "Maintain structured data and AI-crawler access.";
 
   return { business: input.business, url, score, grade, verdict, signals, citation, topFix };
 }

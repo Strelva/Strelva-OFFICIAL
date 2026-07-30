@@ -133,7 +133,7 @@ export async function scanTenant(tenantId: string): Promise<ScanResult> {
     // 90-day baseline to a possibly-degraded current scan; a healthy later run
     // seeds it from the true earliest point.
     if (history.length > 0) {
-      await saveScanBaseline(tenantId, history[0]);
+      await saveScanBaseline(tenantId, history[0]!);
     }
   }
 
@@ -180,7 +180,7 @@ export async function scanAllTenants(
   let next = 0;
   async function worker() {
     while (next < tenants.length) {
-      const t = tenants[next++];
+      const t = tenants[next++]!;
       try {
         const r = await scanTenant(t.id);
         scanned.push({ tenant: t.id, grade: r.grade, score: r.overallScore });

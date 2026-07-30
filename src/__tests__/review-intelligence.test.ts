@@ -121,8 +121,8 @@ describe("getAdminReviewIntelligence (full picture, admin-only)", () => {
 
   it("builds a needs-response queue, urgent first", () => {
     const a = getAdminReviewIntelligence(reviews, 30, NOW);
-    expect(a.needsResponse[0].reviewId).toBe("d"); // high urgency
-    expect(a.needsResponse[0].urgency).toBe("high");
+    expect(a.needsResponse[0]!.reviewId).toBe("d"); // high urgency
+    expect(a.needsResponse[0]!.urgency).toBe("high");
   });
 
   it("excludes already-replied reviews from the queue", () => {

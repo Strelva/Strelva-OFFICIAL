@@ -24,7 +24,7 @@ describe("starter capability manifest ↔ control-plane schema", () => {
     // A representative spread of the ContentMap sections content-defaults ships.
     for (const section of ["hero", "services", "story", "contact", "products", "faq"]) {
       expect(manifest.sections[section]).toBeDefined();
-      expect(manifest.sections[section].allowedActions).toContain("draft");
+      expect(manifest.sections[section]!.allowedActions).toContain("draft");
     }
   });
 
@@ -36,8 +36,8 @@ describe("starter capability manifest ↔ control-plane schema", () => {
     const restricted = buildSiteCapabilityManifest(["hero", "theme"], {
       sectionOverrides: { theme: { allowedActions: ["read"] } },
     });
-    expect(restricted.sections.theme.allowedActions).toEqual(["read"]);
-    expect(restricted.sections.hero.allowedActions).toContain("draft");
+    expect(restricted.sections.theme!.allowedActions).toEqual(["read"]);
+    expect(restricted.sections.hero!.allowedActions).toContain("draft");
     expect(siteCapabilityManifestSchema.safeParse(restricted).success).toBe(true);
   });
 });

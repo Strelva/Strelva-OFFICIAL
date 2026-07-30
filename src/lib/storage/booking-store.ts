@@ -215,7 +215,9 @@ export async function getBookings(
 const SLOT_GRID_MINUTES = 5;
 
 function slotTimeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
+  const parts = time.split(":").map(Number);
+  const h = parts[0] ?? 0;
+  const m = parts[1] ?? 0;
   return h * 60 + m;
 }
 
@@ -447,10 +449,12 @@ export async function updateBooking(
   const bookings = (store[`__bookings_${tenant}`] as Booking[]) ?? [];
   const idx = bookings.findIndex((b) => b.id === id);
   if (idx === -1) return null;
-  bookings[idx] = { ...bookings[idx], ...updates };
+  const existing = bookings[idx]!;
+  const updated: Booking = { ...existing, ...updates };
+  bookings[idx] = updated;
   store[`__bookings_${tenant}`] = bookings;
   await writeDevContent(store, tenant);
-  return bookings[idx];
+  return updated;
 }
 
 export async function getAvailableSlots(

@@ -67,5 +67,5 @@ export async function getTemplateForTenant(tenant: string): Promise<TemplateDefi
   const config = await getTenantConfig(tenant);
   const templateId = config?.template ?? "wellness";
   const registry = getTemplateRegistry();
-  return registry[templateId] ?? registry["wellness"];
+  return registry[templateId] ?? registry["wellness"]!;
 }

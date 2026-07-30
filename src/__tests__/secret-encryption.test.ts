@@ -121,7 +121,7 @@ describe("tampered ciphertext rejection", () => {
       // is at the END of a GCM auth tag's base64, so the first char is always
       // a real encoded byte — unlike the last char which may be '=' padding that
       // Node.js ignores on decode, leaving the tag bytes identical).
-      const tag = parts[1];
+      const tag = parts[1]!;
       parts[1] = (tag.startsWith("A") ? "B" : "A") + tag.slice(1);
       const tampered = PREFIX + parts.join(":");
       expect(() => decryptSecret(tampered)).toThrow();
@@ -132,7 +132,7 @@ describe("tampered ciphertext rejection", () => {
       const cipher = encryptSecret(plain);
       const body = cipher.slice(PREFIX.length);
       const parts = body.split(":");
-      const ct = parts[2];
+      const ct = parts[2]!;
       parts[2] = ct.slice(0, -1) + (ct.endsWith("A") ? "B" : "A");
       const tampered = PREFIX + parts.join(":");
       expect(() => decryptSecret(tampered)).toThrow();

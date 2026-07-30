@@ -39,7 +39,7 @@ describe("cron heartbeat", () => {
     mockRedis.set.mockResolvedValue("OK");
     await recordHeartbeat("weekly-report", { ok: true, processed: 3 });
     expect(mockRedis.set).toHaveBeenCalledTimes(1);
-    const [key, payload, opts] = mockRedis.set.mock.calls[0];
+    const [key, payload, opts] = mockRedis.set.mock.calls[0]!;
     expect(key).toBe("reb:heartbeat:weekly-report");
     expect(payload).toMatchObject({ cron: "weekly-report", ok: true, processed: 3 });
     expect(opts).toMatchObject({ ex: expect.any(Number) });
@@ -93,7 +93,7 @@ describe("mail-send log", () => {
     mockRedis.zremrangebyrank.mockResolvedValue(0);
     await recordMailSend("gldf", "weekly_report", { ok: true, messageId: "abc", to: "x@y.com" });
     expect(mockRedis.zadd).toHaveBeenCalledTimes(1);
-    const [key, entry] = mockRedis.zadd.mock.calls[0];
+    const [key, entry] = mockRedis.zadd.mock.calls[0]!;
     expect(key).toBe("reb:maillog:gldf");
     const record = JSON.parse(entry.member);
     expect(record).toMatchObject({ tenant: "gldf", kind: "weekly_report", ok: true, messageId: "abc" });
@@ -113,7 +113,7 @@ describe("mail-send log", () => {
     ]);
     const records = await getMailLog("gldf");
     expect(records).toHaveLength(2);
-    expect(records[0].ts).toBe(2);
+    expect(records[0]!.ts).toBe(2);
     expect(mockRedis.zrange).toHaveBeenCalledWith("reb:maillog:gldf", 0, 49, { rev: true });
   });
 

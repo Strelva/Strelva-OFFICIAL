@@ -14,7 +14,7 @@ const baseStats: WeeklyBriefStats = {
 
 describe("metricVerdicts", () => {
   it("flags zero visitors as needing attention", () => {
-    const [visitors] = metricVerdicts(baseStats);
+    const visitors = metricVerdicts(baseStats)[0]!;
     expect(visitors.key).toBe("visitors");
     expect(visitors.tone).toBe("attention");
     expect(visitors.verdict.toLowerCase()).toContain("found");
@@ -72,9 +72,9 @@ describe("buildProofCards", () => {
     const metrics = days((d) => (d <= 15 ? 10 : 20)); // doubles after the change
     const cards = buildProofCards(change, metrics);
     expect(cards).toHaveLength(1);
-    expect(cards[0].deltaPct).toBe(100);
-    expect(cards[0].headline).toContain("+100%");
-    expect(cards[0].headline.toLowerCase()).toContain("homepage hero");
+    expect(cards[0]!.deltaPct).toBe(100);
+    expect(cards[0]!.headline).toContain("+100%");
+    expect(cards[0]!.headline.toLowerCase()).toContain("homepage hero");
   });
 
   it("returns nothing when traffic is flat", () => {

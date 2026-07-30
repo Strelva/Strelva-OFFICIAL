@@ -52,7 +52,7 @@ export function TestimonialQuote({ testimonials }: { testimonials: TestimonialsC
 
   if (testimonials.testimonials.length === 0) return null;
 
-  const first = testimonials.testimonials[0];
+  const first = testimonials.testimonials[0]!;
 
   return (
     <section ref={sectionRef} className="py-14 md:py-20" style={{ background: "var(--cream)" }}>

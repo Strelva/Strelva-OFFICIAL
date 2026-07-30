@@ -37,8 +37,9 @@ for (const path of [".env.local", ".env"]) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
     const [key, ...rest] = trimmed.split("=");
-    if (process.env[key]) continue;
-    process.env[key] = rest.join("=").replace(/^['"]|['"]$/g, "");
+    // trimmed.includes("=") is asserted above, so key is always a non-empty string.
+    if (process.env[key!]) continue;
+    process.env[key!] = rest.join("=").replace(/^['"]|['"]$/g, "");
   }
 }
 
@@ -66,13 +67,15 @@ function rampDaily(thisWeekTotal: number, priorWeeksTotal: number): {
   const weekShape = [0.10, 0.18, 0.16, 0.15, 0.17, 0.14, 0.10]; // today..6d ago
   let allocated = 0;
   for (let i = 0; i < 7; i++) {
-    const n = Math.max(1, Math.round(thisWeekTotal * weekShape[i]));
+    // weekShape has exactly 7 elements; i is always within bounds.
+    const n = Math.max(1, Math.round(thisWeekTotal * weekShape[i]!));
     daily[dayKey(i)] = n;
     allocated += n;
   }
   // Correct rounding drift onto today so the week sums exactly.
-  daily[dayKey(0)] += thisWeekTotal - allocated;
-  if (daily[dayKey(0)] < 0) daily[dayKey(0)] = 0;
+  // dayKey(0) was set in the loop above (i=0), so it is always present here.
+  daily[dayKey(0)] = (daily[dayKey(0)] ?? 0) + (thisWeekTotal - allocated);
+  if ((daily[dayKey(0)] ?? 0) < 0) daily[dayKey(0)] = 0;
 
   // Spread prior volume across days 7..20.
   let priorLeft = priorWeeksTotal;

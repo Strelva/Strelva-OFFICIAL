@@ -37,7 +37,7 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
     });
 
     expect(ok).toBe(true);
-    const sent = mockSendEmail.mock.calls[0][0];
+    const sent = mockSendEmail.mock.calls[0]![0];
     expect(sent.subject).toBe("Your update to Rohlax Wellness is live");
     expect(sent.html).toContain("Your update is live.");
     expect(sent.html).toContain("live for visitors right now");
@@ -57,7 +57,7 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
     });
 
     expect(ok).toBe(true);
-    const sent = mockSendEmail.mock.calls[0][0];
+    const sent = mockSendEmail.mock.calls[0]![0];
     expect(sent.subject).toBe("Your update to Rohlax Wellness is rolling out");
     expect(sent.html).toContain("Your update is approved.");
     expect(sent.html).toContain("It can take a few minutes to appear");

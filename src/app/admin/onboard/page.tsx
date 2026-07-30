@@ -91,10 +91,10 @@ function parseItem(raw: string): ParsedItem | null {
   const m = ITEM_RE.exec(raw);
   if (!m) return null;
   return {
-    phase: m[1] as ParsedItem["phase"],
-    key: m[2],
-    title: m[3],
-    detail: m[4],
+    phase: m[1]! as ParsedItem["phase"],
+    key: m[2]!,
+    title: m[3]!,
+    detail: m[4]!,
     raw,
   };
 }

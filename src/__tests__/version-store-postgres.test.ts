@@ -102,7 +102,7 @@ describe("version-store Postgres dual-path", () => {
     expect(supa.lastTable).toBe("content_versions");
     expect(versions).toHaveLength(1);
 
-    const v = versions[0];
+    const v = versions[0]!;
     expect(v.id).toBe("v_1718800000000_abc123");
     expect(v.section).toBe("hero");
     expect(v.data).toEqual({ title: "Welcome", subtitle: "We fix things" });
@@ -136,9 +136,9 @@ describe("version-store Postgres dual-path", () => {
 
     const [v] = await getVersions("hero", "rohlax");
 
-    expect(v.changes).toBeUndefined();
-    expect(v.status).toBe("rolled-back");
-    expect(v.author).toBe("user");
+    expect(v!.changes).toBeUndefined();
+    expect(v!.status).toBe("rolled-back");
+    expect(v!.author).toBe("user");
   });
 
   it("getVersions surfaces an authoritative Postgres failure", async () => {

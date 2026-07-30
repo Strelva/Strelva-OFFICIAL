@@ -72,7 +72,7 @@ describe("reviews Postgres dual-path", () => {
       text: "Great",
       date: "2026-06-20T00:00:00.000Z",
     });
-    expect(r.reply).toBeUndefined();
+    expect(r!.reply).toBeUndefined();
   });
 
   it("addReview inserts snake_case columns and returns the DB-assigned id", async () => {

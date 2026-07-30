@@ -302,8 +302,9 @@ export function OperatorConsole() {
     setMessages((prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i--) {
-        if (next[i].role === "assistant") {
-          next[i] = { ...next[i], cards: [...(next[i].cards ?? []), card] };
+        const msg = next[i];
+        if (msg?.role === "assistant") {
+          next[i] = { ...msg, cards: [...(msg.cards ?? []), card] };
           break;
         }
       }

@@ -50,7 +50,7 @@ describe("events id-based zset members", () => {
     zmembers = [];
     const created = await addEvent({ tenantId: "t1", source: "ai", type: "review", title: "hi", body: "", status: "pending" });
     expect(mockRedis.zadd).toHaveBeenCalledOnce();
-    const entry = mockRedis.zadd.mock.calls[0][1] as { member: string; score: number };
+    const entry = mockRedis.zadd.mock.calls[0]![1] as { member: string; score: number };
     expect(entry.member).toBe(created.id);
     expect(entry.member.startsWith("evt_")).toBe(true);
 
@@ -58,7 +58,7 @@ describe("events id-based zset members", () => {
     // TTL (90 days). Cutoff = this add's score minus the 90-day window in ms.
     const TTL_MS = 90 * 24 * 60 * 60 * 1000;
     expect(mockRedis.zremrangebyscore).toHaveBeenCalledOnce();
-    const [, min, max] = mockRedis.zremrangebyscore.mock.calls[0];
+    const [, min, max] = mockRedis.zremrangebyscore.mock.calls[0]!;
     expect(min).toBe(0);
     expect(max).toBe(entry.score - TTL_MS);
   });
@@ -68,7 +68,7 @@ describe("events id-based zset members", () => {
     zmembers = ["evt_1"];
     const events = await getEvents("t1", { status: "pending" });
     expect(events.map((e) => e.id)).toEqual(["evt_1"]);
-    expect(events[0].title).toBe("a");
+    expect(events[0]!.title).toBe("a");
   });
 
   it("prefers the fresh event:{id} status over a stale legacy JSON member", async () => {
@@ -88,6 +88,6 @@ describe("events id-based zset members", () => {
     zmembers = [JSON.stringify(legacy)];
     const events = await getEvents("t1", { status: "pending" });
     expect(events.map((e) => e.id)).toEqual(["evt_3"]);
-    expect(events[0].title).toBe("legacy-only");
+    expect(events[0]!.title).toBe("legacy-only");
   });
 });

@@ -28,7 +28,7 @@ vi.mock("ai", () => ({
         { day: "SATURDAY", open: "10:00", close: "14:00" },
       ],
     };
-    const output = await opts.tools.update_business_hours.execute(input);
+    const output = await opts.tools.update_business_hours!.execute(input);
     return {
       text: "done",
       finishReason: "stop",
@@ -177,7 +177,7 @@ describe("agent-executor update_business_hours", () => {
     expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
 
     expect(trace.agentResult.status).toBe("queued");
-    const output = trace.toolCalls[0].output as { agentResultStatus: string; message: string };
+    const output = trace.toolCalls[0]!.output as { agentResultStatus: string; message: string };
     expect(output.agentResultStatus).toBe("queued");
     expect(output.message).toContain("once approved");
 

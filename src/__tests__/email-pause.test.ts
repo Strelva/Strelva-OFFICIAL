@@ -117,7 +117,7 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
     });
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(sendMock.mock.calls[0][0].to).toEqual(["jacob@strelva.com"]);
+    expect(sendMock.mock.calls[0]![0].to).toEqual(["jacob@strelva.com"]);
   });
 
   it("sendNewIntakeLeadEmail is silenced ONLY by OPERATOR_EMAILS_ENABLED=false", async () => {
@@ -145,7 +145,7 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
     });
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0];
     expect(call.to).toEqual(["noah@strelva.com", "jacob@strelva.com"]);
     expect(call.subject).toBe("New paying signup: Rohlax Wellness");
     for (const value of ["New paying signup", "Rohlax Wellness", "Growth", "chelsea@example.com", "$199/mo", "Operator notification", "https://strelva.com/admin/tenants/rohlax"]) {
@@ -164,7 +164,7 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
     });
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0];
     expect(call.to).toEqual(["jacob@strelva.com"]);
     expect(call.subject).toBe("Payment failed: Rohlax Wellness");
     for (const value of ["Payment failed: Rohlax Wellness", "chelsea@example.com", "Operator notification", "https://strelva.com/admin/tenants/rohlax"]) {
@@ -232,7 +232,7 @@ describe("prospect email switch (PROSPECT_EMAILS_ENABLED)", () => {
     });
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(sendMock.mock.calls[0][0].to).toBe("dana@acme.example.com");
+    expect(sendMock.mock.calls[0]![0].to).toBe("dana@acme.example.com");
   });
 
   it("sendAuditReportEmail is silenced ONLY by PROSPECT_EMAILS_ENABLED=false", async () => {

@@ -294,9 +294,10 @@ export async function buildAgentSystemPrompt(
     const sorted = Object.entries(serviceClicks)
       .map(([key, data]) => ({ name: key.replace("service-click:", ""), ...data }))
       .sort((left, right) => right.thisWeek - left.thisWeek);
-    if (sorted[0]?.thisWeek > 0) {
+    const topService = sorted[0];
+    if (topService && topService.thisWeek > 0) {
       sectionSummaries.push(
-        `SERVICE POPULARITY:\n- Most clicked: ${sorted[0].name} (${sorted[0].thisWeek} clicks this week)`
+        `SERVICE POPULARITY:\n- Most clicked: ${topService.name} (${topService.thisWeek} clicks this week)`
       );
     }
   } catch {

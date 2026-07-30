@@ -24,8 +24,8 @@ describe("orders store", () => {
     await recordOrder("t1", { amountCents: 2499, currency: "USD", items: [{ name: "Dried Mango", quantity: 2 }], externalId: "o1" });
     const orders = await getOrders("t1");
     expect(orders).toHaveLength(1);
-    expect(orders[0].amountCents).toBe(2499);
-    expect(orders[0].itemCount).toBe(2);
+    expect(orders[0]!.amountCents).toBe(2499);
+    expect(orders[0]!.itemCount).toBe(2);
   });
 
   it("is idempotent on externalId — a retried beacon doesn't double-count", async () => {
@@ -41,7 +41,7 @@ describe("orders store", () => {
     vi.setSystemTime(clock);
     await recordOrder("t1", { amountCents: 200, currency: "USD", items: [], externalId: "second" });
     const orders = await getOrders("t1");
-    expect(orders[0].externalId).toBe("second");
+    expect(orders[0]!.externalId).toBe("second");
   });
 
   it("summarizes revenue, count, and best sellers", async () => {

@@ -108,7 +108,7 @@ describe("getDeliveryLeads", () => {
     const leads = await getDeliveryLeads();
 
     expect(leads.map((l) => l.businessName)).toEqual(["New Co", "Old Co"]);
-    expect(leads[0].email).toBe("new@x.com");
+    expect(leads[0]!.email).toBe("new@x.com");
   });
 
   it("degrades to [] when Redis is absent", async () => {

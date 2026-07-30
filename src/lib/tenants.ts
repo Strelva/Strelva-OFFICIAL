@@ -543,8 +543,8 @@ export async function updateTenant(
   const idx = tenants.findIndex((t) => t.id === id);
   if (idx === -1) return null;
 
-  tenants[idx] = { ...tenants[idx], ...updates, id };
+  tenants[idx] = { ...tenants[idx]!, ...updates, id };
   await fs.writeFile(DEV_TENANTS_PATH, JSON.stringify(tenants, null, 2));
   invalidateCache();
-  return tenants[idx];
+  return tenants[idx] ?? null;
 }

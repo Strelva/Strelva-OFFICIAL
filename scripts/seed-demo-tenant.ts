@@ -42,6 +42,7 @@ for (const path of [".env.local", ".env"]) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
     const [key, ...rest] = trimmed.split("=");
+    if (!key) continue;
     if (process.env[key]) continue;
     process.env[key] = rest.join("=").replace(/^['"]|['"]$/g, "");
   }
@@ -548,7 +549,7 @@ async function seedReviews(tenant: string): Promise<void> {
   const { addReview } = await import("../src/lib/reviews");
   let replied = 0;
   for (let i = 0; i < REVIEWS.length; i++) {
-    const r = REVIEWS[i];
+    const r = REVIEWS[i]!;
     const externalId = `seed-summit-${String(i + 1).padStart(2, "0")}`;
     await addReview(tenant, {
       source: r.source,
@@ -751,11 +752,11 @@ async function seedVisibility(tenant: string): Promise<void> {
     checkedAt: lastCheckedAt,
     estimatedMonthlyCostUsd: 0.02,
     serpResults: [
-      serpResult(VIS_QUERIES[0], 6, false, lastCheckedAt),
-      serpResult(VIS_QUERIES[2], 8, false, lastCheckedAt),
-      serpResult(VIS_QUERIES[3], null, false, lastCheckedAt),
+      serpResult(VIS_QUERIES[0]!, 6, false, lastCheckedAt),
+      serpResult(VIS_QUERIES[2]!, 8, false, lastCheckedAt),
+      serpResult(VIS_QUERIES[3]!, null, false, lastCheckedAt),
     ],
-    aiResults: VIS_QUERIES.map((q, i) => aiResult(q, lastMentions[i], lastCheckedAt)),
+    aiResults: VIS_QUERIES.map((q, i) => aiResult(q, lastMentions[i]!, lastCheckedAt)),
   };
 
   const thisSnapshot: VisibilitySnapshot = {
@@ -767,11 +768,11 @@ async function seedVisibility(tenant: string): Promise<void> {
     checkedAt: thisCheckedAt,
     estimatedMonthlyCostUsd: 0.02,
     serpResults: [
-      serpResult(VIS_QUERIES[0], 3, true, thisCheckedAt),
-      serpResult(VIS_QUERIES[2], 4, true, thisCheckedAt),
-      serpResult(VIS_QUERIES[3], 7, false, thisCheckedAt),
+      serpResult(VIS_QUERIES[0]!, 3, true, thisCheckedAt),
+      serpResult(VIS_QUERIES[2]!, 4, true, thisCheckedAt),
+      serpResult(VIS_QUERIES[3]!, 7, false, thisCheckedAt),
     ],
-    aiResults: VIS_QUERIES.map((q, i) => aiResult(q, thisMentions[i], thisCheckedAt)),
+    aiResults: VIS_QUERIES.map((q, i) => aiResult(q, thisMentions[i]!, thisCheckedAt)),
   };
 
   // Add last week's first so this week's is the most-recent snapshot on read.
@@ -797,7 +798,7 @@ async function seedHealth(tenant: string): Promise<void> {
   // Push oldest→newest so getScanHistory (which reverses) reads oldest→newest.
   for (const p of history) await pushScanHistory(tenant, p);
 
-  const latest = history[history.length - 1];
+  const latest = history[history.length - 1]!;
   const summary: ScanSummary = {
     url,
     scannedAt: latest.scannedAt,

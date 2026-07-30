@@ -60,7 +60,7 @@ describe("accounts store", () => {
 
     const all = await getAllAccounts();
     expect(all).toHaveLength(1);
-    expect(all[0].name).toBe("Andy Anderson");
+    expect(all[0]!.name).toBe("Andy Anderson");
 
     // reverse lookup resolves the owning account
     const owner = await getAccountForTenant("cocard-anderson");

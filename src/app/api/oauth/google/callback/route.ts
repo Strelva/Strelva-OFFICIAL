@@ -165,11 +165,11 @@ export async function GET(req: Request) {
     let locationId: string | undefined;
 
     if (accounts.length > 0) {
-      accountId = accounts[0].name; // e.g., "accounts/123"
+      accountId = accounts[0]!.name; // e.g., "accounts/123"
       const locations = await fetchLocations(tokens.access_token, accountId);
       if (locations.length > 0) {
         // Extract location ID from full name "accounts/123/locations/456"
-        const parts = locations[0].name.split("/locations/");
+        const parts = locations[0]!.name.split("/locations/");
         locationId = parts[1];
       }
     }

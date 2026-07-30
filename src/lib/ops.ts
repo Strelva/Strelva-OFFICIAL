@@ -188,13 +188,13 @@ export async function buildOpsReport(): Promise<OpsReport> {
   // mapPool preserves input order, so perTenantResults[i] corresponds to active[i].
   const domainDrift: DomainDriftItem[] = [];
   for (let i = 0; i < active.length; i++) {
-    const r = perTenantResults[i];
+    const r = perTenantResults[i]!;
     if (r.staleSms) {
       metrics.staleSmsApprovals++;
       metrics.staleSmsItems!.push(r.staleSms);
     }
     if (r.pendingCount > 0) {
-      metrics.pendingEvents[active[i].id] = r.pendingCount;
+      metrics.pendingEvents[active[i]!.id] = r.pendingCount;
       metrics.totalPendingEvents += r.pendingCount;
     }
     metrics.failedAiWrites += r.failedWrites.length;

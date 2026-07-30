@@ -30,8 +30,8 @@ describe("leads store", () => {
     await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?", source: "contact-form" });
     const leads = await getLeads("t1");
     expect(leads).toHaveLength(1);
-    expect(leads[0].name).toBe("Sarah Chen");
-    expect(leads[0].message).toBe("Saturday?");
+    expect(leads[0]!.name).toBe("Sarah Chen");
+    expect(leads[0]!.message).toBe("Saturday?");
   });
 
   it("dedupes a double-submit of the same submission", async () => {
@@ -54,13 +54,13 @@ describe("leads store", () => {
     await recordLead("t1", { name: "B", message: "2" });
     const s = await getLeadSummary("t1", 30);
     expect(s.count).toBe(2);
-    expect(s.recent[0].name).toBe("B"); // newest first
+    expect(s.recent[0]!.name).toBe("B"); // newest first
   });
 
   it("emails the owner when a genuinely new lead comes in", async () => {
     await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?", source: "contact-form" });
     expect(mockSendNewLeadEmail).toHaveBeenCalledTimes(1);
-    const arg = mockSendNewLeadEmail.mock.calls[0][0];
+    const arg = mockSendNewLeadEmail.mock.calls[0]![0];
     expect(arg.email).toBe("owner@example.com");
     expect(arg.lead.name).toBe("Sarah Chen");
     expect(arg.lead.email).toBe("s@x.com");

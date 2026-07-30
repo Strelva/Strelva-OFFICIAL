@@ -321,6 +321,6 @@ describe("extractVerificationData", () => {
       weekEnd
     );
 
-    expect(verifiedChanges[0].section).toBe("story");
+    expect(verifiedChanges[0]?.section).toBe("story");
   });
 });
