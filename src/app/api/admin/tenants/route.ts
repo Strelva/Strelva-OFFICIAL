@@ -187,6 +187,9 @@ export async function PATCH(req: Request) {
       // JSON columns (reviewsConfig / visibility) the UI sends the FULL object,
       // so a save REPLACES the stored value — intentional.
       industry: z.string().max(120),
+      // Operator-editable AI persona + rules (feed the agent system prompt).
+      personality: z.string().max(4000),
+      businessRules: z.string().max(4000),
       autoPublish: z.boolean(),
       autoApproveThreshold: z.number().int().min(0).max(50).nullable(),
       reviewsConfig: z

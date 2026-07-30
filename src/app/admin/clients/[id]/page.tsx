@@ -311,6 +311,11 @@ export default async function ClientDetailPage({
             revalidateUrl: tenant.revalidateUrl ?? "",
             hasRevalidationSecret: Boolean(tenant.revalidationSecret),
             features: tenant.features ?? [],
+            siteUrl: tenant.siteUrl ?? "",
+            industry: tenant.industry ?? "",
+            personality: tenant.personality ?? "",
+            businessRules: tenant.businessRules ?? "",
+            capabilityManifestUrl: tenant.customRepo?.capabilityManifestUrl ?? "",
           }}
         />
         <OperatorControlsPanel

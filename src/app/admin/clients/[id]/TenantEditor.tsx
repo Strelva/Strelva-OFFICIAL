@@ -22,6 +22,12 @@ interface EditableTenant {
   hasRevalidationSecret: boolean;
   /** Enabled dashboard features (see src/lib/features/registry.ts). */
   features: string[];
+  siteUrl: string;
+  industry: string;
+  personality: string;
+  businessRules: string;
+  /** customRepo.capabilityManifestUrl — saved via its own SSRF-guarded route. */
+  capabilityManifestUrl: string;
 }
 
 interface TenantMember {
@@ -114,6 +120,10 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
           adminDomain: form.adminDomain || undefined,
           active: form.active,
           features: form.features,
+          siteUrl: form.siteUrl,
+          industry: form.industry,
+          personality: form.personality,
+          businessRules: form.businessRules,
         }),
       });
       const data = await res.json();
@@ -124,6 +134,28 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  const [manifestSaving, setManifestSaving] = useState(false);
+  const [manifestNote, setManifestNote] = useState<string | null>(null);
+  async function saveManifest() {
+    setManifestNote(null);
+    setManifestSaving(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${form.id}/capability-manifest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ capabilityManifestUrl: form.capabilityManifestUrl.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setManifestNote("Saved");
+      setTimeout(() => setManifestNote(null), 2000);
+    } catch (err) {
+      setManifestNote(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setManifestSaving(false);
     }
   }
 
@@ -266,6 +298,28 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         <Field label="Booking URL" value={form.bookingUrl} onChange={(v) => setForm({ ...form, bookingUrl: v })} placeholder="https://…" />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
         <Field label="Admin domain" value={form.adminDomain} onChange={(v) => setForm({ ...form, adminDomain: v })} />
+        <Field label="Site URL" value={form.siteUrl} onChange={(v) => setForm({ ...form, siteUrl: v })} placeholder="https://client-site.com" hint="Used for audits + reports." />
+        <Field label="Industry" value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="HVAC, wellness, restaurant…" hint="Drives visibility probes + AI context." />
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs text-gray-faint">AI persona (how Strelva sounds for this client)</label>
+          <textarea
+            value={form.personality}
+            onChange={(e) => setForm({ ...form, personality: e.target.value })}
+            rows={2}
+            placeholder="Warm, concise, local."
+            className="w-full rounded-md border border-glass-border bg-gray-bg px-2.5 py-1.5 text-sm text-warm-white placeholder:text-gray-faint"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs text-gray-faint">Business rules (hard facts + guardrails the AI must follow)</label>
+          <textarea
+            value={form.businessRules}
+            onChange={(e) => setForm({ ...form, businessRules: e.target.value })}
+            rows={3}
+            placeholder="Never quote prices. Hours are 9–5 Mon–Fri. Always mention free estimates."
+            className="w-full rounded-md border border-glass-border bg-gray-bg px-2.5 py-1.5 text-sm text-warm-white placeholder:text-gray-faint"
+          />
+        </div>
         <div className="space-y-1.5">
           <label className="flex items-center gap-2 text-sm text-gray-muted">
             <input
@@ -450,6 +504,26 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         >
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
         </button>
+
+        <div className="border-t border-glass-border/50 pt-4">
+          <Field
+            label="Capability manifest URL"
+            value={form.capabilityManifestUrl}
+            onChange={(v) => setForm({ ...form, capabilityManifestUrl: v })}
+            placeholder="https://client-site.com/api/capabilities"
+            hint="The published manifest of sections the AI may edit. Saved separately (SSRF-checked). Leave blank to clear."
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              onClick={() => void saveManifest()}
+              disabled={manifestSaving}
+              className="rounded-md border border-glass-border px-3 py-1.5 text-xs text-warm-white hover:bg-gray-bg disabled:opacity-40"
+            >
+              {manifestSaving ? "Saving…" : "Save manifest"}
+            </button>
+            {manifestNote && <span className="text-xs text-gray-muted">{manifestNote}</span>}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3 self-start">
